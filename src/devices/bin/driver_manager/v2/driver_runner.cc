@@ -47,6 +47,7 @@ namespace {
 
 constexpr uint32_t kTokenId = PA_HND(PA_USER0, 0);
 constexpr auto kBootScheme = "fuchsia-boot://";
+constexpr std::string_view kRootDeviceName = "dev";
 
 template <typename R, typename F>
 std::optional<R> VisitOffer(fdecl::wire::Offer& offer, F apply) {
@@ -159,7 +160,7 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       driver_index_(std::move(driver_index), dispatcher),
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
-      root_node_(std::make_shared<Node>("root", std::vector<Node*>{}, this, dispatcher)),
+      root_node_(std::make_shared<Node>(kRootDeviceName, std::vector<Node*>{}, this, dispatcher)),
       composite_device_manager_(this, dispatcher, [this]() { this->TryBindAllOrphansUntracked(); }),
       composite_node_manager_(dispatcher_, this),
       node_group_manager_(this) {
@@ -233,7 +234,7 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
   auto orphans = inspector.GetRoot().CreateChild("orphan_nodes");
   for (size_t i = 0; i < orphaned_nodes_.size(); i++) {
     if (auto node = orphaned_nodes_[i].lock()) {
-      orphans.RecordString(std::to_string(i), node->TopoName());
+      orphans.RecordString(std::to_string(i), node->MakeComponentMoniker());
     }
   }
 
@@ -332,7 +333,7 @@ zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
     collection = Collection::kUniversePackage;
   }
   node.set_collection(collection);
-  auto create = CreateComponent(node.TopoName(), collection, std::string(url),
+  auto create = CreateComponent(node.MakeComponentMoniker(), collection, std::string(url),
                                 {.node = &node, .token = std::move(token)});
   if (create.is_error()) {
     return create.take_error();
@@ -415,7 +416,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
 
     if (!result.ok()) {
       orphaned();
-      LOGF(ERROR, "Failed to call match Node '%s': %s", node.name().data(),
+      LOGF(ERROR, "Failed to call match Node '%s': %s", node.name().c_str(),
            result.error().FormatDescription().data());
       return;
     }
@@ -428,7 +429,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       // not found errors get very noisy.
       zx_status_t match_error = result->error_value();
       if (!result_tracker || match_error != ZX_ERR_NOT_FOUND) {
-        LOGF(WARNING, "Failed to match Node '%s': %s", driver_node->name().data(),
+        LOGF(WARNING, "Failed to match Node '%s': %s", driver_node->name().c_str(),
              zx_status_get_string(match_error));
       }
 
@@ -442,7 +443,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       LOGF(WARNING,
            "Failed to match Node '%s', the MatchedDriver is not a normal/composite"
            "driver or a node group node.",
-           driver_node->name().data());
+           driver_node->name().c_str());
       return;
     }
 
@@ -452,7 +453,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       LOGF(WARNING,
            "Failed to match Node '%s', the MatchedDriver is missing driver info for a composite "
            "driver.",
-           driver_node->name().data());
+           driver_node->name().c_str());
       return;
     }
 
@@ -462,7 +463,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       LOGF(WARNING,
            "Failed to match Node '%s', the MatchedDriver is missing node groups for a device "
            "group node.",
-           driver_node->name().data());
+           driver_node->name().c_str());
       return;
     }
 
@@ -491,7 +492,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       if (result.is_error()) {
         orphaned();
         LOGF(ERROR, "Failed to bind node '%s' to any of the matched node group nodes.",
-             driver_node->name().data());
+             driver_node->name().c_str());
         return;
       }
 
@@ -516,7 +517,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
     if (!driver_info.has_url()) {
       orphaned();
       LOGF(ERROR, "Failed to match Node '%s', the driver URL is missing",
-           driver_node->name().data());
+           driver_node->name().c_str());
       return;
     }
 
@@ -525,7 +526,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
     auto start_result = StartDriver(*driver_node, driver_info.url().get(), pkg_type);
     if (start_result.is_error()) {
       orphaned();
-      LOGF(ERROR, "Failed to start driver '%s': %s", driver_node->name().data(),
+      LOGF(ERROR, "Failed to start driver '%s': %s", driver_node->name().c_str(),
            zx_status_get_string(start_result.error_value()));
       return;
     }
@@ -533,7 +534,8 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
     driver_node->OnBind();
     report_no_bind.cancel();
     if (result_tracker) {
-      result_tracker->ReportSuccessfulBind(driver_node->TopoName(), driver_info.url().get());
+      result_tracker->ReportSuccessfulBind(driver_node->MakeComponentMoniker(),
+                                           driver_info.url().get());
     }
   };
   fidl::Arena<> arena;

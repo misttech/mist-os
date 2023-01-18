@@ -490,7 +490,7 @@ async fn test_get_device_info_no_filter_dfv2() -> Result<()> {
     assert_eq!(device_nodes.len(), 1);
 
     let root = &device_nodes[0];
-    assert_eq!(root.info.moniker.as_ref().expect("DFv2 node missing moniker"), "root");
+    assert_eq!(root.info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev");
     assert!(root.info.bound_driver_libname.is_none(), "DFv2 node specified bound driver libname");
     assert_eq!(
         root.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
@@ -502,7 +502,7 @@ async fn test_get_device_info_no_filter_dfv2() -> Result<()> {
     assert_eq!(root.child_nodes.len(), 1);
 
     let sys = &root.child_nodes[0];
-    assert_eq!(sys.info.moniker.as_ref().expect("DFv2 node missing moniker"), "root.sys");
+    assert_eq!(sys.info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev.sys");
     assert!(sys.info.bound_driver_libname.is_none(), "DFv2 node specified bound driver libname");
     assert_eq!(
         sys.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
@@ -516,7 +516,7 @@ async fn test_get_device_info_no_filter_dfv2() -> Result<()> {
     assert_eq!(sys.child_nodes.len(), 1);
 
     let test = &sys.child_nodes[0];
-    assert_eq!(test.info.moniker.as_ref().expect("DFv2 node missing moniker"), "root.sys.test");
+    assert_eq!(test.info.moniker.as_ref().expect("DFv2 node missing moniker"), "dev.sys.test");
     assert!(test.info.bound_driver_libname.is_none(), "DFv2 node specified bound driver libname");
     assert_eq!(
         test.info.bound_driver_url.as_ref().expect("DFv2 node missing driver URL"),
@@ -531,7 +531,7 @@ async fn test_get_device_info_no_filter_dfv2() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_device_info_with_filter_dfv2() -> Result<()> {
-    const DEVICE_FILTER: [&str; 1] = ["root.sys.test"];
+    const DEVICE_FILTER: [&str; 1] = ["dev.sys.test"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
     let device_infos =
@@ -543,7 +543,7 @@ async fn test_get_device_info_with_filter_dfv2() -> Result<()> {
     let root_sys_test = &device_nodes[0];
     assert_eq!(
         root_sys_test.info.moniker.as_ref().expect("DFv2 node missing moniker"),
-        "root.sys.test"
+        "dev.sys.test"
     );
     assert!(
         root_sys_test.info.bound_driver_libname.is_none(),
@@ -563,7 +563,7 @@ async fn test_get_device_info_with_filter_dfv2() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_device_info_with_duplicate_filter_dfv2() -> Result<()> {
-    const DEVICE_FILTER: [&str; 2] = ["root.sys.test", "root.sys.test"];
+    const DEVICE_FILTER: [&str; 2] = ["dev.sys.test", "dev.sys.test"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
     let device_infos =
@@ -575,7 +575,7 @@ async fn test_get_device_info_with_duplicate_filter_dfv2() -> Result<()> {
     let root_sys_test = &device_nodes[0];
     assert_eq!(
         root_sys_test.info.moniker.as_ref().expect("DFv2 node missing moniker"),
-        "root.sys.test"
+        "dev.sys.test"
     );
     assert!(
         root_sys_test.info.bound_driver_libname.is_none(),
@@ -595,7 +595,7 @@ async fn test_get_device_info_with_duplicate_filter_dfv2() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_device_info_with_incomplete_filter_dfv2() -> Result<()> {
-    const DEVICE_FILTER: [&str; 1] = ["root.sys.te"];
+    const DEVICE_FILTER: [&str; 1] = ["dev.sys.te"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm(true).await?;
     let device_infos =

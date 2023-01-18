@@ -130,10 +130,20 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   bool IsComposite() const;
 
+  // Creates the node's topological path by combining each primary parent's name together,
+  // separated by '/'.
+  // E.g: dev/sys/topo/path
+  std::string MakeTopologicalPath() const;
+
+  // Make the node's component moniker by making the topological path and then replacing
+  // characters not allowed by the component framework.
+  // E.g: dev.sys.topo.path
+  std::string MakeComponentMoniker() const;
+
   // Exposed for testing.
   Node* GetPrimaryParent() const;
 
-  const std::string& name() const;
+  const std::string& name() const { return name_; }
   const DriverHost* driver_host() const { return *driver_host_; }
   const std::string& driver_url() const;
   const std::vector<Node*>& parents() const;
@@ -150,8 +160,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void set_symbols(std::vector<fuchsia_driver_framework::wire::NodeSymbol> symbols) {
     symbols_ = std::move(symbols);
   }
-
-  std::string TopoName() const;
 
  private:
   struct DriverComponent {
@@ -187,12 +195,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Close the component connection to signal to CF that the component has stopped.
   void StopComponent();
 
-  // The node's original name. This should be used for exporting to devfs.
-  // TODO(fxbug.dev/111156): Migrate driver names to only use CF valid characters and simplify
-  //  this logic.
-  std::string devfs_name_;
-  // The node's name which is valid for CF.
-  // This has been transformed from the original name, ":" and "/" have been replaced.
   std::string name_;
 
   // If this is a composite device, this stores the list of each parent's names.

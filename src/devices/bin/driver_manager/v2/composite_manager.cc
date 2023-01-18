@@ -121,7 +121,8 @@ void CompositeNodeManager::Inspect(inspect::Node& root) const {
     for (uint32_t i = 0; i < parent_set.size(); i++) {
       auto& node = parent_set.get(i);
       if (auto real = node.lock()) {
-        child.RecordString(std::string("parent-").append(std::to_string(i)), real->TopoName());
+        child.RecordString(std::string("parent-").append(std::to_string(i)),
+                           real->MakeComponentMoniker());
       } else {
         child.RecordString(std::string("parent-").append(std::to_string(i)), "<empty>");
       }

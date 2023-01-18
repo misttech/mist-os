@@ -81,7 +81,7 @@ bool CompositeDeviceFragment::BindNode(std::shared_ptr<Node> node) {
 void CompositeDeviceFragment::Inspect(inspect::Node& root) const {
   std::string moniker = "<unbound>";
   if (auto node = bound_node_.lock()) {
-    moniker = node->TopoName();
+    moniker = node->MakeComponentMoniker();
   }
 
   root.RecordString(name_, moniker);
@@ -166,7 +166,7 @@ bool CompositeDeviceAssembler::BindNode(std::shared_ptr<Node> node) {
     if (fragment.BindNode(node)) {
       matched = true;
       LOGF(INFO, "Found a match for composite device '%s': fragment %s: device '%s'", name_.c_str(),
-           std::string(fragment.name()).c_str(), node->TopoName().c_str());
+           std::string(fragment.name()).c_str(), node->MakeComponentMoniker().c_str());
       break;
     }
   }
@@ -200,7 +200,7 @@ void CompositeDeviceAssembler::TryToAssemble() {
     return;
   }
 
-  LOGF(INFO, "Built composite device at '%s'", node->TopoName().c_str());
+  LOGF(INFO, "Built composite device at '%s'", node->MakeComponentMoniker().c_str());
 
   // Bind the node we just created.
   node_manager_->Bind(*node.value(), nullptr);

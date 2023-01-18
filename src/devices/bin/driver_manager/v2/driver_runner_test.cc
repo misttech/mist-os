@@ -403,12 +403,12 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     realm().SetCreateChildHandler(
         [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
           EXPECT_EQ("boot-drivers", collection.name);
-          EXPECT_EQ("root", decl.name());
+          EXPECT_EQ("dev", decl.name());
           EXPECT_EQ("fuchsia-boot:///#meta/root-driver.cm", decl.url());
         });
     realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
       EXPECT_EQ("boot-drivers", child.collection);
-      EXPECT_EQ("root", child.name);
+      EXPECT_EQ("dev", child.name);
       driver_dir_.Bind(std::move(exposed_dir));
     });
     auto start = driver_runner.StartRootDriver(url);
@@ -604,40 +604,6 @@ TEST_F(DriverRunnerTest, StartRootDriver_RemoveOwnedChild) {
   node_controller->Remove();
   EXPECT_TRUE(RunLoopUntilIdle());
   EXPECT_FALSE(second_node.is_bound());
-  ASSERT_NE(nullptr, root_test_driver);
-  EXPECT_TRUE(root_test_driver->node().is_bound());
-
-  StopDriverComponent(std::move(root_driver.value()));
-}
-
-// Start the root driver, and add a child node with an invalid name.
-TEST_F(DriverRunnerTest, StartRootDriver_AddOwnedChild_InvalidName) {
-  auto driver_index = CreateDriverIndex();
-  auto driver_index_client = driver_index.Connect();
-  ASSERT_EQ(ZX_OK, driver_index_client.status_value());
-  DriverRunner driver_runner(ConnectToRealm(), std::move(*driver_index_client), inspector(),
-                             &LoaderFactory, dispatcher());
-  auto defer = fit::defer([this] { Unbind(); });
-
-  TestDriver* root_test_driver = nullptr;
-  fdf::NodePtr invalid_node;
-  driver_host().SetStartHandler(
-      [this, &root_test_driver, &invalid_node](fdf::DriverStartArgs start_args, auto request) {
-        fdf::NodePtr root_node;
-        EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
-
-        fdf::NodeAddArgs args;
-        args.set_name("second.invalid");
-        fdf::NodeControllerPtr node_controller;
-        root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()),
-                            invalid_node.NewRequest(dispatcher()),
-                            [](auto result) { EXPECT_TRUE(result.is_err()); });
-        root_test_driver = BindDriver(std::move(request), std::move(root_node));
-      });
-  auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
-  ASSERT_EQ(ZX_OK, root_driver.status_value());
-
-  EXPECT_FALSE(invalid_node.is_bound());
   ASSERT_NE(nullptr, root_test_driver);
   EXPECT_TRUE(root_test_driver->node().is_bound());
 
@@ -877,7 +843,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
         realm().SetCreateChildHandler([](fdecl::CollectionRef collection, fdecl::Child decl,
                                          std::vector<fdecl::Offer> offers) {
           EXPECT_EQ("boot-drivers", collection.name);
-          EXPECT_EQ("root.second", decl.name());
+          EXPECT_EQ("dev.second", decl.name());
           EXPECT_EQ("fuchsia-boot:///#meta/second-driver.cm", decl.url());
 
           EXPECT_EQ(1u, offers.size());
@@ -887,7 +853,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
           ASSERT_TRUE(protocol.has_source());
           ASSERT_TRUE(protocol.source().is_child());
           auto& source_ref = protocol.source().child();
-          EXPECT_EQ("root", source_ref.name);
+          EXPECT_EQ("dev", source_ref.name);
           EXPECT_EQ("boot-drivers", source_ref.collection.value_or("missing"));
 
           ASSERT_TRUE(protocol.has_source_name());
@@ -898,7 +864,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
         });
         realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
           EXPECT_EQ("boot-drivers", child.collection);
-          EXPECT_EQ("root.second", child.name);
+          EXPECT_EQ("dev.second", child.name);
           driver_dir().Bind(std::move(exposed_dir));
         });
 
@@ -965,12 +931,12 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
         realm().SetCreateChildHandler(
             [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
               EXPECT_EQ("boot-drivers", collection.name);
-              EXPECT_EQ("root.second", decl.name());
+              EXPECT_EQ("dev.second", decl.name());
               EXPECT_EQ("fuchsia-boot:///#meta/second-driver.cm", decl.url());
             });
         realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
           EXPECT_EQ("boot-drivers", child.collection);
-          EXPECT_EQ("root.second", child.name);
+          EXPECT_EQ("dev.second", child.name);
           driver_dir().Bind(std::move(exposed_dir));
         });
 
@@ -1056,12 +1022,12 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
         realm().SetCreateChildHandler(
             [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
               EXPECT_EQ("boot-drivers", collection.name);
-              EXPECT_EQ("root.second", decl.name());
+              EXPECT_EQ("dev.second", decl.name());
               EXPECT_EQ("fuchsia-boot:///#meta/second-driver.cm", decl.url());
             });
         realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
           EXPECT_EQ("boot-drivers", child.collection);
-          EXPECT_EQ("root.second", child.name);
+          EXPECT_EQ("dev.second", child.name);
           driver_dir().Bind(std::move(exposed_dir));
         });
 
@@ -1186,12 +1152,12 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
   realm().SetCreateChildHandler(
       [](fdecl::CollectionRef collection, fdecl::Child decl, auto offers) {
         EXPECT_EQ("boot-drivers", collection.name);
-        EXPECT_EQ("root.second", decl.name());
+        EXPECT_EQ("dev.second", decl.name());
         EXPECT_EQ("fuchsia-boot:///#meta/second-driver.cm", decl.url());
       });
   realm().SetOpenExposedDirHandler([this](fdecl::ChildRef child, auto exposed_dir) {
     EXPECT_EQ("boot-drivers", child.collection);
-    EXPECT_EQ("root.second", child.name);
+    EXPECT_EQ("dev.second", child.name);
     driver_dir().Bind(std::move(exposed_dir));
   });
 
@@ -1825,11 +1791,11 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
   auto hierarchy = Inspect(driver_runner);
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"node_topology"},
-                                                   .child_names = {"root"},
+                                                   .child_names = {"dev"},
                                                }));
 
   ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "root"},
+      CheckNode(hierarchy, {.node_name = {"node_topology", "dev"},
                             .child_names = {"dev-group-0", "dev-group-1"},
                             .str_properties = {
                                 {"driver", "fuchsia-boot:///#meta/root-driver.cm"},
@@ -1837,14 +1803,14 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(
       hierarchy,
-      {.node_name = {"node_topology", "root", "dev-group-0"}, .child_names = {"test-composite"}}));
+      {.node_name = {"node_topology", "dev", "dev-group-0"}, .child_names = {"test-composite"}}));
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(
       hierarchy,
-      {.node_name = {"node_topology", "root", "dev-group-1"}, .child_names = {"test-composite"}}));
+      {.node_name = {"node_topology", "dev", "dev-group-1"}, .child_names = {"test-composite"}}));
 
   ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "root", "dev-group-0", "test-composite"},
+      CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "dev-group-0", "test-composite"},
                             .str_properties = {
                                 {"driver", "fuchsia-boot:///#meta/composite-driver.cm"},
                             }}));
@@ -1898,18 +1864,18 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"node_topology"},
-                                                   .child_names = {"root"},
+                                                   .child_names = {"dev"},
                                                }));
 
   ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "root"},
+      CheckNode(hierarchy, {.node_name = {"node_topology", "dev"},
                             .child_names = {"second"},
                             .str_properties = {
                                 {"driver", "fuchsia-boot:///#meta/root-driver.cm"},
                             }}));
 
   ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "root", "second"},
+      CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "second"},
                             .child_names = {},
                             .str_properties = {
                                 {"offers", "fuchsia.package.RenamedA, fuchsia.package.RenamedB"},
@@ -1995,33 +1961,33 @@ TEST_F(DriverRunnerTest, StartAndInspect_CompositeDriver) {
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
                                                    .node_name = {"node_topology"},
-                                                   .child_names = {"root"},
+                                                   .child_names = {"dev"},
                                                }));
 
   ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "root"},
+      CheckNode(hierarchy, {.node_name = {"node_topology", "dev"},
                             .child_names = {"part-1", "part-2"},
                             .str_properties = {
                                 {"driver", "fuchsia-boot:///#meta/root-driver.cm"},
                             }}));
 
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {.node_name = {"node_topology", "root", "part-1"},
+  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "part-1"},
                                                 .child_names = {"my-composite"},
                                                 .str_properties = {
                                                     {"offers", "fuchsia.package.RenamedA"},
                                                     {"driver", "unbound"},
                                                 }}));
 
-  ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "root", "part-1", "my-composite"},
-                            .child_names = {"child"}}));
+  ASSERT_NO_FATAL_FAILURE(CheckNode(
+      hierarchy,
+      {.node_name = {"node_topology", "dev", "part-1", "my-composite"}, .child_names = {"child"}}));
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(
       hierarchy, {
-                     .node_name = {"node_topology", "root", "part-1", "my-composite", "child"},
+                     .node_name = {"node_topology", "dev", "part-1", "my-composite", "child"},
                  }));
 
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {.node_name = {"node_topology", "root", "part-2"},
+  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "part-2"},
                                                 .child_names = {"my-composite"},
                                                 .str_properties = {
                                                     {"offers", "fuchsia.package.RenamedB"},

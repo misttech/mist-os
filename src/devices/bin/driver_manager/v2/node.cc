@@ -41,14 +41,6 @@ const char* State2String(NodeState state) {
   }
 }
 
-// The driver's component name is based on the node name, which means that the
-// node name cam only have [a-z0-9-_.] characters. DFv1 composites contain ':'
-// which is not allowed, so replace those characters.
-void TransformToValidName(std::string& name) {
-  std::replace(name.begin(), name.end(), ':', '_');
-  std::replace(name.begin(), name.end(), '/', '.');
-}
-
 template <typename R, typename F>
 std::optional<R> VisitOffer(fdecl::wire::Offer& offer, F apply) {
   // Note, we access each field of the union as mutable, so that `apply` can
@@ -277,14 +269,12 @@ void BindResultTracker::Complete(size_t current) {
 
 Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
            async_dispatcher_t* dispatcher, uint32_t primary_index)
-    : devfs_name_(name),
-      name_(name),
+    : name_(name),
       parents_(std::move(parents)),
       primary_index_(primary_index),
       node_manager_(node_manager),
       dispatcher_(dispatcher) {
   ZX_ASSERT(primary_index_ == 0 || primary_index_ < parents_.size());
-  TransformToValidName(name_);
   if (auto primary_parent = GetPrimaryParent()) {
     // By default, we set `driver_host_` to match the primary parent's
     // `driver_host_`. If the node is then subsequently bound to a driver in a
@@ -295,14 +285,11 @@ Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_
 
 Node::Node(std::string_view name, std::vector<Node*> parents, NodeManager* node_manager,
            async_dispatcher_t* dispatcher, DriverHost* driver_host)
-    : devfs_name_(name),
-      name_(name),
+    : name_(name),
       parents_(std::move(parents)),
       node_manager_(node_manager),
       dispatcher_(dispatcher),
-      driver_host_(driver_host) {
-  TransformToValidName(name_);
-}
+      driver_host_(driver_host) {}
 
 zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     std::string_view node_name, std::vector<Node*> parents, std::vector<std::string> parents_names,
@@ -361,8 +348,6 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
 
 Node::~Node() { UnbindAndReset(controller_ref_); }
 
-const std::string& Node::name() const { return name_; }
-
 const std::string& Node::driver_url() const {
   if (driver_component_) {
     return driver_component_->driver_url;
@@ -390,12 +375,24 @@ const std::vector<fdf::wire::NodeProperty>& Node::properties() const { return pr
 
 void Node::set_collection(Collection collection) { collection_ = collection; }
 
-std::string Node::TopoName() const {
+std::string Node::MakeTopologicalPath() const {
   std::deque<std::string_view> names;
   for (auto node = this; node != nullptr; node = node->GetPrimaryParent()) {
     names.push_front(node->name());
   }
-  return fxl::JoinStrings(names, ".");
+  return fxl::JoinStrings(names, "/");
+}
+
+std::string Node::MakeComponentMoniker() const {
+  std::string topo_path = MakeTopologicalPath();
+
+  // The driver's component name is based on the node name, which means that the
+  // node name cam only have [a-z0-9-_.] characters. DFv1 composites contain ':'
+  // which is not allowed, so replace those characters.
+  // TODO(fxbug.dev/111156): Migrate driver names to only use CF valid characters.
+  std::replace(topo_path.begin(), topo_path.end(), ':', '_');
+  std::replace(topo_path.begin(), topo_path.end(), '/', '.');
+  return topo_path;
 }
 
 fuchsia_driver_index::wire::MatchDriverArgs Node::CreateMatchArgs(fidl::AnyArena& arena) {
@@ -536,10 +533,10 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   // Removing kPkg, and state is Running
   if ((node_state_ != NodeState::kPrestop && node_state_ != NodeState::kRunning) ||
       (node_state_ == NodeState::kPrestop && removal_set == RemovalSet::kPackage)) {
-    LOGF(WARNING, "Node::Remove() %s called late, already in state %s", TopoName().c_str(),
-         State2String(node_state_));
+    LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
+         MakeComponentMoniker().c_str(), State2String(node_state_));
     if (should_register)
-      removal_tracker_->RegisterNode(this, collection_, TopoName(), node_state_);
+      removal_tracker_->RegisterNode(this, collection_, MakeComponentMoniker(), node_state_);
     return;
   }
 
@@ -559,7 +556,7 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   }
   // Either way, propagate removal message to children
   if (should_register) {
-    removal_tracker_->RegisterNode(this, collection_, TopoName(), node_state_);
+    removal_tracker_->RegisterNode(this, collection_, MakeComponentMoniker(), node_state_);
   }
 
   // Ask each of our children to remove themselves.
@@ -588,12 +585,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     LOGF(ERROR, "Failed to add Node, a name must be provided");
     return fit::as_error(fdf::wire::NodeError::kNameMissing);
   }
-  auto name = args.name().get();
-  if (name.find('.') != std::string_view::npos) {
-    LOGF(ERROR, "Failed to add Node '%.*s', name must not contain '.'",
-         static_cast<int>(name.size()), name.data());
-    return fit::as_error(fdf::wire::NodeError::kNameInvalid);
-  }
+  std::string_view name = args.name().get();
   for (auto& child : children_) {
     if (child->name() == name) {
       LOGF(ERROR, "Failed to add Node '%.*s', name already exists among siblings",
@@ -630,7 +622,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
       VisitOffer<bool>(offer, [&arena = child->arena_, source_node](auto& decl) mutable {
         // Assign the source of the offer.
         fdecl::wire::ChildRef source_ref{
-            .name = {arena, source_node->TopoName()},
+            .name = {arena, source_node->MakeComponentMoniker()},
             .collection = CollectionName(source_node->collection_),
         };
         decl.set_source(arena, fdecl::wire::Ref::WithChild(arena, source_ref));
@@ -746,9 +738,9 @@ zx::result<> Node::StartDriver(
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
-  auto start = (*driver_host_)
-                   ->Start(std::move(endpoints->client), devfs_name_, std::move(symbols),
-                           std::move(start_info));
+  auto start =
+      (*driver_host_)
+          ->Start(std::move(endpoints->client), name_, std::move(symbols), std::move(start_info));
   if (start.is_error()) {
     return zx::error(start.error_value());
   }

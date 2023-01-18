@@ -72,23 +72,6 @@ std::optional<fdf::wire::NodeProperty> fidl_offer_to_device_prop(fidl::AnyArena&
   return fdf::MakeProperty(arena, BIND_FIDL_PROTOCOL, value);
 }
 
-// Makes a valid name. This must be a valid component framework instance name.
-std::string MakeValidName(std::string_view name) {
-  std::string out;
-  out.reserve(name.size());
-  for (auto ch : name) {
-    switch (ch) {
-      case ':':
-      case '.':
-        out.push_back('_');
-        break;
-      default:
-        out.push_back(ch);
-    }
-  }
-  return out;
-}
-
 template <typename T>
 bool HasOp(const zx_protocol_device_t* ops, T member) {
   return ops != nullptr && ops->*member != nullptr;
@@ -427,10 +410,9 @@ zx_status_t Device::CreateNode() {
                            .address(reinterpret_cast<uint64_t>(ops_))
                            .Build());
 
-  auto valid_name = MakeValidName(name_);
   auto args =
       fdf::wire::NodeAddArgs::Builder(arena)
-          .name(fidl::StringView::FromExternal(valid_name))
+          .name(fidl::StringView::FromExternal(name_))
           .symbols(fidl::VectorView<fdf::wire::NodeSymbol>::FromExternal(symbols))
           .offers(fidl::VectorView<fcd::wire::Offer>::FromExternal(offers.data(), offers.size()))
           .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(properties_))

@@ -44,7 +44,7 @@ async fn test_driver_inspect() -> Result<()> {
     let node = device_watcher::recursive_wait_and_open_node(&dev, "sys/test/root-driver").await?;
 
     let moniker = format!(
-        "realm_builder\\:{}/driver_test_realm/boot-drivers\\:root.sys.test",
+        "realm_builder\\:{}/driver_test_realm/boot-drivers\\:dev.sys.test",
         instance.root.child_name()
     );
     // Check the inspect metrics.

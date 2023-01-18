@@ -65,7 +65,7 @@ async fn driver_runner_test() -> Result<(), anyhow::Error> {
     let events = vec![
         EventMatcher::ok().r#type(events::Started::TYPE).moniker_regex(r".*/driver_manager$"),
         EventMatcher::ok().r#type(events::Started::TYPE).moniker_regex(r".*/driver-index$"),
-        EventMatcher::ok().r#type(events::Started::TYPE).moniker_regex(r".*/pkg-drivers:root$"),
+        EventMatcher::ok().r#type(events::Started::TYPE).moniker_regex(r".*/pkg-drivers:dev$"),
         EventMatcher::ok()
             .r#type(events::Started::TYPE)
             .moniker_regex(r".*/driver-hosts:driver-host-0$"),

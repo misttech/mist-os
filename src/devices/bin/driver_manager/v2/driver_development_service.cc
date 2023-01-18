@@ -79,7 +79,7 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
     device_info.parent_ids(parent_ids);
   }
 
-  device_info.moniker(fidl::StringView(allocator, node->TopoName()));
+  device_info.moniker(fidl::StringView(allocator, node->MakeComponentMoniker()));
 
   device_info.bound_driver_url(fidl::StringView(allocator, node->driver_url()));
 
@@ -147,17 +147,17 @@ void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
       remaining_nodes.push(child.get());
     }
 
-    auto topological_name = node->TopoName();
+    std::string moniker = node->MakeComponentMoniker();
     if (!request->device_filter.empty()) {
       bool found = false;
       for (const auto& device_path : request->device_filter) {
         if (request->exact_match) {
-          if (topological_name == device_path.get()) {
+          if (moniker == device_path.get()) {
             found = true;
             break;
           }
         } else {
-          if (topological_name.find(device_path.get()) != std::string::npos) {
+          if (moniker.find(device_path.get()) != std::string::npos) {
             found = true;
             break;
           }
