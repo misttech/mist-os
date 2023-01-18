@@ -1207,8 +1207,7 @@ fn offer_target_mut(offer: &mut fdecl::Offer) -> Option<&mut Option<fdecl::Ref>>
         | fdecl::Offer::Directory(fdecl::OfferDirectory { target, .. })
         | fdecl::Offer::Storage(fdecl::OfferStorage { target, .. })
         | fdecl::Offer::Runner(fdecl::OfferRunner { target, .. })
-        | fdecl::Offer::Resolver(fdecl::OfferResolver { target, .. })
-        | fdecl::Offer::Event(fdecl::OfferEvent { target, .. }) => Some(target),
+        | fdecl::Offer::Resolver(fdecl::OfferResolver { target, .. }) => Some(target),
         fdecl::OfferUnknown!() => None,
     }
 }
@@ -1723,7 +1722,6 @@ impl ResolvedInstanceState {
                 | fdecl::Offer::Storage(fdecl::OfferStorage { target, .. })
                 | fdecl::Offer::Runner(fdecl::OfferRunner { target, .. })
                 | fdecl::Offer::Resolver(fdecl::OfferResolver { target, .. })
-                | fdecl::Offer::Event(fdecl::OfferEvent { target, .. })
                 | fdecl::Offer::EventStream(fdecl::OfferEventStream { target, .. }) => {
                     if target.is_some() {
                         return Err(ModelError::dynamic_offer_invalid(

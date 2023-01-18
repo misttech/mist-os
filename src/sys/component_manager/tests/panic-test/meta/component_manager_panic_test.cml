@@ -17,10 +17,6 @@
     ],
     use: [
         {
-            event: [ "stopped" ],
-            from: "framework",
-        },
-        {
             event_stream: "stopped",
             from: "parent",
         },

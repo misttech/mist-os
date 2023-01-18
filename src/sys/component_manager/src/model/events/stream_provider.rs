@@ -14,7 +14,7 @@ use {
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
     },
     async_trait::async_trait,
-    cm_rust::{ComponentDecl, UseDecl, UseEventStreamDeprecatedDecl},
+    cm_rust::{ComponentDecl, UseDecl},
     futures::lock::Mutex,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     std::{
@@ -110,7 +110,7 @@ impl EventStreamProvider {
         path: String,
     ) -> Result<(), ModelError> {
         let registry = self.registry.upgrade().ok_or(EventsError::RegistryNotFound)?;
-        let event_stream = registry.subscribe_v2(subscriber, vec![subscription]).await?;
+        let event_stream = registry.subscribe(subscriber, vec![subscription]).await?;
         let subscriber_moniker = subscriber.extended_moniker();
         let absolute_path = AbsolutePath { target_moniker: subscriber_moniker.clone(), path };
         let mut state = self.state.lock().await;
@@ -138,7 +138,7 @@ impl EventStreamProvider {
     /// Returns the server end of the event stream with provided `name` associated with
     /// the component with the provided `target_moniker`. This method returns None if such a stream
     /// does not exist or the channel has already been taken.
-    pub async fn take_v2_static_event_stream(
+    pub async fn take_static_event_stream(
         &self,
         target_moniker: &ExtendedMoniker,
         stream_name: String,
@@ -202,20 +202,10 @@ impl EventStreamProvider {
         // TODO(https://fxbug.dev/81980): Remove once fully migrated.
         // Note that a component can still use v1 and v2 events, and can get the v1
         // events as long as all the v2 events fail to route.
-        let (routed_v2, err) = match self.try_route_v2_events(target, decl).await {
-            Ok(routed) => (routed, None),
-            Err(error) => (false, Some(error)),
+        let err = match self.try_route_v2_events(target, decl).await {
+            Ok(_) => None,
+            Err(error) => Some(error),
         };
-        if !routed_v2 {
-            for use_decl in &decl.uses {
-                match use_decl {
-                    UseDecl::EventStreamDeprecated(UseEventStreamDeprecatedDecl { .. }) => {
-                        unreachable!("v1 events are now gone");
-                    }
-                    _ => {}
-                }
-            }
-        }
         if let Some(error) = err {
             return Err(error);
         }

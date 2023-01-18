@@ -17,7 +17,6 @@
         {
             protocol: [
                 "fuchsia.sys2.CrashIntrospect",
-                "fuchsia.sys2.EventSource",
                 "fuchsia.sys2.SystemController",
                 "fuchsia.time.Maintenance",
             ],
@@ -30,9 +29,6 @@
         },
         {
             resolver: "realm_builder_resolver",
-        },
-        {
-            event: "directory_ready",
         },
     ],
     realm_builder_resolver_and_runner: "namespace",

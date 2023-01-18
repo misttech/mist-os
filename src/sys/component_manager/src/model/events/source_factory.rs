@@ -8,9 +8,7 @@ use {
         model::{
             error::ModelError,
             events::{
-                registry::EventRegistry,
-                source::{EventSource, EventSourceV2},
-                stream_provider::EventStreamProvider,
+                registry::EventRegistry, source::EventSource, stream_provider::EventStreamProvider,
             },
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
@@ -19,14 +17,9 @@ use {
     ::routing::capability_source::InternalCapability,
     async_trait::async_trait,
     cm_rust::CapabilityName,
-    lazy_static::lazy_static,
     moniker::{AbsoluteMoniker, ExtendedMoniker},
     std::sync::{Arc, Weak},
 };
-
-lazy_static! {
-    pub static ref EVENT_SOURCE_SERVICE_NAME: CapabilityName = "fuchsia.sys2.EventSource".into();
-}
 
 /// Allows to create `EventSource`s and tracks all the created ones.
 pub struct EventSourceFactory {
@@ -64,19 +57,14 @@ impl EventSourceFactory {
         ]
     }
 
-    /// Creates an event source for an above-root subscriber.
-    pub async fn create_for_above_root(&self) -> Result<EventSource, ModelError> {
-        EventSource::new_for_above_root(
-            self.model.clone(),
-            self.event_registry.clone(),
-            self.event_stream_provider.clone(),
-        )
-        .await
-    }
-
     /// Creates a `EventSource` for the given `subscriber`.
-    pub async fn create(&self, subscriber: AbsoluteMoniker) -> Result<EventSource, ModelError> {
+    pub async fn create(
+        &self,
+        subscriber: AbsoluteMoniker,
+        name: CapabilityName,
+    ) -> Result<EventSource, ModelError> {
         EventSource::new(
+            name,
             ExtendedMoniker::ComponentInstance(subscriber),
             self.model.clone(),
             self.event_registry.clone(),
@@ -85,17 +73,15 @@ impl EventSourceFactory {
         .await
     }
 
-    /// Creates a `EventSource` for the given `subscriber`.
-    pub async fn create_v2(
-        &self,
-        subscriber: AbsoluteMoniker,
-        name: CapabilityName,
-    ) -> Result<EventSourceV2, ModelError> {
-        Ok(EventSourceV2::new(self.create(subscriber).await?, name))
-    }
-
-    pub async fn create_v2_for_above_root(&self) -> Result<EventSourceV2, ModelError> {
-        Ok(EventSourceV2::new(self.create_for_above_root().await?, CapabilityName::from("")))
+    pub async fn create_for_above_root(&self) -> Result<EventSource, ModelError> {
+        EventSource::new(
+            CapabilityName::from(""),
+            ExtendedMoniker::ComponentManager,
+            self.model.clone(),
+            self.event_registry.clone(),
+            self.event_stream_provider.clone(),
+        )
+        .await
     }
 
     /// Returns an EventSource. An EventSource holds an InstancedAbsoluteMoniker that
@@ -108,7 +94,7 @@ impl EventSourceFactory {
     ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
         match capability_decl {
             InternalCapability::EventStream(name) => {
-                let event_source = self.create_v2(target_moniker, name.clone()).await?;
+                let event_source = self.create(target_moniker, name.clone()).await?;
                 return Ok(Some(Box::new(event_source)));
             }
             _ => {}

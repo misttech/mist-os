@@ -270,7 +270,7 @@ async fn try_handle_get_next_request(
 /// Serves the event_stream_v2 protocol implemented for EventStream2RequestStream
 /// This is needed because we get the request stream directly as a stream from FDIO
 /// but as a ServerEnd from the hooks system.
-pub async fn serve_event_stream_v2_as_stream(
+pub async fn serve_event_stream_as_stream(
     mut event_stream: EventStream,
     mut stream: fcomponent::EventStreamRequestStream,
 ) {
@@ -291,12 +291,12 @@ pub async fn serve_event_stream_v2_as_stream(
 }
 
 /// Serves EventStream FIDL requests received over the provided stream.
-pub async fn serve_event_stream_v2(
+pub async fn serve_event_stream(
     event_stream: EventStream,
     server_end: ServerEnd<fcomponent::EventStreamMarker>,
 ) {
     let stream = server_end.into_stream().unwrap();
-    serve_event_stream_v2_as_stream(event_stream, stream).await;
+    serve_event_stream_as_stream(event_stream, stream).await;
 }
 
 async fn create_event_result(

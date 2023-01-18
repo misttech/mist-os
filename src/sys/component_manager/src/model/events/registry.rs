@@ -33,12 +33,6 @@ use {
     },
 };
 
-#[cfg(test)]
-use {
-    cm_rust::UseEventDecl,
-    routing::{route_capability, RouteRequest},
-};
-
 // TODO(https://fxbug.dev/61861): remove alias once the routing lib has a stable API.
 pub type EventSubscription = ::routing::event::EventSubscription;
 
@@ -163,7 +157,7 @@ impl EventRegistry {
     }
 
     /// Subscribes to events of a provided set of EventTypes.
-    pub async fn subscribe_v2(
+    pub async fn subscribe(
         &self,
         subscriber: &WeakExtendedInstance,
         subscriptions: Vec<EventSubscription>,
@@ -191,53 +185,6 @@ impl EventRegistry {
                 .collect(),
             ExtendedMoniker::ComponentInstance(target_moniker) => {
                 let route_result = self.route_events_v2(&target_moniker, &event_names).await?;
-                // Each target name that we routed, will have an associated scope. The number of
-                // scopes must be equal to the number of target names.
-                let total_scopes: usize =
-                    route_result.mapping.values().map(|state| state.scopes.len()).sum();
-                if total_scopes != event_names.len() {
-                    let names = event_names
-                        .into_iter()
-                        .filter(|event_name| !route_result.contains_event(&event_name))
-                        .collect();
-                    return Err(EventsError::not_available(names).into());
-                }
-                route_result.to_vec()
-            }
-        };
-
-        self.subscribe_with_routed_events(&subscriber, events).await
-    }
-
-    /// Subscribes to events of a provided set of EventTypes.
-    #[cfg(test)]
-    pub async fn subscribe(
-        &self,
-        subscriber: &WeakExtendedInstance,
-        subscriptions: Vec<EventSubscription>,
-    ) -> Result<EventStream, ModelError> {
-        // Register event capabilities if any. It identifies the sources of these events (might be
-        // the parent or this component itself). It consturcts an "allow-list tree" of events and
-        // component instances.
-        let mut event_names = HashSet::new();
-        for subscription in subscriptions {
-            if !event_names.insert(subscription.event_name.clone()) {
-                return Err(EventsError::duplicate_event(subscription.event_name).into());
-            }
-        }
-        let events = match subscriber.extended_moniker() {
-            ExtendedMoniker::ComponentManager => event_names
-                .iter()
-                .map(|source_name| RoutedEvent {
-                    source_name: source_name.clone(),
-                    scopes: vec![
-                        EventDispatcherScope::new(AbsoluteMoniker::root().into()).for_debug()
-                    ],
-                    route: vec![],
-                })
-                .collect(),
-            ExtendedMoniker::ComponentInstance(target_moniker) => {
-                let route_result = self.route_events(&target_moniker, &event_names).await?;
                 // Each target name that we routed, will have an associated scope. The number of
                 // scopes must be equal to the number of target names.
                 let total_scopes: usize =
@@ -380,69 +327,6 @@ impl EventRegistry {
         Ok(result)
     }
 
-    #[cfg(test)]
-    pub async fn route_events(
-        &self,
-        target_moniker: &AbsoluteMoniker,
-        events: &HashSet<CapabilityName>,
-    ) -> Result<RouteEventsResult, ModelError> {
-        let model = self.model.upgrade().ok_or(ModelError::ModelNotAvailable)?;
-        let component = model.look_up(&target_moniker).await?;
-        let decl = {
-            let state = component.lock_state().await;
-            match *state {
-                InstanceState::New | InstanceState::Unresolved => {
-                    unreachable!("route_events: not resolved");
-                }
-                InstanceState::Resolved(ref s) => s.decl().clone(),
-                InstanceState::Destroyed => {
-                    return Err(ModelError::instance_destroyed(target_moniker.clone()));
-                }
-            }
-        };
-
-        let mut result = RouteEventsResult::new();
-        for use_decl in decl.uses {
-            match use_decl {
-                UseDecl::Event(event_decl) => {
-                    if events.contains(&event_decl.target_name) {
-                        let (source_name, scope_moniker) =
-                            Self::route_event(event_decl.clone(), &component).await?;
-                        let scope = EventDispatcherScope::new(scope_moniker)
-                            .with_filter(EventFilter::new(event_decl.filter));
-                        result.insert(source_name, scope, vec![]);
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        Ok(result)
-    }
-
-    /// Routes an event and returns its source name and scope on success.
-    #[cfg(test)]
-    async fn route_event(
-        event_decl: UseEventDecl,
-        component: &Arc<ComponentInstance>,
-    ) -> Result<(CapabilityName, ExtendedMoniker), ModelError> {
-        let (route_source, _route) =
-            route_capability(RouteRequest::UseEvent(event_decl), component).await?;
-        match route_source {
-            RouteSource::Event(CapabilitySource::Framework {
-                capability: InternalCapability::Event(source_name),
-                component,
-            }) => Ok((source_name, component.abs_moniker.into())),
-            RouteSource::Event(CapabilitySource::Builtin {
-                capability: InternalCapability::Event(source_name),
-                ..
-            }) if source_name == "directory_ready" => {
-                Ok((source_name, ExtendedMoniker::ComponentManager))
-            }
-            _ => unreachable!(),
-        }
-    }
-
     /// Routes an event and returns its source name and scope on success.
     async fn route_single_event_v2(
         event_decl: UseEventStreamDecl,
@@ -542,15 +426,9 @@ mod tests {
             testing::test_helpers::{TestModelResult, *},
         },
         assert_matches::assert_matches,
-        cm_rust::{
-            Availability, ChildDecl, ComponentDecl, DependencyType, DictionaryValue, OfferDecl,
-            OfferEventDecl, OfferSource, OfferTarget, UseDecl, UseEventDecl, UseSource,
-        },
-        fidl_fuchsia_component_decl as fdecl, fuchsia_zircon as zx,
+        fuchsia_zircon as zx,
         futures::StreamExt,
-        maplit::hashmap,
         moniker::AbsoluteMoniker,
-        routing::component_instance::ComponentInstanceInterface,
     };
 
     async fn dispatch_capability_requested_event(registry: &EventRegistry) {
@@ -674,106 +552,5 @@ mod tests {
 
         // Verify that we received a valid CapabilityRequested event.
         assert_matches!(event_b.payload, EventPayload::CapabilityRequested { .. });
-    }
-
-    #[fuchsia::test]
-    async fn subscribe_to_same_event_different_scope() {
-        let TestModelResult { model, .. } = TestEnvironmentBuilder::new()
-            .set_components(vec![
-                (
-                    "root",
-                    ComponentDecl {
-                        children: vec![ChildDecl {
-                            name: "foo".to_string(),
-                            url: "test:///foo".to_string(),
-                            startup: fdecl::StartupMode::Lazy,
-                            on_terminate: None,
-                            environment: None,
-                        }],
-                        offers: vec![
-                            OfferDecl::Event(OfferEventDecl {
-                                source: OfferSource::Framework,
-                                source_name: "capability_requested".into(),
-                                target: OfferTarget::static_child("foo".to_string()),
-                                target_name: "foo_requested".into(),
-                                filter: Some(hashmap! {
-                                    "name".to_string() => DictionaryValue::Str(
-                                        "fuchsia.foo.Foo".to_string())
-                                }),
-                                availability: Availability::Required,
-                            }),
-                            OfferDecl::Event(OfferEventDecl {
-                                source: OfferSource::Framework,
-                                source_name: "capability_requested".into(),
-                                target: OfferTarget::static_child("foo".to_string()),
-                                target_name: "bar_requested".into(),
-                                filter: Some(hashmap! {
-                                    "name".to_string() => DictionaryValue::Str(
-                                        "fuchsia.bar.Bar".to_string())
-                                }),
-                                availability: Availability::Required,
-                            }),
-                        ],
-                        ..Default::default()
-                    },
-                ),
-                (
-                    "foo",
-                    ComponentDecl {
-                        uses: vec![
-                            UseDecl::Event(UseEventDecl {
-                                source: UseSource::Parent,
-                                source_name: "foo_requested".into(),
-                                target_name: "foo_requested".into(),
-                                filter: Some(hashmap! {
-                                    "name".to_string() => DictionaryValue::Str(
-                                        "fuchsia.foo.Foo".to_string())
-                                }),
-                                dependency_type: DependencyType::Strong,
-                                availability: Availability::Required,
-                            }),
-                            UseDecl::Event(UseEventDecl {
-                                source: UseSource::Framework,
-                                source_name: "bar_requested".into(),
-                                target_name: "bar_requested".into(),
-                                filter: Some(hashmap! {
-                                    "name".to_string() => DictionaryValue::Str(
-                                        "fuchsia.bar.Bar".to_string())
-                                }),
-                                dependency_type: DependencyType::Strong,
-                                availability: Availability::Required,
-                            }),
-                        ],
-                        ..Default::default()
-                    },
-                ),
-            ])
-            .build()
-            .await;
-        let event_registry = EventRegistry::new(Arc::downgrade(&model));
-
-        assert_eq!(
-            0,
-            event_registry.dispatchers_per_event_type(EventType::CapabilityRequested).await
-        );
-
-        let subscriber =
-            model.look_up(&AbsoluteMoniker::parse_str("/foo").unwrap()).await.unwrap().as_weak();
-
-        let _event_stream = event_registry
-            .subscribe(
-                &WeakExtendedInstance::Component(subscriber),
-                vec![
-                    EventSubscription::new("bar_requested".into()),
-                    EventSubscription::new("foo_requested".into()),
-                ],
-            )
-            .await
-            .expect("can subscribe");
-
-        assert_eq!(
-            1,
-            event_registry.dispatchers_per_event_type(EventType::CapabilityRequested).await
-        );
     }
 }

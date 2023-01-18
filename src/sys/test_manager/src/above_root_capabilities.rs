@@ -202,12 +202,6 @@ impl AboveRootCapabilitiesForTest {
                         "Services, runners and resolvers are not supported by realm builder"
                     );
                 }
-                fdecl::Offer::Event(fdecl::OfferEvent {
-                    target: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name })),
-                    ..
-                }) if collection_data.contains_key(name.as_str()) => {
-                    unreachable!("No events should be routed from above root to a test.");
-                }
                 _ => {
                     // Ignore anything else that is not routed to test collections
                 }

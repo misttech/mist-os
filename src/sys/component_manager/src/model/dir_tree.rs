@@ -75,9 +75,7 @@ impl DirTree {
         // components directly.
         match use_ {
             // TODO(fxbug.dev/81980): Add the event stream protocol to the directory tree.
-            cm_rust::UseDecl::Event(_)
-            | cm_rust::UseDecl::EventStreamDeprecated(_)
-            | cm_rust::UseDecl::EventStream(_) => return,
+            cm_rust::UseDecl::EventStream(_) => return,
             _ => {}
         }
 
