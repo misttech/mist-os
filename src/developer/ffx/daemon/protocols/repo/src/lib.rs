@@ -31,6 +31,7 @@ use {
     pkg::config as pkg_config,
     protocols::prelude::*,
     std::{
+        collections::HashSet,
         convert::{TryFrom, TryInto},
         net::SocketAddr,
         rc::Rc,
@@ -488,7 +489,8 @@ async fn create_aliases(
         transaction.reset_all()?;
 
         // Remove duplicated rules while preserving order.
-        rules.dedup();
+        let mut unique_rules = HashSet::new();
+        rules.retain(|r| unique_rules.insert(r.clone()));
 
         // Add the rules back into the transaction. We do it in reverse, because `.add()`
         // always inserts rules into the front of the list.
@@ -2367,6 +2369,8 @@ mod tests {
                 rule!("fuchsia.com" => "example.com", "/" => "/"),
                 rule!("fuchsia.com" => "example.com", "/" => "/"),
                 rule!("fuchsia.com" => "mycorp.com", "/" => "/"),
+                rule!("example.com" => REPO_NAME, "/" => "/"),
+                rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
             ]);
 
             let daemon = FakeDaemonBuilder::new()
@@ -2403,6 +2407,8 @@ mod tests {
                 fake_engine.take_events(),
                 vec![
                     EngineEvent::ListDynamic,
+                    EngineEvent::IteratorNext,
+                    EngineEvent::IteratorNext,
                     EngineEvent::IteratorNext,
                     EngineEvent::IteratorNext,
                     EngineEvent::IteratorNext,
