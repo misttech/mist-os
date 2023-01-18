@@ -5186,7 +5186,7 @@ rust_library("hyper-v0_14_19") {
   deps += [ ":http-body-v0_4_4" ]
   deps += [ ":httparse-v1_7_1" ]
   deps += [ ":httpdate-v1_0_2" ]
-  deps += [ ":itoa-v1_0_2" ]
+  deps += [ ":itoa-v1_0_5" ]
   deps += [ ":pin-project-lite-v0_2_4" ]
   deps += [ ":tokio-v1_19_2" ]
   deps += [ ":tower-service-v0_3_0" ]
@@ -5569,10 +5569,10 @@ rust_library("itoa-v0_4_3") {
   visibility = [ ":*" ]
 }
 
-rust_library("itoa-v1_0_2") {
+rust_library("itoa-v1_0_5") {
   crate_name = "itoa"
-  crate_root = "//third_party/rust_crates/vendor/itoa-1.0.2/src/lib.rs"
-  output_name = "itoa-23bc182ff9f7689d"
+  crate_root = "//third_party/rust_crates/vendor/itoa-1.0.5/src/lib.rs"
+  output_name = "itoa-d5820561044d3a6e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -5582,8 +5582,8 @@ rust_library("itoa-v1_0_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=23bc182ff9f7689d",
-    "-Cextra-filename=-23bc182ff9f7689d",
+    "-Cmetadata=d5820561044d3a6e",
+    "-Cextra-filename=-d5820561044d3a6e",
   ]
 
   visibility = [ ":*" ]
@@ -9895,7 +9895,7 @@ rust_library("serde_json-v1_0_87") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":itoa-v1_0_2" ]
+  deps += [ ":itoa-v1_0_5" ]
   deps += [ ":ryu-v1_0_3" ]
   deps += [ ":serde-v1_0_147" ]
 
@@ -9970,7 +9970,7 @@ rust_library("serde_yaml-v0_9_14") {
 
   deps = []
   deps += [ ":indexmap-v1_9_2" ]
-  deps += [ ":itoa-v1_0_2" ]
+  deps += [ ":itoa-v1_0_5" ]
   deps += [ ":ryu-v1_0_3" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":unsafe-libyaml-v0_2_4" ]
