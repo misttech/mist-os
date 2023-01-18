@@ -65,6 +65,10 @@ if (labels.images == "//build/images/bringup") {
         "/product_assembly_config/product_assembly_config.json"
     product_assembly_config_dep = ":product_assembly_config"
 
+    # As `:product_assembly_config` specifies an `eng` build-type, the assembly
+    # needs to be allowed to use the "eng" platform bundles as deps / inputs.
+    allow_eng_platform_bundle_use = true
+
     base_packages = [
       "//src/performance/trace",
       "//src/sys/appmgr:appmgr_scheme_config",
