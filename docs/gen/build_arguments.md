@@ -2795,7 +2795,7 @@ From //third_party/perfetto/gn/perfetto.gni:302
 
 **Current value (from the default):** `false`
 
-From //src/power/power-manager/BUILD.gn:152
+From //src/power/power-manager/BUILD.gn:149
 
 ### enable_recovery_ui_v2
 
@@ -5026,7 +5026,7 @@ From //third_party/openthread/etc/gn/openthread.gni:223
 
 Enable external heap support
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/openthread/etc/gn/openthread.gni:145
 
@@ -7066,7 +7066,7 @@ From //build/rust/config.gni:49
 
 If true, use the Rust version of fshost.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/storage/fshost/fshost.gni:11
 
