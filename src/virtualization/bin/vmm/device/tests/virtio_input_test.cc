@@ -6,6 +6,8 @@
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/input3/cpp/fidl.h>
+#include <fuchsia/ui/pointer/cpp/fidl.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/result.h>
@@ -35,7 +37,7 @@ class VirtioInputTest : public TestWithDevice,
       : event_queue_(phys_mem_, PAGE_SIZE * kNumQueues, kQueueSize),
         status_queue_(phys_mem_, event_queue_.end(), kQueueSize) {}
 
-  void SetUp() override {
+  void SetUpWithInputType(fuchsia::virtualization::hardware::InputType input_type) {
     using component_testing::ChildRef;
     using component_testing::ParentRef;
     using component_testing::Protocol;
@@ -56,27 +58,22 @@ class VirtioInputTest : public TestWithDevice,
                             },
                         .source = ParentRef(),
                         .targets = {ChildRef{kComponentName}}})
-        .AddRoute(
-            Route{.capabilities =
-                      {
-                          Protocol{fuchsia::virtualization::hardware::KeyboardListener::Name_},
-                          Protocol{fuchsia::virtualization::hardware::PointerListener::Name_},
-                          Protocol{fuchsia::virtualization::hardware::VirtioInput::Name_},
-                      },
-                  .source = ChildRef{kComponentName},
-                  .targets = {ParentRef()}});
+        .AddRoute(Route{.capabilities =
+                            {
+                                Protocol{fuchsia::virtualization::hardware::VirtioInput::Name_},
+                            },
+                        .source = ChildRef{kComponentName},
+                        .targets = {ParentRef()}});
 
     realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
 
     fuchsia::virtualization::hardware::StartInfo start_info;
-    zx_status_t status = MakeStartInfo(event_queue_.end(), &start_info);
+    zx_status_t status = MakeStartInfo(status_queue_.end(), &start_info);
     ASSERT_EQ(ZX_OK, status);
 
-    keyboard_listener_ = realm_->Connect<fuchsia::virtualization::hardware::KeyboardListener>();
-    pointer_listener_ = realm_->ConnectSync<fuchsia::virtualization::hardware::PointerListener>();
     input_ = realm_->ConnectSync<fuchsia::virtualization::hardware::VirtioInput>();
 
-    status = input_->Start(std::move(start_info));
+    status = input_->Start(std::move(start_info), std::move(input_type));
     ASSERT_EQ(ZX_OK, status);
 
     // Configure device queues.
@@ -116,14 +113,50 @@ class VirtioInputTest : public TestWithDevice,
   // Note: use of sync can be problematic here if the test environment needs to handle
   // some incoming FIDL requests.
   fuchsia::virtualization::hardware::VirtioInputSyncPtr input_;
-  fuchsia::virtualization::hardware::KeyboardListenerPtr keyboard_listener_;
-  fuchsia::virtualization::hardware::PointerListenerSyncPtr pointer_listener_;
   VirtioQueueFake event_queue_;
   VirtioQueueFake status_queue_;
   std::unique_ptr<component_testing::RealmRoot> realm_;
 };
 
-TEST_P(VirtioInputTest, Keyboard) {
+class VirtioInputKeyboardTest : public VirtioInputTest {
+ protected:
+  void SetUp() override {
+    SetUpWithInputType(fuchsia::virtualization::hardware::InputType::WithKeyboard(
+        keyboard_listener_.NewRequest()));
+  }
+
+  fuchsia::ui::input3::KeyboardListenerPtr keyboard_listener_;
+};
+
+class VirtioInputMouseTest : public VirtioInputTest, public fuchsia::ui::pointer::MouseSource {
+ protected:
+  void SetUp() override {
+    // TODO(fxbug.dev/109823): Enable these test.
+    GTEST_SKIP();
+
+    fuchsia::ui::pointer::MouseSourceHandle mouse_client;
+    binding_.Bind(mouse_client.NewRequest());
+    SetUpWithInputType(
+        fuchsia::virtualization::hardware::InputType::WithMouse(std::move(mouse_client)));
+  }
+
+  // fuchsia.ui.pointer.MouseSource implementation
+  void Watch(WatchCallback callback) override {
+    ASSERT_FALSE(watch_responder_.has_value()) << "Device has two Watch calls in flight";
+    watch_responder_ = std::move(callback);
+  }
+
+  std::optional<fuchsia::ui::pointer::MouseSource::WatchCallback> TakeResponder() {
+    return std::exchange(watch_responder_, std::nullopt);
+  }
+
+  fidl::Binding<fuchsia::ui::pointer::MouseSource> binding_{this};
+
+ private:
+  std::optional<fuchsia::ui::pointer::MouseSource::WatchCallback> watch_responder_;
+};
+
+TEST_P(VirtioInputKeyboardTest, Keyboard) {
   // Enqueue descriptors for the events. Do this before we inject the key event because the device
   // may choose to drop input events if there are no descriptors available:
   //
@@ -156,84 +189,176 @@ TEST_P(VirtioInputTest, Keyboard) {
   EXPECT_EQ(VIRTIO_INPUT_EV_SYN, event_2->type);
 }
 
-TEST_P(VirtioInputTest, PointerMove) {
-  // TODO(fxbug.dev/104229): Enable this test.
-  GTEST_SKIP();
+constexpr uint32_t kMouseDeviceId = 0;
 
-  pointer_listener_->OnSizeChanged({1, 1});
-  fuchsia::ui::input::PointerEvent pointer = {
-      .phase = fuchsia::ui::input::PointerEventPhase::MOVE,
-      .x = 0.25,
-      .y = 0.5,
+fuchsia::ui::pointer::MouseEvent MakeMouseUpdate() {
+  static uint64_t timestamp = 0;
+
+  fuchsia::ui::pointer::MousePointerSample pointer_sample;
+  pointer_sample.set_device_id(kMouseDeviceId);
+  pointer_sample.set_position_in_viewport({0.0, 0.0});
+
+  fuchsia::ui::pointer::MouseEvent mouse_event;
+  mouse_event.set_timestamp(timestamp++);
+  mouse_event.set_pointer_sample(std::move(pointer_sample));
+
+  return mouse_event;
+}
+
+fuchsia::ui::pointer::MouseEvent MakeMouseEvent() {
+  // clang-format off
+  fuchsia::ui::pointer::ViewParameters view_parameters {
+    .view = {
+      .min = {0.0, 0.0},
+      .max = {1.0, 1.0},
+    },
+    .viewport = {
+      .min = {0.0, 0.0},
+      .max = {1.0, 1.0},
+    },
+    .viewport_to_view_transform = {
+      1.0, 0.0, 0.0,
+      0.0, 1.0, 0.0,
+      0.0, 0.0, 1.0,
+    }
   };
-  pointer_listener_->OnPointerEvent(std::move(pointer));
+  // clang-format on
 
-  virtio_input_event_t* event_1;
-  virtio_input_event_t* event_2;
-  virtio_input_event_t* event_3;
-  zx_status_t status = DescriptorChainBuilder(event_queue_)
-                           .AppendWritableDescriptor(&event_1, sizeof(*event_1))
-                           .AppendWritableDescriptor(&event_2, sizeof(*event_2))
-                           .AppendWritableDescriptor(&event_3, sizeof(*event_3))
-                           .Build();
+  fuchsia::ui::pointer::MouseDeviceInfo mouse_device_info;
+  mouse_device_info.set_id(kMouseDeviceId);
+  mouse_device_info.set_buttons({1, 2});
+
+  fuchsia::ui::pointer::MouseEvent mouse_event = MakeMouseUpdate();
+  mouse_event.set_view_parameters(std::move(view_parameters));
+  mouse_event.set_device_info(std::move(mouse_device_info));
+
+  return mouse_event;
+}
+
+TEST_P(VirtioInputMouseTest, PointerMove) {
+  std::array<float, 2> position = {0.25, 0.50};
+  fuchsia::ui::pointer::MouseEvent mouse_event = MakeMouseEvent();
+  *mouse_event.mutable_pointer_sample()->mutable_position_in_viewport() = position;
+
+  // Right after device initialization it should be waiting on the first Watch call.
+  binding_.WaitForMessage();
+  RunLoopUntilIdle();
+  auto responder = TakeResponder();
+  ASSERT_TRUE(responder.has_value());
+
+  // Add event descriptors before we send the mouse events lest the device drop them.
+  auto result = AddEventDescriptorsToChain(3);
+  ASSERT_TRUE(result.is_ok());
+  auto events = result.value();
+  zx_status_t status = input_->NotifyQueue(0);
   ASSERT_EQ(ZX_OK, status);
 
-  status = input_->NotifyQueue(0);
-  ASSERT_EQ(ZX_OK, status);
+  // Inject the mouse event.
+  std::vector<fuchsia::ui::pointer::MouseEvent> mouse_events;
+  mouse_events.emplace(mouse_events.end(), std::move(mouse_event));
+  (*responder)(std::move(mouse_events));
+
+  // Expect the virtio event.
   status = WaitOnInterrupt();
   ASSERT_EQ(ZX_OK, status);
 
-  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, event_1->type);
-  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_X, event_1->code);
-  EXPECT_EQ(static_cast<uint32_t>(std::ceil(kInputAbsMaxX * pointer.x)), event_1->value);
-  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, event_2->type);
-  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_Y, event_2->code);
-  EXPECT_EQ(static_cast<uint32_t>(std::ceil(kInputAbsMaxY * pointer.y)), event_2->value);
-  EXPECT_EQ(VIRTIO_INPUT_EV_SYN, event_3->type);
+  // Check for an accurate translation of the mouse event
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, events[0]->type);
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_X, events[0]->code);
+  EXPECT_EQ(static_cast<uint32_t>(std::floor(kInputAbsMaxX * position[0])), events[0]->value);
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, events[1]->type);
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_Y, events[1]->code);
+  EXPECT_EQ(static_cast<uint32_t>(std::floor(kInputAbsMaxY * position[1])), events[1]->value);
+  EXPECT_EQ(VIRTIO_INPUT_EV_SYN, events[2]->type);
 }
 
-TEST_P(VirtioInputTest, PointerUp) {
-  // TODO(fxbug.dev/104229): Enable this test.
-  GTEST_SKIP();
+TEST_P(VirtioInputMouseTest, PointerClick) {
+  // Right after device initialization it should be waiting on the first Watch call.
+  binding_.WaitForMessage();
+  RunLoopUntilIdle();
+  auto responder = TakeResponder();
+  ASSERT_TRUE(responder.has_value());
 
-  pointer_listener_->OnSizeChanged({1, 1});
-  fuchsia::ui::input::PointerEvent pointer = {
-      .phase = fuchsia::ui::input::PointerEventPhase::UP,
-      .x = 0.25,
-      .y = 0.5,
-  };
-  pointer_listener_->OnPointerEvent(std::move(pointer));
-
-  virtio_input_event_t* event_1;
-  virtio_input_event_t* event_2;
-  virtio_input_event_t* event_3;
-  virtio_input_event_t* event_4;
-  zx_status_t status = DescriptorChainBuilder(event_queue_)
-                           .AppendWritableDescriptor(&event_1, sizeof(*event_1))
-                           .AppendWritableDescriptor(&event_2, sizeof(*event_2))
-                           .AppendWritableDescriptor(&event_3, sizeof(*event_3))
-                           .AppendWritableDescriptor(&event_4, sizeof(*event_4))
-                           .Build();
+  // Add event descriptors before we send the mouse events lest the device drop them.
+  auto result = AddEventDescriptorsToChain(8);
+  ASSERT_TRUE(result.is_ok());
+  auto events = result.value();
+  zx_status_t status = input_->NotifyQueue(0);
   ASSERT_EQ(ZX_OK, status);
 
-  status = input_->NotifyQueue(0);
-  ASSERT_EQ(ZX_OK, status);
-  status = WaitOnInterrupt();
-  ASSERT_EQ(ZX_OK, status);
+  // Inject left mouse button pressed
+  {
+    fuchsia::ui::pointer::MouseEvent mouse_event = MakeMouseEvent();
+    *mouse_event.mutable_pointer_sample()->mutable_pressed_buttons() = {1};
 
-  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, event_1->type);
-  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_X, event_1->code);
-  EXPECT_EQ(static_cast<uint32_t>(std::ceil(kInputAbsMaxX * pointer.x)), event_1->value);
-  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, event_2->type);
-  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_Y, event_2->code);
-  EXPECT_EQ(static_cast<uint32_t>(std::ceil(kInputAbsMaxY * pointer.y)), event_2->value);
-  EXPECT_EQ(VIRTIO_INPUT_EV_KEY, event_3->type);
-  EXPECT_EQ(kButtonTouchCode, event_3->code);
-  EXPECT_EQ(VIRTIO_INPUT_EV_KEY_RELEASED, event_3->value);
-  EXPECT_EQ(VIRTIO_INPUT_EV_SYN, event_4->type);
+    std::vector<fuchsia::ui::pointer::MouseEvent> mouse_events;
+    mouse_events.emplace(mouse_events.end(), std::move(mouse_event));
+    (*responder)(std::move(mouse_events));
+
+    // Expect the virtio event.
+    status = WaitOnInterrupt();
+    ASSERT_EQ(ZX_OK, status);
+  }
+
+  // get next watch request
+  binding_.WaitForMessage();
+  RunLoopUntilIdle();
+  responder = TakeResponder();
+  ASSERT_TRUE(responder.has_value());
+
+  // Inject no mouse buttons pressed
+  {
+    fuchsia::ui::pointer::MouseEvent mouse_event = MakeMouseUpdate();
+    *mouse_event.mutable_pointer_sample()->mutable_pressed_buttons() = {};
+
+    std::vector<fuchsia::ui::pointer::MouseEvent> mouse_events;
+    mouse_events.emplace(mouse_events.end(), std::move(mouse_event));
+    (*responder)(std::move(mouse_events));
+
+    // Expect the virtio event.
+    status = WaitOnInterrupt();
+    ASSERT_EQ(ZX_OK, status);
+  }
+
+  constexpr uint32_t kButtonMouseCode = 0x110;
+
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, events[0]->type);
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_X, events[0]->code);
+  EXPECT_EQ(0u, events[0]->value);
+
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, events[1]->type);
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_Y, events[1]->code);
+  EXPECT_EQ(0u, events[1]->value);
+
+  EXPECT_EQ(VIRTIO_INPUT_EV_KEY, events[2]->type);
+  EXPECT_EQ(kButtonMouseCode, events[2]->code);
+  EXPECT_EQ(VIRTIO_INPUT_EV_KEY_PRESSED, events[2]->value);
+
+  EXPECT_EQ(VIRTIO_INPUT_EV_SYN, events[3]->type);
+
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, events[4]->type);
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_X, events[4]->code);
+  EXPECT_EQ(0u, events[4]->value);
+
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS, events[5]->type);
+  EXPECT_EQ(VIRTIO_INPUT_EV_ABS_Y, events[5]->code);
+  EXPECT_EQ(0u, events[5]->value);
+
+  EXPECT_EQ(VIRTIO_INPUT_EV_KEY, events[6]->type);
+  EXPECT_EQ(kButtonMouseCode, events[6]->code);
+  EXPECT_EQ(VIRTIO_INPUT_EV_KEY_RELEASED, events[6]->value);
+
+  EXPECT_EQ(VIRTIO_INPUT_EV_SYN, events[7]->type);
 }
 
-INSTANTIATE_TEST_SUITE_P(VirtioInputComponentsTest, VirtioInputTest,
+INSTANTIATE_TEST_SUITE_P(VirtioInputKeyboardComponentsTest, VirtioInputKeyboardTest,
+                         testing::Values(VirtioInputTestParam{"statusq", true},
+                                         VirtioInputTestParam{"nostatusq", false}),
+                         [](const testing::TestParamInfo<VirtioInputTestParam>& info) {
+                           return info.param.test_name;
+                         });
+
+INSTANTIATE_TEST_SUITE_P(VirtioInputMouseComponentsTest, VirtioInputMouseTest,
                          testing::Values(VirtioInputTestParam{"statusq", true},
                                          VirtioInputTestParam{"nostatusq", false}),
                          [](const testing::TestParamInfo<VirtioInputTestParam>& info) {

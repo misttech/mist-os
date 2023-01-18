@@ -6,7 +6,6 @@
 
 #include <dirent.h>
 #include <fcntl.h>
-#include <fuchsia/ui/input/cpp/fidl.h>
 #include <fuchsia/virtualization/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/async/cpp/task.h>
@@ -252,7 +251,10 @@ fit::result<GuestError> Vmm::Initialize(GuestConfig cfg, ::sys::ComponentContext
   if (cfg.has_virtio_gpu() && cfg.virtio_gpu()) {
     gpu_ = std::make_unique<VirtioGpu>(guest_->phys_mem());
     input_keyboard_ = std::make_unique<VirtioInput>(guest_->phys_mem(), VirtioInput::Keyboard);
-    input_pointer_ = std::make_unique<VirtioInput>(guest_->phys_mem(), VirtioInput::Pointer);
+
+    fidl::InterfaceHandle<fuchsia::ui::input3::KeyboardListener> keyboard_listener;
+    fidl::InterfaceHandle<fuchsia::ui::pointer::MouseSource> mouse_source;
+    auto mouse_source_request = mouse_source.NewRequest();
 
     // Setup keyboard device.
     status = pci_bus_->Connect(input_keyboard_->pci_device(), dispatcher);
@@ -260,27 +262,14 @@ fit::result<GuestError> Vmm::Initialize(GuestConfig cfg, ::sys::ComponentContext
       FX_PLOGS(ERROR, status) << "Failed to connect keyboard device";
       return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
     }
-    status = input_keyboard_->Start(guest_->object(), context, dispatcher, "virtio_input_keyboard");
+    status = input_keyboard_->Start(
+        guest_->object(),
+        fuchsia::virtualization::hardware::InputType::WithKeyboard(keyboard_listener.NewRequest()),
+        context, dispatcher, "virtio_input_keyboard");
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to start keyboard device";
       return fit::error(GuestError::DEVICE_START_FAILURE);
     }
-    fidl::InterfaceHandle<fuchsia::virtualization::hardware::KeyboardListener> keyboard_listener;
-    input_keyboard_->Connect(keyboard_listener.NewRequest());
-
-    // Setup pointer device.
-    status = pci_bus_->Connect(input_pointer_->pci_device(), dispatcher);
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to connect mouse device";
-      return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
-    }
-    status = input_pointer_->Start(guest_->object(), context, dispatcher, "virtio_input_pointer");
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Failed to start mouse device";
-      return fit::error(GuestError::DEVICE_START_FAILURE);
-    }
-    fidl::InterfaceHandle<fuchsia::virtualization::hardware::PointerListener> pointer_listener;
-    input_pointer_->Connect(pointer_listener.NewRequest());
 
     // Setup GPU device.
     status = pci_bus_->Connect(gpu_->pci_device(), dispatcher);
@@ -289,7 +278,7 @@ fit::result<GuestError> Vmm::Initialize(GuestConfig cfg, ::sys::ComponentContext
       return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
     }
     status = gpu_->Start(guest_->object(), std::move(keyboard_listener),
-                         std::move(pointer_listener), context, dispatcher);
+                         std::move(mouse_source_request), context, dispatcher);
     if (status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Failed to start GPU device";
       return fit::error(GuestError::DEVICE_START_FAILURE);

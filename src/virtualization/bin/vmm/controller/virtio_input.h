@@ -28,13 +28,9 @@ class VirtioInput
 
   VirtioInput(const PhysMem& phys_mem, VirtioInputType type);
 
-  zx_status_t Start(const zx::guest& guest, ::sys::ComponentContext* context,
-                    async_dispatcher_t* dispatcher, std::string component_name);
-
-  template <typename Protocol>
-  void Connect(fidl::InterfaceRequest<Protocol> request) {
-    services_->Connect(std::move(request));
-  }
+  zx_status_t Start(const zx::guest& guest, fuchsia::virtualization::hardware::InputType input_type,
+                    ::sys::ComponentContext* context, async_dispatcher_t* dispatcher,
+                    std::string component_name);
 
  private:
   VirtioInputType type_;
