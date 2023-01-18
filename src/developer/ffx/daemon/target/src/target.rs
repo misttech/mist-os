@@ -914,8 +914,8 @@ impl Target {
             });
 
             let (do_legacy, do_circuit) = match mode.as_ref().map(|x| x.as_str()) {
-                None | Some("enabled") => (true, true),
-                Some("disabled") => (true, false),
+                Some("enabled") => (true, true),
+                None | Some("disabled") => (true, false),
                 Some("only") => (false, true),
                 Some(other) => {
                     tracing::warn!(
