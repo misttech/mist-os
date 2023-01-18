@@ -1,7 +1,3 @@
-![Data table showing high-level diagram of the entire Fuchsia system
-  architecture, highlighting core components and subsystems.](
-    /docs/get-started/images/intro/fuchsia-architecture.png){: width="1080"}
-
 The following architectural principles guide Fuchsia's design and development:
 
 * [**Simple:**][simple]
@@ -15,6 +11,10 @@ The following architectural principles guide Fuchsia's design and development:
 
 * [**Performant:**][performant]
   Fuchsia is designed for real world product requirements and optimized for performance.
+
+![Data table showing high-level diagram of the entire Fuchsia system
+  architecture, highlighting core components and subsystems.](
+    /docs/get-started/images/intro/fuchsia-architecture.png){: width="1080"}
 
 The core of the system is [Zircon][glossary.zircon], a kernel and collection of
 libraries for handling system startup and bootstrapping.
