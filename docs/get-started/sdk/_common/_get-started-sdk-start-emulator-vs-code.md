@@ -97,10 +97,10 @@ In VS Code, do the following:
    Device:
        ...
    Build:
-       Version: "10.20221130.0.1"
+       Version: "11.20230109.3.1"
        Product: "workstation_eng"
        Board: "qemu-x64"
-       Commit: "2022-11-30T07:03:36+00:00"
+       Commit: "2023-01-09T20:03:45+00:00"
    Last Reboot:
        Graceful: "false"
        Reason: "Cold"

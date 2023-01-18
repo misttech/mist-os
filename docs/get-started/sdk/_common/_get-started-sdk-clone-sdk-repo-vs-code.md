@@ -73,14 +73,14 @@ In VS Code, do the following:
 
    ```none {:.devsite-disable-click-to-copy}
    $ tools/ffx sdk version
-   10.20221130.0.1
+   11.20230109.3.1
    ```
 
    At this point, you only need to confirm that you can run `ffx` commands
    without error.
 
-   Note: The output above shows the version `10.20221130.0.1`, which
-   indicates that this SDK was built and published on November 30, 2022.
+   Note: The output above shows the version `11.20230109.3.1`, which
+   indicates that this SDK was built and published on January 9, 2023.
 
 <!-- Reference links -->
 
