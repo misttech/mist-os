@@ -213,3 +213,8 @@ pub const KEY_F21: u16 = 191;
 pub const KEY_F22: u16 = 192;
 pub const KEY_F23: u16 = 193;
 pub const KEY_F24: u16 = 194;
+
+// Mouse button evdev keycodes.
+pub const BTN_LEFT: u16 = 0x110;
+pub const BTN_RIGHT: u16 = 0x111;
+pub const BTN_MIDDLE: u16 = 0x112;

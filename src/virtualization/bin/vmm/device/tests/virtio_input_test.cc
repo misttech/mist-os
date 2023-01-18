@@ -131,9 +131,6 @@ class VirtioInputKeyboardTest : public VirtioInputTest {
 class VirtioInputMouseTest : public VirtioInputTest, public fuchsia::ui::pointer::MouseSource {
  protected:
   void SetUp() override {
-    // TODO(fxbug.dev/109823): Enable these test.
-    GTEST_SKIP();
-
     fuchsia::ui::pointer::MouseSourceHandle mouse_client;
     binding_.Bind(mouse_client.NewRequest());
     SetUpWithInputType(

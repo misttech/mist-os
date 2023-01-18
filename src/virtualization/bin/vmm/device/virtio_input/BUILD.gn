@@ -18,13 +18,16 @@ rustc_binary("virtio_input_bin") {
     "src/input_device.rs",
     "src/keyboard.rs",
     "src/main.rs",
+    "src/mouse.rs",
     "src/wire.rs",
   ]
 
   deps = [
     "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_rust",
+    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_rust",
     "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_rust",
+    "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
@@ -37,6 +40,8 @@ rustc_binary("virtio_input_bin") {
     "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
+
+  test_deps = [ "//src/lib/fuchsia-async" ]
 }
 
 fuchsia_unittest_package("virtio_input_unittests") {

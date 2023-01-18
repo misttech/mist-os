@@ -4,11 +4,13 @@
 
 mod input_device;
 mod keyboard;
+mod mouse;
 mod wire;
 
 use {
     crate::input_device::{InputDevice, InputHandler},
     crate::keyboard::KeyboardDevice,
+    crate::mouse::MouseDevice,
     anyhow::{anyhow, Context},
     fidl::endpoints::RequestStream,
     fidl_fuchsia_virtualization_hardware::{InputType, VirtioInputRequestStream},
@@ -57,7 +59,10 @@ async fn run_virtio_input(
                 .into_stream()
                 .context("Failed to create stream from KeyboardListener server end")?,
         )),
-        InputType::Mouse(_mouse_source) => unimplemented!("Mouse support is not yet implemented."),
+        InputType::Mouse(mouse_source) => Box::new(MouseDevice::new(
+            input_device,
+            mouse_source.into_proxy().context("Failed to create MouseSourceProxy")?,
+        )),
     };
 
     ready_responder.send()?;

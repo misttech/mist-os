@@ -30,6 +30,11 @@ static_assert((kATKeyboardLastCode + 1 - kATKeyboardFirstCode) % 8 == 0,
 static_assert((kATKeyboardLastCode + 7) / 8 < sizeof(virtio_input_config_t().u.bitmap),
               "Last scan code cannot exceed allowed range.");
 
+// Event Codes for type EV_KEY
+constexpr uint16_t kBtnLeftCode = 0x110;
+constexpr uint16_t kBtnRightCode = 0x111;
+constexpr uint16_t kBtnMiddleCode = 0x112;
+
 constexpr auto kComponentCollectionName = "virtio_input_devices";
 constexpr auto kComponentUrl = "#meta/virtio_input.cm";
 
@@ -49,12 +54,22 @@ uint8_t VirtioInput::Keyboard(uint8_t subsel, uint8_t* bitmap) {
 }
 
 uint8_t VirtioInput::Pointer(uint8_t subsel, uint8_t* bitmap) {
-  if (subsel != VIRTIO_INPUT_EV_ABS) {
-    return 0;
+  switch (subsel) {
+    case VIRTIO_INPUT_EV_KEY:
+      set_config_bit(bitmap, kBtnLeftCode);
+      set_config_bit(bitmap, kBtnRightCode);
+      set_config_bit(bitmap, kBtnMiddleCode);
+      return sizeof(virtio_input_config_t::u);
+    case VIRTIO_INPUT_EV_ABS:
+      set_config_bit(bitmap, VIRTIO_INPUT_EV_ABS_X);
+      set_config_bit(bitmap, VIRTIO_INPUT_EV_ABS_Y);
+      return sizeof(virtio_input_config_t::u);
+    case VIRTIO_INPUT_EV_REL:
+      set_config_bit(bitmap, VIRTIO_INPUT_EV_REL_WHEEL);
+      return sizeof(virtio_input_config_t::u);
+    default:
+      return 0;
   }
-  set_config_bit(bitmap, VIRTIO_INPUT_EV_ABS_X);
-  set_config_bit(bitmap, VIRTIO_INPUT_EV_ABS_Y);
-  return 1;
 }
 
 VirtioInput::VirtioInput(const PhysMem& phys_mem, VirtioInputType type)
