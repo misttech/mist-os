@@ -261,16 +261,23 @@ static inline pid_t __thread_get_tid(void) {
 // uint32_t as an int32_t would erronously cause the tid to be < 0, causing the
 // FILE structure to go unguarded. See fxbug.dev/34058 for more detail.
 //
-// However, zx_handle_t reserves ZX_HANDLE_FIXED_BITS_MASK of its lower bits,
-// and they're always set to 1. Because we're only using this as an opaque
-// identifier (and no longer treating it as a handle value), we can simply shift
-// the valid bits of the handle down to avoid the sign bit being set.
+// However, zx_handle_t reserves the bits in ZX_HANDLE_FIXED_BITS_MASK, and
+// they're always set to 1. These bits happen to be the lowest two bits, and
+// because we're only using this as an opaque identifier (and no longer treating
+// it as a handle value), we can simply shift the valid bits of the handle down
+// to avoid the sign bit being set.
 //
 // This function is (semi-)exposed for testing, but should only be used by
 // __thread_get_tid_for_filelock().
+#define _MUSL_MIN_FIXED_SHIFT 2
+#define _MUSL_MIN_FIXED_MASK ((1u << _MUSL_MIN_FIXED_SHIFT) - 1)
 static inline pid_t __thread_handle_to_filelock_tid(zx_handle_t handle) {
-  return (pid_t)(handle >> (ZX_HANDLE_FIXED_BITS_MASK - 1));
+  static_assert((_MUSL_MIN_FIXED_MASK & ZX_HANDLE_FIXED_BITS_MASK) == _MUSL_MIN_FIXED_MASK,
+                "Lowest 2 bits of handles are not in ZX_HANDLE_FIXED_BITS_MASK");
+  return (pid_t)(handle >> 2);
 }
+#undef _MUSL_MIN_FIXED_SHIFT
+#undef _MUSL_MIN_FIXED_MASK
 
 static inline pid_t __thread_get_tid_for_filelock(void) {
   return __thread_handle_to_filelock_tid(zxr_thread_get_handle(&__pthread_self()->zxr_thread));
