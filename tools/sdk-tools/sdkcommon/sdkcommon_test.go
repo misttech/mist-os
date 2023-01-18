@@ -5,6 +5,7 @@
 package sdkcommon
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -71,6 +72,12 @@ func helperCommandForSDKCommon(command string, s ...string) (cmd *exec.Cmd) {
 	return cmd
 }
 
+// See exec_test.go for details, but effectively this runs the function called TestHelperProcess passing
+// the args.
+func helperCommandContextForSDKCommon(_ context.Context, command string, s ...string) (cmd *exec.Cmd) {
+	return helperCommandForSDKCommon(command, s...)
+}
+
 func TestNewSDK(t *testing.T) {
 	tempDir := t.TempDir()
 	homeDir := filepath.Join(tempDir, "_TEMP_HOME")
@@ -78,6 +85,7 @@ func TestNewSDK(t *testing.T) {
 		t.Fatal(err)
 	}
 	ExecCommand = helperCommandForSDKCommon
+	ExecCommandContext = helperCommandContextForSDKCommon
 	GetUserHomeDir = mockedUserProperty(homeDir)
 	GetUsername = mockedUserProperty("testuser")
 	GetHostname = mockedUserProperty("test-host")
@@ -105,6 +113,7 @@ func TestNewSDK(t *testing.T) {
 
 func TestGetAvailableImages(t *testing.T) {
 	ExecCommand = helperCommandForSDKCommon
+	ExecCommandContext = helperCommandContextForSDKCommon
 	ExecLookPath = func(cmd string) (string, error) { return filepath.Join("mocked", cmd), nil }
 	defer clearTestEnv()
 	testSDK := SDKProperties{
@@ -260,6 +269,7 @@ func TestListDevicesFfx(t *testing.T) {
 	for _, test := range tests {
 		clearTestEnv()
 		ExecCommand = helperCommandForSDKCommon
+		ExecCommandContext = helperCommandContextForSDKCommon
 		os.Setenv("TEST_FFX_TARGET_LIST_OUTPUT", test.ffxTargetListOutput)
 		os.Setenv("FFX_ISOLATE_DIR", t.TempDir())
 		output, err := testSDK.listDevices()
@@ -279,6 +289,7 @@ func TestRunSSHCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	ExecCommand = helperCommandForSDKCommon
+	ExecCommandContext = helperCommandContextForSDKCommon
 	GetUserHomeDir = mockedUserProperty(homeDir)
 	GetUsername = mockedUserProperty("testuser")
 	GetHostname = mockedUserProperty("test-host")
@@ -365,6 +376,7 @@ func TestRunRunSFTPCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	ExecCommand = helperCommandForSDKCommon
+	ExecCommandContext = helperCommandContextForSDKCommon
 	GetUserHomeDir = mockedUserProperty(homeDir)
 	GetUsername = mockedUserProperty("testuser")
 	GetHostname = mockedUserProperty("test-host")
@@ -453,6 +465,7 @@ func TestCheckSSHConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	ExecCommand = helperCommandForSDKCommon
+	ExecCommandContext = helperCommandContextForSDKCommon
 	GetUserHomeDir = mockedUserProperty(homeDir)
 	GetUsername = mockedUserProperty("testuser")
 	GetHostname = mockedUserProperty("test-host")
@@ -472,6 +485,7 @@ func TestCheckSSHConfigExistingFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	ExecCommand = helperCommandForSDKCommon
+	ExecCommandContext = helperCommandContextForSDKCommon
 	GetUserHomeDir = mockedUserProperty(homeDir)
 	GetUsername = mockedUserProperty("testuser")
 	GetHostname = mockedUserProperty("test-host")
@@ -537,6 +551,7 @@ func TestGetFuchsiaProperty(t *testing.T) {
 	sdk := SDKProperties{}
 
 	ExecCommand = helperCommandForGetFuchsiaProperty
+	ExecCommandContext = helperCommandContextForGetFuchsiaProperty
 	defer clearTestEnv()
 
 	testData := []struct {
@@ -578,6 +593,7 @@ func TestGetDeviceConfigurations(t *testing.T) {
 	sdk := SDKProperties{}
 
 	ExecCommand = helperCommandForGetFuchsiaProperty
+	ExecCommandContext = helperCommandContextForGetFuchsiaProperty
 	defer clearTestEnv()
 
 	tests := []struct {
@@ -631,6 +647,7 @@ func TestMigrateGlobalData(t *testing.T) {
 	for _, test := range tests {
 		clearTestEnv()
 		ExecCommand = helperCommandForSetTesting
+		ExecCommandContext = helperCommandContextForSDKCommon
 		t.Run(test.name, func(t *testing.T) {
 			expectedData, err := json.Marshal(test.expectedValues)
 			if err != nil {
@@ -649,6 +666,7 @@ func TestMigrateGlobalData(t *testing.T) {
 func TestGetDeviceConfiguration(t *testing.T) {
 	sdk := SDKProperties{}
 	ExecCommand = helperCommandForGetFuchsiaProperty
+	ExecCommandContext = helperCommandContextForGetFuchsiaProperty
 	defer clearTestEnv()
 
 	tests := []struct {
@@ -778,6 +796,7 @@ func TestSaveDeviceConfiguration(t *testing.T) {
 	for _, test := range tests {
 		clearTestEnv()
 		ExecCommand = helperCommandForSetTesting
+		ExecCommandContext = helperCommandContextForSDKCommon
 		t.Run(test.name, func(t *testing.T) {
 			expectedData, err := json.Marshal(test.expectedValues)
 			if err != nil {
@@ -814,6 +833,7 @@ func TestResolveTargetAddress(t *testing.T) {
 		expectedConfig               DeviceConfig
 		expectedError                string
 		execHelper                   func(command string, s ...string) (cmd *exec.Cmd)
+		execContextHelper            func(ctx context.Context, command string, s ...string) (cmd *exec.Cmd)
 	}{
 		{
 			name:     "IP address passed in",
@@ -825,7 +845,8 @@ func TestResolveTargetAddress(t *testing.T) {
 				PackageRepo: "packages/amber-files",
 				PackagePort: "8083",
 			},
-			execHelper: helperCommandForGetFuchsiaProperty,
+			execHelper:        helperCommandForGetFuchsiaProperty,
+			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
 		{
 			name:       "Device name passed in",
@@ -840,14 +861,16 @@ func TestResolveTargetAddress(t *testing.T) {
 				IsDefault:    false,
 				Discoverable: true,
 			},
-			execHelper: helperCommandForGetFuchsiaProperty,
+			execHelper:        helperCommandForGetFuchsiaProperty,
+			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
 		{
 			name:       "Device name passed in but is not discoverable and is not set in ffx",
 			deviceName: "some-unknown-device",
 			expectedError: `Cannot get target address for some-unknown-device.
 		Try running 'ffx target list'.`,
-			execHelper: helperCommandForGetFuchsiaProperty,
+			execHelper:        helperCommandForGetFuchsiaProperty,
+			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
 		{
 			name:                      "Gets the default device when there are multiple devices in ffx target list",
@@ -876,7 +899,8 @@ func TestResolveTargetAddress(t *testing.T) {
 				IsDefault:    true,
 				Discoverable: true,
 			},
-			execHelper: helperCommandForGetFuchsiaProperty,
+			execHelper:        helperCommandForGetFuchsiaProperty,
+			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
 		{
 			name: "Returns an error if the default device is set but undiscoverable and doesn't have an" +
@@ -890,7 +914,8 @@ func TestResolveTargetAddress(t *testing.T) {
 			"addresses":["ac80::9ded:df4f:5ee8:605f"]}]`,
 			expectedError: `Cannot get target address for fake-target-device-name.
 		Try running 'ffx target list'.`,
-			execHelper: helperCommandForGetFuchsiaProperty,
+			execHelper:        helperCommandForGetFuchsiaProperty,
+			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
 		{
 			name: "Uses the correct device IP when device has multiple address in ffx target list",
@@ -910,7 +935,8 @@ func TestResolveTargetAddress(t *testing.T) {
 				IsDefault:    false,
 				Discoverable: true,
 			},
-			execHelper: helperCommandForNoDefaultDevice,
+			execHelper:        helperCommandForNoDefaultDevice,
+			execContextHelper: helperCommandContextForNoDefaultDevice,
 		},
 		{
 			name: "Gets the discoverable device if there is only 1, even if ffx has multiple non-default devices",
@@ -930,18 +956,21 @@ func TestResolveTargetAddress(t *testing.T) {
 				IsDefault:    false,
 				Discoverable: true,
 			},
-			execHelper: helperCommandForNoDefaultDevice,
+			execHelper:        helperCommandForNoDefaultDevice,
+			execContextHelper: helperCommandContextForNoDefaultDevice,
 		},
 		{
 			name:                "No discoverable device and no default device",
 			ffxTargetListOutput: "[]",
 			expectedError:       fmt.Sprintf("No devices found. %v", helpfulTipMsg),
 			execHelper:          helperCommandForNoDefaultDevice,
+			execContextHelper:   helperCommandContextForNoDefaultDevice,
 		},
 		{
-			name:          "Multiple discoverable devices found",
-			expectedError: fmt.Sprintf("Multiple devices found. %v", helpfulTipMsg),
-			execHelper:    helperCommandForNoDefaultDevice,
+			name:              "Multiple discoverable devices found",
+			expectedError:     fmt.Sprintf("Multiple devices found. %v", helpfulTipMsg),
+			execHelper:        helperCommandForNoDefaultDevice,
+			execContextHelper: helperCommandContextForNoDefaultDevice,
 		},
 		{
 			name:                      "No discoverable device but ffx has a default device that is undiscoverable",
@@ -949,7 +978,8 @@ func TestResolveTargetAddress(t *testing.T) {
 			ffxTargetDefaultGetOutput: "fake-target-device-name",
 			expectedError: `Cannot get target address for fake-target-device-name.
 		Try running 'ffx target list'.`,
-			execHelper: helperCommandForGetFuchsiaProperty,
+			execHelper:        helperCommandForGetFuchsiaProperty,
+			execContextHelper: helperCommandContextForGetFuchsiaProperty,
 		},
 		{
 			name:                      "Multiple discoverable devices found but ffx has a default device",
@@ -964,14 +994,16 @@ func TestResolveTargetAddress(t *testing.T) {
 				IsDefault:    true,
 				Discoverable: true,
 			},
-			execHelper: helperCommandForNoDefaultDevice,
+			execHelper:        helperCommandForNoDefaultDevice,
+			execContextHelper: helperCommandContextForNoDefaultDevice,
 		},
 		{
 			name:                      "Multiple discoverable devices found but ffx has a default device that isn't discoverable",
 			ffxTargetDefaultGetOutput: "some-unknown-default-device",
 			expectedError: `Cannot get target address for some-unknown-default-device.
 		Try running 'ffx target list'.`,
-			execHelper: helperCommandForNoDefaultDevice,
+			execHelper:        helperCommandForNoDefaultDevice,
+			execContextHelper: helperCommandContextForNoDefaultDevice,
 		},
 		{
 			name: "One discoverable device and no configured device",
@@ -991,7 +1023,8 @@ func TestResolveTargetAddress(t *testing.T) {
 				IsDefault:    false,
 				Discoverable: true,
 			},
-			execHelper: helperCommandForNoConfiguredDevices,
+			execHelper:        helperCommandForNoConfiguredDevices,
+			execContextHelper: helperCommandContextForNoConfiguredDevices,
 		},
 		{
 			name: "Multiple discoverable devices and no configured device",
@@ -1008,8 +1041,9 @@ func TestResolveTargetAddress(t *testing.T) {
 			"target_type":"Unknown",
 			"target_state":"Product",
 			"addresses":["::1"]}]`,
-			expectedError: fmt.Sprintf("Multiple devices found. %v", helpfulTipMsg),
-			execHelper:    helperCommandForNoConfiguredDevices,
+			expectedError:     fmt.Sprintf("Multiple devices found. %v", helpfulTipMsg),
+			execHelper:        helperCommandForNoConfiguredDevices,
+			execContextHelper: helperCommandContextForNoConfiguredDevices,
 		},
 	}
 	for _, test := range tests {
@@ -1020,6 +1054,7 @@ func TestResolveTargetAddress(t *testing.T) {
 			os.Setenv("TEST_GET_SSH_ADDRESS_OUTPUT", test.ffxTargetGetSSHAddressOutput)
 			os.Setenv("FFX_ISOLATE_DIR", t.TempDir())
 			ExecCommand = test.execHelper
+			ExecCommandContext = test.execContextHelper
 
 			config, err := sdk.ResolveTargetAddress(test.deviceIP, test.deviceName)
 			if err != nil {
@@ -1082,6 +1117,7 @@ func TestRunFFX(t *testing.T) {
 				os.Unsetenv("FFX_ISOLATE_DIR")
 			}
 			ExecCommand = helperCommandForSetTesting
+			ExecCommandContext = helperCommandContextForSDKCommon
 			_, err := testSDK.RunFFX([]string{}, false)
 			if test.wantError && err == nil {
 				t.Fatalf("expected error but got nil")
@@ -1096,6 +1132,7 @@ func TestRunFFXDoctor(t *testing.T) {
 	sdk := SDKProperties{}
 
 	ExecCommand = helperCommandForSetTesting
+	ExecCommandContext = helperCommandContextForSetTesting
 	defer clearTestEnv()
 	os.Setenv("FFX_ISOLATE_DIR", t.TempDir())
 
@@ -1229,6 +1266,10 @@ func TestWriteTempFile(t *testing.T) {
 	}
 }
 
+func helperCommandContextForGetFuchsiaProperty(_ context.Context, command string, s ...string) (cmd *exec.Cmd) {
+	return helperCommandForGetFuchsiaProperty(command, s...)
+}
+
 func helperCommandForGetFuchsiaProperty(command string, s ...string) (cmd *exec.Cmd) {
 	cs := []string{"-test.run=TestFakeFfx", "--"}
 	cs = append(cs, command)
@@ -1238,6 +1279,10 @@ func helperCommandForGetFuchsiaProperty(command string, s ...string) (cmd *exec.
 	// Set this in the environment, so we can control the result.
 	cmd.Env = append(os.Environ(), "GO_WANT_HELPER_PROCESS=1")
 	return cmd
+}
+
+func helperCommandContextForNoDefaultDevice(_ context.Context, command string, s ...string) (cmd *exec.Cmd) {
+	return helperCommandForNoDefaultDevice(command, s...)
 }
 
 func helperCommandForNoDefaultDevice(command string, s ...string) (cmd *exec.Cmd) {
@@ -1265,6 +1310,10 @@ func helperCommandForRemoteTarget(command string, s ...string) (cmd *exec.Cmd) {
 	return cmd
 }
 
+func helperCommandContextForNoConfiguredDevices(_ context.Context, command string, s ...string) (cmd *exec.Cmd) {
+	return helperCommandForNoConfiguredDevices(command, s...)
+}
+
 func helperCommandForNoConfiguredDevices(command string, s ...string) (cmd *exec.Cmd) {
 	cs := []string{"-test.run=TestFakeFfx", "--"}
 	cs = append(cs, command)
@@ -1276,6 +1325,10 @@ func helperCommandForNoConfiguredDevices(command string, s ...string) (cmd *exec
 	cmd.Env = append(cmd.Env, "FFX_NO_CONFIGURED_DEVICES=1")
 	cmd.Env = append(cmd.Env, "NO_DEFAULT_DEVICE=1")
 	return cmd
+}
+
+func helperCommandContextForSetTesting(_ context.Context, command string, s ...string) (cmd *exec.Cmd) {
+	return helperCommandForSetTesting(command, s...)
 }
 
 func helperCommandForSetTesting(command string, s ...string) (cmd *exec.Cmd) {

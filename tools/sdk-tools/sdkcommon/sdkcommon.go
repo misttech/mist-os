@@ -5,6 +5,7 @@
 package sdkcommon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -26,6 +27,8 @@ import (
 var (
 	// ExecCommand exports exec.Command as a variable so it can be mocked.
 	ExecCommand = exec.Command
+	// ExecCommandContext exports exec.CommandContext as a variable so it can be mocked.
+	ExecCommandContext = exec.CommandContext
 	// ExecLookPath exported to support mocking.
 	ExecLookPath = exec.LookPath
 	// logging support.
@@ -314,6 +317,12 @@ func (sdk SDKProperties) GetToolsDir() (string, error) {
 // GetAvailableImages returns the images available for the given version and bucket. If
 // bucket is not the default bucket, the images in the default bucket are also returned.
 func (sdk SDKProperties) GetAvailableImages(version string, bucket string) ([]GCSImage, error) {
+	return sdk.GetAvailableImagesContext(context.Background(), version, bucket)
+}
+
+// GetAvailableImagesContext returns the images available for the given version and bucket. If
+// bucket is not the default bucket, the images in the default bucket are also returned.
+func (sdk SDKProperties) GetAvailableImagesContext(ctx context.Context, version string, bucket string) ([]GCSImage, error) {
 	var buckets []string
 	var images []GCSImage
 
@@ -326,7 +335,7 @@ func (sdk SDKProperties) GetAvailableImages(version string, bucket string) ([]GC
 	for _, b := range buckets {
 		url := fmt.Sprintf("gs://%v/development/%v/images*", b, version)
 		args := []string{"ls", url}
-		output, err := runGSUtil(args)
+		output, err := runGSUtil(ctx, args)
 		if err != nil {
 			return images, err
 		}
@@ -482,6 +491,17 @@ func getCommonSSHArgs(sdk SDKProperties, customSSHConfig string, privateKey stri
 // The return value is the error if any.
 func (sdk SDKProperties) RunSFTPCommand(targetAddress string, customSSHConfig string, privateKey string,
 	sshPort string, toTarget bool, src string, dst string) error {
+	return sdk.RunSFTPCommandContext(context.Background(), targetAddress, customSSHConfig, privateKey,
+		sshPort, toTarget, src, dst)
+}
+
+// RunSFTPCommandContext runs sftp (one of SSH's file copy tools).
+// Setting toTarget to true will copy file SRC from host to DST on the target.
+// Otherwise it will copy file from SRC from target to DST on the host.
+// sshPort if non-empty will use this port to connect to the device.
+// The return value is the error if any.
+func (sdk SDKProperties) RunSFTPCommandContext(ctx context.Context, targetAddress string, customSSHConfig string, privateKey string,
+	sshPort string, toTarget bool, src string, dst string) error {
 
 	commonArgs := []string{"-q", "-b", "-"}
 	if customSSHConfig == "" || privateKey == "" {
@@ -510,7 +530,7 @@ func (sdk SDKProperties) RunSFTPCommand(targetAddress string, customSSHConfig st
 		stdin = fmt.Sprintf("get %v %v", src, dst)
 	}
 
-	return runSFTP(cmdArgs, stdin)
+	return runSFTP(ctx, cmdArgs, stdin)
 }
 
 // RunSSHCommand runs the command provided in args on the given target device.
@@ -521,13 +541,24 @@ func (sdk SDKProperties) RunSFTPCommand(targetAddress string, customSSHConfig st
 // The return value is the stdout.
 func (sdk SDKProperties) RunSSHCommand(targetAddress string, customSSHConfig string,
 	privateKey string, sshPort string, verbose bool, args []string) (string, error) {
+	return sdk.RunSSHCommandContext(context.Background(), targetAddress, customSSHConfig, privateKey, sshPort, verbose, args)
+}
+
+// RunSSHCommandContext runs the command provided in args on the given target device.
+// The customSSHconfig is optional and overrides the SSH configuration defined by the SDK.
+// privateKey is optional to specify a private key to use to access the device.
+// verbose adds the -v flag to ssh.
+// sshPort if non-empty is used as the custom ssh port on the commandline.
+// The return value is the stdout.
+func (sdk SDKProperties) RunSSHCommandContext(ctx context.Context, targetAddress string, customSSHConfig string,
+	privateKey string, sshPort string, verbose bool, args []string) (string, error) {
 
 	cmdArgs, err := buildSSHArgs(sdk, targetAddress, customSSHConfig, privateKey, sshPort, verbose, args)
 	if err != nil {
 		return "", err
 	}
 
-	return runSSH(cmdArgs, false)
+	return runSSH(ctx, cmdArgs, false)
 }
 
 // RunSSHShell runs the command provided in args on the given target device and
@@ -540,13 +571,26 @@ func (sdk SDKProperties) RunSSHCommand(targetAddress string, customSSHConfig str
 // The return value is the stdout.
 func (sdk SDKProperties) RunSSHShell(targetAddress string, customSSHConfig string,
 	privateKey string, sshPort string, verbose bool, args []string) error {
+	return sdk.RunSSHShellContext(context.Background(), targetAddress, customSSHConfig, privateKey, sshPort, verbose, args)
+}
+
+// RunSSHShellContext runs the command provided in args on the given target device and
+// uses the system stdin, stdout, stderr.
+// Returns when the ssh process exits.
+// The customSSHconfig is optional and overrides the SSH configuration defined by the SDK.
+// privateKey is optional to specify a private key to use to access the device.
+// sshPort if non-empty is used as the custom ssh port on the commandline.
+// verbose adds the -v flag to ssh.
+// The return value is the stdout.
+func (sdk SDKProperties) RunSSHShellContext(ctx context.Context, targetAddress string, customSSHConfig string,
+	privateKey string, sshPort string, verbose bool, args []string) error {
 
 	cmdArgs, err := buildSSHArgs(sdk, targetAddress, customSSHConfig, privateKey,
 		sshPort, verbose, args)
 	if err != nil {
 		return err
 	}
-	_, err = runSSH(cmdArgs, true)
+	_, err = runSSH(ctx, cmdArgs, true)
 	return err
 
 }
@@ -1248,6 +1292,12 @@ func getDeviceConfigurationData(sdk SDKProperties, key string) (map[string]inter
 // RunFFX executes ffx with the given args, returning stdout. If there is an error,
 // the error will usually be of type *ExitError.
 func (sdk SDKProperties) RunFFX(args []string, interactive bool) (string, error) {
+	return sdk.RunFFXContext(context.Background(), args, interactive)
+}
+
+// RunFFXContext executes ffx with the given args, returning stdout. If there is an error,
+// the error will usually be of type *ExitError.
+func (sdk SDKProperties) RunFFXContext(ctx context.Context, args []string, interactive bool) (string, error) {
 	toolsDir, err := sdk.GetToolsDir()
 	if err != nil {
 		return "", fmt.Errorf("Could not determine tools directory %v", err)
@@ -1259,7 +1309,7 @@ func (sdk SDKProperties) RunFFX(args []string, interactive bool) (string, error)
 		return "", fmt.Errorf("ffx must be isolated when run in infra")
 	}
 
-	ffx := ExecCommand(cmd, args...)
+	ffx := ExecCommandContext(ctx, cmd, args...)
 	if interactive {
 		ffx.Stderr = os.Stderr
 		ffx.Stdout = os.Stdout

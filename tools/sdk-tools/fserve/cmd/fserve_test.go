@@ -60,6 +60,10 @@ func (testSDK testSDKProperties) GetDefaultPackageRepoDir() (string, error) {
 }
 
 func (testSDK testSDKProperties) RunFFX(ffxArgs []string, interactive bool) (string, error) {
+	return testSDK.RunFFXContext(context.Background(), ffxArgs, interactive)
+}
+
+func (testSDK testSDKProperties) RunFFXContext(_ context.Context, ffxArgs []string, interactive bool) (string, error) {
 	expectedArgs := []string{}
 
 	for _, args := range testSDK.expectedFFXArgs {
@@ -92,6 +96,11 @@ func (testSDK testSDKProperties) RunFFX(ffxArgs []string, interactive bool) (str
 }
 
 func (testSDK testSDKProperties) RunSSHCommand(targetAddress string, sshConfig string,
+	privateKey string, sshPort string, verbose bool, sshArgs []string) (string, error) {
+	return testSDK.RunSSHCommandContext(context.Background(), targetAddress, sshConfig, privateKey, sshPort, verbose, sshArgs)
+}
+
+func (testSDK testSDKProperties) RunSSHCommandContext(_ context.Context, targetAddress string, sshConfig string,
 	privateKey string, sshPort string, verbose bool, sshArgs []string) (string, error) {
 
 	if testSDK.expectCustomSSHConfig && sshConfig == "" {
@@ -144,6 +153,12 @@ func testingContext() context.Context {
 	log := logger.NewLogger(logger.DebugLevel, color.NewColor(color.ColorAuto), os.Stdout, os.Stderr, "fserve_test ")
 	log.SetFlags(flags)
 	return logger.WithLogger(context.Background(), log)
+}
+
+// See exec_test.go for details, but effectively this runs the function called TestHelperProcess passing
+// the args.
+func helperCommandContextForFServe(_ context.Context, command string, s ...string) (cmd *exec.Cmd) {
+	return helperCommandForFServe(command, s...)
 }
 
 // See exec_test.go for details, but effectively this runs the function called TestHelperProcess passing
@@ -391,6 +406,7 @@ func TestDownloadImageIfNeeded(t *testing.T) {
 	ctx := testingContext()
 	ExecCommand = helperCommandForFServe
 	sdkcommon.ExecCommand = helperCommandForFServe
+	sdkcommon.ExecCommandContext = helperCommandContextForFServe
 	sdkcommon.ExecLookPath = func(cmd string) (string, error) { return filepath.Join("mocked", cmd), nil }
 	defer clearTestEnv()
 
@@ -749,6 +765,7 @@ func TestMain(t *testing.T) {
 	savedCommandLine := flag.CommandLine
 	ExecCommand = helperCommandForFServe
 	sdkcommon.ExecCommand = helperCommandForFServe
+	sdkcommon.ExecCommandContext = helperCommandContextForFServe
 	sdkcommon.ExecLookPath = func(name string) (string, error) {
 		if name == "gsutil" {
 			return "/path/to/fake/gsutil", nil

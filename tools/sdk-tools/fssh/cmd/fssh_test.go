@@ -35,9 +35,11 @@ func TestMain(t *testing.T) {
 	dataDir := t.TempDir()
 	savedCommandLine := flag.CommandLine
 	sdkcommon.ExecCommand = helperCommandForFSSH
+	sdkcommon.ExecCommandContext = helperCommandContextForFSSH
 	defer func() {
 		clearEnvVars()
 		sdkcommon.ExecCommand = exec.Command
+		sdkcommon.ExecCommandContext = exec.CommandContext
 		flag.CommandLine = savedCommandLine
 	}()
 
@@ -167,6 +169,12 @@ func TestMain(t *testing.T) {
 			}
 		})
 	}
+}
+
+// See exec_test.go for details, but effectively this runs the function called TestHelperProcess passing
+// the args.
+func helperCommandContextForFSSH(_ context.Context, command string, s ...string) (cmd *exec.Cmd) {
+	return helperCommandForFSSH(command, s...)
 }
 
 // See exec_test.go for details, but effectively this runs the function called TestHelperProcess passing

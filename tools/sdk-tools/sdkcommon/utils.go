@@ -5,6 +5,7 @@
 package sdkcommon
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,12 +13,12 @@ import (
 	"strings"
 )
 
-func runGSUtil(args []string) (string, error) {
+func runGSUtil(ctx context.Context, args []string) (string, error) {
 	path, err := ExecLookPath("gsutil")
 	if err != nil {
 		return "", fmt.Errorf("could not find gsutil on path: %v", err)
 	}
-	cmd := ExecCommand(path, args...)
+	cmd := ExecCommandContext(ctx, path, args...)
 	out, err := cmd.Output()
 	if err != nil {
 		var exitError *exec.ExitError
@@ -29,12 +30,12 @@ func runGSUtil(args []string) (string, error) {
 	return string(out), err
 }
 
-func runSSH(args []string, interactive bool) (string, error) {
+func runSSH(ctx context.Context, args []string, interactive bool) (string, error) {
 	path, err := ExecLookPath("ssh")
 	if err != nil {
 		return "", fmt.Errorf("could not find ssh on path: %v", err)
 	}
-	cmd := ExecCommand(path, args...)
+	cmd := ExecCommandContext(ctx, path, args...)
 	if interactive {
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
@@ -53,12 +54,12 @@ func runSSH(args []string, interactive bool) (string, error) {
 	return string(out), err
 }
 
-func runSFTP(args []string, stdin string) error {
+func runSFTP(ctx context.Context, args []string, stdin string) error {
 	path, err := ExecLookPath("sftp")
 	if err != nil {
 		return fmt.Errorf("could not find sftp on path: %v", err)
 	}
-	cmd := ExecCommand(path, args...)
+	cmd := ExecCommandContext(ctx, path, args...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = strings.NewReader(stdin)
@@ -66,13 +67,21 @@ func runSFTP(args []string, stdin string) error {
 }
 
 func GCSFileExists(gcsPath string) (string, error) {
+	return GCSFileExistsContext(context.Background(), gcsPath)
+}
+
+func GCSFileExistsContext(ctx context.Context, gcsPath string) (string, error) {
 	args := []string{"ls", gcsPath}
-	return runGSUtil(args)
+	return runGSUtil(ctx, args)
 }
 
 func GCSCopy(gcsSource string, localDest string) (string, error) {
+	return GCSCopyContext(context.Background(), gcsSource, localDest)
+}
+
+func GCSCopyContext(ctx context.Context, gcsSource string, localDest string) (string, error) {
 	args := []string{"cp", gcsSource, localDest}
-	return runGSUtil(args)
+	return runGSUtil(ctx, args)
 }
 
 // FileExists returns true if filename exists.

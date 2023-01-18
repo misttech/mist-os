@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -58,6 +59,12 @@ func (testSDK testSDKProperties) RunFFX(args []string, interactive bool) (string
 
 	*testSDK.ffxCalled = true
 	return "", nil
+}
+
+// See exec_test.go for details, but effectively this runs the function called TestHelperProcess passing
+// the args.
+func helperCommandContextForFPublish(_ context.Context, command string, s ...string) (cmd *exec.Cmd) {
+	return helperCommandForFPublish(command, s...)
 }
 
 // See exec_test.go for details, but effectively this runs the function called TestHelperProcess passing
@@ -173,6 +180,7 @@ func TestMain(t *testing.T) {
 	savedCommandLine := flag.CommandLine
 	ExecCommand = helperCommandForFPublish
 	sdkcommon.ExecCommand = helperCommandForFPublish
+	sdkcommon.ExecCommandContext = helperCommandContextForFPublish
 	defer func() {
 		ExecCommand = exec.Command
 		sdkcommon.ExecCommand = exec.Command
