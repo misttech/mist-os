@@ -72,8 +72,8 @@ async fn shutdown_test() {
     // request to Driver Manager. In this case, we know that to be true once the previous
     // `wait_for_shutdown_request` completes.
     assert_eq!(
-        env.mocks.driver_manager.get_current_termination_state(),
-        fpower::SystemPowerState::Reboot
+        env.mocks.driver_manager.current_termination_state(),
+        fidl_fuchsia_device_manager::SystemPowerState::Reboot
     );
 
     env.destroy().await;

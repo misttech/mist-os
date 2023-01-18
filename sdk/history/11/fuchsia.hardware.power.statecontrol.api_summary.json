@@ -275,52 +275,6 @@
         "type": "uint32"
     },
     {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState.FULLY_ON",
-        "value": "1"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState.MEXEC",
-        "value": "6"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState.POWEROFF",
-        "value": "5"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState.REBOOT",
-        "value": "2"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState.REBOOT_BOOTLOADER",
-        "value": "3"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState.REBOOT_KERNEL_INITIATED",
-        "value": "8"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState.REBOOT_RECOVERY",
-        "value": "4"
-    },
-    {
-        "kind": "enum/member",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState.SUSPEND_RAM",
-        "value": "7"
-    },
-    {
-        "kind": "enum",
-        "name": "fuchsia.hardware.power.statecontrol/SystemPowerState",
-        "strictness": "strict",
-        "type": "uint8"
-    },
-    {
         "kind": "library",
         "name": "fuchsia.hardware.power.statecontrol"
     }

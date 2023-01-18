@@ -125,13 +125,4 @@ impl MockDriverManager {
     pub fn current_termination_state(&self) -> fdevmgr::SystemPowerState {
         self.current_termination_state.read().expect("Termination state not set")
     }
-
-    pub fn get_current_termination_state(
-        &self,
-    ) -> fidl_fuchsia_hardware_power_statecontrol::SystemPowerState {
-        fidl_fuchsia_hardware_power_statecontrol::SystemPowerState::from_primitive(
-            self.current_termination_state().into_primitive(),
-        )
-        .expect("trivial conversion")
-    }
 }

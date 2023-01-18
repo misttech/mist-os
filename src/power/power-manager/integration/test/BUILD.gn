@@ -23,6 +23,7 @@ rustc_test("integration-test") {
   testonly = true
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
