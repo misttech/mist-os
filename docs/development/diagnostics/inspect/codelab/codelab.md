@@ -731,7 +731,7 @@ is even being handled by your component.
    * {C++}
 
       Update the definition of `CreateDefaultHandler` in [reverser.h][cpp-part1-reverser-h]
-      and [reverser.cc][part1-reverser-cc]:
+      and [reverser.cc][cpp-part1-reverser-cc]:
 
       ```cpp
       {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/diagnostics/inspect/codelab/cpp/part_2/reverser.h" region_tag="part_1_include" adjust_indentation="auto" %}

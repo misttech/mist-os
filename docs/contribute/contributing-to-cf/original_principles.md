@@ -770,7 +770,7 @@ contents of a collection are runtime determined.
 [rfc-versions]: /docs/contribute/governance/rfcs/0002_platform_versioning.md
 [src-builtin]: /src/sys/component_manager/configs/bootfs_config.json5
 [src-route-exceptions]: /src/security/policy/build/verify_routes_exceptions_allowlist.json5
-[src-security_policy]: /src/security/policy/component_manager_policy.json5
+[src-security-policy]: /src/security/policy/component_manager_policy.json5
 [wiki-ambient-authority]: https://en.wikipedia.org/wiki/Ambient_authority
 [wiki-capabilities]: https://en.wikipedia.org/wiki/Capability-based_security
 [wiki-info-security]: https://en.wikipedia.org/wiki/Information_security

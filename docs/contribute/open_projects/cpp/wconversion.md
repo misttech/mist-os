@@ -347,7 +347,7 @@ If the tryjobs turn red, you can click on them to find descriptive errors.
 *   [464514: [fit, fzl] Enable -Wconversion warnings](https://fuchsia-review.googlesource.com/c/fuchsia/+/464514)
 *   [463856: [kcounter] Enable -Wconversion warnings](https://fuchsia-review.googlesource.com/c/fuchsia/+/463856)
 *   [456573: [feedback] fix -Wconversion errors](https://fuchsia-review.googlesource.com/c/fuchsia/+/456573)
-*   [450719: [camera][lib] Fix -Wconversion build errors](https://fuchsia-review.googlesource.com/c/fuchsia/+/450719)
+*   [450719: [camera]\[lib\] Fix -Wconversion build errors](https://fuchsia-review.googlesource.com/c/fuchsia/+/450719)
 
 ## Sponsors
 
