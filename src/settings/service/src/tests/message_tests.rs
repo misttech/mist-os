@@ -14,17 +14,17 @@ use fuchsia_zircon::DurationNum;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
-use std::fmt::Debug;
 use std::sync::Arc;
 use std::task::Poll;
 
-#[derive(Clone, PartialEq, Debug, Copy)]
-pub(crate) enum TestMessage {
-    Foo,
-    Bar,
-    Baz,
-    Qux,
-    Thud,
+type TestPayload = crate::service::test::Payload;
+pub(crate) mod test_message {
+    use super::TestPayload;
+    pub static FOO: crate::Payload = crate::Payload::Test(TestPayload::Integer(0));
+    pub static BAR: crate::Payload = crate::Payload::Test(TestPayload::Integer(1));
+    pub static BAZ: crate::Payload = crate::Payload::Test(TestPayload::Integer(2));
+    pub static QUX: crate::Payload = crate::Payload::Test(TestPayload::Integer(3));
+    pub static THUD: crate::Payload = crate::Payload::Test(TestPayload::Integer(4));
 }
 
 /// Ensures the delivery result matches expected value.
@@ -43,19 +43,18 @@ async fn verify_result<P: Payload + PartialEq + 'static, A: Address + PartialEq 
     panic!("Didn't receive result expected");
 }
 
-static ORIGINAL: TestMessage = TestMessage::Foo;
-static MODIFIED: TestMessage = TestMessage::Qux;
-static MODIFIED_2: TestMessage = TestMessage::Thud;
-static BROADCAST: TestMessage = TestMessage::Baz;
-static REPLY: TestMessage = TestMessage::Bar;
+static ORIGINAL: &crate::Payload = &test_message::FOO;
+static MODIFIED: &crate::Payload = &test_message::QUX;
+static MODIFIED_2: &crate::Payload = &test_message::THUD;
+static BROADCAST: &crate::Payload = &test_message::BAZ;
+static REPLY: &crate::Payload = &test_message::BAR;
 
 const ROLE_1: crate::Role = crate::Role::Event(event::Role::Sink);
 const ROLE_2: crate::Role = crate::Role::Policy(policy::Role::PolicyHandler);
 
 mod test {
-    use super::*;
     pub(crate) type MessageHub =
-        crate::message::message_hub::MessageHub<TestMessage, crate::Address>;
+        crate::message::message_hub::MessageHub<crate::Payload, crate::Address>;
 }
 
 mod num_test {
@@ -69,10 +68,10 @@ async fn test_message_client_equality() {
     let (messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
     let (_, mut receptor) = delegate.create(MessengerType::Unbound).await.unwrap();
 
-    let _ = messenger.message(ORIGINAL, Audience::Broadcast).send();
+    let _ = messenger.message(ORIGINAL.clone(), Audience::Broadcast).send();
     let (_, client_1) = receptor.next_payload().await.unwrap();
 
-    let _ = messenger.message(ORIGINAL, Audience::Broadcast).send();
+    let _ = messenger.message(ORIGINAL.clone(), Audience::Broadcast).send();
     let (_, client_2) = receptor.next_payload().await.unwrap();
 
     assert!(client_1 != client_2);
@@ -167,21 +166,22 @@ async fn test_end_to_end_messaging() {
     let (_, mut receptor_2) =
         delegate.create(MessengerType::Addressable(crate::Address::Test(2))).await.unwrap();
 
-    let mut reply_receptor =
-        messenger_client_1.message(ORIGINAL, Audience::Address(crate::Address::Test(2))).send();
+    let mut reply_receptor = messenger_client_1
+        .message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(2)))
+        .send();
 
     verify_payload(
-        ORIGINAL,
+        ORIGINAL.clone(),
         &mut receptor_2,
         Some(Box::new(|client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                let _ = client.reply(REPLY).send();
+                let _ = client.reply(REPLY.clone()).send();
             })
         })),
     )
     .await;
 
-    verify_payload(REPLY, &mut reply_receptor, None).await;
+    verify_payload(REPLY.clone(), &mut reply_receptor, None).await;
 }
 
 // Tests forwarding behavior, making sure a message is forwarded in the case
@@ -196,27 +196,28 @@ async fn test_implicit_forward() {
     let (_, mut receiver_3) =
         delegate.create(MessengerType::Addressable(crate::Address::Test(3))).await.unwrap();
 
-    let mut reply_receptor =
-        messenger_client_1.message(ORIGINAL, Audience::Address(crate::Address::Test(3))).send();
+    let mut reply_receptor = messenger_client_1
+        .message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(3)))
+        .send();
 
     // Ensure observer gets payload and then do nothing with message.
-    verify_payload(ORIGINAL, &mut receiver_2, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receiver_2, None).await;
 
     verify_payload(
-        ORIGINAL,
+        ORIGINAL.clone(),
         &mut receiver_3,
         Some(Box::new(|client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                let _ = client.reply(REPLY).send();
+                let _ = client.reply(REPLY.clone()).send();
             })
         })),
     )
     .await;
 
     // Ensure observer gets payload and then do nothing with message.
-    verify_payload(REPLY, &mut receiver_2, None).await;
+    verify_payload(REPLY.clone(), &mut receiver_2, None).await;
 
-    verify_payload(REPLY, &mut reply_receptor, None).await;
+    verify_payload(REPLY.clone(), &mut reply_receptor, None).await;
 }
 
 // Exercises the observation functionality. Makes sure a broker who has
@@ -232,11 +233,12 @@ async fn test_observe_addressable() {
     let (_, mut receptor_3) =
         delegate.create(MessengerType::Addressable(crate::Address::Test(3))).await.unwrap();
 
-    let mut reply_receptor =
-        messenger_client_1.message(ORIGINAL, Audience::Address(crate::Address::Test(3))).send();
+    let mut reply_receptor = messenger_client_1
+        .message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(3)))
+        .send();
 
     let observe_receptor = Arc::new(Mutex::new(None));
-    verify_payload(ORIGINAL, &mut receptor_2, {
+    verify_payload(ORIGINAL.clone(), &mut receptor_2, {
         let observe_receptor = observe_receptor.clone();
         Some(Box::new(move |mut client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
@@ -248,22 +250,22 @@ async fn test_observe_addressable() {
     .await;
 
     verify_payload(
-        ORIGINAL,
+        ORIGINAL.clone(),
         &mut receptor_3,
         Some(Box::new(|client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                let _ = client.reply(REPLY).send();
+                let _ = client.reply(REPLY.clone()).send();
             })
         })),
     )
     .await;
 
     if let Some(mut receptor) = observe_receptor.lock().await.take() {
-        verify_payload(REPLY, &mut receptor, None).await;
+        verify_payload(REPLY.clone(), &mut receptor, None).await;
     } else {
         panic!("A receptor should have been assigned")
     }
-    verify_payload(REPLY, &mut reply_receptor, None).await;
+    verify_payload(REPLY.clone(), &mut reply_receptor, None).await;
 }
 
 // Validates that timeout status is reached when there is no response
@@ -280,12 +282,12 @@ fn test_timeout() {
             delegate.create(MessengerType::Addressable(crate::Address::Test(2))).await.unwrap();
 
         let mut reply_receptor = messenger_client_1
-            .message(ORIGINAL, Audience::Address(crate::Address::Test(2)))
+            .message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(2)))
             .set_timeout(Some(timeout_ms.millis()))
             .send();
 
         verify_payload(
-            ORIGINAL,
+            ORIGINAL.clone(),
             &mut receptor_2,
             Some(Box::new(|_| -> BoxFuture<'_, ()> {
                 Box::pin(async move {
@@ -328,10 +330,10 @@ async fn test_broadcast() {
     let (_, mut receptor_3) =
         delegate.create(MessengerType::Addressable(crate::Address::Test(3))).await.unwrap();
 
-    let _ = messenger_client_1.message(ORIGINAL, Audience::Broadcast).send();
+    let _ = messenger_client_1.message(ORIGINAL.clone(), Audience::Broadcast).send();
 
-    verify_payload(ORIGINAL, &mut receptor_2, None).await;
-    verify_payload(ORIGINAL, &mut receptor_3, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor_2, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor_3, None).await;
 }
 
 // Verifies delivery statuses are properly relayed back to the original sender.
@@ -346,18 +348,19 @@ async fn test_delivery_status() {
         delegate.create(MessengerType::Addressable(known_receiver_address)).await.unwrap();
 
     {
-        let mut receptor =
-            messenger_client_1.message(ORIGINAL, Audience::Address(known_receiver_address)).send();
+        let mut receptor = messenger_client_1
+            .message(ORIGINAL.clone(), Audience::Address(known_receiver_address))
+            .send();
 
         // Ensure observer gets payload and then do nothing with message.
-        verify_payload(ORIGINAL, &mut receptor_2, None).await;
+        verify_payload(ORIGINAL.clone(), &mut receptor_2, None).await;
 
         verify_result(Status::Received, &mut receptor).await;
     }
 
     {
         let mut receptor =
-            messenger_client_1.message(ORIGINAL, Audience::Address(unknown_address)).send();
+            messenger_client_1.message(ORIGINAL.clone(), Audience::Address(unknown_address)).send();
 
         verify_result(Status::Undeliverable, &mut receptor).await;
     }
@@ -375,11 +378,11 @@ async fn test_send_delete() {
     {
         let (messenger_client_1, _) =
             delegate.create(MessengerType::Unbound).await.expect("client should be created");
-        messenger_client_1.message(ORIGINAL, Audience::Broadcast).send().ack();
+        messenger_client_1.message(ORIGINAL.clone(), Audience::Broadcast).send().ack();
     }
 
     // Ensure observer gets payload and then do nothing with message.
-    verify_payload(ORIGINAL, &mut receptor_2, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor_2, None).await;
 }
 
 // Verifies beacon returns error when receptor goes out of scope.
@@ -396,16 +399,18 @@ async fn test_beacon_error() {
         verify_result(
             Status::Received,
             &mut messenger_client
-                .message(ORIGINAL, Audience::Address(crate::Address::Test(2)))
+                .message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(2)))
                 .send(),
         )
         .await;
-        verify_payload(ORIGINAL, &mut receptor, None).await;
+        verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
     }
 
     verify_result(
         Status::Undeliverable,
-        &mut messenger_client.message(ORIGINAL, Audience::Address(crate::Address::Test(2))).send(),
+        &mut messenger_client
+            .message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(2)))
+            .send(),
     )
     .await;
 }
@@ -421,9 +426,9 @@ async fn test_acknowledge() {
     let (messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
 
     let mut message_receptor =
-        messenger.message(ORIGINAL, Audience::Address(crate::Address::Test(1))).send();
+        messenger.message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(1))).send();
 
-    verify_payload(ORIGINAL, &mut receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
 
     assert!(message_receptor.wait_for_acknowledge().await.is_ok());
 }
@@ -439,7 +444,7 @@ async fn test_messenger_behavior() {
     }
 }
 
-async fn verify_messenger_behavior(messenger_type: MessengerType<TestMessage, crate::Address>) {
+async fn verify_messenger_behavior(messenger_type: MessengerType<crate::Payload, crate::Address>) {
     let delegate = test::MessageHub::create();
 
     // Messenger to receive message.
@@ -451,34 +456,34 @@ async fn verify_messenger_behavior(messenger_type: MessengerType<TestMessage, cr
 
     // Send top level message from the Messenger.
     let mut reply_receptor =
-        test_client.message(ORIGINAL, Audience::Address(crate::Address::Test(1))).send();
+        test_client.message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(1))).send();
 
     let captured_signature = Arc::new(Mutex::new(None));
 
     // Verify target messenger received message and capture Signature.
-    verify_payload(ORIGINAL, &mut target_receptor, {
+    verify_payload(ORIGINAL.clone(), &mut target_receptor, {
         let captured_signature = captured_signature.clone();
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
                 let mut author = captured_signature.lock().await;
                 *author = Some(client.get_author());
-                client.reply(REPLY).send().ack();
+                client.reply(REPLY.clone()).send().ack();
             })
         }))
     })
     .await;
 
     // Verify messenger received reply on the message receptor.
-    verify_payload(REPLY, &mut reply_receptor, None).await;
+    verify_payload(REPLY.clone(), &mut reply_receptor, None).await;
 
     let messenger_signature =
         captured_signature.lock().await.take().expect("signature should be populated");
 
     // Send top level message to Messenger.
-    target_client.message(ORIGINAL, Audience::Messenger(messenger_signature)).send().ack();
+    target_client.message(ORIGINAL.clone(), Audience::Messenger(messenger_signature)).send().ack();
 
     // Verify Messenger received message.
-    verify_payload(ORIGINAL, &mut test_receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut test_receptor, None).await;
 }
 
 // Ensures unbound messengers operate properly
@@ -492,22 +497,22 @@ async fn test_unbound_messenger() {
         delegate.create(MessengerType::Unbound).await.expect("messenger should be created");
 
     let mut reply_receptor = unbound_messenger_1
-        .message(ORIGINAL, Audience::Messenger(unbound_receptor.get_signature()))
+        .message(ORIGINAL.clone(), Audience::Messenger(unbound_receptor.get_signature()))
         .send();
 
     // Verify target messenger received message and send response.
     verify_payload(
-        ORIGINAL,
+        ORIGINAL.clone(),
         &mut unbound_receptor,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.reply(REPLY).send().ack();
+                client.reply(REPLY.clone()).send().ack();
             })
         })),
     )
     .await;
 
-    verify_payload(REPLY, &mut reply_receptor, None).await;
+    verify_payload(REPLY.clone(), &mut reply_receptor, None).await;
 }
 
 // Ensures next_payload returns the correct values.
@@ -520,18 +525,19 @@ async fn test_next_payload() {
         delegate.create(MessengerType::Unbound).await.expect("should create messenger");
 
     unbound_messenger_1
-        .message(ORIGINAL, Audience::Messenger(unbound_receptor_2.get_signature()))
+        .message(ORIGINAL.clone(), Audience::Messenger(unbound_receptor_2.get_signature()))
         .send()
         .ack();
 
     let receptor_result = unbound_receptor_2.next_payload().await;
 
     let (payload, _) = receptor_result.unwrap();
-    assert_eq!(payload, ORIGINAL);
+    assert_eq!(payload, ORIGINAL.clone());
 
     {
-        let mut receptor =
-            unbound_messenger_1.message(REPLY, Audience::Address(crate::Address::Test(1))).send();
+        let mut receptor = unbound_messenger_1
+            .message(REPLY.clone(), Audience::Address(crate::Address::Test(1)))
+            .send();
         // Should return an error
         let receptor_result = receptor.next_payload().await;
         assert!(receptor_result.is_err());
@@ -597,12 +603,12 @@ async fn test_bind_to_recipient() {
         let (scoped_messenger, _scoped_receptor) =
             delegate.create(MessengerType::Unbound).await.unwrap();
         scoped_messenger
-            .message(ORIGINAL, Audience::Messenger(receptor.get_signature()))
+            .message(ORIGINAL.clone(), Audience::Messenger(receptor.get_signature()))
             .send()
             .ack();
 
         if let Some(MessageEvent::Message(payload, mut client)) = receptor.next().await {
-            assert_eq!(payload, ORIGINAL);
+            assert_eq!(payload, ORIGINAL.clone());
             client
                 .bind_to_recipient(
                     ActionFuseBuilder::new()
@@ -632,7 +638,7 @@ async fn test_reply_propagation() {
     // Create broker to propagate a derived message.
     let (_, mut broker) = delegate
         .create(MessengerType::Broker(Some(filter::Builder::single(filter::Condition::Custom(
-            Arc::new(move |message| *message.payload() == REPLY),
+            Arc::new(move |message| *message.payload() == *REPLY),
         )))))
         .await
         .expect("broker should be created");
@@ -643,16 +649,16 @@ async fn test_reply_propagation() {
 
     // Send top level message.
     let mut result_receptor = sending_messenger
-        .message(ORIGINAL, Audience::Messenger(target_receptor.get_signature()))
+        .message(ORIGINAL.clone(), Audience::Messenger(target_receptor.get_signature()))
         .send();
 
     // Ensure target receives message and reply back.
     verify_payload(
-        ORIGINAL,
+        ORIGINAL.clone(),
         &mut target_receptor,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.reply(REPLY).send().ack();
+                client.reply(REPLY.clone()).send().ack();
             })
         })),
     )
@@ -660,18 +666,18 @@ async fn test_reply_propagation() {
 
     // Ensure broker receives reply and propagate modified message.
     verify_payload(
-        REPLY,
+        REPLY.clone(),
         &mut broker,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED).send().ack();
+                client.propagate(MODIFIED.clone()).send().ack();
             })
         })),
     )
     .await;
 
     // Ensure original sender gets reply.
-    verify_payload(MODIFIED, &mut result_receptor, None).await;
+    verify_payload(MODIFIED.clone(), &mut result_receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -698,16 +704,16 @@ async fn test_propagation() {
 
     // Send top level message.
     let mut result_receptor = sending_messenger
-        .message(ORIGINAL, Audience::Messenger(target_receptor.get_signature()))
+        .message(ORIGINAL.clone(), Audience::Messenger(target_receptor.get_signature()))
         .send();
 
     // Ensure broker 1 receives original message and propagate modified message.
     verify_payload(
-        ORIGINAL,
+        ORIGINAL.clone(),
         &mut broker_1,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED).send().ack();
+                client.propagate(MODIFIED.clone()).send().ack();
             })
         })),
     )
@@ -716,11 +722,11 @@ async fn test_propagation() {
     // Ensure broker 2 receives modified message and propagates a differen
     // modified message.
     verify_payload(
-        MODIFIED,
+        MODIFIED.clone(),
         &mut broker_2,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED_2).send().ack();
+                client.propagate(MODIFIED_2.clone()).send().ack();
             })
         })),
     )
@@ -728,7 +734,7 @@ async fn test_propagation() {
 
     // Ensure target receives message and reply back.
     verify_payload(
-        MODIFIED_2,
+        MODIFIED_2.clone(),
         &mut target_receptor,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
@@ -738,14 +744,14 @@ async fn test_propagation() {
                 assert!(client.get_modifiers().contains(&modifier_1_signature));
                 assert!(client.get_modifiers().contains(&modifier_2_signature));
                 // ensure the message author has not been modified.
-                client.reply(REPLY).send().ack();
+                client.reply(REPLY.clone()).send().ack();
             })
         })),
     )
     .await;
 
     // Ensure original sender gets reply.
-    verify_payload(REPLY, &mut result_receptor, None).await;
+    verify_payload(REPLY.clone(), &mut result_receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -770,17 +776,17 @@ async fn test_broker_filter_audience_broadcast() {
         .expect("broker should be created");
 
     // Send targeted message.
-    messenger.message(ORIGINAL, Audience::Messenger(receptor.get_signature())).send().ack();
+    messenger.message(ORIGINAL.clone(), Audience::Messenger(receptor.get_signature())).send().ack();
     // Verify receptor gets message.
-    verify_payload(ORIGINAL, &mut receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
 
     // Broadcast message.
-    messenger.message(BROADCAST, Audience::Broadcast).send().ack();
+    messenger.message(BROADCAST.clone(), Audience::Broadcast).send().ack();
     // Ensure broker gets broadcast. If the targeted message was received, this
     // will fail.
-    verify_payload(BROADCAST, &mut broker_receptor, None).await;
+    verify_payload(BROADCAST.clone(), &mut broker_receptor, None).await;
     // Ensure receptor gets broadcast.
-    verify_payload(BROADCAST, &mut receptor, None).await;
+    verify_payload(BROADCAST.clone(), &mut receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -807,17 +813,17 @@ async fn test_broker_filter_audience_messenger() {
         .expect("broker should be created");
 
     // Send broadcast message.
-    messenger.message(BROADCAST, Audience::Broadcast).send().ack();
+    messenger.message(BROADCAST.clone(), Audience::Broadcast).send().ack();
     // Verify receptor gets message.
-    verify_payload(BROADCAST, &mut receptor, None).await;
+    verify_payload(BROADCAST.clone(), &mut receptor, None).await;
 
     // Send targeted message.
-    messenger.message(ORIGINAL, Audience::Messenger(receptor.get_signature())).send().ack();
+    messenger.message(ORIGINAL.clone(), Audience::Messenger(receptor.get_signature())).send().ack();
     // Ensure broker gets message. If the broadcast message was received, this
     // will fail.
-    verify_payload(ORIGINAL, &mut broker_receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut broker_receptor, None).await;
     // Ensure receptor gets broadcast.
-    verify_payload(ORIGINAL, &mut receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -846,17 +852,17 @@ async fn test_broker_filter_audience_address() {
         .expect("broker should be created");
 
     // Send broadcast message.
-    messenger.message(BROADCAST, Audience::Broadcast).send().ack();
+    messenger.message(BROADCAST.clone(), Audience::Broadcast).send().ack();
     // Verify receptor gets message.
-    verify_payload(BROADCAST, &mut receptor, None).await;
+    verify_payload(BROADCAST.clone(), &mut receptor, None).await;
 
     // Send targeted message.
-    messenger.message(ORIGINAL, Audience::Address(target_address)).send().ack();
+    messenger.message(ORIGINAL.clone(), Audience::Address(target_address)).send().ack();
     // Ensure broker gets message. If the broadcast message was received, this
     // will fail.
-    verify_payload(ORIGINAL, &mut broker_receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut broker_receptor, None).await;
     // Ensure receptor gets broadcast.
-    verify_payload(ORIGINAL, &mut receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -890,11 +896,11 @@ async fn test_broker_filter_author() {
         .expect("broker should be created");
 
     // Send targeted message.
-    messenger.message(ORIGINAL, Audience::Address(target_address)).send().ack();
+    messenger.message(ORIGINAL.clone(), Audience::Address(target_address)).send().ack();
     // Ensure broker gets message.
-    verify_payload(ORIGINAL, &mut broker_receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut broker_receptor, None).await;
     // Ensure receptor gets message.
-    verify_payload(ORIGINAL, &mut receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -909,7 +915,7 @@ async fn test_broker_filter_custom() {
         .expect("broadcast messenger should be created");
     // Filter to target only the ORIGINAL message.
     let filter = filter::Builder::single(filter::Condition::Custom(Arc::new(|message| {
-        *message.payload() == ORIGINAL
+        *message.payload() == *ORIGINAL
     })));
     // Broker that should only target ORIGINAL messages.
     let (_, mut broker_receptor) = delegate
@@ -918,13 +924,13 @@ async fn test_broker_filter_custom() {
         .expect("broker should be created");
 
     // Send broadcast message.
-    messenger.message(BROADCAST, Audience::Broadcast).send().ack();
+    messenger.message(BROADCAST.clone(), Audience::Broadcast).send().ack();
 
     // Send original message.
-    messenger.message(ORIGINAL, Audience::Broadcast).send().ack();
+    messenger.message(ORIGINAL.clone(), Audience::Broadcast).send().ack();
     // Ensure broker gets message. If the broadcast message was received, this
     // will fail.
-    verify_payload(ORIGINAL, &mut broker_receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut broker_receptor, None).await;
 }
 
 // Verify that using a closure that captures a variable for a custom filter works, since it can't
@@ -940,9 +946,9 @@ async fn test_broker_filter_caputring_closure() {
         .await
         .expect("broadcast messenger should be created");
     // Filter to target only the Foo message.
-    let expected_payload = TestMessage::Foo;
+    let expected_payload = &test_message::FOO;
     let filter = filter::Builder::single(filter::Condition::Custom(Arc::new(move |message| {
-        *message.payload() == expected_payload
+        *message.payload() == *expected_payload
     })));
     // Broker that should only target Foo messages.
     let (_, mut broker_receptor) = delegate
@@ -951,13 +957,13 @@ async fn test_broker_filter_caputring_closure() {
         .expect("broker should be created");
 
     // Send broadcast message.
-    messenger.message(BROADCAST, Audience::Broadcast).send().ack();
+    messenger.message(BROADCAST.clone(), Audience::Broadcast).send().ack();
 
     // Send foo message.
-    messenger.message(expected_payload, Audience::Broadcast).send().ack();
+    messenger.message(expected_payload.clone(), Audience::Broadcast).send().ack();
     // Ensure broker gets message. If the broadcast message was received, this
     // will fail.
-    verify_payload(expected_payload, &mut broker_receptor, None).await;
+    verify_payload(expected_payload.clone(), &mut broker_receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -979,7 +985,7 @@ async fn test_broker_filter_combined_any() {
 
     // Filter to target only the ORIGINAL message.
     let filter = filter::Builder::new(
-        filter::Condition::Custom(Arc::new(|message| *message.payload() == ORIGINAL)),
+        filter::Condition::Custom(Arc::new(|message| *message.payload() == *ORIGINAL)),
         filter::Conjugation::Any,
     )
     .append(filter::Condition::Filter(filter::Builder::single(filter::Condition::Audience(
@@ -987,25 +993,25 @@ async fn test_broker_filter_combined_any() {
     ))))
     .build();
 
-    // Broker that should only target ORIGINAL messages and broadcast audiences.
+    // Broker that should only target ORIGINA messages and broadcast audiences.
     let (_, mut broker_receptor) = delegate
         .create(MessengerType::Broker(Some(filter)))
         .await
         .expect("broker should be created");
 
     // Send broadcast message.
-    messenger.message(BROADCAST, Audience::Broadcast).send().ack();
+    messenger.message(BROADCAST.clone(), Audience::Broadcast).send().ack();
     // Receptor should receive match based on broadcast audience
-    verify_payload(BROADCAST, &mut broker_receptor, None).await;
+    verify_payload(BROADCAST.clone(), &mut broker_receptor, None).await;
     // Other receptors should receive the broadcast as well.
-    verify_payload(BROADCAST, &mut receptor, None).await;
+    verify_payload(BROADCAST.clone(), &mut receptor, None).await;
 
     // Send original message to target.
-    messenger.message(ORIGINAL, Audience::Address(target_address)).send().ack();
+    messenger.message(ORIGINAL.clone(), Audience::Address(target_address)).send().ack();
     // Ensure broker gets message.
-    verify_payload(ORIGINAL, &mut broker_receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut broker_receptor, None).await;
     // Ensure target gets message as well.
-    verify_payload(ORIGINAL, &mut receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -1025,7 +1031,7 @@ async fn test_broker_filter_combined_all() {
 
     // Filter to target only the ORIGINAL message.
     let filter = filter::Builder::new(
-        filter::Condition::Custom(Arc::new(|message| *message.payload() == ORIGINAL)),
+        filter::Condition::Custom(Arc::new(|message| *message.payload() == *ORIGINAL)),
         filter::Conjugation::All,
     )
     .append(filter::Condition::Filter(filter::Builder::single(filter::Condition::Audience(
@@ -1040,16 +1046,16 @@ async fn test_broker_filter_combined_all() {
         .expect("broker should be created");
 
     // Send REPLY message. Should not match broker since content does not match.
-    messenger.message(REPLY, Audience::Address(target_address)).send().ack();
+    messenger.message(REPLY.clone(), Audience::Address(target_address)).send().ack();
     // Other receptors should receive the broadcast as well.
-    verify_payload(REPLY, &mut receptor, None).await;
+    verify_payload(REPLY.clone(), &mut receptor, None).await;
 
     // Send ORIGINAL message to target.
-    messenger.message(ORIGINAL, Audience::Address(target_address)).send().ack();
+    messenger.message(ORIGINAL.clone(), Audience::Address(target_address)).send().ack();
     // Ensure broker gets message.
-    verify_payload(ORIGINAL, &mut broker_receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut broker_receptor, None).await;
     // Ensure target gets message as well.
-    verify_payload(ORIGINAL, &mut receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -1075,14 +1081,14 @@ async fn test_group_message() {
             .build(),
     );
     // Send message targeting both receptors.
-    messenger.message(ORIGINAL, audience).send().ack();
+    messenger.message(ORIGINAL.clone(), audience).send().ack();
     // Receptors should both receive the message.
-    verify_payload(ORIGINAL, &mut receptor_1, None).await;
-    verify_payload(ORIGINAL, &mut receptor_2, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor_1, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor_2, None).await;
 
     // Broadcast and ensure the untargeted receptor gets that message next
-    messenger.message(BROADCAST, Audience::Broadcast).send().ack();
-    verify_payload(BROADCAST, &mut receptor_3, None).await;
+    messenger.message(BROADCAST.clone(), Audience::Broadcast).send().ack();
+    verify_payload(BROADCAST.clone(), &mut receptor_3, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -1108,14 +1114,14 @@ async fn test_group_message_redundant_targets() {
     );
 
     // Send Original message.
-    messenger.message(ORIGINAL, audience.clone()).send().ack();
+    messenger.message(ORIGINAL.clone(), audience.clone()).send().ack();
     // Receptor should receive message.
-    verify_payload(ORIGINAL, &mut receptor, None).await;
+    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
 
     // Send Reply message.
-    messenger.message(REPLY, audience).send().ack();
+    messenger.message(REPLY.clone(), audience).send().ack();
     // Receptor should receive Reply message and not another Original message.
-    verify_payload(REPLY, &mut receptor, None).await;
+    verify_payload(REPLY.clone(), &mut receptor, None).await;
 }
 
 #[fuchsia::test(allow_stalls = false)]
@@ -1200,12 +1206,12 @@ async fn test_roles_membership() {
         .await
         .expect("sending messenger should be created");
 
-    let message = TestMessage::Foo;
+    let message = test_message::FOO.clone();
     let audience = Audience::Role(ROLE_1);
-    sender.message(message, audience).send().ack();
+    sender.message(message.clone(), audience).send().ack();
 
     // Verify payload received by role members.
-    verify_payload(message, &mut foo_role_receptor, None).await;
+    verify_payload(message.clone(), &mut foo_role_receptor, None).await;
     verify_payload(message, &mut foo_role_receptor_2, None).await;
 }
 
@@ -1238,17 +1244,17 @@ async fn test_roles_exclusivity() {
 
     // Send messages to roles.
     {
-        let message = TestMessage::Bar;
+        let message = test_message::BAR.clone();
         let audience = Audience::Role(ROLE_2);
-        sender.message(message, audience).send().ack();
+        sender.message(message.clone(), audience).send().ack();
 
         // Verify payload received by role members.
-        verify_payload(message, &mut bar_role_receptor, None).await;
+        verify_payload(message.clone(), &mut bar_role_receptor, None).await;
     }
     {
-        let message = TestMessage::Foo;
+        let message = test_message::FOO.clone();
         let audience = Audience::Role(ROLE_1);
-        sender.message(message, audience).send().ack();
+        sender.message(message.clone(), audience).send().ack();
 
         // Verify payload received by role members.
         verify_payload(message, &mut foo_role_receptor, None).await;
@@ -1287,9 +1293,9 @@ async fn test_roles_audience() {
 
     // Send message to role.
     {
-        let message = TestMessage::Foo;
+        let message = test_message::FOO.clone();
         let audience = Audience::Role(ROLE_1);
-        sender.message(message, audience).send().ack();
+        sender.message(message.clone(), audience).send().ack();
 
         // Verify payload received by role members.
         verify_payload(message, &mut foo_role_receptor, None).await;
@@ -1297,9 +1303,9 @@ async fn test_roles_audience() {
 
     // Send message to outside messenger.
     {
-        let message = TestMessage::Baz;
+        let message = test_message::BAZ.clone();
         let audience = Audience::Messenger(outside_signature);
-        sender.message(message, audience).send().ack();
+        sender.message(message.clone(), audience).send().ack();
 
         // Since outside messenger isn't part of the role, the next message should
         // be the one sent directly to it, rather than the role.
