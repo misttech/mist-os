@@ -136,12 +136,16 @@ protocol Account {
         enrollment_id AuthMechanismEnrollmentId;
     }) -> () error Error;
 
-    /// Lock an account. After a successful call, all Account and Persona
-    /// channels for this account will be terminated. If storage unlock is not
-    /// enabled for the account, a FailedPrecondition error is returned.
-    // TODO(fxbug.dev/101934): Document the side effects on underlying storage
-    // that may still be in use by the client.
-    Lock() -> () error Error;
+    /// Locks all access to an account and its storage. After a successful call,
+    /// all Account and Persona channels for this account will be terminated.
+    StorageLock() -> () error Error;
+
+    /// Locks interaction with an account. After a successful call, the account
+    /// AuthStateSummary will be set to `INTERACTION_LOCKED`.
+    ///
+    /// Fails with FailedPrecondition if authentication is not enabled for the
+    /// account.
+    InteractionLock() -> () error Error;
 
     /// Connects a channel to access a data directory of the account. The
     /// directory is writable, and is initially empty for a newly created

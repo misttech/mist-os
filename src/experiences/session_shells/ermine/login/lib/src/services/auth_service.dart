@@ -156,7 +156,7 @@ class AuthService {
     assert(_account == null, 'An account already exists.');
     if (_account != null && _account!.ctrl.isBound) {
       // ignore: unawaited_futures
-      _account!.lock().catchError((_) {});
+      _account!.storageLock().catchError((_) {});
       _account!.ctrl.close();
     }
 
@@ -222,7 +222,7 @@ class AuthService {
     assert(_accountIds.isNotEmpty, 'No account exist to login to.');
     if (_account != null && _account!.ctrl.isBound) {
       // ignore: unawaited_futures
-      _account!.lock().catchError((_) {});
+      _account!.storageLock().catchError((_) {});
       _account!.ctrl.close();
     }
 
@@ -256,13 +256,13 @@ class AuthService {
     authenticated = true;
   }
 
-  /// Logs out of an account by locking it and deleting the associated tmp
-  /// directory.
+  /// Logs out of an account by locking storage for it and deleting the
+  /// associated tmp directory.
   Future<void> logout() async {
     assert(_account != null, 'No account exists to logout from.');
 
-    log.info('Locking account.');
-    await _account!.lock();
+    log.info('Locking storage for account.');
+    await _account!.storageLock();
 
     authenticated = false;
 

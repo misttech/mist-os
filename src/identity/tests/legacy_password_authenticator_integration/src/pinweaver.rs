@@ -108,7 +108,7 @@ async fn test_pinweaver_locked_account_can_be_unlocked_again() {
     };
 
     // Lock the account.
-    account_proxy.lock().await.expect("lock FIDL").expect("locked");
+    account_proxy.storage_lock().await.expect("lock FIDL").expect("locked");
 
     // The data directory should be closed.
     fuchsia_fs::directory::open_file(&root, "test", fio::OpenFlags::RIGHT_READABLE)
@@ -170,7 +170,7 @@ async fn test_pinweaver_bad_password_cannot_unlock_account() {
         .expect("get_data_directory");
 
     // Lock the account.
-    account_proxy.lock().await.expect("lock FIDL").expect("locked");
+    account_proxy.storage_lock().await.expect("lock FIDL").expect("locked");
 
     // The data directory should be closed.
     fuchsia_fs::directory::open_file(&root, "test", fio::OpenFlags::RIGHT_READABLE)

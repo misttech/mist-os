@@ -224,8 +224,12 @@ where
             AccountRequest::RemoveAuthMechanismEnrollment { responder, .. } => {
                 responder.send(&mut Err(ApiError::UnsupportedOperation))?;
             }
-            AccountRequest::Lock { responder } => {
-                let mut response = self.lock().await;
+            AccountRequest::StorageLock { responder } => {
+                let mut response = self.storage_lock().await;
+                responder.send(&mut response)?;
+            }
+            AccountRequest::InteractionLock { responder } => {
+                let mut response = self.interaction_lock().await;
                 responder.send(&mut response)?;
             }
             AccountRequest::GetDataDirectory { data_directory, responder, .. } => {
@@ -296,25 +300,30 @@ where
         }
     }
 
-    async fn lock(&self) -> Result<(), ApiError> {
+    async fn storage_lock(&self) -> Result<(), ApiError> {
         match self.lock_request_sender.send().await {
             Err(lock_request::SendError::NotSupported) => {
-                info!("Account lock failure: unsupported account type");
+                info!("Account storage lock failure: unsupported account type");
                 Err(ApiError::FailedPrecondition)
             }
             Err(lock_request::SendError::UnattendedReceiver) => {
-                warn!("Account lock failure: unattended listener");
+                warn!("Account storage lock failure: unattended listener");
                 Err(ApiError::Internal)
             }
             Err(lock_request::SendError::AlreadySent) => {
-                info!("Received account lock request while existing request in progress");
+                info!("Received account storage lock request while existing request in progress");
                 Ok(())
             }
             Ok(()) => {
-                info!("Account lock succeeded");
+                info!("Account storage lock succeeded");
                 Ok(())
             }
         }
+    }
+
+    async fn interaction_lock(&self) -> Result<(), ApiError> {
+        // TODO(fxb/110859): Implement Account::interaction_lock() here.
+        Err(ApiError::UnsupportedOperation)
     }
 
     async fn get_data_directory(
@@ -725,13 +734,13 @@ mod tests {
     }
 
     #[fasync::run_until_stalled(test)]
-    async fn test_lock() {
+    async fn test_storage_lock() {
         let mut test = Test::new();
         let (account, mut receiver) =
             test.create_persistent_account_with_lock_request().await.unwrap();
         test.run(account, |(proxy, _storage_manager)| async move {
             assert_eq!(receiver.try_recv(), Ok(None));
-            assert_eq!(proxy.lock().await?, Ok(()));
+            assert_eq!(proxy.storage_lock().await?, Ok(()));
             assert_eq!(receiver.await, Ok(()));
             Ok(())
         })
@@ -739,36 +748,36 @@ mod tests {
     }
 
     #[fasync::run_until_stalled(test)]
-    async fn test_lock_not_supported() {
+    async fn test_storage_lock_not_supported() {
         let mut test = Test::new();
         let account = test.create_persistent_account().await.unwrap();
         test.run(account, |(proxy, _storage_manager)| async move {
-            assert_eq!(proxy.lock().await?, Err(ApiError::FailedPrecondition));
+            assert_eq!(proxy.storage_lock().await?, Err(ApiError::FailedPrecondition));
             Ok(())
         })
         .await;
     }
 
     #[fasync::run_until_stalled(test)]
-    async fn test_lock_unattended_receiver() {
+    async fn test_storage_lock_unattended_receiver() {
         let mut test = Test::new();
         let (account, receiver) = test.create_persistent_account_with_lock_request().await.unwrap();
         std::mem::drop(receiver);
         test.run(account, |(proxy, _storage_manager)| async move {
-            assert_eq!(proxy.lock().await?, Err(ApiError::Internal));
+            assert_eq!(proxy.storage_lock().await?, Err(ApiError::Internal));
             Ok(())
         })
         .await;
     }
 
     #[fasync::run_until_stalled(test)]
-    async fn test_lock_twice() {
+    async fn test_storage_lock_twice() {
         let mut test = Test::new();
         let (account, _receiver) =
             test.create_persistent_account_with_lock_request().await.unwrap();
         test.run(account, |(proxy, _storage_manager)| async move {
-            assert_eq!(proxy.lock().await?, Ok(()));
-            assert_eq!(proxy.lock().await?, Ok(()));
+            assert_eq!(proxy.storage_lock().await?, Ok(()));
+            assert_eq!(proxy.storage_lock().await?, Ok(()));
             Ok(())
         })
         .await;

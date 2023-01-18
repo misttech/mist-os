@@ -360,7 +360,7 @@ async fn create_account_manager() -> Result<Arc<Mutex<NestedAccountManagerProxy>
 
 /// Locks an account and waits for the channel to close.
 async fn lock_and_check(account: &AccountProxy) -> Result<(), Error> {
-    account.lock().await?.map_err(|err| anyhow!("Lock failed: {:?}", err))?;
+    account.storage_lock().await?.map_err(|err| anyhow!("Lock failed: {:?}", err))?;
     account
         .take_event_stream()
         .for_each(|_| async move {}) // Drain
@@ -539,7 +539,7 @@ async fn get_account_and_persona_helper(lifetime: Lifetime) -> Result<(), Error>
         Lifetime::Ephemeral => Err(ApiError::FailedPrecondition),
         Lifetime::Persistent => Ok(()),
     };
-    assert_eq!(account_proxy.lock().await?, expected_lock_result);
+    assert_eq!(account_proxy.storage_lock().await?, expected_lock_result);
     assert_eq!(account_proxy.get_lifetime().await?, lifetime);
 
     // Connect a channel to the account's default persona and verify it's usable.

@@ -121,7 +121,7 @@ async fn deprecated_provision_new_account_over_existing_account_fails() {
 
     let account_ids = account_manager.get_account_ids().await.expect("get account ids");
     assert_eq!(account_ids, vec![1]);
-    account_proxy.lock().await.expect("lock FIDL").expect("locked");
+    account_proxy.storage_lock().await.expect("lock FIDL").expect("locked");
     drop(account_proxy);
 
     // A second attempt to provision the same user over the existing account should fail, since
@@ -255,7 +255,7 @@ async fn locked_account_can_be_unlocked_again() {
     };
 
     // Lock the account.
-    account_proxy.lock().await.expect("lock FIDL").expect("locked");
+    account_proxy.storage_lock().await.expect("lock FIDL").expect("locked");
 
     // The data directory should be closed.
     fuchsia_fs::directory::open_file(&root, "test", fio::OpenFlags::RIGHT_READABLE)
@@ -323,7 +323,7 @@ async fn locking_account_terminates_all_clients() {
         .expect("deprecated_get_account");
 
     // Calling lock on one account channel should close both.
-    account_proxy1.lock().await.expect("lock FIDL").expect("lock");
+    account_proxy1.storage_lock().await.expect("lock FIDL").expect("lock");
 
     // Verify that both account channels are closed.
     futures::try_join!(

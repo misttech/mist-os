@@ -172,7 +172,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
         SM: Send,
     {
         match request {
-            AccountRequest::Lock { responder } => {
+            AccountRequest::StorageLock { responder } => {
                 let mut res = match self.clone().lock_account().await {
                     Ok(()) => Ok(()),
                     Err(err) => {
@@ -181,6 +181,11 @@ impl<SM: StorageManager + 'static> Account<SM> {
                     }
                 };
                 responder.send(&mut res).context("sending Lock response")?;
+            }
+            AccountRequest::InteractionLock { responder } => {
+                responder
+                    .send(&mut Err(faccount::Error::UnsupportedOperation))
+                    .context("sending InteractionLock response")?;
             }
             AccountRequest::GetDataDirectory { data_directory, responder } => {
                 let mut result = self.get_data_directory(data_directory).await;
@@ -435,7 +440,7 @@ mod test {
                 .expect("get data directory 2");
         }
 
-        proxy1.lock().await.expect("lock FIDL").expect("lock account");
+        proxy1.storage_lock().await.expect("lock FIDL").expect("lock account");
 
         // Check that the clients are disconnected.
         {
@@ -489,7 +494,7 @@ mod test {
         let proxy = serve_new_client(&account).await.expect("serve client");
 
         // Expect the locking to succeed, even though the zxcrypt block is already sealed.
-        proxy.lock().await.expect("lock FIDL").expect("lock account");
+        proxy.storage_lock().await.expect("lock FIDL").expect("lock account");
 
         // Check that the client isdisconnected.
         let (_, server_end) = fidl::endpoints::create_proxy().unwrap();

@@ -147,7 +147,7 @@ where
                 responder.send(&mut response)?;
             }
             AccountHandlerControlRequest::LockAccount { responder } => {
-                let mut response = self.lock_account().await;
+                let mut response = self.storage_lock_account().await;
                 responder.send(&mut response)?;
             }
             AccountHandlerControlRequest::RemoveAccount { responder } => {
@@ -370,12 +370,15 @@ where
     /// the handler to the `Locked` state.
     ///
     /// Optionally returns a serialized PreAuthState if it has changed.
-    async fn lock_account(&self) -> Result<Option<Vec<u8>>, ApiError> {
-        let lock_result = Self::lock_now(Arc::clone(&self.state), Arc::clone(&self.inspect)).await;
+    async fn storage_lock_account(&self) -> Result<Option<Vec<u8>>, ApiError> {
+        let lock_result =
+            Self::storage_lock_now(Arc::clone(&self.state), Arc::clone(&self.inspect)).await;
         match &lock_result {
-            Ok(None) => info!("LockAccount successfully completed without changing PreAuthState"),
-            Ok(Some(_)) => info!("LockAccount successfully completed with new PreAuthState"),
-            Err(err) => warn!("LockAccount operation failed: {:?}", err),
+            Ok(None) => {
+                info!("StorageLockAccount successfully completed without changing PreAuthState")
+            }
+            Ok(Some(_)) => info!("StorageLockAccount successfully completed with new PreAuthState"),
+            Err(err) => warn!("StorageLockAccount operation failed: {:?}", err),
         }
         lock_result.map_err(|err| err.api_error)
     }
@@ -399,7 +402,7 @@ where
                     ApiError::Resource
                 })?;
                 // If this account was once unlocked but is now locked, it must
-                // have passed through the Self::lock_now(..) method, which
+                // have passed through the Self::storage_lock_now(..) method, which
                 // fetches the task group and cancels it.
                 info!("RemoveAccount successfully deleted storage-locked account");
                 Ok(())
@@ -654,7 +657,7 @@ where
                     if let (Some(state), Some(inspect)) =
                         (state_weak.upgrade(), inspect_weak.upgrade())
                     {
-                        if let Err(err) = Self::lock_now(state, inspect).await {
+                        if let Err(err) = Self::storage_lock_now(state, inspect).await {
                             warn!("Lock request failure: {:?}", err);
                         }
                     }
@@ -672,7 +675,7 @@ where
     /// node of the change. Succeeds quitely if already locked.
     ///
     /// Returns a serialized PreAuthState if it's changed.
-    async fn lock_now(
+    async fn storage_lock_now(
         state: Arc<Mutex<Lifecycle<SM>>>,
         inspect: Arc<inspect::AccountHandler>,
     ) -> Result<Option<Vec<u8>>, AccountManagerError> {
@@ -725,7 +728,7 @@ where
                     // and locking storage.
                     info!("Received lifecycle stop request; attempting graceful teardown");
 
-                    match self.lock_account().await {
+                    match self.storage_lock_account().await {
                         Ok(_) => {
                             info!("Shutdown complete");
                         }
@@ -1402,7 +1405,10 @@ mod tests {
                     let account_proxy = account_client_end.into_proxy().unwrap();
 
                     // Send the lock request
-                    assert_eq!(account_proxy.lock().await?, Err(ApiError::FailedPrecondition));
+                    assert_eq!(
+                        account_proxy.storage_lock().await?,
+                        Err(ApiError::FailedPrecondition)
+                    );
 
                     // Wait for a potentitially faulty lock request to propagate
                     fasync::Timer::new(LOCK_REQUEST_DURATION.after_now()).await;
@@ -1445,7 +1451,10 @@ mod tests {
                     let account_proxy = account_client_end.into_proxy().unwrap();
 
                     // Send the lock request
-                    assert_eq!(account_proxy.lock().await?, Err(ApiError::FailedPrecondition));
+                    assert_eq!(
+                        account_proxy.storage_lock().await?,
+                        Err(ApiError::FailedPrecondition)
+                    );
                     Ok(())
                 })
                 .build(),
