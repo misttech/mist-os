@@ -113,14 +113,14 @@ type Response = resource table {
     7: redirect RedirectTarget;
 };
 
-/// An HTTP loader.
+/// An HTTP and HTTPS loader.
 ///
-/// The loader can service many HTTP requests concurrently. The loader tracks
+/// The loader can service many HTTP or HTTPS requests concurrently. The loader tracks
 /// all the outstanding requests and will cancel them all if the client closes
 /// the loader interface.
 @discoverable
 protocol Loader {
-    /// Initiate the given HTTP request, follow redirects, and return the final
+    /// Initiate the given HTTP or HTTPS request, follow redirects, and return the final
     /// response.
     ///
     /// The loader will follow redirects (up to an implementation-defined limit)
@@ -133,7 +133,7 @@ protocol Loader {
         response Response;
     });
 
-    /// Initiate the given HTTP request and return all intermediate responses to
+    /// Initiate the given HTTP or HTTPS request and return all intermediate responses to
     /// the given client.
     ///
     /// Unlike `Fetch`, `Start` does not automatically follow all redirects.
