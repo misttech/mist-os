@@ -4,7 +4,7 @@
 
 // clang-format off
 #include "src/storage/f2fs/f2fs.h"
-#include "src/storage/f2fs/test/compatibility/v2/file_backed_block_device.h"
+#include "src/storage/f2fs/test/compatibility/file_backed_block_device.h"
 // clang-format on
 
 namespace f2fs {

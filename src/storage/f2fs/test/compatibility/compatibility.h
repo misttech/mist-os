@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_F2FS_TEST_COMPATIBILITY_V2_COMPATIBILITY_H_
-#define SRC_STORAGE_F2FS_TEST_COMPATIBILITY_V2_COMPATIBILITY_H_
+#ifndef SRC_STORAGE_F2FS_TEST_COMPATIBILITY_COMPATIBILITY_H_
+#define SRC_STORAGE_F2FS_TEST_COMPATIBILITY_COMPATIBILITY_H_
 
 #include <lib/fdio/fdio.h>
 #include <lib/fit/defer.h>
@@ -19,7 +19,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/f2fs/f2fs.h"
-#include "src/storage/f2fs/test/compatibility/v2/file_backed_block_device.h"
+#include "src/storage/f2fs/test/compatibility/file_backed_block_device.h"
 #include "src/virtualization/tests/lib/guest_test.h"
 
 namespace f2fs {
@@ -282,4 +282,4 @@ fs::VnodeConnectionOptions ConvertFlag(int flags);
 
 }  // namespace f2fs
 
-#endif  // SRC_STORAGE_F2FS_TEST_COMPATIBILITY_V2_COMPATIBILITY_H_
+#endif  // SRC_STORAGE_F2FS_TEST_COMPATIBILITY_COMPATIBILITY_H_

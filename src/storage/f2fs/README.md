@@ -23,7 +23,7 @@ Fuchsia filesystem tests
 * Only run f2fs unit tests
 > $ fx test f2fs-unittest
 
-Debian guest based Linux compatibility tests (EXPERIMENTAL)
+Debian guest based Linux compatibility tests
 -------------
 * Prerequisite
 > Generate Linux image
@@ -32,8 +32,7 @@ Debian guest based Linux compatibility tests (EXPERIMENTAL)
 >   prebuilt/virtualization/packages/debian_guest/images/x64 x64
 
 * Build configuration
-> $ fx set core.x64 --with //src/storage/f2fs:tests \
->   --with //src/storage/f2fs/test/compatibility:tests
+> $ fx set core.x64 --with //src/storage/f2fs:tests
 
 * Run the test
-> $ fx test f2fs-compatibility-test-v2
+> $ fx test f2fs-compatibility-test

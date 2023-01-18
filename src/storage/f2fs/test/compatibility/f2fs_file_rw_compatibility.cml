@@ -8,7 +8,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "test/f2fs-inline-compatibility-test-v2",
+        binary: "test/f2fs-file-rw-compatibility-test",
     },
     facets: {
         "fuchsia.test": {
