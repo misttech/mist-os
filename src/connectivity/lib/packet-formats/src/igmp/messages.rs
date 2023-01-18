@@ -276,13 +276,18 @@ pub struct GroupRecordHeader {
 
 impl GroupRecordHeader {
     /// Returns the number of sources.
-    pub fn number_of_sources(self) -> u16 {
+    pub fn number_of_sources(&self) -> u16 {
         self.number_of_sources.get()
     }
 
     /// Returns the type of the record.
-    pub fn record_type(self) -> Result<IgmpGroupRecordType, UnrecognizedProtocolCode<u8>> {
+    pub fn record_type(&self) -> Result<IgmpGroupRecordType, UnrecognizedProtocolCode<u8>> {
         IgmpGroupRecordType::try_from(self.record_type)
+    }
+
+    /// Returns the multicast address.
+    pub fn multicast_addr(&self) -> &Ipv4Addr {
+        &self.multicast_address
     }
 }
 

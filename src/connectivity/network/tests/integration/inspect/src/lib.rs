@@ -498,8 +498,8 @@ async fn inspect_dhcp(
             .encapsulate(UdpPacketBuilder::new(SRC_IP, *DST_IP, None, *port))
             .encapsulate(Ipv4PacketBuilder::new(SRC_IP, DST_IP, /* ttl */ 1, *ip_proto))
             .encapsulate(EthernetFrameBuilder::new(
-                net_types::ethernet::Mac::BROADCAST,
-                constants::eth::MAC_ADDR,
+                constants::eth::MAC_ADDR,            /* src_mac */
+                net_types::ethernet::Mac::BROADCAST, /* dst_mac */
                 EtherType::Ipv4,
             ))
             .serialize_vec_outer()
@@ -685,6 +685,7 @@ async fn inspect_stat_counters(name: &str) {
                     MulticastListenerDone: AnyProperty,
                     MulticastListenerQuery: AnyProperty,
                     MulticastListenerReport: AnyProperty,
+                    MulticastListenerReportV2: AnyProperty,
                     NeighborAdvert: AnyProperty,
                     NeighborSolicit: AnyProperty,
                     PacketTooBig: AnyProperty,
@@ -704,6 +705,7 @@ async fn inspect_stat_counters(name: &str) {
                     MulticastListenerDone: AnyProperty,
                     MulticastListenerQuery: AnyProperty,
                     MulticastListenerReport: AnyProperty,
+                    MulticastListenerReportV2: AnyProperty,
                     NeighborAdvert: AnyProperty,
                     NeighborSolicit: AnyProperty,
                     PacketTooBig: AnyProperty,
@@ -725,6 +727,7 @@ async fn inspect_stat_counters(name: &str) {
                 Unrecognized: AnyProperty,
                 V1MembershipReport: AnyProperty,
                 V2MembershipReport: AnyProperty,
+                V3MembershipReport: AnyProperty,
             },
             PacketsSent: {
                 Dropped: AnyProperty,
@@ -732,6 +735,7 @@ async fn inspect_stat_counters(name: &str) {
                 MembershipQuery: AnyProperty,
                 V1MembershipReport: AnyProperty,
                 V2MembershipReport: AnyProperty,
+                V3MembershipReport: AnyProperty,
             },
         },
         IP: {

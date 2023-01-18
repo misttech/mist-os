@@ -127,7 +127,7 @@ func (t *testNetworkDispatcher) DeliverNetworkPacket(_ tcpip.NetworkProtocolNumb
 	t.pkt = pkt
 }
 
-func (*testNetworkDispatcher) DeliverLinkPacket(tcpip.NetworkProtocolNumber, stack.PacketBufferPtr, bool) {
+func (*testNetworkDispatcher) DeliverLinkPacket(tcpip.NetworkProtocolNumber, stack.PacketBufferPtr) {
 	panic("not implemented")
 }
 
@@ -216,7 +216,7 @@ func makeStubEndpoint(linkAddr tcpip.LinkAddress, size int) stubEndpoint {
 
 // Raises a failure if `pkt` is nil or does not contain an Ethernet header with
 // matching fields.
-func expectPacket(t *testing.T, name string, pkt stack.PacketBufferPtr, wantSrc, wantDst tcpip.LinkAddress, wantProto tcpip.NetworkProtocolNumber, wantData []byte) {
+func expectPacket(t *testing.T, name string, pkt stack.PacketBufferPtr, wantSrc, wantDst tcpip.LinkAddress, wantProto tcpip.NetworkProtocolNumber, wantData []byte, wantPktType tcpip.PacketType) {
 	t.Helper()
 	if pkt == (stack.PacketBufferPtr{}) {
 		t.Errorf("%s: no packet received", name)
@@ -234,6 +234,9 @@ func expectPacket(t *testing.T, name string, pkt stack.PacketBufferPtr, wantSrc,
 	}
 	if got := pkt.Data().AsRange().ToSlice(); !bytes.Equal(got, wantData) {
 		t.Errorf("%s: got data = %x, want = %x", name, got, wantData)
+	}
+	if pkt.PktType != wantPktType {
+		t.Errorf("%s: got pkt.PktType = %d, want = %d", name, pkt.PktType, wantPktType)
 	}
 }
 
@@ -320,6 +323,7 @@ func TestBridgeWritePackets(t *testing.T) {
 				pkt.EgressRoute.LocalLinkAddress = baddr
 				pkt.EgressRoute.RemoteLinkAddress = dstAddr
 				pkt.NetworkProtocolNumber = fakeNetworkProtocol
+				pkt.PktType = tcpip.PacketOutgoing
 				bridgeEP.AddHeader(pkt)
 				pkts.PushBack(pkt)
 			}
@@ -337,7 +341,7 @@ func TestBridgeWritePackets(t *testing.T) {
 					func() {
 						pkt := ep.getPacket()
 						defer pkt.DecRef()
-						expectPacket(t, fmt.Sprintf("ep%d", id), pkt, baddr, dstAddr, fakeNetworkProtocol, data[j])
+						expectPacket(t, fmt.Sprintf("ep%d", id), pkt, baddr, dstAddr, fakeNetworkProtocol, data[j], tcpip.PacketOutgoing)
 					}()
 				}
 			}
@@ -391,16 +395,19 @@ func TestDeliverNetworkPacketToBridge(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			subtests := []struct {
-				name    string
-				dstAddr tcpip.LinkAddress
+				name        string
+				dstAddr     tcpip.LinkAddress
+				wantPktType tcpip.PacketType
 			}{
 				{
-					name:    "ToMulticast",
-					dstAddr: "\x01\x03\x04\x05\x06\x07",
+					name:        "ToMulticast",
+					dstAddr:     "\x01\x03\x04\x05\x06\x07",
+					wantPktType: tcpip.PacketMulticast,
 				},
 				{
-					name:    "ToBroadcast",
-					dstAddr: header.EthernetBroadcastAddress,
+					name:        "ToBroadcast",
+					dstAddr:     header.EthernetBroadcastAddress,
+					wantPktType: tcpip.PacketMulticast,
 				},
 				{
 					name:    "ToEP0",
@@ -411,8 +418,9 @@ func TestDeliverNetworkPacketToBridge(t *testing.T) {
 					dstAddr: eps[1].LinkAddress(),
 				},
 				{
-					name:    "ToBridge",
-					dstAddr: bridgeEP.LinkAddress(),
+					name:        "ToBridge",
+					dstAddr:     bridgeEP.LinkAddress(),
+					wantPktType: tcpip.PacketHost,
 				},
 				{
 					name:    "ToOther",
@@ -431,6 +439,7 @@ func TestDeliverNetworkPacketToBridge(t *testing.T) {
 						ReserveHeaderBytes: int(bridgeEP.MaxHeaderLength()),
 						Payload:            bufferv2.MakeWithData(data),
 					})
+					pkt.PktType = subtest.wantPktType
 					eth := header.Ethernet(pkt.LinkHeader().Push(header.EthernetMinimumSize))
 					fields := header.EthernetFields{
 						SrcAddr: srcAddr,
@@ -452,7 +461,7 @@ func TestDeliverNetworkPacketToBridge(t *testing.T) {
 							}
 
 							if test.rxEP != beps[i] && subtest.dstAddr != bridgeEP.LinkAddress() {
-								expectPacket(t, fmt.Sprintf("ep%d", i), pkt, srcAddr, subtest.dstAddr, fakeNetworkProtocol, data)
+								expectPacket(t, fmt.Sprintf("ep%d", i), pkt, srcAddr, subtest.dstAddr, fakeNetworkProtocol, data, tcpip.PacketOutgoing)
 							} else if pkt != (stack.PacketBufferPtr{}) {
 								t.Errorf("ep%d unexpectedly got a packet = %+v", i, pkt)
 							}
@@ -467,7 +476,7 @@ func TestDeliverNetworkPacketToBridge(t *testing.T) {
 							func() {
 								pkt := ndb.takePkt()
 								defer pkt.DecRef()
-								expectPacket(t, "bridge-dispatcher", pkt, srcAddr, subtest.dstAddr, fakeNetworkProtocol, data)
+								expectPacket(t, "bridge-dispatcher", pkt, srcAddr, subtest.dstAddr, fakeNetworkProtocol, data, subtest.wantPktType)
 							}()
 						}
 					} else if ndb.count != 0 {

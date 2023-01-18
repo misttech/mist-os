@@ -1260,14 +1260,14 @@ enum MulticastEvent {
 }
 
 /// Extracts Ipv4 `MulticastEvent`s from the provided `data`.
-fn extract_v4_multicast_event(data: &[u8]) -> Option<MulticastEvent> {
+fn extract_v4_multicast_event(data: &[u8]) -> Vec<MulticastEvent> {
     let (mut payload, _src_ip, _dst_ip, proto, _ttl) =
         packet_formats::testutil::parse_ip_packet::<net_types::ip::Ipv4>(&data)
             .expect("error parsing IPv4 packet");
 
     if proto != packet_formats::ip::Ipv4Proto::Igmp {
         // Ignore non-IGMP packets.
-        return None;
+        return Vec::new();
     }
 
     let igmp_packet = packet_formats::igmp::messages::IgmpPacket::parse(&mut payload, ())
@@ -1275,17 +1275,40 @@ fn extract_v4_multicast_event(data: &[u8]) -> Option<MulticastEvent> {
 
     match igmp_packet {
         packet_formats::igmp::messages::IgmpPacket::MembershipReportV2(message) => {
-            Some(MulticastEvent::Joined(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
+            vec![MulticastEvent::Joined(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
                 addr: message.group_addr().ipv4_bytes(),
-            })))
+            }))]
         }
         packet_formats::igmp::messages::IgmpPacket::LeaveGroup(message) => {
-            Some(MulticastEvent::Left(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
+            vec![MulticastEvent::Left(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
                 addr: message.group_addr().ipv4_bytes(),
-            })))
+            }))]
         }
+        packet_formats::igmp::messages::IgmpPacket::MembershipReportV3(message) => message
+            .body()
+            .iter()
+            .filter_map(|record| {
+                use packet_formats::igmp::messages::IgmpGroupRecordType;
+
+                assert_eq!(record.sources(), &[], "Do not expect source filtering");
+
+                let hdr = record.header();
+                let action = match hdr.record_type().expect("record type") {
+                    IgmpGroupRecordType::ModeIsExclude
+                    | IgmpGroupRecordType::ChangeToExcludeMode => MulticastEvent::Joined,
+                    IgmpGroupRecordType::ModeIsInclude
+                    | IgmpGroupRecordType::ChangeToIncludeMode => MulticastEvent::Left,
+                    IgmpGroupRecordType::AllowNewSources | IgmpGroupRecordType::BlockOldSources => {
+                        return None
+                    }
+                };
+
+                Some(action(fnet::IpAddress::Ipv4(fnet::Ipv4Address {
+                    addr: hdr.multicast_addr().ipv4_bytes(),
+                })))
+            })
+            .collect(),
         packet_formats::igmp::messages::IgmpPacket::MembershipReportV1(_)
-        | packet_formats::igmp::messages::IgmpPacket::MembershipReportV3(_)
         | packet_formats::igmp::messages::IgmpPacket::MembershipQueryV2(_)
         | packet_formats::igmp::messages::IgmpPacket::MembershipQueryV3(_) => {
             panic!("unexpected IgmpPacket format: {:?}", igmp_packet)
@@ -1294,14 +1317,14 @@ fn extract_v4_multicast_event(data: &[u8]) -> Option<MulticastEvent> {
 }
 
 /// Extracts Ipv6 `MulticastEvent`s from the provided `data`.
-fn extract_v6_multicast_event(data: &[u8]) -> Option<MulticastEvent> {
+fn extract_v6_multicast_event(data: &[u8]) -> Vec<MulticastEvent> {
     let (mut payload, src_ip, dst_ip, proto, _ttl) =
         packet_formats::testutil::parse_ip_packet::<net_types::ip::Ipv6>(&data)
             .expect("error parsing IPv6 packet");
 
     if proto != packet_formats::ip::Ipv6Proto::Icmpv6 {
         // Ignore non-ICMPv6 packets.
-        return None;
+        return Vec::new();
     }
 
     let icmp_packet = packet_formats::icmp::Icmpv6Packet::parse(
@@ -1318,33 +1341,54 @@ fn extract_v6_multicast_event(data: &[u8]) -> Option<MulticastEvent> {
         | packet_formats::icmp::Icmpv6Packet::Ndp(_)
         | packet_formats::icmp::Icmpv6Packet::PacketTooBig(_)
         | packet_formats::icmp::Icmpv6Packet::ParameterProblem(_)
-        | packet_formats::icmp::Icmpv6Packet::TimeExceeded(_) => return None,
+        | packet_formats::icmp::Icmpv6Packet::TimeExceeded(_) => return Vec::new(),
     };
 
     match mld_packet {
         packet_formats::icmp::mld::MldPacket::MulticastListenerReport(packet) => {
-            (!SOLICITED_NODE_MULTICAST_ADDRESS_PREFIX.contains(&packet.body().group_addr)).then(
-                || {
+            (!SOLICITED_NODE_MULTICAST_ADDRESS_PREFIX.contains(&packet.body().group_addr))
+                .then(|| {
                     MulticastEvent::Joined(fnet::IpAddress::Ipv6(fnet::Ipv6Address {
                         addr: packet.body().group_addr.ipv6_bytes(),
                     }))
-                },
-            )
+                })
+                .into_iter()
+                .collect()
         }
         packet_formats::icmp::mld::MldPacket::MulticastListenerDone(packet) => {
-            (!SOLICITED_NODE_MULTICAST_ADDRESS_PREFIX.contains(&packet.body().group_addr)).then(
-                || {
+            (!SOLICITED_NODE_MULTICAST_ADDRESS_PREFIX.contains(&packet.body().group_addr))
+                .then(|| {
                     MulticastEvent::Left(fnet::IpAddress::Ipv6(fnet::Ipv6Address {
                         addr: packet.body().group_addr.ipv6_bytes(),
                     }))
-                },
-            )
+                })
+                .into_iter()
+                .collect()
         }
-        packet_formats::icmp::mld::MldPacket::MulticastListenerQuery(_) => None,
-        packet_formats::icmp::mld::MldPacket::MulticastListenerReportV2(_) => {
-            // TODO(https://fxbug.dev/119938): Support MLDv2.
-            None
-        }
+        packet_formats::icmp::mld::MldPacket::MulticastListenerQuery(_) => Vec::new(),
+        packet_formats::icmp::mld::MldPacket::MulticastListenerReportV2(packet) => packet
+            .body()
+            .iter_multicast_records()
+            .filter_map(|record| {
+                use packet_formats::icmp::mld::Mldv2MulticastRecordType;
+
+                assert_eq!(record.sources(), &[], "Do not expect source filtering");
+
+                let hdr = record.header();
+                let action = match hdr.record_type().expect("record type") {
+                    Mldv2MulticastRecordType::ModeIsExclude
+                    | Mldv2MulticastRecordType::ChangeToExcludeMode => MulticastEvent::Joined,
+                    Mldv2MulticastRecordType::ModeIsInclude
+                    | Mldv2MulticastRecordType::ChangeToIncludeMode => MulticastEvent::Left,
+                    Mldv2MulticastRecordType::AllowNewSources
+                    | Mldv2MulticastRecordType::BlockOldSources => return None,
+                };
+
+                Some(action(fnet::IpAddress::Ipv6(fnet::Ipv6Address {
+                    addr: hdr.multicast_addr().ipv6_bytes(),
+                })))
+            })
+            .collect(),
     }
 }
 
@@ -1369,16 +1413,16 @@ async fn expect_multicast_event(
             )
             .expect("failed to parse ethernet frame");
 
-            let event = match eth.ethertype().expect("ethertype missing from ethernet frame") {
+            let events = match eth.ethertype().expect("ethertype missing from ethernet frame") {
                 packet_formats::ethernet::EtherType::Ipv4 => extract_v4_multicast_event(data),
                 packet_formats::ethernet::EtherType::Ipv6 => extract_v6_multicast_event(data),
-                packet_formats::ethernet::EtherType::Arp => None,
-                packet_formats::ethernet::EtherType::Other(_other) => None,
+                packet_formats::ethernet::EtherType::Arp
+                | packet_formats::ethernet::EtherType::Other(_) => return None,
             };
 
             // The same event may be emitted multiple times. As a result, we
             // must wait for the expected event.
-            event.and_then(|event| (event == *expected_event).then(|| ()))
+            events.contains(expected_event).then(|| ())
         });
     futures::pin_mut!(stream);
     stream.next().await.expect("failed to find expected multicast event");

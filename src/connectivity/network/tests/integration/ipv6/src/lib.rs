@@ -18,10 +18,11 @@ use anyhow::{self, Context as _};
 use futures::{
     future, Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
+use net_declare::net_ip_v6;
 use net_types::{
     ethernet::Mac,
     ip::{self as net_types_ip, Ip},
-    LinkLocalAddress as _, MulticastAddress as _, SpecifiedAddress as _, Witness as _,
+    LinkLocalAddress as _, SpecifiedAddress as _, Witness as _,
 };
 use netstack_testing_common::{
     constants::{eth as eth_consts, ipv6 as ipv6_consts},
@@ -41,7 +42,7 @@ use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::{
     ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
     icmp::{
-        mld::MldPacket,
+        mld::{MldPacket, Mldv2MulticastRecordType},
         ndp::{
             options::{NdpOption, NdpOptionBuilder, PrefixInformation, RouteInformation},
             NeighborSolicitation, RoutePreference, RouterAdvertisement, RouterSolicitation,
@@ -929,7 +930,11 @@ async fn sends_mld_reports(name: &str) {
                 //   address (::) as the IPv6 source address.
                 assert!(!src_ip.is_specified() || src_ip.is_link_local(), "MLD messages must be sent from the unspecified or link local address; src_ip = {}", src_ip);
 
-                assert!(dst_ip.is_multicast(), "all MLD messages must be sent to a multicast address; dst_ip = {}", dst_ip);
+                assert_eq!(
+                    dst_ip,
+                    net_ip_v6!("ff02::16"),
+                    "MLDv2 reports should should be sent to the MLDv2 routers address"
+                );
 
                 // As per RFC 2710 section 3,
                 //
@@ -937,25 +942,23 @@ async fn sends_mld_reports(name: &str) {
                 //   link-local IPv6 Source Address, an IPv6 Hop Limit of 1, ...
                 assert_eq!(ttl, 1, "MLD messages must have a hop limit of 1");
 
-                let report = if let MldPacket::MulticastListenerReport(report) = mld {
+                let report = if let MldPacket::MulticastListenerReportV2(report) = mld {
                     report
                 } else {
                     // Ignore non-report messages.
                     return Ok(None);
                 };
 
-                let group_addr = report.body().group_addr;
-                assert!(group_addr.is_multicast(), "MLD reports must only be sent for multicast addresses; group_addr = {}", group_addr);
+                let has_snmc_record = report
+                    .body()
+                    .iter_multicast_records()
+                    .any(|record| {
+                        assert_eq!(record.sources(), &[]);
+                        let hdr = record.header();
+                        *hdr.multicast_addr() == snmc.get() &&  hdr.record_type() == Ok(Mldv2MulticastRecordType::ChangeToExcludeMode)
+                    });
 
-                if group_addr != *snmc {
-                    // We are only interested in the report for the solicited node
-                    // multicast group we joined.
-                    return Ok(None);
-                }
-
-                assert_eq!(dst_ip, group_addr, "the destination of an MLD report should be the multicast group the report is for");
-
-                Ok(Some(()))
+                Ok(has_snmc_record.then_some(()))
             }
         });
     futures::pin_mut!(stream);

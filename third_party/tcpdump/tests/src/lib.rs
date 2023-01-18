@@ -428,8 +428,11 @@ async fn bridged_packet_test(name: &str) {
                 r"eth\d+\s+Out\s+IP 192\.168\.1\.1\.9876 > 192\.168\.1\.2\.1234: UDP, length 4",
             )
             .expect("parse tcpdump packet regex for packet sent through ethernet interface"),
+            // TODO(https://fxbug.dev/120145): Change the direction from `P` to
+            // `In` once packets destined to a bridge that arrive at a bridged
+            // member is properly marked as being a packet directed to the host.
             Regex::new(
-                r"eth\d+\s+In\s+IP 192\.168\.1\.2\.2342 > 192\.168\.1\.1\.9876: UDP, length 8",
+                r"eth\d+\s+P\s+IP 192\.168\.1\.2\.2342 > 192\.168\.1\.1\.9876: UDP, length 8",
             )
             .expect("parse tcpdump packet regex for packet received at ethernet interface"),
             Regex::new(

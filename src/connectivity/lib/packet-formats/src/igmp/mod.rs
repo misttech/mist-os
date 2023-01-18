@@ -260,6 +260,11 @@ impl<B: ByteSlice, M: MessageType<B>> IgmpMessage<B, M> {
     pub fn max_response_time(&self) -> M::MaxRespTime {
         M::MaxRespTime::from_code(self.prefix.max_resp_code)
     }
+
+    /// Returns the body.
+    pub fn body(&self) -> &M::VariableBody {
+        &self.body
+    }
 }
 
 fn compute_checksum_fragmented<BB: packet::Fragment>(

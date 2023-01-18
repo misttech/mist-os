@@ -219,6 +219,7 @@ func (ep *Endpoint) DeliverNetworkPacketToBridge(rxEP *BridgeableEndpoint, proto
 	dstLinkAddr := header.Ethernet(pkt.LinkHeader().Slice()).DestinationAddress()
 	if dstLinkAddr == ep.linkAddress {
 		if dispatcher != nil {
+			pkt.PktType = tcpip.PacketHost
 			dispatcher.DeliverNetworkPacket(protocol, pkt)
 		}
 		return
@@ -241,6 +242,9 @@ func (ep *Endpoint) DeliverNetworkPacketToBridge(rxEP *BridgeableEndpoint, proto
 			}()
 		}
 	}
+
+	// We will be sending the packet out the bridge members.
+	pkt.PktType = tcpip.PacketOutgoing
 
 	// TODO(https://fxbug.dev/20778): Learn which destinations are on
 	// which links and restrict transmission, like a bridge.

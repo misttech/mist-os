@@ -8,18 +8,18 @@ use fidl_fuchsia_net as net;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 
 use futures::StreamExt as _;
-use net_declare::std_ip_v4;
-use net_types::{
-    ip::{self as net_types_ip},
-    MulticastAddress as _,
-};
+use net_declare::{net_ip_v4, std_ip_v4};
+use net_types::ip::{self as net_types_ip};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{interfaces, setup_network, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
 use packet_formats::{
     ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
-    igmp::{messages::IgmpMembershipReportV2, IgmpMessage},
+    igmp::{
+        messages::{IgmpGroupRecordType, IgmpMembershipReportV3},
+        IgmpMessage,
+    },
     ip::Ipv4Proto,
     testutil::parse_ip_packet,
 };
@@ -56,10 +56,8 @@ async fn sends_igmp_reports(name: &str) {
 
     let net_types_ip_multicast_addr = net_types_ip::Ipv4Addr::new(MULTICAST_ADDR.octets());
 
-    let stream = fake_ep
-        .frame_stream()
-        .map(|r| r.expect("error getting OnData event"))
-        .filter_map(|(data, dropped)| {
+    let stream = fake_ep.frame_stream().map(|r| r.expect("error getting OnData event")).filter_map(
+        |(data, dropped)| {
             async move {
                 assert_eq!(dropped, 0);
                 let mut data = &data[..];
@@ -84,9 +82,17 @@ async fn sends_igmp_reports(name: &str) {
                     return None;
                 }
 
-                assert_eq!(src_ip, net_types_ip::Ipv4Addr::new(INTERFACE_ADDR.octets()), "IGMP messages must be sent from an address assigned to the NIC");
+                assert_eq!(
+                    src_ip,
+                    net_types_ip::Ipv4Addr::new(INTERFACE_ADDR.octets()),
+                    "IGMP messages must be sent from an address assigned to the NIC",
+                );
 
-                assert!(dst_ip.is_multicast(), "all IGMP messages must be sent to a multicast address; dst_ip = {}", dst_ip);
+                assert_eq!(
+                    dst_ip,
+                    net_ip_v4!("224.0.0.22"),
+                    "IGMPv3 reports should should be sent to the IGMPv3 routers address",
+                );
 
                 // As per RFC 2236 section 2,
                 //
@@ -94,23 +100,31 @@ async fn sends_igmp_reports(name: &str) {
                 //   IP TTL 1, ...
                 assert_eq!(ttl, 1, "IGMP messages must have a TTL of 1");
 
-                let igmp = IgmpMessage::<_, IgmpMembershipReportV2>::parse(&mut payload, ())
+                let igmp = IgmpMessage::<_, IgmpMembershipReportV3>::parse(&mut payload, ())
                     .expect("error parsing IGMP message");
 
-                let group_addr = igmp.group_addr();
-                assert!(group_addr.is_multicast(), "IGMP reports must only be sent for multicast addresses; group_addr = {}", group_addr);
+                let records = igmp
+                    .body()
+                    .iter()
+                    .map(|record| {
+                        let hdr = record.header();
 
-                if group_addr != net_types_ip_multicast_addr {
-                    // We are only interested in the report for the multicast group we
-                    // joined.
-                    return None;
-                }
-
-                assert_eq!(dst_ip, group_addr, "the destination of an IGMP report should be the multicast group the report is for");
+                        (*hdr.multicast_addr(), hdr.record_type(), record.sources().to_vec())
+                    })
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    records,
+                    [(
+                        net_types_ip_multicast_addr,
+                        Ok(IgmpGroupRecordType::ChangeToExcludeMode),
+                        Vec::new(),
+                    )]
+                );
 
                 Some(())
             }
-        });
+        },
+    );
     futures::pin_mut!(stream);
     let () = stream
         .next()
