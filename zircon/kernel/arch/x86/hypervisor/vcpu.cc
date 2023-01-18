@@ -871,7 +871,7 @@ void Vcpu::SaveExtendedRegisters(AutoVmcs& vmcs) {
                           thread.extended_register_buffer, vmx_state_.host_state.xcr0, load_host);
 }
 
-zx_status_t vmx_enter(VmxState* vmx_state) {
+zx::result<> vmx_enter(VmxState* vmx_state) {
   // Perform the low-level vmlaunch or vmresume, entering the guest,
   // and returning when the guest exits.
   zx_status_t status = vmx_enter_asm(vmx_state);
@@ -884,7 +884,7 @@ zx_status_t vmx_enter(VmxState* vmx_state) {
   x86_clear_tss_busy(selector);
   x86_ltr(selector);
 
-  return status;
+  return zx::make_result(status);
 }
 
 template <typename PreEnterFn, typename PostExitFn>
@@ -968,7 +968,7 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
     }
 
     GUEST_STATS_INC(vm_entries);
-    status = vmx_enter(&vmx_state_);
+    status = vmx_enter(&vmx_state_).status_value();
     GUEST_STATS_INC(vm_exits);
 
     if (!gBootOptions->x86_disable_spec_mitigations) {

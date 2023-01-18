@@ -29,9 +29,9 @@ bool vmlaunch_fail() {
   // shouldn't fault, but gracefully return ZX_ERR_INTERNAL.
   VmxState state = {};
   interrupt_saved_state_t interrupt_state = arch_interrupt_save();
-  zx_status_t status = vmx_enter(&state);
+  auto result = vmx_enter(&state);
   arch_interrupt_restore(interrupt_state);
-  EXPECT_EQ(status, ZX_ERR_INTERNAL);
+  EXPECT_EQ(result.status_value(), ZX_ERR_INTERNAL);
 
   END_TEST;
 }

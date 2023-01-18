@@ -34,7 +34,7 @@
 #ifndef __ASSEMBLER__
 
 #include <bits.h>
-#include <zircon/types.h>
+#include <lib/zx/result.h>
 
 // Holds the register state used to restore a host.
 struct HostState {
@@ -121,7 +121,7 @@ static_assert(__offsetof(VmxState, guest_state.cr2) == GS_CR2);
 //
 // If we return ZX_OK, the guest was successfully launched and has now
 // exited again. Otherwise, we failed to launch the guest.
-zx_status_t vmx_enter(VmxState* vmx_state);
+zx::result<> vmx_enter(VmxState* vmx_state);
 
 // Implemented in assembly.
 extern "C" {
