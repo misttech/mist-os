@@ -593,14 +593,11 @@ where
                 let addr = I::SocketAddress::from_sock_addr(addr)?;
                 let mut guard = self.ctx.lock().await;
                 let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
-                let bound = bind::<I, _>(
-                    sync_ctx,
-                    non_sync_ctx,
-                    unbound,
-                    addr.addr(),
-                    NonZeroU16::new(addr.port()),
-                )
-                .map_err(IntoErrno::into_errno)?;
+                let (addr, port) =
+                    addr.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
+                let bound =
+                    bind::<I, _>(sync_ctx, non_sync_ctx, unbound, addr, NonZeroU16::new(port))
+                        .map_err(IntoErrno::into_errno)?;
                 self.id = SocketId::Bound(bound, local_socket.take());
                 Ok(())
             }

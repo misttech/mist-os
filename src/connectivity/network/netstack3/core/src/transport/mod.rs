@@ -65,6 +65,7 @@ use net_types::{
 };
 
 use crate::{
+    convert::OwnedOrCloned,
     device::DeviceId,
     error::ZonedAddressError,
     transport::{
@@ -137,6 +138,22 @@ impl_timer_context!(
     TransportLayerTimerId::Tcp(id),
     id
 );
+
+fn maybe_with_zone<A: IpAddress, D>(
+    addr: SpecifiedAddr<A>,
+    device: impl OwnedOrCloned<Option<D>>,
+) -> ZonedAddr<A, D> {
+    // Invariant guaranteed by bind/connect/reconnect: if a socket has an
+    // address that must have a zone, it has a bound device.
+    if let Some(addr_and_zone) = crate::socket::try_into_null_zoned(&addr) {
+        let device = device.into_owned().unwrap_or_else(|| {
+            unreachable!("connected address has zoned address {:?} but no device", addr)
+        });
+        ZonedAddr::Zoned(addr_and_zone.map_zone(|()| device))
+    } else {
+        ZonedAddr::Unzoned(addr)
+    }
+}
 
 /// Returns the address and device that should be used for a socket.
 ///

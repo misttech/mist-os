@@ -306,14 +306,14 @@ impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> PortAllocImpl
 {
     const TABLE_SIZE: NonZeroUsize = nonzero!(20usize);
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
-    type Id = I::Addr;
+    type Id = Option<SpecifiedAddr<I::Addr>>;
 
-    fn is_port_available(&self, addr: &I::Addr, port: u16) -> bool {
+    fn is_port_available(&self, addr: &Self::Id, port: u16) -> bool {
         // We can safely unwrap here, because the ports received in
         // `is_port_available` are guaranteed to be in `EPHEMERAL_RANGE`.
         let port = NonZeroU16::new(port).unwrap();
         let root_addr = AddrVec::from(ListenerAddr {
-            ip: ListenerIpAddr { addr: SpecifiedAddr::new(*addr), identifier: port },
+            ip: ListenerIpAddr { addr: *addr, identifier: port },
             device: None,
         });
 
@@ -614,7 +614,7 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
         &mut self,
         ctx: &mut C,
         id: UnboundId<I>,
-        local_ip: I::Addr,
+        local_ip: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<BoundId<I>, LocalAddressError>;
 
@@ -698,29 +698,24 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
         &mut self,
         _ctx: &mut C,
         id: UnboundId<I>,
-        local_ip: I::Addr,
+        addr: Option<ZonedAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<BoundId<I>, LocalAddressError> {
         // TODO(https://fxbug.dev/104300): Check if local_ip is a unicast address.
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { port_alloc, inactive, socketmap }| {
                 let port = match port {
-                    None => match port_alloc.try_alloc(&local_ip, &socketmap) {
-                        Some(port) => {
-                            NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
+                    None => {
+                        let addr = addr.as_ref().map(ZonedAddr::addr);
+                        match port_alloc.try_alloc(&addr, &socketmap) {
+                            Some(port) => {
+                                NonZeroU16::new(port).expect("ephemeral ports must be non-zero")
+                            }
+                            None => return Err(LocalAddressError::FailedToAllocateLocalPort),
                         }
-                        None => return Err(LocalAddressError::FailedToAllocateLocalPort),
-                    },
+                    }
                     Some(port) => port,
                 };
-
-                let local_ip = SpecifiedAddr::new(local_ip);
-                if let Some(ip) = local_ip {
-                    if ip_transport_ctx.get_devices_with_assigned_addr(ip).next().is_none() {
-                        return Err(LocalAddressError::AddressMismatch);
-                    }
-                }
-
                 let inactive_entry = match inactive.entry(id.into()) {
                     IdMapEntry::Vacant(_) => panic!("invalid unbound ID"),
                     IdMapEntry::Occupied(o) => o,
@@ -731,12 +726,34 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                     buffer_sizes: buffer_sizes.clone(),
                     socket_options: socket_options.clone(),
                 };
+
+                let (local_ip, device) = match addr {
+                    Some(addr) => {
+                        // Extract the specified address and the device. The
+                        // device is either the one from the address or the one
+                        // to which the socket was previously bound.
+                        let (addr, required_device) = crate::transport::resolve_addr_with_device(
+                            addr,
+                            bound_device.as_ref(),
+                        )?;
+
+                        let mut assigned_to = ip_transport_ctx.get_devices_with_assigned_addr(addr);
+                        if !assigned_to
+                            .any(|d| required_device.as_ref().map_or(true, |device| &d == device))
+                        {
+                            return Err(LocalAddressError::AddressMismatch);
+                        }
+                        (Some(addr), required_device)
+                    }
+                    None => (None, bound_device.clone()),
+                };
+
                 let bound = socketmap
                     .listeners_mut()
                     .try_insert(
                         ListenerAddr {
                             ip: ListenerIpAddr { addr: local_ip, identifier: port },
-                            device: bound_device.clone(),
+                            device,
                         },
                         MaybeListener::Bound(bound_state),
                         // TODO(https://fxbug.dev/101596): Support sharing for TCP sockets.
@@ -878,7 +895,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
 
                 let local_port = match sockets
                     .port_alloc
-                    .try_alloc(&*ip_sock.local_ip(), &sockets.socketmap)
+                    .try_alloc(&Some(*ip_sock.local_ip()), &sockets.socketmap)
                 {
                     Some(port) => NonZeroU16::new(port).expect("ephemeral ports must be non-zero"),
                     None => return Err(ConnectError::NoPort),
@@ -1470,11 +1487,16 @@ where
 }
 
 /// Binds an unbound socket to a local socket address.
+///
+/// Requests that the given socket be bound to the local address, if one is
+/// provided; otherwise to all addresses. If `port` is specified (is `Some`),
+/// the socket will be bound to that port. Otherwise a port will be selected to
+/// not conflict with existing bound or connected sockets.
 pub fn bind<I, C>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: UnboundId<I>,
-    local_ip: I::Addr,
+    local_ip: Option<ZonedAddr<I::Addr, DeviceId<C::Instant>>>,
     port: Option<NonZeroU16>,
 ) -> Result<BoundId<I>, LocalAddressError>
 where
@@ -2489,9 +2511,14 @@ mod tests {
         let backlog = NonZeroUsize::new(1).unwrap();
         let server = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let conn = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
-            let bound =
-                SocketHandler::bind(sync_ctx, non_sync_ctx, conn, listen_addr, Some(PORT_1))
-                    .expect("failed to bind the server socket");
+            let bound = SocketHandler::bind(
+                sync_ctx,
+                non_sync_ctx,
+                conn,
+                SpecifiedAddr::new(listen_addr).map(ZonedAddr::Unzoned),
+                Some(PORT_1),
+            )
+            .expect("failed to bind the server socket");
             SocketHandler::listen(sync_ctx, non_sync_ctx, bound, backlog)
         });
 
@@ -2503,7 +2530,7 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     conn,
-                    *I::FAKE_CONFIG.local_ip,
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
                     Some(PORT_1),
                 )
                 .expect("failed to bind the client socket");
@@ -2642,18 +2669,30 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             s1,
-            *I::FAKE_CONFIG.local_ip,
+            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
             Some(PORT_1),
         )
         .expect("first bind should succeed");
         assert_matches!(
-            SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, s2, conflict_addr, Some(PORT_1)),
+            SocketHandler::bind(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                s2,
+                SpecifiedAddr::new(conflict_addr).map(ZonedAddr::Unzoned),
+                Some(PORT_1)
+            ),
             Err(LocalAddressError::AddressInUse)
         );
-        let _b2 =
-            SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, s2, conflict_addr, Some(PORT_2))
-                .expect("able to rebind to a free address");
+        let _b2 = SocketHandler::bind(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            s2,
+            SpecifiedAddr::new(conflict_addr).map(ZonedAddr::Unzoned),
+            Some(PORT_2),
+        )
+        .expect("able to rebind to a free address");
     }
+
     #[ip_test]
     #[test_case(nonzero!(u16::MAX), Ok(nonzero!(u16::MAX)); "ephemeral available")]
     #[test_case(nonzero!(100u16), Err(LocalAddressError::FailedToAllocateLocalPort);
@@ -2675,14 +2714,9 @@ mod tests {
                 continue;
             }
             let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
-            let bound = SocketHandler::bind(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                unbound,
-                I::UNSPECIFIED_ADDRESS,
-                Some(port),
-            )
-            .expect("uncontested bind");
+            let bound =
+                SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, Some(port))
+                    .expect("uncontested bind");
             let _listener =
                 SocketHandler::listen(&mut sync_ctx, &mut non_sync_ctx, bound, nonzero!(1usize));
         }
@@ -2690,14 +2724,8 @@ mod tests {
         // Now that all but the LOCAL_PORT are occupied, ask the stack to
         // select a port.
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
-        let result = SocketHandler::bind(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            unbound,
-            I::UNSPECIFIED_ADDRESS,
-            None,
-        )
-        .map(|bound| SocketHandler::get_bound_info(&sync_ctx, bound).port);
+        let result = SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
+            .map(|bound| SocketHandler::get_bound_info(&sync_ctx, bound).port);
         assert_eq!(result, expected_result);
     }
 
@@ -2706,7 +2734,7 @@ mod tests {
         let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
             TcpCtx::<I, _>::with_sync_ctx(TcpSyncCtx::new(
                 I::FAKE_CONFIG.local_ip,
-                I::FAKE_CONFIG.local_ip,
+                I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
@@ -2715,10 +2743,37 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 unbound,
-                *I::FAKE_CONFIG.remote_ip,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
                 None
             ),
             Err(LocalAddressError::AddressMismatch)
+        );
+
+        sync_ctx.with_tcp_sockets(|sockets| {
+            assert_matches!(sockets.inactive.get(unbound.into()), Some(_));
+        });
+    }
+
+    #[test]
+    fn bind_addr_requires_zone() {
+        let local_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
+
+        let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
+            TcpCtx::<Ipv6, _>::with_sync_ctx(TcpSyncCtx::new(
+                Ipv6::FAKE_CONFIG.local_ip,
+                Ipv6::FAKE_CONFIG.remote_ip,
+                Ipv6::FAKE_CONFIG.subnet.prefix(),
+            ));
+        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        assert_matches!(
+            SocketHandler::bind(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                unbound,
+                Some(ZonedAddr::Unzoned(local_ip)),
+                None
+            ),
+            Err(LocalAddressError::Zone(ZonedAddressError::RequiredZoneNotProvided))
         );
 
         sync_ctx.with_tcp_sockets(|sockets| {
@@ -2739,7 +2794,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 conn,
-                *I::FAKE_CONFIG.local_ip,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
                 Some(PORT_1),
             )
             .expect("failed to bind the client socket");
@@ -2811,14 +2866,9 @@ mod tests {
             bound_a,
             Some(MultipleDevicesId::A),
         );
-        let bound_a = SocketHandler::bind(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            bound_a,
-            I::UNSPECIFIED_ADDRESS,
-            Some(LOCAL_PORT),
-        )
-        .expect("bind should succeed");
+        let bound_a =
+            SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, bound_a, None, Some(LOCAL_PORT))
+                .expect("bind should succeed");
         let _bound_a =
             SocketHandler::listen(&mut sync_ctx, &mut non_sync_ctx, bound_a, nonzero!(10usize));
 
@@ -2826,13 +2876,7 @@ mod tests {
         // Binding `s` to the unspecified address should fail since the address
         // is shadowed by `bound_a`.
         assert_matches!(
-            SocketHandler::bind(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                s,
-                I::UNSPECIFIED_ADDRESS,
-                Some(LOCAL_PORT)
-            ),
+            SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, s, None, Some(LOCAL_PORT)),
             Err(LocalAddressError::AddressInUse)
         );
 
@@ -2844,14 +2888,9 @@ mod tests {
             s,
             Some(MultipleDevicesId::B),
         );
-        let _: BoundId<_> = SocketHandler::bind(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            s,
-            I::UNSPECIFIED_ADDRESS,
-            Some(LOCAL_PORT),
-        )
-        .expect("no conflict");
+        let _: BoundId<_> =
+            SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, s, None, Some(LOCAL_PORT))
+                .expect("no conflict");
     }
 
     #[test_case(None)]
@@ -2873,19 +2912,11 @@ mod tests {
             ));
 
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
-        // TODO(https://fxbug.dev/115524): Use a local address with a zone
-        // instead of setting the device manually.
-        SocketHandler::set_unbound_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            unbound,
-            Some(MultipleDevicesId::A),
-        );
         let bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            *ll_addr,
+            Some(ZonedAddr::Zoned(AddrAndZone::new(*ll_addr, MultipleDevicesId::A).unwrap())),
             Some(LOCAL_PORT),
         )
         .expect("bind should succeed");
@@ -2950,8 +2981,7 @@ mod tests {
             ));
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
 
-        let (addr, port) = (ip_addr, PORT_1);
-        let zoned_addr = SpecifiedAddr::new(addr).map(ZonedAddr::Unzoned);
+        let (addr, port) = (SpecifiedAddr::new(ip_addr).map(ZonedAddr::Unzoned), PORT_1);
         let bound =
             SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, addr, Some(port))
                 .expect("bind should succeed");
@@ -2962,7 +2992,7 @@ mod tests {
         } else {
             SocketHandler::get_bound_info(&sync_ctx, bound)
         };
-        assert_eq!(info, BoundInfo { addr: zoned_addr, port, device: None });
+        assert_eq!(info, BoundInfo { addr, port, device: None });
     }
 
     #[ip_test]
@@ -2981,7 +3011,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            *local.ip,
+            Some(ZonedAddr::Unzoned(local.ip)),
             Some(local.port),
         )
         .expect("bind should succeed");
@@ -3041,9 +3071,10 @@ mod tests {
 
         let local_server = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let unbound = SocketHandler::<Ipv6, _>::create_socket(sync_ctx, non_sync_ctx);
+            let device = FakeDeviceId;
             let bind_addr = match listen_any {
-                true => Ipv6::UNSPECIFIED_ADDRESS,
-                false => *server_ip,
+                true => None,
+                false => Some(ZonedAddr::Zoned(AddrAndZone::new(*server_ip, device).unwrap())),
             };
             let bind =
                 SocketHandler::bind(sync_ctx, non_sync_ctx, unbound, bind_addr, Some(PORT_1))
@@ -3097,31 +3128,21 @@ mod tests {
         let local = SocketAddr { ip: local_ip, port: PORT_1 };
         let remote = SocketAddr { ip: remote_ip, port: PORT_2 };
 
+        let local_addr = ZonedAddr::Zoned(AddrAndZone::new(*local.ip, FakeDeviceId).unwrap());
+
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
-        // TODO(https://fxbug.dev/115524): Bind to a local address with a zone
-        // instead of setting the device manually.
-        SocketHandler::set_unbound_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            unbound,
-            Some(FakeDeviceId),
-        );
         let bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            *local.ip,
+            Some(local_addr),
             Some(local.port),
         )
         .expect("bind should succeed");
 
         assert_eq!(
             SocketHandler::get_bound_info(&sync_ctx, bound),
-            BoundInfo {
-                addr: Some(ZonedAddr::Zoned(AddrAndZone::new(*local_ip, FakeDeviceId).unwrap())),
-                port: PORT_1,
-                device: Some(FakeDeviceId)
-            }
+            BoundInfo { addr: Some(local_addr), port: PORT_1, device: Some(FakeDeviceId) }
         );
 
         let connected = SocketHandler::connect_bound(
@@ -3136,10 +3157,7 @@ mod tests {
         assert_eq!(
             SocketHandler::get_connection_info(&sync_ctx, connected),
             ConnectionInfo {
-                local_addr: (
-                    ZonedAddr::Zoned(AddrAndZone::new(*local_ip, FakeDeviceId).unwrap()),
-                    PORT_1
-                ),
+                local_addr: (local_addr, PORT_1),
                 remote_addr: (
                     ZonedAddr::Zoned(AddrAndZone::new(*remote_ip, FakeDeviceId).unwrap()),
                     PORT_2
@@ -3239,7 +3257,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            *I::FAKE_CONFIG.local_ip,
+            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
             None,
         )
         .expect("bind should succeed");
@@ -3261,7 +3279,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
-                *I::FAKE_CONFIG.local_ip,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
                 Some(PORT_1),
             )
             .expect("bind should succeed");
@@ -3337,7 +3355,7 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     new_unbound,
-                    *I::FAKE_CONFIG.local_ip,
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip,)),
                     Some(PORT_1),
                 ),
                 Err(LocalAddressError::AddressInUse)
@@ -3393,7 +3411,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
-                *I::FAKE_CONFIG.local_ip,
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip)),
                 Some(PORT_1),
             )
             .expect("bind should succeed");

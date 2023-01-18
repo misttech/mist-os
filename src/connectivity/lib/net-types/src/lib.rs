@@ -874,6 +874,14 @@ impl<A: ScopeableAddress + SpecifiedAddress, Z> AddrAndZone<A, Z> {
     pub fn into_specified_addr_zone(self) -> (SpecifiedAddr<A>, Z) {
         (SpecifiedAddr(self.0), self.1)
     }
+
+    /// Returns the address (as a [`SpecifiedAddr`]).
+    pub fn specified_addr(&self) -> SpecifiedAddr<A>
+    where
+        A: Copy,
+    {
+        SpecifiedAddr(self.0)
+    }
 }
 
 impl<A: ScopeableAddress + Display, Z: Display> Display for AddrAndZone<A, Z> {
@@ -915,6 +923,17 @@ impl<A: ScopeableAddress + SpecifiedAddress, Z> ZonedAddr<A, Z> {
                 let (addr, zone) = scope_and_zone.into_specified_addr_zone();
                 (addr, Some(zone))
             }
+        }
+    }
+
+    /// Accesses the `SpecifiedAddr` for this `ZonedAddr`.
+    pub fn addr(&self) -> SpecifiedAddr<A>
+    where
+        A: Copy,
+    {
+        match self {
+            ZonedAddr::Unzoned(addr) => *addr,
+            ZonedAddr::Zoned(addr_and_zone) => addr_and_zone.specified_addr(),
         }
     }
 }

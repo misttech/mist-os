@@ -770,7 +770,7 @@ pub(super) mod ipv6_source_address_selection {
 /// Test fake implementations of the traits defined in the `socket` module.
 #[cfg(test)]
 pub(crate) mod testutil {
-    use alloc::{collections::HashMap, vec::Vec};
+    use alloc::{boxed::Box, collections::HashMap, vec::Vec};
     use core::{fmt::Debug, num::NonZeroUsize};
 
     use derivative::Derivative;
@@ -819,13 +819,13 @@ pub(crate) mod testutil {
             })
         }
 
-        type DevicesWithAddrIter<'a> = <Option<Self::DeviceId> as IntoIterator>::IntoIter;
+        type DevicesWithAddrIter<'a> = alloc::boxed::Box<dyn Iterator<Item = DeviceId> + 'a>;
 
         fn get_devices_with_assigned_addr(
             &self,
             addr: SpecifiedAddr<<I>::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            self.find_device_with_addr(addr).into_iter()
+            Box::new(self.find_devices_with_addr(addr))
         }
     }
 
@@ -969,11 +969,14 @@ pub(crate) mod testutil {
             FakeIpSocketCtx { table, device_state }
         }
 
-        pub(crate) fn find_device_with_addr(&self, addr: SpecifiedAddr<I::Addr>) -> Option<D> {
+        pub(crate) fn find_devices_with_addr(
+            &self,
+            addr: SpecifiedAddr<I::Addr>,
+        ) -> impl Iterator<Item = D> + '_ {
             let Self { table: _, device_state } = self;
-            device_state.iter().find_map(|(device, state)| {
+            Box::new(device_state.iter().filter_map(move |(device, state)| {
                 state.find_addr(&addr).map(|_: &I::AssignedAddress<FakeInstant>| device.clone())
-            })
+            }))
         }
 
         pub(crate) fn get_device_state(&self, device: &D) -> &IpDeviceState<FakeInstant, I> {

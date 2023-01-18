@@ -35,7 +35,6 @@ use thiserror::Error;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
     context::{CounterContext, InstantContext, RngContext},
-    convert::OwnedOrCloned,
     data_structures::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged as _},
@@ -48,7 +47,6 @@ use crate::{
         IpTransportContext, MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
     },
     socket::{
-        self,
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         datagram::{
             self, ConnState, ConnectListenerError, DatagramBoundId, DatagramFlowId,
@@ -65,7 +63,7 @@ use crate::{
         SocketTypeState as _,
     },
     sync::RwLock,
-    DeviceId, SyncCtx,
+    transport, DeviceId, SyncCtx,
 };
 
 /// A builder for UDP layer state.
@@ -549,22 +547,6 @@ pub struct ConnInfo<A: IpAddress, D> {
     pub remote_port: NonZeroU16,
 }
 
-fn maybe_with_zone<A: IpAddress, D>(
-    addr: SpecifiedAddr<A>,
-    device: impl OwnedOrCloned<Option<D>>,
-) -> ZonedAddr<A, D> {
-    // Invariant guaranteed by bind/connect/reconnect: if a socket has an
-    // address that must have a zone, it has a bound device.
-    if let Some(addr_and_zone) = socket::try_into_null_zoned(&addr) {
-        let device = device.into_owned().unwrap_or_else(|| {
-            unreachable!("connected address has zoned address {:?} but no device", addr)
-        });
-        ZonedAddr::Zoned(addr_and_zone.map_zone(|()| device))
-    } else {
-        ZonedAddr::Unzoned(addr)
-    }
-}
-
 impl<A: IpAddress, D: Clone + Debug> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>>
     for ConnInfo<A, D>
 {
@@ -574,9 +556,9 @@ impl<A: IpAddress, D: Clone + Debug> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>
             ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },
         } = c;
         Self {
-            local_ip: maybe_with_zone(local_ip, &device),
+            local_ip: transport::maybe_with_zone(local_ip, &device),
             local_port,
-            remote_ip: maybe_with_zone(remote_ip, device),
+            remote_ip: transport::maybe_with_zone(remote_ip, device),
             remote_port,
         }
     }
@@ -601,7 +583,7 @@ impl<A: IpAddress, D> From<ListenerAddr<A, D, NonZeroU16>> for ListenerInfo<A, D
             NonZeroU16,
         >,
     ) -> Self {
-        let local_ip = addr.map(|addr| maybe_with_zone(addr, device));
+        let local_ip = addr.map(|addr| transport::maybe_with_zone(addr, device));
         Self { local_ip, local_port: identifier }
     }
 }
@@ -2310,7 +2292,7 @@ mod tests {
             testutil::{FakeDeviceId, MultipleDevicesId},
             SendIpPacketMeta,
         },
-        socket::datagram::MulticastInterfaceSelector,
+        socket::{self, datagram::MulticastInterfaceSelector},
         testutil::{assert_empty, set_logger_for_test, TestIpExt as _},
     };
 
