@@ -496,7 +496,10 @@ pub mod test {
         let trio = "a::b::c";
         result = parser::DeviceCategory::from_str(trio);
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "'a::b::c' is an invalid category. Only expecting at most one '::'.");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "'a::b::c' is an invalid category. Only expecting at most one '::'."
+        );
     }
 
     #[test]

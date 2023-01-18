@@ -13,7 +13,7 @@ use {
     errors::ffx_bail,
     ffx_config, fidl_fuchsia_driver_development as fdd, fidl_fuchsia_test_manager as ftm,
     fuchsia_driver_dev::{
-        get_devices_by_driver, get_driver_by_device, get_driver_by_libname, Device,
+        get_devices_by_driver, get_driver_by_device, get_driver_by_filter, Device,
     },
     futures::FutureExt,
     parser::{FilterTests, ValidateAgainstMetadata},
@@ -209,7 +209,7 @@ async fn get_driver_and_devices(
     }
 
     if let Some(driver) = &cmd.driver {
-        driver_info = Some(Box::new(get_driver_by_libname(&driver, &driver_service).await?));
+        driver_info = Some(Box::new(get_driver_by_filter(&driver, &driver_service).await?));
         device_list = Some(Box::new(get_devices_by_driver(&driver, &driver_service).await?));
     } else if let Some(driver) = &driver_info {
         if let Some(driver_libname) = &driver.libname {

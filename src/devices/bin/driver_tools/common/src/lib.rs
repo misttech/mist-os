@@ -175,39 +175,47 @@ pub async fn get_node_groups(
 
 /// Gets the desired DriverInfo instance.
 ///
+/// Filter based on either the driver's libname or its URL.
+/// For example: "fuchsia-pkg://domain/driver#driver/foo.so" or "fuchsia-boot://domain/#meta/foo.cm"
+///
 /// # Arguments
-/// * `driver_libname` - The driver's libname. e.g. fuchsia-pkg://domain/driver#driver/foo.so
-pub async fn get_driver_by_libname(
-    driver_libname: &String,
+/// * `driver_filter` - Filter to the driver that matches the given filter.
+pub async fn get_driver_by_filter(
+    driver_filter: &String,
     driver_development_proxy: &fdd::DriverDevelopmentProxy,
 ) -> Result<fdd::DriverInfo> {
-    let driver_filter: [String; 1] = [driver_libname.to_string()];
-    let driver_list = get_driver_info(&driver_development_proxy, &driver_filter).await?;
+    let filter_list: [String; 1] = [driver_filter.to_string()];
+    let driver_list = get_driver_info(&driver_development_proxy, &filter_list).await?;
     if driver_list.len() != 1 {
         return Err(anyhow!(
             "There should be exactly one match for '{}'. Found {}.",
-            driver_libname,
+            driver_filter,
             driver_list.len()
         ));
     }
-
     let mut driver_info: Option<fdd::DriverInfo> = None;
 
     // Confirm this is the correct match.
     let driver = &driver_list[0];
     if let Some(ref libname) = driver.libname {
-        if libname == driver_libname {
+        if libname == driver_filter {
+            driver_info = Some(driver.clone());
+        }
+    } else if let Some(ref url) = driver.url {
+        if url == driver_filter {
             driver_info = Some(driver.clone());
         }
     }
-
     match driver_info {
         Some(driver) => Ok(driver),
-        _ => Err(anyhow!("Did not find matching driver for: {}", driver_libname)),
+        _ => Err(anyhow!("Did not find matching driver for: {}", driver_filter)),
     }
 }
 
 /// Gets the driver that is bound to the given device.
+///
+/// Is able to fuzzy match on the device's topological path, where the shortest match
+/// will be the one chosen.
 ///
 /// # Arguments
 /// * `device_topo_path` - The device's topological path. e.g. sys/platform/.../device
@@ -249,13 +257,16 @@ pub async fn get_driver_by_device(
                 found_driver = Some(libname.to_string());
             }
         }
-        Device::V2(ref _info) => {
-            // TODO(fxb/112785): Querying V2 is not supported for now.
+        Device::V2(ref info) => {
+            // TODO(fxb/112785): Querying V2 is not supported for now. This is untested.
+            if let Some(url) = &info.0.bound_driver_url {
+                found_driver = Some(url.to_string());
+            }
         }
     }
     match found_driver {
-        Some(ref driver_libname) => {
-            get_driver_by_libname(&driver_libname, &driver_development_proxy).await
+        Some(ref driver_filter) => {
+            get_driver_by_filter(&driver_filter, &driver_development_proxy).await
         }
         _ => Err(anyhow!("Did not find driver for device {}", &device_topo_path)),
     }
@@ -263,13 +274,16 @@ pub async fn get_driver_by_device(
 
 /// Gets the devices that are bound to the given driver.
 ///
+/// Filter based on either the driver's libname or its URL.
+/// For example: "fuchsia-pkg://domain/driver#driver/foo.so" or "fuchsia-boot://domain/#meta/foo.cm"
+///
 /// # Arguments
-/// * `driver_libname` - The driver's libname. e.g. fuchsia-pkg://domain/driver#driver/foo.so
+/// * `driver_filter` - Filter to the driver that matches the given filter.
 pub async fn get_devices_by_driver(
-    driver_libname: &String,
+    driver_filter: &String,
     driver_development_proxy: &fdd::DriverDevelopmentProxy,
 ) -> Result<Vec<Device>> {
-    let driver_info = get_driver_by_libname(driver_libname, &driver_development_proxy);
+    let driver_info = get_driver_by_filter(driver_filter, &driver_development_proxy);
     let empty: [String; 0] = [];
     let device_list =
         get_device_info(&driver_development_proxy, &empty, /* exact_match= */ false);
