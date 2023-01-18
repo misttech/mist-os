@@ -89,7 +89,7 @@ protocol ImagePipe2 {
     ///
     /// `buffer_collection_id` refers to the BufferCollectionToken instance that is
     /// registered via `AddBufferCollection()`. The underlying memory objects allocated
-    /// are used to address to the image data. `buffer_collection_id` refers to the
+    /// are used to address to the image data. `buffer_collection_index` refers to the
     /// index of the memory object allocated in BufferCollection.
     ///
     /// `image_format` specifiies image properties. `coded_width` and `coded_height` are
