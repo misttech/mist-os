@@ -77,4 +77,5 @@
     log_destination: "klog",
     builtin_boot_resolver: "boot",
     reboot_on_terminate_enabled: true,
+    abi_revision_policy: "allow_all",
 }

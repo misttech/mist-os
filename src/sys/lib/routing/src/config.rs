@@ -967,6 +967,7 @@ mod tests {
                 builtin_boot_resolver: Some(component_internal::BuiltinBootResolver::None),
                 reboot_on_terminate_enabled: Some(true),
                 realm_builder_resolver_and_runner: Some(component_internal::RealmBuilderResolverAndRunner::None),
+                abi_revision_policy: Some(component_internal::AbiRevisionPolicy::AllowAll),
                 ..component_internal::Config::EMPTY
             },
             RuntimeConfig {

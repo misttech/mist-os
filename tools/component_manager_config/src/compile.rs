@@ -38,6 +38,7 @@ struct Config {
     reboot_on_terminate_enabled: Option<bool>,
     realm_builder_resolver_and_runner: Option<RealmBuilderResolverAndRunner>,
     enable_introspection: Option<bool>,
+    abi_revision_policy: Option<AbiRevisionPolicy>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -70,6 +71,22 @@ symmetrical_enums!(
     component_internal::RealmBuilderResolverAndRunner,
     None,
     Namespace
+);
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum AbiRevisionPolicy {
+    AllowAll,
+    EnforcePresenceOnly,
+    EnforcePresenceAndCompatibility,
+}
+
+symmetrical_enums!(
+    AbiRevisionPolicy,
+    component_internal::AbiRevisionPolicy,
+    AllowAll,
+    EnforcePresenceOnly,
+    EnforcePresenceAndCompatibility
 );
 
 #[derive(Deserialize, Debug, Default)]
@@ -242,6 +259,7 @@ impl TryFrom<Config> for component_internal::Config {
             realm_builder_resolver_and_runner: config
                 .realm_builder_resolver_and_runner
                 .map(Into::into),
+            abi_revision_policy: config.abi_revision_policy.map(Into::into),
             ..Self::EMPTY
         })
     }
@@ -373,6 +391,7 @@ impl Config {
                 another,
                 realm_builder_resolver_and_runner
             ),
+            abi_revision_policy: merge_field!(self, another, abi_revision_policy),
         })
     }
 
