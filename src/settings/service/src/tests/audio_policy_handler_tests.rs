@@ -42,10 +42,9 @@ pub(crate) enum TestEnvironmentPayload {
     Serve(AudioInfo),
 }
 
-type Address = crate::message::base::default::Address;
-type Delegate = crate::message::delegate::Delegate<TestEnvironmentPayload, Address>;
-type Receptor = crate::message::receptor::Receptor<TestEnvironmentPayload, Address>;
-type Signature = crate::message::base::Signature<Address>;
+type Delegate = crate::message::delegate::Delegate<TestEnvironmentPayload>;
+type Receptor = crate::message::receptor::Receptor<TestEnvironmentPayload>;
+type Signature = crate::message::base::Signature;
 
 struct TestEnvironment {
     /// Device storage handle.

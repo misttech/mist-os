@@ -4,7 +4,7 @@
 
 use crate::message::action_fuse::ActionFuseBuilder;
 use crate::message::base::{
-    filter::Filter, messenger, ActionSender, Address, Attribution, Audience, Fingerprint, Message,
+    filter::Filter, messenger, ActionSender, Attribution, Audience, Fingerprint, Message,
     MessageAction, MessageClientId, MessageError, MessageType, MessengerAction, MessengerId,
     MessengerType, Payload, Signature, Status,
 };
@@ -35,16 +35,16 @@ pub enum Error {
 
 /// `Broker` captures the information necessary to process messages to a broker.
 #[derive(Clone)]
-struct Broker<P: Payload + 'static, A: Address + 'static> {
+struct Broker<P: Payload + 'static> {
     /// The `MessengerId` associated with the broker so that it can be distinguished from other
     /// messengers.
     messenger_id: MessengerId,
     /// A condition that is applied to a message to determine whether it should be directed to the
     /// broker.
-    filter: Option<Filter<P, A>>,
+    filter: Option<Filter<P>>,
 }
 
-impl<P: Payload + 'static, A: Address + 'static> PartialEq for Broker<P, A> {
+impl<P: Payload + 'static> PartialEq for Broker<P> {
     fn eq(&self, other: &Self) -> bool {
         // Since each broker has a unique [`MessengerId`], it is implied that any brokers that share
         // the same [`MessengerId`] are the same, having matching filters as well.
@@ -55,12 +55,12 @@ impl<P: Payload + 'static, A: Address + 'static> PartialEq for Broker<P, A> {
 /// The MessageHub controls the message flow for a set of messengers. It
 /// processes actions upon messages, incorporates brokers, and signals receipt
 /// of messages.
-pub struct MessageHub<P: Payload + 'static, A: Address + 'static> {
+pub struct MessageHub<P: Payload + 'static> {
     /// A sender given to messengers to signal actions upon the MessageHub.
-    action_tx: ActionSender<P, A>,
+    action_tx: ActionSender<P>,
     /// Address mapping for looking up messengers. Used for sending messages
     /// to an addressable recipient.
-    addresses: HashMap<A, MessengerId>,
+    addresses: HashMap<crate::Address, MessengerId>,
     /// MessengerId mapping to roles. This mapping allows the `MessageHub`
     /// to remove a messenger from role memberships upon removal.
     messengers: HashMap<MessengerId, messenger::Roles>,
@@ -69,9 +69,9 @@ pub struct MessageHub<P: Payload + 'static, A: Address + 'static> {
     roles: HashMap<crate::Role, HashSet<MessengerId>>,
     /// Mapping of registered messengers (including brokers) to beacons. Used for
     /// delivering messages from a resolved address or a list of participants.
-    beacons: HashMap<MessengerId, Beacon<P, A>>,
+    beacons: HashMap<MessengerId, Beacon<P>>,
     /// An ordered set of messengers who will be forwarded messages.
-    brokers: Vec<Broker<P, A>>,
+    brokers: Vec<Broker<P>>,
     /// The next id to be given to a messenger.
     next_id: MessengerId,
     /// The next id to be given to a `MessageClient`.
@@ -82,16 +82,16 @@ pub struct MessageHub<P: Payload + 'static, A: Address + 'static> {
     exit_tx: ExitSender,
 }
 
-impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
+impl<P: Payload + 'static> MessageHub<P> {
     /// Returns a new MessageHub for the given types.
-    pub(crate) fn create() -> Delegate<P, A> {
+    pub(crate) fn create() -> Delegate<P> {
         let (action_tx, mut action_rx) = futures::channel::mpsc::unbounded::<(
-            Fingerprint<A>,
-            MessageAction<P, A>,
-            Option<Beacon<P, A>>,
+            Fingerprint,
+            MessageAction<P>,
+            Option<Beacon<P>>,
         )>();
         let (messenger_tx, mut messenger_rx) =
-            futures::channel::mpsc::unbounded::<MessengerAction<P, A>>();
+            futures::channel::mpsc::unbounded::<MessengerAction<P>>();
 
         let (exit_tx, mut exit_rx) = futures::channel::mpsc::unbounded::<()>();
 
@@ -166,7 +166,7 @@ impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
     }
 
     // Derives the underlying MessengerId from a Signature.
-    fn resolve_messenger_id(&self, signature: &Signature<A>) -> Result<MessengerId, Error> {
+    fn resolve_messenger_id(&self, signature: &Signature) -> Result<MessengerId, Error> {
         Ok(match signature {
             Signature::Anonymous(id) => *id,
             Signature::Address(address) => {
@@ -180,12 +180,7 @@ impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
     /// return path of the source message. The provided sender id represents the
     /// id of the current messenger possessing the message and not necessarily
     /// the original author.
-    async fn send_to_next(
-        &mut self,
-        id: ftrace::Id,
-        sender_id: MessengerId,
-        message: Message<P, A>,
-    ) {
+    async fn send_to_next(&mut self, id: ftrace::Id, sender_id: MessengerId, message: Message<P>) {
         trace!(id, "send_to_next");
         let mut recipients = vec![];
 
@@ -221,7 +216,7 @@ impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
                 .map(|broker| broker.messenger_id)
                 .collect();
 
-            let mut return_path: Vec<Beacon<P, A>> = broker_ids
+            let mut return_path: Vec<Beacon<P>> = broker_ids
                 .iter()
                 .map(|broker_id| {
                     self.beacons.get(broker_id).expect("beacon should resolve").clone()
@@ -382,7 +377,7 @@ impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
     fn resolve_audience(
         &self,
         sender_id: MessengerId,
-        audience: &Audience<A>,
+        audience: &Audience,
     ) -> Result<(HashSet<MessengerId>, bool), anyhow::Error> {
         let mut return_set = HashSet::new();
         let mut delivery_required = false;
@@ -436,7 +431,7 @@ impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
         Ok((return_set, delivery_required))
     }
 
-    async fn process_messenger_request(&mut self, id: ftrace::Id, action: MessengerAction<P, A>) {
+    async fn process_messenger_request(&mut self, id: ftrace::Id, action: MessengerAction<P>) {
         match action {
             MessengerAction::Create(messenger_descriptor, responder, messenger_tx) => {
                 trace!(
@@ -537,7 +532,7 @@ impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
         }
     }
 
-    fn delete_by_signature(&mut self, signature: Signature<A>) {
+    fn delete_by_signature(&mut self, signature: Signature) {
         let id = self.resolve_messenger_id(&signature).expect("messenger should be present");
 
         // Clean up roles
@@ -569,9 +564,9 @@ impl<P: Payload + 'static, A: Address + 'static> MessageHub<P, A> {
     async fn process_request(
         &mut self,
         id: ftrace::Id,
-        fingerprint: Fingerprint<A>,
-        action: MessageAction<P, A>,
-        beacon: Option<Beacon<P, A>>,
+        fingerprint: Fingerprint,
+        action: MessageAction<P>,
+        beacon: Option<Beacon<P>>,
     ) {
         let (mut outgoing_message, _guard) = match action {
             MessageAction::Send(payload, message_type) => {

@@ -151,7 +151,7 @@ impl<
 
     async fn get_next(
         &mut self,
-        receptor: &mut Receptor<ServicePayload, Address>,
+        receptor: &mut Receptor<ServicePayload>,
     ) -> Result<Result<Payload, anyhow::Error>, WorkError> {
         let receptor = receptor.next_of::<Payload>().fuse();
         let mut cancelation_rx = &mut self.cancelation_rx;

@@ -30,16 +30,14 @@ use crate::handler::setting_proxy::{SettingProxy, MAX_NODE_ERRORS};
 use crate::inspect::listener_logger::ListenerInspectLogger;
 use crate::message::base::{Audience, MessageEvent, MessengerType};
 use crate::message::receptor::Receptor;
-use crate::service::{
-    self, message, Address as ServiceAddress, Payload as ServicePayload, TryFromWithClient,
-};
+use crate::service::{self, message, Payload as ServicePayload, TryFromWithClient};
 use crate::{clock, event, Payload};
 
 const TEARDOWN_TIMEOUT: Duration = Duration::from_seconds(5);
 const SETTING_PROXY_MAX_ATTEMPTS: u64 = 3;
 const SETTING_PROXY_TIMEOUT_MS: i64 = 1;
 
-type ListenReceptor = Receptor<ServicePayload, ServiceAddress>;
+type ListenReceptor = Receptor<ServicePayload>;
 
 struct SettingHandler {
     setting_type: SettingType,

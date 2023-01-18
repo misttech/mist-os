@@ -198,7 +198,7 @@ mod tests {
         // Create a broker that only listens to replies.
         let (_, broker_receptor) = delegate
             .create(MessengerType::Broker(Some(filter::Builder::single(
-                filter::Condition::Custom(Arc::new(move |message: &Message<_, _>| {
+                filter::Condition::Custom(Arc::new(move |message: &Message<_>| {
                     // Only filter for reply's that contain results.
                     matches!(message.get_type(), MessageType::Reply(_))
                         && matches!(

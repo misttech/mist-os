@@ -2,21 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::message::base::{Address, MessageEvent, Payload};
+use crate::message::base::{MessageEvent, Payload};
 use crate::message::message_client::MessageClient;
 use crate::message::receptor::Receptor;
 use futures::future::BoxFuture;
 use futures::StreamExt;
 
-pub(crate) type ClientFn<P, A> =
-    Box<dyn FnOnce(MessageClient<P, A>) -> BoxFuture<'static, ()> + Send + Sync + 'static>;
+pub(crate) type ClientFn<P> =
+    Box<dyn FnOnce(MessageClient<P>) -> BoxFuture<'static, ()> + Send + Sync + 'static>;
 
 /// Ensures the payload matches expected value and invokes an action closure.
 /// If a client_fn is not provided, the message is acknowledged.
-pub(crate) async fn verify_payload<P: Payload + PartialEq + 'static, A: Address + 'static>(
+pub(crate) async fn verify_payload<P: Payload + PartialEq + 'static>(
     payload: P,
-    receptor: &mut Receptor<P, A>,
-    client_fn: Option<ClientFn<P, A>>,
+    receptor: &mut Receptor<P>,
+    client_fn: Option<ClientFn<P>>,
 ) {
     while let Some(message_event) = receptor.next().await {
         if let MessageEvent::Message(incoming_payload, client) = message_event {

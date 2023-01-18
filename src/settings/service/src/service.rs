@@ -41,19 +41,18 @@ impl MessageHub {
 }
 
 pub(crate) mod message {
-    use super::Address;
     use super::Payload;
     use crate::message::{base, delegate, message_client, messenger, receptor};
 
-    pub(crate) type Delegate = delegate::Delegate<Payload, Address>;
-    pub(crate) type Audience = base::Audience<Address>;
-    pub(crate) type Messenger = messenger::MessengerClient<Payload, Address>;
-    pub(crate) type MessageError = base::MessageError<Address>;
-    pub(crate) type MessageEvent = base::MessageEvent<Payload, Address>;
-    pub(crate) type MessageClient = message_client::MessageClient<Payload, Address>;
-    pub(crate) type MessengerType = base::MessengerType<Payload, Address>;
-    pub(crate) type Receptor = receptor::Receptor<Payload, Address>;
-    pub(crate) type Signature = base::Signature<Address>;
+    pub(crate) type Delegate = delegate::Delegate<Payload>;
+    pub(crate) type Audience = base::Audience;
+    pub(crate) type Messenger = messenger::MessengerClient<Payload>;
+    pub(crate) type MessageError = base::MessageError;
+    pub(crate) type MessageEvent = base::MessageEvent<Payload>;
+    pub(crate) type MessageClient = message_client::MessageClient<Payload>;
+    pub(crate) type MessengerType = base::MessengerType<Payload>;
+    pub(crate) type Receptor = receptor::Receptor<Payload>;
+    pub(crate) type Signature = base::Signature;
 }
 
 /// The `Address` enumeration defines a namespace for entities that can be
