@@ -438,8 +438,6 @@ async fn inspect_health_status_ok() {
 
 /// Make sure the inspect data correctly report multiple verification failures.
 #[fasync::run_singlethreaded(test)]
-// TODO(fxbug.dev/64607): re-enable when system-update-committer checks netstack failures again
-#[ignore]
 async fn inspect_multiple_failures() {
     let env = TestEnv::builder()
         // Make sure we run health verifications.
@@ -582,8 +580,6 @@ async fn blobfs_verification_failure_causes_reboot() {
 
 /// When the netstack verifications fail and the config says to reboot, we should reboot.
 #[fasync::run_singlethreaded(test)]
-// TODO(fxbug.dev/64607): re-enable when system-update-committer checks netstack failures again
-#[ignore]
 async fn netstack_verification_failure_causes_reboot() {
     let (reboot_sender, reboot_recv) = oneshot::channel();
     let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
