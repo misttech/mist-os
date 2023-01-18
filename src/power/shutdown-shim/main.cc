@@ -9,9 +9,10 @@
 #include <fidl/fuchsia.sys2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fit/function.h>
+#include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/status.h>
 
@@ -23,7 +24,6 @@
 #include "src/lib/storage/vfs/cpp/managed_vfs.h"
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
 #include "src/lib/storage/vfs/cpp/service.h"
-#include "src/lib/storage/vfs/cpp/vfs.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
 namespace fio = fuchsia_io;
@@ -43,13 +43,14 @@ const std::chrono::duration MANUAL_SYSTEM_SHUTDOWN_TIMEOUT = std::chrono::minute
 
 class LifecycleServer final : public fidl::WireServer<fuchsia_process_lifecycle::Lifecycle> {
  public:
-  LifecycleServer(fidl::WireServer<statecontrol_fidl::Admin>::MexecCompleter::Async mexec_completer)
+  explicit LifecycleServer(
+      fidl::WireServer<statecontrol_fidl::Admin>::MexecCompleter::Async mexec_completer)
       : mexec_completer_(std::move(mexec_completer)) {}
 
   static zx_status_t Create(
       async_dispatcher_t* dispatcher,
       fidl::WireServer<statecontrol_fidl::Admin>::MexecCompleter::Async completer,
-      zx::channel chan);
+      fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> server_end);
 
   void Stop(StopCompleter::Sync& completer) override;
 
@@ -59,9 +60,10 @@ class LifecycleServer final : public fidl::WireServer<fuchsia_process_lifecycle:
 
 zx_status_t LifecycleServer::Create(
     async_dispatcher_t* dispatcher,
-    fidl::WireServer<statecontrol_fidl::Admin>::MexecCompleter::Async completer, zx::channel chan) {
+    fidl::WireServer<statecontrol_fidl::Admin>::MexecCompleter::Async completer,
+    fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> server_end) {
   zx_status_t status = fidl::BindSingleInFlightOnly(
-      dispatcher, std::move(chan), std::make_unique<LifecycleServer>(std::move(completer)));
+      dispatcher, std::move(server_end), std::make_unique<LifecycleServer>(std::move(completer)));
   if (status != ZX_OK) {
     fprintf(stderr, "[shutdown-shim]: failed to bind lifecycle service: %s\n",
             zx_status_get_string(status));
@@ -103,23 +105,6 @@ class StateControlAdminServer final : public fidl::WireServer<statecontrol_fidl:
   async::Loop lifecycle_loop_;
 };
 
-// Asynchronously connects to the given protocol.
-zx_status_t connect_to_protocol(const char* name, zx::channel* local) {
-  zx::channel remote;
-  zx_status_t status = zx::channel::create(0, local, &remote);
-  if (status != ZX_OK) {
-    fprintf(stderr, "[shutdown-shim]: error creating channel: %s\n", zx_status_get_string(status));
-    return status;
-  }
-  auto path = fbl::StringPrintf("/svc/%s", name);
-  status = fdio_service_connect(path.data(), remote.release());
-  if (status != ZX_OK) {
-    printf("[shutdown-shim]: failed to connect to %s: %s\n", name, zx_status_get_string(status));
-    return status;
-  }
-  return ZX_OK;
-}
-
 // Opens a service node, failing if the provider of the service does not respond
 // to messages within SERVICE_CONNECTION_TIMEOUT.
 //
@@ -137,11 +122,12 @@ zx_status_t connect_to_protocol(const char* name, zx::channel* local) {
 // forever, which happens if pkgfs never starts up (this always happens on
 // bringup). Once a component is able to be resolved, then all new service
 // connections will either succeed or fail rather quickly.
-zx_status_t connect_to_protocol_with_timeout(const char* name, zx::channel* local) {
-  zx::channel local_2;
-  zx_status_t status = connect_to_protocol(name, &local_2);
-  if (status != ZX_OK) {
-    return status;
+template <typename Protocol>
+zx::result<fidl::ClientEnd<Protocol>> connect_to_protocol_with_timeout(
+    const char* name = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
+  zx::result channel = component::Connect<Protocol>(name);
+  if (channel.is_error()) {
+    return channel.take_error();
   }
 
   // We want to use the zx_channel_call syscall directly here, because there's
@@ -164,33 +150,33 @@ zx_status_t connect_to_protocol_with_timeout(const char* name, zx::channel* loca
       .rd_num_handles = 0,
   };
   uint32_t actual_bytes, actual_handles;
-  status = local_2.call(0, zx::deadline_after(SERVICE_CONNECTION_TIMEOUT), &call, &actual_bytes,
-                        &actual_handles);
-  if (status == ZX_ERR_TIMED_OUT) {
-    fprintf(stderr, "[shutdown-shim]: timed out connecting to %s\n", name);
-    return status;
+  switch (zx_status_t status =
+              channel.value().channel().call(0, zx::deadline_after(SERVICE_CONNECTION_TIMEOUT),
+                                             &call, &actual_bytes, &actual_handles);
+          status) {
+    case ZX_ERR_TIMED_OUT:
+      fprintf(stderr, "[shutdown-shim]: timed out connecting to %s\n", name);
+      return zx::error(status);
+    case ZX_ERR_PEER_CLOSED:
+      return component::Connect<Protocol>(name);
+    default:
+      fprintf(stderr, "[shutdown-shim]: unexpected response from %s: %s\n", name,
+              zx_status_get_string(status));
+      return zx::error(status);
   }
-  if (status != ZX_ERR_PEER_CLOSED) {
-    fprintf(stderr, "[shutdown-shim]: unexpected response from %s: %s\n", name,
-            zx_status_get_string(status));
-    return status;
-  }
-  return connect_to_protocol(name, local);
 }
 
 // Connect to fuchsia.device.manager.SystemStateTransition and set the
 // termination state.
 zx_status_t set_system_state_transition_behavior(
     device_manager_fidl::wire::SystemPowerState state) {
-  zx::channel local;
-  zx_status_t status = connect_to_protocol(
-      fidl::DiscoverableProtocolName<device_manager_fidl::SystemStateTransition>, &local);
-  if (status != ZX_OK) {
-    fprintf(stderr, "[shutdown-shim]: error connecting to driver_manager\n");
-    return status;
+  zx::result local = component::Connect<device_manager_fidl::SystemStateTransition>();
+  if (local.is_error()) {
+    fprintf(stderr, "[shutdown-shim]: error connecting to driver_manager: %s\n",
+            local.status_string());
+    return local.error_value();
   }
-  auto system_state_transition_behavior_client =
-      fidl::WireSyncClient<device_manager_fidl::SystemStateTransition>(std::move(local));
+  fidl::WireSyncClient system_state_transition_behavior_client{std::move(local.value())};
 
   auto resp = system_state_transition_behavior_client->SetTerminationSystemState(state);
   if (resp.status() != ZX_OK) {
@@ -207,14 +193,12 @@ zx_status_t set_system_state_transition_behavior(
 // Connect to fuchsia.device.manager.SystemStateTransition and prepare driver
 // manager to mexec on shutdown.
 zx_status_t SetMexecZbis(zx::vmo kernel_zbi, zx::vmo data_zbi) {
-  zx::channel local;
-  zx_status_t status = connect_to_protocol(
-      fidl::DiscoverableProtocolName<device_manager_fidl::SystemStateTransition>, &local);
-  if (status != ZX_OK) {
-    fprintf(stderr, "[shutdown-shim]: error connecting to driver_manager\n");
-    return status;
+  zx::result local = component::Connect<device_manager_fidl::SystemStateTransition>();
+  if (local.is_error()) {
+    fprintf(stderr, "[shutdown-shim]: error connecting to driver_manager: %s\n",
+            local.status_string());
   }
-  auto client = fidl::WireSyncClient<device_manager_fidl::SystemStateTransition>(std::move(local));
+  fidl::WireSyncClient client{std::move(local.value())};
 
   auto resp = client->SetMexecZbis(std::move(kernel_zbi), std::move(data_zbi));
   if (resp.status() != ZX_OK) {
@@ -232,19 +216,17 @@ zx_status_t SetMexecZbis(zx::vmo kernel_zbi, zx::vmo data_zbi) {
 // everything goes well, this function shouldn't return until shutdown is
 // complete.
 zx_status_t initiate_component_shutdown() {
-  zx::channel local;
-  zx_status_t status =
-      connect_to_protocol(fidl::DiscoverableProtocolName<sys2_fidl::SystemController>, &local);
-  if (status != ZX_OK) {
-    fprintf(stderr, "[shutdown-shim]: error connecting to component_manager\n");
-    return status;
+  zx::result local = component::Connect<sys2_fidl::SystemController>();
+  if (local.is_error()) {
+    fprintf(stderr, "[shutdown-shim]: error connecting to component_manager: %s\n",
+            local.status_string());
+    return local.error_value();
   }
-  auto system_controller_client =
-      fidl::WireSyncClient<sys2_fidl::SystemController>(std::move(local));
+  fidl::WireSyncClient system_controller_client{std::move(local.value())};
 
   printf("[shutdown-shim]: calling system_controller_client.Shutdown()\n");
   auto resp = system_controller_client->Shutdown();
-  printf("[shutdown-shim]: status was returned: %s\n", zx_status_get_string(status));
+  printf("[shutdown-shim]: status was returned: %s\n", resp.status_string());
   return resp.status();
 }
 
@@ -306,51 +288,56 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
       auto resp = statecontrol_client->Reboot(*reboot_reason);
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
-      } else if (resp->is_error()) {
-        return resp->error_value();
-      } else {
-        return ZX_OK;
       }
+      if (resp->is_error()) {
+        return resp->error_value();
+      }
+      return ZX_OK;
+
     } break;
     case device_manager_fidl::wire::SystemPowerState::kRebootKernelInitiated: {
       auto resp = statecontrol_client->Reboot(*reboot_reason);
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
-      } else if (resp.value().is_error()) {
-        return resp.value().error_value();
-      } else {
-        return ZX_OK;
       }
+      if (resp.value().is_error()) {
+        return resp.value().error_value();
+      }
+      return ZX_OK;
+
     } break;
     case device_manager_fidl::wire::SystemPowerState::kRebootBootloader: {
       auto resp = statecontrol_client->RebootToBootloader();
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
-      } else if (resp->is_error()) {
-        return resp->error_value();
-      } else {
-        return ZX_OK;
       }
+      if (resp->is_error()) {
+        return resp->error_value();
+      }
+      return ZX_OK;
+
     } break;
     case device_manager_fidl::wire::SystemPowerState::kRebootRecovery: {
       auto resp = statecontrol_client->RebootToRecovery();
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
-      } else if (resp->is_error()) {
-        return resp->error_value();
-      } else {
-        return ZX_OK;
       }
+      if (resp->is_error()) {
+        return resp->error_value();
+      }
+      return ZX_OK;
+
     } break;
     case device_manager_fidl::wire::SystemPowerState::kPoweroff: {
       auto resp = statecontrol_client->Poweroff();
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
-      } else if (resp->is_error()) {
-        return resp->error_value();
-      } else {
-        return ZX_OK;
       }
+      if (resp->is_error()) {
+        return resp->error_value();
+      }
+      return ZX_OK;
+
     } break;
     case device_manager_fidl::wire::SystemPowerState::kMexec: {
       if (mexec_request == nullptr) {
@@ -361,21 +348,23 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
                                              std::move((*mexec_request)->data_zbi));
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
-      } else if (resp->is_error()) {
-        return resp->error_value();
-      } else {
-        return ZX_OK;
       }
+      if (resp->is_error()) {
+        return resp->error_value();
+      }
+      return ZX_OK;
+
     } break;
     case device_manager_fidl::wire::SystemPowerState::kSuspendRam: {
       auto resp = statecontrol_client->SuspendToRam();
       if (resp.status() != ZX_OK) {
         return ZX_ERR_UNAVAILABLE;
-      } else if (resp->is_error()) {
-        return resp->error_value();
-      } else {
-        return ZX_OK;
       }
+      if (resp->is_error()) {
+        return resp->error_value();
+      }
+      return ZX_OK;
+
     } break;
     default:
       return ZX_ERR_INTERNAL;
@@ -389,13 +378,11 @@ zx_status_t send_command(fidl::WireSyncClient<statecontrol_fidl::Admin> statecon
 zx_status_t forward_command(device_manager_fidl::wire::SystemPowerState fallback_state,
                             const statecontrol_fidl::wire::RebootReason* reboot_reason = nullptr) {
   printf("[shutdown-shim]: checking power_manager liveness\n");
-  zx::channel local;
-  zx_status_t status = connect_to_protocol_with_timeout(
-      fidl::DiscoverableProtocolName<statecontrol_fidl::Admin>, &local);
-  if (status == ZX_OK) {
+  zx::result local = connect_to_protocol_with_timeout<statecontrol_fidl::Admin>();
+  if (local.is_ok()) {
     printf("[shutdown-shim]: trying to forward command\n");
-    status = send_command(fidl::WireSyncClient<statecontrol_fidl::Admin>(std::move(local)),
-                          fallback_state, reboot_reason);
+    zx_status_t status =
+        send_command(fidl::WireSyncClient(std::move(local.value())), fallback_state, reboot_reason);
     if (status != ZX_ERR_UNAVAILABLE && status != ZX_ERR_NOT_SUPPORTED) {
       return status;
     }
@@ -407,7 +394,7 @@ zx_status_t forward_command(device_manager_fidl::wire::SystemPowerState fallback
   }
 
   printf("[shutdown-shim]: failed to forward command to power_manager: %s\n",
-         zx_status_get_string(status));
+         local.status_string());
 
   drive_shutdown_manually(fallback_state);
 
@@ -468,25 +455,24 @@ void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sy
   // Duplicate the VMOs now, as forwarding the mexec request to power-manager
   // will consume them.
   zx::vmo kernel_zbi, data_zbi;
-  zx_status_t status = request->kernel_zbi.duplicate(ZX_RIGHT_SAME_RIGHTS, &kernel_zbi);
-  if (status != ZX_OK) {
+  if (zx_status_t status = request->kernel_zbi.duplicate(ZX_RIGHT_SAME_RIGHTS, &kernel_zbi);
+      status != ZX_OK) {
     completer.ReplyError(status);
     return;
   }
-  status = request->data_zbi.duplicate(ZX_RIGHT_SAME_RIGHTS, &data_zbi);
-  if (status != ZX_OK) {
+  if (zx_status_t status = request->data_zbi.duplicate(ZX_RIGHT_SAME_RIGHTS, &data_zbi);
+      status != ZX_OK) {
     completer.ReplyError(status);
     return;
   }
 
   printf("[shutdown-shim]: checking power_manager liveness\n");
-  zx::channel local;
-  status = connect_to_protocol_with_timeout(
-      fidl::DiscoverableProtocolName<statecontrol_fidl::Admin>, &local);
-  if (status == ZX_OK) {
+  zx::result local = connect_to_protocol_with_timeout<statecontrol_fidl::Admin>();
+  if (local.is_ok()) {
     printf("[shutdown-shim]: trying to forward command\n");
-    status = send_command(fidl::WireSyncClient<statecontrol_fidl::Admin>(std::move(local)),
-                          device_manager_fidl::wire::SystemPowerState::kMexec, nullptr, &request);
+    zx_status_t status =
+        send_command(fidl::WireSyncClient(std::move(local.value())),
+                     device_manager_fidl::wire::SystemPowerState::kMexec, nullptr, &request);
     if (status == ZX_OK) {
       completer.ReplySuccess();
       return;
@@ -499,7 +485,7 @@ void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sy
   }
 
   printf("[shutdown-shim]: failed to forward command to power_manager: %s\n",
-         zx_status_get_string(status));
+         local.status_string());
 
   // In this fallback codepath, we first configure driver_manager to perform
   // the actual mexec syscall on shutdown and then begin an orderly shutdown of
@@ -511,8 +497,8 @@ void StateControlAdminServer::Mexec(MexecRequestView request, MexecCompleter::Sy
   //
   // driver_manager's termination state will be updated as kMexec in
   // drive_shutdown_manually() below.
-  status = SetMexecZbis(std::move(kernel_zbi), std::move(data_zbi));
-  if (status != ZX_OK) {
+  if (zx_status_t status = SetMexecZbis(std::move(kernel_zbi), std::move(data_zbi));
+      status != ZX_OK) {
     fprintf(stderr, "[shutdown-shim]: failed to prepare driver manager to mexec: %s\n",
             zx_status_get_string(status));
     completer.ReplyError(status);
@@ -537,16 +523,17 @@ void StateControlAdminServer::SuspendToRam(SuspendToRamCompleter::Sync& complete
 }
 
 fbl::RefPtr<fs::Service> StateControlAdminServer::Create(async_dispatcher* dispatcher) {
-  return fbl::MakeRefCounted<fs::Service>([dispatcher](zx::channel chan) mutable {
-    zx_status_t status = fidl::BindSingleInFlightOnly(dispatcher, std::move(chan),
-                                                      std::make_unique<StateControlAdminServer>());
-    if (status != ZX_OK) {
-      fprintf(stderr, "[shutdown-shim] failed to bind statecontrol.Admin service: %s\n",
-              zx_status_get_string(status));
-      return status;
-    }
-    return ZX_OK;
-  });
+  return fbl::MakeRefCounted<fs::Service>(
+      [dispatcher](fidl::ServerEnd<statecontrol_fidl::Admin> server_end) mutable {
+        zx_status_t status = fidl::BindSingleInFlightOnly(
+            dispatcher, std::move(server_end), std::make_unique<StateControlAdminServer>());
+        if (status != ZX_OK) {
+          fprintf(stderr, "[shutdown-shim] failed to bind statecontrol.Admin service: %s\n",
+                  zx_status_get_string(status));
+          return status;
+        }
+        return ZX_OK;
+      });
 }
 
 int main() {
@@ -566,8 +553,9 @@ int main() {
                     StateControlAdminServer::Create(loop.dispatcher()));
   outgoing_dir->AddEntry("svc", std::move(svc_dir));
 
-  outgoing_vfs.ServeDirectory(outgoing_dir,
-                              zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST)));
+  outgoing_vfs.ServeDirectory(
+      outgoing_dir,
+      fidl::ServerEnd<fio::Directory>{zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST))});
 
   loop.Run();
 
