@@ -6,7 +6,7 @@ use net_types::ethernet::Mac as MacAddr;
 use num_derive::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::{
-    convert::{Infallible as Never, TryFrom, TryInto},
+    convert::{TryFrom, TryInto},
     fmt,
     iter::Iterator,
     net::Ipv4Addr,
@@ -14,6 +14,9 @@ use std::{
 };
 use thiserror::Error;
 use tracing::debug;
+
+#[cfg(target_os = "fuchsia")]
+use std::convert::Infallible as Never;
 
 pub const SERVER_PORT: u16 = 67;
 pub const CLIENT_PORT: u16 = 68;
@@ -62,6 +65,8 @@ const ASCII_NULL: char = '\x00';
 pub enum ProtocolError {
     #[error("invalid buffer length: {}", _0)]
     InvalidBufferLength(usize),
+
+    #[cfg(target_os = "fuchsia")]
     #[error("option not supported in fuchsia.net.dhcp: {:?}", _0)]
     InvalidFidlOption(DhcpOption),
     #[error("invalid message type: {}", _0)]
@@ -80,6 +85,8 @@ pub enum ProtocolError {
         "malformed option {code} needs at least {want} bytes, but buffer has {remaining} remaining"
     )]
     MalformedOption { code: u8, remaining: usize, want: usize },
+
+    #[cfg(target_os = "fuchsia")]
     #[error("received unknown fidl option variant")]
     UnknownFidlOption,
     #[error("invalid utf-8 after buffer index: {}", _0)]
@@ -1164,6 +1171,7 @@ fn serialize_enum<T: Into<u8>>(code: OptionCode, v: T, buf: &mut Vec<u8>) {
 
 /// A type which can be converted to and from a FIDL type `F`.
 // TODO(https://fxbug.dev/42819): Impl FidlCompatible for Iterator<Item: FidlCompatible>
+#[cfg(target_os = "fuchsia")]
 pub trait FidlCompatible<F>: Sized {
     type FromError;
     type IntoError;
@@ -1173,6 +1181,7 @@ pub trait FidlCompatible<F>: Sized {
 }
 
 /// Utility trait for infallible FIDL conversion.
+#[cfg(target_os = "fuchsia")]
 pub trait FromFidlExt<F>: FidlCompatible<F, FromError = Never> {
     fn from_fidl(fidl: F) -> Self {
         match Self::try_from_fidl(fidl) {
@@ -1181,7 +1190,9 @@ pub trait FromFidlExt<F>: FidlCompatible<F, FromError = Never> {
         }
     }
 }
+
 /// Utility trait for infallible FIDL conversion.
+#[cfg(target_os = "fuchsia")]
 pub trait IntoFidlExt<F>: FidlCompatible<F, IntoError = Never> {
     fn into_fidl(self) -> F {
         match self.try_into_fidl() {
@@ -1191,9 +1202,12 @@ pub trait IntoFidlExt<F>: FidlCompatible<F, IntoError = Never> {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl<F, C: FidlCompatible<F, IntoError = Never>> IntoFidlExt<F> for C {}
+#[cfg(target_os = "fuchsia")]
 impl<F, C: FidlCompatible<F, FromError = Never>> FromFidlExt<F> for C {}
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<fidl_fuchsia_net::Ipv4Address> for Ipv4Addr {
     type FromError = Never;
     type IntoError = Never;
@@ -1207,6 +1221,7 @@ impl FidlCompatible<fidl_fuchsia_net::Ipv4Address> for Ipv4Addr {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<Vec<fidl_fuchsia_net::Ipv4Address>> for Vec<Ipv4Addr> {
     type FromError = Never;
     type IntoError = Never;
@@ -1227,6 +1242,7 @@ impl FidlCompatible<Vec<fidl_fuchsia_net::Ipv4Address>> for Vec<Ipv4Addr> {
 }
 
 // TODO(atait): Consider using a macro to reduce/eliminate the boilerplate in these implementations.
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
     type FromError = ProtocolError;
     type IntoError = ProtocolError;
@@ -1635,6 +1651,7 @@ impl Into<u8> for NodeType {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<fidl_fuchsia_net_dhcp::NodeTypes> for NodeType {
     type FromError = ProtocolError;
     type IntoError = Never;
@@ -1690,6 +1707,7 @@ impl TryFrom<u8> for Overload {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
 impl FidlCompatible<fidl_fuchsia_net_dhcp::OptionOverloadValue> for Overload {
     type FromError = Never;
     type IntoError = Never;
@@ -1929,6 +1947,7 @@ fn trunc_string_to_n_and_push(s: &str, n: usize, buffer: &mut Vec<u8>) {
 #[cfg(test)]
 mod tests {
     use net_declare::std::ip_v4;
+    use rand::Rng as _;
     use std::{net::Ipv4Addr, str::FromStr};
     use test_case::test_case;
     use {super::identifier::ClientIdentifier, super::*};
@@ -2315,6 +2334,14 @@ mod tests {
         );
     }
 
+    fn random_ipv4_generator() -> Ipv4Addr {
+        let octet1: u8 = rand::thread_rng().gen();
+        let octet2: u8 = rand::thread_rng().gen();
+        let octet3: u8 = rand::thread_rng().gen();
+        let octet4: u8 = rand::thread_rng().gen();
+        Ipv4Addr::new(octet1, octet2, octet3, octet4)
+    }
+
     fn test_option_overload(overload: Overload) {
         let mut msg = Message {
             op: OpCode::BOOTREQUEST,
@@ -2331,7 +2358,7 @@ mod tests {
             options: vec![DhcpOption::OptionOverload(overload)],
         }
         .serialize();
-        let ip = crate::server::tests::random_ipv4_generator();
+        let ip = random_ipv4_generator();
         let first_extra_opt = {
             let mut acc = Vec::new();
             let () = DhcpOption::RequestedIpAddress(ip).serialize_to(&mut acc);
