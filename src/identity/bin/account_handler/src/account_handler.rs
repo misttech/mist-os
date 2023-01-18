@@ -8,8 +8,8 @@ use {
         common::AccountLifetime,
         inspect,
         interaction::Interaction,
-        lock_request,
         pre_auth::{self, produce_single_enrollment, EnrollmentState, State as PreAuthState},
+        storage_lock_request,
         storage_lock_state::StorageLockState,
         wrapped_key::make_random_256_bit_generic_array,
     },
@@ -197,7 +197,7 @@ where
                 let pre_auth_state = PreAuthState::new(account_id, enrollment_state);
 
                 let sender = self
-                    .create_lock_request_sender(&pre_auth_state.enrollment_state)
+                    .create_storage_lock_request_sender(&pre_auth_state.enrollment_state)
                     .await
                     .map_err(|err| {
                         warn!("Error constructing lock request sender: {:?}", err);
@@ -314,7 +314,7 @@ where
                 })?;
 
                 let sender = self
-                    .create_lock_request_sender(&pre_auth_state_ref.enrollment_state)
+                    .create_storage_lock_request_sender(&pre_auth_state_ref.enrollment_state)
                     .await
                     .map_err(|err| {
                         warn!("UnlockAccount: Error constructing lock request sender: {:?}", err);
@@ -634,23 +634,23 @@ where
 
     /// Returns a sender which, when dispatched, causes the account handler
     /// to transition to the locked state. This method spawns
-    /// a task monitoring the lock request (which terminates quitely if the
-    /// sender is dropped). If lock requests are not supported for the account,
-    /// depending on the pre-auth state, an unsupported lock request sender is
+    /// a task monitoring the storage lock request (which terminates quitely if the
+    /// sender is dropped). If storage lock requests are not supported for the account,
+    /// depending on the pre-auth state, an unsupported storage lock request sender is
     /// returned.
-    async fn create_lock_request_sender(
+    async fn create_storage_lock_request_sender(
         &self,
         enrollment_state: &pre_auth::EnrollmentState,
-    ) -> Result<lock_request::Sender, AccountManagerError> {
-        // Lock requests are only supported for accounts with an enrolled
+    ) -> Result<storage_lock_request::Sender, AccountManagerError> {
+        // Storage lock requests are only supported for accounts with an enrolled
         // storage unlock mechanism
         if enrollment_state == &pre_auth::EnrollmentState::NoEnrollments {
-            return Ok(lock_request::Sender::NotSupported);
+            return Ok(storage_lock_request::Sender::NotSupported);
         }
         // Use weak pointers in order to not interfere with destruction of AccountHandler
         let state_weak = Arc::downgrade(&self.state);
         let inspect_weak = Arc::downgrade(&self.inspect);
-        let (sender, receiver) = lock_request::channel();
+        let (sender, receiver) = storage_lock_request::channel();
         fasync::Task::spawn(async move {
             match receiver.await {
                 Ok(()) => {
@@ -658,7 +658,7 @@ where
                         (state_weak.upgrade(), inspect_weak.upgrade())
                     {
                         if let Err(err) = Self::storage_lock_now(state, inspect).await {
-                            warn!("Lock request failure: {:?}", err);
+                            warn!("Storage lock request failure: {:?}", err);
                         }
                     }
                 }
@@ -671,8 +671,8 @@ where
         Ok(sender)
     }
 
-    /// Moves the provided lifecycle to the lock state, and notifies the inspect
-    /// node of the change. Succeeds quitely if already locked.
+    /// Moves the provided lifecycle to the storage lock state, and notifies the inspect
+    /// node of the change. Succeeds quitely if already storage locked.
     ///
     /// Returns a serialized PreAuthState if it's changed.
     async fn storage_lock_now(
@@ -685,15 +685,18 @@ where
                 match lock_state {
                     StorageLockState::Locked {} => {
                         info!(
-                            "A lock operation was attempted in the locked state, quietly \
-                            succeeding."
+                            "A storage lock operation was attempted in the storage locked state, \
+                            quietly succeeding."
                         );
                         Ok(None)
                     }
                     StorageLockState::Unlocked { account } => {
                         let () =
                             storage_manager.lock().await.lock_storage().await.map_err(|err| {
-                                warn!("LockAccount failed to lock StorageManager: {:?}", err);
+                                warn!(
+                                    "LockAccount failed to storage lock StorageManager: {:?}",
+                                    err
+                                );
                                 AccountManagerError::new(ApiError::Internal).with_cause(err)
                             })?;
 
@@ -723,8 +726,9 @@ where
                     // `account_handler` supervises a filesystem process, which expects to
                     // receive advance notice when shutdown is imminent so that it can flush any
                     // cached writes to disk.  To uphold our end of that contract, we implement a
-                    // lifecycle listener which responds to a stop request by locking all unlocked
-                    // accounts, which in turn has the effect of gracefully stopping the filesystem
+                    // lifecycle listener which responds to a stop request by
+                    // storage locking all unlocked accounts, which in turn has
+                    // the effect of gracefully stopping the filesystem
                     // and locking storage.
                     info!("Received lifecycle stop request; attempting graceful teardown");
 

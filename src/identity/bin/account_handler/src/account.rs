@@ -5,8 +5,9 @@
 use {
     crate::{
         common::AccountLifetime,
-        inspect, lock_request,
+        inspect,
         persona::{Persona, PersonaContext},
+        storage_lock_request,
         stored_account::StoredAccount,
     },
     account_common::{AccountManagerError, FidlPersonaId, PersonaId},
@@ -52,8 +53,8 @@ pub struct Account<SM> {
     /// Collection of tasks that are using this instance.
     task_group: TaskGroup,
 
-    /// A Sender of a lock request.
-    lock_request_sender: lock_request::Sender,
+    /// A Sender of a storage lock request.
+    storage_lock_request_sender: storage_lock_request::Sender,
 
     /// Helper for outputting account information via fuchsia_inspect.
     inspect: inspect::Account,
@@ -73,7 +74,7 @@ where
     async fn new(
         persona_id: PersonaId,
         lifetime: AccountLifetime,
-        lock_request_sender: lock_request::Sender,
+        storage_lock_request_sender: storage_lock_request::Sender,
         storage_manager: Arc<Mutex<SM>>,
         inspect_parent: &Node,
     ) -> Result<Account<SM>, AccountManagerError> {
@@ -93,7 +94,7 @@ where
                 inspect_parent,
             )),
             task_group,
-            lock_request_sender,
+            storage_lock_request_sender,
             inspect: account_inspect,
             storage_manager,
         })
@@ -103,7 +104,7 @@ where
     pub async fn create(
         lifetime: AccountLifetime,
         storage_manager: Arc<Mutex<SM>>,
-        lock_request_sender: lock_request::Sender,
+        storage_lock_request_sender: storage_lock_request::Sender,
         inspect_parent: &Node,
     ) -> Result<Account<SM>, AccountManagerError> {
         let persona_id = PersonaId::new(rand::random::<u64>());
@@ -115,14 +116,21 @@ where
             let stored_account = StoredAccount::new(persona_id);
             stored_account.save(account_dir)?;
         }
-        Self::new(persona_id, lifetime, lock_request_sender, storage_manager, inspect_parent).await
+        Self::new(
+            persona_id,
+            lifetime,
+            storage_lock_request_sender,
+            storage_manager,
+            inspect_parent,
+        )
+        .await
     }
 
     /// Loads an existing system account from disk.
     pub async fn load(
         lifetime: AccountLifetime,
         storage_manager: Arc<Mutex<SM>>,
-        lock_request_sender: lock_request::Sender,
+        storage_lock_request_sender: storage_lock_request::Sender,
         inspect_parent: &Node,
     ) -> Result<Account<SM>, AccountManagerError> {
         let account_dir = match lifetime {
@@ -137,7 +145,14 @@ where
         };
         let stored_account = StoredAccount::load(account_dir)?;
         let persona_id = *stored_account.get_default_persona_id();
-        Self::new(persona_id, lifetime, lock_request_sender, storage_manager, inspect_parent).await
+        Self::new(
+            persona_id,
+            lifetime,
+            storage_lock_request_sender,
+            storage_manager,
+            inspect_parent,
+        )
+        .await
     }
 
     /// Removes the account from disk or returns the account and the error.
@@ -301,16 +316,16 @@ where
     }
 
     async fn storage_lock(&self) -> Result<(), ApiError> {
-        match self.lock_request_sender.send().await {
-            Err(lock_request::SendError::NotSupported) => {
+        match self.storage_lock_request_sender.send().await {
+            Err(storage_lock_request::SendError::NotSupported) => {
                 info!("Account storage lock failure: unsupported account type");
                 Err(ApiError::FailedPrecondition)
             }
-            Err(lock_request::SendError::UnattendedReceiver) => {
+            Err(storage_lock_request::SendError::UnattendedReceiver) => {
                 warn!("Account storage lock failure: unattended listener");
                 Err(ApiError::Internal)
             }
-            Err(lock_request::SendError::AlreadySent) => {
+            Err(storage_lock_request::SendError::AlreadySent) => {
                 info!("Received account storage lock request while existing request in progress");
                 Ok(())
             }
@@ -396,7 +411,7 @@ mod tests {
             Account::create(
                 AccountLifetime::Persistent { account_dir },
                 make_provisioned_minfs_storage_manager().await,
-                lock_request::Sender::NotSupported,
+                storage_lock_request::Sender::NotSupported,
                 inspector.root(),
             )
             .await
@@ -409,7 +424,7 @@ mod tests {
             Account::create(
                 AccountLifetime::Ephemeral,
                 make_provisioned_minfs_storage_manager().await,
-                lock_request::Sender::NotSupported,
+                storage_lock_request::Sender::NotSupported,
                 inspector.root(),
             )
             .await
@@ -422,13 +437,13 @@ mod tests {
             Account::load(
                 AccountLifetime::Persistent { account_dir: self.location.path.clone() },
                 make_provisioned_minfs_storage_manager().await,
-                lock_request::Sender::NotSupported,
+                storage_lock_request::Sender::NotSupported,
                 inspector.root(),
             )
             .await
         }
 
-        async fn create_persistent_account_with_lock_request(
+        async fn create_persistent_account_with_storage_lock_request(
             &self,
         ) -> Result<
             (Account<MinfsStorageManager<MockDiskManager>>, oneshot::Receiver<()>),
@@ -436,7 +451,7 @@ mod tests {
         > {
             let inspector = Inspector::new();
             let account_dir = self.location.path.clone();
-            let (sender, receiver) = lock_request::channel();
+            let (sender, receiver) = storage_lock_request::channel();
 
             let account = Account::create(
                 AccountLifetime::Persistent { account_dir },
@@ -548,7 +563,7 @@ mod tests {
         assert!(Account::load(
             AccountLifetime::Ephemeral,
             make_provisioned_minfs_storage_manager().await,
-            lock_request::Sender::NotSupported,
+            storage_lock_request::Sender::NotSupported,
             inspector.root(),
         )
         .await
@@ -737,7 +752,7 @@ mod tests {
     async fn test_storage_lock() {
         let mut test = Test::new();
         let (account, mut receiver) =
-            test.create_persistent_account_with_lock_request().await.unwrap();
+            test.create_persistent_account_with_storage_lock_request().await.unwrap();
         test.run(account, |(proxy, _storage_manager)| async move {
             assert_eq!(receiver.try_recv(), Ok(None));
             assert_eq!(proxy.storage_lock().await?, Ok(()));
@@ -761,7 +776,8 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn test_storage_lock_unattended_receiver() {
         let mut test = Test::new();
-        let (account, receiver) = test.create_persistent_account_with_lock_request().await.unwrap();
+        let (account, receiver) =
+            test.create_persistent_account_with_storage_lock_request().await.unwrap();
         std::mem::drop(receiver);
         test.run(account, |(proxy, _storage_manager)| async move {
             assert_eq!(proxy.storage_lock().await?, Err(ApiError::Internal));
@@ -774,7 +790,7 @@ mod tests {
     async fn test_storage_lock_twice() {
         let mut test = Test::new();
         let (account, _receiver) =
-            test.create_persistent_account_with_lock_request().await.unwrap();
+            test.create_persistent_account_with_storage_lock_request().await.unwrap();
         test.run(account, |(proxy, _storage_manager)| async move {
             assert_eq!(proxy.storage_lock().await?, Ok(()));
             assert_eq!(proxy.storage_lock().await?, Ok(()));
@@ -797,7 +813,7 @@ mod tests {
         let mut test = Test::new();
 
         let (account, _receiver) =
-            test.create_persistent_account_with_lock_request().await.unwrap();
+            test.create_persistent_account_with_storage_lock_request().await.unwrap();
 
         test.run(account, |(proxy, storage_manager)| async move {
             // Directory does not exist.
