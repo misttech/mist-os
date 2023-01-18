@@ -36,7 +36,7 @@ struct GestureContext {
   ::fuchsia::math::PointF CurrentCentroid(bool local) const;
 };
 
-// Max value by which pointer events can move(relative to the first point of contact), and still
+// Max value by which touch events can move(relative to the first point of contact), and still
 // are valid for tap gestures, in NDC.
 constexpr float kGestureMoveThreshold = 1.f / 16;
 
@@ -59,15 +59,15 @@ bool FingerIsOnScreen(const GestureContext& gesture_context, uint32_t pointer_id
 void ResetGestureContext(GestureContext* gesture_context);
 
 // Helper function to check if essential fields(like event time, device id, pointer id and ndc
-// point) are present in the pointer event for the current gesture. It also makes sure that device
+// point) are present in the touch event for the current gesture. It also makes sure that device
 // id and pointer id has not changed for the gesture.
-bool ValidatePointerEvent(const GestureContext& gesture_context,
-                          const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
+bool ValidateTouchEvent(const GestureContext& gesture_context,
+                        const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
 
-// Helper function to check if the provided pointer event is valid for current tap gesture being
+// Helper function to check if the provided touch event is valid for current tap gesture being
 // performed, by verifying the move threshold.
-bool PointerEventIsValidTap(const GestureContext& gesture_context,
-                            const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
+bool TouchEventIsValidTap(const GestureContext& gesture_context,
+                          const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
 
 // Returns the square of the distance between points a and b.
 float SquareDistanceBetweenPoints(::fuchsia::math::PointF a, ::fuchsia::math::PointF b);

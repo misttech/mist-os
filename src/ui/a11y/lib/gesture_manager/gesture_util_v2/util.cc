@@ -135,8 +135,8 @@ void ResetGestureContext(GestureContext* gesture_context) {
   gesture_context->current_pointer_locations.clear();
 }
 
-bool ValidatePointerEvent(const GestureContext& gesture_context,
-                          const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
+bool ValidateTouchEvent(const GestureContext& gesture_context,
+                        const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
   // Check if `event` has all the required fields.
   if (event.touch_event.has_timestamp() && event.touch_event.has_pointer_sample() &&
       event.touch_event.pointer_sample().has_interaction()) {
@@ -144,12 +144,12 @@ bool ValidatePointerEvent(const GestureContext& gesture_context,
     return gesture_context.starting_pointer_locations.count(pointer_id);
   }
 
-  FX_LOGS(INFO) << "Pointer Event is missing required information.";
+  FX_LOGS(INFO) << "Touch event is missing required information.";
   return false;
 }
 
-bool PointerEventIsValidTap(const GestureContext& gesture_context,
-                            const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
+bool TouchEventIsValidTap(const GestureContext& gesture_context,
+                          const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
   FX_DCHECK(event.touch_event.has_pointer_sample());
   const auto& sample = event.touch_event.pointer_sample();
 

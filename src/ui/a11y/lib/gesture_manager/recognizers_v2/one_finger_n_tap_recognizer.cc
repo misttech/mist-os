@@ -4,26 +4,32 @@
 
 #include "src/ui/a11y/lib/gesture_manager/recognizers_v2/one_finger_n_tap_recognizer.h"
 
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
+#include <fuchsia/ui/pointer/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/participation_token_interface.h"
 
 namespace a11y::recognizers_v2 {
 
 struct OneFingerNTapRecognizer::Contest {
-  explicit Contest(std::unique_ptr<ContestMember> contest_member)
-      : member(std::move(contest_member)), reject_task(member.get()) {}
+  explicit Contest(std::unique_ptr<ParticipationTokenInterface> participation_token)
+      : token(std::move(participation_token)), reject_task(token.get()) {}
 
-  std::unique_ptr<ContestMember> member;
-  // Indicates that a down event for the current tap is detected.
+  std::unique_ptr<ParticipationTokenInterface> token;
+
+  // Indicates that an ADD event for the current tap is detected.
   bool tap_in_progress = false;
+
   // Keeps the count of the number of taps detected so far, for the gesture.
   int number_of_taps_detected = 0;
 
   // Async task used to schedule long-press timeout.
-  async::TaskClosureMethod<ContestMember, &ContestMember::Reject> reject_task;
+  async::TaskClosureMethod<ParticipationTokenInterface, &ParticipationTokenInterface::Reject>
+      reject_task;
 };
 
 OneFingerNTapRecognizer::OneFingerNTapRecognizer(OnFingerTapGesture callback, int number_of_taps,
@@ -37,38 +43,33 @@ OneFingerNTapRecognizer::OneFingerNTapRecognizer(OnFingerTapGesture callback, in
 OneFingerNTapRecognizer::~OneFingerNTapRecognizer() = default;
 
 void OneFingerNTapRecognizer::HandleEvent(
-    const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) {
+    const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
   FX_DCHECK(contest_);
-  FX_DCHECK(pointer_event.has_phase())
-      << DebugName() << ": Pointer event is missing phase information.";
-  switch (pointer_event.phase()) {
-    case fuchsia::ui::input::PointerEventPhase::DOWN:
+
+  FX_DCHECK(event.touch_event.has_pointer_sample());
+  const auto& sample = event.touch_event.pointer_sample();
+
+  FX_DCHECK(sample.has_phase()) << DebugName() << ": touch event is missing phase information.";
+  switch (sample.phase()) {
+    case fuchsia::ui::pointer::EventPhase::ADD:
       // If a tap is already detected, make sure the pointer_id and device_id of the new event,
       // matches with the previous one.
       if (contest_->number_of_taps_detected) {
-        if (!ValidatePointerEvent(gesture_context_, pointer_event)) {
-          FX_LOGS(INFO) << DebugName()
-                        << ": Pointer Event is not a valid pointer event. Dropping current event.";
+        if (!ValidateTouchEvent(gesture_context_, event)) {
+          FX_LOGS(INFO) << DebugName() << ": touch event is not valid. Dropping current event.";
           ResetRecognizer();
           break;
         }
       }
 
-      // Check if pointer event has all the required fields and initialize gesture_start_info and
-      // gesture_context.
-      if (!InitializeStartingGestureContext(pointer_event, &gesture_context_)) {
-        FX_LOGS(INFO) << DebugName()
-                      << ": Pointer Event is missing required fields. Dropping current event.";
-        ResetRecognizer();
-        break;
-      }
+      // Initialize gesture_start_info and gesture_context.
+      InitializeStartingGestureContext(event, &gesture_context_);
 
-      // If the gesture is already in progress then abandon this gesture since DownEvent()
-      // represents the start of the gesture. Also, validate pointer event is valid for one finger
-      // tap.
-      if (contest_->tap_in_progress || !PointerEventIsValidTap(gesture_context_, pointer_event)) {
+      // If the gesture is already in progress then abandon this gesture since an ADD event
+      // represents the start of the gesture. Also, check event is valid for one finger tap.
+      if (contest_->tap_in_progress || !TouchEventIsValidTap(gesture_context_, event)) {
         FX_LOGS(INFO) << DebugName()
-                      << ": Pointer Event is not valid for current gesture."
+                      << ": touch event is not valid for current gesture. "
                          "Dropping current event.";
         ResetRecognizer();
         break;
@@ -82,30 +83,30 @@ void OneFingerNTapRecognizer::HandleEvent(
       contest_->tap_in_progress = true;
       break;
 
-    case fuchsia::ui::input::PointerEventPhase::MOVE:
+    case fuchsia::ui::pointer::EventPhase::CHANGE:
       FX_DCHECK(contest_->tap_in_progress)
-          << DebugName() << ": Pointer MOVE event received without preceding DOWN event.";
+          << DebugName() << ": CHANGE event received without preceding ADD event.";
 
-      // Validate the pointer_event for the gesture being performed.
-      if (!ValidateEvent(pointer_event)) {
+      // Validate the event for the gesture being performed.
+      if (!ValidateEvent(event)) {
         ResetRecognizer();
       }
 
-      UpdateGestureContext(pointer_event, true, &gesture_context_);
+      UpdateGestureContext(event, true, &gesture_context_);
 
       break;
 
-    case fuchsia::ui::input::PointerEventPhase::UP:
+    case fuchsia::ui::pointer::EventPhase::REMOVE:
       FX_DCHECK(contest_->tap_in_progress)
-          << DebugName() << ": Pointer Up event received without preceding DOWN event.";
+          << DebugName() << ": REMOVE event received without preceding ADD event.";
 
-      // Validate pointer_event for the gesture being performed.
-      if (!ValidateEvent(pointer_event)) {
+      // Validate event for the gesture being performed.
+      if (!ValidateEvent(event)) {
         ResetRecognizer();
         break;
       }
 
-      UpdateGestureContext(pointer_event, false, &gesture_context_);
+      UpdateGestureContext(event, false, &gesture_context_);
 
       // Tap is detected.
       contest_->number_of_taps_detected += 1;
@@ -120,7 +121,7 @@ void OneFingerNTapRecognizer::HandleEvent(
         contest_->reject_task.PostDelayed(async_get_default_dispatcher(), timeout_between_taps_);
       } else {
         // Tap gesture is detected.
-        contest_->member->Accept();
+        contest_->token->Accept();
         contest_.reset();
       }
       break;
@@ -142,14 +143,15 @@ void OneFingerNTapRecognizer::ResetRecognizer() {
 }
 
 bool OneFingerNTapRecognizer::ValidateEvent(
-    const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) const {
-  return ValidatePointerEvent(gesture_context_, pointer_event) &&
-         PointerEventIsValidTap(gesture_context_, pointer_event);
+    const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) const {
+  return ValidateTouchEvent(gesture_context_, event) &&
+         TouchEventIsValidTap(gesture_context_, event);
 }
 
-void OneFingerNTapRecognizer::OnContestStarted(std::unique_ptr<ContestMember> contest_member) {
+void OneFingerNTapRecognizer::OnContestStarted(
+    std::unique_ptr<ParticipationTokenInterface> participation_token) {
   ResetRecognizer();
-  contest_ = std::make_unique<Contest>(std::move(contest_member));
+  contest_ = std::make_unique<Contest>(std::move(participation_token));
 }
 
 std::string OneFingerNTapRecognizer::DebugName() const {

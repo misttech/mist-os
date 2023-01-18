@@ -18,6 +18,12 @@
 
 namespace a11y::recognizers_v2 {
 
+namespace {
+
+using gesture_util_v2::ValidateTouchEvent;
+
+}  // namespace
+
 struct MFingerNTapRecognizer::Contest {
   explicit Contest(std::unique_ptr<ParticipationTokenInterface> participation_token)
       : token(std::move(participation_token)),
@@ -54,7 +60,7 @@ void MFingerNTapRecognizer::OnExcessFingers() { ResetRecognizer(); }
 
 void MFingerNTapRecognizer::OnChangeEvent(
     const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& pointer_event) {
-  if (!PointerEventIsValidTap(gesture_context_, pointer_event)) {
+  if (!TouchEventIsValidTap(gesture_context_, pointer_event)) {
     ResetRecognizer();
   }
 }
@@ -157,7 +163,7 @@ void MFingerNTapRecognizer::HandleEvent(
           << DebugName() << ": Pointer CHANGE event received without preceding ADD event.";
 
       // Validate the pointer_event for the gesture being performed.
-      if (!gesture_util_v2::ValidatePointerEvent(gesture_context_, event)) {
+      if (!ValidateTouchEvent(gesture_context_, event)) {
         ResetRecognizer();
         break;
       }
@@ -174,7 +180,7 @@ void MFingerNTapRecognizer::HandleEvent(
           << DebugName() << ": Pointer REMOVE event received without preceding DOWN event.";
 
       // Validate pointer_event for the gesture being performed.
-      if (!gesture_util_v2::ValidatePointerEvent(gesture_context_, event)) {
+      if (!ValidateTouchEvent(gesture_context_, event)) {
         ResetRecognizer();
         break;
       }
