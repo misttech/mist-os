@@ -26,8 +26,9 @@ pub async fn run_test(test_url: &str) -> Result<(Vec<RunEvent>, Vec<String>), Er
 #[fuchsia_async::run_singlethreaded(test)]
 async fn always_fail() {
     let test_url = "fuchsia-pkg://fuchsia.com/stress-runner-integration-test#meta/always_fail.cm";
-    let (events, _logs) =
-        run_test(test_url).await.expect(&format!("failed to run test {}", test_url));
+    let (events, _logs) = run_test(test_url)
+        .await
+        .unwrap_or_else(|e| panic!("failed to run test {}: {:?}", test_url, e));
 
     let expected_events = vec![
         RunEvent::suite_started(),
@@ -47,8 +48,9 @@ async fn always_fail() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn always_pass() {
     let test_url = "fuchsia-pkg://fuchsia.com/stress-runner-integration-test#meta/always_pass.cm";
-    let (events, _logs) =
-        run_test(test_url).await.expect(&format!("failed to run test {}", test_url));
+    let (events, _logs) = run_test(test_url)
+        .await
+        .unwrap_or_else(|e| panic!("failed to run test {}: {}", test_url, e));
 
     let expected_events = vec![
         RunEvent::suite_started(),
@@ -64,8 +66,9 @@ async fn always_pass() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn timeout() {
     let test_url = "fuchsia-pkg://fuchsia.com/stress-runner-integration-test#meta/timeout.cm";
-    let (events, _logs) =
-        run_test(test_url).await.expect(&format!("failed to run test {}", test_url));
+    let (events, _logs) = run_test(test_url)
+        .await
+        .unwrap_or_else(|e| panic!("failed to run test {}: {}", test_url, e));
 
     let expected_events = vec![
         RunEvent::suite_started(),
@@ -82,8 +85,9 @@ async fn timeout() {
 #[fuchsia_async::run_singlethreaded(test)]
 async fn echo() {
     let test_url = "fuchsia-pkg://fuchsia.com/stress-runner-integration-test#meta/echo_test.cm";
-    let (events, _logs) =
-        run_test(test_url).await.expect(&format!("failed to run test {}", test_url));
+    let (events, _logs) = run_test(test_url)
+        .await
+        .unwrap_or_else(|e| panic!("failed to run test {}: {}", test_url, e));
 
     let expected_events = vec![
         RunEvent::suite_started(),

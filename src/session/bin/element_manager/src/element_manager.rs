@@ -653,9 +653,9 @@ async fn run_element_until_closed(
 /// event, or (for CFv1 only) by closing its directory channel. (Note that a
 /// component process that exits will trigger one of these events.)
 async fn await_element_close(view_provider: fuiapp::ViewProviderProxy, moniker: String) {
-    let channel = view_provider
-        .into_channel()
-        .expect(&format!("could not get ViewProvider channel for moniker: {moniker}"));
+    let channel = view_provider.into_channel().unwrap_or_else(|e| {
+        panic!("could not get ViewProvider channel for moniker: {moniker}: {:?}", e)
+    });
     debug!(%moniker, "await_element_close()");
     let _ =
         fasync::OnSignals::new(&channel.as_handle_ref(), zx::Signals::CHANNEL_PEER_CLOSED).await;

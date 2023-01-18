@@ -157,13 +157,14 @@ impl ViewAssistant for PngViewAssistant {
         // Create image from PNG and raster for clearing.
         let filename = &self.filename;
         let (png_size, png_image, png_raster) = self.png.take().unwrap_or_else(|| {
-            let file = File::open(format!("/pkg/data/static/{}", filename))
-                .expect(&format!("failed to open file /pkg/data/static/{}", filename));
+            let file = File::open(format!("/pkg/data/static/{}", filename)).unwrap_or_else(|e| {
+                panic!("failed to open file /pkg/data/static/{}: {:?}", filename, e)
+            });
             let decoder = png::Decoder::new(file);
             let (info, mut reader) = decoder.read_info().unwrap();
-            let image = render_context
-                .new_image_from_png(&mut reader)
-                .expect(&format!("failed to decode file /pkg/data/static/{}", filename));
+            let image = render_context.new_image_from_png(&mut reader).unwrap_or_else(|e| {
+                panic!("failed to decode file /pkg/data/static/{}: {:?}", filename, e)
+            });
             let size = size2(info.width as f32, info.height as f32);
             let mut raster_builder = render_context.raster_builder().expect("raster_builder");
             raster_builder

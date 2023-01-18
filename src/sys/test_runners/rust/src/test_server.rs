@@ -588,14 +588,14 @@ mod tests {
         // succeed when client passes args to flags.
         let args = vec!["--flag1".to_string(), "flag1_arg".to_string(), "--flag".to_string()];
         TestServer::validate_args(&args)
-            .expect(&format!("should not error out for flags: {:?}", args));
+            .unwrap_or_else(|e| panic!("should not error out for flags: {:?}: {:?}", args, e));
 
         let allowed_flags = vec!["--bench", "--anyflag", "--test", "--mycustomflag", "-e", "-a"];
 
         for flag in allowed_flags {
             let args = vec![flag.to_string()];
             TestServer::validate_args(&args)
-                .expect(&format!("should not error out for flag: {}", flag));
+                .unwrap_or_else(|e| panic!("should not error out for flag: {}: {:?}", flag, e));
         }
     }
 

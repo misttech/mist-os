@@ -41,7 +41,7 @@ fn type_to_c_str(ty: &Type, ir: &FidlIr) -> Result<String, Error> {
         Type::Primitive { ref subtype } => primitive_type_to_c_str(subtype),
         Type::Identifier { identifier, .. } => match ir
             .get_declaration(identifier)
-            .expect(&format!("Could not find declaration for {:?}", identifier))
+            .unwrap_or_else(|e| panic!("Could not find declaration for {:?}: {:?}", identifier, e))
         {
             Declaration::Struct
             | Declaration::Table
@@ -99,7 +99,7 @@ fn constant_to_c_str(ty: &Type, constant: &Constant, ir: &FidlIr) -> Result<Stri
         },
         Type::Identifier { identifier, .. } => match ir
             .get_declaration(identifier)
-            .expect(&format!("Can't identify: {:?}", identifier))
+            .unwrap_or_else(|e| panic!("Can't identify: {:?}: {}", identifier, e))
         {
             Declaration::Enum => {
                 let decl = ir.get_enum(identifier)?;
@@ -708,8 +708,12 @@ impl<'a, W: io::Write> CBackend<'a, W> {
             .map(|f| {
                 field_to_c_str(
                     &f.maybe_attributes,
-                    &f._type.as_ref().expect(&format!("Missing type on table field {:?}", f)),
-                    &f.name.as_ref().expect(&format!("Missing name on table field {:?}", f)),
+                    &f._type
+                        .as_ref()
+                        .unwrap_or_else(|| panic!("Missing type on table field {:?}", f)),
+                    &f.name
+                        .as_ref()
+                        .unwrap_or_else(|| panic!("Missing name on table field {:?}", f)),
                     "    ",
                     preserve_names,
                     &None,

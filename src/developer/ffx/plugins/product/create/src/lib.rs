@@ -139,20 +139,19 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
                 VirtualDevice::V1(ref device) => {
                     let template_path = path
                         .parent()
-                        .expect(&format!("Given path has no parent: '{}'", path))
+                        .unwrap_or_else(|| panic!("Given path has no parent: '{}'", path))
                         .join(&device.start_up_args_template);
                     copy_file(&template_path, &vd_path).with_context(|| {
                         format!("Copying template file to target directory: '{}'", template_path)
                     })?;
                 }
             }
-            let vd_file = File::create(
-                vd_path
-                    .join(path.file_name().expect(&format!("Path has no file name: '{}'", path))),
-            )?;
-            let name = path
-                .file_stem()
-                .expect(&format!("Couldn't determine virtual device name from path: '{}'", path));
+            let vd_file = File::create(vd_path.join(
+                path.file_name().unwrap_or_else(|| panic!("Path has no file name: '{}'", path)),
+            ))?;
+            let name = path.file_stem().unwrap_or_else(|| {
+                panic!("Couldn't determine virtual device name from path: '{}'", path)
+            });
             serde_json::to_writer(vd_file, &device)
                 .context("Couldn't serialize virtual device to disk.")?;
             manifest.device_paths.insert(name.to_string(), path);

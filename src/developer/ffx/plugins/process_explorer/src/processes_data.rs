@@ -302,7 +302,7 @@ mod tests {
         for process in processed.processes {
             let expected = expected_processes_per_koid
                 .get(&process.koid)
-                .expect(&format!("Data contains unexpected process {:?}", process));
+                .unwrap_or_else(|| panic!("Data contains unexpected process {:?}", process));
             pretty_assertions::assert_eq!(process, *expected);
         }
     }

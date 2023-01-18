@@ -29,7 +29,7 @@ pub async fn take_screenshot() {
     let image_size = data.size.expect("no data size returned from screenshot");
     let raw_data_size = image_size.width * image_size.height * 4;
     let screenshot_file = fs::File::create(SCREENSHOT_FILE)
-        .expect(&format!("cannot create file {}", SCREENSHOT_FILE));
+        .unwrap_or_else(|e| panic!("cannot create file {}: {:?}", SCREENSHOT_FILE, e));
     let ref mut w = BufWriter::new(screenshot_file);
 
     let mut encoder = png::Encoder::new(w, image_size.width, image_size.height);

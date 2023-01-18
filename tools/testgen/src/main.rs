@@ -705,13 +705,13 @@ use fuchsia_component::server::*;"#;
                 case.generate_mocks,
                 case.cpp,
             )
-            .expect(&format!("use {}", case.name));
+            .unwrap_or_else(|e| panic!("use {}: {:?}", case.name, e));
             update_code_for_expose_declaration(
                 &decl.exposes.as_ref().unwrap_or(&Vec::new()),
                 code,
                 case.cpp,
             )
-            .expect(&format!("expose {}", case.name));
+            .unwrap_or_else(|e| panic!("expose {}: {:?}", case.name, e));
         }
     }
 }

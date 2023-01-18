@@ -225,7 +225,7 @@ mod tests {
             let response = self
                 .responses
                 .get(&key)
-                .expect(&format!("mock to be configured for key {:?}", key));
+                .unwrap_or_else(|| panic!("mock to be configured for key {:?}", key));
 
             Ok(serde_json5::from_str(&response).context(format!(
                 "Failed to deserialize verify component resolvers results: {:?}",

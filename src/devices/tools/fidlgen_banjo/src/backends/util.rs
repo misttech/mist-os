@@ -386,7 +386,7 @@ pub fn type_to_cpp_str(ty: &Type, wrappers: bool, ir: &FidlIr) -> Result<String,
         Type::Primitive { ref subtype } => primitive_type_to_c_str(subtype),
         Type::Identifier { identifier, .. } => match ir
             .get_declaration(identifier)
-            .expect(&format!("Could not find declaration for {:?}", identifier))
+            .unwrap_or_else(|e| panic!("Could not find declaration for {:?}: {:?}", identifier, e))
         {
             Declaration::Struct
             | Declaration::Table

@@ -640,7 +640,7 @@ impl RoutingTestModel for RoutingTest {
         let (component, component_name) = self
             .start_and_get_instance(&moniker, StartReason::Eager, true)
             .await
-            .expect(&format!("start instance failed for `{}`", moniker));
+            .unwrap_or_else(|e| panic!("start instance failed for `{}`: {:?}", moniker, e));
         let component_resolved_url = Self::resolved_url(&component_name);
         let namespace = self
             .mock_runner
@@ -883,7 +883,7 @@ impl RoutingTestModel for RoutingTest {
     fn install_namespace_directory(&self, path: &str) {
         let (client, server) = fidl::endpoints::create_endpoints().unwrap();
         let ns = fdio::Namespace::installed().expect("Failed to get installed namespace");
-        ns.bind(path, client).expect(&format!("Failed to bind dir {}", path));
+        ns.bind(path, client).unwrap_or_else(|e| panic!("Failed to bind dir {}: {:?}", path, e));
         let mut out_dir = OutDir::new();
         Self::install_default_out_files(&mut out_dir);
         out_dir.add_directory_proxy(&self.test_dir_proxy);
@@ -1373,7 +1373,7 @@ pub mod capability_util {
         let index = ns
             .iter()
             .position(|entry| entry.path.as_ref().unwrap() == dir_path)
-            .expect(&format!("didn't find dir {}", dir_path));
+            .unwrap_or_else(|| panic!("didn't find dir {}", dir_path));
         let entry = ns.remove(index);
         let dir_proxy = entry.directory.unwrap().into_proxy().unwrap();
         dir_proxy
@@ -1405,7 +1405,7 @@ pub mod capability_util {
         let component = model
             .look_up(abs_moniker)
             .await
-            .expect(&format!("component not found {}", abs_moniker));
+            .unwrap_or_else(|e| panic!("component not found {}: {}", abs_moniker, e));
         model
             .start_instance(abs_moniker, &StartReason::Eager)
             .await

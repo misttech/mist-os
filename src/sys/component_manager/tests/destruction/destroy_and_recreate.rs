@@ -28,8 +28,8 @@ async fn main() {
         realm
             .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
             .await
-            .expect(&format!("create_child failed"))
-            .expect(&format!("failed to create child"));
+            .unwrap_or_else(|e| panic!("create_child failed: {:?}", e))
+            .unwrap_or_else(|e| panic!("failed to create child: {:?}", e));
     }
 
     // Bind to child, causing it to start (along with its eager children).
@@ -41,8 +41,8 @@ async fn main() {
         realm
             .open_exposed_dir(&mut child_ref, server_end)
             .await
-            .expect(&format!("open_exposed_dir failed"))
-            .expect(&format!("failed to open child exposed dir"));
+            .unwrap_or_else(|e| panic!("open_exposed_dir failed: {:?}", e))
+            .unwrap_or_else(|e| panic!("failed to open child exposed dir: {:?}", e));
         let trigger = client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(&dir)
             .expect("failed to open trigger service");
         trigger.run().await.expect("trigger failed");
@@ -73,8 +73,8 @@ async fn main() {
         realm
             .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
             .await
-            .expect(&format!("create_child failed"))
-            .expect(&format!("failed to create child"));
+            .unwrap_or_else(|e| panic!("create_child failed: {:?}", e))
+            .unwrap_or_else(|e| panic!("failed to create child: {:?}", e));
     }
 
     // Sleep so that it's more likely that, if the new component is destroyed incorrectly,
@@ -90,8 +90,8 @@ async fn main() {
         realm
             .open_exposed_dir(&mut child_ref, server_end)
             .await
-            .expect(&format!("open_exposed_dir failed"))
-            .expect(&format!("failed to open child exposed dir"));
+            .unwrap_or_else(|e| panic!("open_exposed_dir failed: {:?}", e))
+            .unwrap_or_else(|e| panic!("failed to open child exposed dir: {:?}", e));
         let trigger = client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(&dir)
             .expect("failed to open trigger service");
         trigger.run().await.expect("trigger failed");

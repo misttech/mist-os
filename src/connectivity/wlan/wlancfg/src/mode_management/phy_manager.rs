@@ -1024,7 +1024,7 @@ mod tests {
             ))) => {
                 responder
                     .send(return_status)
-                    .expect(format!("sending fake response: {}", return_status).as_str());
+                    .unwrap_or_else(|e| panic!("sending fake response: {}: {:?}", return_status, e));
             }
         );
     }

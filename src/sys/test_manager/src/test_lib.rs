@@ -519,7 +519,7 @@ impl FidlSuiteEventProcessor {
     fn get_test_case_name(&self, identifier: u32) -> String {
         self.case_map
             .get(&identifier)
-            .expect(&format!("invalid test case identifier: {}", identifier))
+            .unwrap_or_else(|| panic!("invalid test case identifier: {:?}", identifier))
             .clone()
     }
 

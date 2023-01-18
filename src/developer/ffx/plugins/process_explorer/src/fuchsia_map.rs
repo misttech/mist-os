@@ -153,7 +153,7 @@ mod tests {
         for node in json_map.nodes {
             let expected = expected_nodes
                 .get(&node.id)
-                .expect(&format!("Data contains unexpected node {:?}", node));
+                .unwrap_or_else(|| panic!("Data contains unexpected node {:?}", node));
             pretty_assertions::assert_eq!(node, *expected);
         }
         pretty_assertions::assert_eq!(json_map.links, expected_links);

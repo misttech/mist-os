@@ -711,7 +711,7 @@ impl FidlIr {
                 .iter()
                 .filter(|e| e.name == *identifier)
                 .next()
-                .expect(&format!("Could not find protocol declaration: {:?}", identifier))
+                .unwrap_or_else(|| panic!("Could not find protocol declaration: {:?}", identifier))
                 .maybe_attributes);
         }
         Err(anyhow!("Identifier does not represent a protocol: {:?}", identifier))

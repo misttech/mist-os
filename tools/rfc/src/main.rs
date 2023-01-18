@@ -509,9 +509,11 @@ mod test {
 
         pub fn validate_rfcs_file(&self, file: &str, expected: &str) {
             let path = self.rfcs_path.join(file);
-            let mut file = File::open(&path).expect(&format!("open: {}", path.display()));
+            let mut file =
+                File::open(&path).unwrap_or_else(|e| panic!("open: {}: {:?}", path.display(), e));
             let mut contents = String::new();
-            file.read_to_string(&mut contents).expect(&format!("read file: {}", path.display()));
+            file.read_to_string(&mut contents)
+                .unwrap_or_else(|e| panic!("read file: {}: {:?}", path.display(), e));
             assert_eq!(contents, expected);
         }
     }

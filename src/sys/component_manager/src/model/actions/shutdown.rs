@@ -3697,10 +3697,9 @@ mod tests {
             for e in events {
                 match e {
                     Lifecycle::Stop(moniker) => {
-                        let dependents = comes_after.remove(&moniker).expect(&format!(
-                            "{} was unknown or shut down more than once",
-                            moniker
-                        ));
+                        let dependents = comes_after.remove(&moniker).unwrap_or_else(|| {
+                            panic!("{} was unknown or shut down more than once", moniker)
+                        });
                         for d in dependents {
                             if comes_after.contains_key(&d) {
                                 panic!("{} stopped before its dependent {}", moniker, d);

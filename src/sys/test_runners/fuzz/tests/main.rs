@@ -25,7 +25,10 @@ async fn setup() -> (fuzz::ManagerProxy, fuzz::ControllerProxy, fasync::Task<Str
         connect_to_protocol::<fuzz::ManagerMarker>().expect("failed to connect fuzz-manager");
     let (controller, log_task) = connect(&fuzz_manager).await;
     let options = fuzz::Options { seed: Some(1), ..fuzz::Options::EMPTY };
-    let response = controller.configure(options).await.expect(&controller_name("Configure"));
+    let response = controller
+        .configure(options)
+        .await
+        .unwrap_or_else(|e| panic!("{}: {:?}", controller_name("Configure"), e));
     assert_eq!(response, zx::Status::OK.into_raw());
     (fuzz_manager, controller, log_task)
 }
@@ -36,8 +39,10 @@ async fn connect(
 ) -> (fuzz::ControllerProxy, fasync::Task<String>) {
     let (controller, server_end) =
         create_proxy::<fuzz::ControllerMarker>().expect("failed to create proxy");
-    let status =
-        fuzz_manager.connect(FUZZER_URL, server_end).await.expect(&manager_name("Connect"));
+    let status = fuzz_manager
+        .connect(FUZZER_URL, server_end)
+        .await
+        .unwrap_or_else(|e| panic!("{}: {:?}", manager_name("Connect"), e));
     assert_eq!(status, zx::Status::OK.into_raw());
 
     // Forward syslog. This isn't strictly necessary for testing, but is very useful when debugging.
@@ -45,7 +50,7 @@ async fn connect(
     let status = fuzz_manager
         .get_output(FUZZER_URL, fuzz::TestOutput::Syslog, tx)
         .await
-        .expect(&manager_name("GetOutput"));
+        .unwrap_or_else(|e| panic!("{}: {:?}", manager_name("GetOutput"), e));
     assert_eq!(status, zx::Status::OK.into_raw());
     let log_task = fasync::Task::spawn(async move {
         let mut socket = fasync::Socket::from_socket(rx).unwrap();
@@ -184,7 +189,12 @@ async fn teardown(
 
 // Stops the fuzzer.
 async fn stop(fuzz_manager: &fuzz::ManagerProxy) -> Result<(), zx::Status> {
-    zx::Status::ok(fuzz_manager.stop(FUZZER_URL).await.expect(&manager_name("Stop")))
+    zx::Status::ok(
+        fuzz_manager
+            .stop(FUZZER_URL)
+            .await
+            .unwrap_or_else(|e| panic!("{}: {:?}", manager_name("Stop"), e)),
+    )
 }
 
 #[fuchsia::test]

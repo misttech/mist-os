@@ -1676,7 +1676,9 @@ mod tests {
                     None,
                 )
                 .await
-                .expect(&format!("open_object failed (object_id: {})", object_id));
+                .unwrap_or_else(|e| {
+                    panic!("open_object failed (object_id: {}): {:?}", object_id, e)
+                });
                 let mut buf = handle.allocate_buffer(TEST_DEVICE_BLOCK_SIZE as usize);
                 assert_eq!(
                     handle.read(0, buf.as_mut()).await.expect("read failed"),

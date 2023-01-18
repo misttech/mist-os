@@ -624,11 +624,13 @@ where
                     .into());
                 }
             };
-            let env_name = env_name.expect(&format!(
-                "Environment name in component `{}` not found when routing `{}`.",
-                target.abs_moniker(),
-                use_decl.source_name
-            ));
+            let env_name = env_name.unwrap_or_else(|| {
+                panic!(
+                    "Environment name in component `{}` not found when routing `{}`.",
+                    target.abs_moniker(),
+                    use_decl.source_name
+                )
+            });
 
             let env_moniker = env_component_instance.abs_moniker();
 

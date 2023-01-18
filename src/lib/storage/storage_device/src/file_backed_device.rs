@@ -113,7 +113,7 @@ mod tests {
                 .write(true)
                 .create_new(true)
                 .open(temp_path.as_path())
-                .expect(&format!("create {:?} failed", temp_path.as_path())),
+                .unwrap_or_else(|e| panic!("create {:?} failed: {:?}", temp_path.as_path(), e)),
         );
         file.set_len(1024 * 1024).expect("Failed to truncate file");
         (pathbuf, file)

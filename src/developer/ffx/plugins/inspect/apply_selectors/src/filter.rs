@@ -187,10 +187,12 @@ mod tests {
                     acc
                 });
         let filtered_json_value: serde_json::Value = serde_json::from_str(&filtered_data_string)
-            .expect(&format!(
-                "Resultant json dump should be parsable json: {}",
-                filtered_data_string
-            ));
+            .unwrap_or_else(|e| {
+                panic!(
+                    "Resultant json dump should be parsable json: {}: {:?}",
+                    filtered_data_string, e
+                )
+            });
 
         assert_eq!(filtered_json_value, golden_json);
     }

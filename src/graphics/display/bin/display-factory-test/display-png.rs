@@ -260,7 +260,7 @@ impl ViewAssistant for DisplayPngViewAssistant {
                 let mut png_reader = png_source.png_reader.take().expect("png_reader");
                 render_context
                     .new_image_from_png(&mut png_reader)
-                    .expect(&format!("failed to decode file"))
+                    .unwrap_or_else(|e| panic!("failed to decode file: {:?}", e))
             });
 
             // Center image if position has not been specified.

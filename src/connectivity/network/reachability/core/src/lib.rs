@@ -266,7 +266,9 @@ impl StateInfo {
             id,
             state: self
                 .get(id)
-                .expect(&format!("inconsistent system IPv4 state: no interface with ID {:?}", id))
+                .unwrap_or_else(|| {
+                    panic!("inconsistent system IPv4 state: no interface with ID {:?}", id)
+                })
                 .ipv4,
         })
     }
@@ -277,7 +279,9 @@ impl StateInfo {
             id,
             state: self
                 .get(id)
-                .expect(&format!("inconsistent system IPv6 state: no interface with ID {:?}", id))
+                .unwrap_or_else(|| {
+                    panic!("inconsistent system IPv6 state: no interface with ID {:?}", id)
+                })
                 .ipv6,
         })
     }

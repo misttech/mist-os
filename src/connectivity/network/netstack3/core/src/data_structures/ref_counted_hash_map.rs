@@ -179,8 +179,6 @@ impl<T: Eq + Hash> core::iter::FromIterator<T> for RefCountedHashSet<T> {
 
 #[cfg(test)]
 mod test {
-    use alloc::format;
-
     use super::*;
 
     #[test]
@@ -236,7 +234,7 @@ mod test {
         context: &str,
     ) {
         let (actual_refcount, _value) =
-            map.inner.get(key).expect(&format!("refcount should be non-zero {}", context));
+            map.inner.get(key).unwrap_or_else(|| panic!("refcount should be non-zero {}", context));
         assert_eq!(actual_refcount.get(), expected_refcount);
     }
 }

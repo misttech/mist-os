@@ -19,10 +19,10 @@ async fn routing() {
     realm
         .open_exposed_dir(&mut child_ref, server_end)
         .await
-        .expect(&format!("open_exposed_dir failed"))
-        .expect(&format!("failed to open child exposed dir"));
+        .unwrap_or_else(|e| panic!("open_exposed_dir failed: {:?}", e))
+        .unwrap_or_else(|e| panic!("failed to open child exposed dir: {:?}", e));
     let trigger = client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(&exposed_dir)
         .expect("failed to open trigger service");
-    let out = trigger.run().await.expect(&format!("trigger failed"));
+    let out = trigger.run().await.unwrap_or_else(|e| panic!("trigger failed: {:?}", e));
     assert_eq!(out, "Triggered");
 }

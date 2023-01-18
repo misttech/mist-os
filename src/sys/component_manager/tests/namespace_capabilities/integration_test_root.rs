@@ -12,7 +12,7 @@ async fn main() {
     let trigger = client::connect_to_protocol::<ftest::TriggerMarker>()
         .expect("failed to open trigger service");
     info!("Invoking trigger");
-    let out = trigger.run().await.expect(&format!("trigger failed"));
+    let out = trigger.run().await.unwrap_or_else(|e| panic!("trigger failed: {:?}", e));
     assert_eq!(out, "Triggered");
     info!("Done");
 }

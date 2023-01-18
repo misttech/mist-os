@@ -519,7 +519,7 @@ mod tests {
                 key: Some(key),
                 ..input3::KeyEvent::EMPTY
             })
-            .expect(&format!("Unable to translate fuchsia key {:?}", key));
+            .unwrap_or_else(|| panic!("Unable to translate fuchsia key {:?}", key));
         }
     }
 }

@@ -119,10 +119,9 @@ impl Decorator {
     }
 
     pub fn init_regex(&mut self) {
-        self.re_color = Some(
-            Regex::new(self.regex_str_color.as_str())
-                .expect(&format!("should create regex for {}", self.regex_str_color)),
-        );
+        self.re_color = Some(Regex::new(self.regex_str_color.as_str()).unwrap_or_else(|e| {
+            panic!("should create regex for {}: {:?}", self.regex_str_color, e)
+        }));
     }
 
     pub fn activate(&mut self) {

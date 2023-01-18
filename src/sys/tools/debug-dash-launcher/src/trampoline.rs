@@ -488,7 +488,9 @@ mod tests {
         async fn contents_of(path: &str, dir: &fio::DirectoryProxy) -> String {
             let file =
                 open_file(dir, path, OpenFlags::RIGHT_READABLE).await.expect("could not open file");
-            read_to_string(&file).await.expect(&format!("could not open file: {}", path))
+            read_to_string(&file)
+                .await
+                .unwrap_or_else(|e| panic!("could not open file: {}: {:?}", path, e))
         }
 
         let p1t1 =

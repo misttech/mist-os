@@ -271,9 +271,9 @@ mod tests {
         let path = format!("{}{}", dir, filename);
 
         File::open(&path)
-            .expect(&format!("Failed to open file {}", &path))
+            .unwrap_or_else(|e| panic!("Failed to open file {}: {:?}", &path, e))
             .read_to_end(&mut file_buffer)
-            .expect(&format!("Failed to read file {}", &path));
+            .unwrap_or_else(|e| panic!("Failed to read file {}: {:?}", &path, e));
         map.insert(filename.to_string(), file_buffer);
     }
 

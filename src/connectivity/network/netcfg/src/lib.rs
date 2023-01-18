@@ -2102,7 +2102,7 @@ impl<'a> NetCfg<'a> {
                     want_id,
                     self.interface_states
                         .get_mut(&want_id)
-                        .expect(&format!("interface {} state not present", want_id)),
+                        .unwrap_or_else(|| panic!("interface {} state not present", want_id)),
                 )))
             }
             dhcpv6::AcquirePrefixInterfaceConfig::Upstreams => either::Either::Right(
@@ -2268,10 +2268,9 @@ impl<'a> NetCfg<'a> {
             .or_else(errors::Error::accept_non_fatal)
             .expect("stopping DHCPv6 client before restarting without PD");
 
-            let properties = self
-                .interface_properties
-                .get(id)
-                .expect(&format!("interface {} has DHCPv6 client but properties unknown", id));
+            let properties = self.interface_properties.get(id).unwrap_or_else(|| {
+                panic!("interface {} has DHCPv6 client but properties unknown", id)
+            });
 
             // Restart DHCPv6 client without PD.
             let sockaddr = match start_dhcpv6_client(
@@ -3309,7 +3308,7 @@ mod tests {
                 if expect_restart {
                     let res = dhcpv6_client_request_stream
                         .take()
-                        .expect(&format!("interface {} DHCPv6 client provider request stream missing when expecting restart", id))
+                        .unwrap_or_else(|| panic!("interface {} DHCPv6 client provider request stream missing when expecting restart", id))
                         .try_next().await;
                     assert_matches!(res, Ok(None));
                     Some(*id)
@@ -3359,9 +3358,9 @@ mod tests {
                         _control_server_end,
                         dhcpv6_client_request_stream,
                         kind: _,
-                    } = interface_states
-                        .get_mut(&interface_id)
-                        .expect(&format!("interface {} must be present in map", interface_id));
+                    } = interface_states.get_mut(&interface_id).unwrap_or_else(|| {
+                        panic!("interface {} must be present in map", interface_id)
+                    });
                     assert!(
                         std::mem::replace(dhcpv6_client_request_stream, Some(new_stream)).is_none()
                     );
@@ -3641,7 +3640,7 @@ mod tests {
                     &mut virtualization::Stub,
                 )
                 .await
-                .expect(&format!("error handling interface added event for {} with interface up and link-local addr", id));
+                .unwrap_or_else(|e| panic!("error handling interface added event for {} with interface up and link-local addr: {:?}", id, e));
 
             // Expect DHCPv6 client to have started with PD configuration.
             let _: fnet_dhcpv6::ClientRequestStream = check_new_dhcpv6_client(
@@ -3652,7 +3651,9 @@ mod tests {
                 &mut dns_watchers,
             )
             .await
-            .expect(&format!("error checking for new DHCPv6 client on interface {}", id));
+            .unwrap_or_else(|e| {
+                panic!("error checking for new DHCPv6 client on interface {}: {:?}", id, e)
+            });
         }
     }
 

@@ -217,8 +217,9 @@ fn extract_reachability_states(
                 match state.properties.iter().find_map(|p| {
                     if p.key() == "state" {
                         p.string().map(|s| {
-                            s.parse::<State>()
-                                .expect(&format!("failed to parse reachability state: {}", s))
+                            s.parse::<State>().unwrap_or_else(|e| {
+                                panic!("failed to parse reachability state: {}: {:?}", s, e)
+                            })
                         })
                     } else {
                         None

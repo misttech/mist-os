@@ -99,7 +99,7 @@ pub(crate) async fn pbm_repo_list(sdk: &ffx_config::Sdk) -> Result<Vec<url::Url>
         .iter()
         .map(|s| {
             expand_placeholders(s, &version, &sdk_root.to_string_lossy())
-                .expect(&format!("URL for repo {:?}", s))
+                .unwrap_or_else(|e| panic!("URL for repo {:?}: {:?}", s, e))
         })
         .collect();
     Ok(repos)

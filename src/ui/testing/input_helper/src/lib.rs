@@ -118,7 +118,7 @@ fn convert_keyboard_report_to_keys(report: &KeyboardReport) -> Vec<Key> {
         .iter()
         .map(|&usage| {
             hid_usage_to_input3_key(usage.try_into().expect("failed to convert usage to u16"))
-                .expect(format!("no Key for usage {:?}", usage).as_str())
+                .unwrap_or_else(|| panic!("no Key for usage {:?}", usage))
         })
         .collect()
 }

@@ -72,16 +72,16 @@ async fn read_factory_files_from_cast_credentials_store() -> Result<(), Error> {
 
     {
         let path = format!("{}/{}", DATA_FILE_PATH, "another_cast_file");
-        let expected_contents =
-            fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        let expected_contents = fs::read(&path)
+            .unwrap_or_else(|e| panic!("Unable to read expected file {}: {:?}", &path, e));
 
         let contents = read_file_from_proxy(&dir_proxy, "cast.blk").await?;
         assert_eq!(expected_contents, contents);
     }
     {
         let path = format!("{}/{}", DATA_FILE_PATH, "some_cast_file");
-        let expected_contents =
-            fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        let expected_contents = fs::read(&path)
+            .unwrap_or_else(|e| panic!("Unable to read expected file {}: {:?}", &path, e));
 
         let contents = read_file_from_proxy(&dir_proxy, "cast.dat").await?;
         assert_eq!(expected_contents, contents);
@@ -108,7 +108,7 @@ async fn read_factory_files_from_misc_store() -> Result<(), Error> {
 
     let path = format!("{}/{}", DATA_FILE_PATH, "misc");
     let expected_contents =
-        fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
 
     let contents = read_file_from_proxy(&dir_proxy, "misc.bin").await?;
     assert_eq!(expected_contents, contents);
@@ -122,7 +122,7 @@ async fn read_factory_files_from_misc_store_passed_file_appears() -> Result<(), 
 
     let path = format!("{}/{}", DATA_FILE_PATH, "passed_misc_file");
     let expected_contents =
-        fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
 
     let contents = read_file_from_proxy(&dir_proxy, "passed/file").await?;
     assert_eq!(expected_contents, contents);
@@ -156,7 +156,7 @@ async fn read_factory_files_from_playready_store() -> Result<(), Error> {
 
     let path = format!("{}/{}", DATA_FILE_PATH, "file1");
     let expected_contents =
-        fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
 
     let contents = read_file_from_proxy(&dir_proxy, "pr3.dat").await?;
     assert_eq!(expected_contents, contents);
@@ -182,7 +182,7 @@ async fn read_factory_files_from_widevine_store() -> Result<(), Error> {
 
     let path = format!("{}/{}", DATA_FILE_PATH, "widevine_file");
     let expected_contents =
-        fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
 
     let contents = read_file_from_proxy(&dir_proxy, "wv.blk").await?;
     assert_eq!(expected_contents, contents);
@@ -207,7 +207,7 @@ async fn read_factory_files_from_weave_store() -> Result<(), Error> {
     let dir_proxy = connect_to_factory_store_provider!(WeaveFactoryStoreProviderMarker);
     let path = format!("{}/{}", DATA_FILE_PATH, "weave_file");
     let expected_contents =
-        fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
     let contents = read_file_from_proxy(&dir_proxy, "weave").await?;
     assert_eq!(expected_contents, contents);
     Ok(())
@@ -227,7 +227,7 @@ async fn read_factory_files_from_alpha_store() -> Result<(), Error> {
     let dir_proxy = connect_to_factory_store_provider!(AlphaFactoryStoreProviderMarker);
     let path = format!("{}/{}", DATA_FILE_PATH, "alpha_file");
     let expected_contents =
-        fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
     let contents = read_file_from_proxy(&dir_proxy, "alpha").await?;
     assert_eq!(expected_contents, contents);
     Ok(())
@@ -247,7 +247,7 @@ async fn read_factory_files_from_alpha_store_reports_correct_size() -> Result<()
     let dir_proxy = connect_to_factory_store_provider!(AlphaFactoryStoreProviderMarker);
     let path = format!("{}/{}", DATA_FILE_PATH, "alpha_file");
     let expected_contents =
-        fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
 
     let file = fuchsia_fs::directory::open_file_no_describe(
         &dir_proxy,
@@ -282,7 +282,7 @@ async fn multi_validated_file_is_processed_properly() -> Result<(), Error> {
 
     let path = format!("{}/{}", DATA_FILE_PATH, "multi_validated_file");
     let expected_contents =
-        fs::read(&path).expect(&format!("Unable to read expected file: {}", &path));
+        fs::read(&path).unwrap_or_else(|e| panic!("Unable to read expected file {}: {}", &path, e));
 
     let playready_dir_proxy =
         connect_to_factory_store_provider!(PlayReadyFactoryStoreProviderMarker);

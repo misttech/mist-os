@@ -215,7 +215,7 @@ impl TestHook {
             instances.remove(moniker);
             let parent_instance = instances
                 .get(&parent_moniker)
-                .expect(&format!("parent instance {} not found", parent_moniker));
+                .unwrap_or_else(|| panic!("parent instance {} not found", parent_moniker));
             let mut children = parent_instance.children.lock().await;
             let opt_index = children.iter().position(|c| c.moniker == *moniker);
             if let Some(index) = opt_index {

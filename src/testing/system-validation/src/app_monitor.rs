@@ -32,7 +32,9 @@ impl AppMonitor {
                 .moniker(&moniker_clone)
                 .wait::<Stopped>(&mut event_stream)
                 .await
-                .expect(format!("failed to observe {} stop event", &moniker_clone).as_str());
+                .unwrap_or_else(|e| {
+                    panic!("failed to observe {} stop event: {:?}", &moniker_clone, e)
+                });
             *stopped_clone.lock().unwrap() = true;
         })
         .detach();
@@ -51,6 +53,6 @@ impl AppMonitor {
             .moniker(&moniker)
             .wait::<Started>(&mut event_stream)
             .await
-            .expect(format!("failed to observe {} start event", &moniker).as_str());
+            .unwrap_or_else(|e| panic!("failed to observe {} start event: {:?}", &moniker, e));
     }
 }

@@ -194,10 +194,10 @@ mod tests {
                     fuchsia_fs::OpenFlags::RIGHT_READABLE,
                 )
                 .await
-                .expect(&format!("failed to open file {:?}", file_path));
+                .unwrap_or_else(|e| panic!("failed to open file {:?}: {:?}", file_path, e));
                 fuchsia_fs::file::read_to_string(&file_proxy)
                     .await
-                    .expect(&format!("failed to read file {:?}", file_path))
+                    .unwrap_or_else(|e| panic!("failed to read file {:?}: {:?}", file_path, e))
             }
         };
 

@@ -194,7 +194,9 @@ async fn send_then_receive(
 
                         if &payload[..] == peer.payload {
                             info!("{} received packet from {}. Acknowledging receipt through channel...", me.name, peer.name);
-                            sender_to_peer.send(()).expect(&format!("confirming as {}", me.name));
+                            sender_to_peer
+                                .send(())
+                                .unwrap_or_else(|e| panic!("confirming as {}: {:?}", me.name, e));
                         } else {
                             panic!("Unexpected payload received: {:?}", &payload[..]);
                         }
@@ -226,10 +228,9 @@ async fn send_then_receive(
                         receiver_from_peer_ptr = Some(receiver_from_peer);
                     }
                     Ok(receiver_result) => {
-                        receiver_result.expect(&format!(
-                            "{} waiting for {} acknowledgement",
-                            me.name, peer.name
-                        ));
+                        receiver_result.unwrap_or_else(|e| {
+                            panic!("{} waiting for {} acknowledgement: {:?}", me.name, peer.name, e)
+                        });
                         info!("{} received acknowledgement from {}", me.name, peer.name,);
                     }
                 }

@@ -412,7 +412,10 @@ impl ActionsTest {
             let (realm_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fcomponent::RealmMarker>().unwrap();
             let component = WeakComponentInstance::from(
-                &model.look_up(&moniker).await.expect(&format!("could not look up {}", moniker)),
+                &model
+                    .look_up(&moniker)
+                    .await
+                    .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e)),
             );
             fasync::Task::spawn(async move {
                 builtin_environment_inner
@@ -440,14 +443,17 @@ impl ActionsTest {
     }
 
     pub async fn look_up(&self, moniker: AbsoluteMoniker) -> Arc<ComponentInstance> {
-        self.model.look_up(&moniker).await.expect(&format!("could not look up {}", moniker))
+        self.model
+            .look_up(&moniker)
+            .await
+            .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e))
     }
 
     pub async fn start(&self, moniker: AbsoluteMoniker) -> Arc<ComponentInstance> {
         self.model
             .start_instance(&moniker, &StartReason::Eager)
             .await
-            .expect(&format!("could not start {}", moniker))
+            .unwrap_or_else(|e| panic!("could not start {}: {:?}", moniker, e))
     }
 
     /// Add a dynamic child to the given collection, with the given name to the

@@ -486,7 +486,7 @@ async fn take_screenshot(screenshot: ui_comp::ScreenshotProxy) -> Result<Histogr
 
     // Write the screenshot to file.
     let screenshot_file = fs::File::create(SCREENSHOT_FILE)
-        .expect(&format!("cannot create file {}", SCREENSHOT_FILE));
+        .unwrap_or_else(|e| panic!("cannot create file {}: {:?}", SCREENSHOT_FILE, e));
     let ref mut w = BufWriter::new(screenshot_file);
 
     let image_size = data.size.expect("no data size returned from screenshot");

@@ -12,7 +12,10 @@ async fn main() {
 
     let listeners = server_ips()
         .iter()
-        .map(|addr| std::net::TcpListener::bind(&addr).expect(&format!("bind to address {}", addr)))
+        .map(|addr| {
+            std::net::TcpListener::bind(&addr)
+                .unwrap_or_else(|e| panic!("bind to address {}: {:?}", addr, e))
+        })
         .collect::<Vec<_>>();
     info!("waiting for connections...");
     // Let the client know that we are listening for incoming connections.

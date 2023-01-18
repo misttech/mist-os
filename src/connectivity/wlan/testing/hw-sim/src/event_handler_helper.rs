@@ -20,9 +20,17 @@ pub fn start_scan_handler<'a>(
         Ok(ap_advertisements) => {
             Box::new(move |&wlantap::StartScanArgs { wlan_softmac_id: _, scan_id }| {
                 for ap_advertisement in &ap_advertisements {
-                    ap_advertisement.send(phy).expect(match ap_advertisement.mode() {
-                        ApAdvertisementMode::Beacon => "failed to send beacon",
-                        ApAdvertisementMode::ProbeResponse => "failed to send probe response",
+                    ap_advertisement.send(phy).unwrap_or_else(|e| {
+                        panic!(
+                            "{}: {:?}",
+                            match ap_advertisement.mode() {
+                                ApAdvertisementMode::Beacon => "failed to send beacon",
+                                ApAdvertisementMode::ProbeResponse =>
+                                    "failed to send probe response",
+                            }
+                            .to_string(),
+                            e
+                        )
                     });
                 }
                 send_scan_complete(scan_id, zx::Status::OK.into_raw(), &phy)

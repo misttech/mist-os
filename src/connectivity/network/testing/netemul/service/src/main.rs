@@ -1296,9 +1296,9 @@ mod tests {
             let counter = realm.connect_to_protocol::<CounterMarker>();
             for j in 1..=i {
                 assert_eq!(
-                    counter.increment().await.expect(&format!(
-                        "fuchsia.netemul.test/Counter.increment call failed on realm {}",
-                        i
+                    counter.increment().await.unwrap_or_else(|e| panic!(
+                        "fuchsia.netemul.test/Counter.increment call failed on realm {}: {:?}",
+                        i, e
                     )),
                     j,
                 );
@@ -1763,10 +1763,9 @@ mod tests {
                     ..fnetemul::RealmOptions::EMPTY
                 },
             );
-            match realm.take_event_stream().next().await.expect(&format!(
-                "test case failed: \"{}\": epitaph should be sent on realm channel",
-                name
-            )) {
+            match realm.take_event_stream().next().await.unwrap_or_else(|| {
+                panic!("test case failed: \"{}\": epitaph should be sent on realm channel", name)
+            }) {
                 Err(fidl::Error::ClientChannelClosed {
                     status,
                     protocol_name:
@@ -2379,7 +2378,7 @@ mod tests {
             .expect("create directory proxy");
         let () = counter
             .open_in_namespace(&path, fio::OpenFlags::RIGHT_READABLE, server_end.into_channel())
-            .expect(&format!("failed to connect to {} through counter", path));
+            .unwrap_or_else(|e| panic!("failed to connect to {} through counter: {:?}", path, e));
         let (status, mut buf) =
             ethernet.read_dirents(fio::MAX_BUF).await.expect("calling read dirents");
         let () = zx::Status::ok(status).expect("failed reading directory entries");

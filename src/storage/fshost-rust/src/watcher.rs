@@ -65,8 +65,10 @@ impl PathSource {
         tracing::info!(path = %self.path, "watching for new devices");
         let is_nand = self.is_nand;
         Box::pin(
-            watch(self.path).await.expect(&format!("failed to watch {}", self.path)).filter_map(
-                move |event| async move {
+            watch(self.path)
+                .await
+                .unwrap_or_else(|e| panic!("failed to watch {}: {:?}", self.path, e))
+                .filter_map(move |event| async move {
                     let path = match event {
                         PathEvent::Added(path, _) => Some(path),
                         PathEvent::Existing(path, _) => {
@@ -91,8 +93,7 @@ impl PathSource {
                         }
                         None => None,
                     }
-                },
-            ),
+                }),
         )
     }
 }

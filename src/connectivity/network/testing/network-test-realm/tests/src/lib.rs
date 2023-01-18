@@ -432,7 +432,7 @@ async fn add_interface(name: &str, sub_name: &str, wait_any_ip_address: bool) {
         let iface = ifaces_state
             .values()
             .find(|iface| iface.name == EXPECTED_INTERFACE_NAME)
-            .expect(&format!("no interface with name {}", EXPECTED_INTERFACE_NAME));
+            .unwrap_or_else(|| panic!("no interface with name {}", EXPECTED_INTERFACE_NAME));
 
         assert!(
             !iface.addresses.is_empty(),

@@ -174,7 +174,8 @@ impl BufferAllocator {
     /// Allocation is O(lg(N) + M), where N = size and M = number of allocations.
     pub fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
         // TODO(jfsulliv): Wait until a buffer is free, rather than asserting.
-        self.try_allocate_buffer(size).expect(&format!("Unable to allocate {} bytes", size))
+        self.try_allocate_buffer(size)
+            .unwrap_or_else(|| panic!("Unable to allocate {} bytes", size))
     }
 
     /// Like |allocate_buffer|, but returns None if the allocation cannot be satisfied.
@@ -224,7 +225,7 @@ impl BufferAllocator {
         let size = inner
             .allocation_map
             .remove(&offset)
-            .expect(&format!("No allocation record found for {:?}", range));
+            .unwrap_or_else(|| panic!("No allocation record found for {:?}", range));
         assert!(range.end - range.start <= size);
         tracing::debug!(?range, bytes_used = size, "Freeing");
 

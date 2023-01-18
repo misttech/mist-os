@@ -33,8 +33,8 @@ async fn collections() {
         realm
             .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
             .await
-            .expect(&format!("create_child {} failed", name))
-            .expect(&format!("failed to create child {}", name));
+            .unwrap_or_else(|e| panic!("create_child {} failed: {:?}", name, e))
+            .unwrap_or_else(|e| panic!("failed to create child {}: {:?}", name, e));
     }
 
     let children = list_children(&realm).await.expect("failed to list children");
@@ -47,12 +47,13 @@ async fn collections() {
         realm
             .open_exposed_dir(&mut child_ref, server_end)
             .await
-            .expect(&format!("open_exposed_dir {} failed", name))
-            .expect(&format!("failed to open exposed dir of child {}", name));
+            .unwrap_or_else(|e| panic!("open_exposed_dir {} failed: {:?}", name, e))
+            .unwrap_or_else(|e| panic!("failed to open exposed dir of child {}: {:?}", name, e));
         let trigger = client::connect_to_protocol_at_dir_root::<ftest::TriggerMarker>(&dir)
             .expect("failed to open trigger service");
 
-        let out = trigger.run().await.expect(&format!("trigger {} failed", name));
+        let out =
+            trigger.run().await.unwrap_or_else(|e| panic!("trigger {} failed: {:?}", name, e));
         assert_eq!(out, format!("Triggered {}", name));
     }
 
@@ -141,7 +142,7 @@ async fn child_args() {
         let res = realm
             .create_child(&mut collection_ref, child_decl, child_args)
             .await
-            .expect(&format!("create_child {} failed", name));
+            .unwrap_or_else(|e| panic!("create_child {} failed: {:?}", name, e));
         let err = res.expect_err("expected create_child a to fail");
         assert_eq!(err, fcomponent::Error::Unsupported);
     }

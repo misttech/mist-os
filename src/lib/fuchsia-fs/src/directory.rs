@@ -1593,7 +1593,7 @@ mod tests {
                 | fio::OpenFlags::CREATE,
         )
         .await
-        .expect(&format!("failed to create {}", path));
+        .unwrap_or_else(|e| panic!("failed to create {}: {:?}", path, e));
     }
 
     fn build_direntry(name: &str, kind: DirentKind) -> DirEntry {

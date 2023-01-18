@@ -19,10 +19,9 @@ pub(crate) fn configure_cert_store(tls: &mut ClientConfig) {
         if certs.is_some() {
             warn!("One or more TLS certificates in root store failed to load: {}", err);
         }
-        certs.expect(&format!(
-            "Unable to load any TLS CA certificates from platform root store: {}",
-            err
-        ))
+        certs.unwrap_or_else(|| {
+            panic!("Unable to load any TLS CA certificates from platform root store: {}", err)
+        })
     })
 }
 

@@ -51,9 +51,11 @@ fn main() {
         let contents = std::fs::read_to_string(&filename).unwrap();
 
         if args.json5 {
-            serde_json5::from_str(&contents).expect(&format!("Failed to parse file {}", filename))
+            serde_json5::from_str(&contents)
+                .unwrap_or_else(|e| panic!("Failed to parse file {}: {:?}", filename, e))
         } else {
-            serde_json::from_str(&contents).expect(&format!("Failed to parse file {}", filename))
+            serde_json::from_str(&contents)
+                .unwrap_or_else(|e| panic!("Failed to parse file {}: {:?}", filename, e))
         }
     };
 
@@ -64,7 +66,7 @@ fn main() {
     let mut scope = valico::json_schema::Scope::new();
     let schema = scope
         .compile_and_return(schema, false)
-        .expect(&format!("Schema file {} is invalid", args.schema));
+        .unwrap_or_else(|e| panic!("Schema file {} is invalid: {:?}", args.schema, e));
 
     let state = schema.validate(&input);
     if !state.is_valid() {

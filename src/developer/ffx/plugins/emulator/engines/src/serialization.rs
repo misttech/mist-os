@@ -89,8 +89,9 @@ mod tests {
         q_engine.write_to_disk(&temp_path).expect("Problem serializing QEMU engine to disk.");
 
         // Deserialize it from the expected file location.
-        let file = File::open(&file_path)
-            .expect(&format!("Unable to open file {:?} for deserialization.", file_path));
+        let file = File::open(&file_path).unwrap_or_else(|e| {
+            panic!("Unable to open file {:?} for deserialization: {:?}", file_path, e)
+        });
         let engine_copy: QemuEngine = serde_json::from_reader(file)?;
         assert_eq!(engine_copy, q_engine);
 
@@ -107,11 +108,13 @@ mod tests {
         assert!(box_engine.is_ok(), "Read from disk failed for FEMU: {:?}", box_engine.err());
 
         // Now that we know the file is ok, we intentionally corrupt the FEMU engine file.
-        let mut file = File::open(&file_path)
-            .expect(&format!("Unable to open file {:?} for manual read.", &file_path));
+        let mut file = File::open(&file_path).unwrap_or_else(|e| {
+            panic!("Unable to open file {:?} for manual read: {:?}", &file_path, e)
+        });
         let mut text = String::new();
-        file.read_to_string(&mut text)
-            .expect(&format!("Couldn't read contents of {:?} to memory.", &file_path));
+        file.read_to_string(&mut text).unwrap_or_else(|e| {
+            panic!("Couldn't read contents of {:?} to memory: {:?}", &file_path, e)
+        });
         let re = Regex::new("femu")?;
         let unsupported = re.replace_all(&text, "unsupported").into_owned();
 

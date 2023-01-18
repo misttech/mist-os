@@ -5467,14 +5467,7 @@ mod test {
 
             let mut output = <[[u32; 5]; 2]>::new_empty();
             Decoder::decode_with_context(ctx, bytes, &mut to_handle_info(handles), &mut output)
-                .expect(
-                    format!(
-                        "Array decoding failed\n\
-                     bytes: {:X?}",
-                        bytes
-                    )
-                    .as_str(),
-                );
+                .unwrap_or_else(|e| panic!("Array decoding failed\nbytes: {:X?}: {:?}", bytes, e));
 
             assert_eq!(
                 input,

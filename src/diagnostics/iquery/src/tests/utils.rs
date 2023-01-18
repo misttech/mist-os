@@ -154,7 +154,8 @@ impl TestInExecution {
 
     fn read_golden(&self, golden_basename: &str, format: Format) -> String {
         let path = format!("/pkg/data/goldens/{}.{}", golden_basename, format);
-        fs::read_to_string(Path::new(&path)).expect(&format!("loaded golden {}", path))
+        fs::read_to_string(Path::new(&path))
+            .unwrap_or_else(|e| panic!("loaded golden {}: {:?}", path, e))
     }
 }
 

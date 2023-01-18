@@ -808,7 +808,7 @@ mod tests {
         for flag in allowed_flags {
             let args = vec![flag.to_string()];
             TestServer::validate_args(&args)
-                .expect(&format!("should not error out for flag: {}", flag));
+                .unwrap_or_else(|e| panic!("should not error out for flag: {}: {:?}", flag, e));
         }
     }
 

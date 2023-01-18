@@ -162,7 +162,9 @@ async fn route_from_bt_init_to_mock_client<S: DiscoverableProtocolMarker>(builde
                 .to(Ref::child(MOCK_CLIENT_MONIKER)),
         )
         .await
-        .expect(&format!("failed routing {} from bt-init to mock client", S::PROTOCOL_NAME));
+        .unwrap_or_else(|e| {
+            panic!("failed routing {} from bt-init to mock client: {:?}", S::PROTOCOL_NAME, e)
+        });
 }
 
 /// Tests that the v2 bt-init component has the correct topology and verifies

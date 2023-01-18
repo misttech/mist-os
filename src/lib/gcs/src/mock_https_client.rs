@@ -46,11 +46,13 @@ impl HttpsClient {
     }
 
     pub async fn request(&self, req: Request<Body>) -> http::Result<http::Response<Body>> {
-        let expected = self.expected.lock().expect("locking").pop_front().expect(&format!(
-            "Error: received more https requests than expected. \
+        let expected = self.expected.lock().expect("locking").pop_front().unwrap_or_else(|| {
+            panic!(
+                "Error: received more https requests than expected. \
             No response available for req: {:?}",
-            req
-        ));
+                req
+            )
+        });
 
         assert_eq!(
             expected.req.uri(),

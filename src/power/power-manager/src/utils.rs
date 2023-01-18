@@ -219,7 +219,7 @@ pub fn test_each_node_config_file(
             let file_path = path.to_str().unwrap().to_string();
             let contents = std::fs::read_to_string(&file_path).unwrap();
             let json = serde_json5::from_str(&contents)
-                .expect(&format!("Failed to parse file {}", file_path));
+                .unwrap_or_else(|e| panic!("Failed to parse file {}: {:?}", file_path, e));
 
             (file_path, json)
         })

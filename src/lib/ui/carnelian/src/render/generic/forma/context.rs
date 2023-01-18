@@ -262,7 +262,7 @@ impl Context<Forma> for FormaContext {
         let mut image = self
             .images
             .get(image.0 as usize)
-            .expect(&format!("invalid image {:?}", image_id))
+            .unwrap_or_else(|| panic!("invalid image {:?}", image_id))
             .borrow_mut();
         let width = self.size.width as usize;
         let height = self.size.height as usize;
@@ -281,7 +281,7 @@ impl Context<Forma> for FormaContext {
             let src_image = self
                 .images
                 .get(src_image_id.0 as usize)
-                .expect(&format!("invalid PreCopy image {:?}", src_image_id))
+                .unwrap_or_else(|| panic!("invalid PreCopy image {:?}", src_image_id))
                 .try_borrow_mut();
 
             let (src_ptr, src_bytes_per_row) = match src_image {
@@ -335,9 +335,11 @@ impl Context<Forma> for FormaContext {
             let mut dst_image = self
                 .images
                 .get(dst_image_id.0 as usize)
-                .expect(&format!("invalid PostCopy image {:?}", dst_image_id))
+                .unwrap_or_else(|| panic!("invalid PostCopy image {:?}", dst_image_id))
                 .try_borrow_mut()
-                .expect(&format!("image {:?} as already used for rendering", dst_image_id));
+                .unwrap_or_else(|e| {
+                    panic!("image {:?} as already used for rendering: {:?}", dst_image_id, e)
+                });
 
             let src_bytes_per_row = image.bytes_per_row();
             let dst_bytes_per_row = dst_image.bytes_per_row();

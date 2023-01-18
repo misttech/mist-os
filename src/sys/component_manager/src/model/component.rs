@@ -1608,7 +1608,7 @@ impl ResolvedInstanceState {
             Arc::clone(
                 self.environments
                     .get(environment_name)
-                    .expect(&format!("Environment not found: {}", environment_name)),
+                    .unwrap_or_else(|| panic!("Environment not found: {}", environment_name)),
             )
         } else {
             // Auto-inherit the environment from this component instance.
