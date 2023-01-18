@@ -251,7 +251,7 @@ async fn create_new_kernel(
 
     let pkg_handle_info = fprocess::HandleInfo {
         handle: pkg.into_channel().into_handle(),
-        id: HandleInfo::new(HandleType::User1, 0).as_raw(),
+        id: kernel_config::PKG_HANDLE_INFO.as_raw(),
     };
     let numbered_handles = vec![controller_handle_info, pkg_handle_info];
 

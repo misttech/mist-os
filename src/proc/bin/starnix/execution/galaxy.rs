@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Error};
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
 use fuchsia_inspect as inspect;
+use fuchsia_runtime as fruntime;
 use fuchsia_zircon as zx;
 use futures::FutureExt;
+use runner::get_value;
 use starnix_kernel_config::Config;
 use std::collections::BTreeMap;
 use std::ffi::CString;
@@ -23,16 +26,105 @@ use crate::fs::*;
 use crate::logging::log_info;
 use crate::task::*;
 use crate::types::*;
+use fidl::HandleBased;
+
+/// A temporary wrapper struct that contains both a `Config` for the galaxy, as well as optional
+/// handles for the galaxy's component controller and `/pkg` directory.
+///
+/// When using structured_config, the `component_controller` handle will not be set. When all
+/// galaxies are run as components, by starnix_manager, the `component_controller` will always
+/// exist.
+struct ConfigWrapper {
+    config: Config,
+    component_controller: Option<zx::Channel>,
+    dir: Option<zx::Channel>,
+}
+
+impl std::ops::Deref for ConfigWrapper {
+    type Target = Config;
+    fn deref(&self) -> &Self::Target {
+        &self.config
+    }
+}
 
 lazy_static::lazy_static! {
-    /// The configuration for the starnix kernel. This is static because reading the configuration
-    /// consumes a startup handle, and thus can only be done once per component-run.
-    static ref CONFIG: Config = Config::take_from_startup_handle();
-
     static ref COMMAND: inspect::StringReference<'static> = "command".into();
     static ref PPID: inspect::StringReference<'static> = "ppid".into();
     static ref TASKS: inspect::StringReference<'static> = "tasks".into();
     static ref STOPPED: inspect::StringReference<'static> = "stopped".into();
+}
+
+/// Returns the configuration object for the galaxy being run by this `starnix_kernel`.
+fn get_config() -> ConfigWrapper {
+    if let Ok(config_bytes) = std::fs::read("/galaxy_config/config") {
+        let program_dict: fdata::Dictionary = fidl::encoding::unpersist(&config_bytes)
+            .expect("Failed to unpersist the program dictionary.");
+
+        let apex_hack = get_config_strvec(&program_dict, "apex_hack").unwrap_or_default();
+        let features = get_config_strvec(&program_dict, "features").unwrap_or_default();
+        let init = get_config_strvec(&program_dict, "init").unwrap_or_default();
+        let init_user = get_config_str(&program_dict, "init_user").unwrap_or_default();
+        let kernel_cmdline = get_config_str(&program_dict, "kernel_cmdline").unwrap_or_default();
+        let mounts = get_config_strvec(&program_dict, "mounts").unwrap_or_default();
+        let name = get_config_str(&program_dict, "name").unwrap_or_default();
+        let startup_file_path =
+            get_config_str(&program_dict, "startup_file_path").unwrap_or_default();
+
+        let component_controller =
+            fruntime::take_startup_handle(kernel_config::COMPONENT_CONTROLLER_HANDLE_INFO)
+                .map(zx::Channel::from_handle);
+        let dir = fruntime::take_startup_handle(kernel_config::PKG_HANDLE_INFO)
+            .map(zx::Channel::from_handle);
+
+        ConfigWrapper {
+            config: Config {
+                apex_hack,
+                features,
+                init,
+                init_user,
+                kernel_cmdline,
+                mounts,
+                name,
+                startup_file_path,
+            },
+            dir,
+            component_controller,
+        }
+    } else {
+        const COMPONENT_PKG_PATH: &str = "/pkg";
+        let (server, dir) = zx::Channel::create();
+        let dir = if fdio::open(
+            COMPONENT_PKG_PATH,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            server,
+        )
+        .is_ok()
+        {
+            Some(dir)
+        } else {
+            None
+        };
+        // Default to the configuration that is provided by structured config.
+        ConfigWrapper {
+            config: Config::take_from_startup_handle(),
+            dir,
+            component_controller: None,
+        }
+    }
+}
+
+fn get_config_strvec(dict: &fdata::Dictionary, key: &str) -> Option<Vec<String>> {
+    match get_value(dict, key) {
+        Some(fdata::DictionaryValue::StrVec(values)) => Some(values.clone()),
+        _ => None,
+    }
+}
+
+fn get_config_str(dict: &fdata::Dictionary, key: &str) -> Option<String> {
+    match get_value(dict, key) {
+        Some(fdata::DictionaryValue::Str(string)) => Some(string.clone()),
+        _ => None,
+    }
 }
 
 // Creates a CString from a String. Calling this with an invalid CString will panic.
@@ -73,53 +165,43 @@ impl Galaxy {
 }
 
 /// Creates a new galaxy.
-///
-/// If the CONFIG specifies an init task, it is run before
-/// returning from create_galaxy and optionally waits for
-/// a startup file to be created.
 pub async fn create_galaxy() -> Result<Galaxy, Error> {
-    const COMPONENT_PKG_PATH: &str = "/pkg";
     const DEFAULT_INIT: &str = "/galaxy/init";
+    let mut config = get_config();
 
-    let (server, client) = zx::Channel::create();
-    fdio::open(
-        COMPONENT_PKG_PATH,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        server,
-    )
-    .context("failed to open /pkg")?;
-    let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(client);
+    let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.dir.take().unwrap());
+    let galaxy_component_controller = config.component_controller.take();
 
-    let mut kernel = Kernel::new(CONFIG.name.as_bytes(), &CONFIG.features)?;
-    kernel.cmdline = CONFIG.kernel_cmdline.as_bytes().to_vec();
+    let mut kernel = Kernel::new(config.name.as_bytes(), &config.features)?;
+    kernel.cmdline = config.kernel_cmdline.as_bytes().to_vec();
 
     let kernel = Arc::new(kernel);
 
     let node = inspect::component::inspector().root().create_child("galaxy");
     create_galaxy_inspect(kernel.clone(), &node);
 
-    let mut init_task = create_init_task(&kernel)?;
-    let fs_context = create_fs_context(&init_task, &CONFIG.features, &pkg_dir_proxy)?;
+    let mut init_task = create_init_task(&kernel, &config)?;
+    let fs_context = create_fs_context(&init_task, &config, &pkg_dir_proxy)?;
     init_task.set_fs(fs_context.clone());
     let system_task = create_task(&kernel, Some(fs_context), "kthread", Credentials::root())?;
 
-    mount_filesystems(&system_task, &pkg_dir_proxy)?;
+    mount_filesystems(&system_task, &config, &pkg_dir_proxy)?;
 
     // Hack to allow mounting apexes before apexd is working.
     // TODO(tbodt): Remove once apexd works.
-    mount_apexes(&system_task)?;
+    mount_apexes(&system_task, &config)?;
 
     // Run all common features that were specified in the .cml.
-    run_features(&CONFIG.features, &system_task)
+    run_features(&config.features, &system_task)
         .map_err(|e| anyhow!("Failed to initialize features: {:?}", e))?;
-    // TODO: This should probably be part of the "feature" CONFIGuration.
+    // TODO: This should probably be part of the "feature" config.
     let kernel = init_task.kernel().clone();
     let root_fs = init_task.fs().fork();
 
-    let startup_file_path = if CONFIG.startup_file_path.is_empty() {
+    let startup_file_path = if config.startup_file_path.is_empty() {
         None
     } else {
-        Some(CONFIG.startup_file_path.clone())
+        Some(config.startup_file_path.clone())
     };
 
     // If there is an init binary path, run it, optionally waiting for the
@@ -127,13 +209,16 @@ pub async fn create_galaxy() -> Result<Galaxy, Error> {
     // to initialize the system up until this point, regardless of whether
     // or not there is an actual init to be run.
     let argv =
-        if CONFIG.init.is_empty() { vec![DEFAULT_INIT.to_string()] } else { CONFIG.init.clone() }
+        if config.init.is_empty() { vec![DEFAULT_INIT.to_string()] } else { config.init.clone() }
             .iter()
             .map(|s| to_cstr(s))
             .collect::<Vec<_>>();
     init_task.exec(argv[0].clone(), argv.clone(), vec![])?;
-    execute_task(init_task, |result| {
+    execute_task(init_task, move |result| {
         log_info!("Finished running init process: {:?}", result);
+        // Drop the component controller explicitly, since the lifecycle of the galaxy component
+        // is tied to that of the init task in the kernel.
+        std::mem::drop(galaxy_component_controller);
     });
     if let Some(startup_file_path) = startup_file_path {
         wait_for_init_file(&startup_file_path, &system_task).await?;
@@ -144,13 +229,13 @@ pub async fn create_galaxy() -> Result<Galaxy, Error> {
 
 fn create_fs_context(
     task: &CurrentTask,
-    features: &[String],
+    config: &ConfigWrapper,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error> {
     // The mounts are appplied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
-    let mut mounts_iter = CONFIG.mounts.iter();
+    let mut mounts_iter = config.mounts.iter();
     let (root_point, root_fs) = create_filesystem_from_spec(
         task,
         pkg_dir_proxy,
@@ -178,7 +263,7 @@ fn create_fs_context(
     );
     let mut mappings =
         vec![(b"galaxy".to_vec(), galaxy_fs), (b"data".to_vec(), TmpFs::new_fs(kernel))];
-    if features.contains(&"custom_artifacts".to_string()) {
+    if config.features.contains(&"custom_artifacts".to_string()) {
         mappings.push((b"custom_artifacts".to_vec(), TmpFs::new_fs(kernel)));
     }
     let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
@@ -186,13 +271,13 @@ fn create_fs_context(
     Ok(FsContext::new(root_fs))
 }
 
-fn mount_apexes(init_task: &CurrentTask) -> Result<(), Error> {
-    if !CONFIG.apex_hack.is_empty() {
+fn mount_apexes(init_task: &CurrentTask, config: &ConfigWrapper) -> Result<(), Error> {
+    if !config.apex_hack.is_empty() {
         init_task
             .lookup_path_from_root(b"apex")?
             .mount(WhatToMount::Fs(TmpFs::new_fs(init_task.kernel())), MountFlags::empty())?;
         let apex_dir = init_task.lookup_path_from_root(b"apex")?;
-        for apex in &CONFIG.apex_hack {
+        for apex in &config.apex_hack {
             let apex = apex.as_bytes();
             let apex_subdir =
                 apex_dir.create_node(init_task, apex, mode!(IFDIR, 0o700), DeviceType::NONE)?;
@@ -214,17 +299,18 @@ fn create_task(
     Ok(task)
 }
 
-fn create_init_task(kernel: &Arc<Kernel>) -> Result<CurrentTask, Error> {
-    let credentials = Credentials::from_passwd(&CONFIG.init_user)?;
-    let name = if CONFIG.init.is_empty() { "" } else { &CONFIG.init[0] };
+fn create_init_task(kernel: &Arc<Kernel>, config: &ConfigWrapper) -> Result<CurrentTask, Error> {
+    let credentials = Credentials::from_passwd(&config.init_user)?;
+    let name = if config.init.is_empty() { "" } else { &config.init[0] };
     create_task(kernel, None, name, credentials)
 }
 
 fn mount_filesystems(
     system_task: &CurrentTask,
+    config: &ConfigWrapper,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error> {
-    let mut mounts_iter = CONFIG.mounts.iter();
+    let mut mounts_iter = config.mounts.iter();
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
