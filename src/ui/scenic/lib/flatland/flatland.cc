@@ -153,6 +153,7 @@ Flatland::Flatland(
       register_view_ref_focused_(std::move(register_view_ref_focused)),
       register_touch_source_(std::move(register_touch_source)),
       register_mouse_source_(std::move(register_mouse_source)) {
+  FX_DCHECK(flatland_presenter_);
   zx_status_t status = peer_closed_waiter_.Begin(
       dispatcher(), [this](async_dispatcher_t* dispatcher, async::WaitOnce* wait,
                            zx_status_t status, const zx_packet_signal_t* signal) {

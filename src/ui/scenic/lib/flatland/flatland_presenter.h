@@ -40,9 +40,10 @@ class FlatlandPresenter {
 
   // From scheduling::FrameScheduler::RemoveSession():
   //
-  // Removes all references to |session_id|.
+  // Removes all references to |session_id| and schedules a new frame to clean up any leftovers.
   //
-  // This function should be called from the main render thread.
+  // This function should be called from Flatland instance worker threads. Final clean-up is posted
+  // back on the main thread, so state may still exist after this method returns.
   virtual void RemoveSession(scheduling::SessionId session_id) = 0;
 };
 

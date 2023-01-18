@@ -123,24 +123,15 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
   }
 
   void TearDown() override {
-    // Expect RemoveSession() calls for each Flatland instance that was active. |manager_| may have
-    // been reset during the test.
-    removed_sessions_.clear();
-    size_t session_count = 0;
-    if (manager_) {
-      session_count = manager_->GetSessionCount();
-      EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_)).Times(session_count);
-    }
-
-    // Triggers cleanup of manager resources for Flatland instances that have exited.
-    RunLoopUntilIdle();
-
     // |manager_| may have been reset during the test. If not, run until all sessions have closed,
     // which depends on the worker threads receiving "peer closed" for the clients created in
     // the tests.
+    removed_sessions_.clear();
     if (manager_) {
+      const size_t session_count = manager_->GetSessionCount();
+      EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_)).Times(session_count);
       RunLoopUntil([this] { return manager_->GetSessionCount() == 0; });
-      EXPECT_EQ(removed_sessions_.size(), session_count);
+      RunLoopUntil([this, session_count] { return removed_sessions_.size() == session_count; });
     }
 
     auto snapshot = uber_struct_system_->Snapshot();
@@ -284,6 +275,8 @@ TEST_F(FlatlandManagerTest, ManagerDiesBeforeClients) {
   manager_.reset();
 
   EXPECT_EQ(uber_struct_system_->GetSessionCount(), 0ul);
+
+  RunLoopUntil([this] { return removed_sessions_.size() == 1ul; });
   EXPECT_EQ(removed_sessions_.size(), 1ul);
   EXPECT_TRUE(removed_sessions_.count(id));
 

@@ -194,7 +194,7 @@ void AssertViewTreeSnapshot(const fuog_ViewTreeSnapshot& snapshot,
   }
 }
 
-bool CheckViewExistsInSnapshot(const fuog_ViewTreeSnapshot& snapshot, zx_koid_t view_ref_koid) {
+bool ViewExistsInSnapshot(const fuog_ViewTreeSnapshot& snapshot, zx_koid_t view_ref_koid) {
   auto it = std::find_if(
       snapshot.views().begin(), snapshot.views().end(),
       [view_ref_koid](const auto& view) { return view.view_ref_koid() == view_ref_koid; });
@@ -206,7 +206,7 @@ bool CheckViewExistsInSnapshot(const fuog_ViewTreeSnapshot& snapshot, zx_koid_t 
 std::vector<fuog_ViewTreeSnapshot>::const_iterator GetFirstSnapshotWithView(
     const std::vector<fuog_ViewTreeSnapshot>& updates, zx_koid_t view_ref_koid) {
   return std::find_if(updates.begin(), updates.end(), [view_ref_koid](auto& snapshot) {
-    return CheckViewExistsInSnapshot(snapshot, view_ref_koid);
+    return ViewExistsInSnapshot(snapshot, view_ref_koid);
   });
 }
 
@@ -772,6 +772,61 @@ TEST_F(FlatlandObserverRegistryIntegrationTest, ChildRequestsFocusAfterConnectin
   // Child view should receive focus when it gets connected to the root view.
   EXPECT_TRUE(request_processed.value());
   EXPECT_TRUE(child_focused.value());
+}
+
+TEST_F(FlatlandObserverRegistryIntegrationTest, ClientDeath_ShouldTriggerNewSnapshot) {
+  fuog_ProviderPtr view_tree_watcher;
+
+  {
+    bool result = false;
+    observer_registry_ptr_->RegisterGlobalViewTreeWatcher(view_tree_watcher.NewRequest(),
+                                                          [&result] { result = true; });
+
+    RunLoopUntil([&result] { return result; });
+  }
+
+  // Set up the child view and connect it to the root view.
+  std::optional<fuc_FlatlandPtr> child;
+  zx_koid_t child_view_koid = ZX_KOID_INVALID;
+  {
+    auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
+    child = realm_->Connect<fuc_Flatland>();
+    fidl::InterfacePtr<fuc_ParentViewportWatcher> parent_viewport_watcher;
+    auto identity = scenic::NewViewIdentityOnCreation();
+    child_view_koid = ExtractKoid(identity.view_ref);
+
+    ConnectChildView(root_session_, std::move(parent_viewport_token));
+    child.value()->CreateView2(std::move(child_view_token), std::move(identity),
+                               fuc_ViewBoundProtocols{}, parent_viewport_watcher.NewRequest());
+
+    BlockingPresent(child.value());
+  }
+
+  {  //  Child view should now be present in the snapshot.
+    std::optional<fuog_WatchResponse> view_tree_result;
+    view_tree_watcher->Watch(
+        [&view_tree_result](auto response) { view_tree_result = std::move(response); });
+    RunLoopUntil([&view_tree_result] { return view_tree_result.has_value(); });
+
+    ASSERT_TRUE(view_tree_result->has_updates());
+    EXPECT_FALSE(view_tree_result->has_error());
+    EXPECT_TRUE(ViewExistsInSnapshot(view_tree_result->updates().back(), child_view_koid));
+  }
+
+  // Kill child (while all clients are idle) and confirm that we get a new snapshot.
+  // This means the child instance successfully scheduled a new frame on death.
+  child.reset();
+  {
+    std::optional<fuog_WatchResponse> view_tree_result;
+    view_tree_watcher->Watch(
+        [&view_tree_result](auto response) { view_tree_result = std::move(response); });
+    RunLoopUntil([&view_tree_result] { return view_tree_result.has_value(); });
+
+    ASSERT_TRUE(view_tree_result->has_updates());
+    EXPECT_EQ(view_tree_result->updates().size(), 1);
+    EXPECT_FALSE(view_tree_result->has_error());
+    EXPECT_FALSE(ViewExistsInSnapshot(view_tree_result->updates().back(), child_view_koid));
+  }
 }
 
 // The client should receive updates whenever there is a change in the topology of the view tree.
