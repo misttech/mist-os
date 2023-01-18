@@ -16,16 +16,11 @@ use anyhow::format_err;
 use fuchsia_async as fasync;
 use fuchsia_syslog::fx_log_warn;
 use fuchsia_trace as ftrace;
-use futures::lock::Mutex;
 use futures::StreamExt;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::iter::FromIterator;
 use std::sync::Arc;
-
-/// Type definition for a handle to the MessageHub. There is a single instance
-/// of a hub per communication ecosystem and therefore held behind an Arc mutex.
-pub type MessageHubHandle<P, A> = Arc<Mutex<MessageHub<P, A>>>;
 
 /// Type definition for exit message sender.
 type ExitSender = futures::channel::mpsc::UnboundedSender<()>;
