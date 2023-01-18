@@ -18,7 +18,6 @@ sdk_source_set("cpp") {
     "protocol.h",
     "service.cc",
     "service.h",
-    "service_client.h",
   ]
 
   public_deps = [
