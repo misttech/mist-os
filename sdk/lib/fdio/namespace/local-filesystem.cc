@@ -232,7 +232,6 @@ zx_status_t fdio_namespace::Readdir(const LocalVnode& vn, DirentIteratorState* s
     uint8_t name_size = static_cast<uint8_t>(name.size());
     inout_entry->name_length = name_size;
     memcpy(inout_entry->name, name.data(), name_size);
-    inout_entry->name[name_size] = '\0';
     return ZX_OK;
   };
 
