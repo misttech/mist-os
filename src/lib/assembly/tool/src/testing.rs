@@ -6,8 +6,8 @@
 
 use crate::tool::{Tool, ToolCommand, ToolCommandLog, ToolProvider};
 use anyhow::Result;
-use assembly_util::PathToStringExt;
 use std::path::PathBuf;
+use utf8_path::PathToStringExt;
 
 /// A provider for tools that no-op, but log their execution so it can be asserted in a test.
 #[derive(Clone)]

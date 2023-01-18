@@ -82,6 +82,7 @@ ffx_plugin("ffx_assembly") {
     "//src/lib/fuchsia-url",
     "//src/lib/gcs",
     "//src/lib/structured_ui",
+    "//src/lib/utf8_path",
     "//src/sys/pkg/lib/epoch",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-merkle",

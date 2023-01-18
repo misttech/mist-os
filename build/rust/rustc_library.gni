@@ -114,6 +114,9 @@ import("//build/rust/rustc_test.gni")
 #   metadata (optional)
 #     The usual GN meaning.
 #
+#   assert_no_deps (optional)
+#     Ensure no deps on these targets, see [assert_no_deps](https://gn.googlesource.com/gn/+/main/docs/reference.md#var_assert_no_deps)
+#
 # Example of usage:
 #
 #   rustc_library("foo-bar") {
@@ -157,7 +160,15 @@ template("rustc_library") {
         name = invoker.name + "_lib_test"
       }
       original_target_name = _original_target_name
-      forward_variables_from(invoker, "*", [ "name" ])
+
+      # It's valid for the test to use dependencies that were declared
+      # `assert_no_deps`.
+      forward_variables_from(invoker,
+                             "*",
+                             [
+                               "name",
+                               "assert_no_deps",
+                             ])
     }
   }
 
@@ -206,6 +217,7 @@ template("rustc_library") {
 
     forward_variables_from(invoker,
                            [
+                             "assert_no_deps",
                              "disable_clippy",
                              "quiet_clippy",
                              "edition",

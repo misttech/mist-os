@@ -16,7 +16,7 @@ rustc_library("minfs") {
 
   deps = [
     "//src/lib/assembly/tool",
-    "//src/lib/assembly/util",
+    "//src/lib/utf8_path",
     "//third_party/rust_crates:anyhow",
   ]
 

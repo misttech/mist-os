@@ -10,9 +10,9 @@ use assembly_images_config::{Zbi, ZbiCompression};
 use assembly_manifest::{AssemblyManifest, Image};
 use assembly_package_list::{PackageList, WritablePackageList};
 use assembly_tool::Tool;
-use assembly_util::path_relative_from_current_dir;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
+use utf8_path::path_relative_from_current_dir;
 use zbi::ZbiBuilder;
 
 /// The path to the package index file for bootfs packages in gendir and

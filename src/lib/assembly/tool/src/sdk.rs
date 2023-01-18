@@ -5,11 +5,11 @@
 use crate::{Tool, ToolCommand, ToolCommandLog, ToolProvider};
 
 use anyhow::{anyhow, Context, Result};
-use assembly_util::PathToStringExt;
 use ffx_config::{global_env_context, sdk::Sdk};
 use futures::executor::block_on;
 use std::path::PathBuf;
 use std::process::Command;
+use utf8_path::PathToStringExt;
 
 /// Implementation of ToolProvider that fetches tools from the SDK.
 pub struct SdkToolProvider {

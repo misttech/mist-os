@@ -6,7 +6,6 @@ use anyhow::{ensure, Context, Result};
 use assembly_base_package::BasePackageBuilder;
 use assembly_config_schema::ImageAssemblyConfig;
 use assembly_manifest::{AssemblyManifest, Image};
-use assembly_util::path_relative_from_current_dir;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_hash::Hash;
 use fuchsia_merkle::MerkleTree;
@@ -14,6 +13,7 @@ use fuchsia_pkg::PackageManifest;
 use std::collections::{BTreeMap, HashSet};
 use std::fs::File;
 use tracing::info;
+use utf8_path::path_relative_from_current_dir;
 
 #[derive(Debug)]
 pub struct BasePackage {
@@ -136,12 +136,12 @@ fn add_nested_subpackages(
 mod tests {
     use super::*;
 
-    use assembly_util::path_relative_from_current_dir;
     use fuchsia_archive::Utf8Reader;
     use serde_json::json;
     use std::fs::File;
     use std::io::{BufRead, BufReader, Write};
     use tempfile::tempdir;
+    use utf8_path::path_relative_from_current_dir;
 
     #[test]
     fn construct() {

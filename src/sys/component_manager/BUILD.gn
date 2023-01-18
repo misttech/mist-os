@@ -250,6 +250,9 @@ template("component_manager") {
       sources = _sources
       deps = _deps
 
+      # component_manager should not depend on json5
+      assert_no_deps = [ "//third_party/rust_crates:serde_json5" ]
+
       # Only for internal use.
       visibility = [
         "//src/session/*",

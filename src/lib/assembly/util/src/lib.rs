@@ -7,16 +7,11 @@
 //! Utility methods and traits used throughout assembly.
 
 mod insert_unique;
-mod path_to_string;
 
 mod paths;
 
 pub use insert_unique::{DuplicateKeyError, InsertAllUniqueExt, InsertUniqueExt, MapEntry};
-pub use path_to_string::PathToStringExt;
-pub use paths::{
-    normalize_path, path_relative_from, path_relative_from_current_dir, path_relative_from_file,
-    resolve_path, resolve_path_from_file, PathTypeMarker, TypedPathBuf,
-};
+pub use paths::{PathTypeMarker, TypedPathBuf};
 
 use anyhow::{Context as _, Result};
 use std::io::Read;

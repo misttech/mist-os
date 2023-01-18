@@ -101,6 +101,8 @@ import("//build/toolchain/rbe.gni")
 #   visibility (optional)
 #     Standard GN meaning. The visibility option for the generated targets.
 #
+#   assert_no_deps (optional)
+#     Ensure no deps on these targets, see [assert_no_deps](https://gn.googlesource.com/gn/+/main/docs/reference.md#var_assert_no_deps)
 template("rustc_artifact") {
   # rustc does not support dashes in crate names
   _crate_name = string_replace(invoker.crate_name, "-", "_")
@@ -293,6 +295,7 @@ template("rustc_artifact") {
 
     forward_variables_from(invoker,
                            [
+                             "assert_no_deps",
                              "pool",
                              "testonly",
                              "visibility",

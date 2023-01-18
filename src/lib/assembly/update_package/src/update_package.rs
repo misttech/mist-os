@@ -9,7 +9,6 @@ use assembly_manifest::{AssemblyManifest, Image};
 use assembly_partitions_config::PartitionsConfig;
 use assembly_tool::ToolProvider;
 use assembly_update_packages_manifest::UpdatePackagesManifest;
-use assembly_util::PathToStringExt;
 use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
 use fuchsia_merkle::Hash;
@@ -17,6 +16,7 @@ use fuchsia_pkg::{PackageBuilder, PackageManifest};
 use fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use utf8_path::PathToStringExt;
 
 /// The result of the builder.
 pub struct UpdatePackage {

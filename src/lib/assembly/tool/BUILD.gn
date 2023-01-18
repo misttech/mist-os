@@ -14,7 +14,7 @@ rustc_library("tool") {
   with_unit_tests = true
   deps = [
     "//src/developer/ffx/config:lib",
-    "//src/lib/assembly/util",
+    "//src/lib/utf8_path",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde",

@@ -436,9 +436,9 @@ pub struct SubpackageInfo {
 pub mod host {
     use super::*;
     use anyhow::Context;
-    use assembly_util::{path_relative_from_file, resolve_path_from_file};
     use camino::Utf8Path;
     use std::fs::File;
+    use utf8_path::{path_relative_from_file, resolve_path_from_file};
 
     impl PackageManifest {
         pub fn try_load_from(manifest_path: impl AsRef<Utf8Path>) -> anyhow::Result<Self> {

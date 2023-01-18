@@ -5,12 +5,12 @@
 use crate::manifest::BlobManifest;
 use anyhow::{Context, Result};
 use assembly_tool::Tool;
-use assembly_util::PathToStringExt;
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use serde::Deserialize;
 use std::fs::File;
 use std::path::Path;
+use utf8_path::PathToStringExt;
 
 /// Builder for BlobFS.
 ///

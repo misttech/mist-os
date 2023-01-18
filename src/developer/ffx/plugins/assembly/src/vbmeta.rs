@@ -7,9 +7,9 @@ use crate::vfs::{FilesystemProvider, RealFilesystemProvider};
 use anyhow::Result;
 use assembly_images_config::{VBMeta, VBMetaDescriptor};
 use assembly_manifest::{AssemblyManifest, Image};
-use assembly_util::path_relative_from_current_dir;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::path::Path;
+use utf8_path::path_relative_from_current_dir;
 use vbmeta::VBMeta as VBMetaImage;
 use vbmeta::{HashDescriptor, Key, Salt};
 
@@ -91,10 +91,10 @@ mod tests {
 
     use assembly_images_config::VBMeta;
     use assembly_manifest::AssemblyManifest;
-    use assembly_util::path_relative_from_current_dir;
     use camino::Utf8Path;
     use std::convert::TryFrom;
     use tempfile::tempdir;
+    use utf8_path::path_relative_from_current_dir;
     use vbmeta::{Key, Salt};
 
     #[test]

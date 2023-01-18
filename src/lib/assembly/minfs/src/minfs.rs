@@ -4,8 +4,8 @@
 
 use anyhow::Result;
 use assembly_tool::Tool;
-use assembly_util::PathToStringExt;
 use std::path::Path;
+use utf8_path::PathToStringExt;
 
 /// Builder for MinFS. Currently, it only writes an empty minfs.
 pub struct MinFSBuilder {
