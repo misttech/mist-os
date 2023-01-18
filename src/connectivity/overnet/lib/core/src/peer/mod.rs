@@ -587,6 +587,7 @@ impl Peer {
                     command_receiver,
                     service_observer,
                     conn_stats,
+                    coding::Context { use_persistent_header: true },
                 ),
             )),
             conn: PeerConn::from_circuit(conn, node_id),
@@ -625,6 +626,7 @@ impl Peer {
                     Arc::downgrade(router),
                     conn_stats,
                     channel_proxy_stats,
+                    coding::Context { use_persistent_header: true },
                 ),
             )),
             conn: PeerConn::from_circuit(conn, node_id),
@@ -677,6 +679,7 @@ impl Peer {
                         command_receiver,
                         service_observer,
                         conn_stats,
+                        coding::DEFAULT_CONTEXT,
                     ),
                 )
                 .map_ok(drop),
@@ -725,6 +728,7 @@ impl Peer {
                         Arc::downgrade(router),
                         conn_stats,
                         channel_proxy_stats,
+                        coding::DEFAULT_CONTEXT,
                     ),
                 )
                 .map_ok(drop),
@@ -881,6 +885,7 @@ async fn client_handshake(
     peer_node_id: NodeId,
     mut conn: RawConnection,
     conn_stats: Arc<PeerConnStats>,
+    coding_context: coding::Context,
 ) -> Result<(FramedStreamWriter, FramedStreamReader), Error> {
     tracing::trace!(
         my_node_id = my_node_id.0,
@@ -952,7 +957,6 @@ async fn client_handshake(
                 )
             }
         };
-        let coding_context = coding::DEFAULT_CONTEXT;
         conn_stream_writer
             .send(
                 FrameType::Data(coding_context),
@@ -1012,12 +1016,13 @@ async fn client_conn_stream(
     mut commands: mpsc::Receiver<ClientPeerCommand>,
     mut services: Observer<Vec<String>>,
     conn_stats: Arc<PeerConnStats>,
+    coding_context: coding::Context,
 ) -> Result<(), RunnerError> {
     let get_router = move || Weak::upgrade(&router).ok_or_else(|| RunnerError::RouterGone);
     let my_node_id = get_router()?.node_id();
 
     let (conn_stream_writer, mut conn_stream_reader) =
-        client_handshake(my_node_id, peer_node_id, conn, conn_stats.clone())
+        client_handshake(my_node_id, peer_node_id, conn, conn_stats.clone(), coding_context)
             .map_err(RunnerError::HandshakeError)
             .await?;
 
@@ -1041,6 +1046,7 @@ async fn client_conn_stream(
                     command,
                     &mut *conn_stream_writer.lock().await,
                     cmd_conn_stats.clone(),
+                    coding_context,
                 )
                 .await?;
             }
@@ -1081,7 +1087,6 @@ async fn client_conn_stream(
                     "Send update node description with services: {:?}",
                     services
                 );
-                let coding_context = coding::DEFAULT_CONTEXT;
                 conn_stream_writer
                     .lock()
                     .await
@@ -1111,10 +1116,10 @@ async fn client_conn_handle_command(
     command: ClientPeerCommand,
     conn_stream_writer: &mut FramedStreamWriter,
     conn_stats: Arc<PeerConnStats>,
+    coding_context: coding::Context,
 ) -> Result<(), Error> {
     match command {
         ClientPeerCommand::ConnectToService(conn) => {
-            let coding_context = coding::DEFAULT_CONTEXT;
             conn_stream_writer
                 .send(
                     FrameType::Data(coding_context),
@@ -1128,7 +1133,6 @@ async fn client_conn_handle_command(
                 .await?;
         }
         ClientPeerCommand::OpenTransfer(stream_id, transfer_key, sent) => {
-            let coding_context = coding::DEFAULT_CONTEXT;
             conn_stream_writer
                 .send(
                     FrameType::Data(coding_context),
@@ -1171,6 +1175,7 @@ async fn server_handshake(
     node_id: NodeId,
     conn: RawConnection,
     conn_stats: Arc<PeerConnStats>,
+    coding_context: coding::Context,
 ) -> Result<(FramedStreamWriter, FramedStreamReader), Error> {
     // Receive FIDL header
     tracing::trace!(my_node_id = my_node_id.0, svrpeer = node_id.0, "read fidl header");
@@ -1222,7 +1227,6 @@ async fn server_handshake(
     );
     // Send config response
     tracing::trace!(my_node_id = my_node_id.0, svrpeer = node_id.0, "send config");
-    let coding_context = coding::Context { use_persistent_header: false };
     conn_stream_writer
         .send(
             FrameType::Data(coding_context),
@@ -1240,10 +1244,11 @@ async fn server_conn_stream(
     router: Weak<Router>,
     conn_stats: Arc<PeerConnStats>,
     channel_proxy_stats: Arc<MessageStats>,
+    coding_context: coding::Context,
 ) -> Result<(), RunnerError> {
     let my_node_id = Weak::upgrade(&router).ok_or_else(|| RunnerError::RouterGone)?.node_id();
     let (conn_stream_writer, mut conn_stream_reader) =
-        server_handshake(my_node_id, node_id, conn, conn_stats)
+        server_handshake(my_node_id, node_id, conn, conn_stats, coding_context)
             .map_err(RunnerError::HandshakeError)
             .await?;
 

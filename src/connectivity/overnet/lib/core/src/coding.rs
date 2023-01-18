@@ -40,13 +40,7 @@ pub fn encode_fidl_with_context(
     value: &mut impl fidl::encoding::Persistable,
 ) -> Result<Vec<u8>, Error> {
     if ctx.use_persistent_header {
-        // TODO(fxbug.dev/79584): Change to use `fidl::encoding::persist`
-        // (which uses V2 wire format).
-        fidl::encoding::persist_with_context(
-            value,
-            &fidl::encoding::Context { wire_format_version: fidl::encoding::WireFormatVersion::V1 },
-        )
-        .map_err(Into::into)
+        fidl::encoding::persist(value).map_err(Into::into)
     } else {
         let (mut bytes, mut handles) = (Vec::new(), Vec::new());
         fidl::encoding::Encoder::encode_with_context(
