@@ -51,10 +51,10 @@ fn get_timestamp() -> Result<Timestamp> {
     ))
 }
 
-fn write_logs_to_file<T: GenericDiagnosticsStreamer + 'static + ?Sized>(
+fn write_logs_to_file<'a, T: GenericDiagnosticsStreamer + 'a + ?Sized>(
     streamer: Arc<T>,
-    symbolizer_config: Option<&SymbolizerConfig>,
-) -> Result<(ServerEnd<ArchiveIteratorMarker>, impl Future<Output = Result<()>> + '_)> {
+    symbolizer_config: Option<&'a SymbolizerConfig<'a>>,
+) -> Result<(ServerEnd<ArchiveIteratorMarker>, impl Future<Output = Result<()>> + 'a)> {
     let (proxy, server) =
         create_proxy::<ArchiveIteratorMarker>().context("failed to create endpoints")?;
 
@@ -303,14 +303,14 @@ async fn read_target_log_from_socket(socket: fidl::Socket) -> Result<LogsData, S
 }
 
 #[derive(Default)]
-pub struct SymbolizerConfig {
-    pub symbolizer: Option<Arc<dyn Symbolizer + 'static>>,
+pub struct SymbolizerConfig<'a> {
+    pub symbolizer: Option<Arc<dyn Symbolizer + 'a>>,
     pub enabled: bool,
     pub symbolizer_args: Vec<String>,
 }
 
-impl SymbolizerConfig {
-    async fn new() -> Result<Self> {
+impl<'a> SymbolizerConfig<'a> {
+    async fn new() -> Result<SymbolizerConfig<'a>> {
         if get(SYMBOLIZE_ENABLED_CONFIG).await? {
             Ok(Self {
                 symbolizer: Some(Arc::new(LogSymbolizer::new())),
@@ -324,7 +324,7 @@ impl SymbolizerConfig {
 
     #[cfg(test)]
     fn new_with_config(
-        symbolizer: Arc<impl Symbolizer + 'static>,
+        symbolizer: Arc<impl Symbolizer + 'a>,
         enabled: bool,
         symbolizer_args: Vec<String>,
     ) -> Self {
@@ -332,14 +332,14 @@ impl SymbolizerConfig {
     }
 }
 
-pub struct Logger {
+pub struct Logger<'a> {
     target: Weak<Target>,
     enabled: Option<bool>,
     streamer: Option<Arc<dyn GenericDiagnosticsStreamer>>,
-    symbolizer: Option<SymbolizerConfig>,
+    symbolizer: Option<SymbolizerConfig<'a>>,
 }
 
-impl Logger {
+impl<'a> Logger<'a> {
     pub fn new(target: Weak<Target>) -> Self {
         return Self { target: target, enabled: None, streamer: None, symbolizer: None };
     }
@@ -349,7 +349,7 @@ impl Logger {
         target: Weak<Target>,
         streamer: impl GenericDiagnosticsStreamer + 'static,
         enabled: bool,
-        symbolizer: SymbolizerConfig,
+        symbolizer: SymbolizerConfig<'a>,
     ) -> Self {
         return Self {
             target,
@@ -359,7 +359,7 @@ impl Logger {
         };
     }
 
-    pub fn start(self) -> impl Future<Output = Result<(), String>> {
+    pub fn start(self) -> impl Future<Output = Result<(), String>> + 'a {
         async move {
             let enabled = match self.enabled {
                 Some(e) => e,
@@ -576,7 +576,7 @@ mod test {
     }
 
     impl DisabledSymbolizer {
-        fn config() -> SymbolizerConfig {
+        fn config() -> SymbolizerConfig<'static> {
             SymbolizerConfig::new_with_config(Arc::new(DisabledSymbolizer::new()), false, vec![])
         }
     }
@@ -746,14 +746,14 @@ mod test {
         make_default_target_with_format(hoist, expected_logs, false).await
     }
 
-    async fn run_logger_to_completion(logger: Logger) {
+    async fn run_logger_to_completion(logger: Logger<'_>) {
         match logger.start().await {
             Err(e) => assert!(e.contains("PEER_CLOSED")),
             _ => panic!("should have exited with PEER_CLOSED, got ok"),
         };
     }
 
-    async fn fake_symbolizer(extra_args: Vec<String>) -> SymbolizerConfig {
+    async fn fake_symbolizer(extra_args: Vec<String>) -> SymbolizerConfig<'static> {
         SymbolizerConfig {
             symbolizer_args: extra_args.clone(),
             enabled: true,
