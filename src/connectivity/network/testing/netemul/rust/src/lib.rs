@@ -392,6 +392,20 @@ impl<'a> TestRealm<'a> {
         Ok(interface)
     }
 
+    /// Adds a raw device connector to the realm's devfs.
+    pub async fn add_raw_device(
+        &self,
+        path: &str,
+        device: fidl::endpoints::ClientEnd<fnetemul_network::DeviceProxy_Marker>,
+    ) -> Result {
+        self.realm
+            .add_device(path, device)
+            .await
+            .context("add device")?
+            .map_err(zx::Status::from_raw)
+            .context("add device error")
+    }
+
     /// Adds a device to the realm's virtual device filesystem.
     pub async fn add_virtual_device(&self, e: &TestEndpoint<'_>, path: &Path) -> Result {
         let path = path
@@ -403,12 +417,7 @@ impl<'a> TestRealm<'a> {
                 .context("create endpoints")?;
         e.get_proxy_(device_server_end).context("get proxy")?;
 
-        self.realm
-            .add_device(&path, device)
-            .await
-            .context("add device")?
-            .map_err(zx::Status::from_raw)
-            .context("add device error")
+        self.add_raw_device(&path, device).await
     }
 
     /// Removes a device from the realm's virtual device filesystem.

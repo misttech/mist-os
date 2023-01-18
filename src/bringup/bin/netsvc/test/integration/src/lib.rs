@@ -3,9 +3,14 @@
 // found in the LICENSE file.
 
 use fidl::prelude::*;
+use fidl_fuchsia_hardware_network as fhardware_network;
+use fidl_fuchsia_net_tun as fnet_tun;
+use fidl_fuchsia_netemul_internal as fnetemul_internal;
+use fidl_fuchsia_netemul_network as fnetemul_network;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::{Future, FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
+use net_declare::fidl_mac;
 use net_types::Witness as _;
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
@@ -1284,4 +1289,118 @@ async fn retransmits_acks(name: &str) {
             .await;
     })
     .await;
+}
+
+#[netstack_test]
+async fn starts_device_in_multicast_promiscuous(name: &str) {
+    // Create an event stream watcher before starting any realms so we're sure
+    // to observe netsvc early stop events.
+    let mut component_event_stream = netstack_testing_common::get_component_stopped_event_stream()
+        .await
+        .expect("get event stream");
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let (netsvc_realm, services) = create_netsvc_realm(&sandbox, name, DEFAULT_NETSVC_ARGS);
+
+    let netsvc_stopped_fut = netstack_testing_common::wait_for_component_stopped_with_stream(
+        &mut component_event_stream,
+        &netsvc_realm,
+        NETSVC_NAME,
+        None,
+    );
+
+    let (tun, netdevice) = netstack_testing_common::devices::create_tun_device();
+    let (tun_port, _): (_, fhardware_network::PortProxy) =
+        netstack_testing_common::devices::create_eth_tun_port(
+            &tun,
+            /* port_id */ 1,
+            fidl_mac!("02:00:00:00:00:01"),
+        )
+        .await;
+
+    let mac_state_stream = futures::stream::unfold(
+        (tun_port, Option::<fnet_tun::MacState>::None),
+        |(tun_port, last_observed)| async move {
+            loop {
+                let fnet_tun::InternalState { mac, .. } =
+                    tun_port.watch_state().await.expect("watch_state");
+                let mac = mac.expect("missing mac state");
+                if last_observed.as_ref().map(|l| l != &mac).unwrap_or(true) {
+                    let last_observed = Some(mac.clone());
+                    break Some((mac, (tun_port, last_observed)));
+                }
+            }
+        },
+    );
+    futures::pin_mut!(mac_state_stream);
+
+    assert_matches::assert_matches!(
+        mac_state_stream.next().await,
+        Some(fnet_tun::MacState {
+            mode: Some(fhardware_network::MacFilterMode::MulticastFilter),
+            multicast_filters: Some(mcast_filters),
+            ..
+        }) => {
+            assert_eq!(mcast_filters, vec![]);
+        }
+    );
+
+    // Add the device to devfs and wait for netsvc to set it to multicast
+    // promiscuous.
+
+    let (client_end, connector_stream) =
+        fidl::endpoints::create_request_stream().expect("create request stream");
+    let () = netsvc_realm
+        .add_raw_device(
+            netemul::devfs_device_path("ep").as_path().to_str().expect("path to str"),
+            client_end,
+        )
+        .await
+        .expect("add virtual device");
+
+    let netdevice = netdevice.into_proxy().expect("netdevice proxy");
+    let netdevice = &netdevice;
+    let connector_fut = connector_stream.for_each_concurrent(None, |r| async move {
+        let fnetemul_network::DeviceProxy_Request::ServeDevice { req, control_handle: _ } =
+            r.expect("connector error");
+        let server: fidl::endpoints::ServerEnd<fnetemul_internal::NetworkDeviceInstanceMarker> =
+            req.into();
+        let rs = server.into_stream().expect("into request stream");
+        rs.for_each(|req| async move {
+            match req.expect("request error") {
+                fnetemul_internal::NetworkDeviceInstanceRequest::GetDevice {
+                    device,
+                    control_handle: _,
+                } => netdevice.clone(device).expect("clonet"),
+                fnetemul_internal::NetworkDeviceInstanceRequest::GetTopologicalPath {
+                    responder,
+                } => responder
+                    .send(&mut Ok("some_topopath".to_string()))
+                    .expect("send topopath response"),
+                req => panic!("unexpected request {:?}", req),
+            }
+        })
+        .await
+    });
+
+    let new_state = futures::select! {
+        state = mac_state_stream.next() => state,
+        e = netsvc_stopped_fut.fuse() => {
+            let e: component_events::events::Stopped = e.expect("failed to observe stopped event");
+            panic!("netsvc stopped unexpectedly with {:?}", e);
+        },
+        () = services.fuse() => panic!("ServiceFs ended unexpectedly"),
+        () = connector_fut.fuse() => panic!("connector future ended unexpectedly"),
+    };
+
+    assert_matches::assert_matches!(
+        new_state,
+        Some(fnet_tun::MacState {
+            mode: Some(fhardware_network::MacFilterMode::MulticastPromiscuous),
+            multicast_filters: Some(mcast_filters),
+            ..
+        }) => {
+            assert_eq!(mcast_filters, vec![]);
+        }
+    );
 }

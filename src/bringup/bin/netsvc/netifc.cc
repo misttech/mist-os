@@ -21,9 +21,13 @@ namespace {
 
 struct NetdeviceIfc {
   NetdeviceIfc(fidl::ClientEnd<fuchsia_hardware_network::Device> device,
+               fidl::ClientEnd<fuchsia_hardware_network::MacAddressing> mac,
                async_dispatcher_t* dispatcher, fit::callback<void(zx_status_t)> on_error,
                fuchsia_hardware_network::wire::PortId port_id)
-      : client(std::move(device), dispatcher), port_id(port_id), on_error(std::move(on_error)) {}
+      : client(std::move(device), dispatcher),
+        mac(std::move(mac)),
+        port_id(port_id),
+        on_error(std::move(on_error)) {}
 
   zx::result<DeviceBuffer> GetBuffer(size_t len, bool block) {
     network::client::NetworkDeviceClient::Buffer tx = client.AllocTx();
@@ -43,6 +47,9 @@ struct NetdeviceIfc {
   }
 
   network::client::NetworkDeviceClient client;
+  // Note: we must keep our client end to the Mac addressing protocol to
+  // maintain our preference for multicast filter mode.
+  fidl::ClientEnd<fuchsia_hardware_network::MacAddressing> mac;
   const fuchsia_hardware_network::wire::PortId port_id;
   fit::callback<void(zx_status_t)> on_error;
 };
@@ -84,8 +91,48 @@ zx::result<> open_netdevice(async_dispatcher_t* dispatcher,
                             fidl::ClientEnd<fuchsia_hardware_network::Device> device,
                             fuchsia_hardware_network::wire::PortId port_id,
                             fit::callback<void(zx_status_t)> on_error) {
-  std::unique_ptr state =
-      std::make_unique<NetdeviceIfc>(std::move(device), dispatcher, std::move(on_error), port_id);
+  zx::result mac_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::MacAddressing>();
+  if (mac_endpoints.is_error()) {
+    return mac_endpoints.take_error();
+  }
+  auto& [mac_client, mac_server] = mac_endpoints.value();
+
+  zx::result port_endpoints = fidl::CreateEndpoints<fuchsia_hardware_network::Port>();
+  if (port_endpoints.is_error()) {
+    return port_endpoints.take_error();
+  }
+  auto& [port_client, port_server] = port_endpoints.value();
+
+  {
+    fidl::OneWayStatus result = fidl::WireCall(device)->GetPort(port_id, std::move(port_server));
+    if (!result.ok()) {
+      return zx::error(result.status());
+    }
+  }
+  {
+    fidl::OneWayStatus result = fidl::WireCall(port_client)->GetMac(std::move(mac_server));
+    if (!result.ok()) {
+      return zx::error(result.status());
+    }
+  }
+  {
+    // Always set the device to multicast promiscuous mode, that allows us to
+    // receive multicasts without keeping track of multicast groups directly.
+    fidl::WireResult result =
+        fidl::WireCall(mac_client)
+            ->SetMode(fuchsia_hardware_network::wire::MacFilterMode::kMulticastPromiscuous);
+    if (!result.ok()) {
+      return zx::error(result.status());
+    }
+    if (zx_status_t status = result.value().status; status != ZX_OK) {
+      // Don't consider this a fatal error. Just print a warning.
+      printf("netsvc: failed to set device in multicast promiscuous mode %s\n",
+             zx_status_get_string(status));
+    }
+  }
+
+  std::unique_ptr state = std::make_unique<NetdeviceIfc>(std::move(device), std::move(mac_client),
+                                                         dispatcher, std::move(on_error), port_id);
   NetdeviceIfc& ifc = *state;
   ifc.client.SetErrorCallback([&ifc](zx_status_t status) {
     printf("netsvc: netdevice error %s\n", zx_status_get_string(status));

@@ -10,4 +10,10 @@
     program: {
         binary: "bin/netsvc_integration_test",
     },
+    use: [
+        {
+            protocol: [ "fuchsia.net.tun.Control" ],
+            from: "#sandbox",
+        },
+    ],
 }
