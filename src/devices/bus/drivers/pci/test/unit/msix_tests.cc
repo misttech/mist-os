@@ -37,7 +37,8 @@ class PciCapabilityTests : public zxtest::Test {
     Bar bar = {
         .size = size,
         .bar_id = bar_id,
-        .allocation = std::make_unique<FakeAllocation>(std::nullopt, size),
+        .allocation =
+            std::make_unique<FakeAllocation>(PCI_ADDRESS_SPACE_MEMORY, std::nullopt, size),
     };
     return bar;
   }

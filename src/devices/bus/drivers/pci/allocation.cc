@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/devices/bus/drivers/pci/allocation.h"
+
 #include <err.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
@@ -15,10 +17,6 @@
 #include <memory>
 
 #include <fbl/algorithm.h>
-
-#include "src/devices/bus/drivers/pci/common.h"
-#include "src/devices/bus/drivers/pci/root.h"
-#include "src/devices/bus/drivers/pci/upstream_node.h"
 
 namespace pci {
 
@@ -49,9 +47,9 @@ zx::result<std::unique_ptr<PciAllocation>> PciRootAllocator::Allocate(
   zx_paddr_t out_base = {};
   zx::resource res = {};
   zx::eventpair ep = {};
-  zx_status_t status = pciroot_.GetAddressSpace(in_base, size, type_, low_, &out_base, &res, &ep);
+  zx_status_t status = pciroot_.GetAddressSpace(in_base, size, type(), low_, &out_base, &res, &ep);
   if (status != ZX_OK) {
-    bool mmio = type_ == PCI_ADDRESS_SPACE_MEMORY;
+    bool mmio = type() == PCI_ADDRESS_SPACE_MEMORY;
     // This error may not be fatal, the Device probe/allocation methods will know for sure.
     zxlogf(DEBUG, "failed to allocate %s %s [%#8lx, %#8lx) from root: %s", (mmio) ? "mmio" : "io",
            (mmio) ? ((low_) ? "<4GB" : ">4GB") : "", in_base, in_base + size,
@@ -60,7 +58,7 @@ zx::result<std::unique_ptr<PciAllocation>> PciRootAllocator::Allocate(
   }
 
   auto allocation = std::unique_ptr<PciAllocation>(
-      new PciRootAllocation(pciroot_, type_, std::move(res), std::move(ep), out_base, size));
+      new PciRootAllocation(pciroot_, type(), std::move(res), std::move(ep), out_base, size));
   return zx::ok(std::move(allocation));
 }
 
@@ -99,7 +97,7 @@ zx::result<std::unique_ptr<PciAllocation>> PciRegionAllocator::Allocate(
          region_uptr->base + size);
 
   auto allocation = std::unique_ptr<PciAllocation>(
-      new PciRegionAllocation(std::move(out_resource), std::move(region_uptr)));
+      new PciRegionAllocation(type(), std::move(out_resource), std::move(region_uptr)));
   return zx::ok(std::move(allocation));
 }
 

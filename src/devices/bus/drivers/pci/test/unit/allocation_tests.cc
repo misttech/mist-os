@@ -5,13 +5,18 @@
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/zx/result.h>
 #include <zircon/limits.h>
+#include <zircon/syscalls.h>
+
+#include <optional>
 
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/drivers/pci/allocation.h"
+#include "src/devices/bus/drivers/pci/test/fakes/fake_allocator.h"
 #include "src/devices/bus/drivers/pci/test/fakes/fake_pciroot.h"
 
 namespace pci {
+namespace {
 
 FakePciroot* RetrieveFakeFromClient(const ddk::PcirootProtocolClient& client) {
   pciroot_protocol_t proto;
@@ -54,4 +59,45 @@ TEST(PciAllocationTest, VmoCreationFailure) {
   EXPECT_OK(alloc->CreateVmo().status_value());
 }
 
+// Ensure that all allocator and allocation types report the correct address
+// space type even as they're passed to downstream allocators.
+void AllocationTypeHelper(pci_address_space_t type) {
+  FakePciroot pciroot;
+  ddk::PcirootProtocolClient client(pciroot.proto());
+
+  PciRootAllocator root_allocator(client, type, false);
+  EXPECT_EQ(root_allocator.type(), type);
+
+  size_t page_size = zx_system_get_page_size();
+  auto root_result = root_allocator.Allocate(std::nullopt, page_size * 4);
+  ASSERT_OK(root_result.status_value());
+  EXPECT_EQ(root_result->type(), type);
+
+  PciRegionAllocator region_allocator;
+  ASSERT_OK(region_allocator.SetParentAllocation(std::move(root_result.value())));
+  EXPECT_EQ(region_allocator.type(), type);
+
+  auto region_allocator_result = region_allocator.Allocate(std::nullopt, page_size);
+  ASSERT_OK(region_allocator_result.status_value());
+  EXPECT_EQ(region_allocator_result->type(), type);
+}
+
+TEST(PciAllocationTest, IoType) { ASSERT_NO_FAILURES(AllocationTypeHelper(PCI_ADDRESS_SPACE_IO)); }
+
+TEST(PciAllocationTest, MmioType) {
+  ASSERT_NO_FAILURES(AllocationTypeHelper(PCI_ADDRESS_SPACE_MEMORY));
+}
+
+// A PciRegionAllocator has no type until it is given a backing allocation and should assert.
+TEST(PciAllocationTest, RegionTypeNone) {
+  PciRegionAllocator allocator;
+  EXPECT_EQ(allocator.type(), PCI_ADDRESS_SPACE_NONE);
+
+  pci_address_space_t type = PCI_ADDRESS_SPACE_MEMORY;
+  auto allocation = std::make_unique<FakeAllocation>(type, std::nullopt, 1024);
+  ASSERT_OK(allocator.SetParentAllocation(std::move(allocation)));
+  EXPECT_EQ(allocator.type(), type);
+}
+
+}  // namespace
 }  // namespace pci

@@ -63,8 +63,9 @@ type PciPlatformInfo = resource struct {
 };
 
 type PciAddressSpace = strict enum : uint8 {
-    MEMORY = 0;
-    IO = 0x1;
+    NONE = 0;
+    MEMORY = 1;
+    IO = 2;
 };
 
 @transport("Banjo")

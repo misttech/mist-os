@@ -4,6 +4,7 @@
 #ifndef SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_FAKE_ALLOCATOR_H_
 #define SRC_DEVICES_BUS_DRIVERS_PCI_TEST_FAKES_FAKE_ALLOCATOR_H_
 
+#include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/fake-resource/resource.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -22,8 +23,8 @@ namespace pci {
 // will be called anyway.
 class FakeAllocation : public PciAllocation {
  public:
-  FakeAllocation(std::optional<zx_paddr_t> base, size_t size)
-      : PciAllocation(zx::resource(ZX_HANDLE_INVALID)),
+  FakeAllocation(pci_address_space_t type, std::optional<zx_paddr_t> base, size_t size)
+      : PciAllocation(type, zx::resource(ZX_HANDLE_INVALID)),
         base_((base.has_value()) ? *base : 0),
         size_(size) {
     zxlogf(DEBUG, "fake allocation created [%#lx, %#lx)", base_, base_ + size);
@@ -51,6 +52,8 @@ class FakeAllocation : public PciAllocation {
   size_t size_;
 };
 
+// This fake will fulfill any allocation so long as it isn't configured to fail by calling
+// |FailNextAllocation|.
 class FakeAllocator : public PciAllocator {
  public:
   void FailNextAllocation(bool enable) { fail_next_allocation_ = enable; }
@@ -64,7 +67,7 @@ class FakeAllocator : public PciAllocator {
     // In a normal reallocation use the requested base, but in a forced it
     // should align to the size so that's a convenient placeholder.
     const zx_paddr_t base = (in_base.has_value()) ? *in_base : size;
-    auto allocation = std::unique_ptr<PciAllocation>(new FakeAllocation(base, size));
+    auto allocation = std::unique_ptr<PciAllocation>(new FakeAllocation(type(), base, size));
     return zx::ok(std::move(allocation));
   }
 

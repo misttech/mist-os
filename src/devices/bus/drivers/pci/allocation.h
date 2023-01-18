@@ -16,8 +16,6 @@
 #include <fbl/macros.h>
 #include <region-alloc/region-alloc.h>
 
-#include "src/devices/bus/drivers/pci/ref_counted.h"
-
 // PciAllocations and PciAllocators are concepts internal to UpstreamNodes which
 // track address space allocations across roots and bridges. PciAllocator is an
 // interface for roots and bridges to provide allocators to downstream bridges
@@ -76,9 +74,11 @@ class PciAllocation {
   virtual zx::result<zx::vmo> CreateVmo() const;
   // Create a resource for use with zx_ioports_request in the device driver.
   virtual zx::result<zx::resource> CreateResource() const;
+  pci_address_space_t type() const { return type_; }
 
  protected:
-  explicit PciAllocation(zx::resource&& resource) : resource_(std::move(resource)) {}
+  PciAllocation(pci_address_space_t type, zx::resource&& resource)
+      : type_(type), resource_(std::move(resource)) {}
   const zx::resource& resource() { return resource_; }
 
  private:
@@ -92,6 +92,7 @@ class PciAllocation {
   //    IO permission bits.
   // This is only needed for PciRegionAllocators because PciRootAllocators do not
   // hold a backing PciAllocation object.
+  const pci_address_space_t type_;
   const zx::resource resource_;
   friend class PciRegionAllocator;
   friend class Device;
@@ -102,7 +103,7 @@ class PciRootAllocation final : public PciAllocation {
  public:
   PciRootAllocation(const ddk::PcirootProtocolClient client, const pci_address_space_t type,
                     zx::resource resource, zx::eventpair ep, zx_paddr_t base, size_t size)
-      : PciAllocation(std::move(resource)),
+      : PciAllocation(type, std::move(resource)),
         pciroot_client_(client),
         ep_(std::move(ep)),
         base_(base),
@@ -122,8 +123,9 @@ class PciRootAllocation final : public PciAllocation {
 
 class PciRegionAllocation final : public PciAllocation {
  public:
-  PciRegionAllocation(zx::resource&& resource, RegionAllocator::Region::UPtr&& region)
-      : PciAllocation(std::move(resource)), region_(std::move(region)) {}
+  PciRegionAllocation(pci_address_space_t type, zx::resource&& resource,
+                      RegionAllocator::Region::UPtr&& region)
+      : PciAllocation(type, std::move(resource)), region_(std::move(region)) {}
 
   zx_paddr_t base() const final { return region_->base; }
   size_t size() const final { return region_->size; }
@@ -150,8 +152,14 @@ class PciAllocator {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  virtual pci_address_space_t type() const { return type_; }
+
  protected:
+  explicit PciAllocator(pci_address_space_t type) : type_(type) {}
   PciAllocator() = default;
+
+ private:
+  pci_address_space_t type_;
 };
 
 // PciRootAllocators are an implementation of PciAllocator designed
@@ -160,14 +168,13 @@ class PciAllocator {
 class PciRootAllocator : public PciAllocator {
  public:
   PciRootAllocator(ddk::PcirootProtocolClient proto, pci_address_space_t type, bool low)
-      : pciroot_(proto), type_(type), low_(low) {}
+      : PciAllocator(type), pciroot_(proto), low_(low) {}
   zx::result<std::unique_ptr<PciAllocation>> Allocate(std::optional<zx_paddr_t> base,
                                                       size_t size) final;
 
  private:
   // The bus driver outlives allocator objects.
   ddk::PcirootProtocolClient const pciroot_;
-  const pci_address_space_t type_;
   // This denotes whether this allocator requests memory < 4GB. More detail
   // can be found in the explanation for mmio in root.h.
   const bool low_;
@@ -179,10 +186,16 @@ class PciRootAllocator : public PciAllocator {
 // which will release allocations back upstream if they go out of scope.
 class PciRegionAllocator : public PciAllocator {
  public:
-  PciRegionAllocator() = default;
   zx::result<std::unique_ptr<PciAllocation>> Allocate(std::optional<zx_paddr_t> base,
-                                                      size_t size) final;
-  zx_status_t SetParentAllocation(std::unique_ptr<PciAllocation> alloc) final;
+                                                      size_t size) override;
+  zx_status_t SetParentAllocation(std::unique_ptr<PciAllocation> alloc) override;
+  // Region allocators are unique in that they derive their time from their backing allocation.
+  pci_address_space_t type() const final {
+    if (!parent_alloc_) {
+      return PCI_ADDRESS_SPACE_NONE;
+    }
+    return parent_alloc_->type();
+  }
 
  private:
   std::unique_ptr<PciAllocation> parent_alloc_;
