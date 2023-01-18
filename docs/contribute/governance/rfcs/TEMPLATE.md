@@ -1,3 +1,6 @@
+<!--
+// LINT.IfChange
+-->
 <!-- mdformat off(templates not supported) -->
 {% set rfcid = "RFC-0000" %}
 {% include "docs/contribute/governance/rfcs/_common/_rfc_header.md" %}
@@ -202,3 +205,6 @@ this proposal? Your answer to this is likely to evolve as the proposal evolves.
 Is there any background material that might be helpful when reading this
 proposal? For instance, do other operating systems address the same problem this
 proposal addresses?
+<!--
+// LINT.ThenChange(//tools/rfc/test_data/rfc.golden.md)
+-->

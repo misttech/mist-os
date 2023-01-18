@@ -435,6 +435,10 @@ fn create_rfc(meta: &RfcMetadata, path: &PathBuf) -> Result<()> {
     let mut template = String::new();
     template_file.read_to_string(&mut template)?;
 
+    let template = template.replace("<!--\n// LINT.IfChange\n-->\n", "");
+    let template = template
+        .replace("<!--\n// LINT.ThenChange(//tools/rfc/test_data/rfc.golden.md)\n-->\n", "");
+
     let template = template.replace(
         r#"{% set rfcid = "RFC-0000" %}"#,
         r#"{% set rfcid = "RFC-0000" %} <!-- TODO: DO NOT SUBMIT, update number -->"#,
