@@ -180,7 +180,9 @@ async fn handshake(stream: &mut TcpStream) -> Result<()> {
     Ok(())
 }
 
+/// Number of times to retry when connecting to a target in fastboot over TCP
 const OPEN_RETRY_COUNT: &str = "fastboot.tcp.open.retry.count";
+/// Time to wait for a response when connecting to a target in fastboot over TCP
 const OPEN_RETRY_WAIT: &str = "fastboot.tcp.open.retry.wait";
 
 const OPEN_RETRY: u64 = 10;

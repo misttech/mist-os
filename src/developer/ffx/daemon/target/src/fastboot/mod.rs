@@ -48,7 +48,11 @@ lazy_static! {
     static ref SERIALS_IN_USE: Mutex<HashSet<String>> = Mutex::new(HashSet::new());
 }
 
+/// Disables fastboot usb discovery if set to true.
+const FASTBOOT_USB_DISCOVERY_DISABLED: &str = "fastboot.usb.disabled";
+/// The timeout rate in mb/s when communicating with the target device
 const FLASH_TIMEOUT_RATE: &str = "fastboot.flash.timeout_rate";
+/// The minimum flash timeout (in seconds) for flashing to a target device
 const MIN_FLASH_TIMEOUT: &str = "fastboot.flash.min_timeout_secs";
 
 // USB fastboot interface IDs
@@ -245,7 +249,7 @@ fn find_serial_numbers() -> Vec<String> {
 
 pub async fn find_devices() -> Vec<FastbootDevice> {
     let mut products = Vec::new();
-    let is_disabled: bool = get("fastboot.usb.disabled").await.unwrap_or(false);
+    let is_disabled: bool = get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false);
     if is_disabled {
         return products;
     }

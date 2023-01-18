@@ -28,6 +28,9 @@ use {
     std::time::Duration,
 };
 
+/// Timeout in seconds to wait for target after a reboot to fastboot mode
+const FASTBOOT_REBOOT_RECONNECT_TIMEOUT : &str = "fastboot.reboot.reconnect_timeout";
+
 const ADMIN_SELECTOR: &str =
     "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin";
 
@@ -301,7 +304,7 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
                 match res.map_err(|_| RebootError::FastbootError) {
                     Ok(_) => {
                         let reboot_timeout: u64 =
-                            get("fastboot.reboot.reconnect_timeout").await.unwrap_or(10);
+                            get(FASTBOOT_REBOOT_RECONNECT_TIMEOUT).await.unwrap_or(10);
                         self.clear_interface().await;
                         match try_join!(
                             self.target
