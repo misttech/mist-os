@@ -11,14 +11,23 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
 func runGSUtil(ctx context.Context, args []string) (string, error) {
+	// Intentionally shadow log so to not mutate global variable
+	log := log
+	if cLog := logger.LoggerFromContext(ctx); cLog != nil {
+		log = cLog
+	}
+
 	path, err := ExecLookPath("gsutil")
 	if err != nil {
 		return "", fmt.Errorf("could not find gsutil on path: %v", err)
 	}
 	cmd := ExecCommandContext(ctx, path, args...)
+	log.Debugf("About to run gsutil command: %v", cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		var exitError *exec.ExitError
@@ -31,11 +40,18 @@ func runGSUtil(ctx context.Context, args []string) (string, error) {
 }
 
 func runSSH(ctx context.Context, args []string, interactive bool) (string, error) {
+	// Intentionally shadow log so to not mutate global variable
+	log := log
+	if cLog := logger.LoggerFromContext(ctx); cLog != nil {
+		log = cLog
+	}
+
 	path, err := ExecLookPath("ssh")
 	if err != nil {
 		return "", fmt.Errorf("could not find ssh on path: %v", err)
 	}
 	cmd := ExecCommandContext(ctx, path, args...)
+	log.Debugf("About to run command via ssh: %v", cmd)
 	if interactive {
 		cmd.Stderr = os.Stderr
 		cmd.Stdout = os.Stdout
@@ -55,6 +71,12 @@ func runSSH(ctx context.Context, args []string, interactive bool) (string, error
 }
 
 func runSFTP(ctx context.Context, args []string, stdin string) error {
+	// Intentionally shadow log so to not mutate global variable
+	log := log
+	if cLog := logger.LoggerFromContext(ctx); cLog != nil {
+		log = cLog
+	}
+
 	path, err := ExecLookPath("sftp")
 	if err != nil {
 		return fmt.Errorf("could not find sftp on path: %v", err)
@@ -63,6 +85,7 @@ func runSFTP(ctx context.Context, args []string, stdin string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = strings.NewReader(stdin)
+	log.Debugf("About to run sftp command: %v", cmd)
 	return cmd.Run()
 }
 

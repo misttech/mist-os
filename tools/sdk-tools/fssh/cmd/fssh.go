@@ -20,6 +20,8 @@ import (
 )
 
 var (
+	// ExecCommandContext exports exec.CommandContext as a variable so it can be mocked.
+	ExecCommandContext = exec.CommandContext
 	// ExecCommand exports exec.Command as a variable so it can be mocked.
 	ExecCommand = exec.Command
 )
@@ -77,11 +79,12 @@ If neither --device-name nor --device-ip are specified, the device-name configur
 	f.BoolVar(&c.verbose, verboseFlag, false, "Runs ssh in verbose mode.")
 }
 
-func (c *fsshCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
+func (c *fsshCmd) Execute(ctx context.Context, f *flag.FlagSet, _ ...interface{}) subcommands.ExitStatus {
 	// Write all logs to stderr. Other tools parse the output of fssh which will break if logs
 	// are written to stdout.
 	log := logger.NewLogger(c.logLevel, color.NewColor(color.ColorAuto), os.Stderr, os.Stderr, "fssh ")
 	log.SetFlags(logFlags)
+	ctx = logger.WithLogger(ctx, log)
 
 	sdk, err := sdkcommon.NewWithDataPath(c.dataPath)
 	if err != nil {
@@ -108,7 +111,7 @@ func (c *fsshCmd) Execute(_ context.Context, f *flag.FlagSet, _ ...interface{}) 
 
 	log.Debugf("Running SSH with %s %s %s %s %t %s ", deviceConfig.DeviceIP, c.sshConfig,
 		c.privateKey, sshPort, c.verbose, f.Args())
-	if err := sdk.RunSSHShell(deviceConfig.DeviceIP, c.sshConfig, c.privateKey, sshPort, c.verbose, f.Args()); err != nil {
+	if err := sdk.RunSSHShellContext(ctx, deviceConfig.DeviceIP, c.sshConfig, c.privateKey, sshPort, c.verbose, f.Args()); err != nil {
 		var exitError *exec.ExitError
 		// If there is an exit code, exit the subcommand with the same exit code.
 		if errors.As(err, &exitError) {

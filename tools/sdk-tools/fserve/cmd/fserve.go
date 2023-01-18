@@ -29,6 +29,8 @@ import (
 )
 
 var (
+	// ExecCommandContext exports exec.CommandContext as a variable so it can be mocked.
+	ExecCommandContext = exec.CommandContext
 	// ExecCommand exports exec.Command as a variable so it can be mocked.
 	ExecCommand = exec.Command
 	// OsStat exports os.Stat as a variable so it can be mocked.
@@ -72,8 +74,8 @@ type sdkProvider interface {
 	GetSDKDataPath() string
 	GetToolsDir() (string, error)
 	GetAvailableImages(version string, bucket string) ([]sdkcommon.GCSImage, error)
-	RunFFX(args []string, interactive bool) (string, error)
-	RunSSHCommand(targetAddress string, sshConfig string, privateKey string, sshPort string,
+	RunFFXContext(ctx context.Context, args []string, interactive bool) (string, error)
+	RunSSHCommandContext(ctx context.Context, targetAddress string, sshConfig string, privateKey string, sshPort string,
 		verbose bool, sshArgs []string) (string, error)
 }
 
@@ -161,7 +163,7 @@ func main() {
 	}
 
 	// Read the server mode from the ffx config.
-	serverMode, err := getServerModeFromConfig(sdk)
+	serverMode, err := getServerModeFromConfig(ctx, sdk)
 	if err != nil {
 		log.Fatalf("Error reading the server mode from FFX config: %v", err)
 	}
@@ -322,9 +324,9 @@ type pmServer struct {
 	sshPort       string
 }
 
-func getServerEnabledFromConfig(sdk sdkProvider) (bool, error) {
+func getServerEnabledFromConfig(ctx context.Context, sdk sdkProvider) (bool, error) {
 	args := []string{"config", "get", ffxConfigServerEnabledKey}
-	output, err := sdk.RunFFX(args, false)
+	output, err := sdk.RunFFXContext(ctx, args, false)
 	if err != nil {
 		// Exit code of 2 means no value was found.
 		if exiterr, ok := err.(*exec.ExitError); ok && exiterr.ExitCode() == 2 {
@@ -345,9 +347,9 @@ func getServerEnabledFromConfig(sdk sdkProvider) (bool, error) {
 	return serverEnabled, nil
 }
 
-func getServerModeFromConfig(sdk sdkProvider) (string, error) {
+func getServerModeFromConfig(ctx context.Context, sdk sdkProvider) (string, error) {
 	args := []string{"config", "get", ffxConfigServerModeKey}
-	output, err := sdk.RunFFX(args, false)
+	output, err := sdk.RunFFXContext(ctx, args, false)
 	if err != nil {
 		// Exit code of 2 means no value was found.
 		if exiterr, ok := err.(*exec.ExitError); ok && exiterr.ExitCode() == 2 {
@@ -368,9 +370,9 @@ func getServerModeFromConfig(sdk sdkProvider) (string, error) {
 	return serverMode, nil
 }
 
-func getServerPortFromConfig(sdk sdkProvider) (string, error) {
+func getServerPortFromConfig(ctx context.Context, sdk sdkProvider) (string, error) {
 	args := []string{"config", "get", ffxConfigServerListenKey}
-	output, err := sdk.RunFFX(args, false)
+	output, err := sdk.RunFFXContext(ctx, args, false)
 	if err != nil {
 		// Exit code of 2 means no value was found.
 		if exiterr, ok := err.(*exec.ExitError); ok && exiterr.ExitCode() == 2 {
@@ -418,7 +420,7 @@ func killFFXServer(ctx context.Context, sdk sdkProvider) error {
 	// ffx repository has graduated from experimental.
 	args := []string{"--config", "ffx_repository=true", "repository", "server", "stop"}
 	logger.Debugf(ctx, "running %v", args)
-	if _, err := sdk.RunFFX(args, false); err != nil {
+	if _, err := sdk.RunFFXContext(ctx, args, false); err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
 			return fmt.Errorf("Error removing repository %v: %w", string(exitError.Stderr), err)
@@ -431,7 +433,7 @@ func killFFXServerIfRunningOnPort(ctx context.Context, sdk sdkProvider, repoPort
 	// Even though the server mode is 'pm', the ffx repository
 	// server could still be configured to run on our port. Try to
 	// stop it so it won't occupy our port.
-	serverEnabled, err := getServerEnabledFromConfig(sdk)
+	serverEnabled, err := getServerEnabledFromConfig(ctx, sdk)
 	if err != nil {
 		log.Fatalf("Error reading the server enabled from FFX config: %v", err)
 	}
@@ -441,7 +443,7 @@ func killFFXServerIfRunningOnPort(ctx context.Context, sdk sdkProvider, repoPort
 		return nil
 	}
 
-	serverPort, err := getServerPortFromConfig(sdk)
+	serverPort, err := getServerPortFromConfig(ctx, sdk)
 	if err != nil {
 		log.Fatalf("Error reading the server listen from FFX config: %v", err)
 	}
@@ -476,7 +478,7 @@ func (s *ffxServer) startServer(ctx context.Context, sdk sdkProvider) error {
 
 	args := []string{"--config", "ffx_repository=true", "repository", "server", "start"}
 	logger.Debugf(ctx, "running %v", args)
-	if _, err := sdk.RunFFX(args, false); err != nil {
+	if _, err := sdk.RunFFXContext(ctx, args, false); err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
 			return fmt.Errorf("Error starting repository server %v: %w", string(exitError.Stderr), err)
@@ -487,7 +489,7 @@ func (s *ffxServer) startServer(ctx context.Context, sdk sdkProvider) error {
 	args = []string{"--config", "ffx_repository=true", "repository",
 		"add-from-pm", "--repository", s.name, s.repoPath}
 	logger.Debugf(ctx, "running %v", args)
-	if _, err := sdk.RunFFX(args, false); err != nil {
+	if _, err := sdk.RunFFXContext(ctx, args, false); err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
 			return fmt.Errorf("Error adding repository %v: %w", string(exitError.Stderr), err)
@@ -517,7 +519,7 @@ func (s *ffxServer) registerRepository(ctx context.Context, sdk sdkProvider) err
 		args = append(args, "--storage-type", "persistent")
 	}
 	logger.Debugf(ctx, "running %v", args)
-	if _, err := sdk.RunFFX(args, false); err != nil {
+	if _, err := sdk.RunFFXContext(ctx, args, false); err != nil {
 		var exitError *exec.ExitError
 		if errors.As(err, &exitError) {
 			return fmt.Errorf("Error adding repository %v: %w", string(exitError.Stderr), err)
@@ -848,7 +850,7 @@ func registerPMRepository(ctx context.Context, sdk sdkProvider, repoPort string,
 
 	log.Debugf("Using target address %v", targetAddress)
 
-	hostIP, err := getHostIPAddressFromTarget(sdk, targetAddress, sshConfig, privateKey, sshPort)
+	hostIP, err := getHostIPAddressFromTarget(ctx, sdk, targetAddress, sshConfig, privateKey, sshPort)
 	if err != nil {
 		return fmt.Errorf("Could not get host address from target %v: %v", targetAddress, err)
 	}
@@ -869,14 +871,14 @@ func registerPMRepository(ctx context.Context, sdk sdkProvider, repoPort string,
 	}
 
 	verbose := level == logger.DebugLevel || level == logger.TraceLevel
-	if _, err = sdk.RunSSHCommand(targetAddress, sshConfig, privateKey, sshPort, verbose, sshArgs); err != nil {
+	if _, err = sdk.RunSSHCommandContext(ctx, targetAddress, sshConfig, privateKey, sshPort, verbose, sshArgs); err != nil {
 		return fmt.Errorf("Could not set package server address on device: %v", err)
 	}
 
 	ruleTemplate := `'{"version":"1","content":[{"host_match":"fuchsia.com","host_replacement":"%v","path_prefix_match":"/","path_prefix_replacement":"/"}]}'`
 	sshArgs = []string{"pkgctl", "rule", "replace", "json",
 		fmt.Sprintf(ruleTemplate, name)}
-	if _, err = sdk.RunSSHCommand(targetAddress, sshConfig, privateKey, sshPort, verbose, sshArgs); err != nil {
+	if _, err = sdk.RunSSHCommandContext(ctx, targetAddress, sshConfig, privateKey, sshPort, verbose, sshArgs); err != nil {
 		return fmt.Errorf("Could not set package url rewriting rules on device: %v", err)
 	}
 
@@ -884,13 +886,13 @@ func registerPMRepository(ctx context.Context, sdk sdkProvider, repoPort string,
 }
 
 // getHostIPAddressFromTarget returns the host address reported from the SSH connection on the target device.
-func getHostIPAddressFromTarget(sdk sdkProvider, targetAddress string, sshConfig string, privateKey string,
+func getHostIPAddressFromTarget(ctx context.Context, sdk sdkProvider, targetAddress string, sshConfig string, privateKey string,
 	sshPort string) (string, error) {
 
 	var sshArgs = []string{"echo", "$SSH_CONNECTION"}
 
 	verbose := level == logger.DebugLevel || level == logger.TraceLevel
-	connectionString, err := sdk.RunSSHCommand(targetAddress, sshConfig, privateKey,
+	connectionString, err := sdk.RunSSHCommandContext(ctx, targetAddress, sshConfig, privateKey,
 		sshPort, verbose, sshArgs)
 
 	if err != nil {
