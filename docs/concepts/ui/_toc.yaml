@@ -35,7 +35,7 @@ toc:
   - title: "Color spaces"
     path: /docs/concepts/ui/scenic/color_spaces.md
   - title: "Display"
-    path: /docs/concepts/ui/scenic/display.md
+    path: /docs/concepts/ui/scenic/display/index.md
   - title: "Screen Capture"
     path: /docs/concepts/ui/scenic/screen_capture/index.md
 - title: "Input"
