@@ -5,6 +5,7 @@
 #ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SYSTEM_LOG_RECORDER_ENCODING_LZ4_DECODER_H_
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SYSTEM_LOG_RECORDER_ENCODING_LZ4_DECODER_H_
 
+#include <memory>
 #include <string>
 
 #include <lz4/lz4.h>
@@ -30,7 +31,7 @@ class Lz4Decoder : public Decoder {
  public:
   Lz4Decoder();
 
-  virtual ~Lz4Decoder();
+  virtual ~Lz4Decoder() = default;
 
   virtual EncodingVersion GetEncodingVersion() const { return EncodingVersion::kLz4; }
 
@@ -58,9 +59,8 @@ class Lz4Decoder : public Decoder {
   bool DecodeNextChunk(const char* block_end, const char** block_ptr, std::string* decoded_chunk,
                        std::string* err_msg);
 
-  LZ4_streamDecode_t* stream_;
-
   RingBuffer ring_;
+  std::unique_ptr<LZ4_streamDecode_t, decltype(&LZ4_freeStreamDecode)> stream_;
 };
 
 }  // namespace system_log_recorder

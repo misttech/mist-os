@@ -16,9 +16,8 @@ const std::string kDecodingErrorStr = "!!! DECODING ERROR !!!\n";
 const std::string kDecodingSizeErrorStr =
     "!!! CANNOT DECODE %lu BYTES. THERE ARE ONLY %lu BYTES LEFT !!!\n";
 
-Lz4Decoder::Lz4Decoder() : ring_(kDecoderRingBufferSize) { stream_ = LZ4_createStreamDecode(); }
-
-Lz4Decoder::~Lz4Decoder() { LZ4_freeStreamDecode(stream_); }
+Lz4Decoder::Lz4Decoder()
+    : ring_(kDecoderRingBufferSize), stream_(LZ4_createStreamDecode(), LZ4_freeStreamDecode) {}
 
 bool Lz4Decoder::DecodeNextChunk(const char* block_end, const char** block_ptr,
                                  std::string* decoded_chunk, std::string* err_msg) {
@@ -45,7 +44,7 @@ bool Lz4Decoder::DecodeNextChunk(const char* block_end, const char** block_ptr,
     return false;
   }
 
-  const int decoded_bytes = LZ4_decompress_safe_continue(stream_, *block_ptr, ring_.GetPtr(),
+  const int decoded_bytes = LZ4_decompress_safe_continue(stream_.get(), *block_ptr, ring_.GetPtr(),
                                                          encoded_bytes, kMaxChunkSize);
   // Check for decoding error.
   if (decoded_bytes < 0) {
@@ -89,8 +88,7 @@ std::string Lz4Decoder::Decode(const std::string& block) {
 }
 
 void Lz4Decoder::Reset() {
-  LZ4_freeStreamDecode(stream_);
-  stream_ = LZ4_createStreamDecode();
+  stream_.reset(LZ4_createStreamDecode());
   ring_.Reset();
 }
 
