@@ -1,0 +1,48 @@
+// Copyright 2023 The Fuchsia Authors.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "*io.ReadFd*",
+                "*adb_utils.mkdirs*",
+                "*socket_spec.socket_spec_listen_connect_tcp*",
+                "*sysdeps.stat*",
+                "io.WriteFdExactly_whole",
+                "io.WriteFdExactly_partial",
+                "io.WriteFdExactly_string",
+                "io.WriteFdFmt",
+                "LocalSocketTest.read_from_closing_socket",
+                "LocalSocketTest.close_socket_in_CLOSE_WAIT_state",
+                "sysdeps_poll.smoke",
+                "sysdeps_poll.timeout",
+                "sysdeps_poll.invalid_fd",
+                "sysdeps_poll.duplicate_fd",
+                "sysdeps_poll.fd_count",
+                "ShellServiceTest.RawNoProtocolSubprocess",
+                "ShellServiceTest.PtyNoProtocolSubprocess",
+                "ShellServiceTest.RawShellProtocolSubprocess",
+                "ShellServiceTest.PtyShellProtocolSubprocess",
+                "ShellServiceTest.CloseClientStdin",
+                "ShellServiceTest.CloseStdinStdoutSubprocess",
+                "ShellServiceTest.CloseStderrSubprocess",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // These tests currently time out.
+                "*PropertyMonitor*",
+                "*sysdeps_fd.*",
+            ],
+        },
+    ],
+}

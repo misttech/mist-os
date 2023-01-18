@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 
 # Defines a Fuchsia component that contains a test binary built with a specific toolchain.
 #
@@ -22,6 +24,9 @@ import("//build/components.gni")
 #   test_binary (optional)
 #     The name of the binary produced by test_label. Defaults to target_name.
 #     Type: string
+#   uses_expectations (optional)
+#     Set to true if this test has an expectations file in the path "expectations/${target_name}.json5".
+#     Type: bool
 #
 #   The remaining parameters are forwarded to the fuchsia_component template.
 template("starnix_toolchain_test_component") {
@@ -43,7 +48,13 @@ template("starnix_toolchain_test_component") {
     deps = [ test_label ]
   }
 
-  fuchsia_test_component(target_name) {
+  if (defined(invoker.uses_expectations) && invoker.uses_expectations) {
+    target_type = "fuchsia_test_component_with_expectations"
+  } else {
+    target_type = "fuchsia_test_component"
+  }
+
+  target(target_type, target_name) {
     forward_variables_from(invoker, "*", [ "test_label" ])
 
     testonly = true
@@ -55,9 +66,12 @@ template("starnix_toolchain_test_component") {
     if (!defined(deps)) {
       deps = []
     }
-    deps += [
-      ":${target_name}_resource",
-      "//src/proc/tests:starnix_test",
-    ]
+    deps += [ ":${target_name}_resource" ]
+    if (defined(invoker.uses_expectations) && invoker.uses_expectations) {
+      expectations = "expectations/${target_name}.json5"
+      deps += [ "//src/proc/tests:starnix_test_with_expectations" ]
+    } else {
+      deps += [ "//src/proc/tests:starnix_test" ]
+    }
   }
 }

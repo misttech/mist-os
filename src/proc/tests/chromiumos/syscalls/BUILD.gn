@@ -71,6 +71,7 @@ test("crash") {
 starnix_linux_test_component("syscalls_test") {
   test_label = ":syscalls_test_bin"
   test_binary = "syscalls_test_bin"
+  uses_expectations = true
 }
 
 starnix_linux_test_component("crash_test") {
@@ -83,4 +84,5 @@ starmium_test_package("test_chromiumos_syscalls") {
     ":syscalls_test",
     ":crash_test",
   ]
+  deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
 }
