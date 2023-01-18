@@ -6,9 +6,7 @@
 #include <fidl/fidl.service.test/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/component/incoming/cpp/clone.h>
-#include <lib/component/incoming/cpp/protocol.h>
-#include <lib/component/incoming/cpp/service.h>
+#include <lib/component/incoming/cpp/service_client.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/channel.h>
