@@ -198,13 +198,6 @@ components in the `sys` [environment][glossary.environment].
     fx build
     ```
 
-1.  Verify that your package includes the compiled v2 component manifest (with a
-    `.cm` extension).
-
-    ```posix-terminal
-    ffx scrutiny shell "search.components --url {{ '<var label="component">my_component.cm</var>' }}$"
-    ```
-
 Note: it is valid to `use` from `self` in the unusual case that your component
 both consumes and publishes the same protocol. You'll know this is the case
 when the "services" section in your `.cmx` references a protocol that is mapped
@@ -680,23 +673,6 @@ using Components v2.
     ```posix-terminal
     fx build
     ```
-
-1.  Perform manual verification of capability routing using the `verify routes`
-    command built into [scrutiny][fx-scrutiny].
-
-    ```posix-terminal
-    ffx scrutiny verify routes \
-        --build-path {{ '<var label="build directory">$(fx get-build-dir)</var>' }} \
-        --repository-path {{ '<var label="build directory">$(fx get-build-dir)/amber-files/repository</var>' }} 
-    ```
-
-    This command reports routing errors in the static component topology of the
-    current build. This can help you find missing `offer` or `expose`
-    declarations before performing runtime tests.
-
-    Note: Scrutiny can only verify routes in the v2 component topology. It
-    cannot look into `appmgr` and the `sys` environment to review usage from
-    v1 components.
 
 1.  Manually verify your component's behavior. You can use the complete set of
     [`ffx component` tools][ffx-component] to interact with your component and
