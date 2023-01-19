@@ -4,20 +4,26 @@
 
 #include "src/ui/a11y/lib/gesture_manager/recognizers_v2/one_finger_drag_recognizer.h"
 
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/participation_token_interface.h"
+
 namespace a11y::recognizers_v2 {
 
 struct OneFingerDragRecognizer::Contest {
-  explicit Contest(std::unique_ptr<ContestMember> contest_member)
-      : member(std::move(contest_member)), claim_win_task(member.get()) {}
+  explicit Contest(std::unique_ptr<ParticipationTokenInterface> participation_token)
+      : token(std::move(participation_token)), claim_win_task(token.get()) {}
 
-  std::unique_ptr<ContestMember> member;
+  std::unique_ptr<ParticipationTokenInterface> token;
+
   bool won = false;
+
   // Async task that claims a win if the drag gesture lasts longer than a delay.
-  async::TaskClosureMethod<ContestMember, &ContestMember::Accept> claim_win_task;
+  async::TaskClosureMethod<ParticipationTokenInterface, &ParticipationTokenInterface::Accept>
+      claim_win_task;
 };
 
 OneFingerDragRecognizer::OneFingerDragRecognizer(DragGestureCallback on_drag_started,
@@ -32,14 +38,18 @@ OneFingerDragRecognizer::OneFingerDragRecognizer(DragGestureCallback on_drag_sta
 OneFingerDragRecognizer::~OneFingerDragRecognizer() = default;
 
 void OneFingerDragRecognizer::HandleEvent(
-    const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) {
+    const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {
   FX_DCHECK(contest_);
-  FX_DCHECK(pointer_event.has_phase());
-  FX_DCHECK(pointer_event.has_pointer_id());
-  const auto pointer_id = pointer_event.pointer_id();
 
-  switch (pointer_event.phase()) {
-    case fuchsia::ui::input::PointerEventPhase::DOWN:
+  FX_DCHECK(event.touch_event.has_pointer_sample());
+  const auto& sample = event.touch_event.pointer_sample();
+
+  FX_DCHECK(sample.has_interaction());
+  const auto pointer_id = sample.interaction().pointer_id;
+
+  FX_DCHECK(sample.has_phase());
+  switch (sample.phase()) {
+    case fuchsia::ui::pointer::EventPhase::ADD:
       // If there are any fingers already onscreen, then we should reject if
       // another comes down.
       if (NumberOfFingersOnScreen(gesture_context_)) {
@@ -47,32 +57,34 @@ void OneFingerDragRecognizer::HandleEvent(
         return;
       }
 
-      if (InitializeStartingGestureContext(pointer_event, &gesture_context_) &&
-          ValidatePointerEvent(gesture_context_, pointer_event)) {
-        previous_update_location_ = gesture_context_.starting_pointer_locations[pointer_id];
-        // Schedule a task to attempt to claim win after duration of drag_gesture_delay_.
-        contest_->claim_win_task.PostDelayed(async_get_default_dispatcher(), drag_gesture_delay_);
-      } else {
+      InitializeStartingGestureContext(event, &gesture_context_);
+
+      if (!ValidateTouchEvent(gesture_context_, event)) {
         ResetRecognizer();
         return;
       }
 
+      previous_update_location_ = gesture_context_.starting_pointer_locations[pointer_id];
+
+      // Schedule a task to attempt to claim win after duration of drag_gesture_delay_.
+      contest_->claim_win_task.PostDelayed(async_get_default_dispatcher(), drag_gesture_delay_);
+
       break;
 
-    case fuchsia::ui::input::PointerEventPhase::MOVE:
+    case fuchsia::ui::pointer::EventPhase::CHANGE:
       // If there are zero fingers on screen or multiple fingers on screen, then we should reset.
       if (NumberOfFingersOnScreen(gesture_context_) != 1) {
         ResetRecognizer();
         return;
       }
 
-      if (!ValidatePointerEvent(gesture_context_, pointer_event)) {
+      if (!ValidateTouchEvent(gesture_context_, event)) {
         ResetRecognizer();
         return;
       }
 
       // Update pointer book-keeping.
-      UpdateGestureContext(pointer_event, true /*finger is on screen*/, &gesture_context_);
+      UpdateGestureContext(event, true /*finger is on screen*/, &gesture_context_);
 
       // IF this recognizer is the contest winner, previous_update_location_info_ reflects the
       // location of the previous update. Otherwise, previous_update_location_info_ reflects the
@@ -85,23 +97,23 @@ void OneFingerDragRecognizer::HandleEvent(
       // minimum threshold.
       if (!contest_->won) {
         previous_update_location_ = gesture_context_.current_pointer_locations[pointer_id];
-      } else if (DragDistanceExceedsUpdateThreshold(pointer_event)) {
+      } else if (DragDistanceExceedsUpdateThreshold(event)) {
         previous_update_location_ = gesture_context_.current_pointer_locations[pointer_id];
         on_drag_update_(gesture_context_);
       }
 
       break;
 
-    case fuchsia::ui::input::PointerEventPhase::UP:
-      if (!ValidatePointerEvent(gesture_context_, pointer_event)) {
+    case fuchsia::ui::pointer::EventPhase::REMOVE:
+      if (!ValidateTouchEvent(gesture_context_, event)) {
         ResetRecognizer();
         return;
       }
 
-      // Update gesture context to reflect UP event info.
-      UpdateGestureContext(pointer_event, false /*finger is off screen*/, &gesture_context_);
+      // Update gesture context to reflect REMOVE event info.
+      UpdateGestureContext(event, false /*finger is off screen*/, &gesture_context_);
 
-      // If any fingers are left onscreen after an UP event, then this gesture
+      // If any fingers are left onscreen after a REMOVE event, then this gesture
       // cannot be a valid one-finger drag.
       if (NumberOfFingersOnScreen(gesture_context_)) {
         ResetRecognizer();
@@ -127,7 +139,7 @@ void OneFingerDragRecognizer::OnWin() {
     // The gesture has been recognized and we inform about its start.
     on_drag_started_(gesture_context_);
     // We need to call on_drag_update_ immediately after successfully claiming a win, because it's
-    // possible that no update will ever occur if no further MOVE events are ingested, OR if the
+    // possible that no update will ever occur if no further CHANGE events are ingested, OR if the
     // locations of these events are close to the location of the last event ingested before the win
     // was claimed.
     on_drag_update_(gesture_context_);
@@ -148,18 +160,23 @@ void OneFingerDragRecognizer::ResetRecognizer() {
 }
 
 bool OneFingerDragRecognizer::DragDistanceExceedsUpdateThreshold(
-    const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) const {
+    const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) const {
+  FX_DCHECK(event.touch_event.has_pointer_sample());
+  const auto& sample = event.touch_event.pointer_sample();
+  FX_DCHECK(sample.has_position_in_viewport());
+  const auto& [x, y] = sample.position_in_viewport();
+
   // Check if distance between previous update point and current event exceeds specified minimum
   // threshold.
-  auto dx = pointer_event.ndc_point().x - previous_update_location_.ndc_point.x;
-  auto dy = pointer_event.ndc_point().y - previous_update_location_.ndc_point.y;
+  auto dx = x - previous_update_location_.ndc_point.x;
+  auto dy = y - previous_update_location_.ndc_point.y;
 
   return dx * dx + dy * dy >= kMinDragDistanceForUpdate * kMinDragDistanceForUpdate;
 }
 
-void OneFingerDragRecognizer::OnContestStarted(std::unique_ptr<ContestMember> contest_member) {
+void OneFingerDragRecognizer::OnContestStarted(std::unique_ptr<ParticipationTokenInterface> token) {
   ResetRecognizer();
-  contest_ = std::make_unique<Contest>(std::move(contest_member));
+  contest_ = std::make_unique<Contest>(std::move(token));
 }
 
 std::string OneFingerDragRecognizer::DebugName() const { return "one_finger_drag_recognizer"; }
