@@ -113,8 +113,6 @@ fuchsia_component("component-basic") {
   deps = [ ":bin-basic" ]
 }
 
-# TODO(https://fxbug.dev/85450): use product assembly to include this as the
-# `netcfg` in the core product.
 fuchsia_component("component-advanced") {
   component_name = "netcfg-advanced"
   manifest = "meta/netcfg-advanced.cml"
@@ -144,16 +142,7 @@ fuchsia_unittest_package("netcfg-tests") {
   manifest = "meta/netcfg_lib_test.cml"
 }
 
-# TODO(https://fxbug.dev/85450): remove this group once the advanced variant of
-# netcfg is included in the core product build.
-group("compile") {
-  deps = [ ":component-advanced" ]
-}
-
 group("tests") {
   testonly = true
-  deps = [
-    ":compile",
-    ":netcfg-tests",
-  ]
+  deps = [ ":netcfg-tests" ]
 }
