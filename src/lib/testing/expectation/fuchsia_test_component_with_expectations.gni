@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//src/lib/testing/expectation/preprocess/preprocess.gni")
+import("//tools/cmc/build/expect_includes.gni")
 
 # Defines a fuchsia_test_component with an expectations file for this test.
 #
@@ -51,16 +52,74 @@ template("fuchsia_test_component_with_expectations") {
   }
 
   _merged_cml_target = "${target_name}_merged_cml"
-  _merged_cml_file = "${_test_component_name}_merged.cml"
+  _merged_cml_file_name = "${_test_component_name}_merged.cml"
   cmc_merge(_merged_cml_target) {
     deps = [ ":${_expectations_offer_cml_shard_target}" ]
     sources = [
       _expectations_offer_cml_shard_file,
       invoker.manifest,
     ]
-    output_name = _merged_cml_file
+    output_name = _merged_cml_file_name
   }
-  cmc_merge_outputs = get_target_outputs(":${_merged_cml_target}")
+  _cmc_merge_outputs = get_target_outputs(":${_merged_cml_target}")
+  _merged_cml_file = _cmc_merge_outputs[0]
+
+  # We want to ensure that the manifest of the component built by this
+  # `fuchsia_test_component_with_expectations` invocation includes the
+  # expectation-comparer client shard. In order to validate this at build-time,
+  # we'll wire up a `cmc_check_includes` invocation providing:
+  # (a) The manifest that needs to be checked (this component's manifest)
+  # (b) The shard expected to be included (the expectation client shard)
+
+  # Part (a): the manifest that needs to be checked. `cmc_check_includes`
+  # expects to receive this in the form of a JSON file consisting of an
+  # array with a single element, where that element is the path to the CML file
+  # to check.
+  #
+  # i.e. the JSON file's contents look like:
+  # ```
+  # ["src/foo/bar/meta/test_component.cml"]
+  # ```
+  #
+  # Thus, the following generates a JSON file of that format.
+  _manifest_json_singleton_target = "${target_name}_manifest_json_singleton"
+  generated_file(_manifest_json_singleton_target) {
+    outputs = [ "$target_out_dir/$_manifest_json_singleton_target.json" ]
+    output_conversion = "json"
+    contents = [ rebase_path(invoker.manifest, root_build_dir) ]
+
+    visibility = [ ":*" ]
+  }
+  _manifest_json_singleton_target = ":$_manifest_json_singleton_target"
+
+  # Part (b): the shard expected to be included. This is specified to
+  # `cmc_check_includes` by having the `cmc_check_includes` invocation dep on
+  # a target whose metadata specifies the `cmc_expected_includes_cml` like so:
+  _expected_includes_metadata_target = "${target_name}-expected-includes"
+  group(_expected_includes_metadata_target) {
+    metadata = {
+      cmc_expected_includes_cml =
+          [ "//src/lib/testing/expectation/meta/client.shard.cml" ]
+    }
+  }
+  _expected_includes_metadata_target = ":$_expected_includes_metadata_target"
+
+  # Finally, the actual `cmc_check_includes` invocation. Building this target
+  # will fail if `invoker.manifest` does not include the expectation client
+  # shard.
+  _include_check_target = "${target_name}-check-includes"
+  cmc_check_includes(_include_check_target) {
+    _json_singleton_outputs =
+        get_target_outputs(_manifest_json_singleton_target)
+    manifest = _json_singleton_outputs[0]
+    deps = [
+      _expected_includes_metadata_target,
+      _manifest_json_singleton_target,
+    ]
+
+    visibility = [ ":*" ]
+  }
+  _include_check_target = ":$_include_check_target"
 
   fuchsia_test_component(target_name) {
     forward_variables_from(invoker,
@@ -73,8 +132,9 @@ template("fuchsia_test_component_with_expectations") {
     deps = [
       ":${_expectations_target}",
       ":${_merged_cml_target}",
+      _include_check_target,
     ]
-    manifest = cmc_merge_outputs[0]
+    manifest = _merged_cml_file
 
     if (defined(invoker.deps)) {
       deps += invoker.deps
