@@ -91,5 +91,8 @@ fuchsia_unittest_package("build-info-unittest") {
 
 group("tests") {
   testonly = true
-  deps = [ ":build-info-unittest" ]
+  deps = [
+    ":build-info-unittest",
+    "testing:tests",
+  ]
 }

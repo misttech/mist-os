@@ -6,10 +6,7 @@ import("//build/components.gni")
 
 group("testing") {
   testonly = true
-  deps = [
-    ":fake-build-info",
-    ":tests",
-  ]
+  deps = [ ":fake-build-info" ]
 }
 
 executable("bin") {
