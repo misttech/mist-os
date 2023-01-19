@@ -17,6 +17,7 @@ source_set("dfv1") {
   deps = [
     "$dir_pw_log:facade",
     "$dir_pw_string:builder",
+    "//src/devices/lib/driver",
     "//src/lib/ddk",
   ]
 }
