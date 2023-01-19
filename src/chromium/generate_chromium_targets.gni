@@ -250,7 +250,13 @@ template("generate_chromium_targets") {
     group("tests") {
       testonly = true
 
-      visibility = [ "//src:*" ]
+      # TODO(fxbug.dev/108563): Remove //bundles/buildbot/dfv2:core when
+      # //bundles/buildbot/dfv2:core does not directly depend on
+      # //src/chromium:tests
+      visibility = [
+        "//bundles/buildbot/dfv2/core",
+        "//src:*",
+      ]
 
       deps = [
         ":chromium_cast_runner_tests",
