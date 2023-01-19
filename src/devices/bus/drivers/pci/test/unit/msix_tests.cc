@@ -4,7 +4,6 @@
 
 #include <fuchsia/hardware/pci/c/banjo.h>
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/vmo/types.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
@@ -27,6 +26,7 @@
 
 namespace pci {
 
+namespace {
 class PciCapabilityTests : public zxtest::Test {
  public:
   PciCapabilityTests() = default;
@@ -43,8 +43,8 @@ class PciCapabilityTests : public zxtest::Test {
     return bar;
   }
 
-  void ConfigureMsixCapability(Config& cfg, uint8_t tbar, uint8_t pbar, zx_paddr_t toffset,
-                               zx_paddr_t poffset, size_t vectors = 8) {
+  static void ConfigureMsixCapability(Config& cfg, uint8_t tbar, uint8_t pbar, zx_paddr_t toffset,
+                                      zx_paddr_t poffset, size_t vectors = 8) {
     MsixControlReg ctrl{};
     MsixTableReg table{};
     MsixPbaReg pba{};
@@ -145,4 +145,5 @@ TEST_F(PciCapabilityTests, MsixBarAccessTest) {
   }
 }
 
+}  // namespace
 }  // namespace pci

@@ -154,6 +154,5 @@ group("tests") {
     ":pci_bind_test",
     "test:pci-driver-test",
     "test:pci-unit-test",
-    "test:pci-unit-test-fake_ddk",
   ]
 }
