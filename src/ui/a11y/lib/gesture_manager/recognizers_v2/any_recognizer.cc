@@ -4,13 +4,17 @@
 
 #include "src/ui/a11y/lib/gesture_manager/recognizers_v2/any_recognizer.h"
 
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
+
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/participation_token_interface.h"
+
 namespace a11y::recognizers_v2 {
 
 void AnyRecognizer::HandleEvent(
-    const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) {}
+    const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) {}
 
-void AnyRecognizer::OnContestStarted(std::unique_ptr<ContestMember> contest_member) {
-  contest_member->Accept();
+void AnyRecognizer::OnContestStarted(std::unique_ptr<ParticipationTokenInterface> token) {
+  token->Accept();
 }
 
 std::string AnyRecognizer::DebugName() const { return "any"; }
