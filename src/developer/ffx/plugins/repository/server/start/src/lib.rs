@@ -94,7 +94,7 @@ async fn start_impl(
             if writer.is_machine() {
                 writer.machine(&ServerInfo { address: address.0 })?;
             } else {
-                writeln!(writer, "Repository server is listening on {}\n", address)?;
+                writeln!(writer, "Repository server is listening on {}", address)?;
             }
 
             Ok(())
