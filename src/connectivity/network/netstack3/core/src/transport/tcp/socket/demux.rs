@@ -37,7 +37,7 @@ use crate::{
         socket::{
             do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, Listener,
             ListenerId, MaybeClosedConnectionId, MaybeListener, MaybeListenerId, NonSyncContext,
-            SocketAddr, Sockets, SyncContext, TcpIpTransportContext, TimerId,
+            SharingState, SocketAddr, Sockets, SyncContext, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
         BufferSizes, Control, KeepAlive, SocketOptions, UserError,
@@ -357,7 +357,7 @@ where
     SC: BufferTransportIpContext<I, C, Buf<Vec<u8>>>,
 {
     let socketmap = &mut sockets.socketmap;
-    let (maybe_listener, (), listener_addr) =
+    let (maybe_listener, SharingState, listener_addr) =
         socketmap.listeners().get_by_id(&listener_id).expect("invalid listener_id");
 
     let ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) } =
@@ -450,12 +450,12 @@ where
                     socket_options,
                 },
                 // TODO(https://fxbug.dev/101596): Support sharing for TCP sockets.
-                (),
+                SharingState,
             )
             .expect("failed to create a new connection")
             .id();
         assert_eq!(ctx.schedule_timer_instant(poll_send_at, TimerId::new::<I>(conn_id),), None);
-        let (maybe_listener, _, _): (_, &(), &ListenerAddr<_, _, _>) = sockets
+        let (maybe_listener, _, _): (_, &SharingState, &ListenerAddr<_, _, _>) = sockets
             .socketmap
             .listeners_mut()
             .get_by_id_mut(&listener_id)
