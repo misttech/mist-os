@@ -1,0 +1,34 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import(
+    "//build/bazel/assembly/product_configurations/verify_product_configuration.gni")
+
+verify_product_configuration("verify_minimal_product_configuration") {
+  gn_product_config_target = "//products/minimal"
+  bazel_product_config_target =
+      "//build/bazel/assembly/product_configurations:minimal"
+}
+
+verify_product_configuration("verify_core_product_configuration") {
+  testonly = true
+  gn_product_config_target = "//products/core"
+  bazel_product_config_target =
+      "//build/bazel/assembly/product_configurations:core"
+}
+
+verify_product_configuration("verify_workstation_eng_product_configuration") {
+  gn_product_config_target = "//products/workstation"
+  bazel_product_config_target =
+      "//build/bazel/assembly/product_configurations:workstation_eng"
+}
+
+group("verifications") {
+  testonly = true
+  deps = [
+    ":verify_core_product_configuration",
+    ":verify_minimal_product_configuration",
+    ":verify_workstation_eng_product_configuration",
+  ]
+}

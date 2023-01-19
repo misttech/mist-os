@@ -104,7 +104,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//build/assembly/scripts:bazel_assembly_input_bundle_tool",
     "//build/bazel:*",
-    "//build/bazel/assembly:*",
+    "//build/bazel/assembly/*",
     "//build/bazel/examples/*",
     "//build/bazel/licenses:*",
     "//build/bazel/tests/*",

@@ -1,0 +1,100 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/bazel_action.gni")
+import("//build/bazel/bazel_workspace.gni")
+
+# Compares a GN generated product configuration with a Bazel generated one.
+#
+# Example:
+# ```
+# verify_product_configuration("verify_minimal_product_configuration") {
+#   gn_product_config_target = "//products/minimal"
+#   bazel_product_config_target =
+#       "//build/bazel/assembly/product_configurations:minimal"
+# }
+# ```
+#
+# Parameters
+#
+#  gn_product_config_target (required)
+#    The GN target generating the product config used in comparison.
+#    Type: string (GN label)
+#
+#  bazel_product_config_target (required)
+#    The Bazel target generating the product config used in comparison.
+#    Type: string (Bazel label)
+#
+#  deps
+#  testonly
+#  visibility
+#
+template("verify_product_configuration") {
+  assert(defined(invoker.gn_product_config_target),
+         "gn_product_config_target is required")
+  assert(defined(invoker.bazel_product_config_target),
+         "bazel_product_config_target is required")
+
+  _bazel_product_config_target = "${target_name}.bazel_product_config"
+  _bazel_product_config_file = "${target_name}/bazel_product_config.json"
+  bazel_action(_bazel_product_config_target) {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "testonly",
+                           ])
+    visibility = [ ":${invoker.target_name}" ]
+    command = "build"
+    bazel_targets = [ invoker.bazel_product_config_target ]
+
+    _bazel_product_config_out_dir =
+        rebase_path(get_label_info(invoker.bazel_product_config_target, "dir"),
+                    "//")
+    _bazel_product_config_name =
+        get_label_info(invoker.bazel_product_config_target, "name")
+    bazel_outputs = [ "bazel-bin/${_bazel_product_config_out_dir}/${_bazel_product_config_name}_product_config.json" ]
+    ninja_outputs = [ _bazel_product_config_file ]
+  }
+
+  action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    _gn_product_config_out_dir =
+        get_label_info(invoker.gn_product_config_target, "target_out_dir")
+    _gn_product_config_name =
+        get_label_info(invoker.gn_product_config_target, "name")
+    _gn_product_config_file = "${_gn_product_config_out_dir}/${_gn_product_config_name}/product_assembly_config.json"
+
+    inputs = [
+      _gn_product_config_file,
+      "${target_gen_dir}/${_bazel_product_config_file}",
+    ]
+    outputs = [ "${target_out_dir}/${target_name}/diff" ]
+
+    deps = [
+      ":${_bazel_product_config_target}",
+      invoker.gn_product_config_target,
+    ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+
+    script = "//build/bazel/assembly/product_configurations/verify_product_configuration.py"
+    args = [
+      "--product_config1",
+      rebase_path(inputs[0], root_build_dir),
+      "--root_dir1",
+      ".",
+      "--product_config2",
+      rebase_path(inputs[1], root_build_dir),
+      "--root_dir2",
+      bazel_main_top_dir_rebased + "/workspace",
+      "--output",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+  }
+}
