@@ -8,4 +8,6 @@ fidl("fuchsia.accessibility.gesture") {
   sdk_category = "partner"
 
   sources = [ "gesture_listener.fidl" ]
+
+  enable_hlcpp = true
 }

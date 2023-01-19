@@ -13,4 +13,6 @@ fidl("fuchsia.camera2.hal") {
     "//sdk/fidl/fuchsia.camera2",
     "//sdk/fidl/fuchsia.sysmem",
   ]
+
+  enable_hlcpp = true
 }

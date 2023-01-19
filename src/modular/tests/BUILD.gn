@@ -22,6 +22,7 @@ group("tests") {
 # FIDL services/structs used for testing code only.
 fidl("fuchsia.testing.modular") {
   sources = [ "test_service.test.fidl" ]
+  enable_hlcpp = true
 }
 
 rustc_test("basemgr_v2_test_bin") {

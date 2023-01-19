@@ -28,4 +28,5 @@ fidl("fuchsia.web") {
     "//sdk/fidl/fuchsia.ui.gfx",
     "//sdk/fidl/fuchsia.ui.views",
   ]
+  enable_hlcpp = true
 }

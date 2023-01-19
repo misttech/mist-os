@@ -20,4 +20,5 @@ fidl("fuchsia.component.test") {
   ]
 
   sources = [ "realm_builder.fidl" ]
+  enable_hlcpp = true
 }

@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.memorypressure") {
   sdk_category = "partner"
   sources = [ "memorypressure.fidl" ]
+  enable_hlcpp = true
 }

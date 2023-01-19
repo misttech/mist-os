@@ -10,4 +10,6 @@ fidl("fuchsia.migration") {
   sources = [ "migration.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.io" ]
+
+  enable_hlcpp = true
 }

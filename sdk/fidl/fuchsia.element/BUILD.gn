@@ -20,4 +20,6 @@ fidl("fuchsia.element") {
     "//sdk/fidl/fuchsia.ui.views",
     "//sdk/fidl/fuchsia.url",
   ]
+
+  enable_hlcpp = true
 }

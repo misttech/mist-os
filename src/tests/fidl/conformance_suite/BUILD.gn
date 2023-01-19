@@ -9,6 +9,8 @@ fidl("conformance_fidl") {
 
   testonly = true
 
+  enable_hlcpp = true
+
   sources = [
     "//src/tests/fidl/conformance_suite/alignment.test.fidl",
     "//src/tests/fidl/conformance_suite/arrays_and_vectors.test.fidl",
@@ -43,4 +45,6 @@ fidl("conformance_fidl") {
   ]
 
   public_deps = [ "//zircon/vdso/zx" ]
+
+  fuzzers = []
 }

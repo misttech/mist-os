@@ -18,4 +18,5 @@ fidl("fuchsia.hardware.block") {
     "//sdk/fidl/fuchsia.unknown",
     "//zircon/vdso/zx",
   ]
+  enable_hlcpp = true
 }

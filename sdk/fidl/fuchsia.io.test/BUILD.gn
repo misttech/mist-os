@@ -16,4 +16,5 @@ fidl("fuchsia.io.test") {
     "string-bounds-not-specified",
     "vector-bounds-not-specified",
   ]
+  enable_hlcpp = true
 }

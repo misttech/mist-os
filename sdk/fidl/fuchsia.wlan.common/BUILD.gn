@@ -20,4 +20,5 @@ fidl("fuchsia.wlan.common") {
 
   enable_banjo = true
   enable_c = true
+  enable_hlcpp = true
 }

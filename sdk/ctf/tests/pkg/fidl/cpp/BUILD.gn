@@ -184,6 +184,8 @@ ctf_fidl("union_migration_test_fidl") {
   sources = [ "union_migration.test.fidl" ]
 
   excluded_checks = [ "invalid-copyright-for-platform-source-library" ]
+
+  enable_hlcpp = true
 }
 
 ctf_source_set("test_util") {

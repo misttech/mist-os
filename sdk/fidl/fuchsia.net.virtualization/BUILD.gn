@@ -13,4 +13,6 @@ fidl("fuchsia.net.virtualization") {
     "//sdk/fidl/fuchsia.hardware.network",
     "//sdk/fidl/fuchsia.net",
   ]
+
+  enable_hlcpp = true
 }

@@ -10,4 +10,6 @@ fidl("fuchsia.update.channelcontrol") {
   sources = [ "channelcontrol.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.update.channel" ]
+
+  enable_hlcpp = true
 }

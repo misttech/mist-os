@@ -13,4 +13,6 @@ fidl("fuchsia.ui.input.accessibility") {
     "//sdk/fidl/fuchsia.math",
     "//sdk/fidl/fuchsia.ui.input",
   ]
+
+  enable_hlcpp = true
 }

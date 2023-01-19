@@ -30,4 +30,6 @@ fidl("fuchsia.sys2") {
     "storage_admin.fidl",
     "system_controller.fidl",
   ]
+
+  enable_hlcpp = true
 }

@@ -8,4 +8,6 @@ fidl("fuchsia.wayland") {
   sources = [ "server.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }

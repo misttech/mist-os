@@ -24,6 +24,8 @@ fidl("fuchsia.bluetooth.gatt2") {
     "//sdk/fidl/fuchsia.bluetooth",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }
 
 measure_tape("hlcpp_measure_tape_for_read_by_type_result") {

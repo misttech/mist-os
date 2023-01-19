@@ -8,6 +8,7 @@ import("//build/fidl/fidl.gni")
 fidl("fidl_import") {
   name = "fidl.test.imported"
   sources = [ "compatibility_imported.test.fidl" ]
+  enable_hlcpp = true
 }
 
 # The protocol used in the test.
@@ -18,4 +19,5 @@ fidl("fidl_service") {
     ":fidl_import",
     "//zircon/vdso/zx",
   ]
+  enable_hlcpp = true
 }

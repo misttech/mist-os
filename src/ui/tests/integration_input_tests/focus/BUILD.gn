@@ -9,6 +9,7 @@ fidl("test.focus") {
   sdk_category = "internal"
   sources = [ "response_listener.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }
 
 executable("focus-input-test-bin") {

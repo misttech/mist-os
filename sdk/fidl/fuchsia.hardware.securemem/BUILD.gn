@@ -8,4 +8,6 @@ fidl("fuchsia.hardware.securemem") {
   sources = [ "securemem.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }

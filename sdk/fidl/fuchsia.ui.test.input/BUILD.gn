@@ -21,4 +21,6 @@ fidl("fuchsia.ui.test.input") {
     "//sdk/fidl/fuchsia.math",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

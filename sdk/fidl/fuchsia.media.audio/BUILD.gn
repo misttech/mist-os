@@ -17,4 +17,6 @@ fidl("fuchsia.media.audio") {
     "volume_control.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }

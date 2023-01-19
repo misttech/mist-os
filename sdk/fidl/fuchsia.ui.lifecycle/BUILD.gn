@@ -8,4 +8,6 @@ fidl("fuchsia.ui.lifecycle") {
   sdk_category = "partner"
 
   sources = [ "lifecycle_controller.fidl" ]
+
+  enable_hlcpp = true
 }

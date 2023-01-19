@@ -9,6 +9,7 @@ import("//build/rust/rustc_library.gni")
 fidl("fidl") {
   name = "fuchsia.testing.deadline"
   sources = [ "deadline.fidl" ]
+  enable_hlcpp = true
 }
 
 rustc_library("named-timer") {

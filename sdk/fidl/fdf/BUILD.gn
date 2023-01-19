@@ -8,4 +8,6 @@ fidl("fdf") {
   sdk_category = "experimental"
 
   sources = [ "handle.fidl" ]
+
+  golden_fuzzer = true
 }

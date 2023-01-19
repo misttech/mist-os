@@ -13,4 +13,6 @@ fidl("fuchsia.ui.compression.internal") {
     "//sdk/fidl/fuchsia.math",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

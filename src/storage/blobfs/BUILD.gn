@@ -237,6 +237,7 @@ static_library("blobfs") {
 fidl("fuchsia.blobfs.internal") {
   sources = [ "compression/decompressor_sandbox/decompressor.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }
 
 source_set("decompressor_impl") {

@@ -41,4 +41,6 @@ fidl("fuchsia.media") {
     "//sdk/fidl/fuchsia.sysmem",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

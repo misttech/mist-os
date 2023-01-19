@@ -13,4 +13,5 @@ fidl("fuchsia.hardware.camera") {
     "//sdk/fidl/fuchsia.camera2.hal",
     "//zircon/vdso/zx",
   ]
+  enable_hlcpp = true
 }

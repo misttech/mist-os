@@ -10,4 +10,6 @@ fidl("fuchsia.scenic.scheduling") {
   sources = [ "prediction_info.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }

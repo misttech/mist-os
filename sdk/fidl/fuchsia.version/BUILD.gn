@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.version") {
   sdk_category = "partner"
   sources = [ "version.fidl" ]
+  enable_hlcpp = true
 }

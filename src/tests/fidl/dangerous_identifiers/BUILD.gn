@@ -123,6 +123,7 @@ template("dangerous_fidl") {
     name = invoker.fidl_library
     sources = [ generated_file ]
     non_fidl_deps = [ ":${generate_target}" ]
+    enable_hlcpp = true
   }
 }
 

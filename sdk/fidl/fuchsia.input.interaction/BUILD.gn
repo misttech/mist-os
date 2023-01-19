@@ -11,4 +11,6 @@ fidl("fuchsia.input.interaction") {
     "notifier.fidl",
     "state.fidl",
   ]
+
+  enable_hlcpp = true
 }

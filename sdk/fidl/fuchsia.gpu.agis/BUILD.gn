@@ -8,4 +8,5 @@ fidl("fuchsia.gpu.agis") {
   sources = [ "agis.fidl" ]
   sdk_category = "partner"
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }

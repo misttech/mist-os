@@ -14,4 +14,6 @@ fidl("fuchsia.ui.composition.internal") {
     "//sdk/fidl/fuchsia.ui.composition",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

@@ -8,4 +8,6 @@ fidl("fuchsia.test.debug") {
   sources = [ "debug.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.io" ]
+
+  enable_hlcpp = true
 }

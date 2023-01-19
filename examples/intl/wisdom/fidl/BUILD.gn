@@ -12,4 +12,5 @@ fidl("wisdom") {
   sources = [ "intl_wisdom.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.intl" ]
   sdk_category = "internal"
+  enable_hlcpp = true
 }

@@ -25,4 +25,6 @@ fidl("fuchsia.feedback") {
     "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

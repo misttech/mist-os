@@ -12,4 +12,6 @@ fidl("fuchsia.net.tun") {
     "//sdk/fidl/fuchsia.hardware.network",
     "//sdk/fidl/fuchsia.net",
   ]
+
+  enable_hlcpp = true
 }

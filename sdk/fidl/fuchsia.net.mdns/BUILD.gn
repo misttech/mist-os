@@ -34,4 +34,6 @@ fidl("fuchsia.net.mdns") {
     "//sdk/fidl/fuchsia.net",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

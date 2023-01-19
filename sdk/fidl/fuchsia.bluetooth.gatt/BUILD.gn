@@ -22,4 +22,6 @@ fidl("fuchsia.bluetooth.gatt") {
   ]
 
   public_deps = [ "//sdk/fidl/fuchsia.bluetooth" ]
+
+  enable_hlcpp = true
 }

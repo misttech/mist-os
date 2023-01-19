@@ -8,4 +8,6 @@ fidl("fuchsia.tracing") {
   sdk_category = "partner"
   api = "fuchsia.tracing.api"
   sources = [ "tracing.fidl" ]
+
+  enable_hlcpp = true
 }

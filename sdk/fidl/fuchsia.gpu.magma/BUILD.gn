@@ -12,4 +12,5 @@ fidl("fuchsia.gpu.magma") {
     "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",
   ]
+  enable_hlcpp = true
 }

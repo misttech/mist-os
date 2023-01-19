@@ -10,4 +10,6 @@ fidl("fuchsia.accessibility.virtualkeyboard") {
   sources = [ "virtual_keyboard.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.ui.views" ]
+
+  enable_hlcpp = true
 }

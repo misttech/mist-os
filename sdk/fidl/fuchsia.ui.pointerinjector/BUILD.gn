@@ -19,4 +19,6 @@ fidl("fuchsia.ui.pointerinjector") {
     "//sdk/fidl/fuchsia.ui.views",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

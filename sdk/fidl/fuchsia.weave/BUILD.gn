@@ -20,4 +20,6 @@ fidl("fuchsia.weave") {
     "//sdk/fidl/fuchsia.net",
     "//sdk/fidl/fuchsia.wlan.policy",
   ]
+
+  enable_hlcpp = true
 }

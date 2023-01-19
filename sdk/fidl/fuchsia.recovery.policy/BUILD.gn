@@ -11,4 +11,5 @@ fidl("fuchsia.recovery.policy") {
     "device.fidl",
     "factoryreset.fidl",
   ]
+  enable_hlcpp = true
 }

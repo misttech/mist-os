@@ -55,6 +55,7 @@ fidl("fuchsia.camera.test") {
   sources = [ "device_watcher_tester.test.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.hardware.camera" ]
   excluded_checks = [ "string-bounds-not-specified" ]
+  enable_hlcpp = true
 }
 
 fuchsia_component("camera_device_watcher_cmp") {

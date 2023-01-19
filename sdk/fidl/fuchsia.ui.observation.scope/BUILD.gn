@@ -11,4 +11,6 @@ fidl("fuchsia.ui.observation.scope") {
     "//sdk/fidl/fuchsia.ui.observation.geometry",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

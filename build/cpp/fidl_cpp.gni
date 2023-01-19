@@ -4,6 +4,7 @@
 
 import("//build/compiled_action.gni")
 import("//build/config/clang/clang.gni")
+import("//build/cpp/hlcpp_visibility.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/sdk/sdk_atom_alias.gni")
 
@@ -333,6 +334,10 @@ template("fidl_cpp_library") {
 #    - Optional: See //build/fidl/fidl.gni for a description.
 #    - Type: string
 #
+#  * enable_hlcpp
+#    - Required: See //build/fidl/fidl.gni for a description.
+#    - Type: boolean
+#
 #  * testonly, visibility, public_deps
 #    - Optional: Usual GN meanings.
 # Note:
@@ -350,9 +355,23 @@ template("fidl_cpp_family") {
          "fidl_cpp_family(\"$target_name\") must define `fidl_ir_json`")
   assert(defined(invoker.fidl_ir_target),
          "fidl_cpp_family(\"$target_name\") must define `fidl_ir_target`")
+  assert(defined(invoker.enable_hlcpp),
+         "fidl_cpp_family(\"$target_name\") must define `enable_hlcpp`")
 
-  forward_variables_from(invoker, [ "library_name" ])
-  library_name_slashes = string_replace(library_name, ".", "/")
+  forward_variables_from(invoker,
+                         [
+                           "library_name",
+                           "enable_hlcpp",
+                         ])
+
+  # libfuzzer currently depends on HLCPP
+  if (defined(invoker.fuzzers) ||
+      (defined(invoker.golden_fuzzer) && invoker.golden_fuzzer)) {
+    enable_hlcpp = true
+  }
+  if (enable_hlcpp) {
+    library_name_slashes = string_replace(library_name, ".", "/")
+  }
   if (current_toolchain == fidl_toolchain) {
     not_needed(invoker, [ "sdk_category" ])
   }
@@ -374,43 +393,52 @@ template("fidl_cpp_family") {
     ]
   }
 
-  #
-  # HLCPP Bindings
-  #
-  # Define HLCPP target.
+  if (enable_hlcpp) {
+    #
+    # HLCPP Bindings
+    #
+    # Define HLCPP target.
 
-  hlcpp_options = {
-    bindings_flavor = "hlcpp"
-    generated_headers = [
-      "$library_name_slashes/cpp/fidl.h",
-      "$library_name_slashes/cpp/fidl_test_base.h",
-    ]
-    generated_sources = [ "$library_name_slashes/cpp/fidl.cc" ]
+    hlcpp_options = {
+      bindings_flavor = "hlcpp"
+      generated_headers = [
+        "$library_name_slashes/cpp/fidl.h",
+        "$library_name_slashes/cpp/fidl_test_base.h",
+      ]
+      generated_sources = [ "$library_name_slashes/cpp/fidl.cc" ]
+    }
+
+    fidl_cpp_codegen("${target_name}_hlcpp") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "fidl_gen_dir",
+                               "fidl_ir_json",
+                               "fidl_ir_target",
+                             ])
+      forward_variables_from(hlcpp_options, "*")
+      fidlgen_tool = "//tools/fidl/fidlgen_hlcpp"
+    }
+    fidl_cpp_library("${target_name}_hlcpp") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "public_deps",
+                               "fidl_target",
+                               "fidl_gen_dir",
+                             ])
+      forward_variables_from(hlcpp_options, "*")
+      additional_public_deps = hlcpp_public_deps
+
+      if (!defined(visibility) && !(defined(testonly) && testonly)) {
+        visibility = hlcpp_visibility
+      }
+    }
+  } else {
+    not_needed([ "hlcpp_public_deps" ])
   }
 
-  fidl_cpp_codegen("${target_name}_hlcpp") {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "fidl_gen_dir",
-                             "fidl_ir_json",
-                             "fidl_ir_target",
-                           ])
-    forward_variables_from(hlcpp_options, "*")
-    fidlgen_tool = "//tools/fidl/fidlgen_hlcpp"
-  }
-  fidl_cpp_library("${target_name}_hlcpp") {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                             "public_deps",
-                             "fidl_target",
-                             "fidl_gen_dir",
-                           ])
-    forward_variables_from(hlcpp_options, "*")
-    additional_public_deps = hlcpp_public_deps
-  }
   if (current_toolchain != fidl_toolchain) {
     # Set up an HLCPP SDK item for this library
     if (defined(invoker.sdk_category) && invoker.sdk_category != "excluded") {
@@ -553,17 +581,21 @@ template("fidl_cpp_family") {
         "cpp_type_conversions",
       ]
     },
-
-    {
-      layer = "cpp_hlcpp_conversion"
-      headers = [ "fidl/$library_name/cpp/hlcpp_conversion.h" ]
-      public_deps = [
-        ":${target_name}_hlcpp",
-        "//src/lib/fidl/cpp:hlcpp_conversion",
-      ]
-      layer_deps = [ "cpp_natural_types" ]
-    },
   ]
+
+  if (enable_hlcpp) {
+    llcpp_layers += [
+      {
+        layer = "cpp_hlcpp_conversion"
+        headers = [ "fidl/$library_name/cpp/hlcpp_conversion.h" ]
+        public_deps = [
+          ":${target_name}_hlcpp",
+          "//src/lib/fidl/cpp:hlcpp_conversion",
+        ]
+        layer_deps = [ "cpp_natural_types" ]
+      },
+    ]
+  }
 
   not_needed([ "llcpp_layers" ])
 
@@ -642,65 +674,66 @@ template("fidl_cpp_family") {
   #
   # Fuzzers (also dependent on HLCPP and LLCPP)
   #
-
-  libfuzzer_options = {
-    testonly = true
-    bindings_flavor = "libfuzzer"
-  }
-  libfuzzer_headers = [
-    "$library_name_slashes/cpp/libfuzzer.h",
-    "$library_name_slashes/cpp/libfuzzer_decode_encode.h",
-  ]
-  libfuzzer_sources = [
-    "$library_name_slashes/cpp/libfuzzer.cc",
-    "$library_name_slashes/cpp/libfuzzer_decode_encode.cc",
-  ]
-
-  # Define fuzzer targets.
-  fidl_cpp_codegen("${target_name}_libfuzzer") {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "fuzzers",
-                             "golden_fuzzer",
-                             "fidl_gen_dir",
-                             "fidl_ir_json",
-                             "fidl_ir_target",
-                           ])
-    forward_variables_from(libfuzzer_options, "*")
-    generated_headers = libfuzzer_headers
-    generated_sources = libfuzzer_sources
-    fidlgen_tool = "//tools/fidl/fidlgen_libfuzzer"
-  }
-
-  # Define fuzzer header library.
-  fidl_cpp_library("${target_name}_libfuzzer") {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                             "public_deps",
-                             "fidl_target",
-                             "fidl_gen_dir",
-                           ])
-    forward_variables_from(libfuzzer_options, "*")
-    testonly = true
-    additional_public_deps = [
-      "//sdk/lib/fidl/cpp/fuzzing",
-      "//zircon/system/ulib/async-default",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-default",
-
-      # The generated headers `#include` the hlcpp and new C++ bindings headers
-      # generated by the clauses above, so the generated target needs
-      # that bindings library target in its public_deps.
-      ":${fidl_target}_cpp_wire",
-      ":${fidl_target}_hlcpp",
+  if (enable_hlcpp) {
+    libfuzzer_options = {
+      testonly = true
+      bindings_flavor = "libfuzzer"
+    }
+    libfuzzer_headers = [
+      "$library_name_slashes/cpp/libfuzzer.h",
+      "$library_name_slashes/cpp/libfuzzer_decode_encode.h",
+    ]
+    libfuzzer_sources = [
+      "$library_name_slashes/cpp/libfuzzer.cc",
+      "$library_name_slashes/cpp/libfuzzer_decode_encode.cc",
     ]
 
-    # Note: `.../libfuzzer.cc` is linked with different build-time parameters below in loop
-    # over `invoker.fuzzers`. The library itself contains headers only.
-    generated_headers = libfuzzer_headers
+    # Define fuzzer targets.
+    fidl_cpp_codegen("${target_name}_libfuzzer") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "fuzzers",
+                               "golden_fuzzer",
+                               "fidl_gen_dir",
+                               "fidl_ir_json",
+                               "fidl_ir_target",
+                             ])
+      forward_variables_from(libfuzzer_options, "*")
+      generated_headers = libfuzzer_headers
+      generated_sources = libfuzzer_sources
+      fidlgen_tool = "//tools/fidl/fidlgen_libfuzzer"
+    }
+
+    # Define fuzzer header library.
+    fidl_cpp_library("${target_name}_libfuzzer") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "public_deps",
+                               "fidl_target",
+                               "fidl_gen_dir",
+                             ])
+      forward_variables_from(libfuzzer_options, "*")
+      testonly = true
+      additional_public_deps = [
+        "//sdk/lib/fidl/cpp/fuzzing",
+        "//zircon/system/ulib/async-default",
+        "//zircon/system/ulib/async-loop:async-loop-cpp",
+        "//zircon/system/ulib/async-loop:async-loop-default",
+
+        # The generated headers `#include` the hlcpp and new C++ bindings headers
+        # generated by the clauses above, so the generated target needs
+        # that bindings library target in its public_deps.
+        ":${fidl_target}_cpp_wire",
+        ":${fidl_target}_hlcpp",
+      ]
+
+      # Note: `.../libfuzzer.cc` is linked with different build-time parameters below in loop
+      # over `invoker.fuzzers`. The library itself contains headers only.
+      generated_headers = libfuzzer_headers
+    }
   }
 
   # Define fuzzer implementation libraries (one per fuzzed protocol).

@@ -10,6 +10,7 @@ fidl("test.fuzzer") {
   testonly = true
   sources = [ "test.fuzzer.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }
 
 # This config allows linking against libFuzzer regardless of the toolchain variant, which is useful

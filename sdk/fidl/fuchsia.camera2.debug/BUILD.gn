@@ -10,4 +10,6 @@ fidl("fuchsia.camera2.debug") {
   sources = [ "debug.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }

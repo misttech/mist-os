@@ -84,6 +84,7 @@ fidl(fidl_library_target) {
     "invalid-copyright-for-platform-source-library",
     "wrong-prefix-for-platform-source-library",
   ]
+  enable_hlcpp = true
 }
 
 library_headers(cpp_elf_headers_target) {

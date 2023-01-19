@@ -20,4 +20,5 @@ fidl("fuchsia.fuzzer") {
     "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",
   ]
+  enable_hlcpp = true
 }

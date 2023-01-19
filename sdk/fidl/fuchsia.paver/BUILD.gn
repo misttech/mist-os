@@ -11,4 +11,5 @@ fidl("fuchsia.paver") {
     "//sdk/fidl/fuchsia.hardware.block.volume",
     "//sdk/fidl/fuchsia.mem",
   ]
+  enable_hlcpp = true
 }

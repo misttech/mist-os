@@ -10,4 +10,5 @@ fidl("fuchsia.ldsvc") {
   sources = [ "ldsvc.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_c = true
+  enable_hlcpp = true
 }

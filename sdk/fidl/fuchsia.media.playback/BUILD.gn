@@ -24,4 +24,6 @@ fidl("fuchsia.media.playback") {
     "//sdk/fidl/fuchsia.media.audio",
     "//sdk/fidl/fuchsia.ui.views",
   ]
+
+  enable_hlcpp = true
 }

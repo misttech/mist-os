@@ -9,4 +9,5 @@ fidl("fuchsia.hardware.light") {
 
   sources = [ "light.fidl" ]
   enable_c = true
+  enable_hlcpp = true
 }

@@ -10,4 +10,6 @@ fidl("fuchsia.ui.types") {
   sources = [ "types.fidl" ]
 
   public_deps = []
+
+  enable_hlcpp = true
 }

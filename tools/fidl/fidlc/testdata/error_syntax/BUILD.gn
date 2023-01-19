@@ -8,6 +8,7 @@ fidl("test.errorsyntax.parent") {
   testonly = true
   sources = [ "parent.test.fidl" ]
   experimental_flags = [ "unknown_interactions" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }
 
@@ -19,5 +20,6 @@ fidl("test.errorsyntax") {
   ]
   sources = [ "child.test.fidl" ]
   public_deps = [ ":test.errorsyntax.parent" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }

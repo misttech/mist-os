@@ -9,4 +9,5 @@ fidl("fuchsia.hardware.display") {
 
   public_deps = [ "//sdk/fidl/fuchsia.sysmem" ]
   enable_c = true
+  enable_hlcpp = true
 }

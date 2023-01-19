@@ -19,4 +19,6 @@ fidl("fuchsia.ui.activity") {
   ]
 
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }

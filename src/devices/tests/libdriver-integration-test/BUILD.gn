@@ -71,4 +71,5 @@ fidl("mock-device") {
   sources = [ "//src/devices/tests/mock-device/mock-device.test.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }

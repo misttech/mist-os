@@ -36,4 +36,6 @@ fidl("fuchsia.stash") {
     # TODO(fxb/91585): Resolve this unapproved dependency.
     "//src/ui/scenic/bin",
   ]
+
+  enable_hlcpp = true
 }

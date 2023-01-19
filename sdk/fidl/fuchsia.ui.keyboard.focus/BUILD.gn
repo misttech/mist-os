@@ -10,4 +10,6 @@ fidl("fuchsia.ui.keyboard.focus") {
   sources = [ "focus.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.ui.views" ]
+
+  enable_hlcpp = true
 }

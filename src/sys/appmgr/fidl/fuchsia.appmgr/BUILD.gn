@@ -6,4 +6,5 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.appmgr") {
   sources = [ "startup.fidl" ]
+  enable_hlcpp = true
 }

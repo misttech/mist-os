@@ -11,5 +11,6 @@ fidl("test.protocollayoutssamelibrary") {
     "output_index_json",
     "unknown_interactions",
   ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }

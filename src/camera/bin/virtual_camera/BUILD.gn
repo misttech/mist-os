@@ -16,6 +16,7 @@ group("tests") {
 fidl("fuchsia.camera.test.virtualcamera") {
   sdk_category = "internal"
   sources = [ "virtual_camera.test.fidl" ]
+  enable_hlcpp = true
 }
 
 source_set("virtual_camera_hal_controller") {

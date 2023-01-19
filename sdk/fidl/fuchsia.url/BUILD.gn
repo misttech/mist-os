@@ -9,4 +9,6 @@ fidl("fuchsia.url") {
 
   sources = [ "url.fidl" ]
   enable_c = true
+
+  enable_hlcpp = true
 }

@@ -19,4 +19,5 @@ fidl("validate") {
     "string-bounds-not-specified",
     "vector-bounds-not-specified",
   ]
+  enable_hlcpp = true
 }

@@ -19,4 +19,6 @@ fidl("fuchsia.modular.internal") {
     "//sdk/fidl/fuchsia.sys",
     "//sdk/fidl/fuchsia.ui.views",
   ]
+
+  enable_hlcpp = true
 }

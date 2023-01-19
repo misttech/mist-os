@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.netstack") {
   sdk_category = "excluded"
   sources = [ "netstack.fidl" ]
+  enable_hlcpp = true
 }

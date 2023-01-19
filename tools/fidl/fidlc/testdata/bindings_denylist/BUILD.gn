@@ -8,6 +8,7 @@ fidl("test.dependent") {
   testonly = true
   sources = [ "dependent.test.fidl" ]
   experimental_flags = [ "unknown_interactions" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }
 
@@ -19,5 +20,6 @@ fidl("test.bindingsdenylist") {
     "output_index_json",
     "unknown_interactions",
   ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }

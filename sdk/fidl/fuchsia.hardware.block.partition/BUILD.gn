@@ -11,4 +11,5 @@ fidl("fuchsia.hardware.block.partition") {
     "//sdk/fidl/fuchsia.hardware.block",
     "//sdk/fidl/fuchsia.logger",
   ]
+  enable_hlcpp = true
 }

@@ -14,4 +14,6 @@ fidl("fuchsia.ui.pointerinjector.configuration") {
     "//sdk/fidl/fuchsia.ui.pointerinjector",
     "//sdk/fidl/fuchsia.ui.views",
   ]
+
+  enable_hlcpp = true
 }

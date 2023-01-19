@@ -15,4 +15,5 @@ fidl("fuchsia.driver.development") {
     "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",
   ]
+  enable_hlcpp = true
 }

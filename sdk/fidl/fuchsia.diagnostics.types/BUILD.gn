@@ -9,4 +9,5 @@ fidl("fuchsia.diagnostics.types") {
   sources = [ "component.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_c = true
+  enable_hlcpp = true
 }

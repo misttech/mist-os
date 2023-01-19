@@ -95,6 +95,9 @@ import("//zircon/tools/zither/zither_library.gni")
 #     Indicates if any of the FIDL files contain the driver transport or
 #     references to the driver transport.
 #
+#   enable_hlcpp (optional flag, default to false)
+#     Set to true to enable legacy HLCPP bindings for this library
+#
 #   enable_c (optional flag, default to false)
 #     Set to true to enable C bindings for this library
 #
@@ -133,14 +136,13 @@ template("fidl") {
 
   enable_banjo = defined(invoker.enable_banjo) && invoker.enable_banjo
   enable_c = defined(invoker.enable_c) && invoker.enable_c
+  enable_hlcpp = defined(invoker.enable_hlcpp) && invoker.enable_hlcpp
   enable_zither = defined(invoker.enable_zither) && invoker.enable_zither
-
-  # TODO(https://fxbug.dev/119953): Temporary for migration.
-  not_needed(invoker, [ "enable_hlcpp" ])
 
   not_needed([
                "enable_banjo",
                "enable_c",
+               "enable_hlcpp",
                "enable_zither",
              ])
 
@@ -235,6 +237,7 @@ template("fidl") {
                                    "sdk_category",
                                  ])
       forward_variables_from(extra_parameters, "*")
+      enable_hlcpp = enable_hlcpp
     }
 
     fidl_rust("${target_name}_rust") {

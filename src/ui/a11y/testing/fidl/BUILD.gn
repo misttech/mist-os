@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("test.accessibility") {
   testonly = true
   sources = [ "magnifier.test.fidl" ]
+  enable_hlcpp = true
 }

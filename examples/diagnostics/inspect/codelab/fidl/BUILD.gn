@@ -9,4 +9,5 @@ fidl("fuchsia.examples.inspect") {
     "fizzbuzz.test.fidl",
     "reverser.test.fidl",
   ]
+  enable_hlcpp = true
 }

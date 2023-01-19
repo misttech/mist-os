@@ -16,4 +16,6 @@ fidl("fuchsia.ui.test.context") {
     "//sdk/fidl/fuchsia.ui.test.input",
     "//sdk/fidl/fuchsia.ui.views",
   ]
+
+  enable_hlcpp = true
 }

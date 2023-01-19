@@ -45,6 +45,8 @@ ctf_fidl("frobinator") {
 
   sources = [ "frobinator.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }
 
 ctf_fidl("fidl_test") {
@@ -53,6 +55,8 @@ ctf_fidl("fidl_test") {
   testonly = true
 
   sources = [ "fidl_test.test.fidl" ]
+
+  enable_hlcpp = true
 }
 
 ctf_fidl("fidl_test_handles") {
@@ -62,6 +66,8 @@ ctf_fidl("fidl_test_handles") {
 
   sources = [ "fidl_test_handles.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }
 
 ctf_fidl("collision_test") {
@@ -70,4 +76,6 @@ ctf_fidl("collision_test") {
   testonly = true
 
   sources = [ "collision.test.fidl" ]
+
+  enable_hlcpp = true
 }

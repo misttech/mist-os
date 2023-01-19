@@ -17,4 +17,5 @@ fidl("examples.canvas.clientrequesteddraw") {
     "vector-bounds-not-specified",
     "wrong-prefix-for-platform-source-library",
   ]
+  enable_hlcpp = true
 }

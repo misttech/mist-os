@@ -15,4 +15,6 @@ fidl("fuchsia.component.config") {
   ]
 
   public_deps = [ "//sdk/fidl/fuchsia.component.decl" ]
+
+  enable_hlcpp = true
 }

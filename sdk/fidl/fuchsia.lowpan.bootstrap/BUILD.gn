@@ -10,4 +10,6 @@ fidl("fuchsia.lowpan.bootstrap") {
   sources = [ "thread.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.mem" ]
+
+  enable_hlcpp = true
 }

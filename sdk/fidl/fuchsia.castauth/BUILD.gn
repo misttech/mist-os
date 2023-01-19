@@ -8,4 +8,6 @@ fidl("fuchsia.castauth") {
   sdk_category = "partner"
 
   sources = [ "cast_auth.fidl" ]
+
+  enable_hlcpp = true
 }

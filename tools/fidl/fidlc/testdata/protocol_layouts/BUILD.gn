@@ -8,6 +8,7 @@ fidl("test.protocollayouts.imported") {
   testonly = true
   sources = [ "imported.test.fidl" ]
   experimental_flags = [ "unknown_interactions" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }
 
@@ -19,5 +20,6 @@ fidl("test.protocollayouts") {
     "unknown_interactions",
   ]
   public_deps = [ ":test.protocollayouts.imported" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }

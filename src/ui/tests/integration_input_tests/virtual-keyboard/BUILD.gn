@@ -10,6 +10,7 @@ fidl("test.virtualkeyboard") {
   sdk_category = "internal"
   sources = [ "input_position_listener.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }
 
 font_collection("single-font-collection") {

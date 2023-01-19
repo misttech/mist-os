@@ -10,4 +10,5 @@ fidl("fuchsia.examples.diagnostics") {
     "profile.test.fidl",
     "profile_store.test.fidl",
   ]
+  enable_hlcpp = true
 }

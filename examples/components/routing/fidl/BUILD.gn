@@ -8,5 +8,7 @@ fidl("echo") {
   name = "fidl.examples.routing.echo"
 
   sources = [ "echo.fidl" ]
+
+  enable_hlcpp = true
 }
 # [END fidl_echo]

@@ -22,4 +22,5 @@ fidl("fuchsia.wlan.sme") {
     "//zircon/vdso/zx",
   ]
   enable_banjo = true
+  enable_hlcpp = true
 }

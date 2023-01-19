@@ -8,4 +8,5 @@ fidl("fuchsia.update.channel") {
   sdk_category = "partner"
 
   sources = [ "channel.fidl" ]
+  enable_hlcpp = true
 }

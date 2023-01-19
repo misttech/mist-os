@@ -15,6 +15,7 @@ fidl("test.transitivedependencies") {
     ":test.bottom",
     ":test.middle",
   ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }
 
@@ -23,6 +24,7 @@ fidl("test.middle") {
   sources = [ "middle.test.fidl" ]
   public_deps = [ ":test.bottom" ]
   experimental_flags = [ "unknown_interactions" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }
 
@@ -30,5 +32,6 @@ fidl("test.bottom") {
   testonly = true
   sources = [ "bottom.test.fidl" ]
   experimental_flags = [ "unknown_interactions" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }

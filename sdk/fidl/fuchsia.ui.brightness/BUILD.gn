@@ -15,4 +15,6 @@ fidl("fuchsia.ui.brightness") {
   public_deps = [ "//zircon/vdso/zx" ]
 
   excluded_checks = [ "invalid-case-for-decl-name" ]
+
+  enable_hlcpp = true
 }

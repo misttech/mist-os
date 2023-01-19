@@ -142,6 +142,7 @@ fidl("fuchsia.zircon.benchmarks") {
     "async_loop.fidl",
     "round_tripper.fidl",
   ]
+  enable_hlcpp = true
 }
 
 fuchsia_unittest_package("fuchsia_microbenchmarks") {

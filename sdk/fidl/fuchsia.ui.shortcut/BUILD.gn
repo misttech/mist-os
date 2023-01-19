@@ -15,4 +15,6 @@ fidl("fuchsia.ui.shortcut") {
     "//sdk/fidl/fuchsia.ui.input3",
     "//sdk/fidl/fuchsia.ui.views",
   ]
+
+  enable_hlcpp = true
 }

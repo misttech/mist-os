@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.example.fostr2") {
   sources = [ "fostr.test2.fidl" ]
   public_deps = [ "//src/lib/fostr/test/fuchsia.example.fostr" ]
+  enable_hlcpp = true
 }

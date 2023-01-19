@@ -9,4 +9,6 @@ fidl("fuchsia.factory") {
 
   sources = [ "factory.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.io" ]
+
+  enable_hlcpp = true
 }

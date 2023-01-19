@@ -23,4 +23,6 @@ fidl("fuchsia.sys.internal") {
 
   # TODO(fxbug.dev/109747): Re-enable.
   excluded_checks = [ "invalid-case-for-decl-name" ]
+
+  enable_hlcpp = true
 }

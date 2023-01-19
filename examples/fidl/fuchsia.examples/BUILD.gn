@@ -12,6 +12,7 @@ fidl("fuchsia.examples") {
     "echo.test.fidl",
     "types.test.fidl",
   ]
+  enable_hlcpp = true
   fuzzers = [
     {
       protocol = "fuchsia.examples.Echo"

@@ -13,23 +13,27 @@ ctf_fidl("test.unknown.interactions") {
     "unknown_interactions",
     "unknown_interactions_new_defaults",
   ]
+  enable_hlcpp = true
 }
 
 ctf_fidl("test.protocol.connector") {
   testonly = true
   sources = [ "protocol_connector.test.fidl" ]
+  enable_hlcpp = true
 }
 
 # A library containing just an empty protocol.
 ctf_fidl("test.empty.protocol") {
   testonly = true
   sources = [ "empty_protocol.test.fidl" ]
+  enable_hlcpp = true
 }
 
 # Methods returning application errors.
 ctf_fidl("test.error.methods") {
   testonly = true
   sources = [ "error_methods.test.fidl" ]
+  enable_hlcpp = true
 }
 
 # Simple one way/two way echo methods and events that test the basic operation
@@ -38,10 +42,12 @@ ctf_fidl("test.basic.protocol") {
   testonly = true
   sources = [ "basic_protocol.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }
 
 # Methods and events with the @transitional attribute.
 ctf_fidl("test.transitional") {
   testonly = true
   sources = [ "transitional.test.fidl" ]
+  enable_hlcpp = true
 }

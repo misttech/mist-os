@@ -18,4 +18,6 @@ fidl("fuchsia.audio.effects") {
     "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

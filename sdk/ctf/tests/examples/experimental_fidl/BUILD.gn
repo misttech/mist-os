@@ -11,6 +11,7 @@ fidl("fuchsia.cts.experimental") {
   sdk_category = "experimental"
   name = "fuchsia.cts.experimental"
   sources = [ "experimental.test.fidl" ]
+  enable_hlcpp = true
 }
 
 ctf_executable("experimental-bin") {

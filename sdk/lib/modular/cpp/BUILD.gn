@@ -30,6 +30,7 @@ sdk_source_set("cpp") {
 
 fidl("test.modular.agent") {
   sources = [ "agent.test.fidl" ]
+  enable_hlcpp = true
 }
 
 executable("modular_cpp_tests_bin") {

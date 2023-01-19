@@ -15,4 +15,6 @@ fidl("fuchsia.ui.shortcut2") {
   ]
 
   excluded_checks = [ "invalid-case-for-decl-name" ]
+
+  enable_hlcpp = true
 }

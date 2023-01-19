@@ -9,4 +9,5 @@ fidl("fuchsia.inspect") {
   api = "fuchsia.inspect.api"
   sources = [ "tree.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.mem" ]
+  enable_hlcpp = true
 }

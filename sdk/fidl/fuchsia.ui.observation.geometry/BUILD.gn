@@ -17,6 +17,8 @@ fidl("fuchsia.ui.observation.geometry") {
     "//sdk/fidl/fuchsia.math",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }
 
 measure_tape("measure_tape_for_geometry") {

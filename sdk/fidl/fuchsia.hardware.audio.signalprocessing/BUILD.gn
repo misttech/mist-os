@@ -17,4 +17,6 @@ fidl("fuchsia.hardware.audio.signalprocessing") {
     "vendor_specific.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
+
+  enable_hlcpp = true
 }

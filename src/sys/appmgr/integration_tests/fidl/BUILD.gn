@@ -21,10 +21,14 @@ fidl("test.component.mockrunner") {
   sources = [ "runner.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.sys" ]
+
+  enable_hlcpp = true
 }
 
 fidl("echo") {
   name = "fidl.examples.echo"
 
   sources = [ "echo.test.fidl" ]
+
+  enable_hlcpp = true
 }

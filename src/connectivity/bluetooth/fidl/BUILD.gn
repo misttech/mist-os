@@ -17,6 +17,7 @@ fidl("host") {
     "//sdk/fidl/fuchsia.bluetooth.le",
     "//sdk/fidl/fuchsia.bluetooth.sys",
   ]
+  enable_hlcpp = true
 }
 
 fidl("component") {

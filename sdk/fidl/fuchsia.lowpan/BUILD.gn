@@ -10,4 +10,6 @@ fidl("fuchsia.lowpan") {
   sources = [ "lowpan.fidl" ]
 
   public_deps = []
+
+  enable_hlcpp = true
 }

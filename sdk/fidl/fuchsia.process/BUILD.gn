@@ -18,4 +18,5 @@ fidl("fuchsia.process") {
     "//zircon/vdso/zx",
   ]
   enable_c = true
+  enable_hlcpp = true
 }

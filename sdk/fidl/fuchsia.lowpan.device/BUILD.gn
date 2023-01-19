@@ -20,4 +20,6 @@ fidl("fuchsia.lowpan.device") {
     "//sdk/fidl/fuchsia.lowpan",
     "//sdk/fidl/fuchsia.net",
   ]
+
+  enable_hlcpp = true
 }

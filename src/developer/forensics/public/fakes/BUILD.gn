@@ -45,4 +45,5 @@ fidl("fuchsia.feedback.testing") {
   testonly = true
 
   sources = [ "query.test.fidl" ]
+  enable_hlcpp = true
 }

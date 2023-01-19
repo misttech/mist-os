@@ -24,6 +24,7 @@ fidl("fuchsia.wlan.policy") {
     "//zircon/vdso/zx",
   ]
   enable_banjo = true
+  enable_hlcpp = true
 }
 
 measure_tape("measure_tape_for_scan_result") {

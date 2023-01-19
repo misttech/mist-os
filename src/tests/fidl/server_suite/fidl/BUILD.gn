@@ -15,4 +15,5 @@ fidl("fidl.serversuite") {
     "unknown_interactions",
     "unknown_interactions_new_defaults",
   ]
+  enable_hlcpp = true
 }

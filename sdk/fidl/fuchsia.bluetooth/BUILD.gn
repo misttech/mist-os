@@ -18,4 +18,6 @@ fidl("fuchsia.bluetooth") {
     "overview.fidl",
     "uuid.fidl",
   ]
+
+  enable_hlcpp = true
 }

@@ -11,4 +11,6 @@ fidl("fuchsia.thermal") {
     "overview.fidl",
     "thermal.fidl",
   ]
+
+  enable_hlcpp = true
 }

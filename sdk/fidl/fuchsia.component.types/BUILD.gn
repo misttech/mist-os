@@ -8,4 +8,6 @@ fidl("fuchsia.component.types") {
   sdk_category = "partner"
 
   sources = [ "constants.fidl" ]
+
+  enable_hlcpp = true
 }

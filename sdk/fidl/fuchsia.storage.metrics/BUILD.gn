@@ -9,4 +9,5 @@ fidl("fuchsia.storage.metrics") {
 
   api = "fuchsia.storage.metrics.api"
   sources = [ "storage-metrics.fidl" ]
+  enable_hlcpp = true
 }

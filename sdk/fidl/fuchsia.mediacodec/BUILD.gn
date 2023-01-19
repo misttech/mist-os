@@ -16,4 +16,6 @@ fidl("fuchsia.mediacodec") {
     "//sdk/fidl/fuchsia.media",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

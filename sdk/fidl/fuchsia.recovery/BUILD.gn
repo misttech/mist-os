@@ -9,4 +9,5 @@ fidl("fuchsia.recovery") {
   name = "fuchsia.recovery"
   sources = [ "factory_reset.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }

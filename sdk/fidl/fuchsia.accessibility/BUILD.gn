@@ -11,4 +11,6 @@ fidl("fuchsia.accessibility") {
     "color_transform.fidl",
     "magnifier.fidl",
   ]
+
+  enable_hlcpp = true
 }

@@ -24,4 +24,5 @@ fidl("fuchsia.developer.remotecontrol") {
     "//sdk/fidl/fuchsia.sys2",
     "//zircon/vdso/zx",
   ]
+  enable_hlcpp = true
 }

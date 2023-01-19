@@ -14,4 +14,6 @@ fidl("fuchsia.input") {
   ]
 
   public_deps = []
+
+  enable_hlcpp = true
 }

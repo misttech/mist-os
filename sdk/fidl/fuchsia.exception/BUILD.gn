@@ -10,4 +10,5 @@ fidl("fuchsia.exception") {
     "process_limbo.fidl",
   ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }

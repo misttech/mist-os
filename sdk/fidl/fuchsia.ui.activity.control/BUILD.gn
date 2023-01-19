@@ -10,4 +10,6 @@ fidl("fuchsia.ui.activity.control") {
   sources = [ "control.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.ui.activity" ]
+
+  enable_hlcpp = true
 }

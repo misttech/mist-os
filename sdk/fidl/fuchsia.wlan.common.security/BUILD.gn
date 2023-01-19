@@ -12,4 +12,5 @@ fidl("fuchsia.wlan.common.security") {
 
   sources = [ "security.fidl" ]
   enable_banjo = true
+  enable_hlcpp = true
 }

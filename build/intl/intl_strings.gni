@@ -205,12 +205,14 @@ template("intl_strings") {
       sources = [ generated_fidl_file_name ]
       non_fidl_deps = [ ":${strings_to_fidl_name}" ]
       excluded_checks = [ "invalid-copyright-for-platform-source-library" ]
+      enable_hlcpp = true
     }
   } else {
     # The non-FIDL toolchain FIDL libraries are built normally; except based
     # off of the generated FIDL file.
     fidl(library) {
       sources = [ generated_fidl_file_name ]
+      enable_hlcpp = true
     }
   }
 

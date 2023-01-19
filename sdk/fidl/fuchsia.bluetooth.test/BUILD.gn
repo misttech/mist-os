@@ -15,4 +15,6 @@ fidl("fuchsia.bluetooth.test") {
     "//sdk/fidl/fuchsia.bluetooth",
     "//sdk/fidl/fuchsia.bluetooth.bredr",
   ]
+
+  enable_hlcpp = true
 }

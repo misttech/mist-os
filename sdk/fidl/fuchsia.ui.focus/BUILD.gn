@@ -16,4 +16,6 @@ fidl("fuchsia.ui.focus") {
     "//sdk/fidl/fuchsia.ui.views",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

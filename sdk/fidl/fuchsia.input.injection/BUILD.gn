@@ -8,4 +8,6 @@ fidl("fuchsia.input.injection") {
   sources = [ "input_device_registry.fidl" ]
 
   public_deps = [ "//sdk/fidl/fuchsia.input.report" ]
+
+  enable_hlcpp = true
 }

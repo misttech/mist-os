@@ -62,6 +62,7 @@ fidl("asix-88179-test-helper") {
   name = "fuchsia.hardware.ax88179"
   sources = [ "hooks.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  enable_hlcpp = true
 }
 
 fuchsia_driver("fake-asix-88179-driver") {

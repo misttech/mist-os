@@ -23,4 +23,6 @@ fidl("fuchsia.modular.session") {
     "//sdk/fidl/fuchsia.mem",
     "//sdk/fidl/fuchsia.sys",
   ]
+
+  enable_hlcpp = true
 }

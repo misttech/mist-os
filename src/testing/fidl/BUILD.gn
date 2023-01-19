@@ -7,4 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("placeholders") {
   name = "test.placeholders"
   sources = [ "placeholders.test.fidl" ]
+  enable_hlcpp = true
 }

@@ -15,4 +15,6 @@ fidl("fuchsia.hwinfo") {
 
   sources = [ "hwinfo.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.intl" ]
+
+  enable_hlcpp = true
 }

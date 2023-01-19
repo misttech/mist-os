@@ -11,4 +11,6 @@ fidl("fuchsia.buildinfo") {
   sdk_category = "partner"
 
   sources = [ "buildinfo.fidl" ]
+
+  enable_hlcpp = true
 }

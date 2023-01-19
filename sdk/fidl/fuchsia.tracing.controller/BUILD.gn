@@ -12,4 +12,6 @@ fidl("fuchsia.tracing.controller") {
     "//sdk/fidl/fuchsia.tracing",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

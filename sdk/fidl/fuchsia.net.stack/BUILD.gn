@@ -11,4 +11,5 @@ fidl("fuchsia.net.stack") {
     "//sdk/fidl/fuchsia.net",
     "//sdk/fidl/fuchsia.net.name",
   ]
+  enable_hlcpp = true
 }

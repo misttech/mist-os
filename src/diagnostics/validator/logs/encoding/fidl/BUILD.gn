@@ -15,4 +15,6 @@ fidl("validate") {
   ]
 
   excluded_checks = [ "invalid-case-for-constant" ]
+
+  enable_hlcpp = true
 }

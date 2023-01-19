@@ -13,4 +13,6 @@ fidl("fuchsia.session.scene") {
     "//sdk/fidl/fuchsia.ui.app",
     "//sdk/fidl/fuchsia.ui.views",
   ]
+
+  enable_hlcpp = true
 }

@@ -19,4 +19,6 @@ fidl("fuchsia.virtualization.hardware") {
     "//sdk/fidl/fuchsia.virtualization",
     "//sdk/fidl/fuchsia.wayland",
   ]
+
+  enable_hlcpp = true
 }

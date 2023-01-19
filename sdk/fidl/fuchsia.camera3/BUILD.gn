@@ -18,4 +18,6 @@ fidl("fuchsia.camera3") {
     "//sdk/fidl/fuchsia.math",
     "//sdk/fidl/fuchsia.sysmem",
   ]
+
+  enable_hlcpp = true
 }

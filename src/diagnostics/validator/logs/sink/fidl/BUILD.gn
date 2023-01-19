@@ -15,4 +15,6 @@ fidl("sink-puppet") {
   ]
 
   excluded_checks = [ "string-bounds-not-specified" ]
+
+  enable_hlcpp = true
 }

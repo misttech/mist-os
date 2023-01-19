@@ -31,4 +31,6 @@ fidl("fuchsia.settings") {
     "//sdk/fidl/fuchsia.ui.types",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

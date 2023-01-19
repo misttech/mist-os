@@ -20,4 +20,6 @@ fidl("fuchsia.developer.tiles") {
     "//sdk/fidl/fuchsia.ui.app",
     "//sdk/fidl/fuchsia.ui.gfx",
   ]
+
+  enable_hlcpp = true
 }

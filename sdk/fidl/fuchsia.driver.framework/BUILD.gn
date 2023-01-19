@@ -23,4 +23,6 @@ fidl("fuchsia.driver.framework") {
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.url",
   ]
+  enable_c = true
+  enable_hlcpp = true
 }

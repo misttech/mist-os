@@ -10,4 +10,5 @@ fidl("fuchsia.fs") {
     "admin.fidl",
     "const.fidl",
   ]
+  enable_hlcpp = true
 }

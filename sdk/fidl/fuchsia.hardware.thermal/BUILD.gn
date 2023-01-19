@@ -11,4 +11,5 @@ fidl("fuchsia.hardware.thermal") {
     "//zircon/vdso/zx",
   ]
   enable_c = true
+  enable_hlcpp = true
 }

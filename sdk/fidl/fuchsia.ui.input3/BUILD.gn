@@ -19,4 +19,6 @@ fidl("fuchsia.ui.input3") {
     "//sdk/fidl/fuchsia.ui.views",
     "//zircon/vdso/zx",
   ]
+
+  enable_hlcpp = true
 }

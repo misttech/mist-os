@@ -12,6 +12,7 @@ fidl("test.placementofattributes") {
     "unknown_interactions",
   ]
   public_deps = [ ":test.exampleusing" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }
 
@@ -19,5 +20,6 @@ fidl("test.exampleusing") {
   testonly = true
   sources = [ "exampleusing.test.fidl" ]
   experimental_flags = [ "unknown_interactions" ]
+  enable_hlcpp = true
   golden_fuzzer = true
 }

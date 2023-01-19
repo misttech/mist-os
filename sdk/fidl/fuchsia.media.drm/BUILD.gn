@@ -24,4 +24,6 @@ fidl("fuchsia.media.drm") {
     "//sdk/fidl/fuchsia.mem",
     "//sdk/fidl/fuchsia.url",
   ]
+
+  enable_hlcpp = true
 }

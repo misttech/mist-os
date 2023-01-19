@@ -8,4 +8,6 @@ fidl("fuchsia.testing.appmgr") {
   testonly = true
 
   sources = [ "crash_inducer.fidl" ]
+
+  enable_hlcpp = true
 }

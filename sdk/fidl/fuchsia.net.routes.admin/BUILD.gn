@@ -18,4 +18,6 @@ fidl("fuchsia.net.routes.admin") {
     "//sdk/fidl/fuchsia.net.interfaces.admin",
     "//sdk/fidl/fuchsia.net.routes",
   ]
+
+  enable_hlcpp = true
 }

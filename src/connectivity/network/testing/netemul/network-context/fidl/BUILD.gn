@@ -13,6 +13,7 @@ fidl("internal") {
     "//sdk/fidl/fuchsia.hardware.network",
     "//sdk/fidl/fuchsia.logger",
   ]
+  enable_hlcpp = true
 }
 
 fidl("network") {
@@ -24,4 +25,5 @@ fidl("network") {
     "//sdk/fidl/fuchsia.net",
     "//sdk/fidl/fuchsia.net.virtualization",
   ]
+  enable_hlcpp = true
 }

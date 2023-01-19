@@ -209,6 +209,8 @@ fidl("fidl") {
   public_deps = [ "//zircon/vdso/zx" ]
 
   excluded_checks = [ "explicit-flexible-modifier" ]
+
+  enable_hlcpp = true
 }
 
 fidl("fidl-composed") {
