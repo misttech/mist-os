@@ -20,7 +20,6 @@ ffx_plugin("ffx_component_run") {
     "//src/sys/lib/moniker",
   ]
   test_deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",

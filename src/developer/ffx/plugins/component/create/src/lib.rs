@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use moniker::ChildMonikerBase;
+
 use {
     anyhow::Result,
     component_debug::lifecycle::create_instance_in_collection,
     errors::ffx_error,
     ffx_component::{
-        format_lifecycle_error, parse_component_url, rcs::connect_to_lifecycle_controller,
+        format::format_create_error, parse_component_url, rcs::connect_to_lifecycle_controller,
     },
     ffx_component_create_args::CreateComponentCommand,
     ffx_core::ffx_plugin,
@@ -30,7 +32,18 @@ async fn create_impl<W: std::io::Write>(
     let url = parse_component_url(url.as_str())?;
 
     let moniker = AbsoluteMoniker::parse_str(&moniker)
-        .map_err(|e| ffx_error!("Moniker could not be parsed: {}", e))?;
+        .map_err(|e| ffx_error!("Error: {} is not a valid moniker ({})", moniker, e))?;
+
+    let parent = moniker
+        .parent()
+        .ok_or(ffx_error!("Error: {} does not reference a dynamic instance", moniker))?;
+    let leaf = moniker
+        .leaf()
+        .ok_or(ffx_error!("Error: {} does not reference a dynamic instance", moniker))?;
+    let child_name = leaf.name();
+    let collection = leaf
+        .collection()
+        .ok_or(ffx_error!("Error: {} does not reference a dynamic instance", moniker))?;
 
     writeln!(writer, "URL: {}", url)?;
     writeln!(writer, "Moniker: {}", moniker)?;
@@ -38,11 +51,17 @@ async fn create_impl<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let moniker = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let parent_relative = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
 
-    create_instance_in_collection(&lifecycle_controller, &moniker, &url)
-        .await
-        .map_err(format_lifecycle_error)?;
+    create_instance_in_collection(
+        &lifecycle_controller,
+        &parent_relative,
+        collection,
+        child_name,
+        &url,
+    )
+    .await
+    .map_err(|e| format_create_error(&moniker, &parent, collection, e))?;
 
     writeln!(writer, "Created component instance!")?;
     Ok(())
@@ -66,7 +85,7 @@ mod test {
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
-                fsys::LifecycleControllerRequest::CreateChild {
+                fsys::LifecycleControllerRequest::CreateInstance {
                     parent_moniker,
                     collection,
                     decl,
@@ -77,7 +96,7 @@ mod test {
                     assert_eq!(expected_collection, collection.name);
                     assert_eq!(expected_name, decl.name.unwrap());
                     assert_eq!(expected_url, decl.url.unwrap());
-                    responder.send(&mut Ok(())).unwrap();
+                    responder.send(None).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }

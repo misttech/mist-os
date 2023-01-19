@@ -6,7 +6,7 @@ use {
     anyhow::Result,
     component_debug::lifecycle::start_instance,
     ffx_component::{
-        format_lifecycle_error,
+        format::format_start_error,
         query::get_cml_moniker_from_query,
         rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer},
     },
@@ -31,7 +31,7 @@ async fn start_impl<W: std::io::Write>(
     lifecycle_controller: fsys::LifecycleControllerProxy,
     moniker: AbsoluteMoniker,
     writer: &mut W,
-) -> Result<fsys::StartResult> {
+) -> Result<()> {
     writeln!(writer, "Moniker: {}", moniker)?;
     writeln!(writer, "Starting component instance...")?;
 
@@ -39,17 +39,12 @@ async fn start_impl<W: std::io::Write>(
     // LifecycleController expects relative monikers only.
     let relative_moniker = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
 
-    let result = start_instance(&lifecycle_controller, &relative_moniker)
+    start_instance(&lifecycle_controller, &relative_moniker)
         .await
-        .map_err(format_lifecycle_error)?;
+        .map_err(|e| format_start_error(&moniker, e))?;
 
-    match result {
-        fsys::StartResult::Started => writeln!(writer, "Started component instance!")?,
-        fsys::StartResult::AlreadyStarted => {
-            writeln!(writer, "Component instance was already running!")?
-        }
-    }
-    Ok(result)
+    writeln!(writer, "Started component instance!")?;
+    Ok(())
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,21 +59,19 @@ mod test {
 
     fn setup_fake_lifecycle_controller(
         expected_moniker: &'static str,
-        is_running: bool,
     ) -> fsys::LifecycleControllerProxy {
         let (lifecycle_controller, mut stream) =
             create_proxy_and_stream::<fsys::LifecycleControllerMarker>().unwrap();
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
-                fsys::LifecycleControllerRequest::Start { moniker, responder, .. } => {
+                fsys::LifecycleControllerRequest::StartInstance {
+                    moniker,
+                    binder: _,
+                    responder,
+                } => {
                     assert_eq!(expected_moniker, moniker);
-                    let sr = if is_running {
-                        fsys::StartResult::AlreadyStarted
-                    } else {
-                        fsys::StartResult::Started
-                    };
-                    responder.send(&mut Ok(sr)).unwrap();
+                    responder.send(&mut Ok(())).unwrap();
                 }
                 _ => panic!("Unexpected Lifecycle Controller request"),
             }
@@ -90,30 +83,14 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_success() -> Result<()> {
         let mut output = Vec::new();
-        let lifecycle_controller =
-            setup_fake_lifecycle_controller("./core/ffx-laboratory:test", false);
-        let response = start_impl(
+        let lifecycle_controller = setup_fake_lifecycle_controller("./core/ffx-laboratory:test");
+        start_impl(
             lifecycle_controller,
             AbsoluteMoniker::parse_str("/core/ffx-laboratory:test").unwrap(),
             &mut output,
         )
-        .await;
-        assert_eq!(response.unwrap(), fsys::StartResult::Started);
-        Ok(())
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_already_started() -> Result<()> {
-        let mut output = Vec::new();
-        let lifecycle_controller =
-            setup_fake_lifecycle_controller("./core/ffx-laboratory:test", true);
-        let response = start_impl(
-            lifecycle_controller,
-            AbsoluteMoniker::parse_str("/core/ffx-laboratory:test").unwrap(),
-            &mut output,
-        )
-        .await;
-        assert_eq!(response.unwrap(), fsys::StartResult::AlreadyStarted);
+        .await
+        .unwrap();
         Ok(())
     }
 }

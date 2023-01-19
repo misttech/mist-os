@@ -5,15 +5,19 @@
 use {
     anyhow::Result,
     component_debug::lifecycle::destroy_instance_in_collection,
+    errors::ffx_error,
     ffx_component::{
-        format_lifecycle_error,
+        format::format_destroy_error,
         query::get_cml_moniker_from_query,
         rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer},
     },
     ffx_component_destroy_args::DestroyComponentCommand,
     ffx_core::ffx_plugin,
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_sys2 as fsys,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
+    moniker::{
+        AbsoluteMoniker, AbsoluteMonikerBase, ChildMonikerBase, RelativeMoniker,
+        RelativeMonikerBase,
+    },
 };
 
 #[ffx_plugin]
@@ -37,18 +41,24 @@ async fn destroy_impl<W: std::io::Write>(
     writeln!(writer, "Moniker: {}", moniker)?;
     writeln!(writer, "Destroying component instance...")?;
 
+    let parent = moniker.parent().ok_or(ffx_error!("Error: {} is not a valid moniker", moniker))?;
+    let leaf = moniker.leaf().ok_or(ffx_error!("Error: {} is not a valid moniker", moniker))?;
+    let child_name = leaf.name();
+    let collection = leaf
+        .collection()
+        .ok_or(ffx_error!("Error: {} does not reference a dynamic instance", moniker))?;
+
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let moniker = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let parent_relative = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &parent).unwrap();
 
-    destroy_instance_in_collection(&lifecycle_controller, &moniker)
+    destroy_instance_in_collection(&lifecycle_controller, &parent_relative, collection, child_name)
         .await
-        .map_err(format_lifecycle_error)?;
+        .map_err(|e| format_destroy_error(&moniker, e))?;
 
     writeln!(writer, "Destroyed component instance!")?;
     Ok(())
 }
-
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 
@@ -69,11 +79,10 @@ mod test {
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
-                fsys::LifecycleControllerRequest::DestroyChild {
+                fsys::LifecycleControllerRequest::DestroyInstance {
                     parent_moniker,
                     child,
                     responder,
-                    ..
                 } => {
                     assert_eq!(expected_moniker, parent_moniker);
                     assert_eq!(expected_collection, child.collection.unwrap());

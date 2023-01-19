@@ -26,19 +26,6 @@ ffx_plugin("ffx_component") {
     "stop:ffx_component_stop",
     "storage:ffx_component_storage",
   ]
-  test_deps = [
-    "common:ffx_component_test",
-    "destroy:ffx_component_destroy_tests",
-    "graph:ffx_component_graph_tests",
-    "list:ffx_component_list_tests",
-    "reload:ffx_component_reload_tests",
-    "resolve:ffx_component_resolve_tests",
-    "run:ffx_component_run_tests",
-    "run-legacy:ffx_component_run_legacy_tests",
-    "show:ffx_component_show_tests",
-    "start:ffx_component_start_tests",
-    "stop:ffx_component_stop_tests",
-  ]
 
   args_sources = [ "src/args.rs" ]
 }
@@ -51,4 +38,22 @@ ffx_tool("ffx_component_tool") {
     "//src/lib/fuchsia-async",
   ]
   sources = [ "src/main.rs" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [
+    "common:ffx_component_test",
+    "destroy:ffx_component_destroy_tests",
+    "doctor:ffx_component_doctor_tests",
+    "graph:ffx_component_graph_tests",
+    "list:ffx_component_list_tests",
+    "reload:ffx_component_reload_tests",
+    "resolve:ffx_component_resolve_tests",
+    "run:ffx_component_run_tests",
+    "run-legacy:ffx_component_run_legacy_tests",
+    "show:ffx_component_show_tests",
+    "start:ffx_component_start_tests",
+    "stop:ffx_component_stop_tests",
+  ]
 }

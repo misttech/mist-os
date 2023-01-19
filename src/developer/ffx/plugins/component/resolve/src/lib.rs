@@ -6,7 +6,7 @@ use {
     anyhow::Result,
     component_debug::lifecycle::resolve_instance,
     ffx_component::{
-        format_lifecycle_error,
+        format::format_resolve_error,
         query::get_cml_moniker_from_query,
         rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer},
     },
@@ -39,9 +39,11 @@ async fn resolve_impl<W: std::io::Write>(
 
     // Convert the absolute moniker into a relative moniker w.r.t. root.
     // LifecycleController expects relative monikers only.
-    let moniker = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
+    let moniker_relative = RelativeMoniker::scope_down(&AbsoluteMoniker::root(), &moniker).unwrap();
 
-    resolve_instance(&lifecycle_controller, &moniker).await.map_err(format_lifecycle_error)?;
+    resolve_instance(&lifecycle_controller, &moniker_relative)
+        .await
+        .map_err(|e| format_resolve_error(&moniker, e))?;
 
     writeln!(writer, "Resolved component instance!")?;
     Ok(())
@@ -65,7 +67,7 @@ mod test {
         fuchsia_async::Task::local(async move {
             let req = stream.try_next().await.unwrap().unwrap();
             match req {
-                fsys::LifecycleControllerRequest::Resolve { moniker, responder, .. } => {
+                fsys::LifecycleControllerRequest::ResolveInstance { moniker, responder } => {
                     assert_eq!(expected_moniker, moniker);
                     responder.send(&mut Ok(())).unwrap();
                 }

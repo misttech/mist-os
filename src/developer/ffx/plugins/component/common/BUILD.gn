@@ -28,6 +28,7 @@ rustc_library("ffx_component") {
   ]
 
   sources = [
+    "src/format.rs",
     "src/lib.rs",
     "src/query.rs",
     "src/rcs.rs",
