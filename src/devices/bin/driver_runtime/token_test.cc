@@ -14,6 +14,10 @@
 #include "src/devices/bin/driver_runtime/driver_context.h"
 #include "src/devices/bin/driver_runtime/runtime_test_case.h"
 
+namespace driver_runtime {
+extern DispatcherCoordinator& GetDispatcherCoordinator();
+}
+
 class TokenTest : public RuntimeTestCase {
  public:
   void SetUp() override;
@@ -32,6 +36,10 @@ class TokenTest : public RuntimeTestCase {
 };
 
 void TokenTest::SetUp() {
+  // Make sure each test starts with exactly one thread.
+  driver_runtime::GetDispatcherCoordinator().Reset();
+  ASSERT_EQ(ZX_OK, driver_runtime::GetDispatcherCoordinator().Start());
+
   {
     driver_context::PushDriver(CreateFakeDriver());
     auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });

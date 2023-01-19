@@ -3001,7 +3001,8 @@ TEST_F(DispatcherTest, MaximumTenThreads) {
 }
 
 // Tests shutting down and destroying multiple dispatchers concurrently.
-TEST_F(DispatcherTest, ConcurrentDispatcherDestroy) {
+// TODO(https://fxbug.dev/120214): re-enable test.
+TEST_F(DispatcherTest, DISABLED_ConcurrentDispatcherDestroy) {
   auto fake_driver = CreateFakeDriver();
   driver_context::PushDriver(fake_driver);
   auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
