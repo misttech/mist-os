@@ -5,7 +5,16 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-test("name_provider_service_not_present_test") {
+name_provider_service_not_present_label = "name_provider_service_not_present"
+bsdsocket_label = "bsdsocket"
+dgramsocket_label = "dgramsocket"
+if_nameindex_label = "if_nameindex"
+streamsocket_label = "streamsocket"
+fuchsia_label = "fuchsia"
+packetsocket_label = "packetsocket"
+rawsocket_label = "rawsocket"
+
+test("netstack_${name_provider_service_not_present_label}_test") {
   sources = [ "name_provider_service_not_present_test.cc" ]
 
   deps = [
@@ -14,7 +23,7 @@ test("name_provider_service_not_present_test") {
   ]
 }
 
-test("netstack_bsdsocket_c_api_test") {
+test("netstack_${bsdsocket_label}_test") {
   sources = [
     "../os.h",
     "bsdsocket_test.cc",
@@ -37,7 +46,7 @@ test("netstack_bsdsocket_c_api_test") {
   }
 }
 
-test("netstack_dgramsocket_c_api_test") {
+test("netstack_${dgramsocket_label}_test") {
   sources = [
     "../os.h",
     "dgramsocket_test.cc",
@@ -61,7 +70,7 @@ test("netstack_dgramsocket_c_api_test") {
   }
 }
 
-test("netstack_if_nameindex_c_api_test") {
+test("netstack_${if_nameindex_label}_test") {
   sources = [ "if_nameindex_test.cc" ]
 
   deps = [
@@ -78,7 +87,7 @@ test("netstack_if_nameindex_c_api_test") {
   }
 }
 
-test("netstack_streamsocket_c_api_test") {
+test("netstack_${streamsocket_label}_test") {
   sources = [
     "../os.h",
     "streamsocket_test.cc",
@@ -100,7 +109,7 @@ test("netstack_streamsocket_c_api_test") {
   }
 }
 
-test("netstack_fuchsia_c_api_test") {
+test("netstack_${fuchsia_label}_test") {
   sources = [
     "../os.h",
     "fdio_test.cc",
@@ -118,7 +127,7 @@ test("netstack_fuchsia_c_api_test") {
   ]
 }
 
-test("netstack_packetsocket_c_api_test") {
+test("netstack_${packetsocket_label}_test") {
   sources = [ "packetsocket_test.cc" ]
 
   deps = [
@@ -128,7 +137,7 @@ test("netstack_packetsocket_c_api_test") {
   ]
 }
 
-test("netstack_rawsocket_c_api_test") {
+test("netstack_${rawsocket_label}_test") {
   sources = [
     "../os.h",
     "rawsocket_test.cc",
@@ -140,21 +149,25 @@ test("netstack_rawsocket_c_api_test") {
   ]
 }
 
-netstack_socket_tests_without_manifest = [
-  "netstack_dgramsocket_c_api_test",
-  "netstack_streamsocket_c_api_test",
-  "netstack_bsdsocket_c_api_test",
-  "netstack_if_nameindex_c_api_test",
+tests_without_manifest = [
+  dgramsocket_label,
+  streamsocket_label,
+  bsdsocket_label,
+  if_nameindex_label,
 ]
 
-foreach(test, netstack_socket_tests_without_manifest) {
-  fuchsia_unittest_component("${test}_component") {
-    component_name = test
+test_components_without_manifest = []
+
+foreach(test, tests_without_manifest) {
+  name = "netstack_${test}_test"
+  fuchsia_unittest_component("${name}_component") {
+    component_name = name
     deps = [
-      ":${test}",
+      ":${name}",
       ":socket_test_includes",
     ]
   }
+  test_components_without_manifest += [ name ]
 }
 
 expect_includes("socket_test_includes") {
@@ -166,8 +179,8 @@ expect_includes("socket_test_includes") {
   ]
 }
 
-name_provider_test_name = "name_provider_service_not_present_test"
-
+name_provider_test_name =
+    "netstack_${name_provider_service_not_present_label}_test"
 fuchsia_unittest_component("${name_provider_test_name}_component") {
   component_name = name_provider_test_name
   deps = [
@@ -183,61 +196,64 @@ expect_includes("name_provider_includes") {
   ]
 }
 
-netstack_tests_without_manifest =
-    netstack_socket_tests_without_manifest + [ name_provider_test_name ]
+test_components_without_manifest += [ name_provider_test_name ]
 
-netstack_tests_with_manifest = [
-  "netstack_packetsocket_c_api_test",
-  "netstack_fuchsia_c_api_test",
-  "netstack_rawsocket_c_api_test",
+tests_with_manifest = [
+  packetsocket_label,
+  fuchsia_label,
+  rawsocket_label,
 ]
 
-foreach(test, netstack_tests_with_manifest) {
-  fuchsia_unittest_component("${test}_component") {
-    component_name = test
-    deps = [ ":${test}" ]
-    manifest = "meta/${test}.cml"
+test_components_with_manifest = []
+
+foreach(test, tests_with_manifest) {
+  name = "netstack_${test}_test"
+  fuchsia_unittest_component("${name}_component") {
+    component_name = name
+    deps = [ ":${name}" ]
+    manifest = "meta/netstack2/${test}.cml"
   }
+  test_components_with_manifest += [ name ]
 }
 
 tests_with_fast_udp = [
-  "bsdsocket_c_api_test",
-  "dgramsocket_c_api_test",
-  "fuchsia_c_api_test",
-  "if_nameindex_c_api_test",
+  bsdsocket_label,
+  dgramsocket_label,
+  fuchsia_label,
+  if_nameindex_label,
 ]
 
-netstack_tests_with_fast_udp = []
+test_components_with_fast_udp = []
 
 foreach(test, tests_with_fast_udp) {
-  name = "netstack_with_fast_udp_${test}"
-  netstack_tests_with_fast_udp += [ name ]
+  name = "netstack_with_fast_udp_${test}_test"
   fuchsia_unittest_component("${name}_component") {
     component_name = name
-    deps = [ ":netstack_${test}" ]
-    manifest = "meta/${name}.cml"
+    deps = [ ":netstack_${test}_test" ]
+    manifest = "meta/netstack2/fastudp/${test}.cml"
   }
+  test_components_with_fast_udp += [ name ]
 }
 
-tests_with_netstack3 = [ "if_nameindex_c_api_test" ]
+tests_with_netstack3 = [ if_nameindex_label ]
 
-netstack3_tests = []
+test_components_with_netstack3 = []
 
 foreach(test, tests_with_netstack3) {
-  name = "netstack3_${test}"
-  netstack3_tests += [ name ]
+  name = "netstack3_${test}_test"
   fuchsia_unittest_component("${name}_component") {
     component_name = name
-    deps = [ ":netstack_${test}" ]
-    manifest = "meta/${name}.cml"
+    deps = [ ":netstack_${test}_test" ]
+    manifest = "meta/netstack3/${test}.cml"
   }
+  test_components_with_netstack3 += [ name ]
 }
 
 fuchsia_test_package("netstack-c-api-tests") {
   test_components = []
   foreach(test,
-          netstack_tests_without_manifest + netstack_tests_with_manifest +
-              netstack_tests_with_fast_udp + netstack3_tests) {
+          test_components_without_manifest + test_components_with_manifest +
+              test_components_with_fast_udp + test_components_with_netstack3) {
     test_components += [ ":${test}_component" ]
   }
 
@@ -250,7 +266,7 @@ fuchsia_test_package("netstack-c-api-tests") {
     "//src/connectivity/network/netstack:component-with-sync-udp-debug",
     "//src/connectivity/network/netstack3:component-debug",
 
-    # cat is used to test FD passing in :netstack_fuchsia_c_api_test.
+    # cat is used to test FD passing in :fuchsia_test.
     "//third_party/sbase:cat_bin",
   ]
 }
@@ -260,12 +276,12 @@ group("tests") {
   public_deps = [ ":netstack-c-api-tests" ]
   if (host_os == "linux") {
     public_deps += [
-      ":netstack_bsdsocket_c_api_test($host_toolchain)",
-      ":netstack_dgramsocket_c_api_test($host_toolchain)",
-      ":netstack_if_nameindex_c_api_test($host_toolchain)",
-      ":netstack_packetsocket_c_api_test($host_toolchain)",
-      ":netstack_rawsocket_c_api_test($host_toolchain)",
-      ":netstack_streamsocket_c_api_test($host_toolchain)",
+      ":netstack_${bsdsocket_label}_test($host_toolchain)",
+      ":netstack_${dgramsocket_label}_test($host_toolchain)",
+      ":netstack_${if_nameindex_label}_test($host_toolchain)",
+      ":netstack_${packetsocket_label}_test($host_toolchain)",
+      ":netstack_${rawsocket_label}_test($host_toolchain)",
+      ":netstack_${streamsocket_label}_test($host_toolchain)",
     ]
   }
 }

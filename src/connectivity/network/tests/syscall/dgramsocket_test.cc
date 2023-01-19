@@ -1694,7 +1694,6 @@ TEST_P(IOSendingMethodTest, ReadWithRxZirconSocketRemainder) {
   if (!std::getenv(kFastUdpEnvVar)) {
     GTEST_SKIP() << "Zircon sockets are only used in Fast UDP";
   }
-
   // Fast datagram sockets on Fuchsia use multiple buffers to store inbound payloads,
   // some of which are in Netstack memory and some of which are in kernel memory.
   // Bytes are shuttled between these buffers using goroutines.
