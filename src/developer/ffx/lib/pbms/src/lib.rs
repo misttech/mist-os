@@ -276,12 +276,11 @@ where
     } else {
         String::new()
     };
-    let formatted =
-        urls.clone().map(|url| format!("`{}`", url)).collect::<Vec<String>>().join("\n");
+    let formatted = urls.clone().map(|url| format!("{}", url)).collect::<Vec<String>>().join("\n");
     if should_print {
         println!(
             "Multiple product bundles found{extra_message}. To choose a specific product, pass \
-            in a full URL from the following:\n{formatted}",
+            in a full URL from the following:\n\n{formatted}",
             extra_message = extra_message,
             formatted = formatted
         );
@@ -327,7 +326,7 @@ where
     // If we get here, selected is Some(_,_); if we didn't match, we threw an error.
     let (url, description) = selected.unwrap();
     if should_print {
-        println!("Defaulting to {}: `{}`", description, url);
+        println!("\nDefaulting to {}: `{}`", description, url);
     }
     Ok(url)
 }
