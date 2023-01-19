@@ -38,8 +38,8 @@ class UpSwipeGestureRecognizer : public SwipeRecognizerBase {
 
  protected:
   // Verifies that the absolute value of the slope of the line containing the gesture start point
-  // and the location of the pointer event in question is sufficiently large (i.e. the swipe is
-  // "vertical"), and that y_displacement is positive (i.e. the swipe is "up").
+  // and the location of the touch event in question is sufficiently large (i.e. the swipe is
+  // "vertical"), and that y_displacement is negative (i.e. the swipe is "up").
   bool SwipeHasValidSlopeAndDirection(float x_displacement, float y_displacement) const override;
 
  private:
@@ -71,8 +71,8 @@ class DownSwipeGestureRecognizer : public SwipeRecognizerBase {
 
  protected:
   // Verifies that the absolute value of the slope of the line containing the gesture start point
-  // and the location of the pointer event in question is sufficiently large (i.e. the swipe is
-  // "vertical"), and that y_displacement is negative (i.e. the swipe is "down").
+  // and the location of the touch event in question is sufficiently large (i.e. the swipe is
+  // "vertical"), and that y_displacement is positive (i.e. the swipe is "down").
   bool SwipeHasValidSlopeAndDirection(float x_displacement, float y_displacement) const override;
 
  private:
@@ -105,7 +105,7 @@ class RightSwipeGestureRecognizer : public SwipeRecognizerBase {
 
  protected:
   // Verifies that the absolute value of the slope of the line containing the gesture start point
-  // and the location of the pointer event in question is sufficiently small (i.e. the swipe is
+  // and the location of the touch event in question is sufficiently small (i.e. the swipe is
   // "horizontal"), and that x_displacement is positive (i.e. the swipe is "right").
   bool SwipeHasValidSlopeAndDirection(float x_displacement, float y_displacement) const override;
 
@@ -139,7 +139,7 @@ class LeftSwipeGestureRecognizer : public SwipeRecognizerBase {
 
  protected:
   // Verifies that the absolute value of the slope of the line containing the gesture start point
-  // and the location of the pointer event in question is sufficiently small (i.e. the swipe is
+  // and the location of the touch event in question is sufficiently small (i.e. the swipe is
   // "horizontal"), and that x_displacement is left (i.e. the swipe is "left").
   bool SwipeHasValidSlopeAndDirection(float x_displacement, float y_displacement) const override;
 

@@ -5,13 +5,14 @@
 #ifndef SRC_UI_A11Y_LIB_GESTURE_MANAGER_RECOGNIZERS_V2_SWIPE_RECOGNIZER_BASE_H_
 #define SRC_UI_A11Y_LIB_GESTURE_MANAGER_RECOGNIZERS_V2_SWIPE_RECOGNIZER_BASE_H_
 
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <lib/zx/time.h>
 
 #include <unordered_map>
 
-#include "src/ui/a11y/lib/gesture_manager/arena/contest_member.h"
-#include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
-#include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/participation_token_interface.h"
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/recognizer_v2.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_util_v2/util.h"
 
 namespace a11y::recognizers_v2 {
 
@@ -21,7 +22,7 @@ namespace a11y::recognizers_v2 {
 // Swipe gestures are directional (up, down, right, or left), so directional recognizers
 // will inherit from this base class and override the ValidateSwipeSlopeAndDirection()
 // method, in which the directional differentiation logic is encapsulated.
-class SwipeRecognizerBase : public GestureRecognizer {
+class SwipeRecognizerBase : public GestureRecognizerV2 {
  public:
   // Minimum distance (in NDC) between finger down and finger up events for gesture to be
   // considered a swipe.
@@ -30,7 +31,7 @@ class SwipeRecognizerBase : public GestureRecognizer {
   static constexpr uint32_t kDefaultNumberOfFingers = 1;
 
   // Callback which will be invoked when the swipe gesture has been recognized.
-  using SwipeGestureCallback = fit::function<void(GestureContext)>;
+  using SwipeGestureCallback = fit::function<void(gesture_util_v2::GestureContext)>;
 
   // Timeout is the maximum time a finger can be in contact with the screen to be considered a
   // swipe. Callback is invoked when swipe gesture is detected and the recognizer is the winner in
@@ -40,25 +41,25 @@ class SwipeRecognizerBase : public GestureRecognizer {
                       zx::duration swipe_gesture_timeout, std::string debug_name);
   ~SwipeRecognizerBase() override;
 
-  void HandleEvent(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) override;
+  void HandleEvent(const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) override;
   void OnWin() override;
   void OnDefeat() override;
-  void OnContestStarted(std::unique_ptr<ContestMember> contest_member) override;
+  void OnContestStarted(std::unique_ptr<ParticipationTokenInterface> token) override;
   std::string DebugName() const override = 0;
 
  protected:
   // Swipe gestures are directional (up, down, right, or left). In order to be recognized as a
   // swipe, the slope of the line containing the gesture start and end points must fall within a
   // specified range, which varies based on the direction of the swipe. Furthermore, the slopes of
-  // the lines containing each pointer event location and the gesture start point must also fall
-  // within this range. If a swipe recognizer receives a pointer event for which this slope property
+  // the lines containing each touch event location and the gesture start point must also fall
+  // within this range. If a swipe recognizer receives a touch event for which this slope property
   // does NOT hold, the recognizer will abandon the gesture. Each directional recognizer must
   // specify the range of acceptable slopes by implementing the method below, which verifies that a
   // given slope value falls within that range.
   virtual bool SwipeHasValidSlopeAndDirection(float x_displacement, float y_displacement) const = 0;
 
  private:
-  // Represents state internal to a contest, i.e. contest member, hold timeout, and tap state.
+  // Represents state internal to a contest, i.e. participation token, hold timeout, and tap state.
   struct Contest;
 
   // Resets contest_ and gesture_context_.
@@ -66,19 +67,18 @@ class SwipeRecognizerBase : public GestureRecognizer {
 
   // Determines whether a gesture's is close enough to up, down, left, or right to be
   // remain in consideration as a swipe. Returns true if so, false otherwise.
-  bool ValidateSwipePath(
-      uint32_t pointer_id,
-      const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) const;
+  bool ValidateSwipePath(uint32_t pointer_id,
+                         const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) const;
 
   // Checks if the distance between the start and end points of a swipe is more than
   // kMinSwipeDistance.
   bool MinSwipeLengthAchieved(
       uint32_t pointer_id,
-      const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) const;
+      const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) const;
 
   // Helper function to save GestureInfo for last pointer position.
   void UpdateLastPointerPosition(
-      uint32_t pointer_id, const fuchsia::ui::input::accessibility::PointerEvent& pointer_event);
+      uint32_t pointer_id, const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
 
   // Callback which will be executed when the gesture is performed.
   SwipeGestureCallback swipe_gesture_callback_;
@@ -87,7 +87,7 @@ class SwipeRecognizerBase : public GestureRecognizer {
   // period, then it won't be recognized.
   const zx::duration swipe_gesture_timeout_;
 
-  GestureContext gesture_context_;
+  gesture_util_v2::GestureContext gesture_context_;
 
   // Number of fingers that will be used to perform the swipe gesture.
   uint32_t number_of_fingers_ = kDefaultNumberOfFingers;
