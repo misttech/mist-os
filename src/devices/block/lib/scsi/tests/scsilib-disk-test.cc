@@ -261,8 +261,7 @@ TEST_F(ScsilibDiskTest, TestCreateDestroy) {
       /*times=*/3);
 
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  EXPECT_EQ(scsi::Disk::Create(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize),
-            ZX_OK);
+  ASSERT_OK(scsi::Disk::Create(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
@@ -275,9 +274,12 @@ TEST_F(ScsilibDiskTest, TestCreateReadDestroy) {
   SetupDefaultCreateExpectations();
 
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  EXPECT_EQ(scsi::Disk::Create(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize),
-            ZX_OK);
+  ASSERT_OK(scsi::Disk::Create(&controller_, fake_parent.get(), kTarget, kLun, kTransferSize));
   ASSERT_EQ(1, fake_parent->child_count());
+  auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<scsi::Disk>();
+  block_info_t info;
+  size_t op_size;
+  dev->BlockImplQuery(&info, &op_size);
 
   // To test SCSI Read functionality, create a fake "disk" backing store in memory and service
   // reads from it. Fill block 1 with a test pattern of 0x01.
@@ -309,7 +311,8 @@ TEST_F(ScsilibDiskTest, TestCreateReadDestroy) {
     fbl::ConditionVariable cv_;
   };
   IoWait iowait_;
-  block_op_t read = {};
+  auto block_op = std::make_unique<uint8_t[]>(op_size);
+  block_op_t& read = *reinterpret_cast<block_op_t*>(block_op.get());
   block_impl_queue_callback done = [](void* ctx, zx_status_t status, block_op_t* op) {
     IoWait* iowait_ = reinterpret_cast<struct IoWait*>(ctx);
 

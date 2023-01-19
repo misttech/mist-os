@@ -123,63 +123,67 @@ zx_status_t Disk::Bind() {
   return DdkAdd(tag_);
 }
 
-struct scsilib_cb {
-  void* ScsiDisk;
-  void* blk_cookie;
+struct ScsiLibOp {
+  block_op_t op;
   block_impl_queue_callback completion_cb;
-  block_op_t* op;
+  void* cookie;
+  uint32_t block_size;
   zx_vaddr_t mapped_addr;
   void* data;
 };
 
 static void ScsiLibCompletionCb(void* c, zx_status_t status) {
-  auto cookie = reinterpret_cast<struct scsilib_cb*>(c);
-  auto disk = reinterpret_cast<class Disk*>(cookie->ScsiDisk);
-  uint64_t length = cookie->op->rw.length * disk->BlockSize();
-  uint64_t vmo_offset = cookie->op->rw.offset_vmo * disk->BlockSize();
+  auto scsilib_op = reinterpret_cast<ScsiLibOp*>(c);
+  uint64_t length = scsilib_op->op.rw.length * scsilib_op->block_size;
+  uint64_t vmo_offset = scsilib_op->op.rw.offset_vmo * scsilib_op->block_size;
 
-  if (cookie->mapped_addr != reinterpret_cast<zx_vaddr_t>(nullptr)) {
-    status = zx_vmar_unmap(zx_vmar_root_self(), cookie->mapped_addr, length);
+  if (scsilib_op->mapped_addr != reinterpret_cast<zx_vaddr_t>(nullptr)) {
+    status = zx_vmar_unmap(zx_vmar_root_self(), scsilib_op->mapped_addr, length);
   } else {
-    auto op_type = cookie->op->command & BLOCK_OP_MASK;
+    auto op_type = scsilib_op->op.command & BLOCK_OP_MASK;
 
     if (op_type == BLOCK_OP_READ) {
       if (status == ZX_OK) {
-        status = zx_vmo_write(cookie->op->rw.vmo, cookie->data, vmo_offset, length);
+        status = zx_vmo_write(scsilib_op->op.rw.vmo, scsilib_op->data, vmo_offset, length);
       }
     }
-    free(cookie->data);
+    free(scsilib_op->data);
   }
-  cookie->completion_cb(cookie->blk_cookie, status, cookie->op);
-  delete cookie;
+  scsilib_op->completion_cb(scsilib_op->cookie, status, &scsilib_op->op);
+}
+
+void Disk::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
+  info_out->block_size = block_size_;
+  info_out->block_count = blocks_;
+  info_out->max_transfer_size = block_size_ * max_xfer_size_;
+  info_out->flags = (removable_) ? BLOCK_FLAG_REMOVABLE : 0;
+  *block_op_size_out = sizeof(ScsiLibOp);
 }
 
 void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_cb, void* cookie) {
-  auto op_type = op->command & BLOCK_OP_MASK;
-  if (!(op_type == BLOCK_OP_READ || op_type == BLOCK_OP_WRITE || op_type == BLOCK_OP_FLUSH)) {
-    completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, op);
-    return;
-  }
+  ScsiLibOp* scsilib_op = containerof(op, ScsiLibOp, op);
+  auto op_type = scsilib_op->op.command & BLOCK_OP_MASK;
+
   // To use zx_vmar_map, offset, length must be page aligned. If it isn't (uncommon),
   // allocate a temp buffer and do a copy.
-  uint64_t length = op->rw.length * block_size_;
-  uint64_t vmo_offset = op->rw.offset_vmo * block_size_;
+  uint64_t length = scsilib_op->op.rw.length * block_size_;
+  uint64_t vmo_offset = scsilib_op->op.rw.offset_vmo * block_size_;
   zx_vaddr_t mapped_addr = reinterpret_cast<zx_vaddr_t>(nullptr);
   void* data = nullptr;  // Quiet compiler.
   zx_status_t status;
   if ((length > 0) && ((length % zx_system_get_page_size()) == 0) &&
       ((vmo_offset % zx_system_get_page_size()) == 0)) {
-    status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, op->rw.vmo,
-                         vmo_offset, length, &mapped_addr);
+    status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0,
+                         scsilib_op->op.rw.vmo, vmo_offset, length, &mapped_addr);
     if (status != ZX_OK) {
       completion_cb(cookie, status, op);
       return;
     }
     data = reinterpret_cast<void*>(mapped_addr);
   } else {
-    data = calloc(op->rw.length, block_size_);
+    data = calloc(scsilib_op->op.rw.length, block_size_);
     if (op_type == BLOCK_OP_WRITE) {
-      status = zx_vmo_read(op->rw.vmo, data, vmo_offset, length);
+      status = zx_vmo_read(scsilib_op->op.rw.vmo, data, vmo_offset, length);
       if (status != ZX_OK) {
         free(data);
         completion_cb(cookie, status, op);
@@ -187,55 +191,65 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       }
     }
   }
-  auto scsilib_cookie = reinterpret_cast<struct scsilib_cb*>(new scsilib_cb);
-  scsilib_cookie->ScsiDisk = this;
-  scsilib_cookie->blk_cookie = cookie;
-  scsilib_cookie->completion_cb = completion_cb;
-  scsilib_cookie->op = op;
-  scsilib_cookie->mapped_addr = mapped_addr;
-  scsilib_cookie->data = data;
-  if (op_type == BLOCK_OP_READ) {
-    Read16CDB cdb = {};
-    cdb.opcode = Opcode::READ_16;
-    cdb.logical_block_address = htobe64(op->rw.offset_dev);
-    cdb.transfer_length = htonl(op->rw.length);
-    status = controller_->ExecuteCommandAsync(/*target=*/target_, /*lun=*/lun_,
-                                              /*cdb=*/{&cdb, sizeof(cdb)},
-                                              /*data_out=*/{nullptr, 0},
-                                              /*data_in=*/{data, length}, ScsiLibCompletionCb,
-                                              scsilib_cookie);
-  } else if (op_type == BLOCK_OP_WRITE) {
-    Write16CDB cdb = {};
-    cdb.opcode = Opcode::WRITE_16;
-    if (op->command & BLOCK_FL_FORCE_ACCESS) {
-      cdb.set_force_unit_access(true);
+
+  scsilib_op->completion_cb = completion_cb;
+  scsilib_op->cookie = cookie;
+  scsilib_op->block_size = block_size_;
+  scsilib_op->mapped_addr = mapped_addr;
+  scsilib_op->data = data;
+
+  switch (op_type) {
+    case BLOCK_OP_READ: {
+      Read16CDB cdb = {};
+      cdb.opcode = Opcode::READ_16;
+      cdb.logical_block_address = htobe64(scsilib_op->op.rw.offset_dev);
+      cdb.transfer_length = htonl(scsilib_op->op.rw.length);
+      status = controller_->ExecuteCommandAsync(/*target=*/target_, /*lun=*/lun_,
+                                                /*cdb=*/{&cdb, sizeof(cdb)},
+                                                /*data_out=*/{nullptr, 0},
+                                                /*data_in=*/{data, length}, ScsiLibCompletionCb,
+                                                scsilib_op);
+      break;
     }
-    cdb.logical_block_address = htobe64(op->rw.offset_dev);
-    cdb.transfer_length = htonl(op->rw.length);
-    status = controller_->ExecuteCommandAsync(/*target=*/target_, /*lun=*/lun_,
-                                              /*cdb=*/{&cdb, sizeof(cdb)},
-                                              /*data_out=*/{data, length},
-                                              /*data_in=*/{nullptr, 0}, ScsiLibCompletionCb,
-                                              scsilib_cookie);
-  } else if (op_type == BLOCK_OP_FLUSH) {
-    if (!write_cache_enabled_) {
-      completion_cb(cookie, ZX_OK, op);
+    case BLOCK_OP_WRITE: {
+      Write16CDB cdb = {};
+      cdb.opcode = Opcode::WRITE_16;
+      if (scsilib_op->op.command & BLOCK_FL_FORCE_ACCESS) {
+        cdb.set_force_unit_access(true);
+      }
+      cdb.logical_block_address = htobe64(scsilib_op->op.rw.offset_dev);
+      cdb.transfer_length = htonl(scsilib_op->op.rw.length);
+      status = controller_->ExecuteCommandAsync(/*target=*/target_, /*lun=*/lun_,
+                                                /*cdb=*/{&cdb, sizeof(cdb)},
+                                                /*data_out=*/{data, length},
+                                                /*data_in=*/{nullptr, 0}, ScsiLibCompletionCb,
+                                                scsilib_op);
+      break;
+    }
+    case BLOCK_OP_FLUSH: {
+      if (!write_cache_enabled_) {
+        completion_cb(cookie, ZX_OK, op);
+        return;
+      }
+      SynchronizeCache10CDB cdb = {};
+      cdb.opcode = Opcode::SYNCHRONIZE_CACHE_10;
+      // Prefer writing to storage medium (instead of nv cache) and return only
+      // after completion of operation.
+      cdb.syncnv_immed = 0;
+      // Ideally this would flush specific blocks, but several platforms don't
+      // support this functionality, so just synchronize the whole disk.
+      cdb.logical_block_address = 0;
+      cdb.num_blocks = 0;
+      status = controller_->ExecuteCommandAsync(/*target=*/target_, /*lun=*/lun_,
+                                                /*cdb=*/{&cdb, sizeof(cdb)},
+                                                /*data_out=*/{nullptr, 0},
+                                                /*data_in=*/{nullptr, 0}, ScsiLibCompletionCb,
+                                                scsilib_op);
+      break;
+    }
+    default:
+      completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, op);
       return;
-    }
-    SynchronizeCache10CDB cdb = {};
-    cdb.opcode = Opcode::SYNCHRONIZE_CACHE_10;
-    // Prefer writing to storage medium (instead of nv cache) and return only
-    // after completion of operation.
-    cdb.syncnv_immed = 0;
-    // Ideally this would flush specific blocks, but several platforms don't
-    // support this functionality, so just synchronize the whole disk.
-    cdb.logical_block_address = 0;
-    cdb.num_blocks = 0;
-    status = controller_->ExecuteCommandAsync(/*target=*/target_, /*lun=*/lun_,
-                                              /*cdb=*/{&cdb, sizeof(cdb)},
-                                              /*data_out=*/{nullptr, 0},
-                                              /*data_in=*/{nullptr, 0}, ScsiLibCompletionCb,
-                                              scsilib_cookie);
   }
 }
 

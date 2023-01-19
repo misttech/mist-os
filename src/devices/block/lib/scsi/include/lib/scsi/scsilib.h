@@ -374,15 +374,8 @@ class Disk : public DeviceType, public ddk::BlockImplProtocol<Disk, ddk::base_pr
   void DdkRelease() { delete this; }
 
   // ddk::BlockImplProtocol functions.
-  void BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
-    info_out->block_size = block_size_;
-    info_out->block_count = blocks_;
-    info_out->max_transfer_size = block_size_ * max_xfer_size_;
-    info_out->flags = (removable_) ? BLOCK_FLAG_REMOVABLE : 0;
-    *block_op_size_out = sizeof(block_op_t);
-  }
+  void BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out);
   void BlockImplQueue(block_op_t* operation, block_impl_queue_callback completion_cb, void* cookie);
-  uint32_t BlockSize() { return block_size_; }
 
   Disk(const Disk&) = delete;
   Disk& operator=(const Disk&) = delete;

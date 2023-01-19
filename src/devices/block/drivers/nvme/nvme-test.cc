@@ -171,7 +171,7 @@ TEST_F(NvmeTest, NamespaceReadTest) {
 
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &vmo));
-  auto block_op = std::make_unique<uint8_t[]>(sizeof(block_op_t) + op_size);
+  auto block_op = std::make_unique<uint8_t[]>(op_size);
   auto op = reinterpret_cast<block_op_t*>(block_op.get());
   *op = {.rw = {
              .command = BLOCK_OP_READ,
