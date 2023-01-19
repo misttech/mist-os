@@ -31,22 +31,6 @@ class Devnode {
   struct NoRemote {
     mutable ExportOptions export_options;
   };
-  struct Service {
-    zx::result<Service> Clone() {
-      zx::result result = component::Clone(remote);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-      return zx::ok(Service{
-          .remote = std::move(result.value()),
-          .path = path,
-          .export_options = export_options,
-      });
-    }
-    fidl::ClientEnd<fuchsia_io::Directory> remote;
-    std::string path;
-    mutable ExportOptions export_options;
-  };
   struct Connector {
     fidl::WireSharedClient<fuchsia_device_fs::Connector> connector;
     mutable ExportOptions export_options;
@@ -67,7 +51,7 @@ class Devnode {
     }
   };
 
-  using Target = std::variant<NoRemote, Service, Remote, Connector>;
+  using Target = std::variant<NoRemote, Remote, Connector>;
 
   // Constructs a root node.
   explicit Devnode(Devfs& devfs);

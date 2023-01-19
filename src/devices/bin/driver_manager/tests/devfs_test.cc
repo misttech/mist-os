@@ -19,6 +19,17 @@ namespace {
 
 namespace fio = fuchsia_io;
 
+class Connecter : public fidl::WireServer<fuchsia_device_fs::Connector> {
+ public:
+ private:
+  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
+    ASSERT_EQ(channel_.get(), ZX_HANDLE_INVALID);
+    channel_ = std::move(request->server);
+  }
+
+  zx::channel channel_;
+};
+
 std::optional<std::reference_wrapper<const Devnode>> lookup(const Devnode& parent,
                                                             std::string_view name) {
   {
@@ -40,26 +51,6 @@ std::optional<std::reference_wrapper<const Devnode>> lookup(const Devnode& paren
   return {};
 }
 
-zx::result<fidl::ServerEnd<fuchsia_io::Directory>> ExportServiceDir(
-    Devnode& dn, std::string_view path, fuchsia_device_fs::wire::ExportOptions export_options,
-    std::optional<std::string_view> topological_path, std::optional<std::string_view> class_path,
-    std::vector<std::unique_ptr<Devnode>>& out) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.take_error();
-  }
-  if (zx_status_t status = dn.export_dir(Devnode::Target(Devnode::Service{
-                                             .remote = std::move(endpoints->client),
-                                             .path = std::string(path),
-                                             .export_options = export_options,
-                                         }),
-                                         topological_path, class_path, out);
-      status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok(std::move(endpoints->server));
-}
-
 TEST(Devfs, Export) {
   std::optional<Devnode> root_slot;
   const Devfs devfs(root_slot);
@@ -67,7 +58,7 @@ TEST(Devfs, Export) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", {}, out));
+  ASSERT_OK(root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one/two", {}, out));
 
   std::optional node_one = lookup(root_node, "one");
   ASSERT_TRUE(node_one.has_value());
@@ -84,7 +75,7 @@ TEST(Devfs, Export_ExcessSeparators) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_STATUS(ExportServiceDir(root_node, "svc", {}, "one///two", {}, out).status_value(),
+  ASSERT_STATUS(root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one//two", {}, out),
                 ZX_ERR_INVALID_ARGS);
 
   ASSERT_FALSE(lookup(root_node, "one").has_value());
@@ -98,12 +89,12 @@ TEST(Devfs, Export_OneByOne) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one", {}, out));
+  ASSERT_OK(root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one", {}, out));
   std::optional node_one = lookup(root_node, "one");
   ASSERT_TRUE(node_one.has_value());
   EXPECT_EQ("one", node_one->get().name());
 
-  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", {}, out));
+  ASSERT_OK(root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one/two", {}, out));
   std::optional node_two = lookup(node_one->get(), "two");
   ASSERT_TRUE(node_two.has_value());
   EXPECT_EQ("two", node_two->get().name());
@@ -117,13 +108,13 @@ TEST(Devfs, Export_InvalidPath) {
   std::vector<std::unique_ptr<Devnode>> out;
 
   ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                ExportServiceDir(root_node, "svc", {}, "", {}, out).status_value());
+                root_node.export_dir(Devnode::Target(Devnode::Connector{}), "", {}, out));
   ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                ExportServiceDir(root_node, "svc", {}, "/one/two", {}, out).status_value());
+                root_node.export_dir(Devnode::Target(Devnode::Connector{}), "/one/two", {}, out));
   ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                ExportServiceDir(root_node, "svc", {}, "one/two/", {}, out).status_value());
+                root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one/two/", {}, out));
   ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                ExportServiceDir(root_node, "svc", {}, "/one/two/", {}, out).status_value());
+                root_node.export_dir(Devnode::Target(Devnode::Connector{}), "/one/two/", {}, out));
 }
 
 TEST(Devfs, Export_WithProtocol) {
@@ -142,7 +133,7 @@ TEST(Devfs, Export_WithProtocol) {
   }
 
   std::vector<std::unique_ptr<Devnode>> out;
-  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", "block", out));
+  ASSERT_OK(root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one/two", "block", out));
 
   std::optional node_one = lookup(root_node, "one");
   ASSERT_TRUE(node_one.has_value());
@@ -164,25 +155,9 @@ TEST(Devfs, Export_AlreadyExists) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", {}, out));
-
+  ASSERT_OK(root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one/two", {}, out));
   ASSERT_STATUS(ZX_ERR_ALREADY_EXISTS,
-                ExportServiceDir(root_node, "svc", {}, "one/two", {}, out).status_value());
-}
-
-TEST(Devfs, Export_FailedToClone) {
-  std::optional<Devnode> root_slot;
-  const Devfs devfs(root_slot);
-  ASSERT_TRUE(root_slot.has_value());
-  Devnode& root_node = root_slot.value();
-  std::vector<std::unique_ptr<Devnode>> out;
-
-  ASSERT_STATUS(ZX_ERR_BAD_HANDLE, root_node.export_dir(Devnode::Target(Devnode::Service{
-                                                            .remote = {},
-                                                            .path = "svc",
-                                                            .export_options = {},
-                                                        }),
-                                                        "one/two", "block", out));
+                root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one/two", {}, out));
 }
 
 TEST(Devfs, Export_DropDevfs) {
@@ -192,7 +167,7 @@ TEST(Devfs, Export_DropDevfs) {
   Devnode& root_node = root_slot.value();
   std::vector<std::unique_ptr<Devnode>> out;
 
-  ASSERT_OK(ExportServiceDir(root_node, "svc", {}, "one/two", {}, out));
+  ASSERT_OK(root_node.export_dir(Devnode::Target(Devnode::Connector{}), "one/two", {}, out));
 
   {
     std::optional node_one = lookup(root_node, "one");
@@ -209,240 +184,6 @@ TEST(Devfs, Export_DropDevfs) {
   ASSERT_FALSE(lookup(root_node, "one").has_value());
 }
 
-TEST(Devfs, ExportWatcher_Export) {
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-
-  std::optional<Devnode> root_slot;
-  Devfs devfs(root_slot);
-  ASSERT_TRUE(root_slot.has_value());
-  Devnode& root_node = root_slot.value();
-
-  // Create a fake service at svc/test.
-  auto outgoing = component::OutgoingDirectory(loop.dispatcher());
-  zx::channel service_channel;
-  auto handler = [&service_channel](zx::channel server) { service_channel = std::move(server); };
-  ASSERT_EQ(outgoing.AddUnmanagedProtocol(std::move(handler), "test").status_value(), ZX_OK);
-
-  // Export the svc/test.
-  auto endpoints = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(outgoing.Serve(std::move(endpoints->server)).status_value());
-
-  auto result = driver_manager::ExportWatcher::Create(
-      loop.dispatcher(), devfs, &root_node, std::move(endpoints->client), "svc/test", "one/two",
-      ZX_PROTOCOL_BLOCK, fuchsia_device_fs::wire::ExportOptions());
-  ASSERT_EQ(ZX_OK, result.status_value());
-
-  // Set our ExportWatcher to let us know if the service was closed.
-  bool did_close = false;
-  result.value()->set_on_close_callback(
-      [&did_close](driver_manager::ExportWatcher*) { did_close = true; });
-
-  // Make sure the directories were set up correctly.
-  {
-    std::optional node_one = lookup(root_node, "one");
-    ASSERT_TRUE(node_one.has_value());
-    EXPECT_EQ("one", node_one->get().name());
-
-    std::optional node_two = lookup(node_one->get(), "two");
-    ASSERT_TRUE(node_two.has_value());
-    EXPECT_EQ("two", node_two->get().name());
-  }
-
-  // Run the loop and make sure ExportWatcher connected to our service.
-  loop.RunUntilIdle();
-  ASSERT_NE(service_channel.get(), ZX_HANDLE_INVALID);
-  ASSERT_FALSE(did_close);
-  ASSERT_TRUE(lookup(root_node, "one").has_value());
-
-  // Close the server end and check that ExportWatcher noticed.
-  service_channel.reset();
-  loop.RunUntilIdle();
-  ASSERT_TRUE(did_close);
-  ASSERT_TRUE(lookup(root_node, "one").has_value());
-
-  // Drop ExportWatcher and make sure the devfs nodes disappeared.
-  result.value().reset();
-  ASSERT_FALSE(lookup(root_node, "one").has_value());
-}
-
-TEST(Devfs, ExportWatcher_Export_Invisible) {
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-
-  std::optional<Devnode> root_slot;
-  Devfs devfs(root_slot);
-  ASSERT_TRUE(root_slot.has_value());
-  Devnode& root_node = root_slot.value();
-
-  // Create the export server and client.
-  auto exporter = driver_manager::DevfsExporter(devfs, &root_node, loop.dispatcher());
-  fidl::WireClient<fuchsia_device_fs::Exporter> exporter_client;
-  {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_device_fs::Exporter>();
-    ASSERT_OK(endpoints.status_value());
-    fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &exporter);
-    exporter_client.Bind(std::move(endpoints->client), loop.dispatcher());
-  }
-
-  // Create a fake service at svc/test.
-  auto outgoing = component::OutgoingDirectory(loop.dispatcher());
-  zx::channel service_channel;
-  auto handler = [&service_channel](zx::channel server) { service_channel = std::move(server); };
-  ASSERT_EQ(outgoing.AddUnmanagedProtocol(std::move(handler), "test").status_value(), ZX_OK);
-
-  // Export the svc/test.
-  auto endpoints = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(endpoints.status_value());
-  ASSERT_OK(outgoing.Serve(std::move(endpoints->server)).status_value());
-
-  exporter_client
-      ->ExportOptions(std::move(endpoints->client), "svc/test", "one/two", ZX_PROTOCOL_BLOCK,
-                      fuchsia_device_fs::wire::ExportOptions::kInvisible)
-      .Then([](auto& result) { ASSERT_EQ(ZX_OK, result.status()); });
-  ASSERT_EQ(ZX_OK, loop.RunUntilIdle());
-
-  // Make sure the directories were set up correctly.
-  {
-    std::optional node_one = lookup(root_node, "one");
-    ASSERT_TRUE(node_one.has_value());
-    EXPECT_EQ("one", node_one->get().name());
-    EXPECT_EQ(fuchsia_device_fs::wire::ExportOptions::kInvisible, node_one->get().export_options());
-
-    std::optional node_two = lookup(node_one.value(), "two");
-    ASSERT_TRUE(node_two.has_value());
-    EXPECT_EQ("two", node_two->get().name());
-    EXPECT_EQ(fuchsia_device_fs::wire::ExportOptions::kInvisible, node_two->get().export_options());
-  }
-
-  // Try and make a subdir visible, this will fail because the devfs path has to match exactly with
-  // Export.
-  exporter_client->MakeVisible("one").Then(
-      [](fidl::WireUnownedResult<fuchsia_device_fs::Exporter::MakeVisible>& result) {
-        ASSERT_EQ(ZX_OK, result.status());
-        ASSERT_TRUE(!result->is_ok());
-        ASSERT_EQ(ZX_ERR_NOT_FOUND, result->error_value());
-      });
-
-  // Make the directories visible.
-  exporter_client->MakeVisible("one/two").Then([](auto& result) {
-    ASSERT_EQ(ZX_OK, result.status());
-    ASSERT_TRUE(result->is_ok());
-  });
-  ASSERT_EQ(ZX_OK, loop.RunUntilIdle());
-
-  // Make sure the directories were set up correctly.
-  {
-    std::optional node_one = lookup(root_node, "one");
-    ASSERT_TRUE(node_one.has_value());
-    EXPECT_EQ("one", node_one->get().name());
-    EXPECT_EQ(fuchsia_device_fs::wire::ExportOptions(), node_one->get().export_options());
-
-    std::optional node_two = lookup(node_one->get(), "two");
-    ASSERT_TRUE(node_two.has_value());
-    EXPECT_EQ("two", node_two->get().name());
-    EXPECT_EQ(fuchsia_device_fs::wire::ExportOptions(), node_two->get().export_options());
-  }
-
-  // Try and make visible again, this will cause an error.
-  exporter_client->MakeVisible("one/two").Then([](auto& result) {
-    ASSERT_EQ(ZX_OK, result.status());
-    ASSERT_TRUE(!result->is_ok());
-    ASSERT_EQ(ZX_ERR_BAD_STATE, result->error_value());
-  });
-
-  ASSERT_EQ(ZX_OK, loop.RunUntilIdle());
-}
-
-TEST(Devfs, ExportWatcherCreateFails) {
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-
-  std::optional<Devnode> root_slot;
-  Devfs devfs(root_slot);
-  ASSERT_TRUE(root_slot.has_value());
-  Devnode& root_node = root_slot.value();
-
-  // Create a fake service at svc/test.
-  // Export the svc/test.
-  auto endpoints = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(endpoints.status_value());
-
-  driver_manager::DevfsExporter exporter(devfs, &root_node, loop.dispatcher());
-  auto exporter_endpoints = fidl::CreateEndpoints<fuchsia_device_fs::Exporter>();
-  ASSERT_OK(exporter_endpoints.status_value());
-
-  fidl::BindServer(loop.dispatcher(), std::move(exporter_endpoints->server), &exporter);
-
-  ASSERT_OK(loop.StartThread("export-watcher-test-thread"));
-
-  const fidl::WireSyncClient<fuchsia_device_fs::Exporter> client(
-      std::move(exporter_endpoints->client));
-
-  std::vector<std::unique_ptr<Devnode>> out;
-  ASSERT_OK(ExportServiceDir(root_node, "svc/test", {}, "one/two", {}, out));
-  // ExportWatcher::Create will fail because the node exists.
-  auto result =
-      client->Export(std::move(endpoints->client), "svc/test", "one/two", ZX_PROTOCOL_BLOCK);
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_error());
-  ASSERT_STATUS(ZX_ERR_ALREADY_EXISTS, result->error_value());
-}
-
-TEST(Devfs, ExportWatcherEndpointClosedCleanup) {
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-
-  std::optional<Devnode> root_slot;
-  Devfs devfs(root_slot);
-  ASSERT_TRUE(root_slot.has_value());
-  Devnode& root_node = root_slot.value();
-
-  // Create a fake service at svc/test.
-  // Export the svc/test.
-  auto endpoints = fidl::CreateEndpoints<fio::Directory>();
-  ASSERT_OK(endpoints.status_value());
-
-  driver_manager::DevfsExporter exporter(devfs, &root_node, loop.dispatcher());
-  auto exporter_endpoints = fidl::CreateEndpoints<fuchsia_device_fs::Exporter>();
-  ASSERT_OK(exporter_endpoints.status_value());
-
-  fidl::ServerBinding<fuchsia_device_fs::Exporter> exporter_binding(
-      loop.dispatcher(), std::move(exporter_endpoints->server), &exporter,
-      fidl::kIgnoreBindingClosure);
-
-  const fidl::WireClient<fuchsia_device_fs::Exporter> client(std::move(exporter_endpoints->client),
-                                                             loop.dispatcher());
-
-  client->Export(std::move(endpoints->client), "svc/test", "one/two", ZX_PROTOCOL_BLOCK)
-      .ThenExactlyOnce([&](auto& result) {
-        ASSERT_TRUE(result.ok());
-        ASSERT_TRUE(result->is_ok());
-      });
-  ASSERT_OK(loop.RunUntilIdle());
-
-  // Close the server end, so that the export is destroyed.
-  endpoints->server.Close(ZX_ERR_PEER_CLOSED);
-
-  // Make sure the server observes the closing.
-  ASSERT_OK(loop.RunUntilIdle());
-
-  // Check that the export is destroyed.
-  client->MakeVisible("one/two").ThenExactlyOnce([&](auto& result) {
-    ASSERT_TRUE(result.ok());
-    ASSERT_TRUE(result->is_error());
-    ASSERT_STATUS(ZX_ERR_NOT_FOUND, result->error_value());
-  });
-  ASSERT_OK(loop.RunUntilIdle());
-}
-
-class Connecter : public fidl::WireServer<fuchsia_device_fs::Connector> {
- public:
- private:
-  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
-    ASSERT_EQ(channel_.get(), ZX_HANDLE_INVALID);
-    channel_ = std::move(request->server);
-  }
-
-  zx::channel channel_;
-};
 TEST(Devfs, ExportWatcherConnector_Export) {
   async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
 

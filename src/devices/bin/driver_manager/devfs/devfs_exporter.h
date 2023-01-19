@@ -17,13 +17,6 @@ namespace driver_manager {
 class ExportWatcher : public fidl::WireAsyncEventHandler<fuchsia_io::Node>,
                       public fidl::WireAsyncEventHandler<fuchsia_device_fs::Connector> {
  public:
-  // Create an ExportWatcher with a service directory.
-  static zx::result<std::unique_ptr<ExportWatcher>> Create(
-      async_dispatcher_t* dispatcher, Devfs& devfs, Devnode* root,
-      fidl::ClientEnd<fuchsia_io::Directory> service_dir, std::string_view service_path,
-      std::string_view devfs_path, uint32_t protocol_id,
-      fuchsia_device_fs::wire::ExportOptions options);
-
   // Create an ExportWatcher with a connector.
   static zx::result<std::unique_ptr<ExportWatcher>> Create(
       async_dispatcher_t* dispatcher, Devfs& devfs, Devnode* root,
@@ -64,16 +57,7 @@ class DevfsExporter : public fidl::WireServer<fuchsia_device_fs::Exporter> {
 
  private:
   // fidl::WireServer<fuchsia_device_fs::Exporter>
-  void Export(ExportRequestView request, ExportCompleter::Sync& completer) override;
-
-  void ExportOptions(ExportOptionsRequestView request,
-                     ExportOptionsCompleter::Sync& completer) override;
-
   void ExportV2(ExportV2RequestView request, ExportV2Completer::Sync& completer) override;
-
-  zx::result<> Export(fidl::ClientEnd<fuchsia_io::Directory> service_dir,
-                      std::string_view service_path, std::string_view devfs_path,
-                      uint32_t protocol_id, fuchsia_device_fs::wire::ExportOptions options);
 
   void MakeVisible(MakeVisibleRequestView request, MakeVisibleCompleter::Sync& completer) override;
 
