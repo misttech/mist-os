@@ -103,11 +103,16 @@ export OWNERS_TMP=$(mktemp -d)
   $FUCHSIA_DIR/third_party/rust_crates/vendor \
   -q)
 
-# restore OWNERS files
+# restore OWNERS files for unchanged directories
 shopt -s nullglob
 for f in $OWNERS_TMP/*
 do
-  cp -r $f $VENDOR_DIR/
+  crate_dir=$(basename "$f")
+  # if the exact same version of the crate still exists
+  if [ -d "${VENDOR_DIR}/${crate_dir}" ]; then
+    # put the OWNERS file back
+    cp -r "$f" "${VENDOR_DIR}/"
+  fi
 done
 
 # copy the OWNERS from the previous latest version for the new latest version
