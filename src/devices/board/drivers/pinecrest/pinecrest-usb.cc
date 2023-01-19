@@ -48,6 +48,14 @@ static const std::vector<fpbus::Bti> usb_btis{
     }},
 };
 
+static const std::vector<fpbus::BootMetadata> usb_boot_metadata{
+    {{
+        // Use Bluetooth MAC address for USB ethernet as well.
+        .zbi_type = DEVICE_METADATA_MAC_ADDRESS,
+        .zbi_extra = MACADDR_BLUETOOTH,
+    }},
+};
+
 // Metadata for DWC2 driver.
 constexpr dwc2_metadata_t dwc2_metadata = {
     .dma_burst_len = DWC2_DMA_BURST_INCR8,
@@ -64,12 +72,6 @@ constexpr dwc2_metadata_t dwc2_metadata = {
             512,  // for test function bulk IN.
             16,   // for test function interrupt IN.
         },
-};
-
-// Statically assigned dummy MAC address.
-// TODO: Provide real MAC address via bootloader or some other mechanism.
-constexpr uint8_t eth_mac_address[] = {
-    0x02, 0x98, 0x8f, 0x3c, 0xd2, 0xaa,
 };
 
 using FunctionDescriptor = fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor;
@@ -153,10 +155,6 @@ zx_status_t Pinecrest::UsbInit() {
               reinterpret_cast<const uint8_t*>(&dwc2_metadata),
               reinterpret_cast<const uint8_t*>(&dwc2_metadata) + sizeof(dwc2_metadata)),
       }},
-      {{
-          .type = DEVICE_METADATA_MAC_ADDRESS,
-          .data = std::vector<uint8_t>(eth_mac_address, eth_mac_address + sizeof(eth_mac_address)),
-      }},
   };
 
   fpbus::Node dwc2_dev;
@@ -168,6 +166,7 @@ zx_status_t Pinecrest::UsbInit() {
   dwc2_dev.irq() = dwc2_irqs;
   dwc2_dev.bti() = usb_btis;
   dwc2_dev.metadata() = std::move(usb_metadata);
+  dwc2_dev.boot_metadata() = usb_boot_metadata;
 
   {
     auto result = pbus_.buffer(arena)->AddComposite(
