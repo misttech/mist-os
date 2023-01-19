@@ -389,7 +389,7 @@ async fn recv_loop(sock: Rc<UdpSocket>, mdns_protocol: Weak<MdnsProtocolInner>) 
     }
 }
 
-fn construct_query_buf(service: &str) -> &'static [u8] {
+fn construct_query_buf(service: &str) -> Box<[u8]> {
     let question = dns::QuestionBuilder::new(
         dns::DomainBuilder::from_str(service).unwrap(),
         dns::Type::Ptr,
@@ -402,11 +402,11 @@ fn construct_query_buf(service: &str) -> &'static [u8] {
 
     let mut buf = vec![0; message.bytes_len()];
     message.serialize(buf.as_mut_slice());
-    Box::leak(buf.into_boxed_slice())
+    buf.into_boxed_slice()
 }
 
 lazy_static::lazy_static! {
-    static ref QUERY_BUF: [&'static [u8]; 2] =
+    static ref QUERY_BUF: [Box<[u8]>; 2] =
     [
         (construct_query_buf("_fuchsia._udp.local")),
         (construct_query_buf("_fastboot._tcp.local")),
