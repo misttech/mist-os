@@ -79,7 +79,7 @@ bool operator>=(const Rational& a, const Rational& b) { return Reduce(a - b).n >
 
 std::ostream& operator<<(std::ostream& os, const Rational& r) {
   constexpr auto kFractionSlash = u8"\u2044";
-  os << r.n << kFractionSlash << r.d;
+  os << r.n << reinterpret_cast<const char*>(kFractionSlash) << r.d;
   return os;
 }
 
