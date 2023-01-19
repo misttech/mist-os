@@ -2516,6 +2516,17 @@ async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
 
 #[netstack_test]
 async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
+    match N::VERSION {
+        NetstackVersion::Netstack2
+        | NetstackVersion::ProdNetstack2
+        | NetstackVersion::Netstack2WithFastUdp => (),
+        NetstackVersion::Netstack3 => {
+            // TODO(https://fxbug.dev/100759): Re-enable this once Netstack3
+            // supports fallible device access.
+            return;
+        }
+    }
+
     const PORT: u16 = 80;
     const NUM_BYTES: usize = 10;
 
