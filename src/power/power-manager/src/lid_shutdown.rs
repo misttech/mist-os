@@ -7,9 +7,9 @@ use crate::node::Node;
 use crate::ok_or_default_err;
 use crate::shutdown_request::ShutdownRequest;
 use crate::utils::result_debug_panic::ResultDebugPanic;
-use anyhow::{format_err, Error};
+use anyhow::{format_err, Context, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_input::{DeviceMarker as LidMarker, DeviceProxy as LidProxy};
+use fidl_fuchsia_hardware_input::{ControllerMarker, DeviceMarker, DeviceProxy};
 use fuchsia_async as fasync;
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
@@ -24,12 +24,7 @@ use futures::{
 use log::*;
 use serde_derive::Deserialize;
 use serde_json as json;
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
 
 /// Node: LidShutdown
 ///
@@ -60,7 +55,7 @@ const LID_CLOSED: u8 = 0x0;
 static INPUT_DEVICES_DIRECTORY: &str = "/dev/class/input";
 
 pub struct LidShutdownBuilder<'a> {
-    driver_proxy: Option<LidProxy>,
+    driver_proxy: Option<DeviceProxy>,
     system_shutdown_node: Option<Rc<dyn Node>>,
     inspect_root: Option<&'a inspect::Node>,
 }
@@ -78,7 +73,7 @@ impl<'a> LidShutdownBuilder<'a> {
     }
 
     #[cfg(test)]
-    pub fn driver_proxy(mut self, proxy: LidProxy) -> Self {
+    pub fn driver_proxy(mut self, proxy: DeviceProxy) -> Self {
         self.driver_proxy = Some(proxy);
         self
     }
@@ -234,7 +229,7 @@ impl LidShutdown {
 struct MutableInner {
     /// Proxy to the lid sensor driver. Populated during `init()` unless previously supplied (in a
     /// test).
-    driver_proxy: Option<LidProxy>,
+    driver_proxy: Option<DeviceProxy>,
 
     /// Task that monitors the lid sensor state and processes changes to that state. Requires being
     /// an Option because the Task has a reference to the node itself. Therefore, the node had to be
@@ -286,7 +281,7 @@ impl Node for LidShutdown {
 }
 
 /// Checks all the input devices until the lid sensor is found.
-async fn find_lid_sensor() -> Result<LidProxy, Error> {
+async fn find_lid_sensor() -> Result<DeviceProxy, Error> {
     info!("Trying to find lid device");
 
     let dir_proxy = fuchsia_fs::directory::open_in_namespace(
@@ -299,12 +294,18 @@ async fn find_lid_sensor() -> Result<LidProxy, Error> {
     while let Some(msg) = watcher.try_next().await? {
         match msg.event {
             vfs::WatchEvent::EXISTING | vfs::WatchEvent::ADD_FILE => {
-                match open_sensor(&msg.filename).await {
+                // Skip directory since we are looking for a device.
+                if msg.filename == PathBuf::from(".") {
+                    continue;
+                }
+                match open_sensor(&dir_proxy, &msg.filename).await {
                     Ok(device) => {
                         info!("Found lid device");
                         return Ok(device);
                     }
-                    _ => (),
+                    Err(e) => {
+                        debug!("{:?} is not the lid device: {:?}", &msg.filename, e);
+                    }
                 }
             }
             _ => (),
@@ -316,23 +317,32 @@ async fn find_lid_sensor() -> Result<LidProxy, Error> {
 
 /// Opens the sensor's device file. Returns the device if the correct HID
 /// report descriptor is found.
-async fn open_sensor(filename: &PathBuf) -> Result<LidProxy, Error> {
-    let path = Path::new(INPUT_DEVICES_DIRECTORY).join(filename);
-    let device = fuchsia_component::client::connect_to_protocol_at_path::<LidMarker>(
-        &String::from(path.to_str().ok_or(format_err!("Could not read path {:?}", path))?),
-    )?;
-    if let Ok(device_descriptor) = device.get_report_desc().await {
-        if device_descriptor.len() < HID_LID_DESCRIPTOR.len() {
-            return Err(format_err!("Short HID header"));
-        }
-        let device_header = &device_descriptor[0..HID_LID_DESCRIPTOR.len()];
-        if device_header == HID_LID_DESCRIPTOR {
-            return Ok(device);
-        } else {
-            return Err(format_err!("Device is not lid sensor"));
-        }
+async fn open_sensor(
+    directory: &fidl_fuchsia_io::DirectoryProxy,
+    filename: &PathBuf,
+) -> Result<DeviceProxy, Error> {
+    let filename =
+        filename.to_str().ok_or_else(|| format_err!("cannot convert {:?} to string", filename))?;
+    let controller = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+        ControllerMarker,
+    >(directory, filename)?;
+    let (device, server_end) = fidl::endpoints::create_proxy::<DeviceMarker>()?;
+    let () = controller.open_session(server_end)?;
+    check_sensor(device).await
+}
+
+async fn check_sensor(device: DeviceProxy) -> Result<DeviceProxy, Error> {
+    let device_descriptor =
+        device.get_report_desc().await.context("Could not get device HID report descriptor")?;
+    if device_descriptor.len() < HID_LID_DESCRIPTOR.len() {
+        return Err(format_err!("Short HID header"));
     }
-    Err(format_err!("Could not get device HID report descriptor"))
+    let device_header = &device_descriptor[0..HID_LID_DESCRIPTOR.len()];
+    if device_header == HID_LID_DESCRIPTOR {
+        Ok(device)
+    } else {
+        Err(format_err!("Device is not lid sensor"))
+    }
 }
 
 struct InspectData {
@@ -372,6 +382,8 @@ mod tests {
     use super::*;
     use crate::test::mock_node::create_dummy_node;
     use crate::utils::run_all_tasks_until_stalled::run_all_tasks_until_stalled;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_hardware_input as finput;
     use fuchsia_async as fasync;
     use fuchsia_inspect::testing::TreeAssertion;
@@ -381,6 +393,9 @@ mod tests {
     use std::cell::Cell;
 
     const LID_OPEN: u8 = 0x1;
+
+    const SHORT_HID_DESC: [u8; 8] = [0x05, 0x01, 0x09, 0x80, 0xA1, 0x01, 0x0A, 0xFF];
+    const VALID_NOT_LID_HID_DESC: [u8; 9] = [0x05, 0x01, 0x09, 0x80, 0xA1, 0x01, 0x0A, 0xFF, 0x02];
 
     // Fake node to mock the ShutdownHandler node, providing a convenient function to wait on a
     // received shutdown message (`wait_for_shutdown`).
@@ -426,7 +441,7 @@ mod tests {
     struct FakeLidDriver {
         report_event: zx::Event,
         _server_task: fasync::Task<()>,
-        proxy: LidProxy,
+        proxy: DeviceProxy,
         lid_state: Rc<Cell<u8>>,
     }
 
@@ -439,8 +454,7 @@ mod tests {
             let report_event_clone =
                 report_event.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
-            let (proxy, mut stream) =
-                fidl::endpoints::create_proxy_and_stream::<LidMarker>().unwrap();
+            let (proxy, mut stream) = create_proxy_and_stream::<DeviceMarker>().unwrap();
 
             let server_task = fasync::Task::local(async move {
                 while let Ok(req) = stream.try_next().await {
@@ -476,9 +490,28 @@ mod tests {
                 .expect("Failed to signal event");
         }
 
-        fn proxy(&self) -> LidProxy {
+        fn proxy(&self) -> DeviceProxy {
             self.proxy.clone()
         }
+    }
+
+    // Creates a mock device proxy that receives GetReportDesc requests and returns the supplied
+    // HID descriptor.
+    fn mock_device_proxy(desc: Vec<u8>) -> DeviceProxy {
+        let (device_proxy, mut stream) =
+            create_proxy_and_stream::<DeviceMarker>().expect("Failed to create proxy and stream");
+        fasync::Task::spawn(async move {
+            while let Ok(Some(req)) = stream.try_next().await {
+                match req {
+                    finput::DeviceRequest::GetReportDesc { responder } => {
+                        let () = responder.send(&desc).unwrap();
+                    }
+                    req => panic!("{req:?}"),
+                }
+            }
+        })
+        .detach();
+        device_proxy
     }
 
     /// Tests that well-formed configuration JSON does not panic the `new_from_json` function.
@@ -598,5 +631,23 @@ mod tests {
 
         root.add_child_assertion(lid_reports);
         assert_data_tree!(inspector, root: { root, });
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_short_hid_desc() {
+        let mock_lid_proxy = mock_device_proxy(Vec::from(SHORT_HID_DESC));
+        assert_matches!(check_sensor(mock_lid_proxy).await, Err(_));
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_not_lid_hid_desc() {
+        let mock_lid_proxy = mock_device_proxy(Vec::from(VALID_NOT_LID_HID_DESC));
+        assert_matches!(check_sensor(mock_lid_proxy).await, Err(_));
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_lid_hid_desc() {
+        let mock_lid_proxy = mock_device_proxy(Vec::from(HID_LID_DESCRIPTOR));
+        assert_matches!(check_sensor(mock_lid_proxy).await, Ok(_));
     }
 }
