@@ -16,6 +16,10 @@ import sys
 
 from pathlib import Path
 
+# The length of the API compatibility window, in API levels. This is the number
+# of stable API levels that will be supported in addition to the one in development.
+_API_COMPATIBILITY_WINDOW_SIZE = 2
+
 
 def update_platform_version(fuchsia_api_level, platform_version_path):
     """Updates platform_version.json to set the in_development_api_level to the given
@@ -25,6 +29,12 @@ def update_platform_version(fuchsia_api_level, platform_version_path):
         with open(platform_version_path, "r+") as f:
             platform_version = json.load(f)
             platform_version["in_development_api_level"] = fuchsia_api_level
+            # Generates a list of supported API levels that contains at most
+            # _API_COMPATIBILITY_WINDOW_SIZE elements.
+            platform_version["supported_fuchsia_api_levels"] = list(
+                range(
+                    max(fuchsia_api_level - _API_COMPATIBILITY_WINDOW_SIZE, 1),
+                    fuchsia_api_level))
             f.seek(0)
             json.dump(platform_version, f)
             f.truncate()
@@ -38,7 +48,8 @@ Did you run this script from the root of the source tree?""".format(
         return False
 
 
-def update_fidl_compatibility_doc(fuchsia_api_level, fidl_compatiblity_doc_path):
+def update_fidl_compatibility_doc(
+        fuchsia_api_level, fidl_compatiblity_doc_path):
     """Updates fidl_api_compatibility_testing.md given the in-development API level."""
     try:
         with open(fidl_compatiblity_doc_path, "r+") as f:
@@ -110,7 +121,7 @@ Did you run this script from the root of the source tree?""".format(
 def move_owners_file(root_source_dir, root_build_dir, fuchsia_api_level):
     """Helper function for copying golden files. It accomplishes the following:
     1. Overrides //sdk/history/OWNERS in //sdk/history/N/ allowing a wider set of reviewers.
-    2. Reverts //sdk/history/N-1/  back to using //sdk/history/OWNERS, now that N-1 is a 
+    2. Reverts //sdk/history/N-1/  back to using //sdk/history/OWNERS, now that N-1 is a
        supported API level.
 
     """
@@ -177,17 +188,21 @@ def main():
 
     args = parser.parse_args()
 
-    if not update_version_history(args.fuchsia_api_level, args.sdk_version_history):
+    if not update_version_history(args.fuchsia_api_level,
+                                  args.sdk_version_history):
         return 1
 
-    if not update_platform_version(args.fuchsia_api_level, args.platform_version_json):
+    if not update_platform_version(args.fuchsia_api_level,
+                                   args.platform_version_json):
         return 1
 
-    if not update_fidl_compatibility_doc(args.fuchsia_api_level, args.fidl_compatibility_doc_path):
+    if not update_fidl_compatibility_doc(args.fuchsia_api_level,
+                                         args.fidl_compatibility_doc_path):
         return 1
 
     if args.update_goldens:
-        if not move_owners_file(args.root_source_dir, args.root_build_dir, args.fuchsia_api_level):
+        if not move_owners_file(args.root_source_dir, args.root_build_dir,
+                                args.fuchsia_api_level):
             return 1
         if not copy_compatibility_test_goldens(args.root_build_dir,
                                                args.fuchsia_api_level):

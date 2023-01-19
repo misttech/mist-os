@@ -1,1 +1,7 @@
-{"in_development_api_level": 11, "supported_fuchsia_api_levels": [7, 8, 9, 10]}
+{
+    "in_development_api_level": 11,
+    "supported_fuchsia_api_levels": [
+        9,
+        10
+    ]
+}
