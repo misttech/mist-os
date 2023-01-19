@@ -1,0 +1,28 @@
+# adb end to end tests
+
+This folder contains host side python based end to end tests for adb support.
+
+## Running the test manually
+
+Include adb support in the build by following instructions in adb
+[README](/src/developer/adb/README.md). Additionally, add these args to `fx set` to include adb end
+to end tests in the build
+
+```
+--with '//src/developer/adb/tests/adb_e2e:manual_tests'
+```
+
+Once the device boots, you can run the host tests with the following command -
+
+```
+fx test adb_e2e_tests
+```
+
+The `adb_e2e_tests` target is not run on any CI/CQ and is meant for manual testing.
+
+## Including adb e2e tests into CI/CQ
+
+Use the `adb_e2e` template to defined in
+[/src/developer/adb/tests/adb_e2e/adb_e2e.gni](/src/developer/adb/tests/adb_e2e/adb_e2e.gni) to
+create a new test target and define environment parameters specific to CI/CQ builders to include the
+test. You can follow the `adb_e2e_tests` target as an example.

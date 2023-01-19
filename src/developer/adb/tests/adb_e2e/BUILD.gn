@@ -1,0 +1,14 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//src/developer/adb/tests/adb_e2e/adb_e2e.gni")
+
+adb_e2e("adb_e2e_tests") {
+  environments = []
+}
+
+group("manual_tests") {
+  testonly = true
+  deps = [ ":adb_e2e_tests($host_toolchain)" ]
+}
