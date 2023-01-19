@@ -553,11 +553,38 @@ failed to resolve component fuchsia-pkg://fuchsia.com/[package_name]#meta/[compo
 
 You can avoid this error by including any components your test relies on
 to the test package - see [this CL](https://fxrev.dev/608222) for an example of
-how to do this.
+how to do this, or by using [subpackages]:
 
-For the time being if you are not able to include a dependent component in your
-test package you can add below option to your test manifest file to selectively
-allow resolution of some packages:
+```gn
+# BUILD.gn
+import("//build/components.gni")
+
+
+fuchsia_test_package("simple_test") {
+  test_components = [ ":simple_test_component" ]
+  subpackages = [ "//path/to/subpackage:subpackage" ]
+}
+```
+
+```json5
+ // test.cml
+ {
+...
+    children: [
+        {
+            name: "child",
+            url: "subpackage#meta/subpackaged_component.cm",
+        },
+    ],
+...
+}
+```
+
+See [this CL](https://fxrev.dev/784304) as an example of using subpackages.
+
+Note: Subpackages are not available in the sdk yet. If you are not able to
+include a dependent component in your test package you can add below option
+to your test manifest file to selectively allow resolution of some packages:
 
 ```json5
 // my_component_test.cml
@@ -834,3 +861,4 @@ offer: [
 [caching-loader-service]: /src/sys/test_runners/src/elf/elf_component.rs
 [framework-capabilities]: /docs/concepts/components/v2/capabilities/protocol.md#framework
 [sys-migration-guide]: /docs/development/components/v2/migration/tests.md
+[subpackages]: /docs/concepts/components/v2/subpackaging.md
