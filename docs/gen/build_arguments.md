@@ -2648,7 +2648,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2683,7 +2683,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -2842,13 +2842,23 @@ using '--args=ermine_app_entries="config/app_launch_entries.json"'
 
 From //src/experiences/session_shells/ermine/shell/BUILD.gn:16
 
+### ermine_manifest
+
+Build arg that allows overriding the default manifest for Ermine.
+TODO(fxbug.dev/120106): Remove this argument when we have a better way of
+overriding the manifest.
+
+**Current value (from the default):** `"meta/ermine.cml"`
+
+From //src/experiences/session_shells/ermine/shell/BUILD.gn:21
+
 ### ermine_start_screensaver
 
 Whether or not to launch screensaver.
 
 **Current value (from the default):** `false`
 
-From //src/experiences/session_shells/ermine/shell/BUILD.gn:19
+From //src/experiences/session_shells/ermine/shell/BUILD.gn:24
 
 ### ermine_user_feedback_enabled
 
@@ -2856,7 +2866,7 @@ Whether or not to allow user feedback report from the device.
 
 **Current value (from the default):** `false`
 
-From //src/experiences/session_shells/ermine/shell/BUILD.gn:22
+From //src/experiences/session_shells/ermine/shell/BUILD.gn:27
 
 ### escher_test_for_glsl_spirv_mismatch
 
@@ -8126,7 +8136,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/lib/vulkan/build/config.gni:40
 
