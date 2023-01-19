@@ -4,39 +4,41 @@
 
 #include "src/ui/a11y/lib/gesture_manager/recognizers_v2/m_finger_n_tap_drag_recognizer.h"
 
-#include <fuchsia/ui/input/accessibility/cpp/fidl.h>
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 
 #include <memory>
 
 #include <gtest/gtest.h>
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/ui/a11y/lib/gesture_manager/arena/tests/mocks/mock_contest_member.h"
-#include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_util_v2/util.h"
+#include "src/ui/a11y/lib/gesture_manager/recognizers_v2/tests/mocks/mock_participation_token.h"
 #include "src/ui/a11y/lib/gesture_manager/recognizers_v2/timing_constants.h"
-#include "src/ui/a11y/lib/testing/input.h"
+#include "src/ui/a11y/lib/testing/input_v2.h"
 
 namespace accessibility_test {
 
 namespace {
 
-using Phase = fuchsia::ui::input::PointerEventPhase;
+using input_v2::AddEvent;
+using input_v2::ChangeEvents;
+using input_v2::RemoveEvent;
 
 class MFingerNTapDragRecognizerTest : public gtest::TestLoopFixture {
  public:
   MFingerNTapDragRecognizerTest() = default;
 
-  void SendPointerEvents(const std::vector<PointerParams>& events) const {
+  void SendPointerEvents(const std::vector<input_v2::PointerParams>& events) const {
     for (const auto& event : events) {
       SendPointerEvent(event);
     }
   }
 
   // Constraints to keep in mind when simulating |GestureArena| behavior:
-  // * Only send pointer events while a contest member is held.
-  void SendPointerEvent(const PointerParams& event) const {
-    if (member_.is_held()) {
-      recognizer_->HandleEvent(ToPointerEvent(event, 0));
+  // * Only send pointer events while a participation token is held.
+  void SendPointerEvent(const input_v2::PointerParams& event) const {
+    if (token_.is_held()) {
+      recognizer_->HandleEvent(ToTouchEvent(event, 0));
     }
   }
 
@@ -47,53 +49,55 @@ class MFingerNTapDragRecognizerTest : public gtest::TestLoopFixture {
       float update_displacement_threshold =
           a11y::recognizers_v2::MFingerNTapDragRecognizer::kDefaultUpdateDisplacementThreshold) {
     recognizer_ = std::make_unique<a11y::recognizers_v2::MFingerNTapDragRecognizer>(
-        [this](a11y::GestureContext context) {
+        [this](a11y::gesture_util_v2::GestureContext context) {
           gesture_won_ = true;
-          gesture_context_ = context;
+          gesture_context_ = std::move(context);
         },
-        [this](a11y::GestureContext context) { gesture_updates_.push_back(context); },
-        [this](a11y::GestureContext context) { gesture_complete_called_ = true; },
+        [this](a11y::gesture_util_v2::GestureContext context) {
+          gesture_updates_.push_back(std::move(context));
+        },
+        [this](a11y::gesture_util_v2::GestureContext context) { gesture_complete_called_ = true; },
         number_of_fingers, number_of_taps, drag_displacement_threshold,
         update_displacement_threshold);
   }
 
-  MockContestMember member_;
+  MockParticipationTokenHandle token_;
   std::unique_ptr<a11y::recognizers_v2::MFingerNTapDragRecognizer> recognizer_;
   bool gesture_won_ = false;
   bool gesture_complete_called_ = false;
-  a11y::GestureContext gesture_context_;
-  std::vector<a11y::GestureContext> gesture_updates_;
+  a11y::gesture_util_v2::GestureContext gesture_context_;
+  std::vector<a11y::gesture_util_v2::GestureContext> gesture_updates_;
 };
 
 // Tests successful three-finger double-tap with drag detection.
 TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapWithDragDetected) {
   CreateGestureRecognizer(3 /*number of fingers*/, 2 /*number of fingers*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + UpEvents(1, {}) +
-                     UpEvents(2, {}) + UpEvents(3, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + RemoveEvent(1, {}) +
+                     RemoveEvent(2, {}) + RemoveEvent(3, {})));
 
   // Send events for second tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {})));
 
   RunLoopFor(a11y::recognizers_v2::kMinDragDuration);
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kAccepted);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
   recognizer_->OnWin();
 
   EXPECT_TRUE(gesture_won_);
   EXPECT_FALSE(gesture_complete_called_);
 
-  SendPointerEvents(MoveEvents(1, {}, {0, .5f}));
+  SendPointerEvents(ChangeEvents(1, {}, {0, .5f}));
   EXPECT_EQ(gesture_updates_.size(), 10u);
   EXPECT_EQ(gesture_updates_[9].current_pointer_locations[1].ndc_point.x, .0f);
   EXPECT_GT(gesture_updates_[9].current_pointer_locations[1].ndc_point.y, .49f);
   EXPECT_LT(gesture_updates_[9].current_pointer_locations[1].ndc_point.y, .51f);
 
-  // We should call on_complete_ after the first UP event received after the
+  // We should call on_complete_ after the first REMOVE event received after the
   // gesture was accepted.
-  SendPointerEvents(UpEvents(1, {}));
+  SendPointerEvents(RemoveEvent(1, {}));
 
   EXPECT_TRUE(gesture_complete_called_);
 }
@@ -103,19 +107,19 @@ TEST_F(MFingerNTapDragRecognizerTest,
        ThreeFingerDoubleTapWithDragUndecidedNonDefaultDragThreshold) {
   CreateGestureRecognizer(3 /*number of fingers*/, 2 /*number of fingers*/,
                           0.2f /*drag displacement threshold*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + UpEvents(1, {}) +
-                     UpEvents(2, {}) + UpEvents(3, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + RemoveEvent(1, {}) +
+                     RemoveEvent(2, {}) + RemoveEvent(3, {})));
 
   // Send events for second tap. The centroid's displacement should be between
   // the default drag displacement threshold of 0.1f and the specified threshold
   // of 0.2f.
   SendPointerEvents(
-      (DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + MoveEvents(1, {}, {0.45f, 0})));
+      (AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + ChangeEvents(1, {}, {0.45f, 0})));
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kUndecided);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kUndecided);
 }
 
 // Tests the case in which a three-finger-double-tap is detected, but the update
@@ -124,24 +128,24 @@ TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapWithDragNoUpdatesUntil
   CreateGestureRecognizer(3 /*number of fingers*/, 2 /*number of fingers*/,
                           0.1f /*drag displacement threshold*/,
                           0.5f /*update displacement threshold*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + UpEvents(1, {}) +
-                     UpEvents(2, {}) + UpEvents(3, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + RemoveEvent(1, {}) +
+                     RemoveEvent(2, {}) + RemoveEvent(3, {})));
 
   // Send events for second tap.
   SendPointerEvents(
-      (DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + MoveEvents(1, {}, {0.5f, 0})));
+      (AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + ChangeEvents(1, {}, {0.5f, 0})));
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kAccepted);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
   recognizer_->OnWin();
 
   EXPECT_TRUE(gesture_won_);
   EXPECT_FALSE(gesture_complete_called_);
 
   // Move across a displacement that does NOT exceed the update threshold.
-  SendPointerEvents(MoveEvents(2, {}, {0.1f, 0}));
+  SendPointerEvents(ChangeEvents(2, {}, {0.1f, 0}));
 
   // No updates should have been received.
   EXPECT_TRUE(gesture_updates_.empty());
@@ -150,17 +154,17 @@ TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapWithDragNoUpdatesUntil
 // Tests rejection of drag that doesn't last long enough.
 TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapWithDragRejected) {
   CreateGestureRecognizer(3 /*number of fingers*/, 2 /*number of fingers*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
   // Send events for first tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + UpEvents(1, {}) +
-                     UpEvents(2, {}) + UpEvents(3, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + RemoveEvent(1, {}) +
+                     RemoveEvent(2, {}) + RemoveEvent(3, {})));
 
   // Send events for second tap.
-  SendPointerEvents((DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + UpEvents(1, {}) +
-                     UpEvents(2, {}) + UpEvents(3, {})));
+  SendPointerEvents((AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + RemoveEvent(1, {}) +
+                     RemoveEvent(2, {}) + RemoveEvent(3, {})));
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kRejected);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kReject);
   EXPECT_FALSE(gesture_won_);
   EXPECT_TRUE(gesture_updates_.empty());
   EXPECT_FALSE(gesture_complete_called_);
@@ -169,14 +173,14 @@ TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapWithDragRejected) {
 // Tests successful one-finger triple-tap with drag detection.
 TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapWithDragDetected) {
   CreateGestureRecognizer(1 /*number of fingers*/, 3 /*number of fingers*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents((DownEvents(1, {}) + UpEvents(1, {}) + DownEvents(1, {}) + UpEvents(1, {}) +
-                     DownEvents(1, {}) + MoveEvents(1, {}, {})));
+  SendPointerEvents((AddEvent(1, {}) + RemoveEvent(1, {}) + AddEvent(1, {}) + RemoveEvent(1, {}) +
+                     AddEvent(1, {}) + ChangeEvents(1, {}, {})));
 
   RunLoopFor(a11y::recognizers_v2::kMinDragDuration);
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kAccepted);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
   recognizer_->OnWin();
 
   EXPECT_TRUE(gesture_won_);
@@ -185,12 +189,12 @@ TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapWithDragDetected) {
   // accepting.
   EXPECT_TRUE(gesture_updates_.empty());
 
-  SendPointerEvents(MoveEvents(1, {}, {0, .5f}));
+  SendPointerEvents(ChangeEvents(1, {}, {0, .5f}));
   EXPECT_EQ(gesture_updates_.size(), 10u);
 
   EXPECT_FALSE(gesture_complete_called_);
 
-  SendPointerEvents(UpEvents(1, {}));
+  SendPointerEvents(RemoveEvent(1, {}));
 
   EXPECT_TRUE(gesture_complete_called_);
 }
@@ -200,14 +204,14 @@ TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapWithDragDetected) {
 TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapWithDragUndecidedNonDefaultDragThreshold) {
   CreateGestureRecognizer(1 /*number of fingers*/, 3 /*number of fingers*/,
                           0.2f /*drag displacement threshold*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
-  // MOVE events should cover a displacement between the default drag threshold
+  // CHANGE events should cover a displacement between the default drag threshold
   // of 0.1f and the specified threshold of 0.2f.
-  SendPointerEvents((DownEvents(1, {}) + UpEvents(1, {}) + DownEvents(1, {}) + UpEvents(1, {}) +
-                     DownEvents(1, {}) + MoveEvents(1, {}, {0.15f, 0})));
+  SendPointerEvents((AddEvent(1, {}) + RemoveEvent(1, {}) + AddEvent(1, {}) + RemoveEvent(1, {}) +
+                     AddEvent(1, {}) + ChangeEvents(1, {}, {0.15f, 0})));
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kUndecided);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kUndecided);
 }
 
 // Tests the case in which a drag is detected, but the update threshold is not
@@ -216,22 +220,22 @@ TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapDragNoUpdatesUntilThresh
   CreateGestureRecognizer(1 /*number of fingers*/, 3 /*number of fingers*/,
                           0.1f /*drag displacement threshold*/,
                           0.5f /*update displacement threshold*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents((DownEvents(1, {}) + UpEvents(1, {}) + DownEvents(1, {}) + UpEvents(1, {}) +
-                     DownEvents(1, {}) + MoveEvents(1, {}, {0.5f, 0.5f})));
+  SendPointerEvents((AddEvent(1, {}) + RemoveEvent(1, {}) + AddEvent(1, {}) + RemoveEvent(1, {}) +
+                     AddEvent(1, {}) + ChangeEvents(1, {}, {0.5f, 0.5f})));
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kAccepted);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
   recognizer_->OnWin();
 
   EXPECT_TRUE(gesture_won_);
   EXPECT_FALSE(gesture_complete_called_);
-  // We should NOT have received any updates during the MOVE events prior to
+  // We should NOT have received any updates during the CHANGE events prior to
   // accepting.
   EXPECT_TRUE(gesture_updates_.empty());
 
   // Move across a displacement that does NOT exceed the update threshold.
-  SendPointerEvents(MoveEvents(1, {0.5f, 0.5f}, {0.6f, .5f}));
+  SendPointerEvents(ChangeEvents(1, {0.5f, 0.5f}, {0.6f, .5f}));
 
   // No updates should have been received.
   EXPECT_TRUE(gesture_updates_.empty());
@@ -241,28 +245,28 @@ TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapDragNoUpdatesUntilThresh
 // placed on screen.
 TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapWithDragDetectedExtraFinger) {
   CreateGestureRecognizer(1 /*number of fingers*/, 3 /*number of fingers*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents((DownEvents(1, {}) + UpEvents(1, {}) + DownEvents(1, {}) + UpEvents(1, {}) +
-                     DownEvents(1, {}) + MoveEvents(1, {}, {})));
+  SendPointerEvents((AddEvent(1, {}) + RemoveEvent(1, {}) + AddEvent(1, {}) + RemoveEvent(1, {}) +
+                     AddEvent(1, {}) + ChangeEvents(1, {}, {})));
 
   RunLoopFor(a11y::recognizers_v2::kMinDragDuration);
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kAccepted);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
   recognizer_->OnWin();
 
   EXPECT_TRUE(gesture_won_);
   EXPECT_FALSE(gesture_complete_called_);
-  // We should NOT have received any updates during the MOVE events prior to
+  // We should NOT have received any updates during the CHANGE events prior to
   // accepting.
   EXPECT_TRUE(gesture_updates_.empty());
 
-  SendPointerEvents(MoveEvents(1, {}, {0, .5f}));
+  SendPointerEvents(ChangeEvents(1, {}, {0, .5f}));
   EXPECT_EQ(gesture_updates_.size(), 10u);
 
   EXPECT_FALSE(gesture_complete_called_);
 
-  SendPointerEvents(DownEvents(2, {}));
+  SendPointerEvents(AddEvent(2, {}));
 
   EXPECT_TRUE(gesture_complete_called_);
 }
@@ -271,11 +275,11 @@ TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapWithDragDetectedExtraF
 // during one of the non-drag taps.
 TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapWithDragRejectedInvalidTap) {
   CreateGestureRecognizer(1 /*number of fingers*/, 3 /*number of fingers*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents((DownEvents(1, {}) + MoveEvents(1, {}, {1, 1})));
+  SendPointerEvents((AddEvent(1, {}) + ChangeEvents(1, {}, {1, 1})));
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kRejected);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kReject);
   EXPECT_FALSE(gesture_won_);
   EXPECT_FALSE(gesture_complete_called_);
   EXPECT_TRUE(gesture_updates_.empty());
@@ -285,38 +289,38 @@ TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapWithDragRejectedInvalidT
 // position on the last tap.
 TEST_F(MFingerNTapDragRecognizerTest, OneFingerTripleTapWithDragAggressiveAccept) {
   CreateGestureRecognizer(1 /*number of fingers*/, 3 /*number of fingers*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents((DownEvents(1, {}) + UpEvents(1, {}) + DownEvents(1, {}) + UpEvents(1, {}) +
-                     DownEvents(1, {}) + MoveEvents(1, {}, {0, 0.6})));
+  SendPointerEvents((AddEvent(1, {}) + RemoveEvent(1, {}) + AddEvent(1, {}) + RemoveEvent(1, {}) +
+                     AddEvent(1, {}) + ChangeEvents(1, {}, {0, 0.6})));
 
   // Once the finger has a displacement of more than .1f from its initial
   // location during the third tap, we should accept.
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kAccepted);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kAccept);
 }
 
 // Tests the case in which the gesture is rejected for a timeout on one of the taps that is NOT the
 // last.
 TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapRejectedEarlyTapLengthTimeout) {
   CreateGestureRecognizer(3 /*number of fingers*/, 2 /*number of fingers*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents(DownEvents(1, {}));
+  SendPointerEvents(AddEvent(1, {}));
   RunLoopFor(a11y::recognizers_v2::kMaxTapDuration);
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kRejected);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kReject);
 }
 
 // Tests the case in which the gesture is rejected for a timeout on the last tap.
 TEST_F(MFingerNTapDragRecognizerTest, ThreeFingerDoubleTapRejectedLastTapLengthTimeout) {
   CreateGestureRecognizer(3 /*number of fingers*/, 2 /*number of fingers*/);
-  recognizer_->OnContestStarted(member_.TakeInterface());
+  recognizer_->OnContestStarted(token_.TakeToken());
 
-  SendPointerEvents(DownEvents(1, {}) + DownEvents(2, {}) + DownEvents(3, {}) + UpEvents(1, {}) +
-                    UpEvents(2, {}) + UpEvents(3, {}) + DownEvents(1, {}));
+  SendPointerEvents(AddEvent(1, {}) + AddEvent(2, {}) + AddEvent(3, {}) + RemoveEvent(1, {}) +
+                    RemoveEvent(2, {}) + RemoveEvent(3, {}) + AddEvent(1, {}));
   RunLoopFor(a11y::recognizers_v2::kMaxTapDuration);
 
-  EXPECT_EQ(member_.status(), a11y::ContestMember::Status::kRejected);
+  EXPECT_EQ(token_.status(), MockParticipationTokenHandle::Status::kReject);
 }
 
 }  // namespace

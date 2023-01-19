@@ -79,11 +79,11 @@ std::vector<PointerParams> AddEvent(PointerId pointer_id, const glm::vec2& coord
 std::vector<PointerParams> RemoveEvent(PointerId pointer_id, const glm::vec2& coordinate);
 std::vector<PointerParams> TapEvents(PointerId pointer_id, const glm::vec2& coordinate);
 
-// Pointer move events between two endpoints, (start, end]. The start point is exclusive and the end
-// point is inclusive, as move events signify where a pointer has moved to rather than where it has
-// moved from.
-std::vector<PointerParams> MoveEvents(PointerId pointer_id, const glm::vec2& start,
-                                      const glm::vec2& end, size_t moves = kDefaultMoves);
+// `CHANGE` events between two endpoints, (start, end]. The start point is exclusive and the end
+// point is inclusive, as CHANGE events signify where a pointer has moved to rather than where it
+// has moved from.
+std::vector<PointerParams> ChangeEvents(PointerId pointer_id, const glm::vec2& start,
+                                        const glm::vec2& end, size_t moves = kDefaultMoves);
 
 std::vector<PointerParams> DragEvents(PointerId pointer_id, const glm::vec2& start,
                                       const glm::vec2& end, size_t moves = kDefaultMoves);

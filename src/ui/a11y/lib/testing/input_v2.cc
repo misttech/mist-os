@@ -33,11 +33,8 @@ std::vector<PointerParams> TapEvents(PointerId pointer_id, const glm::vec2& coor
   return AddEvent(pointer_id, coordinate) + RemoveEvent(pointer_id, coordinate);
 }
 
-// Pointer move events between two endpoints, (start, end]. The start point is exclusive and the end
-// point is inclusive, as move events signify where a pointer has moved to rather than where it has
-// moved from.
-std::vector<PointerParams> MoveEvents(PointerId pointer_id, const glm::vec2& start,
-                                      const glm::vec2& end, size_t moves) {
+std::vector<PointerParams> ChangeEvents(PointerId pointer_id, const glm::vec2& start,
+                                        const glm::vec2& end, size_t moves) {
   std::vector<PointerParams> events;
   events.reserve(moves);
   for (size_t i = 1; i <= moves; ++i) {
@@ -50,7 +47,7 @@ std::vector<PointerParams> MoveEvents(PointerId pointer_id, const glm::vec2& sta
 
 std::vector<PointerParams> DragEvents(PointerId pointer_id, const glm::vec2& start,
                                       const glm::vec2& end, size_t moves) {
-  return AddEvent(pointer_id, start) + MoveEvents(pointer_id, start, end, moves) +
+  return AddEvent(pointer_id, start) + ChangeEvents(pointer_id, start, end, moves) +
          RemoveEvent(pointer_id, end);
 }
 

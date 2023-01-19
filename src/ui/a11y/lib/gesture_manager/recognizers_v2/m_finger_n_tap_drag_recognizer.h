@@ -5,32 +5,33 @@
 #ifndef SRC_UI_A11Y_LIB_GESTURE_MANAGER_RECOGNIZERS_V2_M_FINGER_N_TAP_DRAG_RECOGNIZER_H_
 #define SRC_UI_A11Y_LIB_GESTURE_MANAGER_RECOGNIZERS_V2_M_FINGER_N_TAP_DRAG_RECOGNIZER_H_
 
-#include "src/ui/a11y/lib/gesture_manager/arena/contest_member.h"
-#include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
-#include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
+
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/participation_token_interface.h"
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/recognizer_v2.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_util_v2/util.h"
 
 namespace a11y::recognizers_v2 {
 
-// MFingerNTapRecognizer class is responsible for implementing m-finger-n-tap-drag gesture.
-class MFingerNTapDragRecognizer : public GestureRecognizer {
+class MFingerNTapDragRecognizer : public GestureRecognizerV2 {
  public:
   // Displacements of less than 1/16 NDC are considered valid for taps, so we want
   // to recognize slightly larger gestures as drags.
   static constexpr float kDefaultDragDisplacementThreshold = 1.f / 10;
 
   // Default value for the minimum displacement between successive updates.
-  // Default to updating on every MOVE event after a win.
+  // Default to updating on every CHANGE event after a win.
   static constexpr float kDefaultUpdateDisplacementThreshold = 0;
 
   // Callback which will be invoked when gesture has been recognized.
-  using OnMFingerNTapDragCallback = fit::function<void(GestureContext)>;
+  using OnMFingerNTapDragCallback = fit::function<void(gesture_util_v2::GestureContext)>;
 
   // Constructor of this class takes in following parameters:
   //  1. on_recognize: Callback will be invoked, when the gesture is detected and the recognizer
   //     is the winner in gesture arena.
-  //  2. on_update: Callback invoked on MOVE events after the gesture has
+  //  2. on_update: Callback invoked on CHANGE events after the gesture has
   //     claimed the win (and only if hold_last_tap = true).
-  //  3. on_complete: Callback invoked on the last UP event after the gesture
+  //  3. on_complete: Callback invoked on the last REMOVE event after the gesture
   //     has claimed the win (and ony if hold_last_tap = true).
   //  4. number_of_fingers: Number of fingers in gesture.
   //  5. number_of_taps: Number of taps gesture recognizer will detect.
@@ -48,22 +49,23 @@ class MFingerNTapDragRecognizer : public GestureRecognizer {
   // A human-readable string name for the recognizer to be used in logs only.
   std::string DebugName() const override;
 
-  // Processes incoming pointer events to detect tap gestures like (Single, double, etc.).
-  void HandleEvent(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) override;
+  // Processes incoming touch events to detect tap gestures like (Single, double, etc.).
+  void HandleEvent(const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) override;
 
   // This method gets called when the recognizer has won the arena.
   void OnWin() override;
 
   // This method gets called when the recognizer has lost the arena.
-  // It resets the state of the contest member.
+  // It resets the state of the participation token.
   void OnDefeat() override;
 
   // At the start of every arena contest this method will be called.
   // This also resets the state of the recognizer.
-  void OnContestStarted(std::unique_ptr<ContestMember> contest_member) override;
+  void OnContestStarted(std::unique_ptr<ParticipationTokenInterface> token) override;
 
  private:
-  // Represents state internal to a contest, i.e. contest member, long-press timeout, and tap state.
+  // Represents state internal to a contest, i.e. participation token,
+  // long-press timeout, and tap state.
   struct Contest;
 
   // Returns true if the displacement from |start| to |end| is at least |threshold|.
@@ -74,28 +76,24 @@ class MFingerNTapDragRecognizer : public GestureRecognizer {
   // screen.
   void OnExcessFingers();
 
-  // |MFingerNTapRecognizer|
   void OnTapStarted();
 
-  // |MFingerNTapRecognizer|
-  void OnMoveEvent(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event);
+  void OnChangeEvent(const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
 
-  // |MFingerNTapRecognizer|
-  void OnUpEvent();
+  void OnRemoveEvent();
 
-  // |MFingerNTapRecognizer|
   void ResetRecognizer();
 
   // Stores the Gesture Context which is required to execute the callback.
-  GestureContext gesture_context_ = {};
+  gesture_util_v2::GestureContext gesture_context_ = {};
 
   // Stores the Gesture Context at the time of the last update.
-  GestureContext last_update_gesture_context_ = {};
+  gesture_util_v2::GestureContext last_update_gesture_context_ = {};
 
   // Callback which will be executed when gesture is detected and is also a winner in the arena.
   OnMFingerNTapDragCallback on_recognize_;
 
-  // Callback which will be executed on MOVE events after a tap-hold gesture is detected.
+  // Callback which will be executed on CHANGE events after a tap-hold gesture is detected.
   OnMFingerNTapDragCallback on_update_;
 
   // Callback which will be executed when the last finger is removed after a tap-hold gesture is
