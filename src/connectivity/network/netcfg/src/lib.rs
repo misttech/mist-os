@@ -1585,8 +1585,7 @@ impl<'a> NetCfg<'a> {
         .into();
         let interface_name = if stable_name {
             match self.persisted_interface_config.generate_stable_name(
-                &topological_path, /* TODO(tamird): we can probably do
-                                    * better with std::borrow::Cow. */
+                topological_path.into(),
                 mac,
                 interface_type,
             ) {
