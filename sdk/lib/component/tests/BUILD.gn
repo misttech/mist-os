@@ -33,6 +33,7 @@ fidl("fidl.service.test") {
     "//sdk/fidl/fuchsia.io",
     "//sdk/fidl/fuchsia.unknown",
   ]
+  enable_hlcpp = true
 }
 
 test("service_client_test") {
