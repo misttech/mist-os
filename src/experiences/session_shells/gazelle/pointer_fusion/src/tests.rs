@@ -306,16 +306,18 @@ async fn test_touch_synthesized_up_before_remove() {
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Down));
 
-    let touch_event = InputEvent::touch()
-        .view(1024.0, 600.0)
-        .device_info(42)
-        .phase(fptr::EventPhase::Remove)
-        .position(512.0, 300.0);
+    let touch_event = InputEvent::touch().phase(fptr::EventPhase::Remove).position(512.0, 300.0);
     sender.unbounded_send(touch_event).unwrap();
 
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Up));
     assert!(pointer_event.synthesized);
+
+    let pointer_event = receiver.next().await.unwrap();
+    assert!(matches!(pointer_event.phase, Phase::Remove));
+
+    let touch_event = InputEvent::touch().phase(fptr::EventPhase::Remove).position(512.0, 300.0);
+    sender.unbounded_send(touch_event).unwrap();
 
     let pointer_event = receiver.next().await.unwrap();
     assert!(matches!(pointer_event.phase, Phase::Remove));

@@ -243,41 +243,41 @@ impl PointerFusionState {
                 }
                 Phase::Up => {
                     // Makes sure we have an existing pointer in down state
-                    let mut state =
-                        self.pointer_states.get_mut(&event.device_id).expect("State should exist");
-                    assert!(state.is_down);
-                    event.id = state.id;
+                    if let Some(state) = self.pointer_states.get_mut(&event.device_id) {
+                        assert!(state.is_down);
+                        event.id = state.id;
 
-                    // Up phase should include which buttons where released.
-                    let new_buttons = event.buttons;
-                    event.buttons = state.buttons;
+                        // Up phase should include which buttons where released.
+                        let new_buttons = event.buttons;
+                        event.buttons = state.buttons;
 
-                    // Synthesize a move event if the location does not match.
-                    if state.is_location_changed(&event) {
-                        let (physical_delta_x, physical_delta_y) =
-                            state.compute_physical_delta(&event);
-                        let (logical_delta_x, logical_delta_y) =
-                            state.compute_logical_delta(&event);
-                        let move_event = PointerEvent {
-                            physical_delta_x,
-                            physical_delta_y,
-                            logical_delta_x,
-                            logical_delta_y,
-                            phase: Phase::Move,
-                            synthesized: true,
-                            ..event.clone()
-                        };
+                        // Synthesize a move event if the location does not match.
+                        if state.is_location_changed(&event) {
+                            let (physical_delta_x, physical_delta_y) =
+                                state.compute_physical_delta(&event);
+                            let (logical_delta_x, logical_delta_y) =
+                                state.compute_logical_delta(&event);
+                            let move_event = PointerEvent {
+                                physical_delta_x,
+                                physical_delta_y,
+                                logical_delta_x,
+                                logical_delta_y,
+                                phase: Phase::Move,
+                                synthesized: true,
+                                ..event.clone()
+                            };
 
-                        state.physical_x = move_event.physical_x;
-                        state.physical_y = move_event.physical_y;
-                        state.logical_x = move_event.logical_x;
-                        state.logical_y = move_event.logical_y;
+                            state.physical_x = move_event.physical_x;
+                            state.physical_y = move_event.physical_y;
+                            state.logical_x = move_event.logical_x;
+                            state.logical_y = move_event.logical_y;
 
-                        converted_pointers.push(move_event);
+                            converted_pointers.push(move_event);
+                        }
+                        state.is_down = false;
+                        state.buttons = new_buttons;
+                        converted_pointers.push(event);
                     }
-                    state.is_down = false;
-                    state.buttons = new_buttons;
-                    converted_pointers.push(event);
                 }
             },
             SignalKind::Scroll => {
