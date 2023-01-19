@@ -874,6 +874,9 @@ zx_status_t phy_destroy_iface(void* ctx, uint16_t id) {
     // attempt to stop any ongoing scans.
     iwl_mvm_scan_stop(mvm, IWL_MVM_SCAN_REGULAR, true);
 
+    // Reset the completion before using it during the deletion process.
+    sync_completion_reset(&mvmvif->mvm->wait_for_delete);
+
     // To serialize IF delete and create.  phy_create_iface() waits until
     // this flag is cleared before proceeeding. This flag is cleared in mac_stop().
     mvm->if_delete_in_progress = true;
