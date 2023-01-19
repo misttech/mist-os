@@ -22,6 +22,7 @@ impl DefineSubsystemConfiguration<Option<DiagnosticsConfig>> for DiagnosticsSubs
                 ArchivistConfig::NoService => builder.platform_bundle("archivist-no-service"),
                 ArchivistConfig::Bringup => builder.platform_bundle("archivist-bringup"),
                 ArchivistConfig::DefaultService => builder.platform_bundle("archivist-minimal"),
+                ArchivistConfig::LowMem => builder.platform_bundle("archivist-minimal"),
             }
         }
         Ok(())

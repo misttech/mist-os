@@ -21,6 +21,8 @@ pub enum ArchivistConfig {
     Bringup,
     #[default]
     DefaultService,
+    #[serde(rename = "low-mem-default-service-config")]
+    LowMem,
 }
 
 #[cfg(test)]
@@ -60,6 +62,14 @@ mod tests {
         let mut cursor = std::io::Cursor::new(json5);
         let archivist: ArchivistConfig = util::from_reader(&mut cursor).unwrap();
         assert_eq!(archivist, ArchivistConfig::Bringup);
+    }
+
+    #[test]
+    fn test_diagnostics_archivist_low_mem() {
+        let json5 = r#""low-mem-default-service-config""#;
+        let mut cursor = std::io::Cursor::new(json5);
+        let archivist: ArchivistConfig = util::from_reader(&mut cursor).unwrap();
+        assert_eq!(archivist, ArchivistConfig::LowMem);
     }
 
     #[test]
