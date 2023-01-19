@@ -230,6 +230,11 @@ fuchsia_structured_config_values("bringup-config") {
   values = bringup_config
 }
 
+fuchsia_structured_config_values("low-mem-default-service-config") {
+  cm_label = ":root-manifest"
+  values = low_mem_default_config
+}
+
 fuchsia_structured_config_values("without-attribution-config") {
   cm_label = ":archivist-without-attribution-manifest"
   values = without_attribution_config

@@ -30,6 +30,14 @@ bringup_config = {
   bind_services = []
 }
 
+low_mem_default_config = {
+  forward_variables_from(default_config, "*")
+
+  num_threads = 2
+  logs_max_cached_original_bytes = 2097152
+  maximum_concurrent_snapshots_per_reader = 2
+}
+
 embedded_config = {
   forward_variables_from(default_config, "*")
 
