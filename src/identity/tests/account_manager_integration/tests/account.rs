@@ -10,7 +10,7 @@ use {
     fidl_fuchsia_identity_account::{
         AccountManagerGetAccountRequest, AccountManagerMarker,
         AccountManagerProvisionNewAccountRequest, AccountManagerProxy, AccountMarker,
-        AccountMetadata, AccountProxy, Error as ApiError, Lifetime,
+        AccountMetadata, AccountProxy, AuthState, AuthStateSummary, Error as ApiError, Lifetime,
     },
     fidl_fuchsia_identity_authentication::{
         Empty, InteractionMarker, InteractionWatchStateResponse, Mechanism, Mode,
@@ -532,7 +532,10 @@ async fn get_account_and_persona_helper(lifetime: Lifetime) -> Result<(), Error>
     );
     let account_proxy = account_client_end.into_proxy()?;
     let account_auth_state = account_proxy.get_auth_state().await?;
-    assert_eq!(account_auth_state, Err(ApiError::UnsupportedOperation));
+    assert_matches!(
+        account_auth_state,
+        Ok(AuthState { summary: Some(AuthStateSummary::RecentlyAuthenticated), .. })
+    );
 
     let expected_lock_result = match lifetime {
         // Cannot lock account not protected by an auth mechanism

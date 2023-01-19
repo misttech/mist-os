@@ -7,6 +7,10 @@
 use std::time::{Duration, SystemTime};
 
 /// The current state of the account with respect to interaction lock.
+//
+// TODO(fxb/110859): provide a factory method for InteractionLockState::Unlocked
+// which performs the SystemTime::now() construction and can claim -not- to be
+// recently authenticated if UTC is unavailable.
 pub enum InteractionLockState {
     /// The account is interaction-locked.
     Locked,

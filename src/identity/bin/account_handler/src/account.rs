@@ -6,6 +6,7 @@ use {
     crate::{
         common::AccountLifetime,
         inspect,
+        interaction_lock_state::InteractionLockState,
         persona::{Persona, PersonaContext},
         storage_lock_request,
         stored_account::StoredAccount,
@@ -14,14 +15,18 @@ use {
     anyhow::Error,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_identity_account::{
-        AccountRequest, AccountRequestStream, AuthState, AuthTargetRegisterAuthListenerRequest,
-        Error as ApiError, Lifetime, PersonaMarker,
+        AccountRequest, AccountRequestStream, AuthState, AuthStateSummary,
+        AuthTargetRegisterAuthListenerRequest, Error as ApiError, Lifetime, PersonaMarker,
     },
     fidl_fuchsia_io as fio,
     fuchsia_inspect::{Node, NumericProperty},
     futures::{lock::Mutex, prelude::*},
     identity_common::{cancel_or, TaskGroup, TaskGroupCancel},
-    std::{fs, sync::Arc},
+    std::{
+        fs,
+        sync::Arc,
+        time::{Duration, SystemTime},
+    },
     storage_manager::StorageManager,
     tracing::{error, info, warn},
 };
@@ -31,6 +36,10 @@ use {
 /// that FIDL clients cannot access, and to potentially serve different directories to different
 /// clients in the future.
 const DEFAULT_DIR: &str = "default";
+
+/// When evaluating whether or not an account is 'unlocked' vs. 'recently
+/// authenticated', the threshold to consider.
+const RECENCY_THRESHOLD: &Duration = &Duration::from_secs(30);
 
 /// The context that a particular request to an Account should be executed in, capturing
 /// information that was supplied upon creation of the channel.
@@ -61,6 +70,9 @@ pub struct Account<SM> {
 
     /// The StorageManager used by the owning account handler.
     storage_manager: Arc<Mutex<SM>>,
+
+    /// Whether or not the account is currently interaction-locked.
+    interaction_lock_state: Arc<Mutex<InteractionLockState>>,
     // TODO(jsankey): Once the system and API surface can support more than a single persona, add
     // additional state here to store these personae. This will most likely be a hashmap from
     // PersonaId to Persona struct, and changing default_persona from a struct to an ID.
@@ -97,6 +109,9 @@ where
             storage_lock_request_sender,
             inspect: account_inspect,
             storage_manager,
+            interaction_lock_state: Arc::new(Mutex::new(InteractionLockState::Unlocked {
+                last_authentication_time: SystemTime::now(),
+            })),
         })
     }
 
@@ -211,7 +226,7 @@ where
                 responder.send(response)?;
             }
             AccountRequest::GetAuthState { responder } => {
-                let mut response = self.get_auth_state();
+                let mut response = self.get_auth_state().await;
                 responder.send(&mut response)?;
             }
             AccountRequest::RegisterAuthListener { payload, responder } => {
@@ -259,9 +274,20 @@ where
         Lifetime::from(self.lifetime.as_ref())
     }
 
-    fn get_auth_state(&self) -> Result<AuthState, ApiError> {
-        // TODO(jsankey): Return real authentication state once authenticators exist to create it.
-        Err(ApiError::UnsupportedOperation)
+    async fn get_auth_state(&self) -> Result<AuthState, ApiError> {
+        let interaction_lock_state = &*self.interaction_lock_state.lock().await;
+        let summary = match &interaction_lock_state {
+            InteractionLockState::Locked => AuthStateSummary::InteractionLocked,
+            InteractionLockState::Unlocked { .. } => {
+                if interaction_lock_state.is_recently_authenticated(RECENCY_THRESHOLD) {
+                    AuthStateSummary::RecentlyAuthenticated
+                } else {
+                    AuthStateSummary::Unlocked
+                }
+            }
+        };
+
+        Ok(AuthState { summary: Some(summary), ..AuthState::EMPTY })
     }
 
     fn register_auth_listener(
@@ -337,8 +363,8 @@ where
     }
 
     async fn interaction_lock(&self) -> Result<(), ApiError> {
-        // TODO(fxb/110859): Implement Account::interaction_lock() here.
-        Err(ApiError::UnsupportedOperation)
+        self.interaction_lock_state.lock().await.lock();
+        Ok(())
     }
 
     async fn get_data_directory(
@@ -578,12 +604,39 @@ mod tests {
     }
 
     #[fasync::run_until_stalled(test)]
-    async fn test_get_auth_state() {
+    async fn test_get_auth_state_recently_authenticated_to_unlocked() {
         let mut test = Test::new();
         test.run(
             test.create_persistent_account().await.unwrap(),
             |(proxy, _storage_manager)| async move {
-                assert_eq!(proxy.get_auth_state().await?, Err(ApiError::UnsupportedOperation));
+                assert_matches!(
+                    proxy.get_auth_state().await?,
+                    Ok(AuthState { summary: Some(AuthStateSummary::RecentlyAuthenticated), .. })
+                );
+
+                // TODO(fxb/110859): Once fxr/790543 lands and we can use
+                // structured configuration to reduce the recency threshold,
+                // wait a second and then assert that this is ::Unlocked.
+
+                Ok(())
+            },
+        )
+        .await;
+    }
+
+    #[fasync::run_until_stalled(test)]
+    async fn test_interaction_lock() {
+        let mut test = Test::new();
+        test.run(
+            test.create_persistent_account().await.unwrap(),
+            |(proxy, _storage_manager)| async move {
+                assert_matches!(proxy.interaction_lock().await, Ok(Ok(())));
+
+                assert_matches!(
+                    proxy.get_auth_state().await?,
+                    Ok(AuthState { summary: Some(AuthStateSummary::InteractionLocked), .. })
+                );
+
                 Ok(())
             },
         )
