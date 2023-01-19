@@ -65,7 +65,6 @@ config("fidl-llcpp-deprecated-raw-channels") {
     "//src/devices/tests/ddk-metadata-test:tests",
     "//src/devices/tests/ddk-power",
     "//src/devices/tests/ddk-runcompatibilityhook",
-    "//src/devices/tests/driver-inspect-test:tests",
     "//src/devices/tests/mock-device:mock-device-driver",
     "//src/devices/thermal/drivers/as370-thermal:as370-thermal-test-bin",
     "//src/devices/usb/bin/usb-fwloader",
