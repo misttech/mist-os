@@ -216,7 +216,6 @@ impl DocYamlCheck for YamlChecker {
                 Some("_drivers_areas.yaml") => check_drivers_areas(filename, yaml_value),
                 Some("_drivers_epitaphs.yaml") => check_drivers_epitaphs(filename, yaml_value),
                 Some("_eng_council.yaml") => check_eng_council(filename, yaml_value),
-                Some("_glossary.yaml") => check_glossary(filename, yaml_value),
                 Some("glossary.yaml") => check_glossary(filename, yaml_value),
                 Some("_metadata.yaml") => check_metadata(filename, yaml_value),
                 Some("_problems.yaml") => check_problems(filename, yaml_value),

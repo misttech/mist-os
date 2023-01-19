@@ -101,7 +101,17 @@ on a line by itself.
 
 ## YAML data file checks
 
+YAML files in fuchsia.dev are used to store documentation content in a structured
+format which is then rendered through the use of Jinja templates. Any YAML file
+that is prefixed with a `_` indicates that the YAML is not published as a
+standalone file, but only rendered through the use of a template. If a YAML
+file is not prefixed with `_`, the YAML file is published on fuchsia.dev and can
+be viewed as a plain YAML file.
+
 ### _toc.yaml checks
+
+`_toc.yaml` files are mainly used to create the information architecture for
+fuchsia.dev.
 
 These checks enforce the table of contents structure described in
  [_toc.yaml reference](/docs/contribute/docs/documentation-navigation-toc.md#toc-reference).
