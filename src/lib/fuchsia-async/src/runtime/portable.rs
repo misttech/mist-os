@@ -140,8 +140,8 @@ pub mod executor {
     impl SendExecutor {
         /// Create a new executor running with actual time.
         #[allow(deprecated)]
-        pub fn new(num_threads: usize) -> Result<Self, zx_status::Status> {
-            Self::try_new(num_threads)
+        pub fn new(num_threads: usize) -> Self {
+            Self::try_new(num_threads).unwrap()
         }
 
         /// Deprecated, will be deleted.

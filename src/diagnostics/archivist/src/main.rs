@@ -99,7 +99,7 @@ fn main() -> Result<(), Error> {
         let mut executor = fasync::LocalExecutor::new();
         executor.run_singlethreaded(async_main(config)).context("async main")?;
     } else {
-        let mut executor = fasync::SendExecutor::new(num_threads as usize - 1)?;
+        let mut executor = fasync::SendExecutor::new(num_threads as usize - 1);
         executor.run(async_main(config)).context("async main")?;
     }
     debug!("Exiting.");

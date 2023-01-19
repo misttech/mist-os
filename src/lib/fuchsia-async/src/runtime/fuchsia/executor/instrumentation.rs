@@ -422,7 +422,7 @@ mod tests {
 
     #[test]
     fn instrumentation_multi_smoke_test() {
-        let mut executor = SendExecutor::new(2).unwrap();
+        let mut executor = SendExecutor::new(2);
         executor.run(simple_task_for_snapshot());
         let snapshot = executor.snapshot();
         snapshot_sanity_check(&snapshot, /* extra_tasks */ 1);

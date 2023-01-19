@@ -257,7 +257,7 @@ mod test {
 
     #[test]
     fn shorter_fires_first_multithreaded() {
-        let mut exec = SendExecutor::new(4).unwrap();
+        let mut exec = SendExecutor::new(4);
         let shorter = Timer::new(Time::after(100.millis()));
         let longer = Timer::new(Time::after(1.second()));
         match exec.run(future::select(shorter, longer)) {

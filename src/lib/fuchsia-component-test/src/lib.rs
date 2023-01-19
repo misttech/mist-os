@@ -3287,7 +3287,7 @@ mod tests {
     fn realm_builder_works_with_send() {
         // This test exercises realm builder on a multi-threaded executor, so that we can guarantee
         // that the library works in this situation.
-        let mut executor = fasync::SendExecutor::new(2).expect("failed to create send executor");
+        let mut executor = fasync::SendExecutor::new(2);
         executor.run(async {
             let (builder, _server_task, _receive_server_requests) =
                 new_realm_builder_and_server_task();

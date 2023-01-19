@@ -52,8 +52,8 @@ impl fmt::Debug for SendExecutor {
 impl SendExecutor {
     /// Create a new multi-threaded executor.
     #[allow(deprecated)]
-    pub fn new(num_threads: usize) -> Result<Self, zx::Status> {
-        Self::try_new(num_threads)
+    pub fn new(num_threads: usize) -> Self {
+        Self::try_new(num_threads).unwrap()
     }
 
     /// Deprecated, will be deleted.

@@ -43,8 +43,6 @@ pub mod task {
 }
 
 pub mod executor {
-    use fuchsia_zircon_status::Status;
-
     /// Stub spawn, panics if used.
     //pub fn spawn<T>(_: T) {
     //    unimplemented!()
@@ -60,7 +58,7 @@ pub mod executor {
 
     impl SendExecutor {
         /// Stub new, panics if used.
-        pub fn new(_: usize) -> Result<Self, Status> {
+        pub fn new(_: usize) -> Self {
             unimplemented!();
         }
 

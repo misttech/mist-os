@@ -9,7 +9,7 @@ fn panic() {
 }
 
 fn async_panic() {
-    let mut executor = fasync::SendExecutor::new(4).unwrap();
+    let mut executor = fasync::SendExecutor::new(4);
     let async_code = async {
         panic!("async panic!");
     };

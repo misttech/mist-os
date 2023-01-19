@@ -49,8 +49,7 @@ fn main() {
     drop(ldsvc);
 
     let (runtime_config, bootfs_svc, boot_defaults) = build_runtime_config();
-    let mut executor =
-        fasync::SendExecutor::new(runtime_config.num_threads).expect("error creating executor");
+    let mut executor = fasync::SendExecutor::new(runtime_config.num_threads);
 
     match runtime_config.log_destination {
         finternal::LogDestination::Syslog => {

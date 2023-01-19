@@ -232,7 +232,7 @@ mod tests {
     #[should_panic]
     fn spawn_from_unblock_fails() {
         // no executor in the off-thread, so spawning fails
-        SendExecutor::new(2).unwrap().run(async move {
+        SendExecutor::new(2).run(async move {
             unblock(|| {
                 let _ = Task::spawn(async {});
             })
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_spawn_on() {
-        SendExecutor::new(2).unwrap().run(async move {
+        SendExecutor::new(2).run(async move {
             let executor = EHandle::local();
             let done = Arc::new(AtomicBool::new(false));
             let done_clone = done.clone();
@@ -285,13 +285,13 @@ mod tests {
         let (finish_sender, finish_receiver) = oneshot::channel();
 
         let executor_thread = std::thread::spawn(move || {
-            SendExecutor::new(2).unwrap().run(async move {
+            SendExecutor::new(2).run(async move {
                 ehandle_sender.send(EHandle::local()).unwrap();
                 finish_receiver.await.unwrap();
             })
         });
 
-        SendExecutor::new(2).unwrap().run(async move {
+        SendExecutor::new(2).run(async move {
             // Get the handle for the other executor.
             let ehandle = ehandle_receiver.await.unwrap();
 

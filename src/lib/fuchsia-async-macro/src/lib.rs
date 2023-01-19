@@ -303,9 +303,7 @@ pub fn run(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     } else {
         quote! {
-            ::fuchsia_async::SendExecutor::new(#threads)
-                .expect("Failed to create executor")
-                .run(func())
+            ::fuchsia_async::SendExecutor::new(#threads).run(func())
         }
     };
     common(item, run_executor.into(), test)

@@ -204,7 +204,7 @@ mod task_tests {
 
     fn run(f: impl Send + 'static + Future<Output = ()>) {
         const TEST_THREADS: usize = 2;
-        SendExecutor::new(TEST_THREADS).unwrap().run(f)
+        SendExecutor::new(TEST_THREADS).run(f)
     }
 
     #[test]

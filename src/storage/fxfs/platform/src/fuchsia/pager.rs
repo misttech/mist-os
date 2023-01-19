@@ -131,8 +131,7 @@ impl PagerExecutor {
         let terminate_event = Event::new();
         let terminate_wait = terminate_event.listen();
         let primary_thread_handle = std::thread::spawn(move || {
-            let mut executor = fasync::SendExecutor::new(Self::get_num_threads())
-                .expect("Failed to create executor for PagerExecutor");
+            let mut executor = fasync::SendExecutor::new(Self::get_num_threads());
             executor.run(PagerExecutor::executor_worker_lifecycle(ehandle_tx, terminate_wait));
         });
 
