@@ -40,11 +40,26 @@ pub fn construct_base_package(
         let pkg_manifest = PackageManifest::try_load_from(pkg_manifest_path)?;
         base_pkg_builder.add_files_from_package(pkg_manifest);
     }
+
     let mut added_packages = HashSet::default();
+    let mut top_level_subpackages = Vec::default();
     for pkg_manifest_path in &product.base {
         let pkg_manifest = PackageManifest::try_load_from(pkg_manifest_path)?;
         added_packages.insert(pkg_manifest.hash());
-        for subpackage in pkg_manifest.subpackages() {
+        top_level_subpackages.push((pkg_manifest_path, pkg_manifest.subpackages().to_vec()));
+        base_pkg_builder.add_base_package(pkg_manifest).context(format!(
+            "Failed to add package to base package list with manifest: {pkg_manifest_path}"
+        ))?;
+    }
+
+    // Add only the anonymous subpackages (those packages not also in the named
+    // packages listed in `product.base`).
+    //
+    // `add_nested_subpackages()` adds subpackages recursively, only if the
+    // package hash is not already in `added_packages`, which is already
+    // populated with the package hashes from `product.base`.
+    for (pkg_manifest_path, subpackages) in top_level_subpackages {
+        for subpackage in subpackages {
             add_nested_subpackages(
                 &mut base_pkg_builder,
                 &mut added_packages,
@@ -54,9 +69,6 @@ pub fn construct_base_package(
             )
             .with_context(|| format!("Adding subpackages for {pkg_manifest_path}"))?;
         }
-        base_pkg_builder.add_base_package(pkg_manifest).context(format!(
-            "Failed to add package to base package list with manifest: {pkg_manifest_path}"
-        ))?;
     }
 
     for pkg_manifest_path in &product.cache {
