@@ -47,7 +47,7 @@ class AuthService {
 
   final _accountManager = faccount.AccountManagerProxy();
   faccount.AccountProxy? _account;
-  final _accountIds = <int>[];
+  int? _accountId;
   final _ready = false.asObservable();
 
   /// Set to true if successfully authenticated, false otherwise or post logout.
@@ -74,13 +74,12 @@ class AuthService {
   /// Load existing accounts from [AccountManager].
   void loadAccounts() async {
     try {
-      final ids = (await _accountManager.getAccountIds()).toList();
+      final ids = await _accountManager.getAccountIds();
 
       // TODO(http://fxb/85576): Remove once login and OOBE are mandatory.
       // Remove any accounts created with a deprecated name or from an auth
       // mode that does not match the current build configuration.
-      final tempIds = <int>[]..addAll(ids);
-      for (var id in tempIds) {
+      for (var id in ids) {
         final metadata = await _accountManager.getAccountMetadata(id);
 
         if (metadata.name != null &&
@@ -96,12 +95,15 @@ class AuthService {
           }
         }
       }
-      _accountIds.addAll(ids);
-      runInAction(() => _ready.value = true);
       if (ids.length > 1) {
         log.shout(
             'Multiple (${ids.length}) accounts found, will use the first.');
       }
+
+      if (ids.isNotEmpty) {
+        _accountId = ids.first;
+      }
+      runInAction(() => _ready.value = true);
       // ignore: avoid_catches_without_on_clauses
     } catch (e) {
       log.shout('Failed during deprecated account removal: $e');
@@ -128,7 +130,14 @@ class AuthService {
   /// Returns [true] if no accounts exists on device.
   bool get hasAccount {
     assert(ready, 'Called before list of accounts could be retrieved.');
-    return _accountIds.isNotEmpty;
+    return _accountId != null;
+  }
+
+  /// Returns the first logged in account id.
+  /// [loadAccounts] should have been called first.
+  int get accountId {
+    assert(hasAccount);
+    return _accountId!;
   }
 
   String errorFromException(Object e, AuthOp op) {
@@ -206,10 +215,8 @@ class AuthService {
     }
 
     final ids = await _accountManager.getAccountIds();
-    _accountIds
-      ..clear()
-      ..addAll(ids);
-    log.info('Account creation succeeded.');
+    _accountId = ids.first;
+    log.info('Account creation succeeded. $_accountId');
 
     await _publishAccountDirectory(_account!);
 
@@ -219,7 +226,7 @@ class AuthService {
   /// Logs in to the first account with [password] and sets up the account data
   /// directory.
   Future<void> loginWithPassword(String password) async {
-    assert(_accountIds.isNotEmpty, 'No account exist to login to.');
+    assert(_accountId != null, 'No account exist to login to.');
     if (_account != null && _account!.ctrl.isBound) {
       // ignore: unawaited_futures
       _account!.storageLock().catchError((_) {});
@@ -229,7 +236,8 @@ class AuthService {
     if (useNewAccountManager) {
       try {
         final passwordInteractionFlow =
-            await _getPasswordInteractionFlowForAuth(_accountIds.first);
+            await _getPasswordInteractionFlowForAuth(
+                _accountId!.toUnsigned(64));
         await passwordInteractionFlow.setPassword(password);
         clearPasswordInteractionFlow();
         // ignore: avoid_catches_without_on_clauses
@@ -244,7 +252,7 @@ class AuthService {
     } else {
       _account = faccount.AccountProxy();
       await _accountManager.deprecatedGetAccount(
-        _accountIds.first,
+        _accountId!.toUnsigned(64),
         password,
         _account!.ctrl.request(),
       );

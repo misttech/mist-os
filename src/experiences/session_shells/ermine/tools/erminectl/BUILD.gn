@@ -11,6 +11,7 @@ rustc_binary("bin") {
   edition = "2018"
 
   deps = [
+    "//sdk/fidl/fuchsia.identity.account:fuchsia.identity.account_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/experiences/session_shells/ermine/fidl:ermine.tools_rust",
     "//src/lib/fidl/rust/fidl",

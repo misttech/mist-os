@@ -4,12 +4,13 @@
 
 use {
     anyhow::{format_err, Error},
-    // anyhow::Error,
     argh::FromArgs,
-    fidl_ermine_tools as fermine,
-    fidl_fuchsia_sys2 as fsys,
-    fuchsia_async as fasync,
-    fuchsia_component::client::{connect_to_protocol_at_dir_root, connect_to_protocol_at_path},
+    fidl_ermine_tools as fermine, fidl_fuchsia_identity_account as faccount,
+    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fuchsia_component::client::{
+        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_root,
+        connect_to_protocol_at_path,
+    },
 };
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -96,10 +97,14 @@ const LOGIN_SHELL_MONIKER: &str =
     "./core/session-manager/session:session/workstation_session/login_shell";
 
 /// Moniker of the application shell component
-// TODO(fxbug.dev/114052): The `1` in `application_shell:1` will change
-// eventually.
 const ERMINE_SHELL_MONIKER: &str =
-    "./core/session-manager/session:session/workstation_session/login_shell/application_shell:1";
+    "./core/session-manager/session:session/workstation_session/login_shell/application_shell:";
+
+/// Moniker of the account manager component.
+const ACCOUNT_MANAGER_MONIKER: &str = "./core/account/account_manager";
+const ACCOUNT_MANAGER_PROTOCOL: &str = "fuchsia.identity.account.AccountManager";
+const PASSWORD_AUTHENTICATOR_MONIKER: &str = "./core/account/password_authenticator";
+const PASSWORD_AUTHENTICATOR_PROTOCOL: &str = "fuchsia.identity.account.DeprecatedAccountManager";
 
 async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>(
     realm_query: &fsys::RealmQueryProxy,
@@ -112,6 +117,51 @@ async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMar
         .ok_or(format_err!("{} is not resolved", moniker))?;
     let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
     connect_to_protocol_at_dir_root::<P>(&exposed_dir)
+}
+
+/// Connects to a discoverable protocol at the component instance supplied by `moniker`.
+async fn connect_to_exposed_named_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>(
+    realm_query: &fsys::RealmQueryProxy,
+    moniker: &str,
+    protocol_name: &str,
+) -> Result<P::Proxy, Error> {
+    let resolved_dirs = realm_query
+        .get_instance_directories(moniker)
+        .await?
+        .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
+        .ok_or(format_err!("{} could not be resolved", moniker))?;
+    let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
+    connect_to_named_protocol_at_dir_root::<P>(&exposed_dir, protocol_name)
+}
+
+async fn get_account_id(realm_query: &fsys::RealmQueryProxy) -> Result<u64, Error> {
+    // Connect to the new account system implementation if possible.
+    let result = connect_to_exposed_named_protocol::<faccount::AccountManagerMarker>(
+        realm_query,
+        ACCOUNT_MANAGER_MONIKER,
+        ACCOUNT_MANAGER_PROTOCOL,
+    )
+    .await;
+
+    // If not then fallback to the deprecated password authenticator implementation.
+    let account_manager = match result {
+        Ok(account_manager) => account_manager,
+        Err(_) => {
+            connect_to_exposed_named_protocol::<faccount::AccountManagerMarker>(
+                realm_query,
+                PASSWORD_AUTHENTICATOR_MONIKER,
+                PASSWORD_AUTHENTICATOR_PROTOCOL,
+            )
+            .await?
+        }
+    };
+
+    let account_ids = account_manager.get_account_ids().await?;
+    if account_ids.is_empty() {
+        Err(format_err!("Failed to find any accounts in the system"))
+    } else {
+        Ok(*account_ids.first().unwrap())
+    }
 }
 
 #[fasync::run_singlethreaded]
@@ -166,12 +216,16 @@ async fn main() -> Result<(), Error> {
             }
         },
         Some(Command::Shell(ShellCommand { command })) => {
+            let account_id = get_account_id(&realm_query).await?;
+            // Append the account id to the shell's moniker.
+            let moniker = format!("{}{}", ERMINE_SHELL_MONIKER, account_id);
+            let shell_automator = connect_to_exposed_protocol::<fermine::ShellAutomatorMarker>(
+                &realm_query,
+                &moniker,
+            )
+            .await?;
             match command {
                 ShellSubCommand::Launch(ShellLaunchCommand { app_name }) => {
-                    let shell_automator = connect_to_exposed_protocol::<
-                        fermine::ShellAutomatorMarker,
-                    >(&realm_query, ERMINE_SHELL_MONIKER)
-                    .await?;
                     let result = shell_automator
                         .launch(fermine::ShellAutomatorLaunchRequest {
                             app_name: Some(app_name),
@@ -185,10 +239,6 @@ async fn main() -> Result<(), Error> {
                     }
                 }
                 ShellSubCommand::CloseAll(ShellCloseAllCommand {}) => {
-                    let shell_automator = connect_to_exposed_protocol::<
-                        fermine::ShellAutomatorMarker,
-                    >(&realm_query, ERMINE_SHELL_MONIKER)
-                    .await?;
                     let result = shell_automator.close_all().await?;
                     match result {
                         Ok(()) => println!("ok"),

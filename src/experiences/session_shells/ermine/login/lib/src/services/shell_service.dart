@@ -28,13 +28,6 @@ const kApplicationShellConfigPath =
 
 const kApplicationShellCollectionName = 'application_shell';
 
-/// '1' currently refers to the ID of the account that's logged in. At the end
-/// of the day it doesn't really matter what the instance name is.
-///
-/// TODO(fxbug.dev/114052): There won't always be just a single account with ID
-/// 1, so we'll need to decide what to do with this.
-const kApplicationShellComponentName = '1';
-
 // The component url of the ermine application shell.
 const kErmineShellUrl = 'fuchsia-pkg://fuchsia.com/ermine#meta/ermine.cm';
 
@@ -107,7 +100,7 @@ class ShellService {
   }
 
   /// Launch Ermine shell and return [FuchsiaViewConnection].
-  FuchsiaViewConnection launchErmineShell() {
+  FuchsiaViewConnection launchErmineShell(int accountId) {
     assert(_ermine == null, 'Instance of ermine shell already exists.');
 
     _shellExposedDir = DirectoryProxy();
@@ -121,6 +114,7 @@ class ShellService {
       },
       onExit: onShellExit,
       componentUrl: shellUrl,
+      componentName: accountId.toUnsigned(64).toString(),
       exposedDir: _shellExposedDir,
       exposedDirRequest: _shellExposedDir.ctrl.request(),
     );
@@ -145,7 +139,8 @@ class _ErmineViewConnection {
   final bool useFlatland;
   final VoidCallback onReady;
   final VoidCallback onExit;
-  late final RealmProxy realm;
+  final RealmProxy realm;
+  final String componentName;
   late final FuchsiaViewConnection fuchsiaViewConnection;
   bool _focusRequested = false;
 
@@ -154,19 +149,20 @@ class _ErmineViewConnection {
     required this.onReady,
     required this.onExit,
     required String componentUrl,
+    required this.componentName,
     required DirectoryProxy exposedDir,
     required InterfaceRequest<Directory> exposedDirRequest,
-  }) {
+  }) : realm = RealmProxy() {
     // Connect to the Realm.
-    realm = RealmProxy();
     Incoming.fromSvcPath().connectToService(realm);
 
-    log.info('launching application shell with url $componentUrl');
+    log.info(
+        'launching application shell with url $componentUrl name $componentName');
     realm
       ..createChild(
           CollectionRef(name: kApplicationShellCollectionName),
           Child(
-              name: kApplicationShellComponentName,
+              name: componentName,
               url: componentUrl,
               startup: StartupMode.lazy),
           CreateChildArgs())
@@ -174,8 +170,7 @@ class _ErmineViewConnection {
       // Get the shell's exposed /svc directory.
       ..openExposedDir(
           ChildRef(
-              collection: kApplicationShellCollectionName,
-              name: kApplicationShellComponentName),
+              collection: kApplicationShellCollectionName, name: componentName),
           exposedDirRequest);
 
     // Get the ermine shell's view provider.
@@ -188,8 +183,7 @@ class _ErmineViewConnection {
 
   void dispose() {
     realm.destroyChild(ChildRef(
-        collection: kApplicationShellCollectionName,
-        name: kApplicationShellComponentName));
+        collection: kApplicationShellCollectionName, name: componentName));
   }
 
   void setFocus() {

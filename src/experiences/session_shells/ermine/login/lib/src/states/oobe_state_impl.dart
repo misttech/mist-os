@@ -7,7 +7,6 @@ import 'dart:ui';
 
 import 'package:ermine_utils/ermine_utils.dart';
 import 'package:fidl_ermine_tools/fidl_async.dart';
-import 'package:fidl_fuchsia_identity_authentication/fidl_async.dart';
 import 'package:fidl/fidl.dart';
 import 'package:flutter/services.dart';
 import 'package:fuchsia_inspect/inspect.dart';
@@ -146,8 +145,12 @@ class OobeStateImpl with Disposable implements OobeState {
 
   final _ermineViewConnection = Observable<FuchsiaViewConnection?>(null);
   @override
-  FuchsiaViewConnection get ermineViewConnection =>
-      _ermineViewConnection.value ??= shellService.launchErmineShell();
+  FuchsiaViewConnection get ermineViewConnection {
+    assert(authService.hasAccount);
+    _ermineViewConnection.value ??=
+        shellService.launchErmineShell(authService.accountId);
+    return _ermineViewConnection.value!;
+  }
 
   @override
   OobeScreen get screen => _screen.value;
