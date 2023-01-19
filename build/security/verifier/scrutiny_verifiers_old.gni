@@ -73,9 +73,6 @@ import("//build/security/verifier/verify_structured_config.gni")
 #   verify_routes_exceptions_allowlist (required)
 #     [string]
 #
-#   verify_routes_exceptions_allowlist_bootfs (required)
-#     [string]
-#
 #   verify_routes_exceptions_allowlist_product (required)
 #     [list of files]
 #
@@ -112,9 +109,6 @@ template("scrutiny_verifiers") {
       defined(invoker.verify_routes_component_tree_config),
       "verify_routes_component_tree_config is required for scrutiny_verifiers()")
   assert(
-      defined(invoker.verify_routes_exceptions_allowlist_bootfs),
-      "verify_routes_exceptions_allowlist_bootfs is required for scrutiny_verifiers()")
-  assert(
       defined(invoker.verify_routes_exceptions_allowlist_product),
       "verify_routes_exceptions_allowlist_product is required for scrutiny_verifiers()")
   assert(
@@ -129,6 +123,9 @@ template("scrutiny_verifiers") {
 
   # TODO(fxbug.dev/114473): Remove once clients have stopped supplying a ZBI.
   not_needed(invoker, [ "zbi" ])
+
+  # TODO(fxbug.dev/93041): Remove once clients have stopped supplying this arg.
+  not_needed(invoker, [ "verify_routes_exceptions_allowlist_bootfs" ])
   verifiers = []
 
   verify_structured_config_policy_by_build_type(
@@ -216,8 +213,7 @@ template("scrutiny_verifiers") {
     }
 
     if (invoker.verify_routes_exceptions_allowlist != "" ||
-        invoker.verify_routes_exceptions_allowlist_product != [] ||
-        invoker.verify_routes_exceptions_allowlist_bootfs != "") {
+        invoker.verify_routes_exceptions_allowlist_product != []) {
       verify_routes("${invoker.assembly_image_name}_verify_capability_routes") {
         forward_variables_from(invoker,
                                [
@@ -231,11 +227,6 @@ template("scrutiny_verifiers") {
           allowlist += [ invoker.verify_routes_exceptions_allowlist ]
         }
         allowlist += invoker.verify_routes_exceptions_allowlist_product
-        if (use_bringup_assembly) {
-          allowlist += [ invoker.verify_routes_exceptions_allowlist_bootfs ]
-        } else {
-          not_needed(invoker, [ "verify_routes_exceptions_allowlist_bootfs" ])
-        }
         if (invoker.verify_routes_component_tree_config != "") {
           component_tree_config = invoker.verify_routes_component_tree_config
         }
@@ -301,7 +292,6 @@ template("scrutiny_verifiers") {
                  "structured_config_policy",
                  "verify_component_resolvers_allowlist",
                  "verify_routes_component_tree_config",
-                 "verify_routes_exceptions_allowlist_bootfs",
                  "verify_routes_exceptions_allowlist_product",
                  "verify_routes_exceptions_allowlist",
                  "zbi_bootfs_filelist_goldens",

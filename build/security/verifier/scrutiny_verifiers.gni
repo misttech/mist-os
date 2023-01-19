@@ -60,9 +60,6 @@ import("//build/security/verifier/verify_structured_config.gni")
 #   verify_routes_exceptions_allowlist (required)
 #     [string]
 #
-#   verify_routes_exceptions_allowlist_bootfs (required)
-#     [string]
-#
 #   verify_routes_exceptions_allowlist_product (required)
 #     [list of files]
 #
@@ -103,10 +100,6 @@ template("scrutiny_verifiers2") {
       defined(invoker.verify_routes_component_tree_config) &&
           invoker.verify_routes_component_tree_config != "",
       "verify_routes_component_tree_config is required for scrutiny_verifiers()")
-  assert(
-      defined(invoker.verify_routes_exceptions_allowlist_bootfs) &&
-          invoker.verify_routes_exceptions_allowlist_bootfs != [],
-      "verify_routes_exceptions_allowlist_bootfs is required for scrutiny_verifiers()")
   assert(
       defined(invoker.verify_routes_exceptions_allowlist_product) &&
           invoker.verify_routes_exceptions_allowlist_product != [],
@@ -198,11 +191,8 @@ template("scrutiny_verifiers2") {
                              "recovery",
                            ])
     product_bundle = invoker.product_bundle
-    allowlist = [
-      invoker.verify_routes_exceptions_allowlist,
-      invoker.verify_routes_exceptions_allowlist_product,
-      invoker.verify_routes_exceptions_allowlist_bootfs,
-    ]
+    allowlist = [ invoker.verify_routes_exceptions_allowlist ]
+    allowlist += invoker.verify_routes_exceptions_allowlist_product
     component_tree_config = invoker.verify_routes_component_tree_config
   }
 
