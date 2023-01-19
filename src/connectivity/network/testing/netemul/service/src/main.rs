@@ -214,6 +214,19 @@ async fn create_realm_instance(
                                     fio::OpenFlags::CLONE_SAME_RIGHTS,
                                     mock_handles.outgoing_dir.into_channel().into(),
                                 )
+                                .or_else(|e| {
+                                    // A mock child source is served from
+                                    // outside of our component and returning an
+                                    // error here causes an error log. A racy
+                                    // component teardown can cause this, so log
+                                    // any closed errors as warnings.
+                                    if e.is_closed() {
+                                        warn!("failed to serve mock connection request: {:?}", e);
+                                        Ok(())
+                                    } else {
+                                        Err(e)
+                                    }
+                                })
                                 .context("cloning directory for mock handles"),
                             )
                             // The lifetime of the mock child component is tied
