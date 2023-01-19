@@ -415,6 +415,7 @@ type Import struct {
 
 // Root holds all of the declarations for a FIDL library.
 type Root struct {
+	Experiments     fidlgen.Experiments
 	LibraryName     string
 	Imports         []Import
 	Consts          []Const
@@ -1430,6 +1431,7 @@ func Compile(r fidlgen.Root) Root {
 	// are used as a transactional message payloads and/or wire bodies.
 	mtum := r.MethodTypeUsageMap()
 
+	c.Root.Experiments = r.Experiments
 	c.Root.LibraryName = fmt.Sprintf("fidl_%s", formatLibraryName(c.library))
 
 	for _, v := range r.Consts {

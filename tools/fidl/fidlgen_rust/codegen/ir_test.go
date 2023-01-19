@@ -105,13 +105,13 @@ func TestExperiments(t *testing.T) {
 			t.Errorf("case (%s): got %d experiment markers, want %d", test.desc, len(all), total_experiments)
 		}
 		for _, ex := range test.experiments {
-			if !strings.Contains(rust, fmt.Sprintf("\n// experiment = %s", ex)) {
-				t.Errorf("case (%s): could not find '// experiment = %s' in output", test.desc, ex)
+			if !strings.Contains(rust, fmt.Sprintf("\n// fidl_experiment = %s", ex)) {
+				t.Errorf("case (%s): could not find '// fidl_experiment = %s' in output", test.desc, ex)
 			}
 		}
 		for _, ex := range default_experiments {
-			if !strings.Contains(rust, fmt.Sprintf("\n// experiment = %s", ex)) {
-				t.Errorf("case (%s): could not find '// experiment = %s' in output", test.desc, ex)
+			if !strings.Contains(rust, fmt.Sprintf("\n// fidl_experiment = %s", ex)) {
+				t.Errorf("case (%s): could not find '// fidl_experiment = %s' in output", test.desc, ex)
 			}
 		}
 	}

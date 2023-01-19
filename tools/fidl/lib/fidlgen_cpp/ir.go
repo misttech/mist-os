@@ -208,6 +208,7 @@ type Member interface {
 }
 
 type Root struct {
+	Experiments              fidlgen.Experiments
 	HandleTypes              []string
 	Library                  fidlgen.LibraryIdentifier
 	Decls                    []Kinded
@@ -741,6 +742,7 @@ type Payloader interface {
 
 func compile(r fidlgen.Root) *Root {
 	root := Root{
+		Experiments: r.Experiments,
 		Library: r.Name.Parse(),
 	}
 

@@ -96,6 +96,9 @@ type Method struct {
 
 // Root is the root of the syzkaller backend IR structure.
 type Root struct {
+	// Experiments that have been enabled upstream in fidlc.
+	Experiments fidlgen.Experiments
+
 	// Name is the name of the library.
 	Name string
 
@@ -628,7 +631,9 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 
 func compile(fidlData fidlgen.Root) Root {
 	fidlData = fidlData.ForBindings("syzkaller")
-	root := Root{}
+	root := Root{
+		Experiments: fidlData.Experiments,
+	}
 	libraryName := fidlData.Name.Parse()
 	c := compiler{
 		decls:              fidlData.DeclInfo(),

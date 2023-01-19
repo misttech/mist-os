@@ -576,6 +576,9 @@ type Library struct {
 // The golang backend IR structure is loosely modeled after an abstract syntax
 // tree, and is used to generate golang code from templates.
 type Root struct {
+	// Experiments that have been enabled upstream in fidlc.
+	Experiments fidlgen.Experiments
+
 	// Name is the name of the library.
 	Name string
 
@@ -1283,6 +1286,7 @@ func Compile(fidlData fidlgen.Root) Root {
 
 	// Compile fidlData into r.
 	r := Root{
+		Experiments:   fidlData.Experiments,
 		Name:          changeIfReserved(libraryName[len(libraryName)-1], ""),
 		PackageName:   libraryPath,
 		BindingsAlias: BindingsAlias,
