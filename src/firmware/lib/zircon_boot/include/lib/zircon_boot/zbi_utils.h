@@ -58,6 +58,39 @@ typedef bool (*read_factory_t)(void* context, const char* name, size_t capacity,
 zbi_result_t AppendBootfsFactoryFiles(zbi_header_t* zbi, size_t capacity, const char** file_names,
                                       size_t file_count, read_factory_t read_factory,
                                       void* read_factory_context);
+
+// Alignment requirement for the buffer to boot zircon kernel. At the time this is written,
+// all our products on ARM use 64Kb alignment.
+#ifndef ZIRCON_BOOT_KERNEL_ALIGN
+#define ZIRCON_BOOT_KERNEL_ALIGN (64 * 1024)
+#endif
+
+// Extracts the kernel from `image` and relocate (copy) it to `relocate_addr`. Returns the kernel
+// entry point address on success. Only applies to ARM kernel type.
+//
+// This is needed because zircon booting requires additional scratch memory following the kernel.
+// See zircon/system/public/zircon/boot/image.h for more details.
+//
+// @zbi: Pointer to the zbi image.
+// @relocate_addr: Pointer to the relocation address.
+// @size: As input, it is set to the size of the `relocate_addr`. As output and
+//   when buffer is too small, it is set to the minimum required buffer size.
+//
+// Returns the kernel entry point address on success. NULL if `image` is not a zbi kernel or `size`
+// is too small to hold the entire kernel.
+void* RelocateKernel(const zbi_header_t* zbi, void* relocate_addr, size_t* size);
+
+// Simimlar to RelocateKernel(), but instead of to a different buffer, it relocates the kernel to
+// the end of the ZBI container.
+//
+// @zbi: Pointer to the zbi image.
+// @capacity: As input, it is set to the capacity of the `zbi`. As output and when capacity is not
+// enough, it is set to the minimum required capacity.
+//
+// Returns the kernel entry point address on success. NULL if `image` is not a zbi kernel or
+// `capacity` is not enough to relocate the kernel.
+void* RelocateKernelToTail(zbi_header_t* zbi, size_t* capacity);
+
 __END_CDECLS
 
 #endif  // SRC_FIRMWARE_LIB_ZIRCON_BOOT_INCLUDE_LIB_ZIRCON_BOOT_ZBI_UTILS_H_

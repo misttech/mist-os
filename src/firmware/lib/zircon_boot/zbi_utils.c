@@ -248,3 +248,66 @@ zbi_result_t AppendBootfsFactoryFiles(zbi_header_t* zbi, size_t capacity, const 
   }
   return ZBI_RESULT_OK;
 }
+
+static bool GetKernelLength(const zbi_header_t* zbi, size_t* kernel_len,
+                            size_t* kernel_and_scratch_memory_len) {
+  const zircon_kernel_t* kernel = (const zircon_kernel_t*)zbi;
+  if (kernel->hdr_file.type != ZBI_TYPE_CONTAINER ||
+      kernel->hdr_kernel.type != ZBI_TYPE_KERNEL_ARM64) {
+    return false;
+  }
+  *kernel_len = kernel->hdr_kernel.length + 2 * sizeof(zbi_header_t);
+  *kernel_and_scratch_memory_len = *kernel_len + kernel->data_kernel.reserve_memory_size;
+  return true;
+}
+
+void* RelocateKernel(const zbi_header_t* zbi, void* relocate_addr, size_t* size) {
+  if (((uintptr_t)relocate_addr) % ZIRCON_BOOT_KERNEL_ALIGN) {
+    zircon_boot_dlog("ERROR: relocated address must be aligned to %x\n", ZIRCON_BOOT_KERNEL_ALIGN);
+    return NULL;
+  }
+
+  size_t kernel_len, required_size;
+  if (!GetKernelLength(zbi, &kernel_len, &required_size)) {
+    return NULL;
+  }
+
+  if (required_size > *size) {
+    zircon_boot_dlog("ERROR: relocated buffer is too small %zu < %zu\n", *size, required_size);
+    *size = required_size;
+    return NULL;
+  }
+
+  const zircon_kernel_t* kernel = (const zircon_kernel_t*)zbi;
+  // Copy over the kernel
+  memcpy(relocate_addr, kernel, kernel_len);
+  zircon_kernel_t* new_kernel = (zircon_kernel_t*)relocate_addr;
+  new_kernel->hdr_file.length = (uint32_t)(kernel_len - sizeof(zbi_header_t));
+  // Calculate the entry point.
+  uintptr_t entry_point = (uintptr_t)relocate_addr + kernel->data_kernel.entry;
+  return (void*)entry_point;
+}
+
+#define ZBI_UTILS_ROUNDUP(a, b)   \
+  ({                              \
+    const __typeof((a)) _a = (a); \
+    const __typeof((b)) _b = (b); \
+    ((_a + _b - 1) / _b * _b);    \
+  })
+
+void* RelocateKernelToTail(zbi_header_t* zbi, size_t* capacity) {
+  size_t kernel_len, required_size;
+  if (!GetKernelLength(zbi, &kernel_len, &required_size)) {
+    return NULL;
+  }
+
+  uint8_t* start = (uint8_t*)zbi;
+  uint8_t* relocate_start = (uint8_t*)ZBI_UTILS_ROUNDUP(
+      (uintptr_t)(start + sizeof(zbi_header_t) + zbi->length), ZIRCON_BOOT_KERNEL_ALIGN);
+  if (relocate_start + required_size > start + *capacity) {
+    *capacity = relocate_start + required_size - start;
+    return NULL;
+  }
+  size_t buffer_size = start + *capacity - relocate_start;
+  return RelocateKernel(zbi, relocate_start, &buffer_size);
+}
