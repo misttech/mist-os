@@ -110,7 +110,7 @@ fit::nullable<Handle*> HandleTableArena::GetExistingHandle(uint32_t dir_index, u
     return fit::nullable<Handle*>{};
   }
   Handle* handle = &(handle_table_dir_[dir_index]->data()[index]);
-  return fit::nullable<Handle*>(handle->object() ? handle : nullptr);
+  return fit::nullable<Handle*>(handle->has_object() ? handle : nullptr);
 }
 
 Handle* HandleTableArena::AllocHandleMemoryLocked(uint32_t* out_dir_index, uint32_t* out_index) {
@@ -157,7 +157,7 @@ Handle* HandleTableArena::Alloc(fdf_handle_t* out_value) {
     return nullptr;
   }
   // The handle should be newly allocated or previously destructed.
-  ZX_ASSERT(!handle->object());
+  ZX_ASSERT(!handle->has_object());
 
   *out_value = new_handle_value(dir_index, index, handle->handle_value());
   num_allocated_++;

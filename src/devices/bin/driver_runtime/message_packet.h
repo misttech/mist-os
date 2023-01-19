@@ -10,6 +10,8 @@
 
 #include <fbl/intrusive_double_list.h>
 
+#include "src/devices/bin/driver_runtime/arena.h"
+
 namespace driver_runtime {
 
 class MessagePacket;

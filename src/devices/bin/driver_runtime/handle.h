@@ -84,6 +84,7 @@ class Handle : public fbl::SinglyLinkedListable<Handle*> {
 
   // Returns the object this handle refers to.
   fbl::RefPtr<Object> object() { return object_; }
+  bool has_object() const { return object_ != nullptr; }
 
   // Returns the handle value which refers to this object.
   fdf_handle_t handle_value() const { return value_; }
