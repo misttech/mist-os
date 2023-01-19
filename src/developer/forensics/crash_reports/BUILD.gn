@@ -113,6 +113,7 @@ source_set("crash_server") {
   ]
 
   deps = [
+    "//src/developer/forensics/feedback:constants",
     "//src/developer/forensics/utils:sized_data",
     "//src/lib/fostr/fidl/fuchsia.net.http",
     "//src/lib/fsl",

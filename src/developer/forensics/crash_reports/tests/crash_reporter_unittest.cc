@@ -184,8 +184,8 @@ class CrashReporterTest : public UnitTestFixture {
     report_store_ =
         std::make_unique<ScopedTestReportStore>(annotation_manager_.get(), info_context_);
 
-    crash_server_ =
-        std::make_unique<StubCrashServer>(dispatcher(), services(), upload_attempt_results);
+    crash_server_ = std::make_unique<StubCrashServer>(
+        dispatcher(), services(), annotation_manager_.get(), upload_attempt_results);
 
     const feedback::BuildTypeConfig build_type_config{
         .crash_report_upload_policy = crash_report_upload_policy,

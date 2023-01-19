@@ -15,6 +15,7 @@
 #include "src/developer/forensics/crash_reports/log_tags.h"
 #include "src/developer/forensics/crash_reports/report.h"
 #include "src/developer/forensics/crash_reports/snapshot.h"
+#include "src/developer/forensics/feedback/annotations/annotation_manager.h"
 #include "src/lib/fxl/macros.h"
 
 namespace forensics {
@@ -28,7 +29,8 @@ class CrashServer {
   enum UploadStatus { kSuccess, kFailure, kThrottled, kTimedOut };
 
   CrashServer(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
-              const std::string& url, LogTags* tags);
+              const std::string& url, LogTags* tags,
+              feedback::AnnotationManager* annotation_manager);
 
   virtual ~CrashServer() {}
 
@@ -43,18 +45,23 @@ class CrashServer {
   virtual void MakeRequest(const Report& report, const Snapshot& snapshot,
                            ::fit::function<void(UploadStatus, std::string)> callback);
 
-  // Combines the annotations from |report| and |snapshot| into annotations for upload.
+  // Combines the annotations from |report|, |snapshot|, and |annotation_manager| into annotations
+  // for upload.
   //
-  // Annotations from |report| are always included and only "presence" annotations from
-  // |snapshot| are included.
-  static std::map<std::string, std::string> PrepareAnnotations(const Report& report,
-                                                               const Snapshot& snapshot);
+  // * Annotations from |report| are always included.
+  // * Only "presence" annotations from |snapshot| are included.
+  // * Only the upload boot id from |annotation_manager| is included (if the current boot id is
+  //   immediately available).
+  static std::map<std::string, std::string> PrepareAnnotations(
+      const Report& report, const Snapshot& snapshot,
+      const feedback::AnnotationManager* annotation_manager);
 
  private:
   async_dispatcher_t* dispatcher_;
   std::shared_ptr<sys::ServiceDirectory> services_;
   const std::string url_;
   LogTags* tags_;
+  feedback::AnnotationManager* annotation_manager_;
 
   bool pending_request_{false};
   fuchsia::net::http::LoaderPtr loader_;

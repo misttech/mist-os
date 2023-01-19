@@ -133,8 +133,9 @@ class QueueTest : public UnitTestFixture {
   void SetUpQueue(const std::vector<CrashServer::UploadStatus>& upload_attempt_results =
                       std::vector<CrashServer::UploadStatus>{}) {
     report_id_ = 1;
-    crash_server_ = std::make_unique<StubCrashServer>(dispatcher(), services(),
-                                                      upload_attempt_results, kUploadResponseDelay);
+    crash_server_ =
+        std::make_unique<StubCrashServer>(dispatcher(), services(), &annotation_manager_,
+                                          upload_attempt_results, kUploadResponseDelay);
 
     InitQueue();
   }

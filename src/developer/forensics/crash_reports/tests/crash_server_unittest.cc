@@ -48,15 +48,18 @@ class CrashServerTest : public UnitTestFixture {
  protected:
   CrashServerTest()
       : data_provider_server_(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>()),
-        annotation_manager_(dispatcher(), {}),
         tags_() {
+    annotation_manager_ = std::make_unique<feedback::AnnotationManager>(
+        dispatcher(), std::set<std::string>({feedback::kSystemBootIdCurrentKey}),
+        feedback::Annotations({{feedback::kSystemBootIdCurrentKey, "some-value"}}));
     RunLoopUntilIdle();
   }
 
   void SetUpLoader(std::vector<stubs::LoaderResponse> responses) {
     loader_server_ = std::make_unique<stubs::Loader>(dispatcher(), std::move(responses));
     InjectServiceProvider(loader_server_.get());
-    crash_server_ = std::make_unique<CrashServer>(dispatcher(), services(), kUrl, &tags_);
+    crash_server_ = std::make_unique<CrashServer>(dispatcher(), services(), kUrl, &tags_,
+                                                  annotation_manager_.get());
     RunLoopUntilIdle();
   }
 
@@ -64,7 +67,7 @@ class CrashServerTest : public UnitTestFixture {
   Snapshot GetSnapshot() {
     // The presence annotations below are returned in the Snapshot from SnapshotStore::GetSnapshot
     // whenever a snapshot is not persisted
-    return MissingSnapshot(annotation_manager_.ImmediatelyAvailable(),
+    return MissingSnapshot(annotation_manager_->ImmediatelyAvailable(),
                            {
                                {feedback::kDebugSnapshotErrorKey, "not persisted"},
                                {feedback::kDebugSnapshotPresentKey, "false"},
@@ -73,12 +76,13 @@ class CrashServerTest : public UnitTestFixture {
 
   std::string LoaderLastRequestUrl() const { return loader_server_->LastRequestUrl(); }
 
+  std::unique_ptr<feedback::AnnotationManager> annotation_manager_;
+
  private:
   sys::testing::ComponentContextProvider loader_context_provider_;
   std::unique_ptr<stubs::Loader> loader_server_;
 
   std::unique_ptr<stubs::DataProviderBase> data_provider_server_;
-  feedback::AnnotationManager annotation_manager_;
   LogTags tags_;
   std::unique_ptr<CrashServer> crash_server_;
 };
@@ -270,11 +274,6 @@ TEST_F(CrashServerTest, PreparesAnnotationsErrorSnapshot) {
                       /*snapshot_uuid=*/kSnapshotUuid,
                       /*minidump=*/std::nullopt};
 
-  const feedback::Annotations annotations({
-      {"key2", "value2.1"},
-      {"key3", "value3"},
-  });
-
   const feedback::Annotations presence_annotations({
       {"key3", "value3.1"},
       {"key4", "value4"},
@@ -282,7 +281,41 @@ TEST_F(CrashServerTest, PreparesAnnotationsErrorSnapshot) {
   });
 
   EXPECT_THAT(CrashServer::PrepareAnnotations(
-                  report, MissingSnapshot(feedback::Annotations(), presence_annotations)),
+                  report, MissingSnapshot(feedback::Annotations(), presence_annotations),
+                  annotation_manager_.get()),
+              UnorderedElementsAreArray({
+                  Pair("key1", "value1"),
+                  Pair("key2", "value2"),
+                  Pair("key3", "value3.1"),
+                  Pair("key4", "value4"),
+                  Pair(feedback::kDebugReportUploadBootId, "some-value"),
+              }));
+}
+
+TEST_F(CrashServerTest, PreparesAnnotationsNoCurrentBootId) {
+  const Report report{/*report_id=*/0,
+                      /*program_shortname=*/"program-shortname",
+                      /*annotations=*/
+                      {
+                          {"key1", "value1"},
+                          {"key2", "value2"},
+                      },
+                      /*attachments=*/{},
+                      /*snapshot_uuid=*/kSnapshotUuid,
+                      /*minidump=*/std::nullopt};
+
+  const feedback::Annotations presence_annotations({
+      {"key3", "value3.1"},
+      {"key4", "value4"},
+
+  });
+
+  annotation_manager_ =
+      std::make_unique<feedback::AnnotationManager>(dispatcher(), std::set<std::string>());
+
+  EXPECT_THAT(CrashServer::PrepareAnnotations(
+                  report, MissingSnapshot(feedback::Annotations(), presence_annotations),
+                  annotation_manager_.get()),
               UnorderedElementsAreArray({
                   Pair("key1", "value1"),
                   Pair("key2", "value2"),

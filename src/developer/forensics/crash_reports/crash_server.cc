@@ -14,6 +14,9 @@
 #include <src/lib/fostr/fidl/fuchsia/net/http/formatting.h>
 
 #include "src/developer/forensics/crash_reports/sized_data_reader.h"
+#include "src/developer/forensics/feedback/annotations/annotation_manager.h"
+#include "src/developer/forensics/feedback/annotations/constants.h"
+#include "src/developer/forensics/feedback/annotations/types.h"
 #include "src/developer/forensics/utils/sized_data.h"
 #include "src/lib/fsl/socket/blocking_drain.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
@@ -92,8 +95,12 @@ class HttpRequestBuilder : public crashpad::HTTPTransport {
 
 CrashServer::CrashServer(async_dispatcher_t* dispatcher,
                          std::shared_ptr<sys::ServiceDirectory> services, const std::string& url,
-                         LogTags* tags)
-    : dispatcher_(dispatcher), services_(services), url_(url), tags_(tags) {
+                         LogTags* tags, feedback::AnnotationManager* annotation_manager)
+    : dispatcher_(dispatcher),
+      services_(services),
+      url_(url),
+      tags_(tags),
+      annotation_manager_(annotation_manager) {
   services_->Connect(loader_.NewRequest(dispatcher_));
   loader_.set_error_handler([](const zx_status_t status) {
     FX_PLOGS(WARNING, status) << "Lost connection to fuchsia.net.http.Loader";
@@ -124,7 +131,8 @@ void CrashServer::MakeRequest(const Report& report, const Snapshot& snapshot,
   }
 
   // Append the product and version parameters to the URL.
-  const std::map<std::string, std::string> annotations = PrepareAnnotations(report, snapshot);
+  const std::map<std::string, std::string> annotations =
+      PrepareAnnotations(report, snapshot, annotation_manager_);
   FX_CHECK(annotations.count("product") != 0);
   FX_CHECK(annotations.count("version") != 0);
   const std::string url = fxl::Substitute("$0?product=$1&version=$2", url_,
@@ -233,8 +241,9 @@ void CrashServer::MakeRequest(const Report& report, const Snapshot& snapshot,
   pending_request_ = true;
 }
 
-std::map<std::string, std::string> CrashServer::PrepareAnnotations(const Report& report,
-                                                                   const Snapshot& snapshot) {
+std::map<std::string, std::string> CrashServer::PrepareAnnotations(
+    const Report& report, const Snapshot& snapshot,
+    const feedback::AnnotationManager* annotation_manager) {
   // Start with annotations from |report| and only add "presence" annotations.
   //
   // If |snapshot| is a MissingSnapshot, they contain potentially new information about why the
@@ -244,6 +253,16 @@ std::map<std::string, std::string> CrashServer::PrepareAnnotations(const Report&
   if (std::holds_alternative<MissingSnapshot>(snapshot)) {
     const auto& s = std::get<MissingSnapshot>(snapshot);
     annotations.Set(s.PresenceAnnotations());
+  }
+
+  // The crash server is responsible for adding the upload boot id because adding the annotation to
+  // the crash report earlier in the crash reporting flow could result in the upload boot id being
+  // incorrect if the upload doesn't succeed until a later boot.
+  if (const feedback::Annotations immediate_annotations =
+          annotation_manager->ImmediatelyAvailable();
+      immediate_annotations.count(feedback::kSystemBootIdCurrentKey) != 0) {
+    annotations.Set(feedback::kDebugReportUploadBootId,
+                    immediate_annotations.at(feedback::kSystemBootIdCurrentKey));
   }
 
   return annotations.Raw();

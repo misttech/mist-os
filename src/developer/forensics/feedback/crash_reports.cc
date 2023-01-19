@@ -37,7 +37,7 @@ CrashReports::CrashReports(async_dispatcher_t* dispatcher,
       info_context_(
           std::make_shared<crash_reports::InfoContext>(inspect_root, clock, dispatcher, services)),
       tags_(),
-      crash_server_(dispatcher, services, kCrashServerUrl, &tags_),
+      crash_server_(dispatcher, services, kCrashServerUrl, &tags_, annotation_manager),
       report_store_(&tags_, info_context_, annotation_manager,
                     /*temp_reports_root=*/
                     crash_reports::ReportStore::Root{crash_reports::kReportStoreTmpPath,

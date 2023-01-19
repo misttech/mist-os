@@ -23,6 +23,7 @@ constexpr const char kBuildVersionPreviousBootKey[] = "build.version.previous-bo
 constexpr const char kBuildProductKey[] = "build.product";
 constexpr const char kBuildLatestCommitDateKey[] = "build.latest-commit-date";
 constexpr const char kBuildIsDebugKey[] = "build.is_debug";
+constexpr const char kDebugReportUploadBootId[] = "debug.report.upload.boot-id";
 constexpr const char kDebugSnapshotErrorKey[] = "debug.snapshot.error";
 constexpr const char kDebugSnapshotPresentKey[] = "debug.snapshot.present";
 constexpr const char kDeviceBoardNameKey[] = "device.board-name";

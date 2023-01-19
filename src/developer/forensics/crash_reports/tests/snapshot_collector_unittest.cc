@@ -93,8 +93,9 @@ class SnapshotCollectorTest : public UnitTestFixture {
  protected:
   void SetUpQueue(const std::vector<CrashServer::UploadStatus>& upload_attempt_results =
                       std::vector<CrashServer::UploadStatus>{}) {
-    crash_server_ = std::make_unique<StubCrashServer>(dispatcher(), services(),
-                                                      upload_attempt_results, kUploadResponseDelay);
+    crash_server_ =
+        std::make_unique<StubCrashServer>(dispatcher(), services(), &annotation_manager_,
+                                          upload_attempt_results, kUploadResponseDelay);
 
     queue_ = std::make_unique<Queue>(dispatcher(), services(), info_context_, &tags_,
                                      &report_store_->GetReportStore(), crash_server_.get());
