@@ -5,6 +5,10 @@
 #ifndef PLATFORM_HANDLE_H
 #define PLATFORM_HANDLE_H
 
+#if defined(__Fuchsia__)
+#include <lib/zx/handle.h>
+#endif
+
 #include <memory>
 #include <string>
 
@@ -19,6 +23,9 @@ class PlatformHandle {
 
   virtual bool GetCount(uint32_t* count_out) = 0;
   virtual uint32_t release() = 0;
+#if defined(__Fuchsia__)
+  virtual zx::handle release_handle() = 0;
+#endif
 
   // Registers an async wait delivered on the given |port| when the given handle is readable,
   // or if the handle has a peer and the peer is closed.
@@ -33,6 +40,10 @@ class PlatformHandle {
   static bool duplicate_handle(uint32_t handle_in, uint32_t* handle_out);
 
   static std::unique_ptr<PlatformHandle> Create(uint32_t handle);
+
+#if defined(__Fuchsia__)
+  static std::unique_ptr<PlatformHandle> Create(zx::handle handle);
+#endif
 
   static bool SupportsGetCount();
 

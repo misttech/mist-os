@@ -66,11 +66,19 @@ class ZirconPlatformBuffer : public PlatformBuffer {
   zx_handle_t handle() const { return vmo_.get(); }
 
   bool duplicate_handle(uint32_t* handle_out) const override {
+    zx::handle new_handle;
+    if (!duplicate_handle(&new_handle))
+      return false;
+    *handle_out = new_handle.release();
+    return true;
+  }
+
+  bool duplicate_handle(zx::handle* handle_out) const override {
     zx::vmo duplicate;
     zx_status_t status = vmo_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
     if (status < 0)
       return DRETF(false, "zx_handle_duplicate failed");
-    *handle_out = duplicate.release();
+    *handle_out = std::move(duplicate);
     return true;
   }
 

@@ -33,6 +33,9 @@ source_set("buffer_header") {
     "//src/graphics/lib/magma/src/magma_util:macros",
     "//src/graphics/lib/magma/src/magma_util:status",
   ]
+  if (is_fuchsia) {
+    public_deps += [ "//zircon/system/ulib/zx" ]
+  }
   sources = [ "platform_buffer.h" ]
 }
 
@@ -98,6 +101,9 @@ source_set("handle_header") {
   sources = [ "platform_handle.h" ]
 
   public_deps = [ ":port_header" ]
+  if (is_fuchsia) {
+    public_deps += [ "//zircon/system/ulib/zx" ]
+  }
 }
 
 source_set("handle") {
@@ -307,6 +313,9 @@ source_set("object_header") {
   public_configs = [ ":platform_include_config" ]
 
   sources = [ "platform_object.h" ]
+  if (is_fuchsia) {
+    public_deps = [ "//zircon/system/ulib/zx" ]
+  }
 }
 
 source_set("object") {
@@ -327,6 +336,9 @@ source_set("semaphore_header") {
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util:status",
   ]
+  if (is_fuchsia) {
+    public_deps += [ "//zircon/system/ulib/zx" ]
+  }
 }
 
 source_set("semaphore") {

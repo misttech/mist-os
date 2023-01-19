@@ -5,6 +5,10 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_BUFFER_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_BUFFER_H_
 
+#if defined(__Fuchsia__)
+#include <lib/zx/vmo.h>
+#endif
+
 #include <memory>
 
 #include "magma/magma_common_defs.h"
@@ -51,6 +55,10 @@ class PlatformBuffer : public PlatformObject {
 
   // Import takes ownership of the handle.
   static std::unique_ptr<PlatformBuffer> Import(uint32_t handle);
+
+#if defined(__Fuchsia__)
+  static std::unique_ptr<PlatformBuffer> Import(zx::vmo handle);
+#endif
 
   virtual ~PlatformBuffer() {}
 

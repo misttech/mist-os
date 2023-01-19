@@ -26,6 +26,7 @@ class ZirconPlatformHandle : public PlatformHandle {
   std::string GetName() override;
 
   uint32_t release() override { return handle_.release(); }
+  zx::handle release_handle() override { return std::move(handle_); }
 
   zx_handle_t get() const { return handle_.get(); }
 

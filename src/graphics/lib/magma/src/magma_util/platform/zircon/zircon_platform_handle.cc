@@ -64,4 +64,8 @@ std::unique_ptr<PlatformHandle> PlatformHandle::Create(uint32_t handle) {
   return std::make_unique<ZirconPlatformHandle>(zx::handle(handle));
 }
 
+std::unique_ptr<PlatformHandle> PlatformHandle::Create(zx::handle handle) {
+  return std::make_unique<ZirconPlatformHandle>(std::move(handle));
+}
+
 }  // namespace magma

@@ -5,6 +5,10 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_SEMAPHORE_H_
 #define SRC_GRAPHICS_LIB_MAGMA_SRC_MAGMA_UTIL_PLATFORM_PLATFORM_SEMAPHORE_H_
 
+#if defined(__Fuchsia__)
+#include <lib/zx/event.h>
+#endif
+
 #include <memory>
 
 #include "magma_util/macros.h"
@@ -38,6 +42,9 @@ class PlatformSemaphore : public PlatformObject {
 
   // Imports and takes ownership of |handle|.
   static std::unique_ptr<PlatformSemaphore> Import(uint32_t handle);
+#if defined(__Fuchsia__)
+  static std::unique_ptr<PlatformSemaphore> Import(zx::event event);
+#endif
 
   virtual ~PlatformSemaphore() {}
 

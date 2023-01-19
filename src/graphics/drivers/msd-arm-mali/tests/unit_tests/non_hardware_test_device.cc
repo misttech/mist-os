@@ -256,6 +256,11 @@ class TestNonHardwareMsdArmDevice {
       bool duplicate_handle(uint32_t* handle_out) const override {
         return real_semaphore_->duplicate_handle(handle_out);
       }
+#if defined(__Fuchsia__)
+      bool duplicate_handle(zx::handle* handle_out) const override {
+        return real_semaphore_->duplicate_handle(handle_out);
+      }
+#endif
 
      private:
       std::unique_ptr<magma::PlatformSemaphore> real_semaphore_;

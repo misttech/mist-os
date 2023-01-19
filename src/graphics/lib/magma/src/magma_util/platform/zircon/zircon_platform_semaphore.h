@@ -29,6 +29,7 @@ class ZirconPlatformSemaphore : public PlatformSemaphore {
   uint64_t global_id() const override { return koid_; }
 
   bool duplicate_handle(uint32_t* handle_out) const override;
+  bool duplicate_handle(zx::handle* handle_out) const override;
 
   void Reset() override {
     event_.signal(zx_signal(), 0);

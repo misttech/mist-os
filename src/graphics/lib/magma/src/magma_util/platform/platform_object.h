@@ -5,6 +5,9 @@
 #ifndef PLATFORM_OBJECT_H
 #define PLATFORM_OBJECT_H
 
+#if defined(__Fuchsia__)
+#include <lib/zx/handle.h>
+#endif
 #include <stdint.h>
 
 namespace magma {
@@ -26,6 +29,10 @@ class PlatformObject {
 
   // on success, duplicate of the underlying handle which is owned by the caller
   virtual bool duplicate_handle(uint32_t* handle_out) const = 0;
+
+#if defined(__Fuchsia__)
+  virtual bool duplicate_handle(zx::handle* handle_out) const = 0;
+#endif
 
   // Returns the id for the given handle
   static bool IdFromHandle(uint32_t handle, uint64_t* id_out);

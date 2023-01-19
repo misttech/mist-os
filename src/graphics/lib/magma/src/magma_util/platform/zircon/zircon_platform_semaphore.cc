@@ -13,11 +13,19 @@
 namespace magma {
 
 bool ZirconPlatformSemaphore::duplicate_handle(uint32_t* handle_out) const {
+  zx::handle new_handle;
+  if (!duplicate_handle(&new_handle))
+    return false;
+  *handle_out = new_handle.release();
+  return true;
+}
+
+bool ZirconPlatformSemaphore::duplicate_handle(zx::handle* handle_out) const {
   zx::event duplicate;
   zx_status_t status = event_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate);
   if (status < 0)
     return DRETF(false, "zx_handle_duplicate failed: %d", status);
-  *handle_out = duplicate.release();
+  *handle_out = std::move(duplicate);
   return true;
 }
 
@@ -74,8 +82,10 @@ std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Create() {
 }
 
 std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(uint32_t handle) {
-  zx::event event(handle);
+  return Import(zx::event(handle));
+}
 
+std::unique_ptr<PlatformSemaphore> PlatformSemaphore::Import(zx::event event) {
   zx_info_handle_basic_t info;
   zx_status_t status = event.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status != ZX_OK)

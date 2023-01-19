@@ -538,9 +538,11 @@ std::unique_ptr<PlatformBuffer> PlatformBuffer::Create(uint64_t size, const char
 }
 
 std::unique_ptr<PlatformBuffer> PlatformBuffer::Import(uint32_t handle) {
-  uint64_t size;
-  zx::vmo vmo(handle);
+  return Import(zx::vmo(handle));
+}
 
+std::unique_ptr<PlatformBuffer> PlatformBuffer::Import(zx::vmo vmo) {
+  uint64_t size;
   // get_size fails if handle is not a VMO
   zx_status_t status = vmo.get_size(&size);
   if (status != ZX_OK)
