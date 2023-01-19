@@ -10,6 +10,7 @@ use fuchsia_async::DurationExt;
 use fuchsia_inspect as inspect;
 use fuchsia_runtime as fruntime;
 use fuchsia_zircon as zx;
+use fuchsia_zircon::Task as _;
 use futures::FutureExt;
 use runner::get_value;
 use starnix_kernel_config::Config;
@@ -217,6 +218,9 @@ pub async fn create_galaxy() -> Result<Galaxy, Error> {
     init_task.exec(argv[0].clone(), argv.clone(), vec![])?;
     execute_task(init_task, move |result| {
         log_info!("Finished running init process: {:?}", result);
+
+        // Kill the starnix_kernel job, as the kernel is expected to reboot when init exits.
+        fruntime::job_default().kill().expect("Failed to kill job");
     });
     if let Some(startup_file_path) = startup_file_path {
         wait_for_init_file(&startup_file_path, &system_task).await?;
