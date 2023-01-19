@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:math';
+import 'package:collection/collection.dart' show IterableNullableExtension;
 
 import '../time_delta.dart';
 import '../time_point.dart';
@@ -13,7 +13,7 @@ import '../trace_model.dart';
 
 // This file contains common utility functions that are shared across metrics.
 
-T _add<T extends num>(T a, T b) => a + b;
+T _add<T extends num>(T a, T b) => a + b as T;
 T _min<T extends Comparable<T>>(T a, T b) => a.compareTo(b) < 0 ? a : b;
 T _max<T extends Comparable<T>>(T a, T b) => a.compareTo(b) > 0 ? a : b;
 
@@ -31,8 +31,8 @@ TimeDelta getTotalTraceDuration(Model model) {
   final TimePoint traceStartTime = allEvents.map((e) => e.start).reduce(_min);
   final TimePoint traceEndTime = allEvents
       .map((e) => e is DurationEvent
-          ? e.start + e.duration
-          : (e is AsyncEvent ? e.start + e.duration : e.start))
+          ? e.start + e.duration!
+          : (e is AsyncEvent ? e.start + e.duration! : e.start))
       .reduce(_max);
   return traceEndTime - traceStartTime;
 }
@@ -40,7 +40,7 @@ TimeDelta getTotalTraceDuration(Model model) {
 /// Filter [events] for events that have a matching [category] and [name]
 /// fields.
 Iterable<Event> filterEvents(Iterable<Event> events,
-        {String category, String name}) =>
+        {String? category, String? name}) =>
     events.where((event) =>
         (category == null || event.category == category) &&
         (name == null || event.name == name));
@@ -48,20 +48,20 @@ Iterable<Event> filterEvents(Iterable<Event> events,
 /// Filter [events] for events that have a matching [category] and [name]
 /// fields, that are also of type [T].
 Iterable<T> filterEventsTyped<T extends Event>(Iterable<Event> events,
-        {String category, String name}) =>
+        {String? category, String? name}) =>
     Iterable.castFrom<Event, T>(events.where((event) =>
         (event is T) &&
         (category == null || event.category == category) &&
         (name == null || event.name == name)));
 
-Iterable<T> getArgValuesFromEvents<T extends Object>(
+Iterable<T?> getArgValuesFromEvents<T extends Object>(
     Iterable<Event> events, String argKey) {
   return events.map((e) {
     if (!(e.args.containsKey(argKey) && e.args[argKey] is T)) {
       throw ArgumentError(
           'Error, expected events to include arg key "$argKey" of type $T');
     }
-    final T v = e.args[argKey];
+    final T? v = e.args[argKey];
     return v;
   });
 }
@@ -73,7 +73,7 @@ Iterable<T> getArgValuesFromEvents<T extends Object>(
 /// visiting all sub-duration-events and outgoing flow events for duration
 /// events, and the enclosing duration and next flow event for flow events.
 List<Event> getFollowingEvents(Event event) {
-  final List<Event> frontier = [event];
+  final List<Event?> frontier = [event];
   final Set<Event> visited = {};
 
   while (frontier.isNotEmpty) {
@@ -106,7 +106,7 @@ List<Event> getFollowingEvents(Event event) {
 /// Find the first "VSYNC" event that [durationEvent] is connected to.
 ///
 /// Returns [null] if no "VSYNC" is found.
-DurationEvent findFollowingVsync(DurationEvent durationEvent) {
+DurationEvent? findFollowingVsync(DurationEvent durationEvent) {
   final followingVsyncs = filterEventsTyped<DurationEvent>(
       getFollowingEvents(durationEvent),
       category: 'gfx',
@@ -119,19 +119,19 @@ DurationEvent findFollowingVsync(DurationEvent durationEvent) {
 
 /// Returns a list of durations in milliseconds from the given |startEventName|
 /// events in |startEventCategory| to the nearest connected  "VSYNC" events.
-List<double> getEventToVsyncLatencyValues(
+List<double?> getEventToVsyncLatencyValues(
     Model model, String startEventCategory, String startEventName) {
   final startEvents = filterEventsTyped<DurationEvent>(getAllEvents(model),
       category: startEventCategory, name: startEventName);
   final vsyncEvents = startEvents.map(findFollowingVsync);
 
-  return Zip2Iterable<DurationEvent, DurationEvent, double>(
+  return Zip2Iterable<DurationEvent, DurationEvent?, double?>(
           startEvents,
           vsyncEvents,
           (startEvent, vsyncEvent) => (vsyncEvent == null)
               ? null
               : (vsyncEvent.start - startEvent.start).toMillisecondsF())
-      .where((delta) => delta != null)
+      .whereNotNull()
       .toList();
 }
 
@@ -192,11 +192,11 @@ T computeMin<T extends num>(Iterable<T> values) => values.reduce(min);
 /// I.e., [x0, x1, x2, ...] -> [(x1 - x0), (x2 - x1), ...]
 List<T> differenceValues<T extends num>(Iterable<T> values) {
   final List<T> result = [];
-  T previous;
+  T? previous;
   for (final value in values) {
     if (previous != null) {
       final difference = value - previous;
-      result.add(difference);
+      result.add(difference as T);
     }
     previous = value;
   }
@@ -236,7 +236,7 @@ String describeValues<T extends num>(List<T> values,
 /// In other words, iterate over [x1, x2, ...] and [y1, y2, ...] like
 /// [_f(x1, y1), _f(x2, y2), ...].  Iteration stops when any [Iterable] is
 /// exhausted.
-class Zip2Iterable<T1, T2, R> extends Iterable<R> {
+class Zip2Iterable<T1, T2, R> extends Iterable<R?> {
   final Iterable<T1> _t1s;
   final Iterable<T2> _t2s;
   final R Function(T1, T2) _f;
@@ -244,16 +244,16 @@ class Zip2Iterable<T1, T2, R> extends Iterable<R> {
   Zip2Iterable(this._t1s, this._t2s, this._f);
 
   @override
-  Iterator<R> get iterator =>
+  Iterator<R?> get iterator =>
       Zip2Iterator<T1, T2, R>(_t1s.iterator, _t2s.iterator, _f);
 }
 
-class Zip2Iterator<T1, T2, R> extends Iterator<R> {
+class Zip2Iterator<T1, T2, R> extends Iterator<R?> {
   final Iterator<T1> _t1s;
   final Iterator<T2> _t2s;
   final R Function(T1, T2) _f;
 
-  R _current;
+  R? _current;
 
   Zip2Iterator(this._t1s, this._t2s, this._f);
 
@@ -267,5 +267,5 @@ class Zip2Iterator<T1, T2, R> extends Iterator<R> {
   }
 
   @override
-  R get current => _current;
+  R? get current => _current;
 }

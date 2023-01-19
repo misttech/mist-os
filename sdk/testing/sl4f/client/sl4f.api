@@ -275,7 +275,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "iterator",
-              "returnType": "Iterator<R>",
+              "returnType": "Iterator<R?>",
               "type": "MethodDeclarationImpl"
             }
           },
@@ -335,7 +335,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "current",
-              "returnType": "R",
+              "returnType": "R?",
               "type": "MethodDeclarationImpl"
             },
             "moveNext": {
@@ -752,7 +752,7 @@
               "isRequiredPositional": false,
               "name": "category",
               "type": "SimpleFormalParameterImpl",
-              "varType": "String"
+              "varType": "String?"
             },
             "event": {
               "isConst": false,
@@ -794,7 +794,7 @@
               "isRequiredPositional": false,
               "name": "name",
               "type": "SimpleFormalParameterImpl",
-              "varType": "String"
+              "varType": "String?"
             }
           },
           "isGetter": false,
@@ -817,7 +817,7 @@
               "isRequiredPositional": false,
               "name": "category",
               "type": "SimpleFormalParameterImpl",
-              "varType": "String"
+              "varType": "String?"
             },
             "event": {
               "isConst": false,
@@ -859,7 +859,7 @@
               "isRequiredPositional": false,
               "name": "name",
               "type": "SimpleFormalParameterImpl",
-              "varType": "String"
+              "varType": "String?"
             }
           },
           "TypeParameterListImpl": {
@@ -900,7 +900,7 @@
           "isGetter": false,
           "isSetter": false,
           "name": "findFollowingVsync",
-          "returnType": "DurationEvent",
+          "returnType": "DurationEvent?",
           "type": "FunctionDeclarationImpl"
         },
         "getAllEvents": {
@@ -1014,25 +1014,11 @@
           "isGetter": false,
           "isSetter": false,
           "name": "getArgValuesFromEvents",
-          "returnType": "Iterable<T>",
+          "returnType": "Iterable<T?>",
           "type": "FunctionDeclarationImpl"
         },
         "getEventToVsyncLatencyValues": {
           "SimpleFormalParameterImpl": {
-            "delta": {
-              "isConst": false,
-              "isFinal": false,
-              "isOptional": false,
-              "isOptionalNamed": false,
-              "isOptionalPositional": false,
-              "isPositional": true,
-              "isRequired": true,
-              "isRequiredNamed": false,
-              "isRequiredPositional": true,
-              "name": "delta",
-              "type": "SimpleFormalParameterImpl",
-              "varType": "null"
-            },
             "model": {
               "isConst": false,
               "isFinal": false,
@@ -1107,7 +1093,7 @@
           "isGetter": false,
           "isSetter": false,
           "name": "getEventToVsyncLatencyValues",
-          "returnType": "List<double>",
+          "returnType": "List<double?>",
           "type": "FunctionDeclarationImpl"
         },
         "getFollowingEvents": {
