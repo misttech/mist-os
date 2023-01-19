@@ -36,7 +36,7 @@ const char kDefaultHCIDev[] = "/dev/class/bt-hci/000";
 
 // TODO(armansito): Make this tool not depend on drivers/bluetooth/lib and avoid
 // this hack.
-BT_DECLARE_FAKE_DRIVER();
+PW_LOG_DECLARE_FAKE_DRIVER();
 
 int main(int argc, char* argv[]) {
   auto cl = fxl::CommandLineFromArgcArgv(argc, argv);

@@ -13,12 +13,14 @@ source_set("dfv1") {
   public = [ "public_overrides/pw_log_backend/log_backend.h" ]
   sources = [ "log_dfv1.cc" ]
   public_configs = [ ":backend_config" ]
-  public_deps = [ dir_pw_preprocessor ]
+  public_deps = [
+    "//src/lib/ddk",
+    dir_pw_preprocessor,
+  ]
   deps = [
     "$dir_pw_log:facade",
     "$dir_pw_string:builder",
     "//src/devices/lib/driver",
-    "//src/lib/ddk",
   ]
 }
 

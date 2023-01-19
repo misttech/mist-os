@@ -5,6 +5,8 @@
 #ifndef THIRD_PARTY_PIGWEED_BACKENDS_PW_LOG_DFV1_PUBLIC_OVERRIDES_PW_LOG_BACKEND_LOG_BACKEND_H_
 #define THIRD_PARTY_PIGWEED_BACKENDS_PW_LOG_DFV1_PUBLIC_OVERRIDES_PW_LOG_BACKEND_LOG_BACKEND_H_
 
+#include <lib/ddk/driver.h>
+
 #include "pw_preprocessor/arguments.h"
 #include "pw_preprocessor/compiler.h"
 #include "pw_preprocessor/util.h"
@@ -25,6 +27,9 @@ PW_EXTERN_C_END
 // When specified, the log message should not be logged. This is useful for disabling log levels at
 // runtime.
 #define PW_LOG_FLAG_IGNORE 1 << 3
+
+// This global symbol needs to defined when the dfv1 log backend is used outside of a driver.
+#define PW_LOG_DECLARE_FAKE_DRIVER() zx_driver_rec_t __zircon_driver_rec__ = {}
 
 namespace pw_log_ddk {
 
