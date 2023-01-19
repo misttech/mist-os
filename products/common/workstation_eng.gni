@@ -84,3 +84,6 @@ legacy_cache_package_labels += [
   "//src/dart:dart_aot",
   "//src/flutter:flutter_aot",
 ]
+
+# Add iquery back for eng builds
+product_bootfs_labels += [ "//bundles:diagnostics-eng" ]
