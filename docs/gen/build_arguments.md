@@ -139,7 +139,7 @@ example, because the package is in base).
 
 **Current value (from the default):** `true`
 
-From //build/security.gni:240
+From //build/security.gni:227
 
 ### av400_has_codec
 
@@ -1247,9 +1247,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From //third_party/crashpad/src/util/net/tls.gni:21
+From //third_party/crashpad/src/util/net/tls.gni:19
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -3377,7 +3377,7 @@ From //build/security.gni:134
 
 **Current value (from the default):** `"//src/security/policy/component_resolvers_policy.json5"`
 
-From //build/security.gni:210
+From //build/security.gni:197
 
 ### fuchsia_verify_routes_component_tree_config
 
@@ -3389,22 +3389,13 @@ routes in the fuchsia component tree.
 
 **Current value (from the default):** `""`
 
-From //build/security.gni:195
+From //build/security.gni:182
 
 ### fuchsia_verify_routes_exceptions_allowlist
 
 **Current value (from the default):** `"//src/security/policy/build/verify_routes_exceptions_allowlist.json5"`
 
 From //build/security.gni:155
-
-### fuchsia_verify_routes_exceptions_allowlist_bootfs
-
-Same as fuchsia_verify_routes_exceptions_allowlist, except this allowlist
-gets added in bootfs_only builds.
-
-**Current value (from the default):** `"//src/security/policy/build/verify_routes_exceptions_allowlist_bootfs.json5"`
-
-From //build/security.gni:171
 
 ### fuchsia_verify_routes_exceptions_allowlist_product
 
@@ -3413,7 +3404,7 @@ get added according to product-specific configuration.
 
 **Current value (from the default):** `[]`
 
-From //build/security.gni:184
+From //build/security.gni:171
 
 ### fuchsia_zbi_bootfs_filelist_goldens
 
@@ -6912,7 +6903,7 @@ From //build/security.gni:139
 
 **Current value (from the default):** `"//src/security/policy/component_resolvers_policy.json5"`
 
-From //build/security.gni:218
+From //build/security.gni:205
 
 ### recovery_verify_routes_component_tree_config
 
@@ -6924,7 +6915,7 @@ routes in the fuchsia component tree.
 
 **Current value (from the default):** `""`
 
-From //build/security.gni:202
+From //build/security.gni:189
 
 ### recovery_verify_routes_exceptions_allowlist
 
@@ -6943,20 +6934,6 @@ configurations that do perform recovery build verification is
 
 From //build/security.gni:167
 
-### recovery_verify_routes_exceptions_allowlist_bootfs
-
-Same as recovery_verify_routes_exceptions_allowlist, except this allowlist
-gets added in bootfs_only builds.
-
-The path to this list defaults to "" because most build configurations do
-perform recovery build verification. The canonical allowlist for build
-configurations that do perform recovery build verification is
-"//src/security/policy/build/verify_routes_exceptions_allowlist_bootfs.json5".
-
-**Current value (from the default):** `""`
-
-From //build/security.gni:180
-
 ### recovery_verify_routes_exceptions_allowlist_product
 
 Same as recovery_verify_routes_exceptions_allowlist, except these allowlists
@@ -6964,7 +6941,7 @@ get added according to product-specific configuration.
 
 **Current value (from the default):** `[]`
 
-From //build/security.gni:188
+From //build/security.gni:175
 
 ### recovery_zbi_bootfs_filelist_goldens
 
@@ -7803,7 +7780,7 @@ Default value is 'all', it is preferable to set to 'none' for production
 
 **Current value (from the default):** `"all"`
 
-From //build/security.gni:231
+From //build/security.gni:218
 
 ### thinlto_cache_dir
 
