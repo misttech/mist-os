@@ -11,7 +11,7 @@ use futures::{lock::Mutex, prelude::*, stream::FuturesUnordered};
 use omaha_client::{
     cup_ecdsa::StandardCupv2Handler, state_machine::StateMachineBuilder, time::StandardTimeSource,
 };
-use omaha_client_fuchsia::{http_request, install_plan};
+use omaha_client_fuchsia::{http_request, install_plan, timer};
 use std::cell::RefCell;
 use std::rc::Rc;
 use tracing::{error, info};
@@ -29,7 +29,6 @@ mod metrics;
 mod observer;
 mod policy;
 mod storage;
-mod timer;
 
 use configuration::{ChannelSource, ClientConfiguration};
 

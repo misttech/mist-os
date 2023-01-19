@@ -6,9 +6,8 @@
 // because these modules all come from //src/sys/pkg/bin/omaha-client.
 mod installer;
 mod policy;
-mod timer;
 use {
-    crate::omaha::{installer::IsolatedInstaller, timer::FuchsiaTimer},
+    crate::omaha::installer::IsolatedInstaller,
     anyhow::{Context, Error},
     futures::lock::Mutex,
     futures::prelude::*,
@@ -24,7 +23,7 @@ use {
         storage::MemStorage,
         time::StandardTimeSource,
     },
-    omaha_client_fuchsia::http_request,
+    omaha_client_fuchsia::{http_request, timer},
     std::rc::Rc,
     tracing::error,
     version::Version,
@@ -101,7 +100,7 @@ where
         policy::IsolatedPolicyEngine::new(StandardTimeSource),
         http_request,
         installer,
-        FuchsiaTimer,
+        timer::FuchsiaTimer,
         StubMetricsReporter,
         storage,
         config,

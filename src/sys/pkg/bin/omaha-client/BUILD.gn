@@ -106,7 +106,6 @@ rustc_library("lib") {
     "src/policy/rate_limiter.rs",
     "src/storage.rs",
     "src/storage/stash.rs",
-    "src/timer.rs",
   ]
 
   visibility = [
