@@ -415,12 +415,6 @@ func loadTests(path string) ([]testsharder.Test, error) {
 	return tests, nil
 }
 
-type multiTester interface {
-	Tester
-	TestMultiple(ctx context.Context, tests []testsharder.Test, stdout, stderr io.Writer, outDir string) ([]*TestResult, error)
-	EnabledForTest(testsharder.Test) bool
-}
-
 // testToRun represents an entry in a queue of tests to run.
 type testToRun struct {
 	testsharder.Test
@@ -446,27 +440,8 @@ func runAndOutputTests(
 	// deadlocks.
 	testQueue := make(chan testToRun, 2*len(tests))
 
-	var multiTests []testToRun
-	var mt multiTester
 	for _, test := range tests {
-		t, _, err := testerForTest(test)
-		if err != nil {
-			return err
-		}
-		mtForTest, ok := t.(multiTester)
-		if ok && mtForTest.EnabledForTest(test) {
-			multiTests = append(multiTests, testToRun{Test: test})
-			if mt == nil {
-				mt = mtForTest
-			}
-		} else {
-			testQueue <- testToRun{Test: test}
-		}
-	}
-
-	// Run ffx tests first.
-	if err := runMultipleTests(ctx, multiTests, mt, globalOutDir, outputs); err != nil {
-		return err
+		testQueue <- testToRun{Test: test}
 	}
 
 	// `for test := range testQueue` might seem simpler, but it would block
@@ -513,6 +488,9 @@ func runAndOutputTests(
 		if err := osmisc.CopyDir(tmpOutDir, outDir); err != nil {
 			return fmt.Errorf("failed to move test outputs: %w", err)
 		}
+		if ffxTester, ok := t.(*FFXTester); ok {
+			ffxTester.UpdateOutputDir(tmpOutDir, outDir)
+		}
 
 		test.previousRuns++
 		test.totalDuration += result.Duration()
@@ -543,54 +521,6 @@ func shouldKeepGoing(test testsharder.Test, lastResult *TestResult, testTotalDur
 		return false
 	}
 	return true
-}
-
-func runMultipleTests(ctx context.Context, multiTests []testToRun, mt multiTester, globalOutDir string, outputs *TestOutputs) error {
-	multiTestRunIndex := 0
-	skippedTests := 0
-	for len(multiTests) > 0 {
-		outDir := filepath.Join(globalOutDir, "ffx_tests", strconv.Itoa(multiTestRunIndex))
-
-		var tests []testsharder.Test
-		for _, t := range multiTests {
-			tests = append(tests, t.Test)
-		}
-
-		testResults, err := mt.TestMultiple(ctx, tests, streams.Stdout(ctx), streams.Stderr(ctx), outDir)
-		if err != nil {
-			return err
-		}
-
-		retryTests := []testToRun{}
-		skippedTests = 0
-		for i, result := range testResults {
-			result.RunIndex = multiTestRunIndex
-			result.Affected = multiTests[i].Affected
-			if result.Result == runtests.TestSkipped {
-				// Skipped tests result from an issue with the test
-				// framework, so don't record them in the summary.json
-				// because there is nothing useful to report anyway
-				// since the test didn't run. However, keep track of
-				// the skipped tests to log an error that they never
-				// ran.
-				skippedTests++
-			} else {
-				if err := outputs.Record(ctx, *result); err != nil {
-					return err
-				}
-			}
-			multiTests[i].totalDuration += result.Duration()
-			if shouldKeepGoing(multiTests[i].Test, result, multiTests[i].totalDuration) {
-				retryTests = append(retryTests, multiTests[i])
-			}
-		}
-		multiTestRunIndex++
-		multiTests = retryTests
-	}
-	if skippedTests > 0 {
-		return fmt.Errorf("%s: %d total tests skipped", constants.SkippedRunningTestsMsg, skippedTests)
-	}
-	return nil
 }
 
 // stdioBuffer is a simple thread-safe wrapper around bytes.Buffer. It

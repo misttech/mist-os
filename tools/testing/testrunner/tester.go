@@ -707,6 +707,17 @@ func (t *FFXTester) processTestResult(runResult *ffxutil.TestRunResult, testsByU
 	return testResults, nil
 }
 
+// UpdateOutputDir updates the output dir with the oldDir substring with the newDir.
+// This should be called if the outputs are moved.
+func (t *FFXTester) UpdateOutputDir(oldDir, newDir string) {
+	for i, outDir := range t.testOutDirs {
+		if strings.Contains(outDir, oldDir) {
+			t.testOutDirs[i] = strings.ReplaceAll(outDir, oldDir, newDir)
+			break
+		}
+	}
+}
+
 // RemoveAllOutputDirs removes the test output directories for all calls to Test().
 func (t *FFXTester) RemoveAllOutputDirs() error {
 	var errs []string

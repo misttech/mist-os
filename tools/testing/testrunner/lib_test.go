@@ -951,10 +951,6 @@ func TestExecute(t *testing.T) {
 			expectedTestCount := 3
 			if c.useFFX {
 				testCount = strings.Count(strings.Join(ffx.CmdsCalled, ","), "test")
-				// We expect to call ffx.Test() twice. The first time will be through
-				// calling FFXTester.TestMultiple() with both tests bar and baz, and the
-				// second time to run the second run of bar.
-				expectedTestCount = 2
 			}
 			copySinksCount := strings.Count(funcCalls, copySinksFunc)
 			snapshotCount := strings.Count(funcCalls, runSnapshotFunc)
