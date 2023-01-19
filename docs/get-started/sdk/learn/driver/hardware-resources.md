@@ -169,13 +169,13 @@ initialization:
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="start_method_end" adjust_indentation="auto" %}
 ```
 
-Update the driver build configuration to depend on the FIDL binding libraries
-for `fuchsia.hardware.pci`:
+Update the driver build configuration to include the new source files and depend
+on the FIDL binding libraries for `fuchsia.hardware.pci`:
 
 `qemu_edu/drivers/BUILD.bazel`:
 
 ```bazel
-{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/BUILD.bazel" region_tag="binary" adjust_indentation="auto" exclude_regexp="edu_device\.cc|edu_device\.h|edu_server\.cc|edu_server\.h|\/\/src\/qemu_edu|sdk\/\/fidl\/fuchsia\.device" highlight="9" %}
+{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/BUILD.bazel" region_tag="binary" adjust_indentation="auto" exclude_regexp="edu_server\.cc|edu_server\.h|\/\/src\/qemu_edu|sdk\/\/fidl\/fuchsia\.device" highlight="4,5,11" %}
 ```
 
 ## Read device registers
@@ -253,14 +253,6 @@ the log:
 {{ '<strong>' }}{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="device_registers" %}{{ '</strong>' }}
 
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/qemu_edu.cc" region_tag="start_method_end" adjust_indentation="auto" %}
-```
-
-Update the driver's build configuration to include the new source files:
-
-`qemu_edu/drivers/BUILD.bazel`:
-
-```bazel
-{% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/qemu_edu/drivers/BUILD.bazel" region_tag="binary" adjust_indentation="auto" exclude_regexp="edu_server\.cc|edu_server\.h|\/\/src\/qemu_edu|sdk\/\/fidl\/fuchsia\.device" highlight="4,5" %}
 ```
 
 <<_common/_restart_femu.md>>
