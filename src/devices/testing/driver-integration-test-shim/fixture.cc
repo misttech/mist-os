@@ -117,8 +117,9 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
   }
 
   // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Directory> dev;
-  if (zx_status_t status = devmgr.realm_->Connect("dev", dev.NewRequest().TakeChannel());
+  fidl::InterfaceHandle<fuchsia::io::Node> dev;
+  if (zx_status_t status = devmgr.realm_->component().exposed()->Open(
+          fuchsia::io::OpenFlags::RIGHT_READABLE, 0, "dev", dev.NewRequest());
       status != ZX_OK) {
     return status;
   }

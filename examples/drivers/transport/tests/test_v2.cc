@@ -38,8 +38,9 @@ TEST(DriverTransportTest, ParentChildExists) {
   ASSERT_FALSE(realm_result.is_err());
 
   // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Directory> dev;
-  zx_status_t status = realm.Connect("dev", dev.NewRequest().TakeChannel());
+  fidl::InterfaceHandle<fuchsia::io::Node> dev;
+  zx_status_t status = realm.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, 0,
+                                                         "dev", dev.NewRequest());
   ASSERT_EQ(status, ZX_OK);
 
   fbl::unique_fd root_fd;

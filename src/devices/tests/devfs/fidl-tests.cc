@@ -70,9 +70,8 @@ void FidlOpenValidator(const fidl::ClientEnd<fio::Directory>& directory, const c
 TEST(FidlTestCase, OpenDev) {
   zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_OK(endpoints.status_value());
-  fdio_ns_t* ns;
-  ASSERT_OK(fdio_ns_get_installed(&ns));
-  ASSERT_OK(fdio_ns_service_connect(ns, "/dev", endpoints->server.channel().release()));
+  ASSERT_OK(fdio_open("/dev", static_cast<uint32_t>(fio::OpenFlags::kRightReadable),
+                      endpoints->server.channel().release()));
 
   FidlOpenValidator(endpoints->client, "zero", zx::ok(fio::wire::NodeInfoDeprecated::Tag::kFile));
   FidlOpenValidator(endpoints->client, "this-path-better-not-actually-exist",
@@ -84,9 +83,8 @@ TEST(FidlTestCase, OpenDev) {
 TEST(FidlTestCase, OpenPkg) {
   zx::result endpoints = fidl::CreateEndpoints<fio::Directory>();
   ASSERT_OK(endpoints.status_value());
-  fdio_ns_t* ns;
-  ASSERT_OK(fdio_ns_get_installed(&ns));
-  ASSERT_OK(fdio_ns_service_connect(ns, "/pkg", endpoints->server.channel().release()));
+  ASSERT_OK(fdio_open("/pkg", static_cast<uint32_t>(fio::OpenFlags::kRightReadable),
+                      endpoints->server.channel().release()));
 
   FidlOpenValidator(endpoints->client, "bin",
                     zx::ok(fio::wire::NodeInfoDeprecated::Tag::kDirectory));

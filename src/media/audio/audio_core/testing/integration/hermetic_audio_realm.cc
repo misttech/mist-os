@@ -16,6 +16,8 @@
 #include <lib/vfs/cpp/remote_dir.h>
 #include <zircon/status.h>
 
+#include <utility>
+
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
@@ -25,8 +27,9 @@ namespace {
 void ConnectToVirtualAudio(component_testing::RealmRoot& root,
                            fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control>& out) {
   // Connect to dev.
-  fidl::InterfaceHandle<fuchsia::io::Directory> dev;
-  zx_status_t status = root.Connect("dev", dev.NewRequest().TakeChannel());
+  fidl::InterfaceHandle<fuchsia::io::Node> dev;
+  zx_status_t status = root.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, 0,
+                                                        "dev", dev.NewRequest());
   ASSERT_EQ(status, ZX_OK);
 
   fbl::unique_fd dev_fd;
@@ -51,7 +54,8 @@ void ConnectToVirtualAudio(component_testing::RealmRoot& root,
 // using a TestEffectsV2.
 class LocalProcessorCreator : public component_testing::LocalComponent {
  public:
-  explicit LocalProcessorCreator(std::vector<TestEffectsV2::Effect> effects) : effects_(effects) {}
+  explicit LocalProcessorCreator(std::vector<TestEffectsV2::Effect> effects)
+      : effects_(std::move(effects)) {}
 
   void Start(std::unique_ptr<component_testing::LocalComponentHandles> mock_handles) override {
     handles_ = std::move(mock_handles);
@@ -309,7 +313,7 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
   return {builder.Build(dispatcher), std::move(local_components)};
 }
 
-const inspect::Hierarchy HermeticAudioRealm::ReadInspect(std::string_view component_name) {
+inspect::Hierarchy HermeticAudioRealm::ReadInspect(std::string_view component_name) {
   // Only supported component for now.
   FX_CHECK(component_name == kAudioCore);
 

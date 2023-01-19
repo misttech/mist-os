@@ -68,10 +68,10 @@ class HermeticAudioRealm {
   static inline std::string kThermalTestControl = "thermal_test_control";
 
   // Read the exported inspect info for the given component.
-  const inspect::Hierarchy ReadInspect(std::string_view component_name);
+  inspect::Hierarchy ReadInspect(std::string_view component_name);
 
   // Returns the root.
-  const component_testing::RealmRoot& realm_root() { return root_; }
+  component_testing::RealmRoot& realm_root() { return root_; }
 
  private:
   struct CtorArgs {

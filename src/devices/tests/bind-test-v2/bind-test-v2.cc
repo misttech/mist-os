@@ -34,8 +34,9 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
     ASSERT_EQ(driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result), ZX_OK);
     ASSERT_FALSE(realm_result.is_err());
 
-    fidl::InterfaceHandle<fuchsia::io::Directory> dev;
-    zx_status_t status = realm_->Connect("dev", dev.NewRequest().TakeChannel());
+    fidl::InterfaceHandle<fuchsia::io::Node> dev;
+    zx_status_t status = realm_->component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE,
+                                                             0, "dev", dev.NewRequest());
     ASSERT_EQ(status, ZX_OK);
 
     fbl::unique_fd root_fd;
