@@ -968,6 +968,11 @@ config("Wno-defaulted-function-deleted") {
   visibility = [ "//src/lib/vulkan/*" ]
 }
 
+config("Wno-missing-prototypes") {
+  cflags_c = [ "-Wno-missing-prototypes" ]
+  visibility = [ "//zircon/third_party/ulib/lz4" ]
+}
+
 config("symbol_visibility_hidden") {
   # Disable libc++ visibility annotations to make sure that the compiler option
   # has effect on symbols defined in libc++ headers. Note that we don't want to

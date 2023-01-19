@@ -33,7 +33,10 @@ zx_library("lz4") {
     "__declspec(x)=",
   ]
 
-  configs += [ "//build/config:Wno-implicit-fallthrough" ]
+  configs += [
+    "//build/config:Wno-implicit-fallthrough",
+    "//build/config:Wno-missing-prototypes",
+  ]
 }
 
 config("undefined_behavior_null_pointer_arithmetic") {
