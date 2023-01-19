@@ -137,7 +137,7 @@ zx_status_t WlanSoftmacHandle::Init() {
         return DEVICE(device)->SetKey(key);
       },
       .start_passive_scan = [](void* device,
-                               const wlan_softmac_passive_scan_args_t* passive_scan_args,
+                               const wlan_softmac_start_passive_scan_request_t* passive_scan_args,
                                uint64_t* out_scan_id) -> zx_status_t {
         return DEVICE(device)->StartPassiveScan(passive_scan_args, out_scan_id);
       },
@@ -847,8 +847,8 @@ zx_status_t Device::SetKey(wlan_key_config_t* key_config) {
   return ZX_OK;
 }
 
-zx_status_t Device::StartPassiveScan(const wlan_softmac_passive_scan_args_t* passive_scan_args,
-                                     uint64_t* out_scan_id) {
+zx_status_t Device::StartPassiveScan(
+    const wlan_softmac_start_passive_scan_request_t* passive_scan_args, uint64_t* out_scan_id) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     errorf("Arena creation failed: %s", arena.status_string());
@@ -856,7 +856,7 @@ zx_status_t Device::StartPassiveScan(const wlan_softmac_passive_scan_args_t* pas
   }
 
   fidl::Arena fidl_arena;
-  fuchsia_wlan_softmac::wire::WlanSoftmacPassiveScanArgs fidl_passive_scan_args;
+  fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest fidl_passive_scan_args;
   ConvertPassiveScanArgs(*passive_scan_args, &fidl_passive_scan_args, fidl_arena);
 
   auto result = client_.sync().buffer(*std::move(arena))->StartPassiveScan(fidl_passive_scan_args);
@@ -869,7 +869,7 @@ zx_status_t Device::StartPassiveScan(const wlan_softmac_passive_scan_args_t* pas
     return result->error_value();
   }
 
-  *out_scan_id = result->value()->scan_id;
+  *out_scan_id = result->value()->scan_id();
   return ZX_OK;
 }
 

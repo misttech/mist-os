@@ -95,9 +95,9 @@ typedef struct {
   /**
    * Make passive scan request to the driver
    */
-  zx_status_t (*start_passive_scan)(void *device,
-                                    const wlan_softmac_passive_scan_args_t *passive_scan_args,
-                                    uint64_t *out_scan_id);
+  zx_status_t (*start_passive_scan)(
+      void *device, const wlan_softmac_start_passive_scan_request_t *passive_scan_args,
+      uint64_t *out_scan_id);
   /**
    * Make active scan request to the driver
    */

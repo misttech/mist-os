@@ -178,7 +178,11 @@ struct WlantapMacImpl : WlantapMac,
                         StartPassiveScanCompleter::Sync& completer) override {
     uint64_t scan_id = 111;
     listener_->WlantapMacStartScan(scan_id);
-    completer.buffer(arena).ReplySuccess(scan_id);
+    fidl::Arena fidl_arena;
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanResponse::Builder(fidl_arena);
+    builder.scan_id(scan_id);
+    completer.buffer(arena).ReplySuccess(builder.Build());
   }
 
   void StartActiveScan(StartActiveScanRequestView request, fdf::Arena& arena,

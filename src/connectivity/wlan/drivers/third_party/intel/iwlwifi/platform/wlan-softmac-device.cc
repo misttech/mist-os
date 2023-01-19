@@ -369,14 +369,18 @@ void WlanSoftmacDevice::StartPassiveScan(StartPassiveScanRequestView request, fd
                                          StartPassiveScanCompleter::Sync& completer) {
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
   uint64_t out_scan_id;
-  zx_status_t status = mac_start_passive_scan(mvmvif_, &request->args, &out_scan_id);
+  zx_status_t status = mac_start_passive_scan(mvmvif_, request, &out_scan_id);
   if (status != ZX_OK) {
     IWL_ERR(this, "%s() failed start passive scan: %s\n", __func__, zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }
 
-  completer.buffer(arena).ReplySuccess(out_scan_id);
+  fidl::Arena fidl_arena;
+  auto builder =
+      fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanResponse::Builder(fidl_arena);
+  builder.scan_id(out_scan_id);
+  completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
 void WlanSoftmacDevice::StartActiveScan(StartActiveScanRequestView request, fdf::Arena& arena,

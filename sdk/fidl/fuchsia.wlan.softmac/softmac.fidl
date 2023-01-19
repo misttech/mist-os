@@ -237,29 +237,6 @@ protocol WlanSoftmacIfc {
     }) -> ();
 };
 
-/// Argument struct to be passed as the single argument to WlanSoftmac.StartPassiveScan.
-type WlanSoftmacPassiveScanArgs = table {
-    /// List of channels to scan on. An empty list of channels will cause a
-    /// scan request to immediately return ZX_ERR_INVALID_ARGS.
-    ///
-    /// Invalid channel numbers will be silently ignored. The validity of a channel
-    /// number depends on the current regulatory region, and a SoftMAC driver cannot
-    /// always determine the region setting. This is especially the case when
-    /// firmware changes the region setting dynamically.
-    1: channels vector<uint8>:ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS;
-
-    /// Minimum duration to spend on each channel during the scan.
-    2: min_channel_time zx.duration;
-
-    /// Maximum duration to spend on each channel during the scan.
-    3: max_channel_time zx.duration;
-
-    /// Minimum duration to spend on the home channel(s) between the dwell time on each channel
-    /// where a home channel corresponds to channels the device should otherwise be present
-    /// on while not scanning.
-    4: min_home_time zx.duration;
-};
-
 /// Argument struct to be passed as the single argument to WlanSoftmac.StartActiveScan
 type WlanSoftmacActiveScanArgs = table {
     /// List of channels to scan on. An empty list of channels will cause a
@@ -403,13 +380,43 @@ protocol WlanSoftmac {
         peer_addr ieee80211.MacAddr;
     }) -> () error zx.status;
 
-    /// Start a passive scan in the device driver. Scan results will be delivered as Beacon
-    /// frames via WlanSoftmacIfc.Recv(). When complete, WlanSoftmacIfc.ScanComplete() will
-    /// be called with the corresponding unique `scan_id`.
-    StartPassiveScan(struct {
-        args WlanSoftmacPassiveScanArgs;
-    }) -> (struct {
-        scan_id uint64;
+    /// Start a passive scan in the device driver. Scan results will be delivered
+    /// as Beacon frames via WlanSoftmacIfc.Recv(). When complete,
+    /// WlanSoftmacIfc.ScanComplete() will be called with the corresponding
+    /// unique `scan_id`.
+    ///
+    /// A device driver indicates support for `StartPassiveScan()` using
+    /// `fuchsia.wlan.common/ScanOffloadExtension.supported`.
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_INVALID_ARGS: The device is not capable of performing the
+    ///       requested scan, e.g. because an incompatible channel was requested. \
+    ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans. \
+    ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
+    StartPassiveScan(table {
+        /// List of channels to scan on. An empty list of channels will cause a
+        /// scan request to immediately return ZX_ERR_INVALID_ARGS.
+        ///
+        /// Invalid channel numbers will be silently ignored. The validity of a channel
+        /// number depends on the current regulatory region, and a SoftMAC driver cannot
+        /// always determine the region setting. This is especially the case when
+        /// firmware changes the region setting dynamically.
+        ///
+        /// This is a required parameter.
+        1: channels vector<uint8>:ieee80211.MAX_UNIQUE_CHANNEL_NUMBERS;
+
+        /// Minimum duration to spend on each channel during the scan.
+        2: min_channel_time zx.duration;
+
+        /// Maximum duration to spend on each channel during the scan.
+        3: max_channel_time zx.duration;
+
+        /// Minimum duration to spend on the home channel(s) between the dwell time on
+        /// each channel where a home channel corresponds to channels the device should
+        /// otherwise be present on while not scanning.
+        4: min_home_time zx.duration;
+    }) -> (table {
+        1: scan_id uint64;
     }) error zx.status;
 
     /// Start an active scan in the device driver. Scan results will be delivered as Beacon or

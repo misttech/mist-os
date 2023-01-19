@@ -119,7 +119,7 @@ impl Device {
 
     pub fn start_passive_scan(
         &self,
-        passive_scan_args: &banjo_wlan_softmac::WlanSoftmacPassiveScanArgs,
+        passive_scan_args: &banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
     ) -> Result<u64, zx::Status> {
         self.raw_device.start_passive_scan(&passive_scan_args)
     }
@@ -393,7 +393,7 @@ pub struct DeviceInterface {
     /// Make passive scan request to the driver
     start_passive_scan: extern "C" fn(
         device: *mut c_void,
-        passive_scan_args: *const banjo_wlan_softmac::WlanSoftmacPassiveScanArgs,
+        passive_scan_args: *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
         out_scan_id: *mut u64,
     ) -> zx::sys::zx_status_t,
     /// Make active scan request to the driver
@@ -501,12 +501,12 @@ impl DeviceInterface {
 
     fn start_passive_scan(
         &self,
-        passive_scan_args: &banjo_wlan_softmac::WlanSoftmacPassiveScanArgs,
+        passive_scan_args: &banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
     ) -> Result<u64, zx::Status> {
         let mut out_scan_id = 0;
         let status = (self.start_passive_scan)(
             self.device,
-            passive_scan_args as *const banjo_wlan_softmac::WlanSoftmacPassiveScanArgs,
+            passive_scan_args as *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
             &mut out_scan_id as *mut u64,
         );
         zx::ok(status).map(|_| out_scan_id)
@@ -617,26 +617,26 @@ pub mod test_utils {
         std::convert::TryInto,
     };
 
-    pub struct CapturedWlanSoftmacPassiveScanArgs {
+    pub struct CapturedWlanSoftmacStartPassiveScanRequest {
         pub channels: Vec<u8>,
         pub min_channel_time: zx::sys::zx_duration_t,
         pub max_channel_time: zx::sys::zx_duration_t,
         pub min_home_time: zx::sys::zx_duration_t,
     }
 
-    impl CapturedWlanSoftmacPassiveScanArgs {
+    impl CapturedWlanSoftmacStartPassiveScanRequest {
         /// # Safety
         ///
         /// This function is used exclusively in tests to simulate a driver
         /// receiving a request. It is only guaranteed to be safe if the given
         /// pointer is safe to dereference and will outlive the returned
-        /// CapturedWlanSoftmacPassiveScanArgs. The caller is responsible for
+        /// CapturedWlanSoftmacStartPassiveScanRequest. The caller is responsible for
         /// enforcing this.
         pub unsafe fn from_banjo(
-            banjo_args_ptr: *const banjo_wlan_softmac::WlanSoftmacPassiveScanArgs,
-        ) -> CapturedWlanSoftmacPassiveScanArgs {
+            banjo_args_ptr: *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
+        ) -> CapturedWlanSoftmacStartPassiveScanRequest {
             let banjo_args = *banjo_args_ptr;
-            CapturedWlanSoftmacPassiveScanArgs {
+            CapturedWlanSoftmacStartPassiveScanRequest {
                 channels: std::slice::from_raw_parts(
                     banjo_args.channels_list,
                     banjo_args.channels_count,
@@ -658,7 +658,7 @@ pub mod test_utils {
         pub keys: Vec<banjo_wlan_softmac::WlanKeyConfig>,
         pub keys_vec: Vec<Vec<u8>>,
         pub next_scan_id: u64,
-        pub captured_passive_scan_args: Option<CapturedWlanSoftmacPassiveScanArgs>,
+        pub captured_passive_scan_args: Option<CapturedWlanSoftmacStartPassiveScanRequest>,
         pub captured_active_scan_args: Option<ActiveScanArgs>,
         pub info: WlanSoftmacInfo,
         pub discovery_support: banjo_common::DiscoverySupport,
@@ -822,7 +822,7 @@ pub mod test_utils {
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
         pub extern "C" fn start_passive_scan(
             device: *mut c_void,
-            passive_scan_args: *const banjo_wlan_softmac::WlanSoftmacPassiveScanArgs,
+            passive_scan_args: *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
             out_scan_id: *mut u64,
         ) -> zx::sys::zx_status_t {
             unsafe {
@@ -830,7 +830,7 @@ pub mod test_utils {
                 *out_scan_id = self_.next_scan_id;
                 self_.next_scan_id += 1;
                 self_.captured_passive_scan_args =
-                    Some(CapturedWlanSoftmacPassiveScanArgs::from_banjo(passive_scan_args));
+                    Some(CapturedWlanSoftmacStartPassiveScanRequest::from_banjo(passive_scan_args));
             }
             zx::sys::ZX_OK
         }
@@ -852,7 +852,7 @@ pub mod test_utils {
 
         pub extern "C" fn start_passive_scan_fails(
             _device: *mut c_void,
-            _passive_scan_args: *const banjo_wlan_softmac::WlanSoftmacPassiveScanArgs,
+            _passive_scan_args: *const banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest,
             _out_scan_id: *mut u64,
         ) -> zx::sys::zx_status_t {
             zx::sys::ZX_ERR_NOT_SUPPORTED
@@ -1306,13 +1306,14 @@ mod tests {
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
-        let result = dev.start_passive_scan(&banjo_wlan_softmac::WlanSoftmacPassiveScanArgs {
-            channels_list: &[1u8, 2, 3] as *const u8,
-            channels_count: 3,
-            min_channel_time: zx::Duration::from_millis(0).into_nanos(),
-            max_channel_time: zx::Duration::from_millis(200).into_nanos(),
-            min_home_time: 0,
-        });
+        let result =
+            dev.start_passive_scan(&banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
+                channels_list: &[1u8, 2, 3] as *const u8,
+                channels_count: 3,
+                min_channel_time: zx::Duration::from_millis(0).into_nanos(),
+                max_channel_time: zx::Duration::from_millis(200).into_nanos(),
+                min_home_time: 0,
+            });
         assert!(result.is_ok());
         assert_variant!(fake_device.captured_passive_scan_args, Some(passive_scan_args) => {
             assert_eq!(passive_scan_args.channels.len(), 3);

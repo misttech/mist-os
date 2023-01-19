@@ -589,7 +589,7 @@ zx_status_t mac_clear_assoc(struct iwl_mvm_vif* mvmvif,
 }
 
 zx_status_t mac_start_passive_scan(
-    void* ctx, const wlan_softmac_wire::WlanSoftmacPassiveScanArgs* passive_scan_args,
+    void* ctx, const wlan_softmac_wire::WlanSoftmacStartPassiveScanRequest* passive_scan_args,
     uint64_t* out_scan_id) {
   const auto mvmvif = reinterpret_cast<struct iwl_mvm_vif*>(ctx);
   if (!passive_scan_args->has_channels()) {

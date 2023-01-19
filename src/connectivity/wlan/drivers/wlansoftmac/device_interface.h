@@ -62,8 +62,9 @@ class DeviceInterface {
   virtual zx_status_t EnableBeaconing(wlan_bcn_config_t* bcn_cfg) = 0;
   virtual zx_status_t ConfigureBeacon(std::unique_ptr<Packet> packet) = 0;
   virtual zx_status_t SetKey(wlan_key_config_t* key_config) = 0;
-  virtual zx_status_t StartPassiveScan(const wlan_softmac_passive_scan_args_t* passive_scan_args,
-                                       uint64_t* out_scan_id) = 0;
+  virtual zx_status_t StartPassiveScan(
+      const wlan_softmac_start_passive_scan_request_t* passive_scan_args,
+      uint64_t* out_scan_id) = 0;
   virtual zx_status_t StartActiveScan(const wlan_softmac_active_scan_args_t* active_scan_args,
                                       uint64_t* out_scan_id) = 0;
   virtual zx_status_t CancelScan(uint64_t scan_id) = 0;

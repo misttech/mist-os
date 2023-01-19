@@ -537,14 +537,14 @@ TEST(ConvertTest, ToFidlKeyConfig) {
 }
 
 TEST(ConvertTest, ToFidlPassiveScanArgs) {
-  // Populate wlan_softmac_passive_scan_args_t
+  // Populate wlan_softmac_start_passive_scan_request_t
   uint8_t* channel_list =
       (uint8_t*)calloc(wlan_ieee80211::kMaxUniqueChannelNumbers, sizeof(uint8_t));
   for (size_t i = 0; i < wlan_ieee80211::kMaxUniqueChannelNumbers; i++) {
     channel_list[i] = kFakeChannel;
   }
 
-  wlan_softmac_passive_scan_args_t in = {
+  wlan_softmac_start_passive_scan_request_t in = {
       .channels_list = channel_list,
       .channels_count = wlan_ieee80211::kMaxUniqueChannelNumbers,
       .min_channel_time = kFakeDuration,
@@ -554,7 +554,7 @@ TEST(ConvertTest, ToFidlPassiveScanArgs) {
 
   // Conduct conversion
   fidl::Arena arena;
-  wlan_softmac::WlanSoftmacPassiveScanArgs out;
+  wlan_softmac::WlanSoftmacStartPassiveScanRequest out;
   ConvertPassiveScanArgs(in, &out, arena);
 
   // Verify outputs

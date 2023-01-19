@@ -579,7 +579,8 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     return ZX_OK;
   }
 
-  zx_status_t StartPassiveScan(fuchsia_wlan_softmac::wire::WlanSoftmacPassiveScanArgs* args) {
+  zx_status_t StartPassiveScan(
+      fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest* args) {
     auto result = client_.buffer(test_arena_)->StartPassiveScan(*args);
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
@@ -1158,7 +1159,8 @@ TEST_F(MacInterfaceTest, StartPassiveScanTest) {
   uint8_t channels_to_scan[kChannelSize] = {7, 1, 40, 136};
   {
     // Passive scan with some random channels should pass.
-    auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacPassiveScanArgs::Builder(fidl_arena);
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest::Builder(fidl_arena);
     builder.channels(fidl::VectorView<uint8_t>::FromExternal(&channels_to_scan[0], kChannelSize));
     auto passive_scan_args = builder.Build();
     ASSERT_OK(StartPassiveScan(&passive_scan_args));
@@ -1166,7 +1168,8 @@ TEST_F(MacInterfaceTest, StartPassiveScanTest) {
 
   {
     // Passive scan request will fail in mvm-mlme.cc if the channels field is not set.
-    auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacPassiveScanArgs::Builder(fidl_arena);
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest::Builder(fidl_arena);
     auto passive_scan_args = builder.Build();
     ASSERT_EQ(ZX_ERR_INVALID_ARGS, StartPassiveScan(&passive_scan_args));
   }

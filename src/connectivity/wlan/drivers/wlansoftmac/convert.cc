@@ -576,10 +576,10 @@ zx_status_t ConvertKeyConfig(const wlan_key_config_t& in,
   return ZX_OK;
 }
 
-void ConvertPassiveScanArgs(const wlan_softmac_passive_scan_args_t& in,
-                            fuchsia_wlan_softmac::wire::WlanSoftmacPassiveScanArgs* out,
+void ConvertPassiveScanArgs(const wlan_softmac_start_passive_scan_request_t& in,
+                            fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest* out,
                             fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacPassiveScanArgs::Builder(arena);
+  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest::Builder(arena);
   auto channel_vec = std::vector<uint8_t>(in.channels_list, in.channels_list + in.channels_count);
   builder.channels(fidl::VectorView<uint8_t>(arena, channel_vec));
   builder.min_channel_time(in.min_channel_time);

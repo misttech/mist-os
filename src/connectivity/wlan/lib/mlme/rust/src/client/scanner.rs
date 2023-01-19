@@ -198,14 +198,14 @@ impl<'a> BoundScanner<'a> {
     }
 
     fn start_passive_scan(&mut self, req: fidl_mlme::ScanRequest) -> Result<OngoingScan, Error> {
-        // Note: WlanSoftmacPassiveScanArgs contains raw pointers and the memory pointed
+        // Note: WlanSoftmacStartPassiveScanRequest contains raw pointers and the memory pointed
         // to must remain in scope for the duration of the call to Device::start_passive_scan().
         Ok(OngoingScan::PassiveOffloadScan {
             mlme_txn_id: req.txn_id,
             in_progress_device_scan_id: self
                 .ctx
                 .device
-                .start_passive_scan(&banjo_wlan_softmac::WlanSoftmacPassiveScanArgs {
+                .start_passive_scan(&banjo_wlan_softmac::WlanSoftmacStartPassiveScanRequest {
                     channels_list: req.channel_list.as_ptr(),
                     channels_count: req.channel_list.len(),
                     // TODO(fxbug.dev/89933): A TimeUnit is generally limited to 2 octets. Conversion here

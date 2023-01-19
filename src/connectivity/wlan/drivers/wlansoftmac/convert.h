@@ -43,8 +43,8 @@ void ConvertBcn(const wlan_bcn_config_t& in, fuchsia_wlan_softmac::wire::WlanBcn
                 fidl::AnyArena& arena);
 zx_status_t ConvertKeyConfig(const wlan_key_config_t& in,
                              fuchsia_wlan_softmac::wire::WlanKeyConfig* out, fidl::AnyArena& arena);
-void ConvertPassiveScanArgs(const wlan_softmac_passive_scan_args_t& in,
-                            fuchsia_wlan_softmac::wire::WlanSoftmacPassiveScanArgs* out,
+void ConvertPassiveScanArgs(const wlan_softmac_start_passive_scan_request_t& in,
+                            fuchsia_wlan_softmac::wire::WlanSoftmacStartPassiveScanRequest* out,
                             fidl::AnyArena& arena);
 void ConvertActiveScanArgs(const wlan_softmac_active_scan_args_t& in,
                            fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs* out,

@@ -15,6 +15,7 @@
 #include "banjo/ieee80211.h"
 #include "banjo/softmac.h"
 #include "banjo/wlanphyimpl.h"
+#include "fidl/fuchsia.wlan.softmac/cpp/wire_types.h"
 
 // IEEE Std 802.11-2016, Table 9-19
 #define WLAN_MSDU_MAX_LEN 2304UL
@@ -70,7 +71,7 @@ zx_status_t mac_configure_assoc(
 zx_status_t mac_clear_assoc(struct iwl_mvm_vif* mvmvif,
                             const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]);
 zx_status_t mac_start_passive_scan(
-    void* ctx, const wlan_softmac_wire::WlanSoftmacPassiveScanArgs* passive_scan_args,
+    void* ctx, const wlan_softmac_wire::WlanSoftmacStartPassiveScanRequest* passive_scan_args,
     uint64_t* out_scan_id);
 zx_status_t mac_start_active_scan(
     void* ctx, const wlan_softmac_wire::WlanSoftmacActiveScanArgs* active_scan_args,
