@@ -4,7 +4,7 @@
 
 # Adding a glossary term
 
-Fuchsia.dev uses a [_glossary.yaml][glossary-yaml] file to define all Fuchsia
+Fuchsia.dev uses a [glossary.yaml][glossary-yaml] file to define all Fuchsia
 specific terminology.
 
 This format allows Fuchsia to use single-source definitions to be edited in
@@ -19,7 +19,7 @@ Additionally, Fuchsia has a main filterable [glossary page][glossary-index].
 ## Add a glossary entry
 
 To add a glossary definition, you need to edit the
-[_glossary.yaml][glossary-yaml] to include information about your definition:
+[glossary.yaml][glossary-yaml] to include information about your definition:
 
 <div>
 <devsite-selector>
@@ -177,7 +177,7 @@ and usable as a [documentation widget][documentation-widgets].
 
 <!-- xrefs -->
 
-[glossary-yaml]: {{fuchsia_editor }}docs/glossary/_glossary.yaml
+[glossary-yaml]: {{fuchsia_editor }}docs/glossary/glossary.yaml
 [glossary-index]: /docs/glossary
 [documentation-widgets]: /docs/reference/documentation/widgets.md
 

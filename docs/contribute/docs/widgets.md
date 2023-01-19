@@ -93,7 +93,7 @@ This widget does not use parameters, make sure to specify the
 ## Glossary
 
 These widgets are specifically created to work with the glossary terms defined
-in [//docs/glossary/_glossary.yaml][glossary-yaml].
+in [//docs/glossary/glossary.yaml][glossary-yaml].
 
 
 In order to enable over-hover definitions, you must use one of the syntaxes listed below. The
@@ -185,7 +185,7 @@ Note: When using the widgets in Jinja2 there are additional parameters available
         <td><code>term</code></td>
         <td><b>Required</b><br>Specify a term that is defined
           in the <a href="{{fuchsia_editor }}{{ glossary_file }}">
-          _glossary.yaml</a> file.</td>
+          glossary.yaml</a> file.</td>
       </tr>
     </tbody>
   </table>
@@ -201,7 +201,7 @@ Note: When using the widgets in Jinja2 there are additional parameters available
         <td><code>term</code></td>
         <td><b>Required</b><br>Specify a term that is defined
           in the <a href="{{fuchsia_editor }}{{ glossary_file }}">
-          _glossary.yaml</a> file.</td>
+          glossary.yaml</a> file.</td>
       </tr>
       <tr>
         <td><code>display_name</code></td>
@@ -291,7 +291,7 @@ Note: The parameters for markdown and Jinja2 are the same.
       <td><code>term</code></td>
       <td><b>Required</b><br>Specify a term that is defined
         in the <a href="{{fuchsia_editor }}{{ glossary_file }}">
-        _glossary.yaml</a> file.</td>
+        glossary.yaml</a> file.</td>
     </tr>
     <tr>
         <td><code>display_name</code></td>

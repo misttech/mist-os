@@ -1,6 +1,6 @@
 {% include "docs/glossary/_common/_glossary_header.md" %}
 
-<!--The Fuchsia glossary uses templates to load definitions from _glossary.yaml. View
+<!--The Fuchsia glossary uses templates to load definitions from glossary.yaml. View
 the fully rendered glossary at https://fuchsia.dev/fuchsia-src/glossary-->
 
 # Glossary

@@ -1,11 +1,11 @@
 <!-- Glossary specific widgets -->
 
 {% set glossary | yamlloads %}
-{% include "docs/glossary/_glossary.yaml" %}
+{% include "docs/glossary/glossary.yaml" %}
 {% endset %}
 
 {% set fuchsia_editor = "https://ci.android.com/edit?repo=fuchsia/fuchsia/main&file=" %}
-{% set glossary_file = "docs/glossary/_glossary.yaml" %}
+{% set glossary_file = "docs/glossary/glossary.yaml" %}
 
 {% setvar pencil_edit %}
 <div class="pencil-edit">
