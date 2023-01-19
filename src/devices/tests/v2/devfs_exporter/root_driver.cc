@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.devfs.test/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
-#include <lib/driver/devfs/cpp/exporter.h>
+#include <lib/driver/devfs/cpp/connector.h>
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -19,44 +19,45 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Device> {
 
  public:
   RootDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-      : fdf::DriverBase(name, std::move(start_args), std::move(driver_dispatcher)) {}
+      : fdf::DriverBase(name, std::move(start_args), std::move(driver_dispatcher)),
+        devfs_connector_(fit::bind_member<&RootDriver::Serve>(this)) {}
 
   zx::result<> Start() override {
-    // Setup the outgoing directory.
-    auto status = context().outgoing()->component().AddUnmanagedProtocol<ft::Device>(
-        bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure), name);
-    if (status.is_error()) {
-      return status.take_error();
+    // Export to devfs.
+    zx::result connection = this->context().incoming()->Connect<fuchsia_device_fs::Exporter>();
+    if (connection.is_error()) {
+      FDF_SLOG(ERROR, "Failed to connect to fuchsia_device_fs::Exporter",
+               KV("status", connection.status_string()));
+      return connection.take_error();
     }
+    fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
 
-    // Create the devfs exporter.
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return zx::error(endpoints.status_value());
+    zx::result connector = devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      FDF_SLOG(ERROR, "Failed to bind devfs_connector: %s",
+               KV("status", connector.status_string()));
+      return connector.take_error();
     }
-    status = context().outgoing()->Serve(std::move(endpoints->server));
-    if (status.is_error()) {
-      return status.take_error();
+    fidl::WireResult export_result = devfs_exporter->ExportV2(
+        std::move(connector.value()), fidl::StringView::FromExternal("root-device"),
+        fidl::StringView(), fuchsia_device_fs::ExportOptions());
+    if (!export_result.ok()) {
+      FDF_SLOG(ERROR, "Failed to export to devfs: %s", KV("status", export_result.status_string()));
+      return zx::error(export_result.status());
     }
-    auto exporter = fdf::DevfsExporter::Create(
-        *context().incoming(), dispatcher(),
-        fidl::WireSharedClient(std::move(endpoints->client), dispatcher()));
-    if (exporter.is_error()) {
-      return exporter.take_error();
+    if (export_result.value().is_error()) {
+      FDF_SLOG(ERROR, "Failed to export to devfs: %s",
+               KV("status", zx_status_get_string(export_result.value().error_value())));
+      return export_result.value().take_error();
     }
-    exporter_ = std::move(*exporter);
-
-    // Export "root-device" to devfs.
-    exporter_.Export(std::string("svc/").append(name), "root-device", {}, 0,
-                     [this](zx_status_t status) {
-                       if (status != ZX_OK) {
-                         UnbindNode(status);
-                       }
-                     });
     return zx::ok();
   }
 
  private:
+  void Serve(fidl::ServerEnd<ft::Device> server) {
+    bindings_.AddBinding(dispatcher(), std::move(server), this, fidl::kIgnoreBindingClosure);
+  }
+
   void UnbindNode(zx_status_t status) {
     FDF_LOG(ERROR, "Failed to start root driver: %s", zx_status_get_string(status));
     node().reset();
@@ -66,7 +67,7 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Device> {
   void Ping(PingCompleter::Sync& completer) override { completer.Reply(); }
 
   fidl::ServerBindingGroup<ft::Device> bindings_;
-  fdf::DevfsExporter exporter_;
+  driver_devfs::Connector<ft::Device> devfs_connector_;
 };
 
 }  // namespace

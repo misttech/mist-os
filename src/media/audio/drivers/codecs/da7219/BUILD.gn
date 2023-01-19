@@ -119,6 +119,7 @@ source_set("common-dfv2") {
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/sys/service/cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

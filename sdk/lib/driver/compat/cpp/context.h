@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.driver.compat/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_context.h>
-#include <lib/driver/devfs/cpp/exporter.h>
 
 namespace compat {
 

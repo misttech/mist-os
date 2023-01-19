@@ -11,7 +11,6 @@
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/devfs/cpp/exporter.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <zircon/errors.h>
 

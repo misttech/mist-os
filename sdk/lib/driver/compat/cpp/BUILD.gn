@@ -27,7 +27,6 @@ sdk_source_set("cpp") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/devfs/cpp",
   ]
 }
 
