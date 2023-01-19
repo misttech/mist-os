@@ -6,6 +6,7 @@
 #define ZIRCON_SYSTEM_ULIB_TRACE_PROVIDER_PROVIDER_IMPL_H_
 
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/trace-provider/provider.h>
 
 // Provide a definition for the opaque type declared in provider.h.
@@ -16,7 +17,7 @@ namespace trace::internal {
 class TraceProviderImpl final : public trace_provider_t,
                                 public fidl::Server<fuchsia_tracing_provider::Provider> {
  public:
-  TraceProviderImpl(async_dispatcher_t* dispatcher,
+  TraceProviderImpl(std::string name, async_dispatcher_t* dispatcher,
                     fidl::ServerEnd<fuchsia_tracing_provider::Provider> server_end);
 
   void Initialize(InitializeRequest& request, InitializeCompleter::Sync& completer) override;
@@ -29,6 +30,8 @@ class TraceProviderImpl final : public trace_provider_t,
 
   void GetKnownCategories(GetKnownCategoriesCompleter::Sync& completer) override;
 
+  void SetGetKnownCategoriesCallback(GetKnownCategoriesCallback callback);
+
   async_dispatcher_t* dispatcher() const { return dispatcher_; }
 
   const ProviderConfig& GetProviderConfig() const;
@@ -36,8 +39,12 @@ class TraceProviderImpl final : public trace_provider_t,
  private:
   static void OnClose();
 
+  const std::string name_;
   async_dispatcher_t* const dispatcher_;
   ProviderConfig provider_config_;
+  trace::GetKnownCategoriesCallback get_known_categories_callback_;
+
+  async::Executor executor_;
 
   TraceProviderImpl(const TraceProviderImpl&) = delete;
   TraceProviderImpl(TraceProviderImpl&&) = delete;

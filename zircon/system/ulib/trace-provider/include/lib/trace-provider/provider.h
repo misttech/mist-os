@@ -138,6 +138,8 @@ __END_CDECLS
 
 #ifdef __cplusplus
 
+#include <lib/fit/function.h>
+#include <lib/fpromise/promise.h>
 #include <lib/zx/channel.h>
 
 #include <memory>
@@ -151,7 +153,23 @@ struct ProviderConfig {
   std::vector<std::string> categories;
 };
 
-const ProviderConfig& GetProviderConfig(trace_provider_t* provider);
+struct KnownCategory {
+  std::string name;
+  std::string description;
+
+  bool operator==(const KnownCategory& other) const {
+    return name == other.name && description == other.description;
+  }
+};
+
+struct KnownCategoryHash {
+  size_t operator()(const KnownCategory& known_category) const {
+    return std::hash<std::string>{}(known_category.name) ^
+           std::hash<std::string>{}(known_category.description);
+  }
+};
+
+using GetKnownCategoriesCallback = fit::function<fpromise::promise<std::vector<KnownCategory>>()>;
 
 // Convenience RAII wrapper for creating and destroying a trace provider.
 class TraceProvider {
@@ -190,7 +208,16 @@ class TraceProvider {
   bool is_valid() const { return provider_ != nullptr; }
 
   // Returns the most recent provider config passed to `Initialize`.
-  ProviderConfig GetProviderConfig() const { return ::trace::GetProviderConfig(provider_); }
+  ProviderConfig GetProviderConfig() const;
+
+  // Sets a callback that will be used by `TraceProvider` to collect a list of known categories from
+  // the code that created the provider in order to return them from the fidl `GetKnownCategories`
+  // method. If this value is never set, then the provider defaults to having `GetKnownCategories`
+  // return the list of all categories registered at compile time in the current process. This
+  // callback is an affordance for instances where the categories logged by the provider might not
+  // be captured in the compile-time list. These include meta-providers such as `perfetto-bridge`
+  // and providers from languages other than C++.
+  void SetGetKnownCategoriesCallback(GetKnownCategoriesCallback callback);
 
  protected:
   explicit TraceProvider(trace_provider_t* provider) : provider_(provider) {}

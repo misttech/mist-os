@@ -61,9 +61,9 @@ namespace internal {
 
 constexpr bool kVerboseTraceErrors = false;
 
-TraceProviderImpl::TraceProviderImpl(async_dispatcher_t* dispatcher,
+TraceProviderImpl::TraceProviderImpl(std::string name, async_dispatcher_t* dispatcher,
                                      fidl::ServerEnd<fuchsia_tracing_provider::Provider> server_end)
-    : dispatcher_(dispatcher) {
+    : name_(std::move(name)), dispatcher_(dispatcher), executor_(dispatcher) {
   fidl::BindServer(
       dispatcher_, std::move(server_end), this,
       [](TraceProviderImpl* impl, fidl::UnbindInfo info,
@@ -94,7 +94,34 @@ void TraceProviderImpl::Stop(StopCompleter::Sync& completer) { Session::StopEngi
 void TraceProviderImpl::Terminate(TerminateCompleter::Sync& completer) { OnClose(); }
 
 void TraceProviderImpl::GetKnownCategories(GetKnownCategoriesCompleter::Sync& completer) {
+  if (get_known_categories_callback_ != nullptr) {
+    auto promise = get_known_categories_callback_().then(
+        [completer = completer.ToAsync(),
+         name = name_](fpromise::result<std::vector<trace::KnownCategory>>& result) mutable {
+          if (result.is_error()) {
+            fprintf(stderr, "TraceProvider: error getting known categories for %s\n", name.c_str());
+            completer.Reply({});
+            return;
+          }
+          auto known_categories = result.take_value();
+          std::vector<fuchsia_tracing::KnownCategory> known_categories_fidl;
+          known_categories_fidl.reserve(known_categories.size());
+          for (const auto& known_category : known_categories) {
+            known_categories_fidl.emplace_back(known_category.name, known_category.description);
+          }
+          completer.Reply(known_categories_fidl);
+        });
+    executor_.schedule_task(std::move(promise));
+    return;
+  }
+
+  // TODO(fxb/117525): Return the trace categories that were registered with the category string
+  // literal.
   completer.Reply({});
+}
+
+void TraceProviderImpl::SetGetKnownCategoriesCallback(GetKnownCategoriesCallback callback) {
+  get_known_categories_callback_ = std::move(callback);
 }
 
 void TraceProviderImpl::OnClose() { Session::TerminateEngine(); }
@@ -103,10 +130,16 @@ const ProviderConfig& TraceProviderImpl::GetProviderConfig() const { return prov
 
 }  // namespace internal
 
-const ProviderConfig& GetProviderConfig(trace_provider_t* provider) {
-  ZX_DEBUG_ASSERT(provider);
-  const auto* provider_impl = reinterpret_cast<internal::TraceProviderImpl*>(provider);
+ProviderConfig TraceProvider::GetProviderConfig() const {
+  ZX_DEBUG_ASSERT(provider_);
+  const auto* provider_impl = reinterpret_cast<internal::TraceProviderImpl*>(provider_);
   return provider_impl->GetProviderConfig();
+}
+
+void TraceProvider::SetGetKnownCategoriesCallback(GetKnownCategoriesCallback callback) {
+  ZX_DEBUG_ASSERT(provider_);
+  auto* provider_impl = reinterpret_cast<internal::TraceProviderImpl*>(provider_);
+  provider_impl->SetGetKnownCategoriesCallback(std::move(callback));
 }
 }  // namespace trace
 
@@ -141,7 +174,7 @@ EXPORT trace_provider_t* trace_provider_create_with_name(zx_handle_t to_service_
   // Note: |to_service| can be closed now. Let it close as a consequence
   // of going out of scope.
 
-  return new trace::internal::TraceProviderImpl(dispatcher, std::move(endpoints->server));
+  return new trace::internal::TraceProviderImpl(name, dispatcher, std::move(endpoints->server));
 }
 
 EXPORT trace_provider_t* trace_provider_create(zx_handle_t to_service,
@@ -196,7 +229,7 @@ EXPORT trace_provider_t* trace_provider_create_synchronously(zx_handle_t to_serv
   if (out_already_started) {
     *out_already_started = response.started;
   }
-  return new trace::internal::TraceProviderImpl(dispatcher, std::move(endpoints->server));
+  return new trace::internal::TraceProviderImpl(name, dispatcher, std::move(endpoints->server));
 }
 
 EXPORT void trace_provider_destroy(trace_provider_t* provider) {
