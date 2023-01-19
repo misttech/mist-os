@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/connectivity/network/netstack/meta/client-with-sync-udp-debug.shard.cml",
-        "//src/sys/test_runners/gtest/default.shard.cml",
-        "syslog/client.shard.cml",
+        "//src/connectivity/network/tests/syscall/meta/netstack2/fastudp/use_fast_udp.shard.cml",
+        "//src/connectivity/network/tests/syscall/meta/syscall_test.shard.cml",
     ],
 }

@@ -4,15 +4,6 @@
 {
     include: [
         "//src/connectivity/network/tests/syscall/meta/netstack2/use_sync_udp.shard.cml",
-        "//src/connectivity/network/tests/syscall/meta/test_with_expectations.shard.cml",
-    ],
-    program: {
-        binary: "test/netstack_fuchsia_test",
-    },
-    use: [
-        {
-            protocol: [ "fuchsia.process.Launcher" ],
-            from: "parent",
-        },
+        "//src/connectivity/network/tests/syscall/meta/syscall_test.shard.cml",
     ],
 }

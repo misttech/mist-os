@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/connectivity/network/tests/syscall/meta/netstack2/fastudp/fastudp_syscall_test.shard.cml" ],
+    include: [
+        "//src/lib/testing/expectation/meta/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     program: {
-        binary: "test/netstack_dgramsocket_test",
+        runner: "gtest_runner",
     },
 }

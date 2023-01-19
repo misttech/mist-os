@@ -51,9 +51,6 @@ void FillRxBuffersLeavingRemainderInZirconSocket(const fbl::unique_fd& recvfd,
                                                  const fbl::unique_fd& sendfd,
                                                  const IOMethod& io_method,
                                                  std::vector<char>& sendbuf) {
-  if (!std::getenv(kFastUdpEnvVar)) {
-    FAIL() << "Zircon sockets are only used in Fast UDP";
-  }
   // Start with the maximum datagram payload size, derived as:
   // 65535 bytes (max IP packet size) - 20 bytes (IPv4 header) - 8 bytes (UDP header)
   size_t payload_size = 65507;
@@ -1633,9 +1630,6 @@ std::string DomainAndIOMethodToString(const testing::TestParamInfo<DomainAndIOMe
 class IOSendingMethodTest : public testing::TestWithParam<DomainAndIOMethod> {};
 
 TEST_P(IOSendingMethodTest, CloseTerminatesWithRxZirconSocketRemainder) {
-  if (!std::getenv(kFastUdpEnvVar)) {
-    GTEST_SKIP() << "Zircon sockets are only used in Fast UDP";
-  }
   // Fast datagram sockets on Fuchsia use multiple buffers to store inbound payloads,
   // some of which are in Netstack memory and some of which are in kernel memory.
   // Bytes are shuttled between these buffers using routines that spin until
@@ -1691,9 +1685,6 @@ TEST_P(IOSendingMethodTest, CloseTerminatesWithRxZirconSocketRemainder) {
 }
 
 TEST_P(IOSendingMethodTest, ReadWithRxZirconSocketRemainder) {
-  if (!std::getenv(kFastUdpEnvVar)) {
-    GTEST_SKIP() << "Zircon sockets are only used in Fast UDP";
-  }
   // Fast datagram sockets on Fuchsia use multiple buffers to store inbound payloads,
   // some of which are in Netstack memory and some of which are in kernel memory.
   // Bytes are shuttled between these buffers using goroutines.

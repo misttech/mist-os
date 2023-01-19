@@ -4,6 +4,8 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
 
 name_provider_service_not_present_label = "name_provider_service_not_present"
 bsdsocket_label = "bsdsocket"
@@ -149,25 +151,61 @@ test("netstack_${rawsocket_label}_test") {
   ]
 }
 
-tests_without_manifest = [
-  dgramsocket_label,
-  streamsocket_label,
-  bsdsocket_label,
-  if_nameindex_label,
-]
+# Defines a component for testing POSIX sockets.
+#
+# Parameters
+#
+#   component_name
+#     The name of the component to be instantiated.
+#     Type: string
+#
+#   expects_path (optional)
+#     The path to a `.json5` file containing expectations for results
+#     of non-passing tests.
+#     Type: string
+#     Default: The test will be run without expectations.
+#
+#   manifest (optional)
+#     The path to a manifest used to run the component.
+#     Type: string
+#     Default: An `expect_include` dep must be provided.
+#
+#   expect_include_dep (optional)
+#     The name of an `expect_includes` target used to run the component.
+#     Type: string
+template("posix_socket_test_component") {
+  component_label = target_name
+  assert(
+      defined(invoker.component_name),
+      "`component_name` must be specified when calling posix_socket_test_component($target_name)")
+  _component_name = invoker.component_name
 
-test_components_without_manifest = []
+  test_target = ":netstack_${component_label}_test"
 
-foreach(test, tests_without_manifest) {
-  name = "netstack_${test}_test"
-  fuchsia_unittest_component("${name}_component") {
-    component_name = name
-    deps = [
-      ":${name}",
-      ":socket_test_includes",
-    ]
+  if (defined(invoker.expects_path)) {
+    assert(
+        defined(invoker.manifest),
+        "`manifest` must be specified when calling posix_socket_test_component($target_name) with expectations")
+    fuchsia_test_component_with_expectations("${_component_name}_component") {
+      component_name = _component_name
+      deps = [ test_target ]
+      manifest = rebase_path(invoker.manifest)
+      expectations = rebase_path(invoker.expects_path)
+    }
+  } else {
+    fuchsia_unittest_component("${_component_name}_component") {
+      component_name = _component_name
+      deps = [ test_target ]
+      if (defined(invoker.manifest)) {
+        manifest = rebase_path(invoker.manifest)
+      } else {
+        assert(
+            defined(invoker.expect_include_dep),
+            "`expect_include_dep` must be specified when calling posix_socket_test_component($target_name) without a manifest")
+        deps += [ invoker.expect_include_dep ]
+      }
+    }
   }
-  test_components_without_manifest += [ name ]
 }
 
 expect_includes("socket_test_includes") {
@@ -179,16 +217,6 @@ expect_includes("socket_test_includes") {
   ]
 }
 
-name_provider_test_name =
-    "netstack_${name_provider_service_not_present_label}_test"
-fuchsia_unittest_component("${name_provider_test_name}_component") {
-  component_name = name_provider_test_name
-  deps = [
-    ":${name_provider_test_name}",
-    ":name_provider_includes",
-  ]
-}
-
 expect_includes("name_provider_includes") {
   includes = [
     "//src/sys/test_runners/gtest/default.shard.cml",
@@ -196,64 +224,99 @@ expect_includes("name_provider_includes") {
   ]
 }
 
-test_components_without_manifest += [ name_provider_test_name ]
+all_test_component_names = []
 
-tests_with_manifest = [
-  packetsocket_label,
-  fuchsia_label,
-  rawsocket_label,
+netstack2_syncudp_tests = [
+  {
+    label = streamsocket_label
+    expect_include_dep = ":socket_test_includes"
+  },
+  {
+    label = bsdsocket_label
+    expect_include_dep = ":socket_test_includes"
+  },
+  {
+    label = if_nameindex_label
+    expect_include_dep = ":socket_test_includes"
+  },
+  {
+    label = name_provider_service_not_present_label
+    expect_include_dep = ":name_provider_includes"
+  },
+  {
+    label = packetsocket_label
+  },
+  {
+    label = rawsocket_label
+  },
+  {
+    label = dgramsocket_label
+    expects = true
+  },
+  {
+    label = fuchsia_label
+    expects = true
+  },
 ]
 
-test_components_with_manifest = []
-
-foreach(test, tests_with_manifest) {
-  name = "netstack_${test}_test"
-  fuchsia_unittest_component("${name}_component") {
-    component_name = name
-    deps = [ ":${name}" ]
-    manifest = "meta/netstack2/${test}.cml"
+foreach(test, netstack2_syncudp_tests) {
+  _component_name = "netstack2_syncudp_${test.label}_test"
+  posix_socket_test_component(test.label) {
+    component_name = _component_name
+    if (defined(test.expects) && test.expects) {
+      expects_path = "expects/netstack2/${test.label}_syncudp.json5"
+    }
+    if (defined(test.expect_include_dep)) {
+      expect_include_dep = test.expect_include_dep
+    } else {
+      manifest = "meta/netstack2/${test.label}.cml"
+    }
   }
-  test_components_with_manifest += [ name ]
+  all_test_component_names += [ _component_name ]
 }
 
-tests_with_fast_udp = [
-  bsdsocket_label,
-  dgramsocket_label,
-  fuchsia_label,
-  if_nameindex_label,
+netstack2_fastudp_tests = [
+  {
+    label = bsdsocket_label
+  },
+  {
+    label = dgramsocket_label
+  },
+  {
+    label = if_nameindex_label
+  },
+  {
+    label = fuchsia_label
+    expects = true
+  },
 ]
 
-test_components_with_fast_udp = []
-
-foreach(test, tests_with_fast_udp) {
-  name = "netstack_with_fast_udp_${test}_test"
-  fuchsia_unittest_component("${name}_component") {
-    component_name = name
-    deps = [ ":netstack_${test}_test" ]
-    manifest = "meta/netstack2/fastudp/${test}.cml"
+foreach(test, netstack2_fastudp_tests) {
+  _component_name = "netstack2_fastudp_${test.label}_test"
+  posix_socket_test_component(test.label) {
+    component_name = _component_name
+    if (defined(test.expects) && test.expects) {
+      expects_path = "expects/netstack2/${test.label}_fastudp.json5"
+    }
+    manifest = "meta/netstack2/fastudp/${test.label}.cml"
   }
-  test_components_with_fast_udp += [ name ]
+  all_test_component_names += [ _component_name ]
 }
 
-tests_with_netstack3 = [ if_nameindex_label ]
+netstack3_tests = [ if_nameindex_label ]
 
-test_components_with_netstack3 = []
-
-foreach(test, tests_with_netstack3) {
-  name = "netstack3_${test}_test"
-  fuchsia_unittest_component("${name}_component") {
-    component_name = name
-    deps = [ ":netstack_${test}_test" ]
+foreach(test, netstack3_tests) {
+  _component_name = "netstack3_${test}_test"
+  posix_socket_test_component(test) {
+    component_name = _component_name
     manifest = "meta/netstack3/${test}.cml"
   }
-  test_components_with_netstack3 += [ name ]
+  all_test_component_names += [ _component_name ]
 }
 
 fuchsia_test_package("netstack-c-api-tests") {
   test_components = []
-  foreach(test,
-          test_components_without_manifest + test_components_with_manifest +
-              test_components_with_fast_udp + test_components_with_netstack3) {
+  foreach(test, all_test_component_names) {
     test_components += [ ":${test}_component" ]
   }
 
@@ -268,6 +331,9 @@ fuchsia_test_package("netstack-c-api-tests") {
 
     # cat is used to test FD passing in :fuchsia_test.
     "//third_party/sbase:cat_bin",
+
+    # used to run tests with expectations.
+    "//src/lib/testing/expectation:expectation_comparer",
   ]
 }
 

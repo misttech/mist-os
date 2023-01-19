@@ -181,20 +181,6 @@ template <typename Impl>
 class SocketTest : public testing::Test {
  protected:
   void SetUp() override {
-    constexpr char kFastUdpEnvVar[] = "FAST_UDP";
-    if (std::getenv(kFastUdpEnvVar)) {
-      if (std::is_same<Impl, SynchronousDatagramSocketImplIp>::value) {
-        GTEST_SKIP()
-            << "SynchronousDatagramSocket protocol should not be used for SOCK_DGRAM sockets when "
-               "fast UDP is enabled.";
-      }
-    } else {
-      if (std::is_same<Impl, DatagramSocketImpl>::value) {
-        GTEST_SKIP()
-            << "DatagramSocket protocol should not be used for SOCK_DGRAM sockets when fast UDP is "
-               "not enabled.";
-      }
-    }
     ASSERT_TRUE(fd_ = fbl::unique_fd(socket(AF_INET, Impl::type(), Impl::network_protocol())))
         << strerror(errno);
     addr_ = {
