@@ -6,7 +6,6 @@
 
 use anyhow::Context as _;
 use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet};
-use netstack_testing_common::Result;
 use netstack_testing_common::{
     interfaces,
     realms::{Netstack2, TestSandboxExt as _},
@@ -16,13 +15,14 @@ use netstack_testing_macros::netstack_test;
 async fn resolve(
     routes: &fidl_fuchsia_net_routes::StateProxy,
     mut remote: fidl_fuchsia_net::IpAddress,
-) -> Result<fidl_fuchsia_net_routes::Resolved> {
+) -> fidl_fuchsia_net_routes::Resolved {
     routes
         .resolve(&mut remote)
         .await
-        .context("routes/State.Resolve FIDL error")?
+        .expect("routes/State.Resolve FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
         .context("routes/State.Resolve error")
+        .expect("failed to resolve remote")
 }
 
 #[netstack_test]
@@ -37,7 +37,7 @@ async fn resolve_loopback_route(name: &str) {
 
     let test = |remote: fidl_fuchsia_net::IpAddress, source: fidl_fuchsia_net::IpAddress| async move {
         assert_eq!(
-            resolve(routes, remote).await.expect("error resolving remote"),
+            resolve(routes, remote).await,
             fidl_fuchsia_net_routes::Resolved::Direct(fidl_fuchsia_net_routes::Destination {
                 address: Some(remote),
                 mac: None,
@@ -46,15 +46,10 @@ async fn resolve_loopback_route(name: &str) {
                 ..fidl_fuchsia_net_routes::Destination::EMPTY
             }),
         );
-        Result::Ok(())
     };
 
-    let () = test(fidl_ip!("127.0.0.1"), fidl_ip!("127.0.0.1"))
-        .await
-        .expect("error testing resolution for IPv4 loopback");
-    let () = test(fidl_ip!("::1"), fidl_ip!("::1"))
-        .await
-        .expect("error testing resolution for IPv6 loopback");
+    test(fidl_ip!("127.0.0.1"), fidl_ip!("127.0.0.1")).await;
+    test(fidl_ip!("::1"), fidl_ip!("::1")).await;
 }
 
 #[netstack_test]
@@ -123,8 +118,7 @@ async fn resolve_route(name: &str) {
                 .expect("resolve FIDL error")
                 .map_err(fuchsia_zircon::Status::from_raw),
             Err(fuchsia_zircon::Status::ADDRESS_UNREACHABLE)
-        );
-        Result::Ok(())
+        )
     };
 
     let interface_id = host_ep.id();
@@ -145,12 +139,12 @@ async fn resolve_route(name: &str) {
 
         // Start asking for a route for something that is directly accessible on the
         // network.
-        let resolved = resolve(routes, gateway).await.expect("can't resolve peer");
+        let resolved = resolve(routes, gateway).await;
         assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Direct(gateway_node()));
         // Fails if MAC unreachable.
-        let () = resolve_fails(unreachable_peer).await.expect("error resolving unreachable peer");
+        resolve_fails(unreachable_peer).await;
         // Fails if route unreachable.
-        let () = resolve_fails(public_ip).await.expect("error resolving without route");
+        resolve_fails(public_ip).await;
 
         // Install a default route and try to resolve through the gateway.
         let () = host_stack
@@ -165,35 +159,30 @@ async fn resolve_route(name: &str) {
             .expect("add route");
 
         // Resolve a public IP again and check that we get the gateway response.
-        let resolved = resolve(routes, public_ip).await.expect("can't resolve through gateway");
+        let resolved = resolve(routes, public_ip).await;
         assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Gateway(gateway_node()));
         // And that the unspecified address resolves to the gateway node as well.
-        let resolved =
-            resolve(routes, unspecified).await.expect("can't resolve unspecified address");
+        let resolved = resolve(routes, unspecified).await;
         assert_eq!(resolved, fidl_fuchsia_net_routes::Resolved::Gateway(gateway_node()));
-
-        Result::Ok(())
     };
 
-    let () = do_test(
+    do_test(
         GATEWAY_IP_V4.addr,
         fidl_ip!("192.168.0.3"),
         fidl_ip!("0.0.0.0"),
         fidl_ip!("8.8.8.8"),
         HOST_IP_V4.addr,
     )
-    .await
-    .expect("IPv4 route lookup failed");
+    .await;
 
-    let () = do_test(
+    do_test(
         GATEWAY_IP_V6.addr,
         fidl_ip!("3080::3"),
         fidl_ip!("::"),
         fidl_ip!("2001:4860:4860::8888"),
         HOST_IP_V6.addr,
     )
-    .await
-    .expect("IPv6 route lookup failed");
+    .await;
 }
 
 #[netstack_test]
