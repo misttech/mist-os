@@ -162,6 +162,8 @@ class OutgoingMessage : public ::fidl::Status {
 
     uint8_t* data() { return bytes_.data(); }
     size_t size() const { return bytes_.size(); }
+    auto begin() const { return bytes_.begin(); }
+    auto end() const { return bytes_.end(); }
 
    private:
     explicit CopiedBytes(const OutgoingMessage& msg);

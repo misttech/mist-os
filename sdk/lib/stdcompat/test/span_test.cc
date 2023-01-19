@@ -21,25 +21,41 @@ struct WellFormed {
   int* data() { return nullptr; }
   const int* data() const { return nullptr; }
   size_t size() const { return 0; }
+  int* begin() const { return nullptr; }
+  int* end() const { return nullptr; }
 };
 
 struct NoMutableDataOverload {
   const int* data() const { return nullptr; }
   size_t size() const { return 0; }
+  int* begin() const { return nullptr; }
+  int* end() const { return nullptr; }
 };
 
 struct NoDataOverload {
   size_t size() const { return 0; }
+  int* begin() const { return nullptr; }
+  int* end() const { return nullptr; }
 };
 
 struct NoConstDataOverload {
   int* data() { return nullptr; }
   size_t size() const { return 0; }
+  int* begin() const { return nullptr; }
+  int* end() const { return nullptr; }
 };
 
 struct NoSizeOverload {
   int* data() { return nullptr; }
   const int* data() const { return nullptr; }
+  int* begin() const { return nullptr; }
+  int* end() const { return nullptr; }
+};
+
+struct NoBeginAndEnd {
+  int* data() { return nullptr; }
+  const int* data() const { return nullptr; }
+  size_t size() const { return 0; }
 };
 
 TEST(SpanCompatibleTraitTest, CheckForDataSizeAndConversionValidation) {
@@ -66,6 +82,7 @@ TEST(SpanCompatibleTraitTest, CheckForWellAndIllformedTypes) {
   static_assert(is_span_compatible_v<NoConstDataOverload, int> == true, "");
   static_assert(is_span_compatible_v<const NoDataOverload, const int> == false, "");
   static_assert(is_span_compatible_v<NoSizeOverload, const int> == false, "");
+  static_assert(is_span_compatible_v<NoBeginAndEnd, const int> == false, "");
 
   // Discard array and span specializations.
   static_assert(is_span_compatible_v<cpp20::span<const int>, int> == false, "");

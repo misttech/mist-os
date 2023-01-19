@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
-#define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
+#ifndef SDK_LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
+#define SDK_LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
 
 #include <array>
 #include <cstddef>
 #include <limits>
 #include <type_traits>
+#include <utility>
 
 #if defined(__cpp_lib_span) && __cpp_lib_span >= 202002L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 #include <span>
@@ -107,10 +108,19 @@ struct is_well_formed_data_and_size<
     : is_qualification_conversion<std::remove_pointer_t<decltype(cpp17::data(std::declval<T&>()))>,
                                   ElementType>::type {};
 
+template <typename T, typename = void>
+struct has_range_begin_and_end : std::false_type {};
+
+template <typename T>
+struct has_range_begin_and_end<T, std::void_t<decltype(std::begin(std::declval<T>())),
+                                              decltype(std::begin(std::declval<T>()))>>
+    : std::is_same<decltype(std::begin(std::declval<T>())),
+                   decltype(std::begin(std::declval<T>()))> {};
+
 template <typename T, class ElementType>
 static constexpr bool is_span_compatible_v =
     cpp17::conjunction_v<cpp17::negation<is_span<T>>, cpp17::negation<is_array_type<T>>,
-                         is_well_formed_data_and_size<T, ElementType>>;
+                         has_range_begin_and_end<T>, is_well_formed_data_and_size<T, ElementType>>;
 
 template <typename SizeType, SizeType Extent, SizeType Offset, SizeType Count>
 struct subspan_extent
@@ -127,4 +137,4 @@ using byte_span_size =
 }  // namespace internal
 }  // namespace cpp20
 
-#endif  // LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
+#endif  // SDK_LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_INTERNAL_SPAN_H_
