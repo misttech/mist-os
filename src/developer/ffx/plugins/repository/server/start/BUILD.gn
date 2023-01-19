@@ -22,6 +22,7 @@ ffx_plugin("ffx_repository_server_start") {
     "//third_party/rust_crates:serde",
   ]
   test_deps = [
+    "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/developer/ffx/config:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",

@@ -17,6 +17,7 @@ const CONFIG_KEY_DEFAULT_REPOSITORY: &str = "repository.default";
 const CONFIG_KEY_SERVER_MODE: &str = "repository.server.mode";
 const CONFIG_KEY_SERVER_ENABLED: &str = "repository.server.enabled";
 const CONFIG_KEY_SERVER_LISTEN: &str = "repository.server.listen";
+const CONFIG_KEY_LAST_USED_ADDRESS: &str = "repository.server.last_used_address";
 const ESCAPE_SET: &AsciiSet = &CONTROLS.add(b'%').add(b'.');
 
 // Try to figure out why the server is not running.
@@ -42,9 +43,13 @@ pub async fn determine_why_repository_server_is_not_running() -> anyhow::Error {
     match check!(repository_listen_addr().await) {
         Some(addr) => {
             return anyhow!(
-                "Another process may be using {}. Try shutting it down and restarting the \
+                "ffx config detects repository.server.listen to be {} \
+                Another process may be using that address. \
+                Try shutting it down and restarting the \
                 ffx daemon with:\n\
-                $ ffx repository server start",
+                $ ffx repository server start \n\
+                Or alternatively specify at runtime \n\
+                $ ffx repository server start --address <addr>",
                 addr,
             );
         }
@@ -52,7 +57,9 @@ pub async fn determine_why_repository_server_is_not_running() -> anyhow::Error {
             return anyhow!(
                 "Server listening address is unspecified. You can fix this with:\n\
                 $ ffx config set repository.server.listen '[::]:8083'\n\
-                $ ffx repository server start",
+                $ ffx repository server start\n\
+                Or alternatively specify at runtime \n\
+                $ ffx repository server start --address <port_number>",
             );
         }
     }
@@ -80,7 +87,34 @@ pub async fn set_repository_server_enabled(enabled: bool) -> Result<()> {
         .await
 }
 
-/// Return the repository server address.
+/// Return if the last used repository address used.
+pub async fn get_repository_server_last_address_used() -> Result<Option<std::net::SocketAddr>> {
+    if let Some(address) =
+        ffx_config::get::<Option<String>, _>(CONFIG_KEY_LAST_USED_ADDRESS).await?
+    {
+        if address.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(
+                address
+                    .parse::<std::net::SocketAddr>()
+                    .with_context(|| format!("Parsing {}", CONFIG_KEY_LAST_USED_ADDRESS))?,
+            ))
+        }
+    } else {
+        Ok(None)
+    }
+}
+
+/// Sets the repository server last used address.
+pub async fn set_repository_server_last_address_used(socket_address: String) -> Result<()> {
+    ffx_config::query(CONFIG_KEY_LAST_USED_ADDRESS)
+        .level(Some(ConfigLevel::User))
+        .set(socket_address.into())
+        .await
+}
+
+/// Return the repository server address from ffx config.
 pub async fn repository_listen_addr() -> Result<Option<std::net::SocketAddr>> {
     if let Some(address) = ffx_config::get::<Option<String>, _>(CONFIG_KEY_SERVER_LISTEN).await? {
         if address.is_empty() {

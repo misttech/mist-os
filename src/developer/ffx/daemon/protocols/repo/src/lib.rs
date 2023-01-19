@@ -255,12 +255,8 @@ async fn add_repository(
     }
 
     // Finally add the repository.
-    let mut inner = inner.write().await;
+    let inner = inner.write().await;
     inner.manager.add(repo_name, repo);
-
-    // The repository server is only started when repositories are added to the
-    // daemon. Now that we added one, make sure the server has started.
-    inner.start_server_warn().await;
 
     metrics::add_repository_event(&repo_spec).await;
 
@@ -510,7 +506,10 @@ async fn create_aliases(
 }
 
 impl RepoInner {
-    async fn start_server(&mut self) -> Result<Option<SocketAddr>, ffx::RepositoryError> {
+    async fn start_server(
+        &mut self,
+        socket_address: Option<SocketAddress>,
+    ) -> Result<Option<SocketAddr>, ffx::RepositoryError> {
         // Exit early if the server is disabled.
         let server_enabled = pkg_config::get_repository_server_enabled().await.map_err(|err| {
             tracing::error!("failed to read save server enabled flag: {:#?}", err);
@@ -529,7 +528,13 @@ impl RepoInner {
             ServerState::Running(info) => {
                 return Ok(Some(info.server.local_addr()));
             }
-            ServerState::Stopped => match pkg_config::repository_listen_addr().await {
+            ServerState::Stopped => match {
+                if let Some(addr) = socket_address {
+                    Ok(Some(addr.0))
+                } else {
+                    pkg_config::repository_listen_addr().await
+                }
+            } {
                 Ok(Some(addr)) => addr,
                 Ok(None) => {
                     tracing::error!(
@@ -550,6 +555,15 @@ impl RepoInner {
             Ok(info) => {
                 let local_addr = info.server.local_addr();
                 self.server = ServerState::Running(info);
+                pkg_config::set_repository_server_last_address_used(local_addr.to_string())
+                    .await
+                    .map_err(|err| {
+                    tracing::error!(
+                        "failed to save server last address used flag to config: {:#?}",
+                        err
+                    );
+                    ffx::RepositoryError::InternalError
+                })?;
                 metrics::server_started_event().await;
                 Ok(Some(local_addr))
             }
@@ -567,9 +581,32 @@ impl RepoInner {
         }
     }
 
+    async fn fetch_repo_address(&mut self) -> Result<Option<SocketAddr>, ffx::RepositoryError> {
+        let last_addr = pkg_config::get_repository_server_last_address_used().await.unwrap();
+        if let Some(_addr) = last_addr {
+            Ok(last_addr)
+        } else {
+            let listen_addr = pkg_config::repository_listen_addr().await.unwrap();
+            Ok(listen_addr)
+        }
+    }
+
     async fn start_server_warn(&mut self) {
-        if let Err(err) = self.start_server().await {
-            tracing::error!("Failed to start repository server: {:#?}", err);
+        let previous_addr = self.fetch_repo_address().await.unwrap();
+        if previous_addr.is_none() {
+            tracing::warn!(
+                "Unable to find address for package repo. Please set via --address flag\n\
+            $ ffx repository server start --address <IP4V_or_IP6V_addr>\n\
+            Or using ffx config\n\
+            ffx config set repository.server.listen '[::]:8083'"
+            )
+        } else {
+            let repo_addr = previous_addr.unwrap();
+            if let Err(err) =
+                self.start_server(Some(fidl_fuchsia_net_ext::SocketAddress(repo_addr))).await
+            {
+                tracing::info!("Failed to start repository server: {:#?}", err);
+            }
         }
     }
 
@@ -841,7 +878,7 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
         req: ffx::RepositoryRegistryRequest,
     ) -> Result<(), anyhow::Error> {
         match req {
-            ffx::RepositoryRegistryRequest::ServerStart { responder } => {
+            ffx::RepositoryRegistryRequest::ServerStart { address, responder } => {
                 let mut res = async {
                     pkg_config::set_repository_server_enabled(true).await.map_err(|err| {
                         tracing::error!("failed to save server enabled flag to config: {:#?}", err);
@@ -854,7 +891,8 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
                         return Err(ffx::RepositoryError::ServerNotRunning);
                     }
 
-                    match inner.start_server().await {
+                    let server_start = inner.start_server(address.map(|addr| (*addr).into())).await;
+                    match server_start {
                         Ok(Some(addr)) => Ok(SocketAddress(addr).into()),
                         Ok(None) => {
                             tracing::warn!("Not starting server because the server is disabled");
@@ -889,6 +927,16 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
                         );
                         ffx::RepositoryError::InternalError
                     })?;
+
+                    pkg_config::set_repository_server_last_address_used("".to_string())
+                        .await
+                        .map_err(|err| {
+                            tracing::error!(
+                                "failed to save server last address used flag to config: {:#?}",
+                                err
+                            );
+                            ffx::RepositoryError::InternalError
+                        })?;
 
                     self.inner.write().await.stop_server().await?;
 
@@ -1069,6 +1117,11 @@ impl<T: EventHandlerProvider + Default + Unpin + 'static> FidlProtocol for Repo<
         {
             let mut inner = self.inner.write().await;
             inner.server = ServerState::Stopped;
+        }
+
+        // Start the server if it is enabled.
+        if pkg_config::get_repository_server_enabled().await? {
+            self.inner.write().await.start_server_warn().await;
         }
 
         load_repositories_from_config(&self.inner).await;
@@ -1263,7 +1316,7 @@ mod tests {
             convert::TryInto,
             fs,
             future::Future,
-            net::{Ipv4Addr, Ipv6Addr, SocketAddr},
+            net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
             rc::Rc,
             str::FromStr,
             sync::{Arc, Mutex},
@@ -1581,6 +1634,22 @@ mod tests {
             .expect("adding repository to succeed");
     }
 
+    async fn register_target(proxy: &ffx::RepositoryRegistryProxy, target: ffx::RepositoryTarget) {
+        // We need to start the server before we can register a repository
+        // on a target.
+        proxy
+            .server_start(None)
+            .await
+            .expect("communicated with proxy")
+            .expect("starting the server to succeed");
+
+        proxy
+            .register_target(target)
+            .await
+            .expect("communicated with proxy")
+            .expect("target registration to succeed");
+    }
+
     async fn get_repositories(proxy: &ffx::RepositoryRegistryProxy) -> Vec<ffx::RepositoryConfig> {
         let (client, server) = fidl::endpoints::create_endpoints().unwrap();
         proxy.list_repositories(server).unwrap();
@@ -1629,7 +1698,9 @@ mod tests {
     // * clear out the config keys before we run each test to make sure state isn't leaked across
     //   tests.
     fn run_test<F: Future>(fut: F) -> F::Output {
-        let _guard = TEST_LOCK.lock().unwrap();
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|_| {
+            panic!("the test lock is poisoned, which probably means another test failed")
+        });
 
         let _ = simplelog::SimpleLogger::init(
             simplelog::LevelFilter::Debug,
@@ -1641,13 +1712,9 @@ mod tests {
 
             // Since ffx_config is global, it's possible to leave behind entries
             // across tests. Let's clean them up.
-            let _ = ffx_config::query("repository.server.mode").remove().await;
-            let _ = ffx_config::query("repository.server.listen").remove().await;
-            let _ = pkg::config::remove_repository(REPO_NAME).await;
-            let _ = pkg::config::remove_registration(REPO_NAME, TARGET_NODENAME).await;
+            let _ = ffx_config::query("repository").remove().await;
 
             // Most tests want the server to be running.
-            pkg_config::set_repository_server_enabled(true).await.unwrap();
             ffx_config::query("repository.server.mode")
                 .level(Some(ConfigLevel::User))
                 .set("ffx".into())
@@ -1888,7 +1955,7 @@ mod tests {
             assert_eq!(fake_engine.take_events(), vec![]);
 
             // Start the server.
-            proxy.server_start().await.unwrap().unwrap();
+            proxy.server_start(None).await.unwrap().unwrap();
 
             // Make sure we set up the repository and rewrite rules on the device.
             assert_eq!(
@@ -1928,9 +1995,43 @@ mod tests {
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
 
             let actual_address =
-                SocketAddress::from(proxy.server_start().await.unwrap().unwrap()).0;
+                SocketAddress::from(proxy.server_start(None).await.unwrap().unwrap()).0;
             let expected_address = repo.borrow().inner.read().await.server.listen_addr().unwrap();
             assert_eq!(actual_address, expected_address);
+
+            assert_matches!(proxy.server_stop().await.unwrap(), Ok(()));
+        })
+    }
+
+    #[test]
+    fn test_start_stop_server_runtime_address() {
+        run_test(async {
+            let config_addr: SocketAddr = (Ipv4Addr::LOCALHOST, 80).into();
+            ffx_config::query("repository.server.listen")
+                .level(Some(ConfigLevel::User))
+                .set(config_addr.to_string().into())
+                .await
+                .unwrap();
+
+            let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
+            let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
+
+            let daemon = FakeDaemonBuilder::new()
+                .rcs_handler(fake_rcs_closure)
+                .inject_fidl_protocol(Rc::clone(&repo))
+                .build();
+
+            let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
+
+            let runtime_address = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
+
+            proxy
+                .server_start(Some(&mut SocketAddress(runtime_address).into()))
+                .await
+                .unwrap()
+                .unwrap();
+            let actual_address = repo.borrow().inner.read().await.server.listen_addr().unwrap();
+            assert_ne!(config_addr, actual_address);
 
             assert_matches!(proxy.server_stop().await.unwrap(), Ok(()));
         })
@@ -1952,7 +2053,7 @@ mod tests {
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
 
             let actual_address =
-                SocketAddress::from(proxy.server_start().await.unwrap().unwrap()).0;
+                SocketAddress::from(proxy.server_start(None).await.unwrap().unwrap()).0;
             let expected_address = repo.borrow().inner.read().await.server.listen_addr().unwrap();
             assert_eq!(actual_address, expected_address);
 
@@ -1995,10 +2096,10 @@ mod tests {
                 vec![ffx::RepositoryConfig { name: REPO_NAME.to_string(), spec }]
             );
 
-            // Adding a repository should start the server.
+            // Adding a repository does not start the server.
             {
                 let inner = Arc::clone(&repo.borrow().inner);
-                assert_matches!(inner.read().await.server, ServerState::Running(_));
+                assert_matches!(inner.read().await.server, ServerState::Stopped);
             }
 
             // Adding a repository should not create a tunnel, since we haven't registered the
@@ -2048,17 +2149,17 @@ mod tests {
             assert_eq!(fake_repo_manager.take_events(), vec![]);
             assert_eq!(fake_engine.take_events(), vec![]);
 
-            proxy
-                .register_target(ffx::RepositoryTarget {
+            register_target(
+                &proxy,
+                ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
                     ..ffx::RepositoryTarget::EMPTY
-                })
-                .await
-                .expect("communicated with proxy")
-                .expect("target registration to succeed");
+                },
+            )
+            .await;
 
             // Registering the target should have set up a repository.
             assert_eq!(
@@ -2156,17 +2257,17 @@ mod tests {
             assert_eq!(fake_repo_manager.take_events(), vec![]);
             assert_eq!(fake_engine.take_events(), vec![]);
 
-            proxy
-                .register_target(ffx::RepositoryTarget {
+            register_target(
+                &proxy,
+                ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
                     ..ffx::RepositoryTarget::EMPTY
-                })
-                .await
-                .expect("communicated with proxy")
-                .expect("target registration to succeed");
+                },
+            )
+            .await;
 
             // Registering the target should have set up a repository.
             assert_eq!(
@@ -2279,17 +2380,17 @@ mod tests {
         assert_eq!(fake_repo_manager.take_events(), vec![]);
         assert_eq!(fake_engine.take_events(), vec![]);
 
-        proxy
-            .register_target(ffx::RepositoryTarget {
+        register_target(
+            &proxy,
+            ffx::RepositoryTarget {
                 repo_name: Some(REPO_NAME.to_string()),
                 target_identifier: Some(TARGET_NODENAME.to_string()),
                 storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                 aliases: None,
                 ..ffx::RepositoryTarget::EMPTY
-            })
-            .await
-            .expect("communicated with proxy")
-            .expect("target registration to succeed");
+            },
+        )
+        .await;
 
         // Registering the target should have set up a repository.
         let repo_config = test_repo_config_with_repo_host(&repo, Some(expected_repo_host)).await;
@@ -2390,17 +2491,17 @@ mod tests {
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
             add_repo(&proxy, REPO_NAME).await;
 
-            proxy
-                .register_target(ffx::RepositoryTarget {
+            register_target(
+                &proxy,
+                ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec!["fuchsia.com".to_string(), "example.com".to_string()]),
                     ..ffx::RepositoryTarget::EMPTY
-                })
-                .await
-                .expect("communicated with proxy")
-                .expect("target registration to succeed");
+                },
+            )
+            .await;
 
             // Adding the registration should have set up rewrite rules.
             assert_eq!(
@@ -2496,16 +2597,16 @@ mod tests {
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
             add_repo(&proxy, REPO_NAME).await;
 
-            proxy
-                .register_target(ffx::RepositoryTarget {
+            register_target(
+                &proxy,
+                ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: None,
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     ..ffx::RepositoryTarget::EMPTY
-                })
-                .await
-                .expect("communicated with proxy")
-                .expect("target registration to succeed");
+                },
+            )
+            .await;
 
             assert_eq!(
                 fake_repo_manager.take_events(),
@@ -2549,17 +2650,17 @@ mod tests {
             // Make sure the registry doesn't have any registrations.
             assert_eq!(get_target_registrations(&proxy).await, vec![]);
 
-            proxy
-                .register_target(ffx::RepositoryTarget {
+            register_target(
+                &proxy,
+                ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: Some(vec![]),
                     ..ffx::RepositoryTarget::EMPTY
-                })
-                .await
-                .unwrap()
-                .unwrap();
+                },
+            )
+            .await;
 
             // We should have added a repository to the device, but no rewrite rules.
             assert_eq!(
@@ -2607,17 +2708,17 @@ mod tests {
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
             add_repo(&proxy, REPO_NAME).await;
 
-            proxy
-                .register_target(ffx::RepositoryTarget {
+            register_target(
+                &proxy,
+                ffx::RepositoryTarget {
                     repo_name: Some(REPO_NAME.to_string()),
                     target_identifier: Some(TARGET_NODENAME.to_string()),
                     storage_type: Some(ffx::RepositoryStorageType::Ephemeral),
                     aliases: None,
                     ..ffx::RepositoryTarget::EMPTY
-                })
-                .await
-                .unwrap()
-                .unwrap();
+                },
+            )
+            .await;
 
             // Make sure we set up the repository on the device.
             assert_eq!(
@@ -2663,6 +2764,15 @@ mod tests {
                 .build();
 
             let proxy = daemon.open_proxy::<ffx::RepositoryRegistryMarker>().await;
+
+            // We need to start the server before we can register a repository
+            // on a target.
+            proxy
+                .server_start(None)
+                .await
+                .expect("communicated with proxy")
+                .expect("starting the server to succeed");
+
             add_repo(&proxy, REPO_NAME).await;
 
             assert_eq!(

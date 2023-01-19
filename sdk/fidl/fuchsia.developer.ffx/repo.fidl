@@ -64,7 +64,12 @@ type GcsRepositorySpec = table {
 protocol RepositoryRegistry {
     /// Start the repository server if it is not already running. Returns the local socket address
     /// the server is listening upon.
-    ServerStart() -> (struct {
+    ///
+    /// `address`: local socket address that the server will listen on to run package repository.
+    ///     This param is optional and if not provided will rely on ffx config. 
+    ServerStart(struct {
+        address fuchsia.net.SocketAddress:optional;
+    }) -> (struct {
         address fuchsia.net.SocketAddress;
     }) error RepositoryError;
 

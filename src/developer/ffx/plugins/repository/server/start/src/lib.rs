@@ -30,27 +30,44 @@ struct ServerInfo {
 }
 
 async fn start_impl(
-    _cmd: StartCommand,
+    cmd: StartCommand,
     repos: RepositoryRegistryProxy,
     writer: &mut Writer,
 ) -> Result<()> {
-    let listen_address = match pkg_config::repository_listen_addr().await {
+    let listen_address = match {
+        if let Some(addr_flag) = cmd.address {
+            Ok(Some(addr_flag))
+        } else {
+            pkg_config::repository_listen_addr().await
+        }
+    } {
         Ok(Some(address)) => address,
         Ok(None) => {
             ffx_bail!(
-                "The server listening address is unspecified. You can fix this with:\n\
+                "The server listening address is unspecified.\n\
+                You can fix this by setting your ffx config.\n\
                 \n\
                 $ ffx config set repository.server.listen '[::]:8083'\n\
-                $ ffx repository server start",
+                $ ffx repository server start
+                \n\
+                Or alternatively specify at runtime:\n\
+                $ ffx repository server start --address <IP4V_or_IP6V_addr>",
             )
         }
         Err(err) => {
-            ffx_bail!("Failed to read repository server from config: {:#?}", err)
+            ffx_bail!(
+                "Failed to read repository server from ffx config or runtime flag: {:#?}",
+                err
+            )
         }
     };
 
+    let mut addr =
+        if cmd.address.is_some() { Some(SocketAddress(listen_address).into()) } else { None };
+    let runtime_address = addr.as_mut();
+
     match repos
-        .server_start()
+        .server_start(runtime_address)
         .await
         .context("communicating with daemon")?
         .map_err(RepositoryError::from)
@@ -103,6 +120,7 @@ mod tests {
     use {
         super::*,
         fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest},
+        fidl_fuchsia_net as fidl,
         futures::channel::oneshot::channel,
         std::{future::Future, net::Ipv4Addr},
     };
@@ -136,7 +154,7 @@ mod tests {
             let (sender, receiver) = channel();
             let mut sender = Some(sender);
             let repos = setup_fake_repos(move |req| match req {
-                RepositoryRegistryRequest::ServerStart { responder } => {
+                RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
                     let address = SocketAddress(address).into();
                     responder.send(&mut Ok(address)).unwrap()
@@ -144,7 +162,42 @@ mod tests {
                 other => panic!("Unexpected request: {:?}", other),
             });
 
-            start_impl(StartCommand {}, repos, &mut writer).await.unwrap();
+            start_impl(StartCommand { address: None }, repos, &mut writer).await.unwrap();
+            assert_eq!(receiver.await, Ok(()));
+        })
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_start_runtime_port() {
+        run_async_test(async {
+            let mut writer = Writer::new_test(None);
+
+            let address = (Ipv4Addr::LOCALHOST, 8084).into();
+
+            let _test = fidl::SocketAddress::Ipv4(fidl::Ipv4SocketAddress {
+                address: fidl::Ipv4Address { addr: [1, 2, 3, 4] },
+                port: 5,
+            });
+
+            let (sender, receiver) = channel();
+            let mut sender = Some(sender);
+            let repos = setup_fake_repos(move |req| match req {
+                RepositoryRegistryRequest::ServerStart { responder, address: Some(_test) } => {
+                    sender.take().unwrap().send(()).unwrap();
+                    let address = SocketAddress(address).into();
+                    responder.send(&mut Ok(address)).unwrap()
+                }
+                other => panic!("Unexpected request: {:?}", other),
+            });
+
+            start_impl(
+                StartCommand { address: Some("127.0.0.1:8084".parse().unwrap()) },
+                repos,
+                &mut writer,
+            )
+            .await
+            .unwrap();
             assert_eq!(receiver.await, Ok(()));
         })
     }
@@ -165,7 +218,7 @@ mod tests {
             let (sender, receiver) = channel();
             let mut sender = Some(sender);
             let repos = setup_fake_repos(move |req| match req {
-                RepositoryRegistryRequest::ServerStart { responder } => {
+                RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
                     let address = SocketAddress(address).into();
                     responder.send(&mut Ok(address)).unwrap()
@@ -173,7 +226,7 @@ mod tests {
                 other => panic!("Unexpected request: {:?}", other),
             });
 
-            start_impl(StartCommand {}, repos, &mut writer).await.unwrap();
+            start_impl(StartCommand { address: None }, repos, &mut writer).await.unwrap();
             assert_eq!(receiver.await, Ok(()));
 
             let info: ServerInfo = serde_json::from_str(&writer.test_output().unwrap()).unwrap();
@@ -190,14 +243,14 @@ mod tests {
             let (sender, receiver) = channel();
             let mut sender = Some(sender);
             let repos = setup_fake_repos(move |req| match req {
-                RepositoryRegistryRequest::ServerStart { responder } => {
+                RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
                     responder.send(&mut Err(RepositoryError::ServerNotRunning)).unwrap()
                 }
                 other => panic!("Unexpected request: {:?}", other),
             });
 
-            assert!(start_impl(StartCommand {}, repos, &mut writer).await.is_err());
+            assert!(start_impl(StartCommand { address: None }, repos, &mut writer).await.is_err());
             assert_eq!(receiver.await, Ok(()));
         })
     }
@@ -218,7 +271,7 @@ mod tests {
             let (sender, receiver) = channel();
             let mut sender = Some(sender);
             let repos = setup_fake_repos(move |req| match req {
-                RepositoryRegistryRequest::ServerStart { responder } => {
+                RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                     sender.take().unwrap().send(()).unwrap();
                     let address = SocketAddress(address).into();
                     responder.send(&mut Ok(address)).unwrap()
@@ -226,7 +279,7 @@ mod tests {
                 other => panic!("Unexpected request: {:?}", other),
             });
 
-            assert!(start_impl(StartCommand {}, repos, &mut writer).await.is_err());
+            assert!(start_impl(StartCommand { address: None }, repos, &mut writer).await.is_err());
             assert_eq!(receiver.await, Ok(()));
         })
     }
