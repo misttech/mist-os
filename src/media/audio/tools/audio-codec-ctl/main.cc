@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_ostream.h>
 #include <getopt.h>
-#include <lib/component/incoming/cpp/service_client.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fdio.h>
