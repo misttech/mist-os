@@ -227,8 +227,8 @@ class AutoVmcs : public hypervisor::StateInvalidator {
   void Write(VmcsField64 field, uint64_t val);
   void Write(VmcsFieldXX field, uint64_t val);
 
-  zx_status_t SetControl(VmcsField32 controls, uint64_t true_msr, uint64_t old_msr, uint32_t set,
-                         uint32_t clear);
+  zx::result<> SetControl(VmcsField32 controls, uint64_t true_msr, uint64_t old_msr, uint32_t set,
+                          uint32_t clear);
 
  private:
   paddr_t vmcs_address_;

@@ -137,7 +137,7 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
                        paddr_t msr_bitmaps_address, paddr_t ept_pml4, VmxState* vmx_state,
                        uint8_t* extended_register_state) {
   // Setup secondary processor-based VMCS controls.
-  zx_status_t status =
+  auto result =
       vmcs.SetControl(VmcsField32::PROCBASED_CTLS2, read_msr(X86_MSR_IA32_VMX_PROCBASED_CTLS2), 0,
                       // Enable use of extended page tables.
                       kProcbasedCtls2Ept |
@@ -152,16 +152,17 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
                           (config.unrestricted ? kProcbasedCtls2UnrestrictedGuest : 0),
                       // If not `unrestricted`, disable unrestricted guest.
                       (config.unrestricted ? 0 : kProcbasedCtls2UnrestrictedGuest));
-  if (status != ZX_OK) {
-    return zx::error(status);
+  if (result.is_error()) {
+    return result;
   }
 
   // Enable use of INVPCID instruction if available.
-  vmcs.SetControl(VmcsField32::PROCBASED_CTLS2, read_msr(X86_MSR_IA32_VMX_PROCBASED_CTLS2),
-                  vmcs.Read(VmcsField32::PROCBASED_CTLS2), kProcbasedCtls2Invpcid, 0);
+  std::ignore =
+      vmcs.SetControl(VmcsField32::PROCBASED_CTLS2, read_msr(X86_MSR_IA32_VMX_PROCBASED_CTLS2),
+                      vmcs.Read(VmcsField32::PROCBASED_CTLS2), kProcbasedCtls2Invpcid, 0);
 
   // Setup pin-based VMCS controls.
-  status =
+  result =
       vmcs.SetControl(VmcsField32::PINBASED_CTLS, read_msr(X86_MSR_IA32_VMX_TRUE_PINBASED_CTLS),
                       read_msr(X86_MSR_IA32_VMX_PINBASED_CTLS),
                       // External interrupts cause a VM exit.
@@ -169,8 +170,8 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
                           // Non-maskable interrupts cause a VM exit.
                           kPinbasedCtlsNmiExiting,
                       0);
-  if (status != ZX_OK) {
-    return zx::error(status);
+  if (result.is_error()) {
+    return result;
   }
 
   const uint32_t cr_ctls =
@@ -183,7 +184,7 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
       // VM exit on CR8 store.
       kProcbasedCtlsCr8StoreExiting;
   // Setup primary processor-based VMCS controls.
-  status =
+  result =
       vmcs.SetControl(VmcsField32::PROCBASED_CTLS, read_msr(X86_MSR_IA32_VMX_TRUE_PROCBASED_CTLS),
                       read_msr(X86_MSR_IA32_VMX_PROCBASED_CTLS),
                       // Enable VM exit when interrupts are enabled.
@@ -202,8 +203,8 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
                           (config.cr_exiting ? cr_ctls : 0),
                       // If not `cr_exiting`, disable VM exit on CRs.
                       (config.cr_exiting ? 0 : cr_ctls));
-  if (status != ZX_OK) {
-    return zx::error(status);
+  if (result.is_error()) {
+    return result;
   }
 
   // We only enable interrupt-window exiting above to ensure that the
@@ -211,7 +212,7 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
   vmcs.InterruptWindowExiting(false);
 
   // Setup VM-exit VMCS controls.
-  status = vmcs.SetControl(VmcsField32::EXIT_CTLS, read_msr(X86_MSR_IA32_VMX_TRUE_EXIT_CTLS),
+  result = vmcs.SetControl(VmcsField32::EXIT_CTLS, read_msr(X86_MSR_IA32_VMX_TRUE_EXIT_CTLS),
                            read_msr(X86_MSR_IA32_VMX_EXIT_CTLS),
                            // Logical processor is in 64-bit mode after VM
                            // exit. On VM exit CS.L, IA32_EFER.LME, and
@@ -228,8 +229,8 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
                                // Load the host IA32_EFER MSR on exit.
                                kExitCtlsLoadIa32Efer,
                            0);
-  if (status != ZX_OK) {
-    return zx::error(status);
+  if (result.is_error()) {
+    return result;
   }
 
   // Whether we are configuring the base processor. The base processor starts in
@@ -248,10 +249,10 @@ zx::result<> vmcs_init(AutoVmcs& vmcs, const VcpuConfig& config, uint16_t vpid, 
     // On the BSP, go straight to 64-bit mode on entry.
     entry_ctls |= kEntryCtls64bitMode;
   }
-  status = vmcs.SetControl(VmcsField32::ENTRY_CTLS, read_msr(X86_MSR_IA32_VMX_TRUE_ENTRY_CTLS),
+  result = vmcs.SetControl(VmcsField32::ENTRY_CTLS, read_msr(X86_MSR_IA32_VMX_TRUE_ENTRY_CTLS),
                            read_msr(X86_MSR_IA32_VMX_ENTRY_CTLS), entry_ctls, 0);
-  if (status != ZX_OK) {
-    return zx::error(status);
+  if (result.is_error()) {
+    return result;
   }
 
   // From Volume 3, Section 24.6.3: The exception bitmap is a 32-bit field
@@ -625,25 +626,25 @@ void AutoVmcs::Write(VmcsFieldXX field, uint64_t val) {
   vmwrite(static_cast<uint64_t>(field), val);
 }
 
-zx_status_t AutoVmcs::SetControl(VmcsField32 controls, uint64_t true_msr, uint64_t old_msr,
-                                 uint32_t set, uint32_t clear) {
+zx::result<> AutoVmcs::SetControl(VmcsField32 controls, uint64_t true_msr, uint64_t old_msr,
+                                  uint32_t set, uint32_t clear) {
   DEBUG_ASSERT(vmcs_address_ != 0);
   uint32_t allowed_0 = static_cast<uint32_t>(BITS(true_msr, 31, 0));
   uint32_t allowed_1 = static_cast<uint32_t>(BITS_SHIFT(true_msr, 63, 32));
   if ((allowed_1 & set) != set) {
     dprintf(INFO, "Failed to set VMCS controls %#x, %#x != %#x\n", static_cast<uint>(controls),
             allowed_1, set);
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   if ((~allowed_0 & clear) != clear) {
     dprintf(INFO, "Failed to clear VMCS controls %#x, %#x != %#x\n", static_cast<uint>(controls),
             ~allowed_0, clear);
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   if ((set & clear) != 0) {
     dprintf(INFO, "Attempted to set and clear the same VMCS controls %#x\n",
             static_cast<uint>(controls));
-    return ZX_ERR_INVALID_ARGS;
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   // See Volume 3, Section 31.5.1, Algorithm 3, Part C. If the control can be
@@ -653,7 +654,7 @@ zx_status_t AutoVmcs::SetControl(VmcsField32 controls, uint64_t true_msr, uint64
   uint32_t unknown = flexible & ~(set | clear);
   uint32_t defaults = unknown & BITS(old_msr, 31, 0);
   Write(controls, allowed_0 | defaults | set);
-  return ZX_OK;
+  return zx::ok();
 }
 
 bool cr0_is_invalid(AutoVmcs& vmcs, uint64_t cr0_value) {
@@ -1037,10 +1038,10 @@ zx::result<ktl::unique_ptr<Vcpu>> NormalVcpu::Create(NormalGuest& guest, zx_vadd
                                         : x86_feature_test(X86_FEATURE_INVAR_TSC);
   AutoVmcs vmcs(vcpu->vmcs_page_.PhysicalAddress());
   // Enable use of PAUSE-loop exiting if available.
-  zx_status_t status =
+  auto result =
       vmcs.SetControl(VmcsField32::PROCBASED_CTLS2, read_msr(X86_MSR_IA32_VMX_PROCBASED_CTLS2),
                       vmcs.Read(VmcsField32::PROCBASED_CTLS2), kProcbasedCtls2PauseLoopExiting, 0);
-  if (status == ZX_OK) {
+  if (result.is_ok()) {
     // From Volume 3, Section 25.1.3: The processor determines the amount of
     // time between this execution of PAUSE and the previous execution of PAUSE
     // at CPL 0. If this amount of time exceeds the value of the VM-execution
