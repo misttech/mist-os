@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"sync"
 
@@ -75,6 +76,7 @@ func (b *BatchRunner) Enqueue(command []string, stdout, stderr io.Writer, closer
 			select {
 			case b.errs <- err:
 				// Stop all other jobs.
+				fmt.Printf("Command %s encountered error: %v", command, err)
 				b.cancel()
 				return
 			default:
