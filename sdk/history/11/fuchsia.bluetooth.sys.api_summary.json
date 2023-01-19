@@ -395,6 +395,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.bluetooth.sys/HostInfo.addresses",
+        "ordinal": "8",
+        "type": "vector<fuchsia.bluetooth/Address>"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.bluetooth.sys/HostInfo.discoverable",
         "ordinal": "6",
         "type": "bool"

@@ -844,12 +844,11 @@ mod tests {
         HostInfo {
             id,
             technology: fsys::TechnologyType::LowEnergy,
-            address,
+            addresses: vec![address],
             active,
             local_name: name,
             discoverable,
             discovering,
-            addresses: vec![address],
         }
     }
 

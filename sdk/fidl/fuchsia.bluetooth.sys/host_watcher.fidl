@@ -24,7 +24,7 @@ type HostInfo = table {
     /// The `addresses` field provides more information about the host.
     ///
     /// This field is always present.
-    @available(deprecated=HEAD, note="use `HostInfo.addresses`")
+    @available(deprecated=11, removed=12, note="Removed in 12, use HostInfo.addresses instead")
     3: address bt.Address;
 
     /// Indicates whether or not this is the active host. The system has one active host which
@@ -47,7 +47,7 @@ type HostInfo = table {
     /// The Public address is always reported first.
     ///
     /// This field is always present.
-    @available(added=HEAD)
+    @available(added=11)
     8: addresses vector<bt.Address>:MAX;
 };
 

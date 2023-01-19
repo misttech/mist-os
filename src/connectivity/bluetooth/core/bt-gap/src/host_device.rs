@@ -113,8 +113,10 @@ impl HostDevice {
         self.0.info.read().id.into()
     }
 
-    pub fn address(&self) -> Address {
-        self.0.info.read().address
+    pub fn public_address(&self) -> Address {
+        // The list of known Host Addresses is always nonempty. The Public address is guaranteed to
+        // be listed first.
+        self.0.info.read().addresses[0]
     }
 
     /// Convenience method to produce a type for easy debug printing of the main identifiers for the
@@ -122,7 +124,7 @@ impl HostDevice {
     pub fn debug_identifiers(&self) -> HostDebugIdentifiers {
         HostDebugIdentifiers {
             id: self.id(),
-            address: self.address(),
+            address: self.public_address(),
             path: self.path().to_path_buf(),
         }
     }
@@ -355,12 +357,11 @@ impl HostDevice {
         let info = HostInfo {
             id,
             technology: TechnologyType::DualMode,
-            address,
+            addresses: vec![address],
             active: false,
             local_name: None,
             discoverable: false,
             discovering: false,
-            addresses: vec![address],
         };
         HostDevice::new(
             path.into(),

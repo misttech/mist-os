@@ -22,9 +22,9 @@ pub struct HostInfo {
     /// The Bluetooth technologies that are supported by this adapter.
     pub technology: fsys::TechnologyType,
 
-    /// The identity address.
-    // TODO(fxbug.dev/107656): Remove this once it is removed from the `sys.HostWatcher` API.
-    pub address: Address,
+    /// The known Classic and LE addresses associated with this Host.
+    /// This is guaranteed to be nonempty. The Public Address is always first.
+    pub addresses: Vec<Address>,
 
     /// Indicates whether or not this is the active host. The system has one active host which
     /// handles all Bluetooth procedures.
@@ -40,9 +40,6 @@ pub struct HostInfo {
 
     /// Whether or not device discovery is currently being performed.
     pub discovering: bool,
-
-    /// The known Classic and LE addresses associated with this Host.
-    pub addresses: Vec<Address>,
 }
 
 impl TryFrom<&fsys::HostInfo> for HostInfo {
@@ -50,16 +47,18 @@ impl TryFrom<&fsys::HostInfo> for HostInfo {
     fn try_from(src: &fsys::HostInfo) -> Result<HostInfo, Self::Error> {
         let addresses =
             src.addresses.as_ref().ok_or(format_err!("HostInfo.addresses is mandatory!"))?;
+        if addresses.is_empty() {
+            return Err(format_err!("HostInfo.addresses must be nonempty!"));
+        }
         let addresses = addresses.iter().map(Into::into).collect();
         Ok(HostInfo {
             id: HostId::from(src.id.ok_or(format_err!("HostInfo.id is mandatory!"))?),
             technology: src.technology.ok_or(format_err!("HostInfo.technology is mandatory!"))?,
-            address: src.address.ok_or(format_err!("HostInfo.address is mandatory!"))?.into(),
+            addresses,
             active: src.active.unwrap_or(false),
             local_name: src.local_name.clone(),
             discoverable: src.discoverable.unwrap_or(false),
             discovering: src.discovering.unwrap_or(false),
-            addresses,
         })
     }
 }
@@ -76,7 +75,6 @@ impl From<&HostInfo> for fsys::HostInfo {
         fsys::HostInfo {
             id: Some(src.id.into()),
             technology: Some(src.technology),
-            address: Some(src.address.into()),
             active: Some(src.active),
             local_name: src.local_name.clone(),
             discoverable: Some(src.discoverable),
@@ -175,14 +173,10 @@ mod tests {
     }
 
     #[test]
-    fn from_fidl_address_not_present() {
+    fn from_fidl_addresses_not_present() {
         let info = fsys::HostInfo {
             id: Some(fbt::HostId { value: 1 }),
             technology: Some(fsys::TechnologyType::LowEnergy),
-            addresses: Some(vec![fbt::Address {
-                type_: fbt::AddressType::Public,
-                bytes: [1, 2, 3, 4, 5, 6],
-            }]),
             ..fsys::HostInfo::EMPTY
         };
         let info = HostInfo::try_from(info);
@@ -190,14 +184,11 @@ mod tests {
     }
 
     #[test]
-    fn from_fidl_addresses_not_present() {
+    fn from_fidl_addresses_is_empty() {
         let info = fsys::HostInfo {
             id: Some(fbt::HostId { value: 1 }),
             technology: Some(fsys::TechnologyType::LowEnergy),
-            address: Some(fbt::Address {
-                type_: fbt::AddressType::Public,
-                bytes: [1, 2, 3, 4, 5, 6],
-            }),
+            addresses: Some(vec![]),
             ..fsys::HostInfo::EMPTY
         };
         let info = HostInfo::try_from(info);
@@ -209,14 +200,6 @@ mod tests {
         let info = fsys::HostInfo {
             id: Some(fbt::HostId { value: 1 }),
             technology: Some(fsys::TechnologyType::LowEnergy),
-            address: Some(fbt::Address {
-                type_: fbt::AddressType::Public,
-                bytes: [1, 2, 3, 4, 5, 6],
-            }),
-            active: None,
-            local_name: None,
-            discoverable: None,
-            discovering: None,
             addresses: Some(vec![fbt::Address {
                 type_: fbt::AddressType::Public,
                 bytes: [1, 2, 3, 4, 5, 6],
@@ -226,12 +209,11 @@ mod tests {
         let expected = HostInfo {
             id: HostId(1),
             technology: fsys::TechnologyType::LowEnergy,
-            address: Address::Public([1, 2, 3, 4, 5, 6]),
+            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
             active: false,
             local_name: None,
             discoverable: false,
             discovering: false,
-            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
         };
 
         let info = HostInfo::try_from(info).expect("expected successful conversion");
@@ -243,10 +225,6 @@ mod tests {
         let info = fsys::HostInfo {
             id: Some(fbt::HostId { value: 1 }),
             technology: Some(fsys::TechnologyType::LowEnergy),
-            address: Some(fbt::Address {
-                type_: fbt::AddressType::Public,
-                bytes: [1, 2, 3, 4, 5, 6],
-            }),
             active: Some(true),
             local_name: Some("name".to_string()),
             discoverable: Some(false),
@@ -260,12 +238,11 @@ mod tests {
         let expected = HostInfo {
             id: HostId(1),
             technology: fsys::TechnologyType::LowEnergy,
-            address: Address::Public([1, 2, 3, 4, 5, 6]),
+            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
             active: true,
             local_name: Some("name".to_string()),
             discoverable: false,
             discovering: true,
-            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
         };
 
         let info = HostInfo::try_from(info).expect("expected successful conversion");
@@ -277,20 +254,15 @@ mod tests {
         let info = HostInfo {
             id: HostId(1),
             technology: fsys::TechnologyType::LowEnergy,
-            address: Address::Public([1, 2, 3, 4, 5, 6]),
+            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
             active: false,
             local_name: Some("name".to_string()),
             discoverable: false,
             discovering: false,
-            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
         };
         let expected = fsys::HostInfo {
             id: Some(fbt::HostId { value: 1 }),
             technology: Some(fsys::TechnologyType::LowEnergy),
-            address: Some(fbt::Address {
-                type_: fbt::AddressType::Public,
-                bytes: [1, 2, 3, 4, 5, 6],
-            }),
             active: Some(false),
             local_name: Some("name".to_string()),
             discoverable: Some(false),
@@ -312,12 +284,11 @@ mod tests {
         let info = HostInfo {
             id: HostId(1),
             technology: fsys::TechnologyType::LowEnergy,
-            address: Address::Public([1, 2, 3, 4, 5, 6]),
+            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
             active: false,
             local_name: Some("name".to_string()),
             discoverable: false,
             discovering: true,
-            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
         };
         let mut info = Inspectable::new(info, node);
         assert_data_tree!(inspector, root: {
@@ -333,12 +304,11 @@ mod tests {
         info.update(HostInfo {
             id: HostId(1),
             technology: fsys::TechnologyType::LowEnergy,
-            address: Address::Public([1, 2, 3, 4, 5, 6]),
+            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
             active: true,
             local_name: Some("foo".to_string()),
             discoverable: true,
             discovering: true,
-            addresses: vec![Address::Public([1, 2, 3, 4, 5, 6])],
         });
         assert_data_tree!(inspector, root: {
             info: contains {

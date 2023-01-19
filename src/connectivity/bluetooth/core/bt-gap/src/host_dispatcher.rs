@@ -726,7 +726,8 @@ impl HostDispatcher {
             // Bootstrap.Commit(), but a failure on the host. So do not return error from this
             // function, but instead log and continue.
             // TODO(fxbug.dev/45325) - if a host fails we should close it and clean up after it
-            if let Err(error) = try_restore_bonds(host.clone(), self.clone(), &host.address()).await
+            if let Err(error) =
+                try_restore_bonds(host.clone(), self.clone(), &host.public_address()).await
             {
                 error!(
                     "Error restoring Bootstrapped bonds to host '{:?}': {}",
@@ -745,7 +746,7 @@ impl HostDispatcher {
         // TODO(fxbug.dev/66615): Make sure that the bt-host device is left in a well-known state if
         // any of these operations fails.
 
-        let address = host_device.address();
+        let address = host_device.public_address();
         assign_host_data(host_device.clone(), self.clone(), &address)
             .await
             .context(format!("{:?}: failed to assign identity to bt-host", dbg_ids))?;

@@ -701,10 +701,11 @@ impl BluetoothSysFacade {
         for host in host_info_list {
             let host_active = host.active.unwrap();
             if host_active {
-                match host.address {
+                match host.addresses {
                     Some(a) => {
-                        self.inner.write().active_bt_address = Some(Address::from(a).to_string());
-                        return Ok(Address::from(a).to_string());
+                        let public_address = Address::from(a[0]).to_string();
+                        self.inner.write().active_bt_address = Some(public_address.clone());
+                        return Ok(public_address);
                     }
                     None => fx_err_and_bail!(&with_line!(tag), "Host address not found."),
                 }

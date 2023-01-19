@@ -136,7 +136,7 @@ pub async fn activate_fake_host(
         .when_satisfied(
             expectation::host_exists(Predicate::predicate(
                 move |host: &HostInfo| {
-                    host.address == FAKE_HCI_ADDRESS && !initial_hosts_.contains(&host.id)
+                    host.addresses.contains(&FAKE_HCI_ADDRESS) && !initial_hosts_.contains(&host.id)
                 },
                 &format!("A fake host that is not in {:?}", initial_hosts),
             )),
@@ -147,7 +147,9 @@ pub async fn activate_fake_host(
     let host = host_watcher_state
         .hosts
         .iter()
-        .find(|(id, host)| host.address == FAKE_HCI_ADDRESS && !initial_hosts.contains(id))
+        .find(|(id, host)| {
+            host.addresses.contains(&FAKE_HCI_ADDRESS) && !initial_hosts.contains(id)
+        })
         .unwrap()
         .1
         .id; // We can safely unwrap here as this is guarded by the previous expectation

@@ -83,7 +83,7 @@ async fn test_lifecycle(_: ()) {
         .unwrap();
 
     // The bt-host should have been initialized with the address that we initially configured.
-    assert_eq!(address, info.address);
+    assert_eq!(address, info.addresses[0]);
 
     // Remove the bt-hci device and check that the test device is also destroyed.
     emulator.destroy_and_wait().await.unwrap();
