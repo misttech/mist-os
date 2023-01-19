@@ -253,7 +253,7 @@ impl Interaction {
         }
 
         warn!("Client closed channel without finishing all Interaction steps");
-        Err(AccountManagerError::from(ApiError::FailedPrecondition))
+        Err(AccountManagerError::from(ApiError::Aborted))
     }
 
     /// Check that the request is sent for the correct mode and mechanism.

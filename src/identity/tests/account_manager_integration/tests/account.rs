@@ -484,13 +484,13 @@ async fn test_provision_then_lock_then_unlock_fail_authentication() -> Result<()
     // Lock the account and ensure that it's locked
     lock_and_check(&account_proxy).await?;
 
-    // Attempting to unlock the account fails with a FailedPrecondition error
+    // Attempting to unlock the account fails with a Aborted error
     // since we don't finish interaction procedure while authenticating.
     let (_, account_server_end) = create_endpoints()?;
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Fail)
             .await?,
-        Err(ApiError::FailedPrecondition)
+        Err(ApiError::Aborted)
     );
     Ok(())
 }
@@ -504,13 +504,13 @@ async fn test_unlock_account_fail_authentication() -> Result<(), Error> {
     // Restart the account manager, now the account should be locked
     account_manager.lock().await.restart().await?;
 
-    // Attempting to unlock the account fails with a FailedPrecondition error
+    // Attempting to unlock the account fails with a Aborted error
     // since we don't finish interaction procedure while authenticating.
     let (_, account_server_end) = create_endpoints()?;
     assert_eq!(
         get_account(&account_manager, account_id, account_server_end, InteractionOutcome::Fail)
             .await?,
-        Err(ApiError::FailedPrecondition)
+        Err(ApiError::Aborted)
     );
     Ok(())
 }
