@@ -141,7 +141,8 @@ zx_status_t WlanSoftmacHandle::Init() {
                                uint64_t* out_scan_id) -> zx_status_t {
         return DEVICE(device)->StartPassiveScan(passive_scan_args, out_scan_id);
       },
-      .start_active_scan = [](void* device, const wlan_softmac_active_scan_args_t* active_scan_args,
+      .start_active_scan = [](void* device,
+                              const wlan_softmac_start_active_scan_request_t* active_scan_args,
                               uint64_t* out_scan_id) -> zx_status_t {
         return DEVICE(device)->StartActiveScan(active_scan_args, out_scan_id);
       },
@@ -873,21 +874,21 @@ zx_status_t Device::StartPassiveScan(
   return ZX_OK;
 }
 
-// Max size of WlanSoftmacActiveScanArgs.
-static constexpr size_t kWlanSoftmacActiveScanArgsBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs,
+// Max size of WlanSoftmacStartActiveScanRequest.
+static constexpr size_t kWlanSoftmacStartActiveScanRequestBufferSize =
+    fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest,
                            fidl::MessageDirection::kSending>();
 
-zx_status_t Device::StartActiveScan(const wlan_softmac_active_scan_args_t* active_scan_args,
-                                    uint64_t* out_scan_id) {
+zx_status_t Device::StartActiveScan(
+    const wlan_softmac_start_active_scan_request_t* active_scan_args, uint64_t* out_scan_id) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     errorf("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
-  fidl::Arena<kWlanSoftmacActiveScanArgsBufferSize> fidl_arena;
-  fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs fidl_active_scan_args;
+  fidl::Arena<kWlanSoftmacStartActiveScanRequestBufferSize> fidl_arena;
+  fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest fidl_active_scan_args;
   ConvertActiveScanArgs(*active_scan_args, &fidl_active_scan_args, fidl_arena);
   auto result = client_.sync().buffer(*std::move(arena))->StartActiveScan(fidl_active_scan_args);
   if (!result.ok()) {
@@ -899,7 +900,7 @@ zx_status_t Device::StartActiveScan(const wlan_softmac_active_scan_args_t* activ
     return result->error_value();
   }
 
-  *out_scan_id = result->value()->scan_id;
+  *out_scan_id = result->value()->scan_id();
   return ZX_OK;
 }
 

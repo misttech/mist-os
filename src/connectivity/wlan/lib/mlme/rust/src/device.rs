@@ -297,17 +297,19 @@ pub struct ActiveScanArgs {
 }
 
 // Private wrapper struct to manage the lifetime of the pointers contained in the
-// banjo_fuchsia_wlan_softmac::WlanSoftmacActiveScanArgs converted
+// banjo_fuchsia_wlan_softmac::WlanSoftmacStartActiveScanRequest converted
 // from an ActiveScanArgs.
-struct WlanSoftmacActiveScanArgs<'a, T> {
-    args: banjo_wlan_softmac::WlanSoftmacActiveScanArgs,
+struct WlanSoftmacStartActiveScanRequest<'a, T> {
+    args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest,
     phantom: PhantomData<&'a T>,
 }
 
-impl<'a> From<&'a ActiveScanArgs> for WlanSoftmacActiveScanArgs<'a, ActiveScanArgs> {
-    fn from(active_scan_args: &ActiveScanArgs) -> WlanSoftmacActiveScanArgs<'_, ActiveScanArgs> {
-        WlanSoftmacActiveScanArgs {
-            args: banjo_wlan_softmac::WlanSoftmacActiveScanArgs {
+impl<'a> From<&'a ActiveScanArgs> for WlanSoftmacStartActiveScanRequest<'a, ActiveScanArgs> {
+    fn from(
+        active_scan_args: &ActiveScanArgs,
+    ) -> WlanSoftmacStartActiveScanRequest<'_, ActiveScanArgs> {
+        WlanSoftmacStartActiveScanRequest {
+            args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest {
                 min_channel_time: active_scan_args.min_channel_time,
                 max_channel_time: active_scan_args.max_channel_time,
                 min_home_time: active_scan_args.min_home_time,
@@ -327,8 +329,8 @@ impl<'a> From<&'a ActiveScanArgs> for WlanSoftmacActiveScanArgs<'a, ActiveScanAr
     }
 }
 
-impl From<banjo_wlan_softmac::WlanSoftmacActiveScanArgs> for ActiveScanArgs {
-    fn from(banjo_args: banjo_wlan_softmac::WlanSoftmacActiveScanArgs) -> ActiveScanArgs {
+impl From<banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest> for ActiveScanArgs {
+    fn from(banjo_args: banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest) -> ActiveScanArgs {
         unsafe {
             ActiveScanArgs {
                 min_channel_time: banjo_args.min_channel_time,
@@ -399,7 +401,7 @@ pub struct DeviceInterface {
     /// Make active scan request to the driver
     start_active_scan: extern "C" fn(
         device: *mut c_void,
-        active_scan_args: *const banjo_wlan_softmac::WlanSoftmacActiveScanArgs,
+        active_scan_args: *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest,
         out_scan_id: *mut u64,
     ) -> zx::sys::zx_status_t,
     /// Cancel ongoing scan in the driver
@@ -516,8 +518,8 @@ impl DeviceInterface {
         let mut out_scan_id = 0;
         let status = (self.start_active_scan)(
             self.device,
-            &WlanSoftmacActiveScanArgs::<'_>::from(active_scan_args).args
-                as *const banjo_wlan_softmac::WlanSoftmacActiveScanArgs,
+            &WlanSoftmacStartActiveScanRequest::<'_>::from(active_scan_args).args
+                as *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest,
             &mut out_scan_id as *mut u64,
         );
         zx::ok(status).map(|_| out_scan_id)
@@ -838,7 +840,7 @@ pub mod test_utils {
         #[allow(clippy::not_unsafe_ptr_arg_deref)] // TODO(fxbug.dev/95064)
         pub extern "C" fn start_active_scan(
             device: *mut c_void,
-            active_scan_args: *const banjo_wlan_softmac::WlanSoftmacActiveScanArgs,
+            active_scan_args: *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest,
             out_scan_id: *mut u64,
         ) -> zx::sys::zx_status_t {
             unsafe {
@@ -860,7 +862,7 @@ pub mod test_utils {
 
         pub extern "C" fn start_active_scan_fails(
             _device: *mut c_void,
-            _active_scan_args: *const banjo_wlan_softmac::WlanSoftmacActiveScanArgs,
+            _active_scan_args: *const banjo_wlan_softmac::WlanSoftmacStartActiveScanRequest,
             _out_scan_id: *mut u64,
         ) -> zx::sys::zx_status_t {
             zx::sys::ZX_ERR_NOT_SUPPORTED

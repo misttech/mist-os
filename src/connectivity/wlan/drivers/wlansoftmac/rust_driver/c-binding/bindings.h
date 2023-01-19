@@ -102,7 +102,7 @@ typedef struct {
    * Make active scan request to the driver
    */
   zx_status_t (*start_active_scan)(void *device,
-                                   const wlan_softmac_active_scan_args_t *active_scan_args,
+                                   const wlan_softmac_start_active_scan_request_t *active_scan_args,
                                    uint64_t *out_scan_id);
   /**
    * Cancel ongoing scan in the driver

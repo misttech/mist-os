@@ -274,8 +274,8 @@ impl<'a> BoundScanner<'a> {
         &mut self,
         active_scan_args: ActiveScanArgs,
     ) -> Result<u64, ScanError> {
-        // Note: active_scan_args must outlive the WlanSoftmacActiveScanArgs it returns
-        // because WlanSoftmacActiveScanArgs contains raw pointers that must be valid
+        // Note: active_scan_args must outlive the WlanSoftmacStartActiveScanRequest it returns
+        // because WlanSoftmacStartActiveScanRequest contains raw pointers that must be valid
         // for the duration of the call to Device::start_active_scan().
         self.ctx
             .device

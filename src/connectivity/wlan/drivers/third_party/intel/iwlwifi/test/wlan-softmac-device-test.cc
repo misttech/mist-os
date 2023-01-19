@@ -589,7 +589,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     return ZX_OK;
   }
 
-  zx_status_t StartActiveScan(fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs* args) {
+  zx_status_t StartActiveScan(fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest* args) {
     auto result = client_.buffer(test_arena_)->StartActiveScan(*args);
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
@@ -1182,7 +1182,8 @@ TEST_F(MacInterfaceTest, StartActiveScanTest) {
   {
     // Active scan with args in which all of "channels", "ssids", "mac_header" and "ies" fields are
     // set will pass the argument check in mvm-mlme.cc.
-    auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs::Builder(fidl_arena);
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest::Builder(fidl_arena);
 
     builder.channels(fidl::VectorView<uint8_t>::FromExternal(&channels_to_scan[0], kChannelSize));
     builder.ssids(fidl::VectorView<fuchsia_wlan_ieee80211::wire::CSsid>());
@@ -1195,7 +1196,8 @@ TEST_F(MacInterfaceTest, StartActiveScanTest) {
 
   {
     // Missing "channels" fails the argument check.
-    auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs::Builder(fidl_arena);
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest::Builder(fidl_arena);
 
     builder.ssids(fidl::VectorView<fuchsia_wlan_ieee80211::wire::CSsid>());
     builder.mac_header(fidl::VectorView<uint8_t>());
@@ -1207,7 +1209,8 @@ TEST_F(MacInterfaceTest, StartActiveScanTest) {
 
   {
     // Missing "ssids" fails the argument check.
-    auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs::Builder(fidl_arena);
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest::Builder(fidl_arena);
 
     builder.channels(fidl::VectorView<uint8_t>::FromExternal(&channels_to_scan[0], kChannelSize));
     builder.mac_header(fidl::VectorView<uint8_t>());
@@ -1219,7 +1222,8 @@ TEST_F(MacInterfaceTest, StartActiveScanTest) {
 
   {
     // Missing "mac_header" fails the argument check.
-    auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs::Builder(fidl_arena);
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest::Builder(fidl_arena);
 
     builder.channels(fidl::VectorView<uint8_t>::FromExternal(&channels_to_scan[0], kChannelSize));
     builder.ssids(fidl::VectorView<fuchsia_wlan_ieee80211::wire::CSsid>());
@@ -1231,7 +1235,8 @@ TEST_F(MacInterfaceTest, StartActiveScanTest) {
 
   {
     // Missing "ies" fails the argument check.
-    auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs::Builder(fidl_arena);
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest::Builder(fidl_arena);
 
     builder.channels(fidl::VectorView<uint8_t>::FromExternal(&channels_to_scan[0], kChannelSize));
     builder.ssids(fidl::VectorView<fuchsia_wlan_ieee80211::wire::CSsid>());

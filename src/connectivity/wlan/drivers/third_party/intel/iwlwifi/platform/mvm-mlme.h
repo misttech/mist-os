@@ -74,7 +74,7 @@ zx_status_t mac_start_passive_scan(
     void* ctx, const wlan_softmac_wire::WlanSoftmacStartPassiveScanRequest* passive_scan_args,
     uint64_t* out_scan_id);
 zx_status_t mac_start_active_scan(
-    void* ctx, const wlan_softmac_wire::WlanSoftmacActiveScanArgs* active_scan_args,
+    void* ctx, const wlan_softmac_wire::WlanSoftmacStartActiveScanRequest* active_scan_args,
     uint64_t* out_scan_id);
 zx_status_t mac_init(void* ctx, struct iwl_trans* drvdata, zx_device_t* zxdev, uint16_t idx);
 

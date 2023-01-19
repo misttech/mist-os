@@ -611,13 +611,13 @@ zx_status_t mac_start_passive_scan(
 }
 
 zx_status_t mac_start_active_scan(
-    void* ctx, const wlan_softmac_wire::WlanSoftmacActiveScanArgs* active_scan_args,
+    void* ctx, const wlan_softmac_wire::WlanSoftmacStartActiveScanRequest* active_scan_args,
     uint64_t* out_scan_id) {
   const auto mvmvif = reinterpret_cast<struct iwl_mvm_vif*>(ctx);
   zx_status_t ret = ZX_OK;
   if (!(active_scan_args->has_channels() && active_scan_args->has_mac_header() &&
         active_scan_args->has_ies() && active_scan_args->has_ssids())) {
-    IWL_ERR(mvmvif, "WlanSoftmacActiveScanArgs missing fields: %s %s %s %s",
+    IWL_ERR(mvmvif, "WlanSoftmacStartActiveScanRequest missing fields: %s %s %s %s",
             active_scan_args->has_channels() ? "" : "channels",
             active_scan_args->has_mac_header() ? "" : "mac_header",
             active_scan_args->has_ies() ? "" : "ies", active_scan_args->has_ssids() ? "" : "ssids");

@@ -588,10 +588,10 @@ void ConvertPassiveScanArgs(const wlan_softmac_start_passive_scan_request_t& in,
   *out = builder.Build();
 }
 
-void ConvertActiveScanArgs(const wlan_softmac_active_scan_args_t& in,
-                           fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs* out,
+void ConvertActiveScanArgs(const wlan_softmac_start_active_scan_request_t& in,
+                           fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest* out,
                            fidl::AnyArena& arena) {
-  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacActiveScanArgs::Builder(arena);
+  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest::Builder(arena);
   auto channel_vec = std::vector<uint8_t>(in.channels_list, in.channels_list + in.channels_count);
   builder.channels(fidl::VectorView<uint8_t>(arena, channel_vec));
   std::vector<fuchsia_wlan_ieee80211::wire::CSsid> ssids_data;

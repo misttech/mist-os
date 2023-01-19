@@ -65,8 +65,8 @@ class DeviceInterface {
   virtual zx_status_t StartPassiveScan(
       const wlan_softmac_start_passive_scan_request_t* passive_scan_args,
       uint64_t* out_scan_id) = 0;
-  virtual zx_status_t StartActiveScan(const wlan_softmac_active_scan_args_t* active_scan_args,
-                                      uint64_t* out_scan_id) = 0;
+  virtual zx_status_t StartActiveScan(
+      const wlan_softmac_start_active_scan_request_t* active_scan_args, uint64_t* out_scan_id) = 0;
   virtual zx_status_t CancelScan(uint64_t scan_id) = 0;
   virtual zx_status_t ConfigureAssoc(wlan_assoc_ctx_t* assoc_ctx) = 0;
   virtual zx_status_t ClearAssoc(const uint8_t[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) = 0;

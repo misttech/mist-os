@@ -238,7 +238,7 @@ protocol WlanSoftmacIfc {
 };
 
 /// Argument struct to be passed as the single argument to WlanSoftmac.StartActiveScan
-type WlanSoftmacActiveScanArgs = table {
+type WlanSoftmacStartActiveScanRequest = table {
     /// List of channels to scan on. An empty list of channels will cause a
     /// scan request to immediately return ZX_ERR_INVALID_ARGS.
     ///
@@ -419,18 +419,27 @@ protocol WlanSoftmac {
         1: scan_id uint64;
     }) error zx.status;
 
-    /// Start an active scan in the device driver. Scan results will be delivered as Beacon or
-    /// Probe Response frames via WlanSoftmacIfc.Recv(). When complete,
-    /// WlanSoftmacIfc.ScanComplete() will be called with the corresponding unique `scan_id`.
+    /// Start an active scan in the device driver. Scan results will be delivered
+    /// as Beacon or Probe Response frames via WlanSoftmacIfc.Recv(). When
+    /// complete, WlanSoftmacIfc.ScanComplete() will be called with the
+    /// corresponding unique `scan_id`.
     ///
-    /// The IEs specified must not result in a Probe Request MMPDU that exceed the limits
-    /// defined by IEEE Std 802.11-2016, 9.2.4.7. MMPDU limit constants can be found in
-    /// fuchsia.wlan.ieee80211. These limits are very large and will likely not be exceeded
-    /// by specifying the most common IEs found in Probe Request frames.
-    StartActiveScan(struct {
-        args WlanSoftmacActiveScanArgs;
-    }) -> (struct {
-        scan_id uint64;
+    /// The IEs specified must not result in a Probe Request MMPDU that exceed the
+    /// limits defined by IEEE Std 802.11-2016, 9.2.4.7. MMPDU limit constants can
+    /// be found in fuchsia.wlan.ieee80211. These limits are very large and will
+    /// likely not be exceeded by specifying the most common IEs found in
+    /// Probe Request frames.
+    ///
+    /// A device driver indicates support for `StartActiveScan()` using
+    /// `fuchsia.wlan.common/ProbeRequestOffloadExtension.supported`.
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_INVALID_ARGS: The device is not capable of performing the
+    ///       requested scan, e.g. because an incompatible channel was requested. \
+    ///   ZX_ERR_UNAVAILABLE: The device cannot currently perform scans. \
+    ///   ZX_ERR_SHOULD_WAIT: Another scan is already in-progress.
+    StartActiveScan(WlanSoftmacStartActiveScanRequest) -> (table {
+        1: scan_id uint64;
     }) error zx.status;
 
     /// If supported, cancel the ongoing scan corresponding to `scan_id` in the

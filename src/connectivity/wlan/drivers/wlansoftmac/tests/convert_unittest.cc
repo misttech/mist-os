@@ -570,7 +570,7 @@ TEST(ConvertTest, ToFidlPassiveScanArgs) {
 }
 
 TEST(ConvertTest, ToFidlActiveScanArgs) {
-  // Populate wlan_softmac_active_scan_args_t
+  // Populate wlan_softmac_start_active_scan_request_t
   uint8_t* channel_list =
       (uint8_t*)calloc(wlan_ieee80211::kMaxUniqueChannelNumbers, sizeof(uint8_t));
   for (size_t i = 0; i < wlan_ieee80211::kMaxUniqueChannelNumbers; i++) {
@@ -594,7 +594,7 @@ TEST(ConvertTest, ToFidlActiveScanArgs) {
     ies[i] = kRandomPopulaterUint8;
   }
 
-  wlan_softmac_active_scan_args_t in = {
+  wlan_softmac_start_active_scan_request_t in = {
       .channels_list = channel_list,
       .channels_count = wlan_ieee80211::kMaxUniqueChannelNumbers,
       .ssids_list = ssid_list,
@@ -612,7 +612,7 @@ TEST(ConvertTest, ToFidlActiveScanArgs) {
 
   // Conduct conversion
   fidl::Arena arena;
-  wlan_softmac::WlanSoftmacActiveScanArgs out;
+  wlan_softmac::WlanSoftmacStartActiveScanRequest out;
   ConvertActiveScanArgs(in, &out, arena);
 
   // Verify outputs

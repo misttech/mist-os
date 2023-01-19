@@ -189,7 +189,12 @@ struct WlantapMacImpl : WlantapMac,
                        StartActiveScanCompleter::Sync& completer) override {
     uint64_t scan_id = 222;
     listener_->WlantapMacStartScan(scan_id);
-    completer.buffer(arena).ReplySuccess(scan_id);
+
+    fidl::Arena fidl_arena;
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanResponse::Builder(fidl_arena);
+    builder.scan_id(scan_id);
+    completer.buffer(arena).ReplySuccess(builder.Build());
   }
 
   void SetKey(SetKeyRequestView request, fdf::Arena& arena,
