@@ -44,7 +44,6 @@ use {
     },
     lazy_static::lazy_static,
     moniker::{AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
-    regex::Regex,
     routing::component_instance::ComponentInstanceInterface,
     std::{
         convert::{From, TryFrom},
@@ -667,9 +666,6 @@ impl StorageAdmin {
     /// * The implementation has a logical error when it finds a
     ///   DirType::ComponentStoragePath, but continues to analyze subpaths.
     fn is_storage_dir(path: PathBuf) -> (DirType, PathBuf, PathBuf) {
-        // The regex used to look for an hex string. Note that this does not
-        // match against
-        let storage_id_regex = Regex::new("[0-9a-fA-F]").unwrap();
         let child_name = "children";
         let data_name = "data";
 
@@ -696,7 +692,7 @@ impl StorageAdmin {
                     };
 
                     // check the string length is 64 and the characters are hex
-                    if segment.len() == 64 && storage_id_regex.is_match(segment) {
+                    if segment.len() == 64 && segment.chars().all(|c| c.is_ascii_hexdigit()) {
                         prev_segment = DirType::ComponentStorage;
                         break;
                     }

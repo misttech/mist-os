@@ -78,7 +78,6 @@ template("component_manager") {
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:regex",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
@@ -250,8 +249,13 @@ template("component_manager") {
       sources = _sources
       deps = _deps
 
-      # component_manager should not depend on json5
-      assert_no_deps = [ "//third_party/rust_crates:serde_json5" ]
+      assert_no_deps = [
+        # component_manager should not depend on json5
+        "//third_party/rust_crates:serde_json5",
+        # TODO(fxbug.dev/119607): remove dep on regex (there are still
+        # transitive deps)
+        #"//third_party/rust_crates:regex",
+      ]
 
       # Only for internal use.
       visibility = [
