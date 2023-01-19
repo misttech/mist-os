@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <dirent.h>
 #include <fcntl.h>
 #include <lib/fit/defer.h>
 #include <limits.h>
@@ -164,6 +165,51 @@ TEST(UnistdTest, OpenMaxPath) {
   max_path.append(PATH_MAX - 1, 'a');
   EXPECT_EQ(-1, open(max_path.c_str(), O_RDONLY));
   EXPECT_EQ(errno, ENAMETOOLONG, "%s", strerror(errno));
+}
+
+TEST(UnistdTest, DupAndRewinddir) {
+  // Create at least one file to iterate over.
+  std::string test_file_name = TestTempDirPath() + "/fdio-dup-and-rewind";
+  {
+    fbl::unique_fd fd(open(test_file_name.c_str(), O_CREAT));
+    ASSERT_TRUE(fd.is_valid());
+  }
+
+  auto cleanup_test_file =
+      fit::defer([&] { ASSERT_EQ(unlink(test_file_name.c_str()), 0, "%s", strerror(errno)); });
+
+  fbl::unique_fd orig_fd(open(TestTempDirPath().c_str(), O_RDONLY));
+  ASSERT_TRUE(orig_fd.is_valid());
+
+  auto count_dirents = [](fbl::unique_fd dir_fd, size_t& out_count) {
+    ASSERT_TRUE(dir_fd.is_valid());
+
+    DIR* dir = fdopendir(dir_fd.release());
+    ASSERT_NE(dir, nullptr, "%s", strerror(errno));
+    auto cleanup_dir = fit::defer([&] { ASSERT_EQ(closedir(dir), 0, "%s", strerror(errno)); });
+
+    rewinddir(dir);
+
+    out_count = 0;
+    while (dirent* ent = readdir(dir)) {
+      std::string filename = ent->d_name;
+      if (filename != "." && filename != "..") {
+        ++out_count;
+      }
+    }
+  };
+
+  size_t initial_count;
+  count_dirents(orig_fd.duplicate(), initial_count);
+
+  // Ensure that continuously duping and rewinding the directory stream always counts the same
+  // number of files.
+  constexpr size_t kNumRecountIterations = 5;
+  for (size_t i = 0; i < kNumRecountIterations; i++) {
+    size_t recount;
+    count_dirents(orig_fd.duplicate(), recount);
+    EXPECT_EQ(recount, initial_count);
+  }
 }
 
 }  // namespace

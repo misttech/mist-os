@@ -1556,6 +1556,20 @@ int closedir(DIR* dir) {
   return 0;
 }
 
+static zx_status_t lazy_init_dirent_iterator(DIR* dir, const fdio_ptr io) {
+  if (dir->iterator != nullptr) {
+    return ZX_OK;
+  }
+
+  dir->iterator = std::make_unique<zxio_dirent_iterator_t>();
+  const zx_status_t status = io->dirent_iterator_init(dir->iterator.get(), &io->zxio_storage().io);
+  if (status != ZX_OK) {
+    dir->iterator.reset();
+  }
+
+  return status;
+}
+
 __EXPORT
 struct dirent* readdir(DIR* dir) {
   const fbl::AutoLock lock(&dir->lock);
@@ -1563,16 +1577,11 @@ struct dirent* readdir(DIR* dir) {
 
   const fdio_ptr io = fd_to_io(dir->fd);
 
-  // Lazy initialize the iterator.
-  if (!dir->iterator) {
-    dir->iterator = std::make_unique<zxio_dirent_iterator_t>();
-    const zx_status_t status =
-        io->dirent_iterator_init(dir->iterator.get(), &io->zxio_storage().io);
-    if (status != ZX_OK) {
-      errno = fdio_status_to_errno(status);
-      return nullptr;
-    }
+  if (const zx_status_t status = lazy_init_dirent_iterator(dir, io); status != ZX_OK) {
+    errno = fdio_status_to_errno(status);
+    return nullptr;
   }
+
   // We need space for the maximum possible filename plus a null terminator.
   static_assert(sizeof(de->d_name) >= ZXIO_MAX_FILENAME + 1);
   zxio_dirent_t entry = {.name = de->d_name};
@@ -1616,10 +1625,24 @@ struct dirent* readdir(DIR* dir) {
 __EXPORT
 void rewinddir(DIR* dir) {
   const fbl::AutoLock lock(&dir->lock);
-  if (dir->iterator) {
-    const fdio_ptr io = fd_to_io(dir->fd);
-    io->dirent_iterator_rewind(dir->iterator.get());
+  const fdio_ptr io = fd_to_io(dir->fd);
+
+  // Always try to initialize and rewind the directory stream. If a client were to create |dir| via
+  // |dup()|ing another file descriptor and then |fdopendir()|, |dir->iterator| will be
+  // uninitialized but the underlying connection may be shared with the original descriptor. For
+  // remote connections, the state of the directory stream pointer is held within the connection
+  // (the connection is stateful), so |dir| will share the directory stream pointer with the
+  // original file descriptor. Clients who call |rewinddir()| are expecting for that pointer to be
+  // rewound.
+  //
+  // TODO(https://fxbug.dev/119968): Remove this when separate |fuchsia.io/DirectoryIterator|s are
+  // used to back different zxio iterators.
+  if (const zx_status_t status = lazy_init_dirent_iterator(dir, io); status != ZX_OK) {
+    // This function should not modify the errno and has no way to propagate error, so drop it.
+    return;
   }
+
+  io->dirent_iterator_rewind(dir->iterator.get());
 }
 
 __EXPORT
