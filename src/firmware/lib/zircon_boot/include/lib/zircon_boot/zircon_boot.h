@@ -244,6 +244,11 @@ typedef enum ForceRecovery {
 // The function is not expected to return if boot is successful.
 ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ForceRecovery force_recovery);
 
+// Get the slot that will be selected to boot according to current A/B/R metadata.
+// Specifically, this is the slot that will be booted by LoadAndBoot() with
+// `force_recovery=kForceRecoveryOff` assuming the slot passes all verification.
+AbrSlotIndex GetActiveBootSlot(ZirconBootOps* ops);
+
 // Create operations for libabr from a ZirconBootOps.
 AbrOps GetAbrOpsFromZirconBootOps(ZirconBootOps* ops);
 

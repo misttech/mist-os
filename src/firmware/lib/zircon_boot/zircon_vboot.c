@@ -101,7 +101,7 @@ static void SetKeyVersion(AvbAtxOps* atx_ops, size_t rollback_index_location,
     context->key_versions[index].location = rollback_index_location;
     context->key_versions[index].value = key_version;
   } else {
-    zircon_boot_dlog("ERROR: set_key_version index out of bounds: %lu\n", index);
+    zircon_boot_dlog("ERROR: set_key_version index out of bounds: %zu\n", index);
     avb_abort();
   }
 }
@@ -330,7 +330,8 @@ static void ProcessProperty(const AvbPropertyDescriptor prop_desc, uint8_t* star
   if (strncmp(key, "zbi", strlen("zbi"))) {
     return;
   }
-  zircon_boot_dlog("Found vbmeta ZBI property '%s' (%lu bytes)\n", key, prop_desc.value_num_bytes);
+  zircon_boot_dlog("Found vbmeta ZBI property '%s' (%llu bytes)\n", key,
+                   (unsigned long long)prop_desc.value_num_bytes);
 
   // We don't care about the key. Move value data to the start address to make sure
   // that the zbi item starts from an aligned address.
@@ -348,8 +349,8 @@ static void ProcessProperty(const AvbPropertyDescriptor prop_desc, uint8_t* star
 
   const uint64_t zbi_size = sizeof(zbi_header_t) + vbmeta_zbi->length;
   if (zbi_size > prop_desc.value_num_bytes) {
-    zircon_boot_dlog("vbmeta ZBI length exceeds property size (%lu > %lu)\n", zbi_size,
-                     prop_desc.value_num_bytes);
+    zircon_boot_dlog("vbmeta ZBI length exceeds property size (%llu > %llu)\n",
+                     (unsigned long long)zbi_size, (unsigned long long)prop_desc.value_num_bytes);
     return;
   }
 

@@ -8,7 +8,6 @@
 #include <zircon/hw/gpt.h>
 
 #include "src/lib/digest/digest.h"
-#include "utils.h"
 
 uint32_t AbrCrc32(const void* buf, size_t buf_size) {
   return crc32(0, reinterpret_cast<const uint8_t*>(buf), buf_size);
@@ -68,8 +67,8 @@ void MockZirconBootOps::Boot(zbi_header_t* image, size_t capacity, AbrSlotIndex 
 
 void MockZirconBootOps::Reboot(bool force_recovery) {
   // For firmware A/B/R, we assume that device boots to slot according to metadata.
-  AbrOps ops = GetAbrOps();
-  firmware_slot_ = force_recovery == kForceRecoveryOn ? kAbrSlotIndexR : AbrPeekBootSlot(&ops);
+  ZirconBootOps ops = GetZirconBootOps();
+  firmware_slot_ = force_recovery ? kAbrSlotIndexR : GetActiveBootSlot(&ops);
 }
 
 void MockZirconBootOps::SetKernelLoadBufferSize(size_t size) { load_buffer_.resize(size); }

@@ -15,7 +15,7 @@
   })
 
 // Set to 1 to enable debug logging - requires printf().
-#define ZIRCON_BOOT_DEBUG_LOGGING 0
+#define ZIRCON_BOOT_DEBUG_LOGGING 1
 #if ZIRCON_BOOT_DEBUG_LOGGING
 #define zircon_boot_dlog(...) printf("zircon_boot: " __VA_ARGS__)
 #else

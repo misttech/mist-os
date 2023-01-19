@@ -106,14 +106,13 @@ static ZirconBootResult LoadKernel(AbrSlotIndex slot, ZirconBootOps* ops, void**
   }
 
   size_t image_size = zbi_hdr.length + sizeof(zbi_header_t);
-  *load_address = ops->get_kernel_load_buffer(ops, &image_size);
+  *load_address_size = image_size;
+  *load_address = ops->get_kernel_load_buffer(ops, load_address_size);
   if (*load_address == NULL) {
     *load_address_size = 0;
     zircon_boot_dlog("Cannot get kernel load buffer\n");
     return kBootResultErrorImageTooLarge;
   }
-
-  *load_address_size = image_size;
 
   if (!ZIRCON_BOOT_OPS_CALL(ops, read_from_partition, zircon_part, 0, image_size, *load_address,
                             &read_size) ||
@@ -182,8 +181,10 @@ static ZirconBootResult LoadImage(ZirconBootOps* ops, ForceRecovery force_recove
       }
 
       if (!supported) {
-        zircon_boot_dlog("Target kernel slot is not supported by current firmware. Rebooting...\n");
-        ZIRCON_BOOT_OPS_CALL(ops, reboot, force_recovery);
+        zircon_boot_dlog(
+            "Target kernel slot %s is not supported by current firmware. Rebooting...\n",
+            AbrGetSlotSuffix(target_slot));
+        ZIRCON_BOOT_OPS_CALL(ops, reboot, force_recovery == kForceRecoveryOn);
         zircon_boot_dlog("Should not reach here. Reboot handoff failed\n");
         return kBootResultRebootReturn;
       }
@@ -228,4 +229,9 @@ ZirconBootResult LoadAndBoot(ZirconBootOps* ops, ForceRecovery force_recovery) {
   ZIRCON_BOOT_OPS_CALL(ops, boot, load_address, load_address_size, slot);
   zircon_boot_dlog("Should not reach here. Boot handoff failed\n");
   return kBootResultBootReturn;
+}
+
+AbrSlotIndex GetActiveBootSlot(ZirconBootOps* ops) {
+  AbrOps abr_ops = GetAbrOpsFromZirconBootOps(ops);
+  return AbrPeekBootSlot(&abr_ops);
 }
