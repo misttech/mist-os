@@ -24,8 +24,10 @@
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -433,12 +435,15 @@ RealmRoot::~RealmRoot() {
 }
 
 zx_status_t RealmRoot::Connect(const std::string& interface_name, zx::channel request) const {
+  ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
   return root_->Connect(interface_name, std::move(request));
 }
 
-std::string RealmRoot::GetChildName() const { return root_->GetChildName(); }
+std::string RealmRoot::GetChildName() const {
+  ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
+  return root_->GetChildName();
+}
 
-#if __Fuchsia_API_level__ >= 9
 fit::function<bool()> RealmRoot::TeardownCallback() {
   ZX_ASSERT_MSG(teardown_status_,
                 "RealmRoot::TeardownCallback() has already been called or RealmRoot was moved");
@@ -448,9 +453,7 @@ fit::function<bool()> RealmRoot::TeardownCallback() {
     return cpp17::get<bool>(*teardown_status);
   };
 }
-#endif
 
-#if __Fuchsia_API_level__ >= 10
 void RealmRoot::Teardown(ScopedChild::TeardownCallback on_teardown_complete) {
   // Register an optional, caller-provided callback to be invoked when the
   // `root_` ScopedChild (realm component) has been destroyed. If the user had
@@ -477,8 +480,12 @@ void RealmRoot::Teardown(ScopedChild::TeardownCallback on_teardown_complete) {
   // calls `Realm::DestroyChild()` to ask component manager to destroy the
   // child realm corresponding to the `RealmRoot`. DestroyChild will invoke
   // the callback on completion of that request.
-  root_.reset();
+  root_.reset(nullptr);
 }
-#endif
+
+ScopedChild& RealmRoot::component() {
+  ZX_ASSERT_MSG(root_ != nullptr, "RealmRoot::component() invoked after |Teardown|");
+  return *root_;
+}
 
 }  // namespace component_testing

@@ -10,6 +10,7 @@
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fidl/cpp/interface_handle.h>
+#include <lib/fidl/cpp/interface_request.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <zircon/status.h>
@@ -133,6 +134,9 @@ class ScopedChild final {
                   zx_status_get_string(status));
     return clone;
   }
+
+  // Returns reference to underlying exposed directory handle.
+  const fuchsia::io::DirectorySyncPtr& exposed() const ZX_AVAILABLE_SINCE(11);
 
  private:
   ScopedChild(std::shared_ptr<sys::ServiceDirectory> svc,

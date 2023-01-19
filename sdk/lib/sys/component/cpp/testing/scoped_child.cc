@@ -16,6 +16,7 @@
 #include <lib/sys/cpp/service_directory.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <memory>
 #include <optional>
@@ -143,5 +144,7 @@ zx_status_t ScopedChild::Connect(const std::string& interface_name, zx::channel 
 }
 
 std::string ScopedChild::GetChildName() const { return child_ref_.name; }
+
+const fuchsia::io::DirectorySyncPtr& ScopedChild::exposed() const { return exposed_dir_; }
 
 }  // namespace component_testing

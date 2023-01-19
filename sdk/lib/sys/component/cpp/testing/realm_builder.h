@@ -17,8 +17,10 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/sys/component/cpp/testing/scoped_child.h>
 #include <lib/sys/cpp/service_directory.h>
+#include <zircon/errors.h>
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -37,6 +39,8 @@ constexpr char kDefaultCollection[] = "realm_builder";
 
 // Root of a constructed Realm. This object can not be instantiated directly.
 // Instead, it can only be constructed with the Realm::Builder/Build().
+//
+// TODO(https://fxbug.dev/120115): Remove all deprecated methods below, e.g. |Connect|.
 class RealmRoot final {
  public:
   RealmRoot(RealmRoot&& other) = default;
@@ -63,8 +67,9 @@ class RealmRoot final {
   // auto echo = realm.Connect<test::placeholders::Echo>();
   // ```
   template <typename Interface>
-  fidl::InterfacePtr<Interface> Connect(
-      const std::string& interface_name = Interface::Name_) const {
+  fidl::InterfacePtr<Interface> Connect(const std::string& interface_name = Interface::Name_) const
+      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
+    ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->Connect<Interface>(interface_name);
   }
 
@@ -72,35 +77,39 @@ class RealmRoot final {
   // method above for more details.
   template <typename Interface>
   fidl::SynchronousInterfacePtr<Interface> ConnectSync(
-      const std::string& interface_name = Interface::Name_) const {
+      const std::string& interface_name = Interface::Name_) const
+      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
+    ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->ConnectSync<Interface>(interface_name);
   }
 
   // Connect to exposed directory of the root component.
   template <typename Interface>
-  zx_status_t Connect(fidl::InterfaceRequest<Interface> request) const {
+  zx_status_t Connect(fidl::InterfaceRequest<Interface> request) const
+      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
+    ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->Connect<Interface>(std::move(request));
   }
 
   // Connect to an interface in the exposed directory using the supplied
   // channel.
-  zx_status_t Connect(const std::string& interface_name, zx::channel request) const;
+  zx_status_t Connect(const std::string& interface_name, zx::channel request) const
+      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead");
 
   // Return a handle to the exposed directory of the root component.
-  fidl::InterfaceHandle<fuchsia::io::Directory> CloneRoot() const {
+  fidl::InterfaceHandle<fuchsia::io::Directory> CloneRoot() const
+      ZX_DEPRECATED_SINCE(1, 11, "Use root() instead") {
+    ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->CloneExposedDir();
   }
 
   // Get the child name of the root component.
-  std::string GetChildName() const;
+  std::string GetChildName() const ZX_DEPRECATED_SINCE(1, 11, "Use component() instead");
 
-#if __Fuchsia_API_level__ >= 9
   // Returns a callback that returns |true| when realm teardown has completed
   // successfully. If realm teardown fails, it will trigger a panic.
-  fit::function<bool()> TeardownCallback();
-#endif
+  fit::function<bool()> TeardownCallback() ZX_AVAILABLE_SINCE(9);
 
-#if __Fuchsia_API_level__ >= 10
   // Destructs the root component and sends Component Manager a request to
   // destroy its realm, which will stop all child components. Each
   // |LocalComponentImpl| should receive an |OnStop()| callback, and after
@@ -110,8 +119,14 @@ class RealmRoot final {
   // |TeardownCallback()| was used to get a |bool| callback function, the
   // function will return |false| until the realm is torn down, and then it
   // will return |true|.
-  void Teardown(ScopedChild::TeardownCallback on_teardown_complete = nullptr);
-#endif
+  void Teardown(ScopedChild::TeardownCallback on_teardown_complete = nullptr)
+      ZX_AVAILABLE_SINCE(10);
+
+  // Returns reference to underlying |ScopedChild| object. Note that this object
+  // will be destroyed if |Teardown| is invoked. In that scenario, using this
+  // value will yield undefined behavior. Invoking this method after |Teardown| is
+  // invoked will cause this process to panic.
+  ScopedChild& component() ZX_AVAILABLE_SINCE(11);
 
  private:
   // Friend classes are needed because the constructor is private.
