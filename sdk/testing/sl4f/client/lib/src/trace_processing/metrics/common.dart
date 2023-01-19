@@ -54,14 +54,14 @@ Iterable<T> filterEventsTyped<T extends Event>(Iterable<Event> events,
         (category == null || event.category == category) &&
         (name == null || event.name == name)));
 
-Iterable<T?> getArgValuesFromEvents<T extends Object>(
+Iterable<T> getArgValuesFromEvents<T extends Object>(
     Iterable<Event> events, String argKey) {
   return events.map((e) {
     if (!(e.args.containsKey(argKey) && e.args[argKey] is T)) {
       throw ArgumentError(
           'Error, expected events to include arg key "$argKey" of type $T');
     }
-    final T? v = e.args[argKey];
+    final T v = e.args[argKey]!;
     return v;
   });
 }
@@ -119,7 +119,7 @@ DurationEvent? findFollowingVsync(DurationEvent durationEvent) {
 
 /// Returns a list of durations in milliseconds from the given |startEventName|
 /// events in |startEventCategory| to the nearest connected  "VSYNC" events.
-List<double?> getEventToVsyncLatencyValues(
+List<double> getEventToVsyncLatencyValues(
     Model model, String startEventCategory, String startEventName) {
   final startEvents = filterEventsTyped<DurationEvent>(getAllEvents(model),
       category: startEventCategory, name: startEventName);

@@ -1014,7 +1014,7 @@
           "isGetter": false,
           "isSetter": false,
           "name": "getArgValuesFromEvents",
-          "returnType": "Iterable<T?>",
+          "returnType": "Iterable<T>",
           "type": "FunctionDeclarationImpl"
         },
         "getEventToVsyncLatencyValues": {
@@ -1093,7 +1093,7 @@
           "isGetter": false,
           "isSetter": false,
           "name": "getEventToVsyncLatencyValues",
-          "returnType": "List<double?>",
+          "returnType": "List<double>",
           "type": "FunctionDeclarationImpl"
         },
         "getFollowingEvents": {
