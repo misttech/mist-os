@@ -88,7 +88,7 @@ zx_status_t Pinecrest::I2cInit() {
       // For power regulator
       {
           .bus_id = 0,
-          .address = 0x66,
+          .address = 0x61,
           .vid = 0,
           .pid = 0,
           .did = 0,
