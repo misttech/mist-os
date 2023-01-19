@@ -394,7 +394,7 @@ impl AudioDaemon {
                 }
                 AudioDaemonRequest::ListDevices { responder } => {
                     async fn get_entries(path: &str) -> Result<Vec<String>, Error> {
-                        let (control_client, control_server) = zx::Channel::create()?;
+                        let (control_client, control_server) = zx::Channel::create();
 
                         // Creates a connection to a FIDL service at path.
                         fdio::service_connect(path, control_server)
