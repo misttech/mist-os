@@ -4,11 +4,28 @@
 
 #![cfg(test)]
 
+use std::collections::HashMap;
+use std::fmt::Debug;
+use std::hash::Hash;
+
 use anyhow::Context as _;
-use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet};
+use assert_matches::assert_matches;
+use async_utils::fold;
+use fidl::endpoints::Proxy;
+use fidl_fuchsia_net_ext::IntoExt;
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
+use fuchsia_async::TimeoutExt;
+use fuchsia_zircon_status as zx_status;
+use futures::{FutureExt, StreamExt};
+use net_declare::{fidl_ip, fidl_ip_v4, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6};
+use net_types::{
+    self,
+    ip::{GenericOverIp, Ip, IpInvariant, Ipv4Addr, Ipv6Addr},
+};
 use netstack_testing_common::{
     interfaces,
-    realms::{Netstack2, TestSandboxExt as _},
+    realms::{Netstack, Netstack2, TestRealmExt as _, TestSandboxExt as _},
 };
 use netstack_testing_macros::netstack_test;
 
@@ -269,4 +286,384 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
             ..fidl_fuchsia_net_routes::Destination::EMPTY
         }))
     );
+}
+
+// Collect all `existing` events from the stream.
+async fn collect_routes_until_idle<I: fnet_routes_ext::FidlRouteIpExt>(
+    event_stream: impl futures::Stream<Item = Result<fnet_routes_ext::Event<I>, fnet_routes_ext::WatchError>>
+        + Unpin,
+) -> Vec<fnet_routes_ext::InstalledRoute<I>> {
+    fold::fold_while(event_stream, Vec::new(), |mut existing_routes, event| {
+        use fnet_routes_ext::Event::*;
+        futures::future::ready(match event.expect("error in event stream") {
+            Existing(e) => {
+                existing_routes.push(e);
+                fold::FoldWhile::Continue(existing_routes)
+            }
+            Idle => fold::FoldWhile::Done(existing_routes),
+            e @ Unknown | e @ Added(_) | e @ Removed(_) => {
+                panic!("unexpected event received from the routes watcher: {e:?}")
+            }
+        })
+    })
+    .await
+    .short_circuited()
+    .expect("event stream unexpectedly ended")
+}
+
+fn new_installed_route<I: fnet_routes_ext::FidlRouteIpExt>(
+    subnet: net_types::ip::Subnet<I::Addr>,
+    interface: u64,
+    metric: u32,
+) -> fnet_routes_ext::InstalledRoute<I> {
+    fnet_routes_ext::InstalledRoute {
+        route: fnet_routes_ext::Route {
+            destination: subnet,
+            action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                outbound_interface: interface,
+                next_hop: None,
+            }),
+            properties: fnet_routes_ext::RouteProperties {
+                specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                    metric: fnet_routes::SpecifiedMetric::ExplicitMetric(metric),
+                },
+            },
+        },
+        effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: metric },
+    }
+}
+
+// Asserts that two vectors contain the same entries, order independent.
+fn assert_eq_unordered<T: Debug + Eq + Hash + PartialEq>(a: Vec<T>, b: Vec<T>) {
+    // Converts a `Vec<T>` into a `HashMap` where the key is `T` and the value
+    // is the count of occurrences of `T` in the vec.
+    fn into_counted_set<T: Eq + Hash>(set: Vec<T>) -> HashMap<T, usize> {
+        set.into_iter().fold(HashMap::new(), |mut map, entry| {
+            *map.entry(entry).or_default() += 1;
+            map
+        })
+    }
+    assert_eq!(into_counted_set(a), into_counted_set(b));
+}
+
+// Default metric values used by the netstack when creating implicit routes.
+// See `src/connectivity/network/netstack/netstack.go`.
+const DEFAULT_INTERFACE_METRIC: u32 = 100;
+const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
+const DEFAULT_UNSET_METRIC: u32 = 0;
+
+// Verifies the startup behavior of the watcher protocols; including the
+// expected preinstalled routes.
+#[netstack_test]
+async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    // The routes we expected to be installed in the netstack by default.
+    let loopback_id = realm
+        .loopback_properties()
+        .await
+        .expect("failed to get loopback properties")
+        .expect("loopback properties unexpectedly None")
+        .id;
+    #[derive(GenericOverIp)]
+    struct RoutesHolder<I: Ip + fnet_routes_ext::FidlRouteIpExt>(
+        Vec<fnet_routes_ext::InstalledRoute<I>>,
+    );
+    let RoutesHolder(expected_routes) = I::map_ip(
+        IpInvariant(loopback_id),
+        |IpInvariant(loopback_id)| {
+            RoutesHolder(vec![
+                new_installed_route(
+                    net_subnet_v4!("127.0.0.0/8"),
+                    loopback_id,
+                    DEFAULT_INTERFACE_METRIC,
+                ),
+                new_installed_route(
+                    net_subnet_v4!("255.255.255.255/32"),
+                    loopback_id,
+                    DEFAULT_LOW_PRIORITY_METRIC,
+                ),
+            ])
+        },
+        |IpInvariant(loopback_id)| {
+            RoutesHolder(vec![
+                new_installed_route(
+                    net_subnet_v6!("::1/128"),
+                    loopback_id,
+                    DEFAULT_INTERFACE_METRIC,
+                ),
+                // TODO(https://fxbug.dev/120250): Once IPv6 link-local subnet
+                // routes have the correct metric, switch this to
+                // `DEFAULT_INTERFACE_METRIC`.
+                new_installed_route(net_subnet_v6!("fe80::/64"), loopback_id, DEFAULT_UNSET_METRIC),
+            ])
+        },
+    );
+
+    let state_proxy =
+        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
+    let event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
+        .expect("failed to connect to routes watcher");
+
+    futures::pin_mut!(event_stream);
+    let existing = collect_routes_until_idle(event_stream.by_ref()).await;
+
+    // Assert that the existing routes contain exactly the expected routes.
+    assert_eq_unordered(existing, expected_routes);
+
+    // Verify that there are no more pending events in the stream.
+    event_stream
+        .next()
+        .map(Err)
+        .on_timeout(
+            fuchsia_async::Time::after(netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
+            || Ok(()),
+        )
+        .await
+        .expect("Unexpected event in event stream");
+}
+
+// Declare subnet routes for tests to add/delete. These are known to not collide
+// with routes implicitly installed by the Netstack.
+const TEST_SUBNET_V4: net_types::ip::Subnet<Ipv4Addr> = net_subnet_v4!("192.168.0.0/24");
+const TEST_SUBNET_V6: net_types::ip::Subnet<Ipv6Addr> = net_subnet_v6!("fd::/64");
+
+// Verifies that a client-installed route is observed as `existing` if added
+// before the watcher client connects.
+#[netstack_test]
+async fn watcher_add_before_watch<
+    N: Netstack,
+    I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+
+    let subnet: net_types::ip::Subnet<I::Addr> =
+        I::map_ip((), |()| TEST_SUBNET_V4, |()| TEST_SUBNET_V6);
+
+    // Add a test route.
+    interface.add_subnet_route(subnet.into_ext()).await.expect("failed to add route");
+
+    // Connect to the watcher protocol.
+    let state_proxy =
+        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
+    let event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
+        .expect("failed to connect to routes watcher");
+
+    // Verify that the previously added route is observed as `existing`.
+    futures::pin_mut!(event_stream);
+    let existing = collect_routes_until_idle(event_stream).await;
+    let expected_route = new_installed_route(subnet, interface.id(), DEFAULT_UNSET_METRIC);
+    assert!(
+        existing.contains(&expected_route),
+        "route: {:?}, existing: {:?}",
+        expected_route,
+        existing
+    )
+}
+
+// Verifies the watcher protocols correctly report `added` and `removed` events.
+#[netstack_test]
+async fn watcher_add_remove<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+
+    let subnet: net_types::ip::Subnet<I::Addr> =
+        I::map_ip((), |()| TEST_SUBNET_V4, |()| TEST_SUBNET_V6);
+
+    // Connect to the watcher protocol and consume all existing events.
+    let state_proxy =
+        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
+    let event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
+        .expect("failed to connect to routes watcher");
+    futures::pin_mut!(event_stream);
+
+    // Skip all `existing` events.
+    let _existing_routes = collect_routes_until_idle(event_stream.by_ref()).await;
+
+    // Add a test route.
+    interface.add_subnet_route(subnet.into_ext()).await.expect("failed to add route");
+
+    // Verify the `Added` event is observed.
+    let added_route = assert_matches!(
+        event_stream.next().await,
+        Some(Ok(fnet_routes_ext::Event::<I>::Added(route))) => route
+    );
+    let expected_route = new_installed_route(subnet, interface.id(), DEFAULT_UNSET_METRIC);
+    assert_eq!(added_route, expected_route);
+
+    // Remove the test route.
+    interface.del_subnet_route(subnet.into_ext()).await.expect("failed to remove route");
+
+    // Verify the removed event is observed.
+    let removed_route = assert_matches!(
+        event_stream.next().await,
+        Some(Ok(fnet_routes_ext::Event::<I>::Removed(route))) => route
+    );
+    assert_eq!(removed_route, expected_route);
+}
+
+// Verifies the watcher protocols close if the client incorrectly calls `Watch()`
+// while there is already a pending `Watch()` call parked in the server.
+#[netstack_test]
+async fn watcher_already_pending<
+    N: Netstack,
+    I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let state_proxy =
+        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
+    let watcher_proxy = fnet_routes_ext::get_watcher::<I>(&state_proxy)
+        .expect("failed to connect to watcher protocol");
+
+    // Call `Watch` in a loop until the idle event is observed.
+    while fnet_routes_ext::watch::<I>(&watcher_proxy)
+        .map(|event_batch| {
+            event_batch.expect("error while calling watch").into_iter().any(|event| {
+                use fnet_routes_ext::Event::*;
+                match event.try_into().expect("failed to process event") {
+                    Existing(_) => true,
+                    Idle => false,
+                    e @ Unknown | e @ Added(_) | e @ Removed(_) => {
+                        panic!("unexpected event received from the routes watcher: {e:?}")
+                    }
+                }
+            })
+        })
+        .await
+    {}
+
+    // Call `Watch` twice and observe the protocol close.
+    assert_matches!(
+        futures::future::join(
+            fnet_routes_ext::watch::<I>(&watcher_proxy),
+            fnet_routes_ext::watch::<I>(&watcher_proxy),
+        )
+        .await,
+        (
+            Err(fidl::Error::ClientChannelClosed { status: zx_status::Status::PEER_CLOSED, .. }),
+            Err(fidl::Error::ClientChannelClosed { status: zx_status::Status::PEER_CLOSED, .. }),
+        )
+    );
+    assert!(watcher_proxy.is_closed());
+}
+
+// Verifies the watcher protocol does not get torn down when the `State`
+// protocol is closed.
+#[netstack_test]
+async fn watcher_outlives_state<
+    N: Netstack,
+    I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    // Connect to the watcher protocol and consume all existing events.
+    let state_proxy =
+        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
+    let event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
+        .expect("failed to connect to routes watcher");
+    futures::pin_mut!(event_stream);
+
+    // Skip all `existing` events.
+    let _existing_routes = collect_routes_until_idle(event_stream.by_ref()).await;
+
+    // Drop the state proxy and verify the event_stream stays open
+    drop(state_proxy);
+    event_stream
+        .next()
+        .map(Err)
+        .on_timeout(
+            fuchsia_async::Time::after(netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
+            || Ok(()),
+        )
+        .await
+        .expect("Unexpected event in event stream");
+}
+
+/// Verifies several instantiations of the watcher protocol can exist independent
+/// of one another.
+#[netstack_test]
+async fn watcher_multiple_instances<
+    N: Netstack,
+    I: net_types::ip::Ip + fnet_routes_ext::FidlRouteIpExt,
+>(
+    name: &str,
+) {
+    const NUM_INSTANCES: u8 = 10;
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let device = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let interface = device.into_interface_in_realm(&realm).await.expect("add endpoint to Netstack");
+
+    let state_proxy =
+        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
+
+    let mut watchers = Vec::new();
+    let mut expected_existing_routes = Vec::new();
+
+    // For each iteration, instantiate a watcher and add a unique route. The
+    // route will appear as `added` for all "already-existing" watcher clients,
+    // but `existing` for all "not-yet-instantiated" watcher clients in future
+    // iterations. This ensures that each client is operating over a unique
+    // event stream.
+    for i in 0..NUM_INSTANCES {
+        // Connect to the watcher protocol and observe all expected existing
+        // events
+        let mut event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
+            .expect("failed to connect to routes watcher")
+            .boxed_local();
+        let existing = collect_routes_until_idle(event_stream.by_ref()).await;
+        for route in &expected_existing_routes {
+            assert!(existing.contains(&route), "route: {:?}, existing: {:?}", route, existing)
+        }
+        watchers.push(event_stream);
+
+        // Add a test route whose subnet is unique based on `i`.
+        let subnet: net_types::ip::Subnet<I::Addr> = I::map_ip(
+            IpInvariant(i),
+            |IpInvariant(i)| {
+                net_types::ip::Subnet::new(net_types::ip::Ipv4Addr::new([192, 168, i, 0]), 24)
+                    .unwrap()
+            },
+            |IpInvariant(i)| {
+                net_types::ip::Subnet::new(
+                    net_types::ip::Ipv6Addr::from_bytes([
+                        0xfd, 0, i, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    ]),
+                    64,
+                )
+                .unwrap()
+            },
+        );
+        interface.add_subnet_route(subnet.into_ext()).await.expect("failed to add route");
+        let expected_route = new_installed_route(subnet, interface.id(), DEFAULT_UNSET_METRIC);
+        expected_existing_routes.push(expected_route);
+
+        // Observe an `added` event on all connected watchers.
+        for event_stream in watchers.iter_mut() {
+            let added_route = assert_matches!(
+                event_stream.next().await,
+                Some(Ok(fnet_routes_ext::Event::<I>::Added(route))) => route
+            );
+            assert_eq!(added_route, expected_route);
+        }
+    }
 }

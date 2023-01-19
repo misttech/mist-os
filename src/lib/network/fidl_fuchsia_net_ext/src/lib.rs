@@ -83,6 +83,13 @@ impl TryFromExt<fidl::Ipv6AddressWithPrefix> for ip::Subnet<ip::Ipv6Addr> {
     }
 }
 
+impl<A: ip::IpAddress> FromExt<ip::Subnet<A>> for fidl::Subnet {
+    fn from_ext(subnet: ip::Subnet<A>) -> fidl::Subnet {
+        let addr: ip::IpAddr = subnet.network().into();
+        fidl::Subnet { addr: addr.into_ext(), prefix_len: subnet.prefix() }
+    }
+}
+
 /// Extension trait to allow user-friendly formatting.
 pub trait DisplayExt {
     type Displayable: Display;
@@ -481,7 +488,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use net_declare::{
-        fidl_ip_v4_with_prefix, fidl_ip_v6_with_prefix, net_subnet_v4, net_subnet_v6,
+        fidl_ip_v4_with_prefix, fidl_ip_v6_with_prefix, fidl_subnet, net_subnet_v4, net_subnet_v6,
     };
     use std::collections::HashMap;
     use std::str::FromStr;
@@ -520,6 +527,12 @@ mod tests {
 
         assert_eq!(want_ext, got_ext);
         assert_eq!(want_fidl, got_fidl);
+    }
+
+    #[test]
+    fn test_net_types_subnet_into_fidl_subnet() {
+        assert_eq!(fidl_subnet!("192.168.0.0/24"), net_subnet_v4!("192.168.0.0/24").into_ext());
+        assert_eq!(fidl_subnet!("fd::/64"), net_subnet_v6!("fd::/64").into_ext());
     }
 
     #[test]

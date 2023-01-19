@@ -2304,6 +2304,10 @@ impl<A: IpAddress> Debug for Subnet<A> {
     }
 }
 
+impl<A, I: Ip> GenericOverIp<I> for Subnet<A> {
+    type Type = Subnet<I::Addr>;
+}
+
 /// An IPv4 subnet or an IPv6 subnet.
 ///
 /// `SubnetEither` is an enum of [`Subnet<Ipv4Addr>`] and `Subnet<Ipv6Addr>`.

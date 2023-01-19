@@ -45,9 +45,10 @@ pub enum FidlConversionError {
 
 /// The specified properties of a route. This type enforces that all required
 /// fields from [`fnet_routes::SpecifiedRouteProperties`] are set.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SpecifiedRouteProperties {
-    metric: fnet_routes::SpecifiedMetric,
+    /// The specified metric of the route.
+    pub metric: fnet_routes::SpecifiedMetric,
 }
 
 impl TryFrom<fnet_routes::SpecifiedRouteProperties> for SpecifiedRouteProperties {
@@ -65,9 +66,10 @@ impl TryFrom<fnet_routes::SpecifiedRouteProperties> for SpecifiedRouteProperties
 
 /// The effective properties of a route. This type enforces that all required
 /// fields from [`fnet_routes::EffectiveRouteProperties`] are set.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct EffectiveRouteProperties {
-    metric: u32,
+    /// The effective metric of the route.
+    pub metric: u32,
 }
 
 impl TryFrom<fnet_routes::EffectiveRouteProperties> for EffectiveRouteProperties {
@@ -85,7 +87,7 @@ impl TryFrom<fnet_routes::EffectiveRouteProperties> for EffectiveRouteProperties
 
 /// The properties of a route, abstracting over
 /// [`fnet_routes::RoutePropertiesV4`] and [`fnet_routes::RoutePropertiesV6`].
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct RouteProperties {
     /// the specified properties of the route.
     pub specified_properties: SpecifiedRouteProperties,
@@ -126,7 +128,7 @@ impl TryFrom<fnet_routes::RoutePropertiesV6> for RouteProperties {
 /// determined to be unicast within the broader context of a subnet, hence they
 /// are only guaranteed to be specified in this context. IPv6 addresses,
 /// however, will be confirmed to be unicast.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct RouteTarget<I: Ip> {
     /// The outbound_interface to use when forwarding packets.
     pub outbound_interface: u64,
@@ -173,7 +175,7 @@ impl TryFrom<fnet_routes::RouteTargetV6> for RouteTarget<Ipv6> {
 /// These fidl types are both defined as flexible unions, which allows the
 /// definition to grow over time. The `Unknown` enum variant accounts for any
 /// new types that are not yet known to the local version of the FIDL bindings.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum RouteAction<I: Ip> {
     /// The RouteAction is unknown.
     Unknown,
@@ -210,7 +212,7 @@ impl TryFrom<fnet_routes::RouteActionV6> for RouteAction<Ipv6> {
 ///
 /// The `destination` subnet is verified to be a valid subnet; e.g. its
 /// prefix-len is a valid value, and its host bits are cleared.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Route<I: Ip> {
     /// The destination subnet of the route.
     pub destination: Subnet<I::Addr>,
@@ -246,7 +248,7 @@ impl TryFrom<fnet_routes::RouteV6> for Route<Ipv6> {
 
 /// An installed route, abstracting over [`fnet_routes::InstalledRouteV4`] and
 /// [`fnet_routes::InstalledRouteV6`].
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct InstalledRoute<I: Ip> {
     /// The route.
     pub route: Route<I>,
@@ -368,7 +370,7 @@ pub enum WatchError {
 /// IP Extension for the `fuchsia.net.routes` FIDL API.
 pub trait FidlRouteIpExt: Ip {
     /// The "state" protocol to use for this IP version.
-    type StateMarker: fidl::endpoints::ProtocolMarker;
+    type StateMarker: fidl::endpoints::DiscoverableProtocolMarker;
     /// The "watcher" protocol to use for this IP version.
     type WatcherMarker: fidl::endpoints::ProtocolMarker;
     /// The type of "event" returned by the this IP version's watcher protocol.
@@ -391,8 +393,8 @@ impl FidlRouteIpExt for Ipv6 {
     type WatchEvent = fnet_routes::EventV6;
 }
 
-// Dispatches either `GetWatcherV4` or `GetWatcherV6` on the state proxy.
-pub(crate) fn get_watcher<I: FidlRouteIpExt>(
+/// Dispatches either `GetWatcherV4` or `GetWatcherV6` on the state proxy.
+pub fn get_watcher<I: FidlRouteIpExt>(
     state_proxy: &<I::StateMarker as fidl::endpoints::ProtocolMarker>::Proxy,
 ) -> Result<<I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy, WatcherCreationError> {
     let (watcher_proxy, watcher_server_end) = fidl::endpoints::create_proxy::<I::WatcherMarker>()
@@ -423,8 +425,8 @@ pub(crate) fn get_watcher<I: FidlRouteIpExt>(
     Ok(watcher_proxy)
 }
 
-// Calls `Watch()` on the provided `WatcherV4` or `WatcherV6` proxy.
-fn watch<'a, I: FidlRouteIpExt>(
+/// Calls `Watch()` on the provided `WatcherV4` or `WatcherV6` proxy.
+pub fn watch<'a, I: FidlRouteIpExt>(
     watcher_proxy: &'a <I::WatcherMarker as fidl::endpoints::ProtocolMarker>::Proxy,
 ) -> impl Future<Output = Result<Vec<I::WatchEvent>, fidl::Error>> {
     #[derive(GenericOverIp)]
