@@ -143,6 +143,7 @@ source_set("namespace_init") {
 
   public_deps = [
     ":constants",
+    "//src/developer/forensics/utils:storage_size",
     "//src/developer/forensics/utils/cobalt",
   ]
 

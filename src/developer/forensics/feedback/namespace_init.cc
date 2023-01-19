@@ -64,10 +64,15 @@ void MovePreviousRebootReason(const std::string& from, const std::string& legacy
   }
 }
 
-void CreatePreviousLogsFile(cobalt::Logger* cobalt, const std::string& dir,
-                            const std::string& write_path) {
+void CreatePreviousLogsFile(cobalt::Logger* cobalt, const StorageSize max_decompressed_size,
+                            const std::string& dir, const std::string& write_path) {
   // We read the set of /cache files into a single /tmp file.
-  feedback_data::system_log_recorder::ProductionDecoder decoder;
+  //
+  // |max_decompressed_size| is typically overkill for a |decoder|'s preallocations because the log
+  // is spread across many files. However, it's efficient because the total log size is usually
+  // large enough to be serviced by scudo's secondary allocator and the memory can be decommitted
+  // immediately after it's freed.
+  feedback_data::system_log_recorder::ProductionDecoder decoder(max_decompressed_size.ToBytes());
   float compression_ratio;
   if (!feedback_data::system_log_recorder::Concatenate(dir, &decoder, write_path,
                                                        &compression_ratio)) {

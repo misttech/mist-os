@@ -6,6 +6,7 @@
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SYSTEM_LOG_RECORDER_ENCODING_LZ4_DECODER_H_
 
 #include <memory>
+#include <optional>
 #include <string>
 
 #include <lz4/lz4.h>
@@ -27,9 +28,12 @@ namespace system_log_recorder {
 // if the encoded block size is 64KB and the compression ratio is greater than 1x). In addition,
 // the state for the current block decompression needed by the LZ4 algorithm is kept in the
 // “stream” variable.
+//
+// |output_preallocation_hint| allows callers to suggest how the decoder should preallocate its
+// output string when decoding.
 class Lz4Decoder : public Decoder {
  public:
-  Lz4Decoder();
+  explicit Lz4Decoder(std::optional<size_t> output_preallocation_hint = std::nullopt);
 
   virtual ~Lz4Decoder() = default;
 
@@ -51,16 +55,9 @@ class Lz4Decoder : public Decoder {
   void Reset();
 
  private:
-  // Decodes the next chunk in the block. Returns whether the block should be further decoded.
-  //
-  // A chunk is made of two consecutive parts: (1) the size of the encoded message and (2) the
-  // encoded message itself. block_ptr points to the start of the chunk (to be decoded) while
-  // block_end points to 1-byte past the last element of the block (analogous to std::vector::end)
-  bool DecodeNextChunk(const char* block_end, const char** block_ptr, std::string* decoded_chunk,
-                       std::string* err_msg);
-
   RingBuffer ring_;
   std::unique_ptr<LZ4_streamDecode_t, decltype(&LZ4_freeStreamDecode)> stream_;
+  std::optional<size_t> output_preallocation_hint_;
 };
 
 }  // namespace system_log_recorder

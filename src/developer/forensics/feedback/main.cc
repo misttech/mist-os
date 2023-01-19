@@ -61,7 +61,7 @@ int main() {
 
   if (component.IsFirstInstance()) {
     MovePreviousRebootReason();
-    CreatePreviousLogsFile(cobalt.get());
+    CreatePreviousLogsFile(cobalt.get(), product_config->persisted_logs_total_size);
     MoveAndRecordBootId(uuid::Generate());
     if (std::string build_version; files::ReadFileToString(kBuildVersionPath, &build_version)) {
       MoveAndRecordBuildVersion(build_version);

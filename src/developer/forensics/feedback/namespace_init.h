@@ -9,6 +9,7 @@
 
 #include "src/developer/forensics/feedback/constants.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
+#include "src/developer/forensics/utils/storage_size.h"
 
 namespace forensics::feedback {
 
@@ -26,7 +27,8 @@ void MovePreviousRebootReason(const std::string& from = kCurrentGracefulRebootRe
 //
 // Decompress and concatenate the logs from the previous boot in |dir| and store the at
 // |write_path|.
-void CreatePreviousLogsFile(cobalt::Logger* cobalt, const std::string& dir = kCurrentLogsDir,
+void CreatePreviousLogsFile(cobalt::Logger* cobalt, StorageSize max_decompressed_size,
+                            const std::string& dir = kCurrentLogsDir,
                             const std::string& write_path = kPreviousLogsFilePath);
 
 // Move the boot id stored at |current_boot_id_path| to |previous_boot_id_path| and write a new

@@ -181,7 +181,8 @@ TEST_F(NamespaceInitTest, CreatePreviousLogsFile) {
   }
 
   std::string log_file = MakeFilepath(RootdDir(), "log.system.previous_boot.txt");
-  CreatePreviousLogsFile(&cobalt, logs_dir, log_file);
+  CreatePreviousLogsFile(&cobalt, /*max_decompressed_size=*/StorageSize::Kilobytes(128), logs_dir,
+                         log_file);
 
   RunLoopUntilIdle();
 
