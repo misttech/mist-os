@@ -14,6 +14,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/fidl-async/bind.h>
+#include <lib/scsi/scsilib.h>
 #include <lib/sync/completion.h>
 #include <threads.h>
 #include <zircon/assert.h>
@@ -118,11 +119,11 @@ class UsbMassStorageDevice : public MassStorageDeviceType {
 
   zx_status_t RequestSense(uint8_t lun, uint8_t* out_data);
 
-  zx_status_t ReadCapacity(uint8_t lun, scsi_read_capacity_10_t* out_data);
+  zx_status_t ReadCapacity(uint8_t lun, scsi::ReadCapacity10ParameterData* out_data);
 
-  zx_status_t ReadCapacity(uint8_t lun, scsi_read_capacity_16_t* out_data);
+  zx_status_t ReadCapacity(uint8_t lun, scsi::ReadCapacity16ParameterData* out_data);
 
-  zx_status_t ModeSense(uint8_t lun, scsi_mode_sense_6_data_t* out_data);
+  zx_status_t ModeSense(uint8_t lun, scsi::ModeSense6ParameterHeader* out_data);
 
   zx_status_t ModeSense(uint8_t lun, uint8_t page, void* data, uint8_t transfer_length);
 

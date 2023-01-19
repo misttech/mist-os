@@ -22,13 +22,25 @@ const uint8_t kCachingPageCode = 0x8;
 
 enum class Opcode : uint8_t {
   TEST_UNIT_READY = 0x00,
+  REQUEST_SENSE = 0x03,
   INQUIRY = 0x12,
+  MODE_SELECT_6 = 0x15,
   MODE_SENSE_6 = 0x1A,
+  START_STOP_UNIT = 0x1B,
+  TOGGLE_REMOVABLE = 0x1E,
+  READ_FORMAT_CAPACITIES = 0x23,
+  READ_CAPACITY_10 = 0x25,
+  READ_10 = 0x28,
+  WRITE_10 = 0x2A,
   SYNCHRONIZE_CACHE_10 = 0x35,
+  MODE_SELECT_10 = 0x55,
+  MODE_SENSE_10 = 0x5A,
   READ_16 = 0x88,
   WRITE_16 = 0x8A,
   READ_CAPACITY_16 = 0x9E,
   REPORT_LUNS = 0xA0,
+  READ_12 = 0xA8,
+  WRITE_12 = 0xAA,
 };
 
 // SCSI command structures (CDBs)
@@ -97,6 +109,16 @@ struct VPDPageList {
   uint8_t pages[255];
 };
 
+struct RequestSenseCDB {
+  Opcode opcode;
+  uint8_t desc;
+  uint16_t reserved;
+  uint8_t allocation_length;
+  uint8_t control;
+} __PACKED;
+
+static_assert(sizeof(RequestSenseCDB) == 6, "Request Sense CDB must be 6 bytes");
+
 struct ModeSense6CDB {
   Opcode opcode;
   // If disable_block_descriptors(3) is '1', device will not return Block Descriptors.
@@ -119,9 +141,11 @@ struct ModeSense6ParameterHeader {
   // device_specific_parameter(4) is disable page out/force unit access available
   uint8_t device_specific_parameter;
   uint8_t block_descriptor_length;
+
+  DEF_SUBBIT(device_specific_parameter, 7, write_protected);
 } __PACKED;
 
-static_assert(sizeof(ModeSense6ParameterHeader) == 4, "Mode sense 6 parameters must be 4 bytes");
+static_assert(sizeof(ModeSense6ParameterHeader) == 4, "Mode Sense 6 parameters must be 4 bytes");
 
 struct CachingModePage {
   ModeSense6ParameterHeader header;
@@ -143,12 +167,30 @@ struct CachingModePage {
 
 static_assert(sizeof(CachingModePage) == 24, "Caching Mode Page must be 24 bytes");
 
+struct ReadCapacity10CDB {
+  Opcode opcode;
+  uint8_t reserved0;
+  uint32_t obsolete;
+  uint16_t reserved1;
+  uint8_t reserved2;
+  uint8_t control;
+} __PACKED;
+
+static_assert(sizeof(ReadCapacity10CDB) == 10, "Read Capacity 10 CDB must be 10 bytes");
+
+struct ReadCapacity10ParameterData {
+  uint32_t returned_logical_block_address;
+  uint32_t block_length_in_bytes;
+} __PACKED;
+
+static_assert(sizeof(ReadCapacity10ParameterData) == 8, "Read Capacity 10 Params are 8 bytes");
+
 struct ReadCapacity16CDB {
   Opcode opcode;
   uint8_t service_action;
-  uint64_t reserved;
+  uint64_t obsolete;
   uint32_t allocation_length;
-  uint8_t pmi;
+  uint8_t reserved;
   uint8_t control;
 } __PACKED;
 
@@ -189,6 +231,40 @@ static_assert(sizeof(ReportLunsParameterDataHeader) == 16, "Report LUNs Header m
 // Count the number of addressable LUNs attached to a target.
 uint32_t CountLuns(Controller* controller, uint8_t target);
 
+struct Read10CDB {
+  Opcode opcode;
+  // dpo_fua(4) - DPO - Disable Page Out
+  // dpo_fua(3) - FUA - Force Unit Access
+  uint8_t dpo_fua;
+  // Network byte order
+  uint32_t logical_block_address;
+  uint8_t group_number;
+  uint16_t transfer_length;
+  uint8_t control;
+
+  DEF_SUBBIT(dpo_fua, 4, disable_page_out);
+  DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+} __PACKED;
+
+static_assert(sizeof(Read10CDB) == 10, "Read 10 CDB must be 10 bytes");
+
+struct Read12CDB {
+  Opcode opcode;
+  // dpo_fua(4) - DPO - Disable Page Out
+  // dpo_fua(3) - FUA - Force Unit Access
+  uint8_t dpo_fua;
+  // Network byte order
+  uint32_t logical_block_address;
+  uint32_t transfer_length;
+  uint8_t group_number;
+  uint8_t control;
+
+  DEF_SUBBIT(dpo_fua, 4, disable_page_out);
+  DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+} __PACKED;
+
+static_assert(sizeof(Read12CDB) == 12, "Read 12 CDB must be 12 bytes");
+
 struct Read16CDB {
   Opcode opcode;
   // dpo_fua(4) - DPO - Disable Page Out
@@ -197,7 +273,7 @@ struct Read16CDB {
   // Network byte order
   uint64_t logical_block_address;
   uint32_t transfer_length;
-  uint8_t reserved;
+  uint8_t group_number;
   uint8_t control;
 
   DEF_SUBBIT(dpo_fua, 4, disable_page_out);
@@ -205,6 +281,42 @@ struct Read16CDB {
 } __PACKED;
 
 static_assert(sizeof(Read16CDB) == 16, "Read 16 CDB must be 16 bytes");
+
+struct Write10CDB {
+  Opcode opcode;
+  // dpo_fua(4) - DPO - Disable Page Out
+  // dpo_fua(3) - FUA - Write to medium
+  // dpo_fua(1) - FUA_NV - If NV_SUP is 1, prefer write to nonvolatile cache.
+  uint8_t dpo_fua;
+  // Network byte order
+  uint32_t logical_block_address;
+  uint8_t group_number;
+  uint16_t transfer_length;
+  uint8_t control;
+
+  DEF_SUBBIT(dpo_fua, 4, disable_page_out);
+  DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+} __PACKED;
+
+static_assert(sizeof(Write10CDB) == 10, "Write 10 CDB must be 10 bytes");
+
+struct Write12CDB {
+  Opcode opcode;
+  // dpo_fua(4) - DPO - Disable Page Out
+  // dpo_fua(3) - FUA - Write to medium
+  // dpo_fua(1) - FUA_NV - If NV_SUP is 1, prefer write to nonvolatile cache.
+  uint8_t dpo_fua;
+  // Network byte order
+  uint32_t logical_block_address;
+  uint32_t transfer_length;
+  uint8_t group_number;
+  uint8_t control;
+
+  DEF_SUBBIT(dpo_fua, 4, disable_page_out);
+  DEF_SUBBIT(dpo_fua, 3, force_unit_access);
+} __PACKED;
+
+static_assert(sizeof(Write12CDB) == 12, "Write 12 CDB must be 12 bytes");
 
 struct Write16CDB {
   Opcode opcode;
@@ -215,7 +327,7 @@ struct Write16CDB {
   // Network byte order
   uint64_t logical_block_address;
   uint32_t transfer_length;
-  uint8_t reserved;
+  uint8_t group_number;
   uint8_t control;
 
   DEF_SUBBIT(dpo_fua, 4, disable_page_out);
@@ -224,19 +336,19 @@ struct Write16CDB {
 
 static_assert(sizeof(Write16CDB) == 16, "Write 16 CDB must be 16 bytes");
 
-struct Synchronize10CDB {
+struct SynchronizeCache10CDB {
   Opcode opcode;
   // syncnv_immed(2) - SYNC_NV - If SYNC_NV is 1 prefer write to nonvolatile cache.
   // syncnv_immed(1) - IMMED - If IMMED is 1 return after CDB has been
   //                           validated.
   uint8_t syncnv_immed;
   uint32_t logical_block_address;
-  uint8_t reserved;
+  uint8_t group_number;
   uint16_t num_blocks;
   uint8_t control;
 } __PACKED;
 
-static_assert(sizeof(Synchronize10CDB) == 10, "Synchronize 10 CDB must be 10 bytes");
+static_assert(sizeof(SynchronizeCache10CDB) == 10, "Synchronize Cache 10 CDB must be 10 bytes");
 
 class Disk;
 using DeviceType = ddk::Device<Disk>;

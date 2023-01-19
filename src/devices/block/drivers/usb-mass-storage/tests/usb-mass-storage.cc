@@ -83,7 +83,7 @@ struct Context {
   block_op_t* op;
   uint64_t transfer_offset;
   uint64_t transfer_blocks;
-  uint8_t transfer_type;
+  scsi::Opcode transfer_type;
   uint8_t transfer_lun;
   size_t pending_write;
   ErrorInjection failure_mode;
@@ -244,16 +244,18 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
       auto DataTransfer = [&]() {
         if ((context->transfer_offset == cbw.bCBWLUN) &&
             (context->transfer_blocks == (cbw.bCBWLUN + 1U) * 65534U)) {
-          uint8_t opcode = cbw.CBWCB[0];
+          auto opcode = static_cast<scsi::Opcode>(cbw.CBWCB[0]);
           size_t transfer_length = context->transfer_blocks * kBlockSize;
           fbl::Array<unsigned char> transfer(new unsigned char[transfer_length], transfer_length);
           context->last_transfer = fbl::MakeRefCounted<Packet>(std::move(transfer));
           context->transfer_lun = cbw.bCBWLUN;
-          if ((opcode == UMS_READ10) || (opcode == UMS_READ12) || (opcode == UMS_READ16)) {
+          if ((opcode == scsi::Opcode::READ_10) || (opcode == scsi::Opcode::READ_12) ||
+              (opcode == scsi::Opcode::READ_16)) {
             // Push reply
             context->pending_packets.push_back(context->last_transfer);
           } else {
-            if ((opcode == UMS_WRITE10) || (opcode == UMS_WRITE12) || (opcode == UMS_WRITE16)) {
+            if ((opcode == scsi::Opcode::WRITE_10) || (opcode == scsi::Opcode::WRITE_12) ||
+                (opcode == scsi::Opcode::WRITE_16)) {
               context->pending_write = transfer_length;
             }
           }
@@ -266,65 +268,65 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(csw)));
         }
       };
-      switch (cbw.CBWCB[0]) {
-        case UMS_WRITE16:
+      auto opcode = static_cast<scsi::Opcode>(cbw.CBWCB[0]);
+      switch (opcode) {
+        case scsi::Opcode::WRITE_16:
           __FALLTHROUGH;
-        case UMS_READ16: {
-          scsi_command16_t cmd;
+        case scsi::Opcode::READ_16: {
+          scsi::Read16CDB cmd;  // struct-wise equivalent to scsi::Write16CDB here.
           memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
-          context->transfer_blocks = be32toh(cmd.length);
-          context->transfer_offset = be64toh(cmd.lba);
-          context->transfer_type = cbw.CBWCB[0];
+          context->transfer_blocks = be32toh(cmd.transfer_length);
+          context->transfer_offset = be64toh(cmd.logical_block_address);
+          context->transfer_type = opcode;
           DataTransfer();
           usb_request->response.status = ZX_OK;
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
-        case UMS_WRITE12:
+        case scsi::Opcode::WRITE_12:
           __FALLTHROUGH;
-        case UMS_READ12: {
-          scsi_command12_t cmd;
+        case scsi::Opcode::READ_12: {
+          scsi::Read12CDB cmd;  // struct-wise equivalent to scsi::Write12CDB here.
           memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
-          context->transfer_blocks = be32toh(cmd.length);
-          context->transfer_offset = be32toh(cmd.lba);
-          context->transfer_type = cbw.CBWCB[0];
+          context->transfer_blocks = be32toh(cmd.transfer_length);
+          context->transfer_offset = be32toh(cmd.logical_block_address);
+          context->transfer_type = opcode;
           DataTransfer();
           usb_request->response.status = ZX_OK;
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
-        case UMS_WRITE10:
+        case scsi::Opcode::WRITE_10:
           __FALLTHROUGH;
-        case UMS_READ10: {
-          scsi_command10_t cmd;
+        case scsi::Opcode::READ_10: {
+          scsi::Read10CDB cmd;  // struct-wise equivalent to scsi::Write10CDB here.
           memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
-          context->transfer_blocks =
-              static_cast<uint16_t>(cmd.length_lo) | (static_cast<uint16_t>(cmd.length_hi) << 8);
-          context->transfer_offset = be32toh(cmd.lba);
-          context->transfer_type = cbw.CBWCB[0];
+          context->transfer_blocks = be16toh(cmd.transfer_length);
+          context->transfer_offset = be32toh(cmd.logical_block_address);
+          context->transfer_type = opcode;
           DataTransfer();
           usb_request->response.status = ZX_OK;
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
-        case UMS_SYNCHRONIZE_CACHE: {
+        case scsi::Opcode::SYNCHRONIZE_CACHE_10: {
           // Push CSW
           fbl::Array<unsigned char> csw(new unsigned char[sizeof(ums_csw_t)], sizeof(ums_csw_t));
           context->csw.dCSWDataResidue = 0;
           context->csw.dCSWTag = context->tag++;
           context->csw.bmCSWStatus = CSW_SUCCESS;
           context->transfer_lun = cbw.bCBWLUN;
-          context->transfer_type = cbw.CBWCB[0];
+          context->transfer_type = opcode;
           memcpy(csw.data(), &context->csw, sizeof(context->csw));
           context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(csw)));
           usb_request->response.status = ZX_OK;
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
-        case UMS_INQUIRY: {
-          scsi_command6_t cmd;
+        case scsi::Opcode::INQUIRY: {
+          scsi::InquiryCDB cmd;
           memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
-          if (cmd.length == UMS_INQUIRY_TRANSFER_LENGTH) {
+          if (be16toh(cmd.allocation_length) == UMS_INQUIRY_TRANSFER_LENGTH) {
             // Push reply
             fbl::Array<unsigned char> reply(new unsigned char[UMS_INQUIRY_TRANSFER_LENGTH],
                                             UMS_INQUIRY_TRANSFER_LENGTH);
@@ -349,7 +351,7 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
-        case UMS_TEST_UNIT_READY: {
+        case scsi::Opcode::TEST_UNIT_READY: {
           // Push CSW
           fbl::Array<unsigned char> csw(new unsigned char[sizeof(ums_csw_t)], sizeof(ums_csw_t));
           context->csw.dCSWDataResidue = 0;
@@ -361,14 +363,16 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
-        case UMS_READ_CAPACITY16: {
+        case scsi::Opcode::READ_CAPACITY_16: {
           if (cbw.bCBWLUN == 3) {
             // Push reply
-            fbl::Array<unsigned char> reply(new unsigned char[sizeof(scsi_read_capacity_16_t)],
-                                            sizeof(scsi_read_capacity_16_t));
-            scsi_read_capacity_16_t scsi;
-            scsi.block_length = htobe32(kBlockSize);
-            scsi.lba = htobe64((976562L * (1 + cbw.bCBWLUN)) + UINT32_MAX);
+            fbl::Array<unsigned char> reply(
+                new unsigned char[sizeof(scsi::ReadCapacity16ParameterData)],
+                sizeof(scsi::ReadCapacity16ParameterData));
+            scsi::ReadCapacity16ParameterData scsi;
+            scsi.block_length_in_bytes = htobe32(kBlockSize);
+            scsi.returned_logical_block_address =
+                htobe64((976562L * (1 + cbw.bCBWLUN)) + UINT32_MAX);
             memcpy(reply.data(), &scsi, sizeof(scsi));
             context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
             // Push CSW
@@ -383,15 +387,16 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
-        case UMS_READ_CAPACITY10: {
+        case scsi::Opcode::READ_CAPACITY_10: {
           // Push reply
-          fbl::Array<unsigned char> reply(new unsigned char[sizeof(scsi_read_capacity_10_t)],
-                                          sizeof(scsi_read_capacity_10_t));
-          scsi_read_capacity_10_t scsi;
-          scsi.block_length = htobe32(kBlockSize);
-          scsi.lba = htobe32(976562 * (1 + cbw.bCBWLUN));
+          fbl::Array<unsigned char> reply(
+              new unsigned char[sizeof(scsi::ReadCapacity10ParameterData)],
+              sizeof(scsi::ReadCapacity10ParameterData));
+          scsi::ReadCapacity10ParameterData scsi;
+          scsi.block_length_in_bytes = htobe32(kBlockSize);
+          scsi.returned_logical_block_address = htobe32(976562 * (1 + cbw.bCBWLUN));
           if (cbw.bCBWLUN == 3) {
-            scsi.lba = -1;
+            scsi.returned_logical_block_address = -1;
           }
           memcpy(reply.data(), &scsi, sizeof(scsi));
           context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
@@ -406,15 +411,16 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
         }
-        case UMS_MODE_SENSE6: {
-          scsi_mode_sense_6_command_t cmd;
+        case scsi::Opcode::MODE_SENSE_6: {
+          scsi::ModeSense6CDB cmd;
           memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
           // Push reply
-          switch (cmd.page) {
+          switch (cmd.page_code) {
             case 0x3F: {
-              fbl::Array<unsigned char> reply(new unsigned char[sizeof(scsi_mode_sense_6_data_t)],
-                                              sizeof(scsi_mode_sense_6_data_t));
-              scsi_mode_sense_6_data_t scsi = {};
+              fbl::Array<unsigned char> reply(
+                  new unsigned char[sizeof(scsi::ModeSense6ParameterHeader)],
+                  sizeof(scsi::ModeSense6ParameterHeader));
+              scsi::ModeSense6ParameterHeader scsi = {};
               memcpy(reply.data(), &scsi, sizeof(scsi));
               context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
               // Push CSW
@@ -464,6 +470,8 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
           }
           break;
         }
+        default:
+          ADD_FAILURE("Unexpected SCSI command: %02Xh", cbw.CBWCB[0]);
       }
       break;
     }
@@ -558,7 +566,9 @@ TEST(Ums, TestRead) {
     dev.QueueTransaction(&transaction);
     sync_completion_wait(&parent_dev.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&parent_dev.completion);
-    uint8_t xfer_type = i == 0 ? UMS_READ10 : i == 3 ? UMS_READ16 : UMS_READ12;
+    scsi::Opcode xfer_type = i == 0   ? scsi::Opcode::READ_10
+                             : i == 3 ? scsi::Opcode::READ_16
+                                      : scsi::Opcode::READ_12;
     EXPECT_EQ(i, parent_dev.transfer_lun);
     EXPECT_EQ(xfer_type, parent_dev.transfer_type);
     EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), parent_dev.last_transfer->data.data(),
@@ -620,7 +630,9 @@ TEST(Ums, TestWrite) {
     dev.QueueTransaction(&transaction);
     sync_completion_wait(&parent_dev.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&parent_dev.completion);
-    uint8_t xfer_type = i == 0 ? UMS_WRITE10 : i == 3 ? UMS_WRITE16 : UMS_WRITE12;
+    scsi::Opcode xfer_type = i == 0   ? scsi::Opcode::WRITE_10
+                             : i == 3 ? scsi::Opcode::WRITE_16
+                                      : scsi::Opcode::WRITE_12;
     EXPECT_EQ(i, parent_dev.transfer_lun);
     EXPECT_EQ(xfer_type, parent_dev.transfer_type);
     EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), parent_dev.last_transfer->data.data(),
@@ -666,7 +678,7 @@ TEST(Ums, TestFlush) {
     dev.QueueTransaction(&transaction);
     sync_completion_wait(&parent_dev.completion, ZX_TIME_INFINITE);
     sync_completion_reset(&parent_dev.completion);
-    uint8_t xfer_type = UMS_SYNCHRONIZE_CACHE;
+    scsi::Opcode xfer_type = scsi::Opcode::SYNCHRONIZE_CACHE_10;
     EXPECT_EQ(i, parent_dev.transfer_lun);
     EXPECT_EQ(xfer_type, parent_dev.transfer_type);
   }

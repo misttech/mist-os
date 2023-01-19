@@ -7,6 +7,7 @@
 #include <endian.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
+#include <lib/scsi/scsilib.h>
 #include <stdio.h>
 #include <string.h>
 #include <zircon/assert.h>
@@ -415,10 +416,9 @@ zx_status_t UsbMassStorageDevice::ReadSync(uint16_t transfer_length) {
 
 zx_status_t UsbMassStorageDevice::Inquiry(uint8_t lun, uint8_t* out_data) {
   // CBW Configuration
-  scsi_command6_t command;
-  memset(&command, 0, sizeof(command));
-  command.opcode = UMS_INQUIRY;
-  command.length = UMS_INQUIRY_TRANSFER_LENGTH;
+  scsi::InquiryCDB command = {};
+  command.opcode = scsi::Opcode::INQUIRY;
+  command.allocation_length = htobe16(UMS_INQUIRY_TRANSFER_LENGTH);
   SendCbw(lun, UMS_INQUIRY_TRANSFER_LENGTH, USB_DIR_IN, sizeof(command), &command);
   // read inquiry response
   QueueRead(UMS_INQUIRY_TRANSFER_LENGTH);
@@ -434,9 +434,8 @@ zx_status_t UsbMassStorageDevice::Inquiry(uint8_t lun, uint8_t* out_data) {
 
 zx_status_t UsbMassStorageDevice::TestUnitReady(uint8_t lun) {
   // CBW Configuration
-  scsi_command6_t command;
-  memset(&command, 0, sizeof(command));
-  command.opcode = UMS_TEST_UNIT_READY;
+  scsi::TestUnitReadyCDB command = {};
+  command.opcode = scsi::Opcode::TEST_UNIT_READY;
   SendCbw(lun, 0, USB_DIR_IN, sizeof(command), &command);
   // wait for CSW
   return ReadCsw(NULL);
@@ -444,10 +443,9 @@ zx_status_t UsbMassStorageDevice::TestUnitReady(uint8_t lun) {
 
 zx_status_t UsbMassStorageDevice::RequestSense(uint8_t lun, uint8_t* out_data) {
   // CBW Configuration
-  scsi_command6_t command;
-  memset(&command, 0, sizeof(command));
-  command.opcode = UMS_REQUEST_SENSE;
-  command.length = UMS_REQUEST_SENSE_TRANSFER_LENGTH;
+  scsi::RequestSenseCDB command = {};
+  command.opcode = scsi::Opcode::REQUEST_SENSE;
+  command.allocation_length = UMS_REQUEST_SENSE_TRANSFER_LENGTH;
   SendCbw(lun, UMS_REQUEST_SENSE_TRANSFER_LENGTH, USB_DIR_IN, sizeof(command), &command);
 
   // Read response code from device
@@ -463,11 +461,11 @@ zx_status_t UsbMassStorageDevice::RequestSense(uint8_t lun, uint8_t* out_data) {
   return status;
 }
 
-zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun, scsi_read_capacity_10_t* out_data) {
+zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun,
+                                               scsi::ReadCapacity10ParameterData* out_data) {
   // CBW Configuration
-  scsi_command10_t command;
-  memset(&command, 0, sizeof(command));
-  command.opcode = UMS_READ_CAPACITY10;
+  scsi::ReadCapacity10CDB command = {};
+  command.opcode = scsi::Opcode::READ_CAPACITY_10;
   SendCbw(lun, sizeof(*out_data), USB_DIR_IN, sizeof(command), &command);
 
   // read capacity10 response
@@ -481,14 +479,14 @@ zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun, scsi_read_capacity_1
   return status;
 }
 
-zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun, scsi_read_capacity_16_t* out_data) {
+zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun,
+                                               scsi::ReadCapacity16ParameterData* out_data) {
   // CBW Configuration
-  scsi_command16_t command;
-  memset(&command, 0, sizeof(command));
-  command.opcode = UMS_READ_CAPACITY16;
+  scsi::ReadCapacity16CDB command = {};
+  command.opcode = scsi::Opcode::READ_CAPACITY_16;
   // service action = 10, not sure what that means
-  command.misc = 0x10;
-  command.length = htobe32(sizeof(*out_data));
+  command.service_action = 0x10;
+  command.allocation_length = htobe32(sizeof(*out_data));
   SendCbw(lun, sizeof(*out_data), USB_DIR_IN, sizeof(command), &command);
 
   // read capacity16 response
@@ -504,10 +502,9 @@ zx_status_t UsbMassStorageDevice::ReadCapacity(uint8_t lun, scsi_read_capacity_1
 zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun, uint8_t page, void* data,
                                             uint8_t transfer_length) {
   // CBW Configuration
-  scsi_mode_sense_6_command_t command;
-  memset(&command, 0, sizeof(command));
-  command.opcode = UMS_MODE_SENSE6;
-  command.page = page;  // all pages, current values
+  scsi::ModeSense6CDB command = {};
+  command.opcode = scsi::Opcode::MODE_SENSE_6;
+  command.page_code = page;  // all pages, current values
   command.allocation_length = transfer_length;
 
   // Per section 6.5 of UMS specification version 1.0
@@ -533,12 +530,12 @@ zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun, uint8_t page, void* dat
   return status;
 }
 
-zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun, scsi_mode_sense_6_data_t* out_data) {
+zx_status_t UsbMassStorageDevice::ModeSense(uint8_t lun,
+                                            scsi::ModeSense6ParameterHeader* out_data) {
   // CBW Configuration
-  scsi_mode_sense_6_command_t command;
-  memset(&command, 0, sizeof(command));
-  command.opcode = UMS_MODE_SENSE6;
-  command.page = 0x3F;  // all pages, current values
+  scsi::ModeSense6CDB command = {};
+  command.opcode = scsi::Opcode::MODE_SENSE_6;
+  command.page_code = 0x3F;  // all pages, current values
   command.allocation_length = sizeof(*out_data);
 
   SendCbw(lun, sizeof(*out_data), USB_DIR_IN, sizeof(command), &command);
@@ -600,30 +597,26 @@ zx_status_t UsbMassStorageDevice::Read(UmsBlockDevice* dev, Transaction* txn) {
     }
     size_t length = blocks * block_size;
     // CBW Configuration
-    // Need to use UMS_READ16 if block addresses are greater than 32 bit
+    // Need to use READ_16 if block addresses are greater than 32 bit
     if (params.total_blocks > UINT32_MAX) {
-      scsi_command16_t command;
-      memset(&command, 0, sizeof(command));
-      command.opcode = UMS_READ16;
-      command.lba = htobe64(block_offset);
-      command.length = htobe32(static_cast<uint32_t>(blocks));
+      scsi::Read16CDB command = {};
+      command.opcode = scsi::Opcode::READ_16;
+      command.logical_block_address = htobe64(block_offset);
+      command.transfer_length = htobe32(static_cast<uint32_t>(blocks));
       status =
           SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_IN, sizeof(command), &command);
     } else if (blocks <= UINT16_MAX) {
-      scsi_command10_t command;
-      memset(&command, 0, sizeof(command));
-      command.opcode = UMS_READ10;
-      command.lba = htobe32(static_cast<uint32_t>(block_offset));
-      command.length_hi = static_cast<uint8_t>(blocks >> 8);
-      command.length_lo = static_cast<uint8_t>(blocks & 0xFF);
+      scsi::Read10CDB command = {};
+      command.opcode = scsi::Opcode::READ_10;
+      command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
+      command.transfer_length = htobe16(static_cast<uint16_t>(blocks));
       status =
           SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_IN, sizeof(command), &command);
     } else {
-      scsi_command12_t command;
-      memset(&command, 0, sizeof(command));
-      command.opcode = UMS_READ12;
-      command.lba = htobe32(static_cast<uint32_t>(block_offset));
-      command.length = htobe32(static_cast<uint32_t>(blocks));
+      scsi::Read12CDB command = {};
+      command.opcode = scsi::Opcode::READ_12;
+      command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
+      command.transfer_length = htobe32(static_cast<uint32_t>(blocks));
       status =
           SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_IN, sizeof(command), &command);
     }
@@ -673,28 +666,24 @@ zx_status_t UsbMassStorageDevice::Write(UmsBlockDevice* dev, Transaction* txn) {
     size_t length = blocks * block_size;
 
     // CBW Configuration
-    // Need to use UMS_WRITE16 if block addresses are greater than 32 bit
+    // Need to use WRITE_16 if block addresses are greater than 32 bit
     if (params.total_blocks > UINT32_MAX) {
-      scsi_command16_t command;
-      memset(&command, 0, sizeof(command));
-      command.opcode = UMS_WRITE16;
-      command.lba = htobe64(block_offset);
-      command.length = htobe32(static_cast<uint32_t>(blocks));
+      scsi::Write16CDB command = {};
+      command.opcode = scsi::Opcode::WRITE_16;
+      command.logical_block_address = htobe64(block_offset);
+      command.transfer_length = htobe32(static_cast<uint32_t>(blocks));
       SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_OUT, sizeof(command), &command);
     } else if (blocks <= UINT16_MAX) {
-      scsi_command10_t command;
-      memset(&command, 0, sizeof(command));
-      command.opcode = UMS_WRITE10;
-      command.lba = htobe32(static_cast<uint32_t>(block_offset));
-      command.length_hi = static_cast<uint8_t>(static_cast<uint32_t>(blocks) >> 8);
-      command.length_lo = static_cast<uint8_t>(static_cast<uint32_t>(blocks) & 0xFF);
+      scsi::Write10CDB command = {};
+      command.opcode = scsi::Opcode::WRITE_10;
+      command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
+      command.transfer_length = htobe16(static_cast<uint16_t>(blocks));
       SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_OUT, sizeof(command), &command);
     } else {
-      scsi_command12_t command;
-      memset(&command, 0, sizeof(command));
-      command.opcode = UMS_WRITE12;
-      command.lba = htobe32(static_cast<uint32_t>(block_offset));
-      command.length = htobe32(static_cast<uint32_t>(blocks));
+      scsi::Write12CDB command = {};
+      command.opcode = scsi::Opcode::WRITE_12;
+      command.logical_block_address = htobe32(static_cast<uint32_t>(block_offset));
+      command.transfer_length = htobe32(static_cast<uint32_t>(blocks));
       SendCbw(params.lun, static_cast<uint32_t>(length), USB_DIR_OUT, sizeof(command), &command);
     }
 
@@ -720,26 +709,26 @@ zx_status_t UsbMassStorageDevice::AddBlockDevice(fbl::RefPtr<UmsBlockDevice> dev
   BlockDeviceParameters params = dev->GetBlockDeviceParameters();
   uint8_t lun = params.lun;
 
-  scsi_read_capacity_10_t data;
+  scsi::ReadCapacity10ParameterData data;
   zx_status_t status = ReadCapacity(lun, &data);
   if (status < 0) {
     zxlogf(ERROR, "read_capacity10 failed: %d", status);
     return status;
   }
 
-  params.total_blocks = betoh32(data.lba);
-  params.block_size = betoh32(data.block_length);
+  params.total_blocks = betoh32(data.returned_logical_block_address);
+  params.block_size = betoh32(data.block_length_in_bytes);
 
   if (params.total_blocks == 0xFFFFFFFF) {
-    scsi_read_capacity_16_t data;
+    scsi::ReadCapacity16ParameterData data;
     status = ReadCapacity(lun, &data);
     if (status < 0) {
       zxlogf(ERROR, "read_capacity16 failed: %d", status);
       return status;
     }
 
-    params.total_blocks = betoh64(data.lba);
-    params.block_size = betoh32(data.block_length);
+    params.total_blocks = betoh64(data.returned_logical_block_address);
+    params.block_size = betoh32(data.block_length_in_bytes);
   }
   if (params.block_size == 0) {
     zxlogf(ERROR, "UMS zero block size");
@@ -751,7 +740,7 @@ zx_status_t UsbMassStorageDevice::AddBlockDevice(fbl::RefPtr<UmsBlockDevice> dev
   params.max_transfer = static_cast<uint32_t>(max_transfer_);
   dev->SetBlockDeviceParameters(params);
   // determine if LUN is read-only
-  scsi_mode_sense_6_data_t ms_data;
+  scsi::ModeSense6ParameterHeader ms_data;
   status = ModeSense(lun, &ms_data);
   if (status != ZX_OK) {
     zxlogf(ERROR, "ModeSense failed: %d", status);
@@ -767,7 +756,7 @@ zx_status_t UsbMassStorageDevice::AddBlockDevice(fbl::RefPtr<UmsBlockDevice> dev
     params.cache_enabled = cache_sense[6] & (1 << 2);
   }
 
-  if (ms_data.device_specific_param & MODE_SENSE_DSP_RO) {
+  if (ms_data.write_protected()) {
     params.flags |= BLOCK_FLAG_READONLY;
   } else {
     params.flags &= ~BLOCK_FLAG_READONLY;
@@ -893,10 +882,9 @@ int UsbMassStorageDevice::WorkerThread(ddk::InitTxn&& init_txn) {
         break;
       case BLOCK_OP_FLUSH:
         if (params.cache_enabled) {
-          scsi_command10_t command;
-          memset(&command, 0, sizeof(command));
-          command.opcode = UMS_SYNCHRONIZE_CACHE;
-          command.misc = 0;
+          scsi::SynchronizeCache10CDB command = {};
+          command.opcode = scsi::Opcode::SYNCHRONIZE_CACHE_10;
+          command.syncnv_immed = 0;
           const auto& params = dev->GetBlockDeviceParameters();
           SendCbw(params.lun, 0, USB_DIR_OUT, sizeof(command), &command);
           uint32_t residue;

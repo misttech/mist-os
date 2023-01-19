@@ -10,6 +10,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fit/defer.h>
+#include <lib/scsi/scsilib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -264,16 +265,16 @@ static void ums_handle_read_capacity10(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_read_capacity10");
 
   usb_request_t* req = ums->data_req;
-  scsi_read_capacity_10_t* data;
+  scsi::ReadCapacity10ParameterData* data;
   usb_request_mmap(req, (void**)&data);
 
   uint64_t lba = BLOCK_COUNT - 1;
   if (lba > UINT32_MAX) {
-    data->lba = htobe32(UINT32_MAX);
+    data->returned_logical_block_address = htobe32(UINT32_MAX);
   } else {
-    data->lba = htobe32(lba);
+    data->returned_logical_block_address = htobe32(lba);
   }
-  data->block_length = htobe32(BLOCK_SIZE);
+  data->block_length_in_bytes = htobe32(BLOCK_SIZE);
 
   req->header.length = sizeof(*data);
   ums_function_queue_data(ums, req);
@@ -283,12 +284,12 @@ static void ums_handle_read_capacity16(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_read_capacity16");
 
   usb_request_t* req = ums->data_req;
-  scsi_read_capacity_16_t* data;
+  scsi::ReadCapacity16ParameterData* data;
   usb_request_mmap(req, (void**)&data);
   memset(data, 0, sizeof(*data));
 
-  data->lba = htobe64(BLOCK_COUNT - 1);
-  data->block_length = htobe32(BLOCK_SIZE);
+  data->returned_logical_block_address = htobe64(BLOCK_COUNT - 1);
+  data->block_length_in_bytes = htobe32(BLOCK_SIZE);
 
   req->header.length = sizeof(*data);
   ums_function_queue_data(ums, req);
@@ -296,14 +297,14 @@ static void ums_handle_read_capacity16(usb_ums_t* ums, ums_cbw_t* cbw) {
 
 static void ums_handle_mode_sense6(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_mode_sense6");
-  scsi_mode_sense_6_command_t command;
+  scsi::ModeSense6CDB command;
   memcpy(&command, cbw->CBWCB, sizeof(command));
   usb_request_t* req = ums->data_req;
-  scsi_mode_sense_6_data_t* data;
+  scsi::ModeSense6ParameterHeader* data;
   usb_request_mmap(req, (void**)&data);
   memset(data, 0, sizeof(*data));
   req->header.length = sizeof(*data);
-  if (command.page == 0x3F && ums->writeback_cache_report) {
+  if (command.page_code == 0x3F && ums->writeback_cache_report) {
     // Special request (cache page)
     // 20 byte response.
     ((unsigned char*)data)[6] = 1 << 2;  // Write Cache enable bit
@@ -315,54 +316,54 @@ static void ums_handle_mode_sense6(usb_ums_t* ums, ums_cbw_t* cbw) {
 static void ums_handle_read10(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_read10");
 
-  scsi_command10_t* command = (scsi_command10_t*)cbw->CBWCB;
-  uint64_t lba = be32toh(command->lba);
-  uint32_t blocks = ((uint32_t)command->length_hi << 8) | (uint32_t)command->length_lo;
+  scsi::Read10CDB* command = reinterpret_cast<scsi::Read10CDB*>(cbw->CBWCB);
+  uint64_t lba = be32toh(command->logical_block_address);
+  uint32_t blocks = be16toh(command->transfer_length);
   ums_start_transfer(ums, DATA_STATE_READ, lba, blocks);
 }
 
 static void ums_handle_read12(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_read12");
 
-  scsi_command12_t* command = (scsi_command12_t*)cbw->CBWCB;
-  uint64_t lba = be32toh(command->lba);
-  uint32_t blocks = be32toh(command->length);
+  scsi::Read12CDB* command = reinterpret_cast<scsi::Read12CDB*>(cbw->CBWCB);
+  uint64_t lba = be32toh(command->logical_block_address);
+  uint32_t blocks = be32toh(command->transfer_length);
   ums_start_transfer(ums, DATA_STATE_READ, lba, blocks);
 }
 
 static void ums_handle_read16(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_read16");
 
-  scsi_command16_t* command = (scsi_command16_t*)cbw->CBWCB;
-  uint64_t lba = be64toh(command->lba);
-  uint32_t blocks = be32toh(command->length);
+  scsi::Read16CDB* command = reinterpret_cast<scsi::Read16CDB*>(cbw->CBWCB);
+  uint64_t lba = be64toh(command->logical_block_address);
+  uint32_t blocks = be32toh(command->transfer_length);
   ums_start_transfer(ums, DATA_STATE_READ, lba, blocks);
 }
 
 static void ums_handle_write10(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_write10");
 
-  scsi_command10_t* command = (scsi_command10_t*)cbw->CBWCB;
-  uint64_t lba = be32toh(command->lba);
-  uint32_t blocks = ((uint32_t)command->length_hi << 8) | (uint32_t)command->length_lo;
+  scsi::Write10CDB* command = reinterpret_cast<scsi::Write10CDB*>(cbw->CBWCB);
+  uint64_t lba = be32toh(command->logical_block_address);
+  uint32_t blocks = be16toh(command->transfer_length);
   ums_start_transfer(ums, DATA_STATE_WRITE, lba, blocks);
 }
 
 static void ums_handle_write12(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_write12");
 
-  scsi_command12_t* command = (scsi_command12_t*)cbw->CBWCB;
-  uint64_t lba = be32toh(command->lba);
-  uint32_t blocks = be32toh(command->length);
+  scsi::Write12CDB* command = reinterpret_cast<scsi::Write12CDB*>(cbw->CBWCB);
+  uint64_t lba = be32toh(command->logical_block_address);
+  uint32_t blocks = be32toh(command->transfer_length);
   ums_start_transfer(ums, DATA_STATE_WRITE, lba, blocks);
 }
 
 static void ums_handle_write16(usb_ums_t* ums, ums_cbw_t* cbw) {
   zxlogf(DEBUG, "ums_handle_write16");
 
-  scsi_command16_t* command = (scsi_command16_t*)cbw->CBWCB;
-  uint64_t lba = be64toh(command->lba);
-  uint32_t blocks = be32toh(command->length);
+  scsi::Write16CDB* command = reinterpret_cast<scsi::Write16CDB*>(cbw->CBWCB);
+  uint64_t lba = be64toh(command->logical_block_address);
+  uint32_t blocks = be32toh(command->transfer_length);
   ums_start_transfer(ums, DATA_STATE_WRITE, lba, blocks);
 }
 
@@ -375,51 +376,51 @@ static void ums_handle_cbw(usb_ums_t* ums, ums_cbw_t* cbw) {
   // reset data length for computing residue
   ums->data_length = 0;
 
-  // all SCSI commands have opcode in the same place, so using scsi_command6_t works here.
-  scsi_command6_t* command = (scsi_command6_t*)cbw->CBWCB;
-  switch (command->opcode) {
-    case UMS_INQUIRY:
+  // all SCSI commands have opcode in the first byte.
+  auto opcode = static_cast<scsi::Opcode>(cbw->CBWCB[0]);
+  switch (opcode) {
+    case scsi::Opcode::INQUIRY:
       ums_handle_inquiry(ums, cbw);
       break;
-    case UMS_TEST_UNIT_READY:
+    case scsi::Opcode::TEST_UNIT_READY:
       ums_handle_test_unit_ready(ums, cbw);
       break;
-    case UMS_REQUEST_SENSE:
+    case scsi::Opcode::REQUEST_SENSE:
       ums_handle_request_sense(ums, cbw);
       break;
-    case UMS_READ_CAPACITY10:
+    case scsi::Opcode::READ_CAPACITY_10:
       ums_handle_read_capacity10(ums, cbw);
       break;
-    case UMS_READ_CAPACITY16:
+    case scsi::Opcode::READ_CAPACITY_16:
       ums_handle_read_capacity16(ums, cbw);
       break;
-    case UMS_MODE_SENSE6:
+    case scsi::Opcode::MODE_SENSE_6:
       ums_handle_mode_sense6(ums, cbw);
       break;
-    case UMS_READ10:
+    case scsi::Opcode::READ_10:
       ums_handle_read10(ums, cbw);
       break;
-    case UMS_READ12:
+    case scsi::Opcode::READ_12:
       ums_handle_read12(ums, cbw);
       break;
-    case UMS_READ16:
+    case scsi::Opcode::READ_16:
       ums_handle_read16(ums, cbw);
       break;
-    case UMS_WRITE10:
+    case scsi::Opcode::WRITE_10:
       ums_handle_write10(ums, cbw);
       break;
-    case UMS_WRITE12:
+    case scsi::Opcode::WRITE_12:
       ums_handle_write12(ums, cbw);
       break;
-    case UMS_WRITE16:
+    case scsi::Opcode::WRITE_16:
       ums_handle_write16(ums, cbw);
       break;
-    case UMS_SYNCHRONIZE_CACHE:
+    case scsi::Opcode::SYNCHRONIZE_CACHE_10:
       // TODO: This is presently untestable.
       // Implement this once we have a means of testing this.
       break;
     default:
-      zxlogf(DEBUG, "ums_handle_cbw: unsupported opcode %d", command->opcode);
+      zxlogf(DEBUG, "ums_handle_cbw: unsupported opcode %02Xh", cbw->CBWCB[0]);
       if (cbw->dCBWDataTransferLength) {
         // queue zero length packet to satisfy data phase
         usb_request_t* req = ums->data_req;

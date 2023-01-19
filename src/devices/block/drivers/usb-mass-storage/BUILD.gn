@@ -27,6 +27,7 @@ fuchsia_driver("usb-mass-storage-driver") {
   sources = [ "usb-mass-storage.cc" ]
   deps = [
     ":block",
+    "//src/devices/block/lib/scsi",
     "//src/devices/lib/driver",
     "//src/devices/usb/lib/usb",
   ]
@@ -48,6 +49,7 @@ source_set("block") {
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.request:fuchsia.hardware.usb.request_banjo_cpp",
+    "//src/devices/block/lib/scsi",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb:ums",
     "//src/lib/ddk",
@@ -68,6 +70,7 @@ test("ums-block") {
     ":block",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
+    "//src/devices/block/lib/scsi",
     "//src/devices/testing/fake-bti",
 
     # TODO(fxb/115052): Migrate from fake_ddk to mock-ddk.
@@ -91,6 +94,7 @@ test("ums") {
     ":block",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
+    "//src/devices/block/lib/scsi",
     "//src/devices/testing/fake-bti",
     "//src/devices/testing/fake_ddk",
     "//src/devices/usb/lib/usb",

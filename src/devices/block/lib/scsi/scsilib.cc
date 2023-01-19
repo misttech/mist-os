@@ -222,7 +222,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       completion_cb(cookie, ZX_OK, op);
       return;
     }
-    Synchronize10CDB cdb = {};
+    SynchronizeCache10CDB cdb = {};
     cdb.opcode = Opcode::SYNCHRONIZE_CACHE_10;
     // Prefer writing to storage medium (instead of nv cache) and return only
     // after completion of operation.
