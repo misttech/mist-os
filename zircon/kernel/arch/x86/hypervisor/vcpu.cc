@@ -915,11 +915,10 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
     }
   });
 
-  zx_status_t status;
+  zx::result<> result = zx::ok();
   do {
     // If the thread was killed or suspended, then we should exit with an error.
-    status = current_thread->CheckKillOrSuspendSignal();
-    if (status != ZX_OK) {
+    if (zx_status_t status = current_thread->CheckKillOrSuspendSignal(); status != ZX_OK) {
       return zx::error(status);
     }
     AutoVmcs vmcs(vmcs_page_.PhysicalAddress());
@@ -940,8 +939,7 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
       return zx::error(ZX_ERR_CANCELED);
     }
 
-    auto result = pre_enter(vmcs);
-    if (result.is_error()) {
+    if (result = pre_enter(vmcs); result.is_error()) {
       return result;
     }
 
@@ -968,7 +966,7 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
     }
 
     GUEST_STATS_INC(vm_entries);
-    status = vmx_enter(&vmx_state_).status_value();
+    result = vmx_enter(&vmx_state_);
     GUEST_STATS_INC(vm_exits);
 
     if (!gBootOptions->x86_disable_spec_mitigations) {
@@ -977,16 +975,16 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
       x86_ras_fill();
     }
 
-    if (status != ZX_OK) {
+    if (result.is_ok()) {
+      vmx_state_.resume = true;
+      result = post_exit(vmcs, packet);
+    } else {
       ktrace_vcpu_exit(VCPU_FAILURE, vmcs.Read(VmcsFieldXX::GUEST_RIP));
       uint64_t error = vmcs.Read(VmcsField32::INSTRUCTION_ERROR);
       dprintf(INFO, "VCPU enter failed: Instruction error %lu\n", error);
-    } else {
-      vmx_state_.resume = true;
-      status = post_exit(vmcs, packet).status_value();
     }
-  } while (status == ZX_OK);
-  return zx::make_result(status == ZX_ERR_NEXT ? ZX_OK : status);
+  } while (result.is_ok());
+  return result.status_value() == ZX_ERR_NEXT ? zx::ok() : result;
 }
 
 zx::result<> Vcpu::ReadState(zx_vcpu_state_t& vcpu_state) {
