@@ -40,7 +40,7 @@ type NodePropertyKey = strict union {
     2: string_value NodePropertyKeyString;
 };
 
-type NodePropertyValue = strict union {
+type NodePropertyValue = flexible union {
     1: int_value NodePropertyValueUint;
     2: string_value NodePropertyValueString;
     3: bool_value NodePropertyValueBool;

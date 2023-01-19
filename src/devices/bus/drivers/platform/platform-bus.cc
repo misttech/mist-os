@@ -113,27 +113,34 @@ device_bind_prop_key_t ConvertFidlPropertyKey(
   }
 }
 
-device_bind_prop_value_t ConvertFidlPropertyValue(
+zx::result<device_bind_prop_value_t> ConvertFidlPropertyValue(
     const fuchsia_driver_framework::NodePropertyValue& value) {
   switch (value.Which()) {
     case fuchsia_driver_framework::NodePropertyValue::Tag::kIntValue:
-      return device_bind_prop_int_val(value.int_value().value());
+      return zx::ok(device_bind_prop_int_val(value.int_value().value()));
     case fuchsia_driver_framework::NodePropertyValue::Tag::kStringValue:
-      return device_bind_prop_str_val(value.string_value().value().c_str());
+      return zx::ok(device_bind_prop_str_val(value.string_value().value().c_str()));
     case fuchsia_driver_framework::NodePropertyValue::Tag::kBoolValue:
-      return device_bind_prop_bool_val(value.bool_value().value());
+      return zx::ok(device_bind_prop_bool_val(value.bool_value().value()));
     case fuchsia_driver_framework::NodePropertyValue::Tag::kEnumValue:
-      return device_bind_prop_enum_val(value.enum_value().value().c_str());
+      return zx::ok(device_bind_prop_enum_val(value.enum_value().value().c_str()));
+    default:
+      return zx::error(ZX_ERR_INVALID_ARGS);
   }
 }
 
-ddk::NodeGroupBindRule ConvertFidlBindRule(const fuchsia_driver_framework::BindRule& fidl_rule) {
+zx::result<ddk::NodeGroupBindRule> ConvertFidlBindRule(
+    const fuchsia_driver_framework::BindRule& fidl_rule) {
   auto key = ConvertFidlPropertyKey(fidl_rule.key());
 
   std::vector<device_bind_prop_value_t> values;
   values.reserve(fidl_rule.values().size());
   for (const auto& fidl_value : fidl_rule.values()) {
-    values.push_back(ConvertFidlPropertyValue(fidl_value));
+    auto property_value = ConvertFidlPropertyValue(fidl_value);
+    if (property_value.is_error()) {
+      return property_value.take_error();
+    }
+    values.push_back(property_value.value());
   }
 
   device_bind_rule_condition condition;
@@ -146,7 +153,7 @@ ddk::NodeGroupBindRule ConvertFidlBindRule(const fuchsia_driver_framework::BindR
       break;
   }
 
-  return ddk::NodeGroupBindRule(key, condition, values);
+  return zx::ok(ddk::NodeGroupBindRule(key, condition, values));
 }
 
 }  // anonymous namespace
@@ -676,7 +683,12 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
     std::vector<ddk::NodeGroupBindRule> rules;
     rules.reserve(node.bind_rules().size());
     for (const auto& bind_rule : node.bind_rules()) {
-      rules.push_back(ConvertFidlBindRule(bind_rule));
+      auto result = ConvertFidlBindRule(bind_rule);
+      if (result.is_error()) {
+        completer.buffer(arena).ReplyError(result.status_value());
+        return;
+      }
+      rules.push_back(result.value());
     }
 
     std::vector<device_bind_prop_t> properties;
@@ -688,9 +700,16 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
         return;
       }
 
+      auto property_value = ConvertFidlPropertyValue(property.value().value());
+      if (property_value.is_error()) {
+        zxlogf(ERROR, "Invalid property value");
+        completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+        return;
+      }
+
       properties.push_back(device_bind_prop_t{
           .key = ConvertFidlPropertyKey(property.key().value()),
-          .value = ConvertFidlPropertyValue(property.value().value()),
+          .value = property_value.value(),
       });
     }
     node_group_desc.AddNodeRepresentation(rules, properties);

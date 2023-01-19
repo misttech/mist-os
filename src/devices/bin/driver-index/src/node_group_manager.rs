@@ -274,7 +274,7 @@ fn convert_fidl_to_bind_rules(
                 if std::mem::discriminant(first_val) != std::mem::discriminant(val) {
                     return Err(Status::INVALID_ARGS.into_raw());
                 }
-                Ok(node_property_to_symbol(val))
+                Ok(node_property_to_symbol(val)?)
             })
             .collect::<Result<Vec<Symbol>, zx_status_t>>()?;
 
@@ -332,14 +332,17 @@ fn match_node(
     true
 }
 
-fn node_property_to_symbol(value: &fdf::NodePropertyValue) -> Symbol {
+fn node_property_to_symbol(value: &fdf::NodePropertyValue) -> Result<Symbol, zx_status_t> {
     match value {
         fdf::NodePropertyValue::IntValue(i) => {
-            bind::compiler::Symbol::NumberValue(i.clone().into())
+            Ok(bind::compiler::Symbol::NumberValue(i.clone().into()))
         }
-        fdf::NodePropertyValue::StringValue(s) => bind::compiler::Symbol::StringValue(s.clone()),
-        fdf::NodePropertyValue::EnumValue(s) => bind::compiler::Symbol::EnumValue(s.clone()),
-        fdf::NodePropertyValue::BoolValue(b) => bind::compiler::Symbol::BoolValue(b.clone()),
+        fdf::NodePropertyValue::StringValue(s) => {
+            Ok(bind::compiler::Symbol::StringValue(s.clone()))
+        }
+        fdf::NodePropertyValue::EnumValue(s) => Ok(bind::compiler::Symbol::EnumValue(s.clone())),
+        fdf::NodePropertyValue::BoolValue(b) => Ok(bind::compiler::Symbol::BoolValue(b.clone())),
+        _ => Err(Status::INVALID_ARGS.into_raw()),
     }
 }
 

@@ -34,6 +34,7 @@ pub fn node_property_value_to_string(value: &fdf::NodePropertyValue) -> String {
         fdf::NodePropertyValue::EnumValue(enum_val) => {
             format!("Enum({})", enum_val)
         }
+        _ => "Unknown value".to_string(),
     }
 }
 

@@ -34,6 +34,9 @@ pub fn node_to_device_property(
             fdf::NodePropertyValue::StringValue(s) => Symbol::StringValue(s.clone()),
             fdf::NodePropertyValue::EnumValue(s) => Symbol::EnumValue(s.clone()),
             fdf::NodePropertyValue::BoolValue(b) => Symbol::BoolValue(b.clone()),
+            _ => {
+                return Err(Status::INVALID_ARGS.into_raw());
+            }
         };
 
         // TODO(fxb/93937): Platform bus devices may contain two different BIND_PROTOCOL values.
