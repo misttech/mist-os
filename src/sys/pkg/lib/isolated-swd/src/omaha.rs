@@ -4,7 +4,6 @@
 
 // TODO(fxbug.dev/51770): move everything except installer and policy into a shared crate,
 // because these modules all come from //src/sys/pkg/bin/omaha-client.
-mod install_plan;
 mod installer;
 mod policy;
 mod timer;

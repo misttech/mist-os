@@ -3,3 +3,4 @@
 // found in the LICENSE file.
 
 pub mod http_request;
+pub mod install_plan;

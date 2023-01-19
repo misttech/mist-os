@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::install_plan::FuchsiaInstallPlan;
 use futures::future::BoxFuture;
 use futures::prelude::*;
 use omaha_client::{
@@ -11,6 +10,7 @@ use omaha_client::{
     request_builder::RequestParams,
     time::TimeSource,
 };
+use omaha_client_fuchsia::install_plan::FuchsiaInstallPlan;
 
 /// The Policy implementation for isolated SWD.
 pub struct IsolatedPolicy;
@@ -150,9 +150,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use fuchsia_url::PinnedAbsolutePackageUrl;
-    use omaha_client::{protocol::request::InstallSource, time::MockTimeSource};
+    use {
+        super::*,
+        omaha_client::{protocol::request::InstallSource, time::MockTimeSource},
+        omaha_client_fuchsia::install_plan::UpdatePackageUrl,
+    };
 
     #[test]
     fn test_compute_next_update_time() {
@@ -211,8 +213,9 @@ mod tests {
     fn test_update_can_start() {
         const TEST_URL: &str = "fuchsia-pkg://fuchsia.com/update/0?hash=0000000000000000000000000000000000000000000000000000000000000000";
         let install_plan = FuchsiaInstallPlan {
-            url: PinnedAbsolutePackageUrl::parse(TEST_URL).unwrap(),
+            update_package_urls: vec![UpdatePackageUrl::System(TEST_URL.parse().unwrap())],
             install_source: InstallSource::ScheduledTask,
+            ..FuchsiaInstallPlan::default()
         };
 
         let result = IsolatedPolicy::update_can_start(&(), &install_plan);

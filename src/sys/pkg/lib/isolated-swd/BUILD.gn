@@ -50,7 +50,6 @@ rustc_library("isolated-swd") {
     "src/cache.rs",
     "src/lib.rs",
     "src/omaha.rs",
-    "src/omaha/install_plan.rs",
     "src/omaha/installer.rs",
     "src/omaha/policy.rs",
     "src/omaha/timer.rs",

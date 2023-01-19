@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    // TODO(fxbug.dev/51770): FuchsiaInstallPlan should be shared with omaha-client.
-    super::install_plan::FuchsiaInstallPlan,
     crate::updater::Updater,
     anyhow::anyhow,
     fuchsia_url::PinnedAbsolutePackageUrl,
@@ -16,6 +14,7 @@ use {
         protocol::response::{OmahaStatus, Response},
         request_builder::RequestParams,
     },
+    omaha_client_fuchsia::install_plan::{FuchsiaInstallPlan, UpdatePackageUrl},
     thiserror::Error,
     tracing::warn,
 };
@@ -44,16 +43,29 @@ impl Installer for IsolatedInstaller {
 
     fn perform_install<'a>(
         &'a mut self,
-        install_plan: &FuchsiaInstallPlan,
+        install_plan: &'a FuchsiaInstallPlan,
         observer: Option<&'a dyn ProgressObserver>,
     ) -> LocalBoxFuture<'_, (Self::InstallResult, Vec<AppInstallResult<Self::Error>>)> {
         if let Some(o) = observer.as_ref() {
             o.receive_progress(None, 0., None, None);
         }
 
-        let url = install_plan.url.clone();
-
         async move {
+            if install_plan.update_package_urls.len() != 1 {
+                return Err(IsolatedInstallError::InstallPlan(anyhow!(
+                    "malformatted update_package_urls: expected 1, received {:?}",
+                    install_plan.update_package_urls.len()
+                )));
+            }
+
+            let url = match &install_plan.update_package_urls[0] {
+                UpdatePackageUrl::System(url) => url.clone(),
+                UpdatePackageUrl::Package(_) => {
+                    return Err(IsolatedInstallError::InstallPlan(anyhow!(
+                        "malformatted update_package_urls: expected System but received Package"
+                    )))
+                }
+            };
             let () = self
                 .updater
                 .install_update(Some(&url.clone().into()))
@@ -156,7 +168,11 @@ fn try_create_install_plan(
     let full_url = url.to_owned() + &package.name;
 
     match PinnedAbsolutePackageUrl::parse(&full_url) {
-        Ok(url) => Ok(FuchsiaInstallPlan { url, install_source: request_params.source }),
+        Ok(url) => Ok(FuchsiaInstallPlan {
+            update_package_urls: vec![UpdatePackageUrl::System(url)],
+            install_source: request_params.source,
+            ..FuchsiaInstallPlan::default()
+        }),
         Err(err) => Err(IsolatedInstallError::InstallPlan(anyhow!(
             "Failed to parse {} to PinnedAbsolutePackageUrl: {:#}",
             full_url,
@@ -176,6 +192,7 @@ mod tests {
     const TEST_URL_BASE: &str = "fuchsia-pkg://fuchsia.com/";
     const TEST_PACKAGE_NAME: &str =
         "update/0?hash=0000000000000000000000000000000000000000000000000000000000000000";
+    const TEST_URL: &str = "fuchsia-pkg://fuchsia.com/update/0?hash=0000000000000000000000000000000000000000000000000000000000000000";
 
     #[test]
     fn test_simple_response() {
@@ -196,7 +213,10 @@ mod tests {
         };
 
         let install_plan = try_create_install_plan(&request_params, &response).unwrap();
-        assert_eq!(install_plan.url.to_string(), TEST_URL_BASE.to_string() + TEST_PACKAGE_NAME);
+        assert_eq!(
+            install_plan.update_package_urls,
+            vec![UpdatePackageUrl::System(TEST_URL.parse().unwrap())],
+        );
         assert_eq!(install_plan.install_source, request_params.source);
     }
 
@@ -230,7 +250,10 @@ mod tests {
         };
 
         let install_plan = try_create_install_plan(&request_params, &response).unwrap();
-        assert_eq!(install_plan.url.to_string(), TEST_URL_BASE.to_string() + TEST_PACKAGE_NAME);
+        assert_eq!(
+            install_plan.update_package_urls,
+            vec![UpdatePackageUrl::System(TEST_URL.parse().unwrap())],
+        );
         assert_eq!(install_plan.install_source, request_params.source);
     }
 

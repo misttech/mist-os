@@ -96,7 +96,6 @@ rustc_library("lib") {
     "src/feedback_annotation.rs",
     "src/fidl.rs",
     "src/inspect.rs",
-    "src/install_plan.rs",
     "src/installer.rs",
     "src/main.rs",
     "src/metrics.rs",

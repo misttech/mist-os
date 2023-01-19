@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    install_plan::FuchsiaInstallPlan, installer::InstallResult, metrics::CobaltMetricsReporter,
-    timer::FuchsiaTimer,
-};
+use crate::{installer::InstallResult, metrics::CobaltMetricsReporter, timer::FuchsiaTimer};
 use anyhow::{anyhow, Context as _, Error};
 use async_utils::hanging_get::client::HangingGetStream;
 use fidl_fuchsia_input_interaction::{NotifierMarker, NotifierProxy, State};
@@ -23,6 +20,7 @@ use omaha_client::{
     time::{ComplexTime, PartialComplexTime, TimeSource, Timer},
     unless::Unless,
 };
+use omaha_client_fuchsia::install_plan;
 use std::{
     convert::{TryFrom, TryInto},
     sync::Arc,
@@ -45,7 +43,7 @@ impl Policy for FuchsiaPolicy {
     type UpdateCheckAllowedPolicyData = FuchsiaUpdateCheckAllowedPolicyData;
     type UpdateCanStartPolicyData = FuchsiaUpdateCanStartPolicyData;
     type RebootPolicyData = FuchsiaRebootPolicyData;
-    type InstallPlan = FuchsiaInstallPlan;
+    type InstallPlan = install_plan::FuchsiaInstallPlan;
 
     fn compute_next_update_time(
         policy_data: &Self::ComputeNextUpdateTimePolicyData,
@@ -357,7 +355,7 @@ where
 {
     type TimeSource = T;
     type InstallResult = InstallResult;
-    type InstallPlan = FuchsiaInstallPlan;
+    type InstallPlan = install_plan::FuchsiaInstallPlan;
 
     fn time_source(&self) -> &Self::TimeSource {
         &self.time_source
@@ -1518,7 +1516,10 @@ mod tests {
     fn test_update_can_start_ok() {
         let policy_data =
             FuchsiaUpdateCanStartPolicyData { commit_status: Some(CommitStatus::Committed) };
-        let result = FuchsiaPolicy::update_can_start(&policy_data, &FuchsiaInstallPlan::new_test());
+        let result = FuchsiaPolicy::update_can_start(
+            &policy_data,
+            &install_plan::FuchsiaInstallPlan::new_test(),
+        );
         assert_eq!(result, UpdateDecision::Ok);
     }
 
@@ -1527,12 +1528,18 @@ mod tests {
     #[test]
     fn test_update_can_start_deferred() {
         let policy_data = FuchsiaUpdateCanStartPolicyData { commit_status: None };
-        let result = FuchsiaPolicy::update_can_start(&policy_data, &FuchsiaInstallPlan::new_test());
+        let result = FuchsiaPolicy::update_can_start(
+            &policy_data,
+            &install_plan::FuchsiaInstallPlan::new_test(),
+        );
         assert_eq!(result, UpdateDecision::DeferredByPolicy);
 
         let policy_data =
             FuchsiaUpdateCanStartPolicyData { commit_status: Some(CommitStatus::Pending) };
-        let result = FuchsiaPolicy::update_can_start(&policy_data, &FuchsiaInstallPlan::new_test());
+        let result = FuchsiaPolicy::update_can_start(
+            &policy_data,
+            &install_plan::FuchsiaInstallPlan::new_test(),
+        );
         assert_eq!(result, UpdateDecision::DeferredByPolicy);
     }
 
