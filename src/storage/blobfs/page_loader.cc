@@ -4,7 +4,8 @@
 
 #include "src/storage/blobfs/page_loader.h"
 
-#include <fuchsia/scheduler/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/owned-vmo-mapper.h>
@@ -91,27 +92,11 @@ ReadRange GetBlockAlignedExtendedRange(const LoaderInfo& info, uint64_t offset, 
 }
 
 void SetDeadlineProfile(const std::vector<zx::unowned_thread>& threads) {
-  zx::channel channel0, channel1;
-  zx_status_t status = zx::channel::create(0u, &channel0, &channel1);
-  if (status != ZX_OK) {
-    FX_LOGS(WARNING) << "Could not create channel pair: " << zx_status_get_string(status);
+  zx::result provider = component::Connect<fuchsia_scheduler::ProfileProvider>();
+  if (provider.is_error()) {
+    FX_PLOGS(WARNING, provider.error_value()) << "Could not connect to scheduler profile provider";
     return;
   }
-
-  // Connect to the scheduler profile provider service.
-  status = fdio_service_connect(
-      (std::string("/svc/") + fuchsia::scheduler::ProfileProvider::Name_).c_str(),
-      channel0.release());
-  if (status != ZX_OK) {
-    FX_LOGS(WARNING) << "Could not connect to scheduler profile provider: "
-                     << zx_status_get_string(status);
-    return;
-  }
-
-  fuchsia::scheduler::ProfileProvider_SyncProxy provider(std::move(channel1));
-
-  zx_status_t fidl_status = ZX_OK;
-  zx::profile profile;
 
   // Deadline profile parameters for the pager thread.
   // Details on the performance analysis to arrive at these numbers can be found in fxbug.dev/56291.
@@ -122,18 +107,22 @@ void SetDeadlineProfile(const std::vector<zx::unowned_thread>& threads) {
   const zx_duration_t deadline = ZX_USEC(2800);
   const zx_duration_t period = deadline;
 
-  status = provider.GetDeadlineProfile(
-      capacity, deadline, period, "/boot/bin/blobfs:blobfs-pager-thread", &fidl_status, &profile);
-
-  if (status != ZX_OK || fidl_status != ZX_OK) {
-    FX_LOGS(WARNING) << "Failed to get deadline profile: " << zx_status_get_string(status) << ", "
-                     << zx_status_get_string(fidl_status);
+  const fidl::WireResult result =
+      fidl::WireCall(provider.value())
+          ->GetDeadlineProfile(capacity, deadline, period, "/boot/bin/blobfs:blobfs-pager-thread");
+  if (!result.ok()) {
+    FX_PLOGS(WARNING, result.status()) << "Failed to get deadline profile";
+    return;
+  }
+  const auto& response = result.value();
+  if (zx_status_t status = response.status; status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "Failed to get deadline profile";
     return;
   }
 
   // Apply to each thread.
   for (const auto& thread : threads) {
-    if (zx_status_t status = thread->set_profile(profile, 0); status != ZX_OK) {
+    if (zx_status_t status = thread->set_profile(response.profile, 0); status != ZX_OK) {
       FX_LOGS(WARNING) << "Failed to set deadline profile: " << zx_status_get_string(status);
     }
   }

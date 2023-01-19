@@ -9,7 +9,8 @@
 #include "src/storage/blobfs/compression/decompressor_sandbox/decompressor_impl.h"
 
 #include <fidl/fuchsia.blobfs.internal/cpp/wire.h>
-#include <fuchsia/scheduler/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
@@ -163,25 +164,13 @@ int WatchFifoWrapper(void* data) {
   return 0;
 }
 
-void SetDeadlineProfile(thrd_t* thread) {
-  zx::channel channel0, channel1;
-  zx_status_t status = zx::channel::create(0u, &channel0, &channel1);
-  if (status != ZX_OK) {
-    FX_LOGS(WARNING) << "[decompressor]: Could not create channel pair: "
-                     << zx_status_get_string(status);
+void SetDeadlineProfile(thrd_t& thread) {
+  zx::result provider = component::Connect<fuchsia_scheduler::ProfileProvider>();
+  if (provider.is_error()) {
+    FX_PLOGS(WARNING, provider.error_value())
+        << "[decompressor]: Could not connect to scheduler profile provider";
     return;
   }
-
-  // Connect to the scheduler profile provider service.
-  status = fdio_service_connect(
-      (std::string("/svc/") + fuchsia::scheduler::ProfileProvider::Name_).c_str(),
-      channel0.release());
-  if (status != ZX_OK) {
-    FX_LOGS(WARNING) << "[decompressor]: Could not connect to scheduler profile provider: "
-                     << zx_status_get_string(status);
-    return;
-  }
-  fuchsia::scheduler::ProfileProvider_SyncProxy profile_provider(std::move(channel1));
 
   // TODO(fxbug.dev/40858): Migrate to the role-based API when available, instead of hard
   // coding parameters.
@@ -189,21 +178,23 @@ void SetDeadlineProfile(thrd_t* thread) {
   const zx_duration_t deadline = ZX_MSEC(2);
   const zx_duration_t period = deadline;
 
-  zx::profile profile;
-  zx_status_t fidl_status = profile_provider.GetDeadlineProfile(
-      capacity, deadline, period, "decompressor-fifo-thread", &status, &profile);
+  const fidl::WireResult result =
+      fidl::WireCall(provider.value())
+          ->GetDeadlineProfile(capacity, deadline, period, "decompressor-fifo-thread");
+  if (!result.ok()) {
+    FX_PLOGS(WARNING, result.status()) << "[decompressor]: Failed to get deadline profile";
+    return;
+  }
+  const auto& response = result.value();
+  if (zx_status_t status = response.status; status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "[decompressor]: Failed to get deadline profile";
+    return;
+  }
 
-  if (status != ZX_OK || fidl_status != ZX_OK) {
-    FX_LOGS(WARNING) << "[decompressor]: Failed to get deadline profile: "
-                     << zx_status_get_string(status) << ", " << zx_status_get_string(fidl_status);
-  } else {
-    auto zx_thread = zx::unowned_thread(thrd_get_zx_handle(*thread));
-    // Set the deadline profile.
-    status = zx_thread->set_profile(profile, 0);
-    if (status != ZX_OK) {
-      FX_LOGS(WARNING) << "[decompressor]: Failed to set deadline profile: "
-                       << zx_status_get_string(status);
-    }
+  auto zx_thread = zx::unowned_thread(thrd_get_zx_handle(thread));
+  // Set the deadline profile.
+  if (zx_status_t status = zx_thread->set_profile(response.profile, 0); status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "[decompressor]: Failed to set deadline profile";
   }
 }
 
@@ -239,7 +230,7 @@ void DecompressorImpl::Create(zx::fifo server_end, zx::vmo compressed_vmo, zx::v
                             "decompressor-fifo-thread") != thrd_success) {
     return callback(ZX_ERR_INTERNAL);
   }
-  SetDeadlineProfile(&handler_thread);
+  SetDeadlineProfile(handler_thread);
 
   thrd_detach(handler_thread);
   return callback(ZX_OK);
