@@ -8,10 +8,15 @@ use {
     anyhow::{anyhow, format_err, Context, Error},
     fidl_fuchsia_identity_account::{AccountManagerMarker, AccountManagerProxy, AccountMetadata},
     fidl_fuchsia_sys2::RealmQueryMarker,
-    fuchsia_component::client::{connect_to_protocol_at_dir_root, connect_to_protocol_at_path},
+    fuchsia_component::client::{
+        connect_to_named_protocol_at_dir_root, connect_to_protocol_at_path,
+    },
 };
 
 const ACCOUNT_MANAGER_MONIKER: &str = "./core/account/account_manager";
+const ACCOUNT_MANAGER_PROTOCOL: &str = "fuchsia.identity.account.AccountManager";
+const PASSWORD_AUTHENTICATOR_MONIKER: &str = "./core/account/password_authenticator";
+const PASSWORD_AUTHENTICATOR_PROTOCOL: &str = "fuchsia.identity.account.DeprecatedAccountManager";
 const REALM_QUERY_PATH: &str = "/svc/fuchsia.sys2.RealmQuery.root";
 
 /// Performs the operation defined by the supplied command line arguments using the supplied
@@ -61,6 +66,7 @@ async fn remove_all(account_manager: &AccountManagerProxy) -> Result<(), Error> 
 /// Connects to a discoverable protocol at the component instance supplied by `moniker`.
 async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMarker>(
     moniker: &str,
+    protocol_name: &str,
 ) -> Result<P::Proxy, Error> {
     let realm_query = connect_to_protocol_at_path::<RealmQueryMarker>(REALM_QUERY_PATH)
         .context("Failed to connect to realm query")?;
@@ -70,19 +76,38 @@ async fn connect_to_exposed_protocol<P: fidl::endpoints::DiscoverableProtocolMar
         .map_err(|e| format_err!("RealmQuery error: {:?}", e))?
         .ok_or(format_err!("{} could not be resolved", moniker))?;
     let exposed_dir = resolved_dirs.exposed_dir.into_proxy()?;
-    connect_to_protocol_at_dir_root::<P>(&exposed_dir)
+    connect_to_named_protocol_at_dir_root::<P>(&exposed_dir, protocol_name)
+}
+
+/// Connects to the account manager protocol at the first available location.
+async fn connect_to_account_manager() -> Result<AccountManagerProxy, Error> {
+    // Connect to the new account system implementation if possible.
+    if let Ok(account_manager) = connect_to_exposed_protocol::<AccountManagerMarker>(
+        ACCOUNT_MANAGER_MONIKER,
+        ACCOUNT_MANAGER_PROTOCOL,
+    )
+    .await
+    {
+        println!("Connected to AccountManager protocol supplied by AccountManager");
+        return Ok(account_manager);
+    }
+
+    // If not then fallback to the deprecated password authenticator implementation.
+    let account_manager = connect_to_exposed_protocol::<AccountManagerMarker>(
+        PASSWORD_AUTHENTICATOR_MONIKER,
+        PASSWORD_AUTHENTICATOR_PROTOCOL,
+    )
+    .await
+    .context("Failed to connect to AccountManager")?;
+    println!("Connected to AccountManager protocol supplied by PasswordAuthenticator");
+    Ok(account_manager)
 }
 
 #[fuchsia::main(logging_tags = ["identity"])]
 async fn main() -> Result<(), Error> {
     let command: args::Command = argh::from_env();
 
-    println!("Connecting to AccountManager");
-    let account_manager =
-        connect_to_exposed_protocol::<AccountManagerMarker>(ACCOUNT_MANAGER_MONIKER)
-            .await
-            .context("Failed to connect to account manager")?;
-
+    let account_manager = connect_to_account_manager().await?;
     perform_command(command, &account_manager).await
 }
 
