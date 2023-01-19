@@ -63,7 +63,7 @@ async fn main() {
     let blobfs = blobfs_ramdisk::BlobfsRamdisk::start().await.expect("start blobfs");
     let () = system_image.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
 
-    let () = this_pkg.write_to_blobfs_dir(&blobfs.root_dir().unwrap());
+    let () = this_pkg.write_to_blobfs_dir_ignore_subpackages(&blobfs.root_dir().unwrap());
 
     // Use VFS because ServiceFs does not support OPEN_RIGHT_EXECUTABLE, but /blob needs it.
     let system_image_hash = *system_image.meta_far_merkle_root();

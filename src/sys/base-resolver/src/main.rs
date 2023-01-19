@@ -64,6 +64,9 @@ enum ResolverError {
     #[error("serve package directory")]
     ServePackageDirectory(#[source] package_directory::Error),
 
+    #[error("create package directory")]
+    CreatePackageDirectory(#[source] package_directory::Error),
+
     #[error("failed to read the resolution context")]
     ReadingContext(#[source] anyhow::Error),
 
@@ -90,6 +93,9 @@ enum ResolverError {
 
     #[error("the package URL was not found in the base package index")]
     PackageNotInBase(fuchsia_url::AbsolutePackageUrl),
+
+    #[error("failed to read the superpackage's subpackage manifest")]
+    ReadingSubpackageManifest(#[from] package_directory::SubpackagesError),
 }
 
 impl From<&ResolverError> for fresolution::ResolverError {
@@ -107,6 +113,8 @@ impl From<&ResolverError> for fresolution::ResolverError {
             ReadManifest(_)
             | CreateEndpoints(_)
             | ServePackageDirectory(_)
+            | CreatePackageDirectory(_)
+            | ReadingSubpackageManifest(_)
             | ConvertProxyToClient => ferror::Io,
             CreatingContext(_) | ReadingContext(_) | RelativeUrlMissingContext(_) => {
                 ferror::Internal
@@ -145,7 +153,9 @@ impl From<&ResolverError> for fpkg::ResolveError {
             ReadManifest(_)
             | CreateEndpoints(_)
             | ServePackageDirectory(_)
-            | ConvertProxyToClient => ferror::Io,
+            | CreatePackageDirectory(_)
+            | ConvertProxyToClient
+            | ReadingSubpackageManifest(_) => ferror::Io,
             PackageNotFound(_)
             | PackageNotInBase(_)
             | SubpackageNotFound(_)

@@ -251,29 +251,29 @@ impl Package {
     }
 
     /// Writes the meta.far and all content blobs to blobfs.
-    pub fn write_to_blobfs_dir(&self, dir: &openat::Dir) {
-        fn write_blob(
-            dir: &openat::Dir,
-            merkle: &fuchsia_merkle::Hash,
-            mut source: impl std::io::Read,
-        ) {
-            let mut bytes = vec![];
-            source.read_to_end(&mut bytes).unwrap();
-            let mut file = match dir.write_file(merkle.to_string(), 0o777) {
-                Ok(file) => file,
-                Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
-                    // blobfs already aware of this blob (e.g. blob is written or write is in-flight)
-                    return;
-                }
-                Err(e) => Err(e).unwrap(),
-            };
-            file.set_len(bytes.len().try_into().unwrap()).unwrap();
-            file.write_all(&bytes).unwrap();
+    /// Does not write the subpackage blobs, if any.
+    pub fn write_to_blobfs_dir_ignore_subpackages(&self, dir: &openat::Dir) {
+        fn read_file(file: &std::fs::File) -> Vec<u8> {
+            let mut ret = vec![];
+            std::io::BufReader::new(file).read_to_end(&mut ret).unwrap();
+            ret
         }
 
-        write_blob(dir, self.meta_far_merkle_root(), self.meta_far().unwrap());
+        write_blob(dir, self.meta_far_merkle_root(), &read_file(&self.meta_far().unwrap()));
         for blob in self.content_blob_files() {
-            write_blob(dir, &blob.merkle, blob.file);
+            write_blob(dir, &blob.merkle, &read_file(&blob.file));
+        }
+    }
+
+    /// Writes the meta.far and all content and subpackage blobs to blobfs.
+    pub fn write_to_blobfs_dir(&self, dir: &openat::Dir) {
+        let subpackage_blobs = self
+            .subpackage_blobs
+            .as_ref()
+            .expect("package must know the subpackage blobs to write them");
+        let () = self.write_to_blobfs_dir_ignore_subpackages(dir);
+        for (hash, content) in subpackage_blobs {
+            write_blob(dir, hash, content);
         }
     }
 
@@ -324,6 +324,19 @@ impl Package {
     pub fn subpackage_blobs(&self) -> Option<&HashMap<Hash, Vec<u8>>> {
         self.subpackage_blobs.as_ref()
     }
+}
+
+fn write_blob(dir: &openat::Dir, merkle: &fuchsia_merkle::Hash, content: &[u8]) {
+    let mut file = match dir.write_file(merkle.to_string(), 0o777) {
+        Ok(file) => file,
+        Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
+            // blob is being written or already written
+            return;
+        }
+        Err(e) => Err(e).unwrap(),
+    };
+    file.set_len(content.len().try_into().unwrap()).unwrap();
+    file.write_all(content).unwrap();
 }
 
 async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, VerificationError> {

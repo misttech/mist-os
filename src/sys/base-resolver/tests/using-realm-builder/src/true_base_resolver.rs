@@ -141,18 +141,34 @@ struct TestEnv {
 }
 
 impl TestEnv {
+    fn package_resolver(&self) -> fpkg::PackageResolverProxy {
+        self.realm_instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<fpkg::PackageResolverMarker>()
+            .unwrap()
+    }
+
     async fn resolve_package(
         &self,
         url: &str,
     ) -> Result<(fio::DirectoryProxy, fpkg::ResolutionContext), fpkg::ResolveError> {
-        let package_resolver = self
-            .realm_instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fpkg::PackageResolverMarker>()
-            .unwrap();
         let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
-        let context = package_resolver.resolve(url, package_server_end).await.unwrap()?;
+        let context = self.package_resolver().resolve(url, package_server_end).await.unwrap()?;
         Ok((package, context))
+    }
+
+    async fn resolve_with_context_package(
+        &self,
+        url: &str,
+        mut in_context: fpkg::ResolutionContext,
+    ) -> Result<(fio::DirectoryProxy, fpkg::ResolutionContext), fpkg::ResolveError> {
+        let (package, package_server_end) = fidl::endpoints::create_proxy().unwrap();
+        let out_context = self
+            .package_resolver()
+            .resolve_with_context(url, &mut in_context, package_server_end)
+            .await
+            .unwrap()?;
+        Ok((package, out_context))
     }
 }
 
@@ -193,10 +209,9 @@ async fn resolve_static_package() {
         fuchsia_pkg_testing::PackageBuilder::new("a-base-package").build().await.unwrap();
     let env = TestEnvBuilder::new().static_packages(&[&base_pkg]).await.build().await;
 
-    let (resolved, context) =
+    let (resolved, _) =
         env.resolve_package("fuchsia-pkg://fuchsia.com/a-base-package/0").await.unwrap();
 
-    assert_eq!(context, fpkg::ResolutionContext { bytes: vec![] });
     let () = base_pkg.verify_contents(&resolved).await.unwrap();
 }
 
@@ -215,4 +230,48 @@ async fn resolve_system_image() {
             .into_path(),
         system_image::SystemImage::package_path()
     );
+}
+
+#[fuchsia::test]
+async fn resolve_with_context_absolute_url_package() {
+    let base_pkg =
+        fuchsia_pkg_testing::PackageBuilder::new("a-base-package").build().await.unwrap();
+    let env = TestEnvBuilder::new().static_packages(&[&base_pkg]).await.build().await;
+
+    let (resolved, _) = env
+        .resolve_with_context_package(
+            "fuchsia-pkg://fuchsia.com/a-base-package/0",
+            fpkg::ResolutionContext { bytes: vec![] },
+        )
+        .await
+        .unwrap();
+
+    let () = base_pkg.verify_contents(&resolved).await.unwrap();
+}
+
+#[fuchsia::test]
+async fn resolve_with_context_relative_url_package() {
+    let sub_sub_pkg =
+        fuchsia_pkg_testing::PackageBuilder::new("sub-sub-package").build().await.unwrap();
+    let sub_pkg = fuchsia_pkg_testing::PackageBuilder::new("sub-package")
+        .add_subpackage("sub-sub-package-url", &sub_sub_pkg)
+        .build()
+        .await
+        .unwrap();
+    let super_pkg = fuchsia_pkg_testing::PackageBuilder::new("super-package")
+        .add_subpackage("sub-package-url", &sub_pkg)
+        .build()
+        .await
+        .unwrap();
+    let env = TestEnvBuilder::new().static_packages(&[&super_pkg]).await.build().await;
+    let (_, context) =
+        env.resolve_package("fuchsia-pkg://fuchsia.com/super-package/0").await.unwrap();
+
+    let (resolved, context) =
+        env.resolve_with_context_package("sub-package-url", context).await.unwrap();
+    let () = sub_pkg.verify_contents(&resolved).await.unwrap();
+
+    let (resolved, _) =
+        env.resolve_with_context_package("sub-sub-package-url", context).await.unwrap();
+    let () = sub_sub_pkg.verify_contents(&resolved).await.unwrap();
 }
