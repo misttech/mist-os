@@ -5,23 +5,20 @@
 #ifndef SRC_UI_A11Y_LIB_GESTURE_MANAGER_RECOGNIZERS_V2_TWO_FINGER_DRAG_RECOGNIZER_H_
 #define SRC_UI_A11Y_LIB_GESTURE_MANAGER_RECOGNIZERS_V2_TWO_FINGER_DRAG_RECOGNIZER_H_
 
+#include <fuchsia/ui/pointer/augment/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/zx/time.h>
 
-#include "src/ui/a11y/lib/gesture_manager/arena/contest_member.h"
-#include "src/ui/a11y/lib/gesture_manager/arena/recognizer.h"
-#include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/participation_token_interface.h"
+#include "src/ui/a11y/lib/gesture_manager/arena_v2/recognizer_v2.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_util_v2/util.h"
 #include "src/ui/a11y/lib/gesture_manager/recognizers_v2/timing_constants.h"
 
 namespace a11y::recognizers_v2 {
 
-// TwoFingerDragRecognizer class implements logic to recognize and react to one finger drag
+// TwoFingerDragRecognizer class implements logic to recognize and react to two finger drag
 // gestures.
-//
-// Minimal effort is taken towards ignoring 2-finger gestures. For feature parity, while a second
-// finger is down, events will be suppressed. When it is released, the remaining pointer must be the
-// original. This requirement should probably be dropped in the future.
-class TwoFingerDragRecognizer : public GestureRecognizer {
+class TwoFingerDragRecognizer : public GestureRecognizerV2 {
  public:
   // Displacements of less than 1/16 are considered valid for taps, so we want
   // to recognize slightly larger gestures as drags.
@@ -32,12 +29,12 @@ class TwoFingerDragRecognizer : public GestureRecognizer {
   static constexpr float kFingerSeparationThresholdFactor = 6.f / 5;
 
   // Signature for various drag recognizer callback functions.
-  using DragGestureCallback = fit::function<void(GestureContext)>;
+  using DragGestureCallback = fit::function<void(gesture_util_v2::GestureContext)>;
 
   // on_drag_started: Callback invoked at most once when the recognizer has won the arena. Callback
   // only occurs if at least one pointer is on the screen.
   //
-  // on_drag_update: Callback invoked as new MOVE events are handled AFTER the drag gesture is
+  // on_drag_update: Callback invoked as new CHANGE events are handled AFTER the drag gesture is
   // recognized and has won the arena. Callbacks only occur while exactly one pointer is on the
   // screen.
   //
@@ -53,21 +50,22 @@ class TwoFingerDragRecognizer : public GestureRecognizer {
                           zx::duration drag_gesture_delay = kMinDragDuration);
   ~TwoFingerDragRecognizer() override;
 
-  void HandleEvent(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event) override;
+  void HandleEvent(const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event) override;
   void OnWin() override;
   void OnDefeat() override;
-  void OnContestStarted(std::unique_ptr<ContestMember> contest_member) override;
+  void OnContestStarted(std::unique_ptr<ParticipationTokenInterface> token) override;
   std::string DebugName() const override;
 
  private:
-  // Represents state internal to a contest, i.e. contest member, accept delay, and pointer state.
+  // Represents state internal to a contest, i.e. participation token, accept delay, and pointer
+  // state.
   struct Contest;
 
   // Resets gesture_context_ and contest_.
   void ResetRecognizer();
 
-  // Helper function to handle move events (for readability to avoid nested switch statements).
-  void HandleMoveEvent(const fuchsia::ui::input::accessibility::PointerEvent& pointer_event);
+  // Helper function to handle CHANGE events (for readability to avoid nested switch statements).
+  void HandleChangeEvent(const fuchsia::ui::pointer::augment::TouchEventWithLocalHit& event);
 
   // Returns true if the displacement between the gesture's starting and current
   // centroids exceeds kDragDisplacementThreshold.
@@ -86,7 +84,7 @@ class TwoFingerDragRecognizer : public GestureRecognizer {
   // Callback invoked when the drag gesture is completed (as finger is lifted from screen).
   DragGestureCallback on_drag_complete_;
 
-  GestureContext gesture_context_;
+  gesture_util_v2::GestureContext gesture_context_;
 
   // Minimum time a finger can be in contact with the screen to be considered a drag.
   zx::duration drag_gesture_delay_;
