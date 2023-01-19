@@ -108,7 +108,17 @@ func NewContextFromStartupInfo() *Context {
 		panic(err)
 	}
 
-	// TODO(tamird): use "/svc" once it no longer causes crashes.
+	// NB: The leading slash is required, for some reason:
+	//
+	// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/go/src/syscall/zx/fdio/namespace.go;l=45-48;drc=5ca02efa3b88b042c50c4af0292f3b93436f489a
+	//
+	// NB: The trailing slash is required; it is stripped unconditionally:
+	//
+	// https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/go/src/syscall/zx/fdio/namespace.go;l=56;drc=5ca02efa3b88b042c50c4af0292f3b93436f489a
+	//
+	// NB: The trailing period is required because empty paths are invalid:
+	//
+	// https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/directory.fidl;l=197-201;drc=469b24f881dbc73b8adbfdedfd2867c15802d7a7
 	if err := fdio.ServiceConnect("/svc/.", zx.Handle(r.Channel)); err != nil {
 		panic(err)
 	}
