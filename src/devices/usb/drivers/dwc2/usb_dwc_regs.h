@@ -448,6 +448,9 @@ class DAINTMSK : public hwreg::RegisterBase<DAINTMSK, uint32_t> {
 };
 
 // Device endpoint#n control register (see DEPCTL0 below).
+//
+// Because endpoints are numbered 0-15 for IN-type and 16-31 for OUT-type, separate DIEPCTL and
+// DOEPCTL registers are not needed.
 class DEPCTL : public hwreg::RegisterBase<DEPCTL, uint32_t> {
  public:
   DEF_FIELD(10, 0, mps);
@@ -493,7 +496,10 @@ class DEPCTL0 : public hwreg::RegisterBase<DEPCTL0, uint32_t> {
   DEF_BIT(29, setd1pid);
   DEF_BIT(30, epdis);
   DEF_BIT(31, epena);
-  static auto Get(unsigned i) { return hwreg::RegisterAddr<DEPCTL0>(0x900 + 0x20 * i); }
+  static auto Get(unsigned i) {
+    ZX_ASSERT(i == DWC_EP0_IN || i == DWC_EP0_OUT);
+    return hwreg::RegisterAddr<DEPCTL0>(0x900 + 0x20 * i);
+  }
 };
 
 // Device IN endpoint#n interrupt register.
@@ -514,6 +520,9 @@ class DIEPINT : public hwreg::RegisterBase<DIEPINT, uint32_t> {
 };
 
 // Device OUT endpoint#n interrupt register.
+//
+// Because OUT-type endpoints are numbered 16-31, the DOEPINTn registers are found at
+//   0x908 + 0x20 * i
 class DOEPINT : public hwreg::RegisterBase<DOEPINT, uint32_t> {
  public:
   DEF_BIT(0, xfercompl);
@@ -534,6 +543,9 @@ class DOEPINT : public hwreg::RegisterBase<DOEPINT, uint32_t> {
 };
 
 // Device endpoint#n transfer size register (see DEPTSIZ0 below).
+//
+// Because endpoints are numbered 0-15 for IN-type and 16-31 for OUT-type, separate DIEPTSIZ and
+// DOEPTSIZ registers are not needed.
 class DEPTSIZ : public hwreg::RegisterBase<DEPTSIZ, uint32_t> {
  public:
   DEF_FIELD(18, 0, xfersize);
@@ -548,10 +560,16 @@ class DEPTSIZ0 : public hwreg::RegisterBase<DEPTSIZ0, uint32_t> {
   DEF_FIELD(6, 0, xfersize);
   DEF_FIELD(20, 19, pktcnt);
   DEF_FIELD(30, 29, supcnt);
-  static auto Get(unsigned i) { return hwreg::RegisterAddr<DEPTSIZ0>(0x910 + 0x20 * i); }
+  static auto Get(unsigned i) {
+    ZX_ASSERT(i == DWC_EP0_IN || i == DWC_EP0_OUT);
+    return hwreg::RegisterAddr<DEPTSIZ0>(0x910 + 0x20 * i);
+  }
 };
 
 // Device IN endpoint#n DMA address register.
+//
+// Because endpoints are numbered 0-15 for IN-type and 16-31 for OUT-type, separate DIEPDMA and
+// DOEPDMA registers are not needed.
 class DEPDMA : public hwreg::RegisterBase<DEPDMA, uint32_t> {
  public:
   DEF_FIELD(31, 0, addr);
