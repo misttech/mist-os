@@ -28,6 +28,8 @@ pub mod macro_deps {
 #[async_trait(?Send)]
 pub trait Injector {
     async fn daemon_factory(&self) -> Result<DaemonProxy>;
+    /// Attempts to get a handle to the ffx daemon.
+    async fn try_daemon(&self) -> Result<Option<DaemonProxy>>;
     async fn remote_factory(&self) -> Result<RemoteControlProxy>;
     async fn fastboot_factory(&self) -> Result<FastbootProxy>;
     async fn target_factory(&self) -> Result<TargetProxy>;

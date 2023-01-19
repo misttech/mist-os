@@ -129,12 +129,31 @@ impl Injector for Injection {
 
         self.daemon_once
             .get_or_try_init(init_daemon_proxy(
+                DaemonStart::AutoStart,
                 self.hoist.clone(),
                 context,
                 self.daemon_check.clone(),
             ))
             .await
             .map(|proxy| proxy.clone())
+    }
+
+    #[tracing::instrument(level = "info")]
+    async fn try_daemon(&self) -> Result<Option<DaemonProxy>> {
+        let context = ffx_config::global_env_context()
+            .context("Trying to initialize daemon with no global context")?;
+        let result = self
+            .daemon_once
+            .get_or_try_init(init_daemon_proxy(
+                DaemonStart::DoNotAutoStart,
+                self.hoist.clone(),
+                context,
+                self.daemon_check.clone(),
+            ))
+            .await
+            .map(|proxy| proxy.clone())
+            .ok();
+        Ok(result)
     }
 
     #[tracing::instrument(level = "info", skip(self))]
@@ -186,7 +205,14 @@ impl Injector for Injection {
     }
 }
 
+#[derive(PartialEq, Debug, Eq)]
+enum DaemonStart {
+    AutoStart,
+    DoNotAutoStart,
+}
+
 async fn init_daemon_proxy(
+    autostart: DaemonStart,
     hoist: Hoist,
     context: EnvironmentContext,
     version_check: DaemonVersionCheck,
@@ -194,6 +220,12 @@ async fn init_daemon_proxy(
     let ascendd_path = context.load().await?.get_ascendd_path()?;
 
     if cfg!(not(test)) && !is_daemon_running_at_path(&ascendd_path) {
+        if autostart == DaemonStart::DoNotAutoStart {
+            return Err(ffx_error!(
+                "FFX Daemon was told not to autostart and no existing Daemon instance was found"
+            )
+            .into());
+        }
         ffx_daemon::spawn_daemon(&context).await?;
     }
 
@@ -306,6 +338,7 @@ mod test {
         });
 
         let res = init_daemon_proxy(
+            DaemonStart::AutoStart,
             Hoist::new().unwrap(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
@@ -325,6 +358,7 @@ mod test {
         let _listener = UnixListener::bind(sockpath.to_owned()).unwrap();
 
         let res = init_daemon_proxy(
+            DaemonStart::AutoStart,
             Hoist::new().unwrap(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
@@ -432,6 +466,7 @@ mod test {
             test_daemon(local_hoist1.clone(), sockpath1.to_owned(), "testcurrenthash", 0).await;
 
         let proxy = init_daemon_proxy(
+            DaemonStart::AutoStart,
             local_hoist.clone(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
@@ -466,6 +501,7 @@ mod test {
         });
 
         let proxy = init_daemon_proxy(
+            DaemonStart::AutoStart,
             local_hoist.clone(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
@@ -489,6 +525,7 @@ mod test {
             test_daemon(local_hoist1.clone(), sockpath1.to_owned(), "testcurrenthash", 4).await;
 
         let proxy = init_daemon_proxy(
+            DaemonStart::AutoStart,
             local_hoist.clone(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
@@ -512,6 +549,7 @@ mod test {
             test_daemon(local_hoist1.clone(), sockpath1.to_owned(), "testcurrenthash", 6).await;
 
         let err = init_daemon_proxy(
+            DaemonStart::AutoStart,
             local_hoist.clone(),
             test_env.context.clone(),
             DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
