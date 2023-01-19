@@ -37,12 +37,9 @@ impl PolicyProxy {
             delegate.create(MessengerType::Unbound).await.map_err(Error::new)?;
 
         let setting_type = policy_type.setting_type();
-
         let setting_handler_address = service::Address::Handler(setting_type);
-
-        // TODO(fxbug.dev/70948): investigate using scopes to eliminate the handler activity from
-        // the observed messages.
         let policy_handler_signature = receptor.get_signature();
+
         // The policy proxy should intercept responses authored by the
         // setting proxy
         let response_author_filter = filter::Builder::new(
