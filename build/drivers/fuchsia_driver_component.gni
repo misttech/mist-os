@@ -74,7 +74,6 @@ import("//tools/cmc/build/cmc.gni")
 #     Type: file
 #   device_categories (optional)
 #      The device categories this driver is for. (The values must be from FHCP.json)
-#      TODO(fxbug.dev/110360): Verify that the values are from FHCP.json
 #      This is a requirement for certification of the driver.
 #      Type: array of scopes
 #   deps
@@ -149,7 +148,6 @@ template("fuchsia_driver_component") {
         }
 
         if (defined(invoker.device_categories)) {
-          # TODO(fxbug.dev/110360): Verify that the values are from FHCP.json
           path = "${target_gen_dir}/device_categories.json"
           write_file(path, invoker.device_categories, "json")
           args += [
