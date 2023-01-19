@@ -132,10 +132,10 @@ language-specific bindings in the `bazel-bin/` directory:
 bazel-bin/fuchsia-codelab/echo-fidl/_virtual_includes/
 ```
 
-Locate and open the `fidl.h` generated header found in the above directory:
+Locate and open the generated headers found in the above directory:
 
 ```posix-terminal
-find bazel-bin/fuchsia-codelab/echo-fidl/_virtual_includes -name fidl.h
+find bazel-bin/fuchsia-codelab/echo-fidl/_virtual_includes -name *.h
 ```
 
 Explore the contents of these files. Below is a summary of some of the key
@@ -149,23 +149,23 @@ generated interfaces:
   </th>
   </tr>
   <tr>
-  <td><code>EchoPtr</code>
-  </td>
-  <td>
-    Asynchronous client that transforms protocol methods into FIDL request
-    messages sent over the IPC channel.
-  </td>
-  </tr>
-  <tr>
-  <td><code>EchoSyncPtr</code>
-  </td>
-  <td>
-    Synchronous client that transforms protocol methods into FIDL request
-    messages sent over the IPC channel.
-  </td>
-  </tr>
-  <tr>
   <td><code>Echo</code>
+  </td>
+  <td>
+    Represents the FIDL protocol and acts as the main entry point for types and
+    classes that both clients and servers use to interact with that protocol.
+  </td>
+  </tr>
+  <tr>
+  <td><code>EchoString</code>
+  </td>
+  <td>
+    Representation of the FIDL protocol method, used by clients and servers to
+    provide typed requests and responses.
+  </td>
+  </tr>
+  <tr>
+  <td><code>fidl::Server&lt;Echo&gt;</code>
   </td>
   <td>
     Abstract class for a server component to override and handle incoming FIDL
@@ -173,11 +173,21 @@ generated interfaces:
   </td>
   </tr>
   <tr>
-  <td><code>EchoStringCallback</code>
+  <td><code>fidl::internal::NaturalClientImpl&lt;Echo&gt;</code>
   </td>
   <td>
-    Callback to send a return value for each request as a FIDL response
-    message.
+    Asynchronous client that transforms protocol methods into FIDL request
+    messages sent over the IPC channel. Provided when a <code>fidl::Client</code>
+    is created for this protocol.
+  </td>
+  </tr>
+  <tr>
+  <td><code>fidl::internal::NaturalSyncClientImpl&lt;Echo&gt;</code>
+  </td>
+  <td>
+    Synchronous client that transforms protocol methods into FIDL request
+    messages sent over the IPC channel. Provided when a <code>fidl::SyncClient</code>
+    is created for this protocol.
   </td>
   </tr>
 </table>
