@@ -74,6 +74,10 @@
             ],
             from: "self",
         },
+        {
+            protocol: "fuchsia.component.Binder",
+            from: "framework",
+        },
     ],
     config: {
         // Hack for specifying apexes.

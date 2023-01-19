@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, format_err, Context, Error};
-use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
+use fidl::endpoints::{ControlHandle, DiscoverableProtocolMarker, Proxy, RequestStream, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_component_runner as frunner;
@@ -12,14 +12,18 @@ use fidl_fuchsia_process as fprocess;
 use fidl_fuchsia_starnix_developer as fstardev;
 use fidl_fuchsia_starnix_galaxy as fstargalaxy;
 use frunner::ComponentStartInfo;
+use fuchsia_async as fasync;
 use fuchsia_component::client::{self as fclient, connect_to_protocol};
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
-use futures::TryStreamExt;
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use rand::Rng;
 use std::sync::Arc;
 use vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable};
+
+/// The name of the collection that the starnix_kernel is run in.
+const KERNEL_COLLECTION: &str = "kernels";
 
 #[fuchsia::main(logging_tags = ["starnix_manager"])]
 async fn main() -> Result<(), Error> {
@@ -221,10 +225,8 @@ fn generate_kernel_name(name: &str) -> String {
 async fn create_new_kernel(
     kernels_dir: &vfs::directory::immutable::Simple,
     mut component_start_info: frunner::ComponentStartInfo,
-    _controller: ServerEnd<frunner::ComponentControllerMarker>,
+    controller: ServerEnd<frunner::ComponentControllerMarker>,
 ) -> Result<(), Error> {
-    // The name of the collection that the starnix_kernel is run in.
-    const KERNEL_COLLECTION: &str = "kernels";
     // The name of the directory capability that is being offered to the starnix_kernel.
     const KERNEL_DIRECTORY: &str = "kernels";
     // The url of the starnix_kernel component, which is packaged with the starnix_manager.
@@ -296,6 +298,78 @@ async fn create_new_kernel(
         )
         .await?
         .map_err(|e| anyhow::anyhow!("failed to create runner child: {:?}", e))?;
+
+    let kernel_outgoing_dir =
+        open_exposed_directory(&realm, &kernel_name, KERNEL_COLLECTION).await?;
+    let kernel_binder =
+        fclient::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(&kernel_outgoing_dir)?;
+
+    fasync::Task::local(async move {
+        let _ = serve_component_controller(controller, kernel_binder, &kernel_name).await;
+    })
+    .detach();
+
+    Ok(())
+}
+
+async fn open_exposed_directory(
+    realm: &fcomponent::RealmProxy,
+    child_name: &str,
+    collection_name: &str,
+) -> Result<fio::DirectoryProxy, Error> {
+    let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
+    realm
+        .open_exposed_dir(
+            &mut fdecl::ChildRef {
+                name: child_name.into(),
+                collection: Some(collection_name.into()),
+            },
+            server_end,
+        )
+        .await?
+        .map_err(|e| {
+            anyhow!(
+                "failed to bind to child {} in collection {:?}: {:?}",
+                child_name,
+                collection_name,
+                e
+            )
+        })?;
+    Ok(directory_proxy)
+}
+
+async fn serve_component_controller(
+    controller: ServerEnd<frunner::ComponentControllerMarker>,
+    binder: fcomponent::BinderProxy,
+    kernel_name: &str,
+) -> Result<(), Error> {
+    let mut request_stream = controller.into_stream()?;
+    let control_handle = request_stream.control_handle();
+
+    let epitaph = futures::select! {
+        result = binder.on_closed().fuse() => {
+                if let Err(e) = result { e } else { zx::Status::OK }
+        },
+        request = request_stream.next() => {
+          if let Some(Ok(request)) = request {
+            match request {
+              frunner::ComponentControllerRequest::Stop { .. }
+              | frunner::ComponentControllerRequest::Kill { .. } => {
+                let realm = connect_to_protocol::<fcomponent::RealmMarker>()
+                    .expect("Failed to connect to realm.");
+                let _ = realm
+                    .destroy_child(&mut fdecl::ChildRef {
+                        name: kernel_name.to_string(),
+                        collection: Some(KERNEL_COLLECTION.to_string()),
+                    })
+                    .await?;
+              }
+            }
+          }
+          zx::Status::OK
+        }
+    };
+    control_handle.shutdown_with_epitaph(epitaph);
 
     Ok(())
 }

@@ -4,5 +4,19 @@
 {
     program: {
         runner: "starnix",
+        apex_hack: [],
+        features: [ "wayland" ],
+        init: [],
+        init_user: "root:x:0:0",
+        kernel_cmdline: "",
+        mounts: [
+            "/:ext4:data/system.img",
+            "/data:remotefs:data",
+            "/dev:devtmpfs",
+            "/data/tmp:tmpfs",
+            "/dev/pts:devpts",
+        ],
+        name: "starmium",
+        startup_file_path: "",
     },
 }
