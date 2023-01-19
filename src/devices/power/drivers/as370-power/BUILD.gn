@@ -66,7 +66,7 @@ test("as370-power-test-bin") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/lib/as370",
-    "//src/devices/testing/no_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

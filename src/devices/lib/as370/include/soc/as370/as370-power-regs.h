@@ -15,7 +15,6 @@ class BuckRegulatorRegister
  public:
   static constexpr uint32_t kMinVoltage = 762'500;      // in uV
   static constexpr uint32_t kMaxVoltage = 1'550'000;    // in uV
-  static constexpr uint32_t kDefaultVoltage = 900'000;  // in uV
   static constexpr uint32_t kStepSize = 12'500;         // in uV
 
   // Software buck enable, 1 - ON(default)
@@ -25,6 +24,8 @@ class BuckRegulatorRegister
   // Voltage Select - 111111b = 1.55V, 001011b = 0.9V(default), 000000b = 0.7625V
   DEF_FIELD(5, 0, voltage);
   static auto Get() { return hwreg::I2cRegisterAddr<BuckRegulatorRegister>(0x00); }
+
+  uint32_t GetVoltage() const { return (voltage() * kStepSize) + kMinVoltage; }
 };
 
 #endif  // SRC_DEVICES_LIB_AS370_INCLUDE_SOC_AS370_AS370_POWER_REGS_H_

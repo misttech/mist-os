@@ -102,6 +102,18 @@ bool As370Power::Test() {
   return true;
 }
 
+zx_status_t As370BuckRegulator::Init() {
+  auto buck_reg = BuckRegulatorRegister::Get().FromValue(0);
+  if (zx_status_t status = buck_reg.ReadFrom(i2c_); status != ZX_OK) {
+    zxlogf(ERROR, "Reading PMIC reg failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  enabled_ = buck_reg.buck_enable();
+  cur_voltage_ = buck_reg.GetVoltage();
+  return ZX_OK;
+}
+
 zx_status_t As370BuckRegulator::Enable() {
   if (enabled_) {
     return ZX_OK;
@@ -259,37 +271,35 @@ zx_status_t As370Power::InitializePowerDomains(fidl::ClientEnd<fuchsia_hardware_
   for (size_t i = 0; i < kAs370NumPowerDomains; i++) {
     auto& domain_params = kAs370PowerDomainParams[i];
     if (domain_params.type == BUCK) {
-      if (i2c.is_valid()) {
-        power_domains_[i] =
-            std::make_unique<As370BuckRegulator>(domain_params.enabled, std::move(i2c));
-        i2c.reset();
-      } else {
+      if (!i2c.is_valid()) {
         zxlogf(ERROR, "No I2C channels remaining");
         return ZX_ERR_INTERNAL;
       }
+
+      power_domains_[i] = std::make_unique<As370BuckRegulator>(std::move(i2c));
+      i2c.reset();
     } else {
       zxlogf(ERROR, "Invalid power domain type :%d", domain_params.type);
       return ZX_ERR_INTERNAL;
+    }
+
+    if (zx_status_t status = power_domains_[i]->Init(); status != ZX_OK) {
+      return status;
     }
   }
   return ZX_OK;
 }
 
 zx_status_t As370Power::InitializeProtocols(fidl::ClientEnd<fuchsia_hardware_i2c::Device>* i2c) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create I2C endpoints");
-    return endpoints.error_value();
-  }
-
   // Get I2C protocol.
-  zx_status_t status = DdkConnectFragmentFidlProtocol("i2c", std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get FIDL I2C fragment");
-    return status;
+  auto i2c_client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_i2c::Service::Device>("i2c");
+  if (!i2c_client.is_ok()) {
+    zxlogf(ERROR, "Failed to get FIDL I2C fragment: %s",
+           zx_status_get_string(i2c_client.error_value()));
+    return i2c_client.error_value();
   }
 
-  *i2c = std::move(endpoints->client);
+  *i2c = std::move(i2c_client.value());
   return ZX_OK;
 }
 

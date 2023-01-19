@@ -34,6 +34,8 @@ class As370Regulator {
   uint32_t default_voltage() { return default_voltage_; }
   bool enabled() { return enabled_; }
 
+  virtual zx_status_t Init() { return ZX_OK; }
+
   virtual zx_status_t Enable() = 0;
   virtual zx_status_t Disable() = 0;
 
@@ -51,8 +53,10 @@ class As370Regulator {
 
 class As370BuckRegulator : public As370Regulator {
  public:
-  As370BuckRegulator(const uint32_t enabled, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c)
-      : As370Regulator(BuckRegulatorRegister::kDefaultVoltage, enabled), i2c_(std::move(i2c)) {}
+  explicit As370BuckRegulator(fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c)
+      : As370Regulator(0, false), i2c_(std::move(i2c)) {}
+
+  zx_status_t Init() override;
 
   zx_status_t Enable() override;
   zx_status_t Disable() override;

@@ -37,12 +37,17 @@ class As370PowerTest : public As370Power {
 
 TEST(As370PowerTest, InitTest) {
   As370PowerTest dut;
+
+  // Initial read to get the regulator state.
+  dut.mock_i2c.ExpectWrite({0x00}).ExpectReadStop({0x85});
+
   EXPECT_OK(dut.Init());
   dut.Verify();
 }
 
 TEST(As370PowerTest, BuckRegulatorEnableDisable) {
   As370PowerTest dut;
+  dut.mock_i2c.ExpectWrite({0x00}).ExpectReadStop({0x85});
   EXPECT_OK(dut.Init());
 
   // Initial status enabled
@@ -51,15 +56,15 @@ TEST(As370PowerTest, BuckRegulatorEnableDisable) {
   EXPECT_EQ(domain_status, POWER_DOMAIN_STATUS_ENABLED);
 
   // Disable
-  dut.mock_i2c.ExpectWrite({0x00}).ExpectReadStop({0x8B});
-  dut.mock_i2c.ExpectWriteStop({0x00, 0x0B});
+  dut.mock_i2c.ExpectWrite({0x00}).ExpectReadStop({0x85});
+  dut.mock_i2c.ExpectWriteStop({0x00, 0x05});
   EXPECT_OK(dut.PowerImplDisablePowerDomain(kBuckSoC));
   EXPECT_OK(dut.PowerImplGetPowerDomainStatus(kBuckSoC, &domain_status));
   EXPECT_EQ(domain_status, POWER_DOMAIN_STATUS_DISABLED);
 
   // Enable
-  dut.mock_i2c.ExpectWrite({0x00}).ExpectReadStop({0x0B});
-  dut.mock_i2c.ExpectWriteStop({0x00, 0x8B});
+  dut.mock_i2c.ExpectWrite({0x00}).ExpectReadStop({0x05});
+  dut.mock_i2c.ExpectWriteStop({0x00, 0x85});
   EXPECT_OK(dut.PowerImplEnablePowerDomain(kBuckSoC));
   EXPECT_OK(dut.PowerImplGetPowerDomainStatus(kBuckSoC, &domain_status));
   EXPECT_EQ(domain_status, POWER_DOMAIN_STATUS_ENABLED);
@@ -69,6 +74,7 @@ TEST(As370PowerTest, BuckRegulatorEnableDisable) {
 
 TEST(As370PowerTest, BuckRegulatorSetVoltage) {
   As370PowerTest dut;
+  dut.mock_i2c.ExpectWrite({0x00}).ExpectReadStop({0x8B});
   EXPECT_OK(dut.Init());
 
   // Get default voltage
