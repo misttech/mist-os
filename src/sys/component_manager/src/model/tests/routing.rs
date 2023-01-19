@@ -2185,6 +2185,9 @@ async fn use_resolver_from_parent_environment() {
                                 package: None,
                                 // this test only resolves one component_url
                                 resolution_context: None,
+                                abi_revision: Some(
+                                    version_history::LATEST_VERSION.abi_revision.into(),
+                                ),
                                 ..fresolution::Component::EMPTY
                             }))
                             .expect("failed to send resolve response");
@@ -2289,6 +2292,9 @@ async fn use_resolver_from_grandparent_environment() {
                                 package: None,
                                 // this test only resolves one component_url
                                 resolution_context: None,
+                                abi_revision: Some(
+                                    version_history::LATEST_VERSION.abi_revision.into(),
+                                ),
                                 ..fresolution::Component::EMPTY
                             }))
                             .expect("failed to send resolve response");
@@ -2391,6 +2397,9 @@ async fn resolver_is_not_available() {
                                 package: None,
                                 // this test only resolves one component_url
                                 resolution_context: None,
+                                abi_revision: Some(
+                                    version_history::LATEST_VERSION.abi_revision.into(),
+                                ),
                                 ..fresolution::Component::EMPTY
                             }))
                             .expect("failed to send resolve response");
@@ -2496,6 +2505,9 @@ async fn resolver_component_decl_is_validated() {
                                 package: None,
                                 // this test only resolves one component_url
                                 resolution_context: None,
+                                abi_revision: Some(
+                                    version_history::LATEST_VERSION.abi_revision.into(),
+                                ),
                                 ..fresolution::Component::EMPTY
                             }))
                             .expect("failed to send resolve response");

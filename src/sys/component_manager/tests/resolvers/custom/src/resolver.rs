@@ -43,6 +43,7 @@ async fn serve_resolver(mut stream: fresolution::ResolverRequestStream) -> Resul
                         }),
                         // component-manager-test-resolver only resolves test://trigger
                         resolution_context: None,
+                        abi_revision: Some(version_history::LATEST_VERSION.abi_revision.into()),
                         ..fresolution::Component::EMPTY
                     })).with_context(|| format!("failed to send response to resolve request for component URL {}", component_url))?;
                 } else {

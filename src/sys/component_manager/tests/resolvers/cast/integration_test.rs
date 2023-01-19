@@ -111,6 +111,7 @@ fn new_fresolution_component() -> fresolution::Component {
         decl: Some(fmem::Data::Bytes(
             fidl::encoding::persist(&mut fdecl::Component::EMPTY.clone()).unwrap(),
         )),
+        abi_revision: Some(version_history::LATEST_VERSION.abi_revision.into()),
         ..fresolution::Component::EMPTY
     }
 }
