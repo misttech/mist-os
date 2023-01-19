@@ -20,7 +20,7 @@ fn with_tcp_stream(f: impl FnOnce(std::net::TcpStream) -> ()) {
 
     // fdio::create_fd isn't async, so we need a dedicated thread for FIDL dispatch.
     let handle = std::thread::spawn(|| {
-        fasync::LocalExecutor::new().expect("new executor").run_singlethreaded(
+        fasync::LocalExecutor::new().run_singlethreaded(
             server.into_stream().expect("endpoint into stream").for_each(move |request| {
                 futures::future::ready(match request.expect("stream socket request stream") {
                     fposix_socket::StreamSocketRequest::Close { responder } => {

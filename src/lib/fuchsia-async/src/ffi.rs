@@ -108,7 +108,7 @@ pub struct Executor {
 impl Executor {
     fn new(cb_executor: *mut std::ffi::c_void) -> Box<Executor> {
         Box::new(Executor {
-            executor: Mutex::new(fasync::LocalExecutor::new().unwrap()),
+            executor: Mutex::new(fasync::LocalExecutor::new()),
             quit_tx: Mutex::new(None),
             start: fasync::Time::now(),
             cb_executor,

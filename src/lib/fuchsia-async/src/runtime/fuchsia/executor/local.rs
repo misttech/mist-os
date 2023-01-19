@@ -51,8 +51,8 @@ impl fmt::Debug for LocalExecutor {
 impl LocalExecutor {
     /// Create a new single-threaded executor running with actual time.
     #[allow(deprecated)]
-    pub fn new() -> Result<Self, zx::Status> {
-        Self::try_new()
+    pub fn new() -> Self {
+        Self::try_new().unwrap()
     }
 
     /// Deprecated, will be deleted.
@@ -167,7 +167,7 @@ impl TestExecutor {
     /// Deprecated, will be deleted.
     #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
     pub fn try_new() -> Result<Self, zx::Status> {
-        Ok(Self { local: LocalExecutor::new()?, next_packet: None })
+        Ok(Self { local: LocalExecutor::new(), next_packet: None })
     }
 
     /// Create a new single-threaded executor running with fake time.
@@ -650,7 +650,7 @@ mod tests {
 
     #[test]
     fn time_now_real_time() {
-        let _executor = LocalExecutor::new().unwrap();
+        let _executor = LocalExecutor::new();
         let t1 = zx::Time::after(0.seconds());
         let t2 = Time::now().into_zx();
         let t3 = zx::Time::after(0.seconds());
@@ -700,7 +700,7 @@ mod tests {
     #[test]
     fn dedup_wakeups() {
         let run = |n| {
-            let mut executor = LocalExecutor::new().unwrap();
+            let mut executor = LocalExecutor::new();
             executor.run_singlethreaded(multi_wake(n));
             let snapshot = executor.inner.collector.snapshot();
             snapshot.wakeups_notification
@@ -712,7 +712,7 @@ mod tests {
     // such as the zx port queue limit.
     #[test]
     fn many_wakeups() {
-        let mut executor = LocalExecutor::new().unwrap();
+        let mut executor = LocalExecutor::new();
         executor.run_singlethreaded(multi_wake(4096 * 2));
     }
 }

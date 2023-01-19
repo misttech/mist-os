@@ -246,7 +246,7 @@ mod test {
 
     #[test]
     fn shorter_fires_first() {
-        let mut exec = LocalExecutor::new().unwrap();
+        let mut exec = LocalExecutor::new();
         let shorter = Timer::new(Time::after(100.millis()));
         let longer = Timer::new(Time::after(1.second()));
         match exec.run_singlethreaded(future::select(shorter, longer)) {

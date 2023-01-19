@@ -55,7 +55,7 @@ fn validate_handle_array(handles: &[Option<fidl::Handle>; MAX_HANDLES], present:
 }
 
 fn server_runner(mut expected_str: &'static str, server_end: Channel) {
-    fasync::LocalExecutor::new().unwrap().run_singlethreaded(async move {
+    fasync::LocalExecutor::new().run_singlethreaded(async move {
         let mut stream =
             ServerEnd::<OverflowingProtocolMarker>::new(server_end).into_stream().unwrap();
         if let Some(request) = stream.next().await {

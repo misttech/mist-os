@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Context as _,
     fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     futures::prelude::*,
@@ -23,7 +22,7 @@ where
     S: SuiteServer,
 {
     info!("started");
-    let mut executor = fasync::LocalExecutor::new().context("Error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
 
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(move |stream| {

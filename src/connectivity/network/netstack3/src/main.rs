@@ -16,7 +16,7 @@ use bindings::NetstackSeed;
 
 #[fuchsia::main(logging_minimum_severity = "debug")]
 fn main() -> Result<(), anyhow::Error> {
-    let mut executor = fuchsia_async::LocalExecutor::new()?;
+    let mut executor = fuchsia_async::LocalExecutor::new();
 
     let seed = NetstackSeed::default();
     executor.run_singlethreaded(seed.serve())

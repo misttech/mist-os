@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context, Error},
+    anyhow::Error,
     donut_lib::*,
     fidl::endpoints::{create_endpoints, create_proxy},
     fidl_fuchsia_wlan_policy as wlan_policy,
@@ -76,7 +76,7 @@ pub fn get_deprecated_configurator() -> Result<wlan_deprecated::DeprecatedConfig
 fn main() -> Result<(), Error> {
     let opt = opts::Opt::from_args();
 
-    let mut exec = fasync::LocalExecutor::new().context("error creating event loop")?;
+    let mut exec = fasync::LocalExecutor::new();
 
     let fut = async {
         match opt {

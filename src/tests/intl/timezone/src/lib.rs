@@ -72,7 +72,7 @@ impl Drop for ScopedTimezone {
         // This piece of gymnastics is needed because the FIDL call we make
         // here is async, but `drop` implementation must be sync.
         std::thread::spawn(move || {
-            let mut executor = fasync::LocalExecutor::new().unwrap();
+            let mut executor = fasync::LocalExecutor::new();
             executor.run_singlethreaded(async move {
                 info!("restoring timezone: {}", &timezone);
                 let client = intl_client().unwrap();

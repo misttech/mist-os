@@ -47,7 +47,7 @@ pub fn start_wlansoftmac(
     device: DeviceInterface,
     buf_provider: BufferProvider,
 ) -> Result<WlanSoftmacHandle, anyhow::Error> {
-    let mut executor = fasync::LocalExecutor::new().unwrap();
+    let mut executor = fasync::LocalExecutor::new();
     executor.run_singlethreaded(start_wlansoftmac_async(device, buf_provider))
 }
 
@@ -63,7 +63,7 @@ async fn start_wlansoftmac_async(
     let driver_event_sink_clone = driver_event_sink.clone();
     info!("Spawning wlansoftmac main loop thread.");
     let join_handle = std::thread::spawn(move || {
-        let mut executor = fasync::LocalExecutor::new().unwrap();
+        let mut executor = fasync::LocalExecutor::new();
         let future = wlansoftmac_thread(
             device,
             buf_provider,

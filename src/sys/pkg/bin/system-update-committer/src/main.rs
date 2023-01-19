@@ -42,7 +42,7 @@ const MINIMUM_REBOOT_WAIT: Duration = Duration::from_secs(5);
 pub fn main() -> Result<(), Error> {
     info!("starting system-update-committer");
 
-    let mut executor = fasync::LocalExecutor::new().context("error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
     let () = executor.run_singlethreaded(main_inner_async()).map_err(|err| {
         // Use anyhow to print the error chain.
         let err = anyhow!(err);

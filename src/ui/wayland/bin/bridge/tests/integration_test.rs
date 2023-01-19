@@ -51,7 +51,7 @@ mod test {
 
     #[test]
     fn list_registry() -> Result<(), Error> {
-        let mut exec = fasync::LocalExecutor::new()?;
+        let mut exec = fasync::LocalExecutor::new();
 
         // Launch the wayland bridge process & connect to the WaylandDispatcher
         // FIDL service.

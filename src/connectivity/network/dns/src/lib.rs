@@ -26,7 +26,7 @@ pub struct FuchsiaExec(fasync::LocalExecutor);
 impl FuchsiaExec {
     /// Constructs a Fuchsia LocalExecutor.
     pub fn new() -> Result<Self, zx::Status> {
-        fasync::LocalExecutor::new().map(|fexec| Self(fexec))
+        Ok(Self(fasync::LocalExecutor::new()))
     }
 
     /// Gets a mutable reference to the internal `fuchsia_async::LocalExecutor`.

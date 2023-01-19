@@ -71,7 +71,7 @@ fn bench_iterate_concurrent(b: &mut criterion::Bencher, args: IterateArgs) {
     }
 
     // measure how long it takes to read |size| entries from the list
-    let mut executor = fasync::LocalExecutor::new().unwrap();
+    let mut executor = fasync::LocalExecutor::new();
     b.iter(|| {
         let list = list.clone();
         executor.run_singlethreaded(async move {

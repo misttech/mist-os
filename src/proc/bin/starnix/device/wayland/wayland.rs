@@ -87,7 +87,7 @@ pub fn serve_wayland(
 
         // Reuse this thread to read data from the wayland_receiver (i.e., wayland protocol messages
         // from the wayland bridge library, meant for the wayland client).
-        let mut executor = fasync::LocalExecutor::new().map_err(|_| errno!(EINVAL))?;
+        let mut executor = fasync::LocalExecutor::new();
         executor.run_singlethreaded(handle_server_data(kernel, socket, wayland_receiver))?;
 
         Ok(())

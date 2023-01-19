@@ -628,7 +628,7 @@ fn main() -> Result<(), Error> {
 }
 
 fn run_test() -> Result<(), Error> {
-    let mut executor = fasync::LocalExecutor::new().context("Error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(|stream| stream);
     fs.take_and_serve_directory_handle().context("Error serving directory handle")?;

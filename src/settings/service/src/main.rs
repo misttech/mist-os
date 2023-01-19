@@ -43,7 +43,7 @@ lazy_static! {
 }
 
 fn main() -> Result<(), Error> {
-    let executor = fasync::LocalExecutor::new()?;
+    let executor = fasync::LocalExecutor::new();
 
     syslog::init_with_tags(&["setui-service"]).expect("Can't init logger");
     fx_log_info!("Starting setui-service...");

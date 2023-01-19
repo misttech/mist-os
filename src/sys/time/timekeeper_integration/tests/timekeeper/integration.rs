@@ -40,7 +40,7 @@ where
     F: FnOnce(Arc<PushSourcePuppet>, RtcUpdates, MetricEventLoggerQuerierProxy) -> Fut,
     Fut: Future,
 {
-    let mut executor = fasync::LocalExecutor::new().unwrap();
+    let mut executor = fasync::LocalExecutor::new();
     executor.run_singlethreaded(async move {
         let clock_arc = Arc::new(clock);
         let (_timekeeper, push_source_controller, rtc, cobalt, _) = NestedTimekeeper::new(

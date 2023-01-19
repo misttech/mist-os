@@ -402,7 +402,7 @@ mod tests {
 
     #[test]
     fn instrumentation_single_smoke_test() {
-        let mut executor = LocalExecutor::new().unwrap();
+        let mut executor = LocalExecutor::new();
         executor.run_singlethreaded(simple_task_for_snapshot());
         let snapshot = executor.snapshot();
         snapshot_sanity_check(&snapshot, 0);

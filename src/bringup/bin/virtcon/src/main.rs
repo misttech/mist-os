@@ -27,7 +27,7 @@ fn main() -> Result<(), Error> {
     };
 
     let args = {
-        let mut executor = LocalExecutor::new().expect("Failed to create executor");
+        let mut executor = LocalExecutor::new();
         executor.run_singlethreaded(init)?
     };
 
@@ -51,7 +51,7 @@ fn main() -> Result<(), Error> {
     };
 
     let read_only_debuglog = {
-        let mut executor = LocalExecutor::new().expect("Failed to create executor");
+        let mut executor = LocalExecutor::new();
         executor.run_singlethreaded(get_read_only_debuglog)?
     };
 

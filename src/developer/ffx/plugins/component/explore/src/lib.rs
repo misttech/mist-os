@@ -102,7 +102,7 @@ pub async fn explore(
     // Set up a thread for forwarding stdin. Reading from stdin is a blocking operation which
     // will halt the executor if it were to run on the same thread.
     std::thread::spawn(move || {
-        let mut executor = fuchsia_async::LocalExecutor::new()?;
+        let mut executor = fuchsia_async::LocalExecutor::new();
         executor.run_singlethreaded(async move {
             let mut term_in = std::io::stdin().lock();
             let mut buf = [0u8; fio::MAX_BUF as usize];

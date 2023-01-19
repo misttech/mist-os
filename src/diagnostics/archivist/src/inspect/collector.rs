@@ -208,7 +208,7 @@ mod tests {
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
             let done = done1;
-            let mut executor = fasync::LocalExecutor::new().unwrap();
+            let mut executor = fasync::LocalExecutor::new();
 
             executor.run_singlethreaded(async {
                 let extra_data =
@@ -276,7 +276,7 @@ mod tests {
         // Use signalling on a zx::Channel to indicate that the test is done.
         std::thread::spawn(move || {
             let done = done1;
-            let mut executor = fasync::LocalExecutor::new().unwrap();
+            let mut executor = fasync::LocalExecutor::new();
 
             executor.run_singlethreaded(async {
                 let extra_data =

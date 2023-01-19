@@ -138,7 +138,7 @@ impl FullmacMlme {
         let (startup_sender, startup_receiver) = oneshot::channel();
         let mlme_loop_join_handle = std::thread::spawn(move || {
             info!("Starting WLAN MLME main loop");
-            let mut executor = fasync::LocalExecutor::new().unwrap();
+            let mut executor = fasync::LocalExecutor::new();
             let future = Self::main_loop_thread(
                 device,
                 driver_event_sender_clone,
@@ -149,7 +149,7 @@ impl FullmacMlme {
             executor.run_singlethreaded(future);
         });
 
-        let mut executor = fasync::LocalExecutor::new().unwrap();
+        let mut executor = fasync::LocalExecutor::new();
         let startup_result = executor.run_singlethreaded(startup_receiver);
         match startup_result.map_err(|_e| FullmacMlmeError::UnableToGetStartupResult) {
             Ok(Ok(())) => Ok(FullmacMlmeHandle {

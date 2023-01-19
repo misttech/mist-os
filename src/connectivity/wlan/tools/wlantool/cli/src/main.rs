@@ -20,7 +20,7 @@ fn main() -> Result<(), Error> {
     let opt = wlan_dev::opts::Opt::from_args();
     println!("{:?}", opt);
 
-    let mut exec = fasync::LocalExecutor::new().context("error creating event loop")?;
+    let mut exec = fasync::LocalExecutor::new();
     let monitor_proxy = connect_to_protocol::<DeviceMonitorMarker>()
         .context("failed to `connect` to device monitor")?;
 

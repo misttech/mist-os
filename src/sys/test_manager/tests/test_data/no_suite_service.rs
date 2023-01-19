@@ -3,14 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context as _, Error},
-    fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
+    anyhow::Error, fuchsia_async as fasync, fuchsia_component::server::ServiceFs,
     futures::StreamExt,
 };
 
 fn main() -> Result<(), Error> {
-    let mut executor = fasync::LocalExecutor::new().context("error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
     let mut fs = ServiceFs::new_local();
     // don't publish  suite service
     fs.take_and_serve_directory_handle()?;

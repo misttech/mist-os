@@ -93,7 +93,7 @@ fn snapshot_bench(b: &mut criterion::Bencher, size: usize, frequency: usize) {
 /// different sizes and containing lazy nodes. This VMO is being written concurrently at the given
 /// frequency. This is fundamental when reading inspect data in the archivist.
 fn snapshot_tree_bench(b: &mut criterion::Bencher, size: usize, frequency: usize) {
-    let mut executor = fuchsia_async::LocalExecutor::new().unwrap();
+    let mut executor = fuchsia_async::LocalExecutor::new();
 
     let inspector = Inspector::new(InspectorConfig::default().size(size));
     let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
@@ -121,7 +121,7 @@ fn snapshot_tree_bench(b: &mut criterion::Bencher, size: usize, frequency: usize
 /// different sizes and containing lazy nodes.
 /// This is fundamental when reading inspect data in the archivist.
 fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
-    let mut executor = fuchsia_async::LocalExecutor::new().unwrap();
+    let mut executor = fuchsia_async::LocalExecutor::new();
 
     let inspector = Inspector::new(InspectorConfig::default().size(size));
     let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
@@ -144,7 +144,7 @@ fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
 /// This benchmark measures the performance of snapshotting an Inspect VMO backed by a tree server
 /// when the vmo is partially filled to the given bytes.
 fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, filled_size: i64) {
-    let mut executor = fuchsia_async::LocalExecutor::new().unwrap();
+    let mut executor = fuchsia_async::LocalExecutor::new();
 
     let inspector = Inspector::new(InspectorConfig::default().size(size));
     let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();

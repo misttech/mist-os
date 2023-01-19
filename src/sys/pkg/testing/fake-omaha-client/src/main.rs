@@ -105,7 +105,7 @@ fn main_inner(args: FakeOmahaClientArgs) -> Result<(), Box<dyn error::Error>> {
         /*cup_handler=*/ Some(StandardCupv2Handler::new(&omaha_public_keys)),
     );
 
-    let stream: Vec<StateMachineEvent> = fuchsia_async::LocalExecutor::new()?
+    let stream: Vec<StateMachineEvent> = fuchsia_async::LocalExecutor::new()
         .run_singlethreaded(async { state_machine.oneshot_check().await.collect().await });
     let mut result: Vec<Result<update_check::Response, UpdateCheckError>> = stream
         .into_iter()

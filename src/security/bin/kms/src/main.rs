@@ -11,7 +11,7 @@ mod kms_sealing_key;
 
 use crate::key_manager::KeyManager;
 
-use anyhow::{format_err, Context as _, Error};
+use anyhow::{format_err, Error};
 use fidl_fuchsia_kms::{KeyManagerRequestStream, KeyProvider};
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
@@ -26,7 +26,7 @@ const CONFIG_PATH: &str = "/config/data/crypto_provider_config.json";
 
 #[fuchsia::main(logging_tags = ["kms"])]
 fn main() -> Result<(), Error> {
-    let mut executor = fasync::LocalExecutor::new().context("Error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
     let key_manager_ref = Arc::new({
         let mut key_manager = KeyManager::new();
         match get_provider_from_config() {

@@ -799,8 +799,8 @@ fn main() -> Result<(), Error> {
     tracing::info!("workstation installer: started.");
 
     // Before we give control to carnelian, wait until a display driver is bound.
-    let (display_result, interactive_result) =
-        fuchsia_async::LocalExecutor::new().context("Creating executor")?.run_singlethreaded(
+    let (display_result, interactive_result) = fuchsia_async::LocalExecutor::new()
+        .run_singlethreaded(
             async move { futures::join!(wait_for_display(), check_is_interactive()) },
         );
     display_result.context("Waiting for display controller")?;

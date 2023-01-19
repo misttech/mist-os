@@ -20,7 +20,7 @@ fn main() -> Result<(), Error> {
     let _loader = icu_data::Loader::new()?;
     // [END loader_example]
 
-    let mut executor = fasync::LocalExecutor::new().context("error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
     let mut fs = server::ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(move |stream| {
         fasync::Task::local(async move {

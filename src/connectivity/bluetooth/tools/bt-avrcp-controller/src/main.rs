@@ -460,8 +460,7 @@ fn cmd_stream() -> (impl Stream<Item = String>, impl Sink<(), Error = SendError>
     let (ack_sender, mut ack_receiver) = channel(512);
 
     let _ = thread::spawn(move || -> Result<(), Error> {
-        let mut exec =
-            fasync::LocalExecutor::new().context("error creating readline event loop")?;
+        let mut exec = fasync::LocalExecutor::new();
 
         let fut = async {
             let config = Config::builder()

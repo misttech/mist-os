@@ -634,8 +634,7 @@ fn cmd_stream(
     let (ack_sender, mut ack_receiver) = mpsc::channel(0);
 
     let _ = thread::spawn(move || -> Result<(), Error> {
-        let mut exec =
-            fasync::LocalExecutor::new().context("error creating readline event loop")?;
+        let mut exec = fasync::LocalExecutor::new();
 
         let fut = async {
             let config = Config::builder()

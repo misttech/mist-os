@@ -12,7 +12,7 @@
 //!
 //! ```
 //! fn main() -> Result<(), Error> {
-//!     let mut executor = fasync::LocalExecutor::new().unwrap();
+//!     let mut executor = fasync::LocalExecutor::new();
 //!     let actual_main = async {
 //!         // Actual main code
 //!         Ok(())
@@ -26,7 +26,7 @@
 //! ```
 //! #[test]
 //! fn test_foo() -> Result<(), Error> {
-//!     let mut executor = fasync::LocalExecutor::new().unwrap();
+//!     let mut executor = fasync::LocalExecutor::new();
 //!     let test = async {
 //!         // Actual test code here
 //!         Ok(())
@@ -244,9 +244,7 @@ pub fn run_singlethreaded(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
     } else {
         quote! {
-            ::fuchsia_async::LocalExecutor::new()
-                .expect("Failed to create executor")
-                .run_singlethreaded(func())
+            ::fuchsia_async::LocalExecutor::new().run_singlethreaded(func())
         }
     };
     common(item, run_executor.into(), test)

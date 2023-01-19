@@ -79,7 +79,7 @@ pub mod executor {
 
     impl LocalExecutor {
         /// Construct a new executor for running tasks on the current thread.
-        pub fn new() -> Result<Self, Status> {
+        pub fn new() -> Self {
             unimplemented!();
         }
 

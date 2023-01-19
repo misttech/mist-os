@@ -359,13 +359,13 @@ mod test {
 
     #[test]
     fn can_create_client() {
-        let _exec = LocalExecutor::new().unwrap();
+        let _exec = LocalExecutor::new();
         let _client = new_client();
     }
 
     #[test]
     fn can_create_https_client() {
-        let _exec = LocalExecutor::new().unwrap();
+        let _exec = LocalExecutor::new();
         let _client = new_https_client();
     }
 

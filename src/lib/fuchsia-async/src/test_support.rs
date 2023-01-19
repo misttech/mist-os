@@ -67,15 +67,13 @@ impl<E: 'static + std::fmt::Debug> TestResult for Result<(), E> {
         cfg.in_parallel(Arc::new(move || {
             let run_stream = run_stream.clone();
             let test = test.clone();
-            crate::LocalExecutor::new().expect("Failed to create executor").run_singlethreaded(
-                async move {
-                    while let Some(run) = run_stream.lock().await.next().await {
-                        if let Err(e) = test(run).await {
-                            panic!("run {} failed with error {:?}", run, e)
-                        }
+            crate::LocalExecutor::new().run_singlethreaded(async move {
+                while let Some(run) = run_stream.lock().await.next().await {
+                    if let Err(e) = test(run).await {
+                        panic!("run {} failed with error {:?}", run, e)
                     }
-                },
-            )
+                }
+            })
         }));
         Ok(())
     }
@@ -120,13 +118,11 @@ impl TestResult for () {
         cfg.in_parallel(Arc::new(move || {
             let run_stream = run_stream.clone();
             let test = test.clone();
-            crate::LocalExecutor::new().expect("Failed to create executor").run_singlethreaded(
-                async move {
-                    while let Some(run) = run_stream.lock().await.next().await {
-                        test(run).await;
-                    }
-                },
-            )
+            crate::LocalExecutor::new().run_singlethreaded(async move {
+                while let Some(run) = run_stream.lock().await.next().await {
+                    test(run).await;
+                }
+            })
         }));
     }
 

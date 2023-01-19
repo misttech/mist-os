@@ -72,7 +72,7 @@ fn main() -> Result<(), Error> {
     fuchsia_syslog::init_with_tags(&["bt-init"]).expect("Can't init logger");
     info!("starting bt-init...");
 
-    let mut executor = fasync::LocalExecutor::new().context("error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
     let cfg = Config::take_from_startup_handle();
 
     // Start bt-snoop service before anything else and hold onto the connection until bt-init exits.

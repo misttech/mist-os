@@ -35,7 +35,7 @@ fn spawn_wayland_server_service(mut stream: Server_RequestStream, display: Displ
 
 fn main() -> Result<(), Error> {
     trace_provider_create_with_fdio();
-    let mut executor = fasync::LocalExecutor::new()?;
+    let mut executor = fasync::LocalExecutor::new();
     let mut dispatcher = WaylandDispatcher::new()?;
 
     // Try to get display properties before serving.

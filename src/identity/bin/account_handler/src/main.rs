@@ -33,7 +33,7 @@ use {
     crate::{account_handler::AccountHandler, common::AccountLifetime},
     account_common::AccountId,
     account_handler_structured_config::Config,
-    anyhow::{Context as _, Error},
+    anyhow::Error,
     fidl::endpoints::RequestStream,
     fidl_fuchsia_identity_authentication::Mechanism,
     fidl_fuchsia_io as fio,
@@ -147,7 +147,7 @@ fn main() -> Result<(), Error> {
         AccountLifetime::Persistent { account_dir: DATA_DIR.into() }
     };
 
-    let mut executor = fasync::LocalExecutor::new().context("Error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
 
     diagnostics_log::init!(&["identity", "account_handler"]);
     info!("Starting account handler");

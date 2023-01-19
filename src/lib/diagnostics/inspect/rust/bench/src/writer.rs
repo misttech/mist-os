@@ -473,7 +473,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
 /// Benchmark the write-speed of a local inspector after it has been copy-on-write
 /// served over FIDL
 fn bench_write_after_tree_cow_read(mut bench: criterion::Benchmark) -> criterion::Benchmark {
-    let mut executor = fasync::LocalExecutor::new().unwrap();
+    let mut executor = fasync::LocalExecutor::new();
     let inspector = Inspector::default();
 
     let mut properties = vec![];

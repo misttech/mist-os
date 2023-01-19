@@ -108,7 +108,7 @@ fn init_scene(
     // The spawned thread will execute the futures and send results back to this thread via a
     // channel.
     std::thread::spawn(move || -> Result<(), anyhow::Error> {
-        let mut executor = fasync::LocalExecutor::new()?;
+        let mut executor = fasync::LocalExecutor::new();
 
         let mut buffer_allocator = BufferCollectionAllocator::new(
             IMAGE_WIDTH,
@@ -184,7 +184,7 @@ pub fn spawn_view_provider(
     outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
 ) {
     std::thread::spawn(|| {
-        let mut executor = fasync::LocalExecutor::new().expect("Failed to create executor");
+        let mut executor = fasync::LocalExecutor::new();
         executor.run_singlethreaded(async move {
             let mut service_fs = ServiceFs::new_local();
             service_fs.dir("svc").add_fidl_service(ExposedProtocols::ViewProvider);

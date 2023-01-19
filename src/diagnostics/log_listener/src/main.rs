@@ -7,7 +7,7 @@
 //! `log_listener` listens to messages from `fuchsia.logger.Log` and prints them to stdout and/or
 //! writes them to disk.
 
-use anyhow::{format_err, Context as _, Error};
+use anyhow::{format_err, Error};
 use chrono::TimeZone;
 use fuchsia_async as fasync;
 use fuchsia_syslog_listener as syslog_listener;
@@ -1002,7 +1002,7 @@ fn new_listener(local_options: LocalOptions) -> Result<Listener<Box<dyn Write + 
 }
 
 fn run_log_listener(options: Option<&mut LogListenerOptions>) -> Result<(), Error> {
-    let mut executor = fasync::LocalExecutor::new().context("Error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
     let (filter_options, local_options, selectors) = options.map_or_else(
         || (None, LocalOptions::default(), None),
         |o| (Some(&mut o.filter), o.local.clone(), Some(&mut o.selectors)),

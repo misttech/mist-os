@@ -37,7 +37,7 @@ use configuration::{ChannelSource, ClientConfiguration};
 pub fn main() -> Result<(), Error> {
     info!("Starting omaha client...");
 
-    let mut executor = fuchsia_async::LocalExecutor::new().context("Error creating executor")?;
+    let mut executor = fuchsia_async::LocalExecutor::new();
 
     executor.run_singlethreaded(main_inner()).map_err(|err| {
         // Use anyhow to print the error chain.

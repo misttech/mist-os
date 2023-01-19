@@ -126,7 +126,7 @@ fn init_logging_with_threads(
 
     let (send, recv) = std::sync::mpsc::channel();
     let bg_thread = std::thread::spawn(move || {
-        let mut exec = fuchsia_async::LocalExecutor::new().unwrap();
+        let mut exec = fuchsia_async::LocalExecutor::new();
         let on_interest_changes =
             diagnostics_log::init_publishing(diagnostics_log::PublishOptions {
                 tags: tags.as_slice(),
@@ -165,7 +165,7 @@ where
     F: FnOnce() -> Fut,
     Fut: Future<Output = R> + 'static,
 {
-    fuchsia_async::LocalExecutor::new().expect("Failed to create executor").run_singlethreaded(f())
+    fuchsia_async::LocalExecutor::new().run_singlethreaded(f())
 }
 
 /// Run an async main function with a multi threaded executor (containing `num_threads`).

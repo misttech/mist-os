@@ -90,7 +90,7 @@ impl ConnectedProtocol for CobaltConnectedService {
 pub fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
-    let mut executor = fasync::LocalExecutor::new().context("error creating executor")?;
+    let mut executor = fasync::LocalExecutor::new();
     executor.run_singlethreaded(main_inner().map_err(|err| {
         let err = anyhow!(err);
         error!("error running pkg-cache: {:#}", err);

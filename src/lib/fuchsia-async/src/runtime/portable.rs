@@ -188,8 +188,8 @@ pub mod executor {
     impl LocalExecutor {
         /// Create a new executor.
         #[allow(deprecated)]
-        pub fn new() -> Result<Self, zx_status::Status> {
-            Self::try_new()
+        pub fn new() -> Self {
+            Self::try_new().unwrap()
         }
 
         /// Deprecated, will be deleted.

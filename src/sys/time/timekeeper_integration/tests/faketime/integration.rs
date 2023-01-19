@@ -37,7 +37,7 @@ where
     F: FnOnce(Arc<PushSourcePuppet>, MetricEventLoggerQuerierProxy, FakeClockController) -> Fut,
     Fut: Future<Output = ()>,
 {
-    let mut executor = fasync::LocalExecutor::new().expect("Failed to create executor");
+    let mut executor = fasync::LocalExecutor::new();
     executor.run_singlethreaded(async move {
         let clock_arc = Arc::new(clock);
         let (_timekeeper, push_source_controller, _, cobalt, fake_clock) =

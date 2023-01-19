@@ -868,7 +868,7 @@ mod tests {
         TestFn: FnOnce(AccountHandlerControlProxy) -> Fut,
         Fut: Future<Output = TestResult>,
     {
-        let mut executor = fasync::LocalExecutor::new().expect("Failed to create executor");
+        let mut executor = fasync::LocalExecutor::new();
         let (proxy, server_fut) =
             create_account_handler(args.lifetime, args.inspector, args.mechanisms);
 

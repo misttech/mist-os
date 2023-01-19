@@ -211,9 +211,7 @@ fn main_res() -> Result<(), Error> {
         Ok(())
     };
 
-    fasync::LocalExecutor::new()
-        .context("error creating event loop")?
-        .run_singlethreaded(main_future)
+    fasync::LocalExecutor::new().run_singlethreaded(main_future)
 }
 
 fn main() {

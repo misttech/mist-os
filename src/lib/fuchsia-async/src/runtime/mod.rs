@@ -249,7 +249,7 @@ mod task_tests {
     #[test]
     fn can_join_unblock_local() {
         // can we poll a blocked task in a local executor
-        LocalExecutor::new().unwrap().run_singlethreaded(async move {
+        LocalExecutor::new().run_singlethreaded(async move {
             assert_eq!(42, unblock(|| 42u8).await);
         });
     }
@@ -267,7 +267,7 @@ mod task_tests {
     #[test]
     fn can_join_local() {
         // can we spawn, then join a task locally
-        LocalExecutor::new().unwrap().run_singlethreaded(async move {
+        LocalExecutor::new().run_singlethreaded(async move {
             assert_eq!(42, Task::local(async move { 42u8 }).await);
         })
     }
@@ -297,7 +297,7 @@ mod timer_tests {
     #[test]
     fn shorter_fires_first_instant() {
         use std::time::{Duration, Instant};
-        let mut exec = LocalExecutor::new().unwrap();
+        let mut exec = LocalExecutor::new();
         let now = Instant::now();
         let shorter = Timer::new(now + Duration::from_millis(100));
         let longer = Timer::new(now + Duration::from_secs(1));
@@ -310,7 +310,7 @@ mod timer_tests {
     #[cfg(target = "fuchsia")]
     #[test]
     fn can_use_zx_duration() {
-        let mut exec = LocalExecutor::new().unwrap();
+        let mut exec = LocalExecutor::new();
         let start = Instant::now();
         let timer = Timer::new(Duration::from_millis(100));
         exec.run_singlethreaded(timer);
@@ -327,7 +327,7 @@ mod timer_tests {
         assert_eq!(
             {
                 let runs = runs.clone();
-                LocalExecutor::new().unwrap().run_singlethreaded(
+                LocalExecutor::new().run_singlethreaded(
                     async move {
                         let mut sleep = Duration::from_millis(1);
                         loop {

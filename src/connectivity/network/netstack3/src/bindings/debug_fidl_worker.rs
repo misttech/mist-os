@@ -126,8 +126,7 @@ impl DiagnosticsInner {
         let (sender, mut receiver) =
             futures::channel::mpsc::channel::<ServerEnd<fnet_debug::DiagnosticsMarker>>(0);
         let thread = std::thread::spawn(move || {
-            let mut executor =
-                fuchsia_async::LocalExecutor::new().expect("failed to create diagnostics executor");
+            let mut executor = fuchsia_async::LocalExecutor::new();
             let fut = async move {
                 let mut futures = futures::stream::FuturesUnordered::new();
                 loop {

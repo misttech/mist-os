@@ -476,7 +476,7 @@ impl App {
     /// Starts an application based on Carnelian. The `assistant` parameter will
     /// be used to create new views when asked to do so by the Fuchsia view system.
     pub fn run(assistant_creator_func: AssistantCreatorFunc) -> Result<(), Error> {
-        let mut executor = fasync::LocalExecutor::new().context("Error creating executor")?;
+        let mut executor = fasync::LocalExecutor::new();
         let (internal_sender, mut internal_receiver) = unbounded::<MessageInternal>();
         let f = async {
             let app_sender = AppSender { sender: internal_sender.clone() };
@@ -663,7 +663,7 @@ impl App {
     /// first update call, or until a five second timeout. The Result returned is the
     /// result of the test, an Ok(()) result means the test passed.
     pub fn test(assistant_creator_func: AssistantCreatorFunc) -> Result<(), Error> {
-        let mut executor = fasync::LocalExecutor::new().context("Error creating executor")?;
+        let mut executor = fasync::LocalExecutor::new();
         let (internal_sender, mut internal_receiver) = unbounded::<MessageInternal>();
         let f = async {
             let app_sender = AppSender { sender: internal_sender.clone() };

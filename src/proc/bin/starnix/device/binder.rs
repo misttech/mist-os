@@ -6150,7 +6150,7 @@ mod tests {
         server_end: ServerEnd<fbinder::ProcessAccessorMarker>,
     ) -> std::thread::JoinHandle<Result<TestFdTable, anyhow::Error>> {
         std::thread::spawn(move || {
-            let mut executor = LocalExecutor::new()?;
+            let mut executor = LocalExecutor::new();
             executor.run_singlethreaded(async move {
                 let mut stream = fbinder::ProcessAccessorRequestStream::from_channel(
                     fasync::Channel::from_channel(server_end.into_channel())?,

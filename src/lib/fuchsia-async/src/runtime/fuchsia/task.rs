@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn future_destroyed_before_await_returns() {
-        LocalExecutor::new().unwrap().run_singlethreaded(async {
+        LocalExecutor::new().run_singlethreaded(async {
             let (sets_bool_true_on_drop, value) = SetsBoolTrueOnDrop::new();
 
             // Move the switch into a different thread.
