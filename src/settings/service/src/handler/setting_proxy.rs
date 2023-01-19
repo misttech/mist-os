@@ -54,7 +54,6 @@ impl PartialEq for RequestInfo {
 impl RequestInfo {
     /// Sends the supplied result as a reply with the associated [`Client`].
     pub(crate) fn reply(&self, result: SettingHandlerResult) {
-        // TODO(fxbug.dev/70985): return HandlerErrors directly
         // Ignore the receptor result.
         let _ = self
             .client
