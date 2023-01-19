@@ -216,5 +216,9 @@
             protocol: [ "fuchsia.net.http.Loader" ],
             from: "#http-client",
         },
+        {
+            protocol: [ "fuchsia.net.reachability.Monitor" ],
+            from: "#reachability",
+        },
     ],
 }
