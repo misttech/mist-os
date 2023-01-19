@@ -13,6 +13,9 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_TEST_SIM_TRANS_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_TEST_SIM_TRANS_H_
 
+#include <lib/fdf/cpp/dispatcher.h>
+#include <lib/sync/cpp/completion.h>
+
 #include <memory>
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/kernel.h"
@@ -61,8 +64,11 @@ class SimTransport : public SimMvm {
   ::wlan::iwlwifi::WlanPhyImplDevice* sim_device();
   const ::wlan::iwlwifi::WlanPhyImplDevice* sim_device() const;
   zx_device_t* fake_parent();
+  async_dispatcher_t* async_driver_dispatcher();
 
  private:
+  fdf::Dispatcher sim_driver_dispatcher_;
+  libsync::Completion completion_;
   std::unique_ptr<::async::Loop> task_loop_;
   std::unique_ptr<::async::Loop> irq_loop_;
   std::unique_ptr<::wlan::iwlwifi::RcuManager> rcu_manager_;

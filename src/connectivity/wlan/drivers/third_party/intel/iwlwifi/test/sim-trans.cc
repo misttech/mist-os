@@ -20,6 +20,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
 #include <lib/fake-bti/bti.h>
 #include <zircon/status.h>
 
@@ -53,12 +54,16 @@ class SimTransDevice : public ::wlan::iwlwifi::WlanPhyImplDevice {
       : WlanPhyImplDevice(parent), drvdata_(drvdata) {}
   void DdkInit(::ddk::InitTxn txn) override { txn.Reply(ZX_OK); }
   void DdkUnbind(::ddk::UnbindTxn txn) override {
+    // Saving the input UnbindTxn to the device, ::ddk::UnbindTxn::Reply() will be called with this
+    // UnbindTxn in the shutdown callback of the dispatcher, so that we can make sure DdkUnbind()
+    // won't end before the dispatcher shutdown.
+    unbind_txn_ = std::move(txn);
     struct iwl_trans* trans = drvdata_;
     if (trans->drv) {
       iwl_drv_stop(trans->drv);
     }
     free(trans);
-    txn.Reply();
+    server_dispatcher_.ShutdownAsync();
   }
 
   iwl_trans* drvdata() override { return drvdata_; }
@@ -264,7 +269,8 @@ static struct iwl_trans* iwl_sim_trans_transport_alloc(struct device* dev,
 // 'out_trans' is used to return the new allocated 'struct iwl_trans'.
 static zx_status_t sim_transport_bind(SimMvm* fw, struct device* dev,
                                       struct iwl_trans** out_iwl_trans,
-                                      wlan::iwlwifi::WlanPhyImplDevice** out_device) {
+                                      wlan::iwlwifi::WlanPhyImplDevice** out_device,
+                                      async_dispatcher_t* driver_dispatcher) {
   zx_status_t status = ZX_OK;
   const struct iwl_cfg* cfg = &iwl7265_2ac_cfg;
 
@@ -274,7 +280,14 @@ static zx_status_t sim_transport_bind(SimMvm* fw, struct device* dev,
   }
   ZX_ASSERT(out_iwl_trans);
 
-  auto device = std::make_unique<SimTransDevice>(dev->zxdev, iwl_trans);
+  std::unique_ptr<SimTransDevice> device;
+  libsync::Completion create_device;
+  async::PostTask(driver_dispatcher, [&]() {
+    device = std::make_unique<SimTransDevice>(dev->zxdev, iwl_trans);
+    create_device.Signal();
+  });
+  create_device.Wait();
+
   status = device->DdkAdd("sim-iwlwifi-wlanphyimpl", DEVICE_ADD_NON_BINDABLE);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add wlanphyimpl device: %s", zx_status_get_string(status));
@@ -327,6 +340,8 @@ SimTransport::SimTransport(zx_device_t* parent) : device_{}, iwl_trans_(nullptr)
 }
 
 SimTransport::~SimTransport() {
+  sim_driver_dispatcher_.ShutdownAsync();
+  completion_.Wait();
   if (sim_device_) {
     sim_device_->DdkAsyncRemove();
     mock_ddk::ReleaseFlaggedDevices(sim_device_->zxdev());
@@ -335,7 +350,16 @@ SimTransport::~SimTransport() {
 }
 
 zx_status_t SimTransport::Init() {
-  return sim_transport_bind(this, &device_, &iwl_trans_, &sim_device_);
+  auto dispatcher = fdf::SynchronizedDispatcher::Create(
+      {.value = FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS}, "iwlwifi-driver-dispatcher",
+      [&](fdf_dispatcher_t*) { completion_.Signal(); });
+  if (dispatcher.is_error()) {
+    zxlogf(ERROR, "Failed to create sim_driver_dispatcher: %s", dispatcher.status_string());
+    return dispatcher.error_value();
+  }
+  sim_driver_dispatcher_ = std::move(*dispatcher);
+  return sim_transport_bind(this, &device_, &iwl_trans_, &sim_device_,
+                            sim_driver_dispatcher_.async_dispatcher());
 }
 
 struct iwl_trans* SimTransport::iwl_trans() { return iwl_trans_; }
@@ -347,5 +371,9 @@ const struct iwl_trans* SimTransport::iwl_trans() const { return iwl_trans_; }
 const ::wlan::iwlwifi::WlanPhyImplDevice* SimTransport::sim_device() const { return sim_device_; }
 
 zx_device_t* SimTransport::fake_parent() { return device_.zxdev; }
+
+async_dispatcher_t* SimTransport::async_driver_dispatcher() {
+  return sim_driver_dispatcher_.async_dispatcher();
+}
 
 }  // namespace wlan::testing

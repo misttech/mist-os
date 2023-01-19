@@ -135,12 +135,13 @@ void PcieDevice::DdkInit(::ddk::InitTxn txn) {
 }
 
 void PcieDevice::DdkUnbind(::ddk::UnbindTxn txn) {
+  unbind_txn_ = std::move(txn);
   iwl_pci_remove(&pci_dev_);
   zx_handle_close(pci_dev_.dev.bti);
   pci_dev_.dev.bti = ZX_HANDLE_INVALID;
   irq_loop_->Shutdown();
   task_loop_->Shutdown();
-  txn.Reply();
+  server_dispatcher_.ShutdownAsync();
 }
 
 }  // namespace iwlwifi

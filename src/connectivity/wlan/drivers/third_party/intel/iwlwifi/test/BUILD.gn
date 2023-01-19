@@ -47,6 +47,7 @@ source_set("sim_library") {
     "//src/devices/testing/fake-bti",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
   public_deps = [
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",

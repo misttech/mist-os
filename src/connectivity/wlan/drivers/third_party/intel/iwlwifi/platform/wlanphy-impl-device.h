@@ -59,6 +59,16 @@ class WlanPhyImplDevice : public ::ddk::Device<WlanPhyImplDevice, ::ddk::Initial
  protected:
   // Only derived classes are allowed to create this object.
   explicit WlanPhyImplDevice(zx_device_t* parent);
+
+  // The FIDL server end dispatcher for fuchsia_wlan_wlanphyimpl::WlanPhyImpl protocol.
+  fdf::SynchronizedDispatcher server_dispatcher_;
+
+  // The pointer of the default driver dispatcher in form of async_dispatcher_t.
+  async_dispatcher_t* driver_async_dispatcher_;
+
+  // The UnbindTxn provided by driver framework. It's used to call Reply() to synchronize the
+  // shutdown of server_dispatcher.
+  std::optional<::ddk::UnbindTxn> unbind_txn_;
 };
 
 }  // namespace wlan::iwlwifi

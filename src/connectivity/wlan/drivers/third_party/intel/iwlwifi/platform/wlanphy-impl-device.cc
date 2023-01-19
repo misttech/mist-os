@@ -4,6 +4,7 @@
 
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/wlanphy-impl-device.h"
 
+#include <lib/sync/cpp/completion.h>
 #include <zircon/status.h>
 
 #include <memory>
@@ -21,7 +22,15 @@ namespace phyimpl_fidl = fuchsia_wlan_phyimpl::wire;
 
 WlanPhyImplDevice::WlanPhyImplDevice(zx_device_t* parent)
     : ::ddk::Device<WlanPhyImplDevice, ::ddk::Initializable, ::ddk::Unbindable,
-                    ddk::ServiceConnectable>(parent) {}
+                    ddk::ServiceConnectable>(parent) {
+  auto dispatcher =
+      fdf::SynchronizedDispatcher::Create({}, "wlanphy-impl-server", [&](fdf_dispatcher_t*) {
+        if (unbind_txn_)
+          unbind_txn_->Reply();
+      });
+  server_dispatcher_ = std::move(*dispatcher);
+  driver_async_dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+}
 
 WlanPhyImplDevice::~WlanPhyImplDevice() = default;
 
@@ -35,7 +44,7 @@ zx_status_t WlanPhyImplDevice::DdkServiceConnect(const char* service_name, fdf::
     return ZX_ERR_NOT_SUPPORTED;
   }
   fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
-  fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(server_end), this);
+  fdf::BindServer(server_dispatcher_.get(), std::move(server_end), this);
   return ZX_OK;
 }
 
@@ -100,7 +109,6 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   }
 
   create_iface_req.mlme_channel = request->mlme_channel().release();
-
   if ((status = phy_create_iface(drvdata(), &create_iface_req, &out_iface_id)) != ZX_OK) {
     IWL_ERR(this, "%s() failed phy create: %s\n", __func__, zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
@@ -110,26 +118,31 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   struct iwl_mvm* mvm = iwl_trans_get_mvm(drvdata());
   struct iwl_mvm_vif* mvmvif = mvm->mvmvif[out_iface_id];
 
-  auto wlan_softmac_device =
-      std::make_unique<WlanSoftmacDevice>(parent(), drvdata(), out_iface_id, mvmvif);
-
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     IWL_ERR(this, "failed to create endpoints: %s\n", endpoints.status_string());
     completer.buffer(arena).ReplyError(endpoints.status_value());
     return;
   }
+  std::unique_ptr<WlanSoftmacDevice> wlan_softmac_device;
 
-  status = wlan_softmac_device->ServeWlanSoftmacProtocol(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    IWL_ERR(this, "failed to serve wlan softmac service: %s\n", zx_status_get_string(status));
-    completer.buffer(arena).ReplyError(status);
-    return;
-  }
+  libsync::Completion served;
+  async::PostTask(driver_async_dispatcher_, [&]() {
+    wlan_softmac_device =
+        std::make_unique<WlanSoftmacDevice>(parent(), drvdata(), out_iface_id, mvmvif);
+    zx_status_t status =
+        wlan_softmac_device->ServeWlanSoftmacProtocol(std::move(endpoints->server));
+    if (status != ZX_OK) {
+      IWL_ERR(this, "failed to serve wlan softmac service: %s\n", zx_status_get_string(status));
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+    served.Signal();
+  });
+  served.Wait();
   std::array<const char*, 1> offers{
       fuchsia_wlan_softmac::Service::Name,
   };
-
   // The outgoing directory will only be accessible by the driver that binds to
   // the newly created device.
   status = wlan_softmac_device->DdkAdd(::ddk::DeviceAddArgs("iwlwifi-wlan-softmac")
