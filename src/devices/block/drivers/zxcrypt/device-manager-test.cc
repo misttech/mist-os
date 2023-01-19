@@ -9,6 +9,7 @@
 #include <lib/fdio/io.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fit/defer.h>
 #include <lib/inspect/cpp/reader.h>
 #include <zircon/errors.h>
 
@@ -42,25 +43,13 @@ std::string GetInspectInstanceGuid(const zx::vmo& inspect_vmo) {
   return property->value();
 }
 
-zx::vmo GetInspectVMOHandle(const fbl::unique_fd& devfs_root) {
+void GetInspectVMOHandle(const fbl::unique_fd& devfs_root, zx::vmo& out_vmo) {
   zx::result channel = device_watcher::RecursiveWaitForFile(
       devfs_root.get(), "diagnostics/class/zxcrypt/000.inspect");
-  if (channel.is_error()) {
-    printf("Failed in wait for inspect file: %s\n", channel.status_string());
-    return zx::vmo();
-  }
+  ASSERT_OK(channel);
   fbl::unique_fd fd;
-  if (zx_status_t status = fdio_fd_create(channel.value().release(), fd.reset_and_get_address());
-      status != ZX_OK) {
-    printf("Failed to create inspect file descriptor: %s\n", zx_status_get_string(status));
-    return zx::vmo();
-  }
-  zx_handle_t out_vmo = ZX_HANDLE_INVALID;
-  if (zx_status_t status = fdio_get_vmo_clone(fd.get(), &out_vmo); status != ZX_OK) {
-    printf("Failed to clone inspect VMO: %s\n", zx_status_get_string(status));
-    return zx::vmo();
-  }
-  return zx::vmo(out_vmo);
+  ASSERT_OK(fdio_fd_create(channel.value().release(), fd.reset_and_get_address()));
+  ASSERT_OK(fdio_get_vmo_clone(fd.get(), out_vmo.reset_and_get_address()));
 }
 
 TEST(ZxcryptInspect, ExportsGuid) {
@@ -78,6 +67,7 @@ TEST(ZxcryptInspect, ExportsGuid) {
   // Create a new ramdisk to stick our zxcrypt instance on.
   ramdisk_client_t* ramdisk = nullptr;
   ASSERT_OK(ramdisk_create_at(devmgr.devfs_root().get(), kBlockSz, kBlockCnt, &ramdisk));
+  auto cleanup = fit::defer([ramdisk]() { ASSERT_OK(ramdisk_destroy(ramdisk)); });
   zx::result channel =
       device_watcher::RecursiveWaitForFile(devfs_root_fd.get(), ramdisk_get_path(ramdisk));
   ASSERT_OK(channel.status_value());
@@ -107,20 +97,24 @@ TEST(ZxcryptInspect, ExportsGuid) {
   // haven't even got a formatted device yet.
   zxcrypt::EncryptedVolumeClient volume_client(std::move(zxc_client_chan));
   ASSERT_EQ(volume_client.Unseal(key.get(), key.len(), 0), ZX_ERR_ACCESS_DENIED);
-  ASSERT_TRUE(GetInspectInstanceGuid(GetInspectVMOHandle(devmgr.devfs_root())).empty());
+  {
+    zx::vmo vmo;
+    ASSERT_NO_FATAL_FAILURE(GetInspectVMOHandle(devmgr.devfs_root(), vmo));
+    ASSERT_TRUE(GetInspectInstanceGuid(vmo).empty());
+  }
 
   // After formatting, we should be able to unseal a device and see its GUID in inspect.
   ASSERT_OK(volume_client.Format(key.get(), key.len(), 0));
 
   ASSERT_OK(volume_client.Unseal(key.get(), key.len(), 0));
-  std::string guid = GetInspectInstanceGuid(GetInspectVMOHandle(devmgr.devfs_root()));
-  ASSERT_FALSE(guid.empty());
+  {
+    zx::vmo vmo;
+    ASSERT_NO_FATAL_FAILURE(GetInspectVMOHandle(devmgr.devfs_root(), vmo));
+    std::string guid = GetInspectInstanceGuid(vmo);
+    ASSERT_FALSE(guid.empty());
+  }
 
   ASSERT_OK(volume_client.Seal());
-
-  // Ensure we turn down the zxcrypt manager before we free up the ramdisk.
-  vol_mgr.reset();
-  ramdisk_destroy(ramdisk);
 }
 
 }  // namespace
