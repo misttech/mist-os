@@ -596,6 +596,7 @@ pub const ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE: u32 = 1 << 4;
 pub const ZX_VMO_CHILD_RESIZABLE: u32 = 1 << 2;
 pub const ZX_VMO_CHILD_SLICE: u32 = 1 << 3;
 pub const ZX_VMO_CHILD_NO_WRITE: u32 = 1 << 5;
+pub const ZX_VMO_CHILD_REFERENCE: u32 = 1 << 6;
 
 // channel write size constants
 pub const ZX_CHANNEL_MAX_MSG_HANDLES: u32 = 64;

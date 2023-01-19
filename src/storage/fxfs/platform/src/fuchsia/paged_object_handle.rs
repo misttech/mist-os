@@ -456,15 +456,11 @@ impl PagedObjectHandle {
     }
 
     async fn flush_impl(&self) -> Result<(), Error> {
-        // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
-        // reading the cached data then the flush could fail. This lock is held to prevent the file
-        // from shrinking while it's being flushed. Technically, a client could call
-        // GetBackingMemory to get a handle to the VMO and directly resize it to cause problems.
-        //
-        // TODO(fxbug.dev/96836): Update this comment when fxfs only hands out non-resizable
-        // reference child VMOs.
         let store = self.handle.store();
         let fs = store.filesystem();
+        // If the VMO is shrunk between getting the VMO's size and calling query_dirty_ranges or
+        // reading the cached data then the flush could fail. This lock is held to prevent the file
+        // from shrinking while it's being flushed.
         let keys = [LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = debug_assert_not_too_long!(fs.write_lock(&keys));
 

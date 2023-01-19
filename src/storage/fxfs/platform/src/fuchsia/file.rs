@@ -15,7 +15,7 @@ use {
     async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, Status},
+    fuchsia_zircon::{self as zx, HandleBased, Status},
     futures::{channel::oneshot, join},
     fxfs::{
         async_enter,
@@ -331,20 +331,6 @@ impl File for FxFile {
 
     // Returns a VMO handle that supports paging.
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        // We do not support exact/duplicate sharing mode.
-        if flags.contains(fio::VmoFlags::SHARED_BUFFER) {
-            error!("get_backing_memory does not support exact sharing mode!");
-            return Err(Status::NOT_SUPPORTED);
-        }
-        // We only support the combination of WRITE when a private COW clone is explicitly
-        // specified. This implicitly restricts any mmap call that attempts to use MAP_SHARED +
-        // PROT_WRITE.
-        if flags.contains(fio::VmoFlags::WRITE) && !flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
-            error!(
-                "get_backing_memory only supports fio::VmoFlags::WRITE with fio::VmoFlags::PRIVATE_CLONE!"
-            );
-            return Err(Status::NOT_SUPPORTED);
-        }
         // We do not support executable VMO handles.
         if flags.contains(fio::VmoFlags::EXECUTE) {
             error!("get_backing_memory does not support execute rights!");
@@ -352,15 +338,28 @@ impl File for FxFile {
         }
 
         let vmo = self.handle.vmo();
-        let size = vmo.get_size()?;
-
-        let mut child_options = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
-        // By default, SNAPSHOT includes WRITE, so we explicitly remove it if not required.
-        if !flags.contains(fio::VmoFlags::WRITE) {
-            child_options |= zx::VmoChildOptions::NO_WRITE
+        let mut rights = zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY;
+        if flags.contains(fio::VmoFlags::READ) {
+            rights |= zx::Rights::READ;
+        }
+        if flags.contains(fio::VmoFlags::WRITE) {
+            rights |= zx::Rights::WRITE;
         }
 
-        let child_vmo = vmo.create_child(child_options, 0, size)?;
+        let child_vmo = if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
+            // Allow for the VMO's content size and name to be changed even without ZX_RIGHT_WRITE.
+            rights |= zx::Rights::SET_PROPERTY;
+            let mut child_options = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
+            if flags.contains(fio::VmoFlags::WRITE) {
+                child_options |= zx::VmoChildOptions::RESIZABLE;
+                rights |= zx::Rights::RESIZE;
+            }
+            vmo.create_child(child_options, 0, vmo.get_size()?)?
+        } else {
+            vmo.create_child(zx::VmoChildOptions::REFERENCE, 0, 0)?
+        };
+
+        let child_vmo = child_vmo.replace_handle(rights)?;
         if self.handle.owner().pager().watch_for_zero_children(self).map_err(map_to_status)? {
             // Take an open count so that we keep this object alive if it is unlinked.
             self.open_count_add_one();
@@ -1298,5 +1297,167 @@ mod tests {
         );
 
         Arc::try_unwrap(fixture).unwrap_or_else(|_| panic!()).close().await;
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_get_backing_memory_shared_vmo_right_write() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::MODE_TYPE_FILE,
+            "foo",
+        )
+        .await;
+
+        file.resize(4096)
+            .await
+            .expect("resize failed")
+            .map_err(Status::from_raw)
+            .expect("resize error");
+
+        let vmo = file
+            .get_backing_memory(fio::VmoFlags::SHARED_BUFFER | fio::VmoFlags::READ)
+            .await
+            .expect("Failed to make FIDL call")
+            .map_err(Status::from_raw)
+            .expect("Failed to get VMO");
+        let err = vmo.write(&[0, 1, 2, 3], 0).expect_err("VMO should not be writable");
+        assert_eq!(Status::ACCESS_DENIED, err);
+
+        let vmo = file
+            .get_backing_memory(
+                fio::VmoFlags::SHARED_BUFFER | fio::VmoFlags::READ | fio::VmoFlags::WRITE,
+            )
+            .await
+            .expect("Failed to make FIDL call")
+            .map_err(Status::from_raw)
+            .expect("Failed to get VMO");
+        vmo.write(&[0, 1, 2, 3], 0).expect("VMO should be writable");
+
+        close_file_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_get_backing_memory_shared_vmo_right_read() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::MODE_TYPE_FILE,
+            "foo",
+        )
+        .await;
+
+        file.resize(4096)
+            .await
+            .expect("resize failed")
+            .map_err(Status::from_raw)
+            .expect("resize error");
+
+        let mut data = [0u8; 4];
+        let vmo = file
+            .get_backing_memory(fio::VmoFlags::SHARED_BUFFER)
+            .await
+            .expect("Failed to make FIDL call")
+            .map_err(Status::from_raw)
+            .expect("Failed to get VMO");
+        let err = vmo.read(&mut data, 0).expect_err("VMO should not be readable");
+        assert_eq!(Status::ACCESS_DENIED, err);
+
+        let vmo = file
+            .get_backing_memory(fio::VmoFlags::SHARED_BUFFER | fio::VmoFlags::READ)
+            .await
+            .expect("Failed to make FIDL call")
+            .map_err(Status::from_raw)
+            .expect("Failed to get VMO");
+        vmo.read(&mut data, 0).expect("VMO should be readable");
+
+        close_file_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_get_backing_memory_shared_vmo_resize() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::MODE_TYPE_FILE,
+            "foo",
+        )
+        .await;
+
+        let vmo = file
+            .get_backing_memory(
+                fio::VmoFlags::SHARED_BUFFER | fio::VmoFlags::READ | fio::VmoFlags::WRITE,
+            )
+            .await
+            .expect("Failed to make FIDL call")
+            .map_err(Status::from_raw)
+            .expect("Failed to get VMO");
+
+        let err = vmo.set_size(10).expect_err("VMO should not be resizable");
+        assert_eq!(Status::ACCESS_DENIED, err);
+
+        let err =
+            vmo.set_content_size(&10).expect_err("content size should not be directly modifiable");
+        assert_eq!(Status::ACCESS_DENIED, err);
+
+        close_file_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test(threads = 10)]
+    async fn test_get_backing_memory_private_vmo_resize() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::MODE_TYPE_FILE,
+            "foo",
+        )
+        .await;
+
+        let vmo = file
+            .get_backing_memory(
+                fio::VmoFlags::PRIVATE_CLONE | fio::VmoFlags::READ | fio::VmoFlags::WRITE,
+            )
+            .await
+            .expect("Failed to make FIDL call")
+            .map_err(Status::from_raw)
+            .expect("Failed to get VMO");
+        vmo.set_size(10).expect("VMO should be resizable");
+        vmo.set_content_size(&20).expect("content size should be modifiable");
+
+        let vmo = file
+            .get_backing_memory(fio::VmoFlags::PRIVATE_CLONE | fio::VmoFlags::READ)
+            .await
+            .expect("Failed to make FIDL call")
+            .map_err(Status::from_raw)
+            .expect("Failed to get VMO");
+        let err = vmo.set_size(10).expect_err("VMO should not be resizable");
+        assert_eq!(err, Status::ACCESS_DENIED);
+        vmo.set_content_size(&20).expect("content is still modifiable");
+
+        close_file_checked(file).await;
+        fixture.close().await;
     }
 }

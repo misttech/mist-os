@@ -199,13 +199,13 @@ protocol File {
             /// specific cases where the client is talking to a known server.
             PRIVATE_CLONE = 0x00010000;
 
-            /// Require an exact (non-cloned) handle to the underlying VMO. All
-            /// clients using this flag would get a VMO with the same koid, and
-            /// this VMO will reflect content and size changes as they are made
-            /// to the underlying file.
+            /// Require a VMO that provides direct access to the contents of the
+            /// file's underlying VMO. The request should fail if such a VMO
+            /// cannot be provided. May not be supplied with `PRIVATE_CLONE`.
             ///
-            /// The request should fail if a handle to the exact VMO cannot be
-            /// returned. May not be supplied with `PRIVATE_CLONE`.
+            /// The returned VMO may not be resizable even when `WRITE` access is
+            /// requested. In this case, [`File.Resize`] should be used to resize
+            /// the file.
             SHARED_BUFFER = 0x00020000;
         };
     }) -> (resource struct {

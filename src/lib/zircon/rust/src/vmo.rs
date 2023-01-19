@@ -234,6 +234,7 @@ bitflags! {
         const RESIZABLE = sys::ZX_VMO_CHILD_RESIZABLE;
         const SLICE = sys::ZX_VMO_CHILD_SLICE;
         const NO_WRITE = sys::ZX_VMO_CHILD_NO_WRITE;
+        const REFERENCE = sys::ZX_VMO_CHILD_REFERENCE;
     }
 }
 
