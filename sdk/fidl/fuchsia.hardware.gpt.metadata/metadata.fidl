@@ -1,0 +1,32 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.hardware.gpt.metadata;
+
+using fuchsia.hardware.block.partition as partition;
+
+const MAX_PARTITIONS uint32 = 16;
+
+type PartitionOptions = table {
+    /// The type GUID to report for this partition. If not set, the type GUID from the partition
+    /// table is used.
+    1: type_guid_override partition.Guid;
+    /// If true, the block core driver won't bind to this device in order to make way for a
+    /// partition-specific driver. Defaults to `false`.
+    2: block_driver_should_ignore_device bool;
+};
+
+/// For each partition in the table read from the block device, the GPT driver will attempt to
+/// find a `PartitionInfo` entry where `name` matches the partition name. If a match is found,
+/// that entry's `options` are applied to the partition device. Otherwise, default values are used
+/// as specified above. Entries that do not match any partition are ignored.
+type PartitionInfo = struct {
+    name string:partition.NAME_LENGTH;
+    options PartitionOptions;
+};
+
+/// Passed to the GPT driver in metadata as DEVICE_METADATA_GPT_INFO.
+type GptInfo = table {
+    1: partition_info vector<PartitionInfo>:MAX_PARTITIONS;
+};
