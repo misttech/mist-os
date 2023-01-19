@@ -475,13 +475,11 @@ if (is_fuchsia) {
       fuchsia_verify_component_resolvers_allowlist,
       fuchsia_verify_routes_component_tree_config,
       fuchsia_verify_routes_exceptions_allowlist,
-      fuchsia_verify_routes_exceptions_allowlist_bootfs,
       recovery_route_sources_config,
       recovery_structured_config_policy,
       recovery_verify_component_resolvers_allowlist,
       recovery_verify_routes_component_tree_config,
       recovery_verify_routes_exceptions_allowlist,
-      recovery_verify_routes_exceptions_allowlist_bootfs,
     ]
     foreach(file, _optional_files) {
       if (file != "") {
