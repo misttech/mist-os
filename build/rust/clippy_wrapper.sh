@@ -76,8 +76,6 @@ transdeps=( $(sort -u "$output.transdeps") )
 
 command=(
   "${filtered_driver_options[@]}"
-  -Cpanic=abort
-  -Zpanic_abort_tests
   -Zno_codegen
   "${deps[@]}"
   "${transdeps[@]}"
