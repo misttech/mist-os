@@ -63,33 +63,34 @@ class MagmaExecuteMsdVsi : public testing::Test {
     auto etna_buffer = std::make_shared<EtnaBuffer>();
     uint64_t actual_size = 0;
 
-    if (MAGMA_STATUS_OK != magma_create_buffer(magma_vsi_.GetConnection(), size, &actual_size,
-                                               &(etna_buffer->magma_buffer_)))
+    if (MAGMA_STATUS_OK != magma_connection_create_buffer(magma_vsi_.GetConnection(), size,
+                                                          &actual_size,
+                                                          &(etna_buffer->magma_buffer_)))
       return nullptr;
 
     EXPECT_EQ(actual_size, size);
     EXPECT_NE(etna_buffer->magma_buffer_, 0ul);
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_set_cache_policy(etna_buffer->magma_buffer_,
-                                                      MAGMA_CACHE_POLICY_WRITE_COMBINING));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_set_cache_policy(etna_buffer->magma_buffer_,
+                                                             MAGMA_CACHE_POLICY_WRITE_COMBINING));
 
     if (!magma::MapCpuHelper(etna_buffer->magma_buffer_, 0 /*offset*/, actual_size,
                              &etna_buffer->cpu_address_))
       return nullptr;
 
-    etna_buffer->size_ = magma_get_buffer_size(etna_buffer->magma_buffer_);
+    etna_buffer->size_ = magma_buffer_get_size(etna_buffer->magma_buffer_);
 
     etna_buffer->gpu_address_ = next_gpu_addr_;
     next_gpu_addr_ += etna_buffer->size_;
 
-    magma_status_t status = magma_map_buffer(magma_vsi_.GetConnection(), etna_buffer->gpu_address_,
-                                             etna_buffer->magma_buffer_,
-                                             0,  // page offset
-                                             etna_buffer->size_, kMapFlags);
+    magma_status_t status = magma_connection_map_buffer(
+        magma_vsi_.GetConnection(), etna_buffer->gpu_address_, etna_buffer->magma_buffer_,
+        0,  // page offset
+        etna_buffer->size_, kMapFlags);
     if (status != MAGMA_STATUS_OK)
       return nullptr;
 
-    etna_buffer->resource_.buffer_id = magma_get_buffer_id(etna_buffer->magma_buffer_);
+    etna_buffer->resource_.buffer_id = magma_buffer_get_id(etna_buffer->magma_buffer_);
     etna_buffer->resource_.offset = 0;
     etna_buffer->resource_.length = etna_buffer->size_;
 
@@ -159,8 +160,9 @@ class MagmaExecuteMsdVsi : public testing::Test {
     magma_semaphore_t semaphore;
 
     ASSERT_NE(length, 0u);
-    ASSERT_EQ(magma_create_semaphore(magma_vsi_.GetConnection(), &semaphore), MAGMA_STATUS_OK);
-    uint64_t semaphore_id = magma_get_semaphore_id(semaphore);
+    ASSERT_EQ(magma_connection_create_semaphore(magma_vsi_.GetConnection(), &semaphore),
+              MAGMA_STATUS_OK);
+    uint64_t semaphore_id = magma_semaphore_get_id(semaphore);
 
     std::vector<magma_exec_resource> resources;
     resources.push_back(command_stream->etna_buffer->resource_);
@@ -180,8 +182,9 @@ class MagmaExecuteMsdVsi : public testing::Test {
 
     auto start = std::chrono::high_resolution_clock::now();
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_execute_command(magma_vsi_.GetConnection(),
-                                                     magma_vsi_.GetContextId(), &descriptor));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_connection_execute_command(magma_vsi_.GetConnection(),
+                                               magma_vsi_.GetContextId(), &descriptor));
     magma_poll_item_t item = {.semaphore = semaphore,
                               .type = MAGMA_POLL_TYPE_SEMAPHORE,
                               .condition = MAGMA_POLL_CONDITION_SIGNALED};
@@ -192,7 +195,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
                  .count();
     EXPECT_LT(t, timeout_ms);
 
-    magma_release_semaphore(magma_vsi_.GetConnection(), semaphore);
+    magma_connection_release_semaphore(magma_vsi_.GetConnection(), semaphore);
   }
 
   void Test() {
@@ -248,7 +251,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     static constexpr uint32_t kTimeoutMs = 10;
     ExecuteCommand(command_stream, kTimeoutMs);
 
-    EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_get_error(magma_vsi_.GetConnection()));
+    EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(magma_vsi_.GetConnection()));
   }
 
   void TestHang() {
@@ -263,7 +266,7 @@ class MagmaExecuteMsdVsi : public testing::Test {
     static constexpr uint32_t kTimeoutMs = 7000;
     ExecuteCommand(command_stream, kTimeoutMs);
 
-    EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_get_error(magma_vsi_.GetConnection()));
+    EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(magma_vsi_.GetConnection()));
   }
 
  private:

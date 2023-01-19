@@ -24,17 +24,17 @@ namespace {
 class TestConnection : public magma::TestDeviceBase {
  public:
   TestConnection() : magma::TestDeviceBase(MAGMA_VENDOR_ID_MALI) {
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_create_connection2(device(), &connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_device_create_connection(device(), &connection_));
     DASSERT(connection_);
 
-    magma_create_context(connection_, &context_id_);
+    magma_connection_create_context(connection_, &context_id_);
   }
 
   ~TestConnection() {
-    magma_release_context(connection_, context_id_);
+    magma_connection_release_context(connection_, context_id_);
 
     if (connection_)
-      magma_release_connection(connection_);
+      magma_connection_release(connection_);
   }
 
   bool AccessPerfCounters() {
@@ -66,8 +66,8 @@ class TestConnection : public magma::TestDeviceBase {
     magma_buffer_t buffer;
     uint64_t buffer_size;
     constexpr uint32_t kPerfCountBufferSize = 2048;
-    EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_create_buffer(connection_, kPerfCountBufferSize * 2, &buffer_size, &buffer));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, kPerfCountBufferSize * 2,
+                                                              &buffer_size, &buffer));
 
     magma_perf_count_pool_t pool;
     magma_handle_t notification_handle;
@@ -88,10 +88,10 @@ class TestConnection : public magma::TestDeviceBase {
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_enable_performance_counters(connection_, &perf_counter_id, 1));
     magma_buffer_offset offsets[2];
-    offsets[0].buffer_id = magma_get_buffer_id(buffer);
+    offsets[0].buffer_id = magma_buffer_get_id(buffer);
     offsets[0].offset = 0;
     offsets[0].length = kPerfCountBufferSize;
-    offsets[1].buffer_id = magma_get_buffer_id(buffer);
+    offsets[1].buffer_id = magma_buffer_get_id(buffer);
     offsets[1].offset = kPerfCountBufferSize;
     offsets[1].length = kPerfCountBufferSize;
     EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_add_performance_counter_buffer_offsets_to_pool(
@@ -127,7 +127,7 @@ class TestConnection : public magma::TestDeviceBase {
                                      connection_, pool, &trigger_id, &buffer_id, &buffer_offset,
                                      &time, &result_flags));
 
-      EXPECT_EQ(magma_get_buffer_id(buffer), buffer_id);
+      EXPECT_EQ(magma_buffer_get_id(buffer), buffer_id);
       EXPECT_TRUE(trigger_id == kTriggerId || trigger_id == kTriggerId + 1);
       bool expected_discontinuous = i == 0;
       uint32_t expected_result_flags =
@@ -158,7 +158,7 @@ class TestConnection : public magma::TestDeviceBase {
 
     magma_connection_release_performance_counter_buffer_pool(connection_, pool);
 
-    magma_release_buffer(connection_, buffer);
+    magma_connection_release_buffer(connection_, buffer);
   }
 
  private:

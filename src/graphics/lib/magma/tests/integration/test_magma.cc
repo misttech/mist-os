@@ -158,7 +158,7 @@ class TestConnection {
 
       if (gVendorId) {
         uint64_t vendor_id;
-        status = magma_query(device, MAGMA_QUERY_VENDOR_ID, NULL, &vendor_id);
+        status = magma_device_query(device, MAGMA_QUERY_VENDOR_ID, NULL, &vendor_id);
         EXPECT_EQ(MAGMA_STATUS_OK, status);
         if (status != MAGMA_STATUS_OK)
           return false;
@@ -211,13 +211,13 @@ class TestConnection {
 #error Unimplemented
 #endif
     if (device_) {
-      magma_create_connection2(device_, &connection_);
+      magma_device_create_connection(device_, &connection_);
     }
   }
 
   ~TestConnection() {
     if (connection_)
-      magma_release_connection(connection_);
+      magma_connection_release(connection_);
     if (device_)
       magma_device_release(device_);
     if (fd_ >= 0)
@@ -234,30 +234,30 @@ class TestConnection {
     ASSERT_TRUE(connection_);
 
     uint32_t context_id[2];
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_create_context(connection_, &context_id[0]));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection_, &context_id[0]));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_create_context(connection_, &context_id[1]));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection_, &context_id[1]));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
-    magma_release_context(connection_, context_id[0]);
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    magma_connection_release_context(connection_, context_id[0]);
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
-    magma_release_context(connection_, context_id[1]);
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    magma_connection_release_context(connection_, context_id[1]);
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
     // Already released
-    magma_release_context(connection_, context_id[1]);
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_get_error(connection_));
+    magma_connection_release_context(connection_, context_id[1]);
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
   }
 
   void NotificationChannelHandle() {
     ASSERT_TRUE(connection_);
 
-    uint32_t handle = magma_get_notification_channel_handle(connection_);
+    uint32_t handle = magma_connection_get_notification_channel_handle(connection_);
     EXPECT_NE(0u, handle);
 
-    uint32_t handle2 = magma_get_notification_channel_handle(connection_);
+    uint32_t handle2 = magma_connection_get_notification_channel_handle(connection_);
     EXPECT_EQ(handle, handle2);
   }
 
@@ -267,7 +267,7 @@ class TestConnection {
     std::array<unsigned char, 1024> buffer;
     uint64_t buffer_size = ~0;
     magma_bool_t more_data = true;
-    magma_status_t status = magma_read_notification_channel2(
+    magma_status_t status = magma_connection_read_notification_channel(
         connection_, buffer.data(), buffer.size(), &buffer_size, &more_data);
     EXPECT_EQ(MAGMA_STATUS_OK, status);
     EXPECT_EQ(0u, buffer_size);
@@ -281,11 +281,12 @@ class TestConnection {
     uint64_t actual_size = 0;
     magma_buffer_t buffer = 0;
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &actual_size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_buffer(connection_, size, &actual_size, &buffer));
     EXPECT_GE(actual_size, size);
     EXPECT_NE(buffer, 0u);
 
-    magma_release_buffer(connection_, buffer);
+    magma_connection_release_buffer(connection_, buffer);
   }
 
   void BufferMap() {
@@ -295,32 +296,34 @@ class TestConnection {
     uint64_t actual_size;
     magma_buffer_t buffer = 0;
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &actual_size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_buffer(connection_, size, &actual_size, &buffer));
     EXPECT_NE(buffer, 0u);
 
     constexpr uint64_t kGpuAddress = 0x1000;
-    EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_map_buffer(connection_, kGpuAddress, buffer, 0, size, MAGMA_MAP_FLAG_READ));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, kGpuAddress, buffer, 0,
+                                                           size, MAGMA_MAP_FLAG_READ));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
     {
       uint64_t vendor_id;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
       // Unmap not implemented on Intel
       if (vendor_id != 0x8086) {
-        magma_unmap_buffer(connection_, kGpuAddress, buffer);
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+        magma_connection_unmap_buffer(connection_, kGpuAddress, buffer);
+        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
       }
     }
 
     // Invalid page offset, remote error
     constexpr uint64_t kInvalidPageOffset = 1024;
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_map_buffer(connection_, 0, buffer, kInvalidPageOffset * page_size(), size,
-                               MAGMA_MAP_FLAG_READ));
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_get_error(connection_));
+              magma_connection_map_buffer(connection_, 0, buffer, kInvalidPageOffset * page_size(),
+                                          size, MAGMA_MAP_FLAG_READ));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
 
-    magma_release_buffer(connection_, buffer);
+    magma_connection_release_buffer(connection_, buffer);
   }
 
   void BufferMapOverlapError() {
@@ -331,32 +334,35 @@ class TestConnection {
 
     {
       uint64_t actual_size;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &actual_size, &buffer[0]));
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_connection_create_buffer(connection_, size, &actual_size, &buffer[0]));
       EXPECT_NE(buffer[0], 0u);
     }
     {
       uint64_t actual_size;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &actual_size, &buffer[1]));
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_connection_create_buffer(connection_, size, &actual_size, &buffer[1]));
       EXPECT_NE(buffer[1], 0u);
     }
 
     constexpr uint64_t kGpuAddress = 0x1000;
 
-    EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_map_buffer(connection_, kGpuAddress, buffer[0], 0, size, MAGMA_MAP_FLAG_READ));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, kGpuAddress, buffer[0], 0,
+                                                           size, MAGMA_MAP_FLAG_READ));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_map_buffer(connection_, kGpuAddress + size / 2, buffer[1], 0,
-                                                size, MAGMA_MAP_FLAG_READ));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_connection_map_buffer(connection_, kGpuAddress + size / 2, buffer[1], 0, size,
+                                          MAGMA_MAP_FLAG_READ));
 
     {
-      magma_status_t status = magma_get_error(connection_);
+      magma_status_t status = magma_connection_get_error(connection_);
       if (status != MAGMA_STATUS_INVALID_ARGS)
         EXPECT_EQ(MAGMA_STATUS_INTERNAL_ERROR, status);
     }
 
-    magma_release_buffer(connection_, buffer[1]);
-    magma_release_buffer(connection_, buffer[0]);
+    magma_connection_release_buffer(connection_, buffer[1]);
+    magma_connection_release_buffer(connection_, buffer[0]);
   }
 
   void BufferMapDuplicates(int count) {
@@ -370,7 +376,8 @@ class TestConnection {
 
     {
       uint64_t vendor_id;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
       if (vendor_id == 0x8086 || vendor_id == 0x10001)
         is_intel_or_vsi = true;
     }
@@ -379,7 +386,8 @@ class TestConnection {
     uint64_t actual_size;
     magma_buffer_t buffer;
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &actual_size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_buffer(connection_, size, &actual_size, &buffer));
 
     // Check that we can map the same underlying memory object many times
     std::vector<magma_buffer_t> imported_buffers;
@@ -389,22 +397,23 @@ class TestConnection {
 
     for (int i = 0; i < count; i++) {
       magma_handle_t handle;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_export(connection_, buffer, &handle));
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_export_buffer(connection_, buffer, &handle));
 
       magma_buffer_t buffer2;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_import(connection_, handle, &buffer2)) << "i " << i;
-
-      ASSERT_EQ(MAGMA_STATUS_OK,
-                magma_map_buffer(connection_, gpu_address, buffer2, 0, size, MAGMA_MAP_FLAG_READ))
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer(connection_, handle, &buffer2))
           << "i " << i;
 
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_)) << "i " << i;
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_address, buffer2, 0,
+                                                             size, MAGMA_MAP_FLAG_READ))
+          << "i " << i;
+
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_)) << "i " << i;
 
       if (!is_intel_or_vsi) {
         ASSERT_EQ(MAGMA_STATUS_OK,
-                  magma_buffer_range_op(connection_, buffer2, MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES,
-                                        0, size));
-        ASSERT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_)) << "i " << i;
+                  magma_connection_buffer_range_op(connection_, buffer2,
+                                                   MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0, size));
+        ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_)) << "i " << i;
       }
 
       imported_buffers.push_back(buffer2);
@@ -415,14 +424,14 @@ class TestConnection {
 
     for (size_t i = 0; i < imported_buffers.size(); i++) {
       if (!is_intel_or_vsi)
-        magma_unmap_buffer(connection_, imported_addrs[i], imported_buffers[i]);
+        magma_connection_unmap_buffer(connection_, imported_addrs[i], imported_buffers[i]);
 
-      EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+      EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
-      magma_release_buffer(connection_, imported_buffers[i]);
+      magma_connection_release_buffer(connection_, imported_buffers[i]);
     }
 
-    magma_release_buffer(connection_, buffer);
+    magma_connection_release_buffer(connection_, buffer);
   }
 
   void BufferMapInvalid() {
@@ -432,16 +441,17 @@ class TestConnection {
     uint64_t actual_size;
     magma_buffer_t buffer;
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &actual_size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_connection_create_buffer(connection_, size, &actual_size, &buffer));
 
     // Invalid page offset, remote error
     constexpr uint64_t kInvalidPageOffset = 1024;
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_map_buffer(connection_, 0, buffer, kInvalidPageOffset * page_size(), size,
-                               MAGMA_MAP_FLAG_READ));
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_get_error(connection_));
+              magma_connection_map_buffer(connection_, 0, buffer, kInvalidPageOffset * page_size(),
+                                          size, MAGMA_MAP_FLAG_READ));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection_));
 
-    magma_release_buffer(connection_, buffer);
+    magma_connection_release_buffer(connection_, buffer);
   }
 
   void BufferExport(uint32_t* handle_out, uint64_t* id_out) {
@@ -450,13 +460,13 @@ class TestConnection {
     uint64_t size = page_size();
     magma_buffer_t buffer;
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, size, &size, &buffer));
 
-    *id_out = magma_get_buffer_id(buffer);
+    *id_out = magma_buffer_get_id(buffer);
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_export(connection_, buffer, handle_out));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_export_buffer(connection_, buffer, handle_out));
 
-    magma_release_buffer(connection_, buffer);
+    magma_connection_release_buffer(connection_, buffer);
   }
 
   void BufferImportInvalid() {
@@ -469,17 +479,18 @@ class TestConnection {
 #elif defined(__linux__)
     constexpr magma_status_t kExpectedStatus = MAGMA_STATUS_INTERNAL_ERROR;
 #endif
-    ASSERT_EQ(kExpectedStatus, magma_import(connection_, kInvalidHandle, &buffer));
+    ASSERT_EQ(kExpectedStatus,
+              magma_connection_import_buffer(connection_, kInvalidHandle, &buffer));
   }
 
   void BufferImport(uint32_t handle, uint64_t exported_id) {
     ASSERT_TRUE(connection_);
 
     magma_buffer_t buffer;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_import(connection_, handle, &buffer));
-    EXPECT_NE(magma_get_buffer_id(buffer), exported_id);
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer(connection_, handle, &buffer));
+    EXPECT_NE(magma_buffer_get_id(buffer), exported_id);
 
-    magma_release_buffer(connection_, buffer);
+    magma_connection_release_buffer(connection_, buffer);
   }
 
   static magma_status_t wait_all(std::vector<magma_poll_item_t>& items, int64_t timeout_ns) {
@@ -509,11 +520,12 @@ class TestConnection {
 
     for (uint32_t i = 0; i < count; i++) {
       items[i] = {.type = MAGMA_POLL_TYPE_SEMAPHORE, .condition = MAGMA_POLL_CONDITION_SIGNALED};
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_create_semaphore(connection_, &items[i].semaphore));
-      EXPECT_NE(0u, magma_get_semaphore_id(items[i].semaphore));
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_connection_create_semaphore(connection_, &items[i].semaphore));
+      EXPECT_NE(0u, magma_semaphore_get_id(items[i].semaphore));
     }
 
-    magma_signal_semaphore(items[0].semaphore);
+    magma_semaphore_signal(items[0].semaphore);
 
     constexpr uint32_t kTimeoutMs = 100;
     constexpr uint64_t kNsPerMs = 1000000;
@@ -529,13 +541,13 @@ class TestConnection {
     }
 
     for (uint32_t i = 1; i < items.size(); i++) {
-      magma_signal_semaphore(items[i].semaphore);
+      magma_semaphore_signal(items[i].semaphore);
     }
 
     EXPECT_EQ(MAGMA_STATUS_OK, wait_all(items, 0));
 
     for (uint32_t i = 0; i < items.size(); i++) {
-      magma_reset_semaphore(items[i].semaphore);
+      magma_semaphore_reset(items[i].semaphore);
     }
 
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, wait_all(items, 0));
@@ -550,16 +562,16 @@ class TestConnection {
                                       std::chrono::steady_clock::now() - start)
                                       .count());
 
-    magma_signal_semaphore(items.back().semaphore);
+    magma_semaphore_signal(items.back().semaphore);
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(items.data(), to_uint32(items.size()), 0));
 
-    magma_reset_semaphore(items.back().semaphore);
+    magma_semaphore_reset(items.back().semaphore);
 
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, magma_poll(items.data(), to_uint32(items.size()), 0));
 
     for (auto& item : items) {
-      magma_release_semaphore(connection_, item.semaphore);
+      magma_connection_release_semaphore(connection_, item.semaphore);
     }
   }
 
@@ -570,7 +582,7 @@ class TestConnection {
 
     for (uint32_t i = 0; i < semaphore_count; i++) {
       magma_semaphore_t semaphore;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_create_semaphore(connection_, &semaphore));
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore));
 
       items.push_back({.semaphore = semaphore,
                        .type = MAGMA_POLL_TYPE_SEMAPHORE,
@@ -578,7 +590,7 @@ class TestConnection {
     }
 
     items.push_back({
-        .handle = magma_get_notification_channel_handle(connection_),
+        .handle = magma_connection_get_notification_channel_handle(connection_),
         .type = MAGMA_POLL_TYPE_HANDLE,
         .condition = MAGMA_POLL_CONDITION_READABLE,
     });
@@ -594,13 +606,13 @@ class TestConnection {
     if (semaphore_count == 0)
       return;
 
-    magma_signal_semaphore(items[0].semaphore);
+    magma_semaphore_signal(items[0].semaphore);
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(items.data(), to_uint32(items.size()), 0));
     EXPECT_EQ(items[0].result, items[0].condition);
     EXPECT_EQ(items[1].result, 0u);
 
-    magma_reset_semaphore(items[0].semaphore);
+    magma_semaphore_reset(items[0].semaphore);
 
     start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
@@ -610,7 +622,7 @@ class TestConnection {
                               .count());
 
     for (uint32_t i = 0; i < semaphore_count; i++) {
-      magma_signal_semaphore(items[i].semaphore);
+      magma_semaphore_signal(items[i].semaphore);
     }
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(items.data(), to_uint32(items.size()), 0));
@@ -625,7 +637,7 @@ class TestConnection {
     }
 
     for (uint32_t i = 0; i < semaphore_count; i++) {
-      magma_release_semaphore(connection_, items[i].semaphore);
+      magma_connection_release_semaphore(connection_, items[i].semaphore);
     }
   }
 
@@ -637,7 +649,7 @@ class TestConnection {
     ASSERT_EQ(ZX_OK, zx::channel::create(0 /* flags */, &local, &remote));
 
     magma_semaphore_t semaphore;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_create_semaphore(connection_, &semaphore));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_semaphore(connection_, &semaphore));
 
     std::vector<magma_poll_item_t> items;
     items.push_back({.semaphore = semaphore,
@@ -657,13 +669,13 @@ class TestConnection {
                               std::chrono::steady_clock::now() - start)
                               .count());
 
-    magma_signal_semaphore(semaphore);
+    magma_semaphore_signal(semaphore);
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(items.data(), static_cast<uint32_t>(items.size()), 0));
     EXPECT_EQ(items[0].result, items[0].condition);
     EXPECT_EQ(items[1].result, 0u);
 
-    magma_reset_semaphore(semaphore);
+    magma_semaphore_reset(semaphore);
 
     start = std::chrono::steady_clock::now();
     EXPECT_EQ(MAGMA_STATUS_TIMED_OUT,
@@ -680,13 +692,13 @@ class TestConnection {
     EXPECT_EQ(items[0].result, 0u);
     EXPECT_EQ(items[1].result, items[1].condition);
 
-    magma_signal_semaphore(semaphore);
+    magma_semaphore_signal(semaphore);
 
     EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(items.data(), static_cast<uint32_t>(items.size()), 0));
     EXPECT_EQ(items[0].result, items[0].condition);
     EXPECT_EQ(items[1].result, items[1].condition);
 
-    magma_release_semaphore(connection_, semaphore);
+    magma_connection_release_semaphore(connection_, semaphore);
 #else
     GTEST_SKIP();
 #endif
@@ -721,20 +733,21 @@ class TestConnection {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
-    ASSERT_EQ(magma_create_semaphore(connection_, &semaphore), MAGMA_STATUS_OK);
-    *id_out = magma_get_semaphore_id(semaphore);
-    EXPECT_EQ(magma_export_semaphore(connection_, semaphore, handle_out), MAGMA_STATUS_OK);
-    magma_release_semaphore(connection_, semaphore);
+    ASSERT_EQ(magma_connection_create_semaphore(connection_, &semaphore), MAGMA_STATUS_OK);
+    *id_out = magma_semaphore_get_id(semaphore);
+    EXPECT_EQ(magma_connection_export_semaphore(connection_, semaphore, handle_out),
+              MAGMA_STATUS_OK);
+    magma_connection_release_semaphore(connection_, semaphore);
   }
 
   void SemaphoreImport(magma_handle_t handle, uint64_t exported_id) {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
-    ASSERT_EQ(magma_import_semaphore(connection_, handle, &semaphore), MAGMA_STATUS_OK);
-    EXPECT_NE(magma_get_semaphore_id(semaphore), exported_id);
+    ASSERT_EQ(magma_connection_import_semaphore(connection_, handle, &semaphore), MAGMA_STATUS_OK);
+    EXPECT_NE(magma_semaphore_get_id(semaphore), exported_id);
 
-    magma_release_semaphore(connection_, semaphore);
+    magma_connection_release_semaphore(connection_, semaphore);
   }
 
   static void SemaphoreImportExport(TestConnection* test1, TestConnection* test2) {
@@ -751,16 +764,16 @@ class TestConnection {
     ASSERT_TRUE(connection_);
 
     uint32_t context_id;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_create_context(connection_, &context_id));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection_, &context_id));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
     magma_inline_command_buffer inline_command_buffer{};
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_execute_immediate_commands2(connection_, context_id, 0,
-                                                                 &inline_command_buffer));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_execute_immediate_commands(
+                                   connection_, context_id, 0, &inline_command_buffer));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
 
-    magma_release_context(connection_, context_id);
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+    magma_connection_release_context(connection_, context_id);
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
   }
 
   void Sysmem(bool use_format_modifier) {
@@ -937,14 +950,16 @@ class TestConnection {
 
     // Ensure failure if result pointer not provided
     EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
-              magma_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, nullptr));
+              magma_device_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, nullptr));
 
     uint64_t device_id = 0;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, &device_id));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, &device_id));
     EXPECT_NE(0u, device_id);
 
     magma_handle_t unused;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_query(device_, MAGMA_QUERY_DEVICE_ID, &unused, &device_id));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_DEVICE_ID, &unused, &device_id));
     EXPECT_FALSE(is_valid_handle(unused));
     EXPECT_NE(0u, device_id);
   }
@@ -954,14 +969,16 @@ class TestConnection {
 
     // Ensure failure if result pointer not provided
     EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
-              magma_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, nullptr));
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, nullptr));
 
     uint64_t vendor_id = 0;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
     EXPECT_NE(0u, vendor_id);
 
     magma_handle_t unused;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_query(device_, MAGMA_QUERY_VENDOR_ID, &unused, &vendor_id));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, &unused, &vendor_id));
     EXPECT_FALSE(is_valid_handle(unused));
     EXPECT_NE(0u, vendor_id);
   }
@@ -975,7 +992,8 @@ class TestConnection {
 
     uint64_t query_id = 0;
     uint64_t vendor_id;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
+    ASSERT_EQ(MAGMA_STATUS_OK,
+              magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &vendor_id));
     switch (vendor_id) {
       case kVendorIdIntel:
         query_id = kMagmaIntelGenQueryTimestamp;
@@ -988,12 +1006,12 @@ class TestConnection {
     }
 
     // Ensure failure if handle pointer not provided
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_query(device_, query_id, nullptr, nullptr));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_device_query(device_, query_id, nullptr, nullptr));
 
     uint64_t before_ns = clock_gettime_monotonic_raw();
 
     magma_handle_t buffer_handle;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_query(device_, query_id, &buffer_handle, nullptr));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_device_query(device_, query_id, &buffer_handle, nullptr));
     EXPECT_TRUE(is_valid_handle(buffer_handle));
 
     uint64_t after_ns = clock_gettime_monotonic_raw();
@@ -1105,22 +1123,22 @@ class TestConnection {
 #else
     uint64_t counter = 5;
     magma_semaphore_t semaphore;
-    ASSERT_EQ(magma_create_semaphore(connection_, &semaphore), MAGMA_STATUS_OK);
+    ASSERT_EQ(magma_connection_create_semaphore(connection_, &semaphore), MAGMA_STATUS_OK);
     uint64_t size = page_size();
     magma_buffer_t buffer;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_create_buffer(connection_, size, &size, &buffer));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection_, size, &size, &buffer));
 
     EXPECT_EQ(MAGMA_STATUS_OK,
               magma_connection_enable_performance_counters(connection_, &counter, 1));
-    EXPECT_EQ(MAGMA_STATUS_ACCESS_DENIED, magma_get_error(connection_));
+    EXPECT_EQ(MAGMA_STATUS_ACCESS_DENIED, magma_connection_get_error(connection_));
 
     magma_perf_count_pool_t pool;
     magma_handle_t handle;
     EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST,
               magma_connection_create_performance_counter_buffer_pool(connection_, &pool, &handle));
 
-    magma_release_buffer(connection_, buffer);
-    magma_release_semaphore(connection_, semaphore);
+    magma_connection_release_buffer(connection_, buffer);
+    magma_connection_release_semaphore(connection_, semaphore);
 #endif
   }
 
@@ -1136,13 +1154,13 @@ class TestConnectionWithContext : public TestConnection {
  public:
   TestConnectionWithContext() {
     if (connection()) {
-      EXPECT_EQ(MAGMA_STATUS_OK, magma_create_context(connection(), &context_id_));
+      EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_context(connection(), &context_id_));
     }
   }
 
   ~TestConnectionWithContext() {
     if (connection()) {
-      magma_release_context(connection(), context_id_);
+      magma_connection_release_context(connection(), context_id_);
     }
   }
 
@@ -1161,10 +1179,11 @@ class TestConnectionWithContext : public TestConnection {
                                            .resources = resources,
                                            .command_buffers = &command_buffer};
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_execute_command(connection(), context_id(), &descriptor));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_connection_execute_command(connection(), context_id(), &descriptor));
 
     // Command buffer is mostly zeros, so we expect an error here
-    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_get_error(connection()));
+    EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_connection_get_error(connection()));
   }
 
   void ExecuteCommandNoResources() {
@@ -1172,10 +1191,11 @@ class TestConnectionWithContext : public TestConnection {
 
     magma_command_descriptor descriptor = {.resource_count = 0, .command_buffer_count = 0};
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_execute_command(connection(), context_id(), &descriptor));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_connection_execute_command(connection(), context_id(), &descriptor));
 
     // Empty command buffers may or may not be valid.
-    magma_status_t status = magma_get_error(connection());
+    magma_status_t status = magma_connection_get_error(connection());
     EXPECT_TRUE(status == MAGMA_STATUS_OK || status == MAGMA_STATUS_INVALID_ARGS ||
                 status == MAGMA_STATUS_UNIMPLEMENTED)
         << "status: " << status;
@@ -1194,9 +1214,10 @@ class TestConnectionWithContext : public TestConnection {
                                            .resources = resources.data(),
                                            .command_buffers = command_buffers.data()};
 
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_execute_command(connection(), context_id(), &descriptor));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_connection_execute_command(connection(), context_id(), &descriptor));
 
-    EXPECT_EQ(magma_get_error(connection()), MAGMA_STATUS_UNIMPLEMENTED);
+    EXPECT_EQ(magma_connection_get_error(connection()), MAGMA_STATUS_UNIMPLEMENTED);
   }
 
  private:
@@ -1403,44 +1424,45 @@ TEST_F(Magma, CommitBuffer) {
   magma_buffer_t buffer;
   uint64_t size_out;
   uint64_t buffer_size = page_size() * 10;
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            magma_create_buffer(connection.connection(), buffer_size, &size_out, &buffer));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection.connection(), buffer_size,
+                                                            &size_out, &buffer));
   magma_buffer_info_t info;
   EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(connection.connection(), buffer, &info));
   EXPECT_EQ(info.size, buffer_size);
   EXPECT_EQ(0u, info.committed_byte_count);
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
-            magma_buffer_range_op(connection.connection(), buffer, MAGMA_BUFFER_RANGE_OP_COMMIT, 0,
-                                  page_size() + 1));
-  EXPECT_EQ(MAGMA_STATUS_MEMORY_ERROR,
-            magma_buffer_range_op(connection.connection(), buffer, MAGMA_BUFFER_RANGE_OP_COMMIT,
-                                  page_size(), buffer_size));
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            magma_buffer_range_op(connection.connection(), buffer, MAGMA_BUFFER_RANGE_OP_COMMIT,
-                                  page_size(), page_size()));
+            magma_connection_buffer_range_op(connection.connection(), buffer,
+                                             MAGMA_BUFFER_RANGE_OP_COMMIT, 0, page_size() + 1));
+  EXPECT_EQ(MAGMA_STATUS_MEMORY_ERROR, magma_connection_buffer_range_op(
+                                           connection.connection(), buffer,
+                                           MAGMA_BUFFER_RANGE_OP_COMMIT, page_size(), buffer_size));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
+                                                              MAGMA_BUFFER_RANGE_OP_COMMIT,
+                                                              page_size(), page_size()));
   EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(connection.connection(), buffer, &info));
   EXPECT_EQ(page_size(), info.committed_byte_count);
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
-            magma_buffer_range_op(connection.connection(), buffer, MAGMA_BUFFER_RANGE_OP_DECOMMIT,
-                                  0, page_size() + 1));
-  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
-            magma_buffer_range_op(connection.connection(), buffer, MAGMA_BUFFER_RANGE_OP_DECOMMIT,
-                                  page_size(), buffer_size));
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            magma_buffer_range_op(connection.connection(), buffer, MAGMA_BUFFER_RANGE_OP_DECOMMIT,
-                                  2 * page_size(), page_size()));
+            magma_connection_buffer_range_op(connection.connection(), buffer,
+                                             MAGMA_BUFFER_RANGE_OP_DECOMMIT, 0, page_size() + 1));
+  EXPECT_EQ(
+      MAGMA_STATUS_INVALID_ARGS,
+      magma_connection_buffer_range_op(connection.connection(), buffer,
+                                       MAGMA_BUFFER_RANGE_OP_DECOMMIT, page_size(), buffer_size));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
+                                                              MAGMA_BUFFER_RANGE_OP_DECOMMIT,
+                                                              2 * page_size(), page_size()));
   EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(connection.connection(), buffer, &info));
   EXPECT_EQ(page_size(), info.committed_byte_count);
 
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            magma_buffer_range_op(connection.connection(), buffer, MAGMA_BUFFER_RANGE_OP_DECOMMIT,
-                                  page_size(), page_size()));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
+                                                              MAGMA_BUFFER_RANGE_OP_DECOMMIT,
+                                                              page_size(), page_size()));
   EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(connection.connection(), buffer, &info));
   EXPECT_EQ(0u, info.committed_byte_count);
 
-  magma_release_buffer(connection.connection(), buffer);
+  magma_connection_release_buffer(connection.connection(), buffer);
 }
 
 TEST_F(Magma, MapWithBufferHandle2) {
@@ -1450,11 +1472,11 @@ TEST_F(Magma, MapWithBufferHandle2) {
   uint64_t actual_size;
   constexpr uint64_t kBufferSizeInPages = 10;
   EXPECT_EQ(MAGMA_STATUS_OK,
-            magma_create_buffer(connection.connection(), kBufferSizeInPages * page_size(),
-                                &actual_size, &buffer));
+            magma_connection_create_buffer(
+                connection.connection(), kBufferSizeInPages * page_size(), &actual_size, &buffer));
 
   magma_handle_t handle;
-  ASSERT_EQ(MAGMA_STATUS_OK, magma_get_buffer_handle2(buffer, &handle));
+  ASSERT_EQ(MAGMA_STATUS_OK, magma_buffer_get_handle(buffer, &handle));
 
   void* full_range_ptr;
   ASSERT_TRUE(magma::MapCpuHelper(buffer, 0 /*offset*/, actual_size, &full_range_ptr));
@@ -1496,7 +1518,7 @@ TEST_F(Magma, MapWithBufferHandle2) {
     EXPECT_TRUE(magma::UnmapCpuHelper(first_page_ptr, page_size()));
   }
 
-  magma_release_buffer(connection.connection(), buffer);
+  magma_connection_release_buffer(connection.connection(), buffer);
 }
 
 TEST_F(Magma, MaxBufferHandle2) {
@@ -1506,8 +1528,8 @@ TEST_F(Magma, MaxBufferHandle2) {
   uint64_t actual_size;
   constexpr uint64_t kBufferSizeInPages = 1;
   ASSERT_EQ(MAGMA_STATUS_OK,
-            magma_create_buffer(connection.connection(), kBufferSizeInPages * page_size(),
-                                &actual_size, &buffer));
+            magma_connection_create_buffer(
+                connection.connection(), kBufferSizeInPages * page_size(), &actual_size, &buffer));
 
   std::unordered_set<magma_handle_t> handles;
 
@@ -1517,7 +1539,7 @@ TEST_F(Magma, MaxBufferHandle2) {
   for (size_t i = 0; i < kMaxBufferHandles; i++) {
     magma_handle_t handle;
 
-    magma_status_t status = magma_get_buffer_handle2(buffer, &handle);
+    magma_status_t status = magma_buffer_get_handle(buffer, &handle);
     if (status != MAGMA_STATUS_OK) {
       EXPECT_EQ(status, MAGMA_STATUS_OK) << "magma_get_buffer_handle2 failed count: " << i;
       break;
@@ -1535,7 +1557,7 @@ TEST_F(Magma, MaxBufferHandle2) {
 #endif
   }
 
-  magma_release_buffer(connection.connection(), buffer);
+  magma_connection_release_buffer(connection.connection(), buffer);
 }
 
 TEST_F(Magma, MaxBufferMappings) {
@@ -1545,8 +1567,8 @@ TEST_F(Magma, MaxBufferMappings) {
   uint64_t actual_size;
   constexpr uint64_t kBufferSizeInPages = 1;
   ASSERT_EQ(MAGMA_STATUS_OK,
-            magma_create_buffer(connection.connection(), kBufferSizeInPages * page_size(),
-                                &actual_size, &buffer));
+            magma_connection_create_buffer(
+                connection.connection(), kBufferSizeInPages * page_size(), &actual_size, &buffer));
 
   std::unordered_set<void*> maps;
 
@@ -1568,10 +1590,10 @@ TEST_F(Magma, MaxBufferMappings) {
     EXPECT_TRUE(magma::UnmapCpuHelper(ptr, actual_size));
   }
 
-  magma_release_buffer(connection.connection(), buffer);
+  magma_connection_release_buffer(connection.connection(), buffer);
 }
 
 TEST_F(Magma, Flush) {
   TestConnection connection;
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_flush(connection.connection()));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_flush(connection.connection()));
 }

@@ -134,26 +134,28 @@ void VirtioMagma::NotifyQueue(uint16_t queue) {
 }
 
 // Returns the notification data after the response struct.
-zx_status_t VirtioMagma::Handle_read_notification_channel2(VirtioDescriptor* request_desc,
-                                                           VirtioDescriptor* response_desc,
-                                                           uint32_t* used_out) {
-  auto request_copy =
-      *reinterpret_cast<virtio_magma_read_notification_channel2_ctrl_t*>(request_desc->addr);
+zx_status_t VirtioMagma::Handle_connection_read_notification_channel(
+    VirtioDescriptor* request_desc, VirtioDescriptor* response_desc, uint32_t* used_out) {
+  auto request_copy = *reinterpret_cast<virtio_magma_connection_read_notification_channel_ctrl_t*>(
+      request_desc->addr);
 
-  virtio_magma_read_notification_channel2_resp_t response{};
+  virtio_magma_connection_read_notification_channel_resp_t response{};
 
   if (response_desc->len < sizeof(response) + request_copy.buffer_size) {
-    FX_LOGS(ERROR) << "VIRTIO_MAGMA_CMD_READ_NOTIFICATION_CHANNEL2: response descriptor too small";
+    FX_LOGS(ERROR)
+        << "VIRTIO_MAGMA_CMD_CONNECTION_READ_NOTIFICATION_CHANNEL: response descriptor too small";
     return ZX_ERR_INVALID_ARGS;
   }
 
   auto notification_buffer =
-      reinterpret_cast<virtio_magma_read_notification_channel2_resp_t*>(response_desc->addr) + 1;
+      reinterpret_cast<virtio_magma_connection_read_notification_channel_resp_t*>(
+          response_desc->addr) +
+      1;
 
   request_copy.buffer = reinterpret_cast<uint64_t>(notification_buffer);
 
   zx_status_t status =
-      VirtioMagmaGeneric::Handle_read_notification_channel2(&request_copy, &response);
+      VirtioMagmaGeneric::Handle_connection_read_notification_channel(&request_copy, &response);
   if (status != ZX_OK)
     return status;
 
@@ -174,23 +176,22 @@ zx_status_t VirtioMagma::Handle_read_notification_channel2(VirtioDescriptor* req
 }
 
 // Returns the buffer size after the response struct.
-zx_status_t VirtioMagma::Handle_get_buffer_handle2(VirtioDescriptor* request_desc,
-                                                   VirtioDescriptor* response_desc,
-                                                   uint32_t* used_out) {
-  virtio_magma_get_buffer_handle2_resp_t response = {
-      .hdr = {.type = VIRTIO_MAGMA_RESP_GET_BUFFER_HANDLE2}};
+zx_status_t VirtioMagma::Handle_buffer_get_handle(VirtioDescriptor* request_desc,
+                                                  VirtioDescriptor* response_desc,
+                                                  uint32_t* used_out) {
+  virtio_magma_buffer_get_handle_resp_t response = {
+      .hdr = {.type = VIRTIO_MAGMA_RESP_BUFFER_GET_HANDLE}};
 
   if (response_desc->len < sizeof(response) + sizeof(uint64_t)) {
-    FX_LOGS(ERROR) << "VIRTIO_MAGMA_CMD_GET_BUFFER_HANDLE2: response descriptor too small";
+    FX_LOGS(ERROR) << "VIRTIO_MAGMA_CMD_BUFFER_GET_HANDLE: response descriptor too small";
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto request_copy =
-      *reinterpret_cast<virtio_magma_get_buffer_handle2_ctrl_t*>(request_desc->addr);
+  auto request_copy = *reinterpret_cast<virtio_magma_buffer_get_handle_ctrl_t*>(request_desc->addr);
 
   zx::vmo vmo;
   response.result_return =
-      magma_get_buffer_handle2(request_copy.buffer, vmo.reset_and_get_address());
+      magma_buffer_get_handle(request_copy.buffer, vmo.reset_and_get_address());
   response.handle_out = vmo.get();
 
   memcpy(response_desc->addr, &response, sizeof(response));
@@ -203,7 +204,7 @@ zx_status_t VirtioMagma::Handle_get_buffer_handle2(VirtioDescriptor* request_des
       return status;
 
     void* buffer_size_ptr =
-        reinterpret_cast<virtio_magma_get_buffer_handle2_resp_t*>(response_desc->addr) + 1;
+        reinterpret_cast<virtio_magma_buffer_get_handle_resp_t*>(response_desc->addr) + 1;
     memcpy(buffer_size_ptr, &buffer_size, sizeof(buffer_size));
     *used_out += sizeof(buffer_size);
 
@@ -215,11 +216,11 @@ zx_status_t VirtioMagma::Handle_get_buffer_handle2(VirtioDescriptor* request_des
 }
 
 // Returns the buffer size after the response struct.
-zx_status_t VirtioMagma::Handle_query(VirtioDescriptor* request_desc,
-                                      VirtioDescriptor* response_desc, uint32_t* used_out) {
-  virtio_magma_query_resp_t response = {.hdr = {.type = VIRTIO_MAGMA_RESP_QUERY}};
+zx_status_t VirtioMagma::Handle_device_query(VirtioDescriptor* request_desc,
+                                             VirtioDescriptor* response_desc, uint32_t* used_out) {
+  virtio_magma_device_query_resp_t response = {.hdr = {.type = VIRTIO_MAGMA_RESP_DEVICE_QUERY}};
 
-  auto request_copy = *reinterpret_cast<virtio_magma_query_ctrl_t*>(request_desc->addr);
+  auto request_copy = *reinterpret_cast<virtio_magma_device_query_ctrl_t*>(request_desc->addr);
 
   const auto device = request_copy.device;
   const auto id = request_copy.id;
@@ -227,10 +228,10 @@ zx_status_t VirtioMagma::Handle_query(VirtioDescriptor* request_desc,
   zx::vmo vmo;
   uint64_t result;
 
-  response.result_return = magma_query(device, id, vmo.reset_and_get_address(), &result);
+  response.result_return = magma_device_query(device, id, vmo.reset_and_get_address(), &result);
 
   if (response_desc->len < sizeof(response) + (vmo.is_valid() ? sizeof(uint64_t) : 0)) {
-    FX_LOGS(ERROR) << "VIRTIO_MAGMA_CMD_QUERY: response descriptor too small";
+    FX_LOGS(ERROR) << "VIRTIO_MAGMA_CMD_DEVICE_QUERY: response descriptor too small";
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -246,7 +247,8 @@ zx_status_t VirtioMagma::Handle_query(VirtioDescriptor* request_desc,
     if (status != ZX_OK)
       return status;
 
-    void* buffer_size_ptr = reinterpret_cast<virtio_magma_query_resp_t*>(response_desc->addr) + 1;
+    void* buffer_size_ptr =
+        reinterpret_cast<virtio_magma_device_query_resp_t*>(response_desc->addr) + 1;
     memcpy(buffer_size_ptr, &buffer_size, sizeof(buffer_size));
     *used_out += sizeof(buffer_size);
 
@@ -274,10 +276,10 @@ zx_status_t VirtioMagma::Handle_device_import(const virtio_magma_device_import_c
   return VirtioMagmaGeneric::Handle_device_import(&modified, response);
 }
 
-zx_status_t VirtioMagma::Handle_release_connection(
-    const virtio_magma_release_connection_ctrl_t* request,
-    virtio_magma_release_connection_resp_t* response) {
-  zx_status_t status = VirtioMagmaGeneric::Handle_release_connection(request, response);
+zx_status_t VirtioMagma::Handle_connection_release(
+    const virtio_magma_connection_release_ctrl_t* request,
+    virtio_magma_connection_release_resp_t* response) {
+  zx_status_t status = VirtioMagmaGeneric::Handle_connection_release(request, response);
   if (status != ZX_OK)
     return ZX_OK;
 
@@ -288,9 +290,10 @@ zx_status_t VirtioMagma::Handle_release_connection(
   return ZX_OK;
 }
 
-zx_status_t VirtioMagma::Handle_release_buffer(const virtio_magma_release_buffer_ctrl_t* request,
-                                               virtio_magma_release_buffer_resp_t* response) {
-  zx_status_t status = VirtioMagmaGeneric::Handle_release_buffer(request, response);
+zx_status_t VirtioMagma::Handle_connection_release_buffer(
+    const virtio_magma_connection_release_buffer_ctrl_t* request,
+    virtio_magma_connection_release_buffer_resp_t* response) {
+  zx_status_t status = VirtioMagmaGeneric::Handle_connection_release_buffer(request, response);
   if (status != ZX_OK)
     return ZX_OK;
 
@@ -431,11 +434,12 @@ zx_status_t VirtioMagma::Handle_poll(VirtioDescriptor* request_desc,
   return status;
 }
 
-zx_status_t VirtioMagma::Handle_export(const virtio_magma_export_ctrl_t* request,
-                                       virtio_magma_export_resp_t* response) {
+zx_status_t VirtioMagma::Handle_connection_export_buffer(
+    const virtio_magma_connection_export_buffer_ctrl_t* request,
+    virtio_magma_connection_export_buffer_resp_t* response) {
   if (!wayland_importer_) {
     LOG_VERBOSE("driver attempted to export a buffer without wayland present");
-    response->hdr.type = VIRTIO_MAGMA_RESP_EXPORT;
+    response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER;
     response->buffer_handle_out = 0;
     response->result_return = MAGMA_STATUS_UNIMPLEMENTED;
     return ZX_OK;
@@ -451,7 +455,7 @@ zx_status_t VirtioMagma::Handle_export(const virtio_magma_export_ctrl_t* request
     const uint64_t buffer = request->buffer;
     auto iter = image_map.find(buffer);
     if (iter == image_map.end()) {
-      response->hdr.type = VIRTIO_MAGMA_RESP_EXPORT;
+      response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER;
       response->buffer_handle_out = 0;
       response->result_return = MAGMA_STATUS_INVALID_ARGS;
       return ZX_OK;
@@ -460,7 +464,7 @@ zx_status_t VirtioMagma::Handle_export(const virtio_magma_export_ctrl_t* request
     ImageInfoWithToken& info = iter->second;
 
     // Get the VMO handle for this buffer.
-    zx_status_t status = VirtioMagmaGeneric::Handle_export(request, response);
+    zx_status_t status = VirtioMagmaGeneric::Handle_connection_export_buffer(request, response);
     if (status != ZX_OK) {
       LOG_VERBOSE("VirtioMagmaGeneric::Handle_export failed: %d", status);
       return status;
@@ -495,11 +499,12 @@ zx_status_t VirtioMagma::Handle_export(const virtio_magma_export_ctrl_t* request
   return ZX_OK;
 }
 
-zx_status_t VirtioMagma::Handle_import(const virtio_magma_import_ctrl_t* request,
-                                       virtio_magma_import_resp_t* response) {
+zx_status_t VirtioMagma::Handle_connection_import_buffer(
+    const virtio_magma_connection_import_buffer_ctrl_t* request,
+    virtio_magma_connection_import_buffer_resp_t* response) {
   if (!wayland_importer_) {
     LOG_VERBOSE("driver attempted to import a buffer without wayland present");
-    response->hdr.type = VIRTIO_MAGMA_RESP_IMPORT;
+    response->hdr.type = VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER;
     response->result_return = MAGMA_STATUS_UNIMPLEMENTED;
     return ZX_OK;
   }
@@ -527,10 +532,10 @@ zx_status_t VirtioMagma::Handle_import(const virtio_magma_import_ctrl_t* request
   InitFromVirtioImage(*image.get(), &vmo, &info);
 
   {
-    virtio_magma_import_ctrl_t request_copy = *request;
+    virtio_magma_connection_import_buffer_ctrl_t request_copy = *request;
     request_copy.buffer_handle = vmo.release();
 
-    status = VirtioMagmaGeneric::Handle_import(&request_copy, response);
+    status = VirtioMagmaGeneric::Handle_connection_import_buffer(&request_copy, response);
     if (status != ZX_OK)
       return status;
   }
@@ -546,12 +551,12 @@ zx_status_t VirtioMagma::Handle_import(const virtio_magma_import_ctrl_t* request
 }
 
 // Command structures come after the request struct.
-zx_status_t VirtioMagma::Handle_execute_command(VirtioDescriptor* request_desc,
-                                                VirtioDescriptor* response_desc,
-                                                uint32_t* used_out) {
+zx_status_t VirtioMagma::Handle_connection_execute_command(VirtioDescriptor* request_desc,
+                                                           VirtioDescriptor* response_desc,
+                                                           uint32_t* used_out) {
   auto request_ptr = reinterpret_cast<uint8_t*>(request_desc->addr);
 
-  auto request = *reinterpret_cast<virtio_magma_execute_command_ctrl_t*>(request_ptr);
+  auto request = *reinterpret_cast<virtio_magma_connection_execute_command_ctrl_t*>(request_ptr);
 
   struct WireDescriptor {
     uint32_t resource_count;
@@ -601,9 +606,9 @@ zx_status_t VirtioMagma::Handle_execute_command(VirtioDescriptor* request_desc,
 
   request.descriptor = reinterpret_cast<uintptr_t>(&magma_descriptor);
 
-  virtio_magma_execute_command_resp_t response{};
+  virtio_magma_connection_execute_command_resp_t response{};
 
-  zx_status_t status = VirtioMagmaGeneric::Handle_execute_command(&request, &response);
+  zx_status_t status = VirtioMagmaGeneric::Handle_connection_execute_command(&request, &response);
 
   if (status == ZX_OK) {
     memcpy(response_desc->addr, &response, sizeof(response));
@@ -614,13 +619,14 @@ zx_status_t VirtioMagma::Handle_execute_command(VirtioDescriptor* request_desc,
 }
 
 // Image create info comes after the request struct.
-zx_status_t VirtioMagma::Handle_virt_create_image(VirtioDescriptor* request_desc,
-                                                  VirtioDescriptor* response_desc,
-                                                  uint32_t* used_out) {
+zx_status_t VirtioMagma::Handle_virt_connection_create_image(VirtioDescriptor* request_desc,
+                                                             VirtioDescriptor* response_desc,
+                                                             uint32_t* used_out) {
   magma_connection_t connection{};
   magma_image_create_info_t image_create_info{};
   {
-    auto request = reinterpret_cast<virtio_magma_virt_create_image_ctrl_t*>(request_desc->addr);
+    auto request =
+        reinterpret_cast<virtio_magma_virt_connection_create_image_ctrl_t*>(request_desc->addr);
 
     connection = reinterpret_cast<magma_connection_t>(request->connection);
     image_create_info = *reinterpret_cast<magma_image_create_info_t*>(request + 1);
@@ -634,8 +640,8 @@ zx_status_t VirtioMagma::Handle_virt_create_image(VirtioDescriptor* request_desc
   ImageInfoWithToken image_info;
   zx::vmo vmo;
 
-  virtio_magma_virt_create_image_resp_t response = {
-      .hdr = {.type = VIRTIO_MAGMA_RESP_VIRT_CREATE_IMAGE}};
+  virtio_magma_virt_connection_create_image_resp_t response = {
+      .hdr = {.type = VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE}};
 
   // Assuming the current connection is on the one and only physical device.
   uint32_t physical_device_index = 0;
@@ -644,7 +650,7 @@ zx_status_t VirtioMagma::Handle_virt_create_image(VirtioDescriptor* request_desc
 
   if (response.result_return == MAGMA_STATUS_OK) {
     magma_buffer_t image;
-    response.result_return = magma_import(connection, vmo.release(), &image);
+    response.result_return = magma_connection_import_buffer(connection, vmo.release(), &image);
 
     if (response.result_return == MAGMA_STATUS_OK) {
       response.image_out = image;
@@ -662,14 +668,15 @@ zx_status_t VirtioMagma::Handle_virt_create_image(VirtioDescriptor* request_desc
 }
 
 // Image info comes after the request struct.
-zx_status_t VirtioMagma::Handle_virt_get_image_info(VirtioDescriptor* request_desc,
-                                                    VirtioDescriptor* response_desc,
-                                                    uint32_t* used_out) {
+zx_status_t VirtioMagma::Handle_virt_connection_get_image_info(VirtioDescriptor* request_desc,
+                                                               VirtioDescriptor* response_desc,
+                                                               uint32_t* used_out) {
   auto request_copy =
-      *reinterpret_cast<virtio_magma_virt_get_image_info_ctrl_t*>(request_desc->addr);
+      *reinterpret_cast<virtio_magma_virt_connection_get_image_info_ctrl_t*>(request_desc->addr);
 
   if (request_desc->len < sizeof(request_copy) + sizeof(magma_image_info_t)) {
-    FX_LOGS(ERROR) << "VIRTIO_MAGMA_CMD_VIRT_GET_IMAGE_INFO: request descriptor too small";
+    FX_LOGS(ERROR)
+        << "VIRTIO_MAGMA_CMD_VIRT_CONNECTION_GET_IMAGE_INFO: request descriptor too small";
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -677,8 +684,8 @@ zx_status_t VirtioMagma::Handle_virt_get_image_info(VirtioDescriptor* request_de
 
   auto& map = connection_image_map_[connection];
 
-  virtio_magma_virt_get_image_info_resp_t response = {
-      .hdr = {.type = VIRTIO_MAGMA_RESP_VIRT_GET_IMAGE_INFO}};
+  virtio_magma_virt_connection_get_image_info_resp_t response = {
+      .hdr = {.type = VIRTIO_MAGMA_RESP_VIRT_CONNECTION_GET_IMAGE_INFO}};
 
   response.result_return = MAGMA_STATUS_INVALID_ARGS;
 
@@ -687,7 +694,8 @@ zx_status_t VirtioMagma::Handle_virt_get_image_info(VirtioDescriptor* request_de
     ImageInfoWithToken& image_info = iter->second;
 
     auto image_info_out = reinterpret_cast<magma_image_info_t*>(
-        reinterpret_cast<virtio_magma_virt_get_image_info_ctrl_t*>(request_desc->addr) + 1);
+        reinterpret_cast<virtio_magma_virt_connection_get_image_info_ctrl_t*>(request_desc->addr) +
+        1);
     *image_info_out = image_info.info;
 
     response.result_return = MAGMA_STATUS_OK;

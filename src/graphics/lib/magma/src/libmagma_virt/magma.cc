@@ -89,8 +89,8 @@ magma_status_t magma_poll(magma_poll_item_t* items, uint32_t count, uint64_t tim
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t magma_execute_command(magma_connection_t connection, uint32_t context_id,
-                                     struct magma_command_descriptor* descriptor) {
+magma_status_t magma_connection_execute_command(magma_connection_t connection, uint32_t context_id,
+                                                struct magma_command_descriptor* descriptor) {
 #if VIRTMAGMA_DEBUG
   printf("%s\n", __PRETTY_FUNCTION__);
 #endif
@@ -124,8 +124,9 @@ magma_status_t magma_execute_command(magma_connection_t connection, uint32_t con
                         (descriptor->wait_semaphore_count + descriptor->signal_semaphore_count),
       .semaphores = reinterpret_cast<uintptr_t>(descriptor->semaphore_ids)};
 
-  virtio_magma_execute_command_ctrl request{.hdr = {.type = VIRTIO_MAGMA_CMD_EXECUTE_COMMAND}};
-  virtio_magma_execute_command_resp response{};
+  virtio_magma_connection_execute_command_ctrl request{
+      .hdr = {.type = VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_COMMAND}};
+  virtio_magma_connection_execute_command_resp response{};
 
   auto connection_wrapped = virtmagma_connection_t::Get(connection);
   request.connection = reinterpret_cast<uint64_t>(connection_wrapped->Object());
@@ -150,9 +151,9 @@ magma_status_t magma_initialize_tracing(magma_handle_t channel) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
-magma_status_t magma_virt_create_image(magma_connection_t connection,
-                                       magma_image_create_info_t* create_info,
-                                       magma_buffer_t* image_out) {
+magma_status_t magma_virt_connection_create_image(magma_connection_t connection,
+                                                  magma_image_create_info_t* create_info,
+                                                  magma_buffer_t* image_out) {
   auto connection_wrapped = virtmagma_connection_t::Get(connection);
 
 #if VIRTMAGMA_DEBUG
@@ -170,19 +171,19 @@ magma_status_t magma_virt_create_image(magma_connection_t connection,
     .create_info_size = sizeof(magma_image_create_info_t),
   };
 
-  virtio_magma_virt_create_image_ctrl_t request{
-      .hdr = {.type = VIRTIO_MAGMA_CMD_VIRT_CREATE_IMAGE},
+  virtio_magma_virt_connection_create_image_ctrl_t request{
+      .hdr = {.type = VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE},
       .connection = reinterpret_cast<uint64_t>(connection_wrapped->Object()),
       .create_info = reinterpret_cast<uintptr_t>(&wrapper),
   };
-  virtio_magma_virt_create_image_resp_t response{};
+  virtio_magma_virt_connection_create_image_resp_t response{};
 
   if (!virtmagma_send_command(connection_wrapped->Parent().fd(), &request, sizeof(request),
                               &response, sizeof(response))) {
     assert(false);
     return DRET(MAGMA_STATUS_INTERNAL_ERROR);
   }
-  if (response.hdr.type != VIRTIO_MAGMA_RESP_VIRT_CREATE_IMAGE)
+  if (response.hdr.type != VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE)
     return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Wrong response header: %u", response.hdr.type);
 
   magma_status_t result_return = static_cast<decltype(result_return)>(response.result_return);
@@ -194,8 +195,9 @@ magma_status_t magma_virt_create_image(magma_connection_t connection,
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t magma_virt_get_image_info(magma_connection_t connection, magma_buffer_t image,
-                                         magma_image_info_t* image_info_out) {
+magma_status_t magma_virt_connection_get_image_info(magma_connection_t connection,
+                                                    magma_buffer_t image,
+                                                    magma_image_info_t* image_info_out) {
 #if VIRTMAGMA_DEBUG
   printf("%s\n", __PRETTY_FUNCTION__);
   printf("image = %lu\n", image);
@@ -213,23 +215,23 @@ magma_status_t magma_virt_get_image_info(magma_connection_t connection, magma_bu
     .image_info_size = sizeof(magma_image_info_t),
   };
 
-  virtio_magma_virt_get_image_info_ctrl_t request{
+  virtio_magma_virt_connection_get_image_info_ctrl_t request{
       .hdr =
           {
-              .type = VIRTIO_MAGMA_CMD_VIRT_GET_IMAGE_INFO,
+              .type = VIRTIO_MAGMA_CMD_VIRT_CONNECTION_GET_IMAGE_INFO,
           },
       .connection = reinterpret_cast<uint64_t>(connection_wrapped->Object()),
       .image = image_wrapped->Object(),
       .image_info_out = reinterpret_cast<uintptr_t>(&wrapper),
   };
-  virtio_magma_virt_get_image_info_resp_t response{};
+  virtio_magma_virt_connection_get_image_info_resp_t response{};
 
   if (!virtmagma_send_command(connection_wrapped->Parent().fd(), &request, sizeof(request),
                               &response, sizeof(response))) {
     assert(false);
     return DRET(MAGMA_STATUS_INTERNAL_ERROR);
   }
-  if (response.hdr.type != VIRTIO_MAGMA_RESP_VIRT_GET_IMAGE_INFO)
+  if (response.hdr.type != VIRTIO_MAGMA_RESP_VIRT_CONNECTION_GET_IMAGE_INFO)
     return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Wrong response header: %u", response.hdr.type);
 
   magma_status_t result_return = static_cast<decltype(result_return)>(response.result_return);
@@ -239,16 +241,16 @@ magma_status_t magma_virt_get_image_info(magma_connection_t connection, magma_bu
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t magma_query(magma_device_t device, uint64_t id, magma_handle_t* result_buffer_out,
-                           uint64_t* result_out) {
+magma_status_t magma_device_query(magma_device_t device, uint64_t id,
+                                  magma_handle_t* result_buffer_out, uint64_t* result_out) {
   auto device_wrapped = virtmagma_device_t::Get(device);
   device = device_wrapped->Object();
 
   int32_t file_descriptor = device_wrapped->Parent().fd();
 
-  virtio_magma_query_ctrl_t request{
-      .hdr = {.type = VIRTIO_MAGMA_CMD_QUERY}, .device = device, .id = id};
-  virtio_magma_query_resp_t response{};
+  virtio_magma_device_query_ctrl_t request{
+      .hdr = {.type = VIRTIO_MAGMA_CMD_DEVICE_QUERY}, .device = device, .id = id};
+  virtio_magma_device_query_resp_t response{};
 
   bool success = virtmagma_send_command(file_descriptor, &request, sizeof(request), &response,
                                         sizeof(response));
@@ -259,7 +261,7 @@ magma_status_t magma_query(magma_device_t device, uint64_t id, magma_handle_t* r
   if (status != MAGMA_STATUS_OK)
     return DRET(status);
 
-  if (response.hdr.type != VIRTIO_MAGMA_RESP_QUERY)
+  if (response.hdr.type != VIRTIO_MAGMA_RESP_DEVICE_QUERY)
     return DRET(MAGMA_STATUS_INTERNAL_ERROR);
 
   int fd = static_cast<int>(response.result_buffer_out);

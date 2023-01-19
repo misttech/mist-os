@@ -56,6 +56,7 @@ def license():
         '// Use of this source code is governed by a BSD-style license that can be\n'
         '// found in the LICENSE file.\n')
 
+
 def top_level_docs():
     return (
         '// Magma is the driver model for GPUs/NPUs on Fuchsia.\n'
@@ -81,8 +82,8 @@ def top_level_docs():
         '// where possible to allow for efficient pipelining of requests.\n'
         '//\n'
         '// [0] https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0198_magma_api_design\n'
-        '//\n'
-    )
+        '//\n')
+
 
 # Guard macro that goes at the beginning/end of the header (after license).
 def guards(begin):
@@ -116,6 +117,10 @@ def genformatoff():
     return '// clang-format off\n'
 
 
+def soft_transition():
+    return '#include "magma_soft_transition.h"\n'
+
+
 def main():
     if (len(sys.argv) != 3):
         usage()
@@ -131,9 +136,10 @@ def main():
                     genformatoff(),
                     guards(True),
                     includes(),
-                    externs(True)
+                    externs(True),
                 ]
                 lines.extend(format_export(e) for e in magma['exports'])
+                lines.append(soft_transition())
                 lines.append(externs(False))
                 lines.append(guards(False))
                 lines.append('')

@@ -61,15 +61,15 @@ where
 ///
 /// SAFETY: Makes an FFI call to populate the fields of `response`.
 pub fn create_connection(
-    control: virtio_magma_create_connection2_ctrl,
-    response: &mut virtio_magma_create_connection2_resp_t,
+    control: virtio_magma_device_create_connection_ctrl,
+    response: &mut virtio_magma_device_create_connection_resp_t,
 ) {
     let mut connection_out: magma_connection_t = 0;
     response.result_return =
-        unsafe { magma_create_connection2(control.device, &mut connection_out) as u64 };
+        unsafe { magma_device_create_connection(control.device, &mut connection_out) as u64 };
 
     response.connection_out = connection_out;
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CREATE_CONNECTION2 as u32;
+    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_CREATE_CONNECTION as u32;
 }
 
 /// Creates a DRM image VMO and imports it to magma.
@@ -83,8 +83,8 @@ pub fn create_connection(
 /// dealt with by magma.
 pub fn create_image(
     current_task: &CurrentTask,
-    control: virtio_magma_virt_create_image_ctrl_t,
-    response: &mut virtio_magma_virt_create_image_resp_t,
+    control: virtio_magma_virt_connection_create_image_ctrl_t,
+    response: &mut virtio_magma_virt_connection_create_image_resp_t,
 ) -> Result<BufferInfo, Errno> {
     let create_info_address = UserAddress::from(control.create_info);
     let create_info_ptr = current_task.mm.read_object(UserRef::new(create_info_address))?;
@@ -99,12 +99,16 @@ pub fn create_image(
 
     let mut buffer_out = magma_buffer_t::default();
     response.result_return = unsafe {
-        magma_import(control.connection as magma_connection_t, vmo.into_raw(), &mut buffer_out)
-            as u64
+        magma_connection_import_buffer(
+            control.connection as magma_connection_t,
+            vmo.into_raw(),
+            &mut buffer_out,
+        ) as u64
     };
 
     response.image_out = buffer_out;
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CREATE_IMAGE as u32;
+    response.hdr.type_ =
+        virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE as u32;
 
     Ok(BufferInfo::Image(ImageInfo { info, token }))
 }
@@ -186,8 +190,8 @@ struct WireDescriptor {
 /// SAFETY: Makes an FFI call to populate the fields of `response`.
 pub fn execute_command(
     current_task: &CurrentTask,
-    control: virtio_magma_execute_command_ctrl_t,
-    response: &mut virtio_magma_execute_command_resp_t,
+    control: virtio_magma_connection_execute_command_ctrl_t,
+    response: &mut virtio_magma_connection_execute_command_resp_t,
 ) -> Result<(), Errno> {
     let virtmagma_command_descriptor_addr =
         UserRef::<virtmagma_command_descriptor>::new(control.descriptor.into());
@@ -233,7 +237,7 @@ pub fn execute_command(
     magma_command_descriptor.semaphore_ids = &mut semaphores[0] as *mut u64;
 
     response.result_return = unsafe {
-        magma_execute_command(
+        magma_connection_execute_command(
             control.connection,
             control.context_id,
             &mut magma_command_descriptor as *mut magma_command_descriptor,
@@ -260,13 +264,13 @@ pub fn execute_command(
 /// a raw handle provided by magma.
 pub fn export_buffer(
     current_task: &CurrentTask,
-    control: virtio_magma_export_ctrl_t,
-    response: &mut virtio_magma_export_resp_t,
+    control: virtio_magma_connection_export_buffer_ctrl_t,
+    response: &mut virtio_magma_connection_export_buffer_resp_t,
     connections: &ConnectionMap,
 ) -> Result<(), Errno> {
     let mut buffer_handle_out = 0;
     let status = unsafe {
-        magma_export(
+        magma_connection_export_buffer(
             control.connection as magma_connection_t,
             control.buffer as magma_buffer_t,
             &mut buffer_handle_out as *mut magma_handle_t,
@@ -292,7 +296,7 @@ pub fn export_buffer(
     }
 
     response.result_return = status as u64;
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_EXPORT as u32;
+    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER as u32;
 
     Ok(())
 }
@@ -300,9 +304,12 @@ pub fn export_buffer(
 /// Calls flush on the provided `control.connection`.
 ///
 /// SAFETY: Makes an FFI call to magma, which is expected to handle invalid connection parameters.
-pub fn flush(control: virtio_magma_flush_ctrl_t, response: &mut virtio_magma_flush_resp_t) {
-    response.result_return = unsafe { magma_flush(control.connection) as u64 };
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_FLUSH as u32;
+pub fn flush(
+    control: virtio_magma_connection_flush_ctrl_t,
+    response: &mut virtio_magma_connection_flush_resp_t,
+) {
+    response.result_return = unsafe { magma_connection_flush(control.connection) as u64 };
+    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_FLUSH as u32;
 }
 
 /// Fetches a VMO handles from magma wraps it in a file, then adds that file to `current_task`.
@@ -316,12 +323,12 @@ pub fn flush(control: virtio_magma_flush_ctrl_t, response: &mut virtio_magma_flu
 /// FFI call succeeds. Either way, creating a `zx::Vmo` with an invalid handle is safe.
 pub fn get_buffer_handle(
     current_task: &CurrentTask,
-    control: virtio_magma_get_buffer_handle2_ctrl_t,
-    response: &mut virtio_magma_get_buffer_handle2_resp_t,
+    control: virtio_magma_buffer_get_handle_ctrl_t,
+    response: &mut virtio_magma_buffer_get_handle_resp_t,
 ) -> Result<(), Errno> {
     let mut buffer_handle_out = 0;
     let status = unsafe {
-        magma_get_buffer_handle2(
+        magma_buffer_get_handle(
             control.buffer as magma_buffer_t,
             &mut buffer_handle_out as *mut magma_handle_t,
         )
@@ -341,7 +348,7 @@ pub fn get_buffer_handle(
         response.result_return = MAGMA_STATUS_OK as u64;
     }
 
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_GET_BUFFER_HANDLE2 as u32;
+    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_HANDLE as u32;
 
     Ok(())
 }
@@ -351,11 +358,11 @@ pub fn get_buffer_handle(
 /// SAFETY: Makes an FFI call to magma. The buffer in `control` is expected to be valid, although
 /// handling invalid buffer handles is left to magma.
 pub fn get_buffer_size(
-    control: virtio_magma_get_buffer_size_ctrl_t,
-    response: &mut virtio_magma_get_buffer_size_resp_t,
+    control: virtio_magma_buffer_get_size_ctrl_t,
+    response: &mut virtio_magma_buffer_get_size_resp_t,
 ) {
-    response.result_return = unsafe { magma_get_buffer_size(control.buffer) };
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_GET_BUFFER_SIZE as u32;
+    response.result_return = unsafe { magma_buffer_get_size(control.buffer) };
+    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_BUFFER_GET_SIZE as u32;
 }
 
 /// Runs a magma query.
@@ -367,13 +374,14 @@ pub fn get_buffer_size(
 /// SAFETY: Makes an FFI call to populate the fields of `response`.
 pub fn query(
     current_task: &CurrentTask,
-    control: virtio_magma_query_ctrl_t,
-    response: &mut virtio_magma_query_resp_t,
+    control: virtio_magma_device_query_ctrl_t,
+    response: &mut virtio_magma_device_query_resp_t,
 ) -> Result<(), Errno> {
     let mut result_buffer_out = 0;
     let mut result_out = 0;
     response.result_return = unsafe {
-        magma_query(control.device, control.id, &mut result_buffer_out, &mut result_out) as u64
+        magma_device_query(control.device, control.id, &mut result_buffer_out, &mut result_out)
+            as u64
     };
 
     if result_buffer_out != zx::sys::ZX_HANDLE_INVALID {
@@ -403,8 +411,8 @@ pub fn query(
 /// buffer pointer always points to a valid vector, even if the provided buffer length is 0.
 pub fn read_notification_channel(
     current_task: &CurrentTask,
-    control: virtio_magma_read_notification_channel2_ctrl_t,
-    response: &mut virtio_magma_read_notification_channel2_resp_t,
+    control: virtio_magma_connection_read_notification_channel_ctrl_t,
+    response: &mut virtio_magma_connection_read_notification_channel_resp_t,
 ) -> Result<(), Errno> {
     // Buffer has a min length of 1 to make sure the call to
     // `magma_read_notification_channel2` uses a valid reference.
@@ -413,7 +421,7 @@ pub fn read_notification_channel(
     let mut more_data_out: u8 = 0;
 
     response.result_return = unsafe {
-        magma_read_notification_channel2(
+        magma_connection_read_notification_channel(
             control.connection as magma_connection_t,
             &mut buffer[0] as *mut u8 as *mut std::ffi::c_void,
             control.buffer_size,
@@ -424,7 +432,8 @@ pub fn read_notification_channel(
 
     response.more_data_out = more_data_out as u64;
     response.buffer_size_out = buffer_size_out;
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_READ_NOTIFICATION_CHANNEL2 as u32;
+    response.hdr.type_ =
+        virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_READ_NOTIFICATION_CHANNEL as u32;
 
     current_task.mm.write_memory(UserAddress::from(control.buffer), &buffer)?;
 
@@ -439,16 +448,16 @@ pub fn read_notification_channel(
 /// SAFETY: The passed in `control` is expected to contain a valid buffer, otherwise the FFI call
 /// will panic.
 pub fn release_buffer(
-    control: virtio_magma_release_buffer_ctrl_t,
-    response: &mut virtio_magma_release_buffer_resp_t,
+    control: virtio_magma_connection_release_buffer_ctrl_t,
+    response: &mut virtio_magma_connection_release_buffer_resp_t,
 ) {
     unsafe {
-        magma_release_buffer(
+        magma_connection_release_buffer(
             control.connection as magma_connection_t,
             control.buffer as magma_buffer_t,
         );
     }
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_RELEASE_BUFFER as u32;
+    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_BUFFER as u32;
 }
 
 /// Releases the provided `control.connection`.
@@ -461,14 +470,14 @@ pub fn release_buffer(
 ///
 /// SAFETY: Makes an FFI call to populate the fields of `response`.
 pub fn release_connection(
-    control: virtio_magma_release_connection_ctrl_t,
-    response: &mut virtio_magma_release_connection_resp_t,
+    control: virtio_magma_connection_release_ctrl_t,
+    response: &mut virtio_magma_connection_release_resp_t,
     connections: &mut ConnectionMap,
 ) {
     let connection = control.connection as magma_connection_t;
     if connections.contains_key(&connection) {
-        unsafe { magma_release_connection(connection) };
+        unsafe { magma_connection_release(connection) };
         connections.remove(&connection);
     }
-    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_RELEASE_CONNECTION as u32;
+    response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE as u32;
 }

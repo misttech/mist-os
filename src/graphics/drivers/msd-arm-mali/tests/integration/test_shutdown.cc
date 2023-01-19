@@ -22,31 +22,31 @@ namespace {
 class TestConnection : public magma::TestDeviceBase {
  public:
   TestConnection() : magma::TestDeviceBase(MAGMA_VENDOR_ID_MALI) {
-    magma_create_connection2(device(), &connection_);
+    magma_device_create_connection(device(), &connection_);
   }
 
   ~TestConnection() {
     if (connection_)
-      magma_release_connection(connection_);
+      magma_connection_release(connection_);
   }
 
   magma_status_t Test() {
     DASSERT(connection_);
 
     uint32_t context_id;
-    magma_status_t status = magma_create_context(connection_, &context_id);
+    magma_status_t status = magma_connection_create_context(connection_, &context_id);
     if (status != MAGMA_STATUS_OK)
       return DRET(status);
 
-    status = magma_get_error(connection_);
+    status = magma_connection_get_error(connection_);
     if (status != MAGMA_STATUS_OK)
       return DRET(status);
 
-    status = magma_execute_immediate_commands2(connection_, context_id, 0, nullptr);
+    status = magma_connection_execute_immediate_commands(connection_, context_id, 0, nullptr);
     if (status != MAGMA_STATUS_OK)
       return DRET(status);
 
-    status = magma_get_error(connection_);
+    status = magma_connection_get_error(connection_);
     return DRET(status);
   }
 

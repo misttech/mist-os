@@ -29,23 +29,23 @@ constexpr uint32_t kValue = 0xabcddcba;
 class TestConnection : public magma::TestDeviceBase {
  public:
   TestConnection() : magma::TestDeviceBase(MAGMA_VENDOR_ID_INTEL) {
-    magma_create_connection2(device(), &connection_);
+    magma_device_create_connection(device(), &connection_);
     DASSERT(connection_);
 
-    magma_status_t status =
-        magma_query(device(), kMagmaIntelGenQueryExtraPageCount, nullptr, &extra_page_count_);
+    magma_status_t status = magma_device_query(device(), kMagmaIntelGenQueryExtraPageCount, nullptr,
+                                               &extra_page_count_);
     if (status != MAGMA_STATUS_OK) {
       DLOG("Failed to query kMagmaIntelGenQueryExtraPageCount: %d", status);
       extra_page_count_ = 0;
     }
 
-    magma_create_context(connection_, &context_id_);
+    magma_connection_create_context(connection_, &context_id_);
   }
 
   ~TestConnection() {
     if (connection_) {
-      magma_release_context(connection_, context_id_);
-      magma_release_connection(connection_);
+      magma_connection_release_context(connection_, context_id_);
+      magma_connection_release(connection_);
     }
   }
 
@@ -62,12 +62,12 @@ class TestConnection : public magma::TestDeviceBase {
     magma_buffer_t batch_buffer;
 
     ASSERT_EQ(MAGMA_STATUS_OK,
-              magma_create_buffer(connection_, PAGE_SIZE, &buffer_size, &batch_buffer));
+              magma_connection_create_buffer(connection_, PAGE_SIZE, &buffer_size, &batch_buffer));
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(batch_buffer, 0 /*offset*/, buffer_size, &vaddr));
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_map_buffer(connection_, gpu_addr_, batch_buffer, 0,
-                                                magma::page_size(), kMapFlags));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_map_buffer(connection_, gpu_addr_, batch_buffer, 0,
+                                                           magma::page_size(), kMapFlags));
 
     // Write to the last dword
     InitBatchBuffer(
@@ -82,14 +82,15 @@ class TestConnection : public magma::TestDeviceBase {
     magma_exec_resource exec_resource;
     EXPECT_TRUE(InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer, buffer_size,
                             flags));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_execute_command(connection_, context_id_, &descriptor));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_connection_execute_command(connection_, context_id_, &descriptor));
 
     magma::InflightList list;
 
     switch (how) {
       case NORMAL:
         EXPECT_TRUE(list.WaitForCompletion(connection_, kOneSecondInNs));
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_get_error(connection_));
+        EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_));
         EXPECT_EQ(kValue, reinterpret_cast<uint32_t*>(vaddr)[buffer_size / 4 - 1]);
         break;
       case FAULT: {
@@ -98,11 +99,11 @@ class TestConnection : public magma::TestDeviceBase {
         while (std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() -
                                                          start)
                    .count() < 2000) {
-          if (magma_get_error(connection_) == MAGMA_STATUS_CONNECTION_LOST) {
+          if (magma_connection_get_error(connection_) == MAGMA_STATUS_CONNECTION_LOST) {
             break;
           }
         }
-        EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_get_error(connection_));
+        EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(connection_));
         EXPECT_TRUE(list.WaitForCompletion(connection_, kOneSecondInNs));
         EXPECT_EQ(0xdeadbeef, reinterpret_cast<uint32_t*>(vaddr)[buffer_size / 4 - 1]);
         break;
@@ -112,11 +113,11 @@ class TestConnection : public magma::TestDeviceBase {
         while (std::chrono::duration<double, std::milli>(std::chrono::high_resolution_clock::now() -
                                                          start)
                    .count() < 2000) {
-          if (magma_get_error(connection_) == MAGMA_STATUS_CONNECTION_LOST) {
+          if (magma_connection_get_error(connection_) == MAGMA_STATUS_CONNECTION_LOST) {
             break;
           }
         }
-        EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_get_error(connection_));
+        EXPECT_EQ(MAGMA_STATUS_CONTEXT_KILLED, magma_connection_get_error(connection_));
         EXPECT_TRUE(list.WaitForCompletion(connection_, kOneSecondInNs));
         EXPECT_EQ(kValue, reinterpret_cast<uint32_t*>(vaddr)[buffer_size / 4 - 1]);
         break;
@@ -125,7 +126,7 @@ class TestConnection : public magma::TestDeviceBase {
 
     EXPECT_TRUE(magma::UnmapCpuHelper(vaddr, buffer_size));
 
-    magma_release_buffer(connection_, batch_buffer);
+    magma_connection_release_buffer(connection_, batch_buffer);
   }
 
   void InitBatchBuffer(void* vaddr, uint64_t size, bool hang, uint64_t gpu_addr) {
@@ -158,7 +159,7 @@ class TestConnection : public magma::TestDeviceBase {
   bool InitCommand(magma_command_descriptor* descriptor, magma_exec_command_buffer* command_buffer,
                    magma_exec_resource* exec_resource, magma_buffer_t batch_buffer,
                    uint64_t batch_buffer_length, uint64_t flags) {
-    exec_resource->buffer_id = magma_get_buffer_id(batch_buffer);
+    exec_resource->buffer_id = magma_buffer_get_id(batch_buffer);
     exec_resource->offset = 0;
     exec_resource->length = batch_buffer_length;
 
@@ -211,7 +212,7 @@ class TestConnection : public magma::TestDeviceBase {
     uint64_t size;
     magma_buffer_t batch_buffer;
 
-    ASSERT_EQ(magma_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer), 0);
+    ASSERT_EQ(magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer), 0);
     void* vaddr;
     ASSERT_TRUE(magma::MapCpuHelper(batch_buffer, 0 /*offset*/, size, &vaddr));
 
@@ -222,14 +223,15 @@ class TestConnection : public magma::TestDeviceBase {
     magma_exec_resource exec_resource;
     EXPECT_TRUE(
         InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer, size, flags));
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_execute_command(connection_, context_id_, &descriptor));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_connection_execute_command(connection_, context_id_, &descriptor));
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     ASSERT_TRUE(magma::UnmapCpuHelper(vaddr, size));
-    magma_release_buffer(connection_, batch_buffer);
+    magma_connection_release_buffer(connection_, batch_buffer);
 
-    magma_release_connection(connection_);
+    magma_connection_release(connection_);
     connection_ = 0u;
   }
 

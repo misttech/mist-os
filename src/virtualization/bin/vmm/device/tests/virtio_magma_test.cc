@@ -303,10 +303,10 @@ class VirtioMagmaTest : public TestWithDevice {
   }
 
   void CreateConnection(magma_device_t device, uint64_t* connection_out) {
-    virtio_magma_create_connection2_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_CREATE_CONNECTION2;
+    virtio_magma_device_create_connection_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_DEVICE_CREATE_CONNECTION;
     request.device = device;
-    virtio_magma_create_connection2_resp_t response{};
+    virtio_magma_device_create_connection_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -320,7 +320,7 @@ class VirtioMagmaTest : public TestWithDevice {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CREATE_CONNECTION2);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_DEVICE_CREATE_CONNECTION);
     EXPECT_EQ(response.hdr.flags, 0u);
     ASSERT_GT(response.connection_out, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
@@ -328,10 +328,10 @@ class VirtioMagmaTest : public TestWithDevice {
   }
 
   void ReleaseConnection(uint64_t connection) {
-    virtio_magma_release_connection_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_RELEASE_CONNECTION;
+    virtio_magma_connection_release_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_RELEASE;
     request.connection = connection;
-    virtio_magma_release_connection_resp_t response{};
+    virtio_magma_connection_release_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -345,16 +345,16 @@ class VirtioMagmaTest : public TestWithDevice {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_RELEASE_CONNECTION);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_RELEASE);
     EXPECT_EQ(response.hdr.flags, 0u);
   }
 
   void CreateBuffer(uint64_t connection, magma_buffer_t* buffer_out) {
-    virtio_magma_create_buffer_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_CREATE_BUFFER;
+    virtio_magma_connection_create_buffer_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_CREATE_BUFFER;
     request.connection = connection;
     request.size = kBufferSize;
-    virtio_magma_create_buffer_resp_t response{};
+    virtio_magma_connection_create_buffer_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -368,7 +368,7 @@ class VirtioMagmaTest : public TestWithDevice {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CREATE_BUFFER);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_CREATE_BUFFER);
     EXPECT_EQ(response.hdr.flags, 0u);
     EXPECT_NE(response.buffer_out, 0u);
     EXPECT_GE(response.size_out, kBufferSize);  // The implementation is free to use a larger size.
@@ -377,11 +377,11 @@ class VirtioMagmaTest : public TestWithDevice {
   }
 
   void ReleaseBuffer(uint64_t connection, magma_buffer_t buffer) {
-    virtio_magma_release_buffer_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_RELEASE_BUFFER;
+    virtio_magma_connection_release_buffer_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_BUFFER;
     request.connection = connection;
     request.buffer = buffer;
-    virtio_magma_release_buffer_resp_t response{};
+    virtio_magma_connection_release_buffer_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -395,16 +395,16 @@ class VirtioMagmaTest : public TestWithDevice {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_RELEASE_BUFFER);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_RELEASE_BUFFER);
     EXPECT_EQ(response.hdr.flags, 0u);
   }
 
   void CreateImage(uint64_t connection, magma_image_create_info_t* create_info,
                    magma_buffer_t* image_out) {
-    virtio_magma_virt_create_image_ctrl_t request = {
+    virtio_magma_virt_connection_create_image_ctrl_t request = {
         .hdr =
             {
-                .type = VIRTIO_MAGMA_CMD_VIRT_CREATE_IMAGE,
+                .type = VIRTIO_MAGMA_CMD_VIRT_CONNECTION_CREATE_IMAGE,
             },
         .connection = connection,
     };
@@ -413,7 +413,7 @@ class VirtioMagmaTest : public TestWithDevice {
     memcpy(request_buffer.data(), &request, sizeof(request));
     memcpy(request_buffer.data() + sizeof(request), create_info, sizeof(*create_info));
 
-    virtio_magma_virt_create_image_resp_t response{};
+    virtio_magma_virt_connection_create_image_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -428,7 +428,7 @@ class VirtioMagmaTest : public TestWithDevice {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_VIRT_CREATE_IMAGE);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_VIRT_CONNECTION_CREATE_IMAGE);
     EXPECT_EQ(response.hdr.flags, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
     EXPECT_NE(response.image_out, 0u);
@@ -436,11 +436,8 @@ class VirtioMagmaTest : public TestWithDevice {
   }
 
   void GetImageInfo(uint64_t connection, magma_buffer_t image, magma_image_info_t* image_info_out) {
-    virtio_magma_virt_get_image_info_ctrl_t request = {
-        .hdr =
-            {
-                .type = VIRTIO_MAGMA_CMD_VIRT_GET_IMAGE_INFO,
-            },
+    virtio_magma_virt_connection_get_image_info_ctrl_t request = {
+        .hdr = {.type = VIRTIO_MAGMA_CMD_VIRT_CONNECTION_GET_IMAGE_INFO},
         .connection = connection,
         .image = image,
     };
@@ -449,7 +446,7 @@ class VirtioMagmaTest : public TestWithDevice {
     // descriptors.
     void* request_ptr;
 
-    virtio_magma_virt_get_image_info_resp_t response{};
+    virtio_magma_virt_connection_get_image_info_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(
@@ -465,7 +462,7 @@ class VirtioMagmaTest : public TestWithDevice {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_VIRT_GET_IMAGE_INFO);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_VIRT_CONNECTION_GET_IMAGE_INFO);
     EXPECT_EQ(response.hdr.flags, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
     memcpy(image_info_out, reinterpret_cast<uint8_t*>(request_ptr) + sizeof(request),
@@ -489,9 +486,9 @@ TEST_F(VirtioMagmaTest, HandleQuery) {
   magma_device_t device{};
   ASSERT_NO_FATAL_FAILURE(ImportDevice(&device));
   {
-    virtio_magma_query_ctrl_t request{};
-    virtio_magma_query_resp_t response{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_QUERY;
+    virtio_magma_device_query_ctrl_t request{};
+    virtio_magma_device_query_resp_t response{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_DEVICE_QUERY;
     request.device = device;
     request.id = MAGMA_QUERY_DEVICE_ID;
     uint16_t descriptor_id{};
@@ -508,7 +505,7 @@ TEST_F(VirtioMagmaTest, HandleQuery) {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_QUERY);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_DEVICE_QUERY);
     EXPECT_EQ(response.hdr.flags, 0u);
     EXPECT_GT(response.result_out, 0u);
     EXPECT_EQ(response.result_buffer_out, 0u);
@@ -523,10 +520,10 @@ TEST_F(VirtioMagmaTest, HandleConnectionMethod) {
   uint64_t connection{};
   ASSERT_NO_FATAL_FAILURE(CreateConnection(device, &connection));
   {  // Try to call a method on the connection
-    virtio_magma_get_error_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_GET_ERROR;
+    virtio_magma_connection_get_error_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_GET_ERROR;
     request.connection = connection;
-    virtio_magma_get_error_resp_t response{};
+    virtio_magma_connection_get_error_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -541,7 +538,7 @@ TEST_F(VirtioMagmaTest, HandleConnectionMethod) {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_GET_ERROR);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_GET_ERROR);
     EXPECT_EQ(response.hdr.flags, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
   }
@@ -556,15 +553,15 @@ TEST_F(VirtioMagmaTest, HandleReadNotificationChannel2) {
   ASSERT_NO_FATAL_FAILURE(CreateConnection(device, &connection));
 
   {
-    virtio_magma_read_notification_channel2_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_READ_NOTIFICATION_CHANNEL2;
+    virtio_magma_connection_read_notification_channel_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_READ_NOTIFICATION_CHANNEL;
     constexpr uint32_t kMagicFlags = 0xabcd1234;
     request.hdr.flags =
         kMagicFlags;  // VirtioMagma will put these magic flags in the returned buffer
     request.connection = connection;
     request.buffer_size = sizeof(uint32_t);
     request.buffer = 0;  // not used
-    virtio_magma_read_notification_channel2_resp_t response{};
+    virtio_magma_connection_read_notification_channel_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -581,16 +578,18 @@ TEST_F(VirtioMagmaTest, HandleReadNotificationChannel2) {
     EXPECT_EQ(used_elem->len, sizeof(response) + request.buffer_size);
 
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_READ_NOTIFICATION_CHANNEL2);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_READ_NOTIFICATION_CHANNEL);
     EXPECT_EQ(response.hdr.flags, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
     EXPECT_EQ(response.buffer_size_out, sizeof(uint32_t));
     EXPECT_EQ(response.more_data_out, 0u);
 
     uint32_t buffer;
-    memcpy(&buffer,
-           reinterpret_cast<virtio_magma_read_notification_channel2_resp_t*>(response_ptr) + 1,
-           sizeof(buffer));
+    memcpy(
+        &buffer,
+        reinterpret_cast<virtio_magma_connection_read_notification_channel_resp_t*>(response_ptr) +
+            1,
+        sizeof(buffer));
     EXPECT_EQ(buffer, kMagicFlags);
   }
 
@@ -643,11 +642,11 @@ TEST_F(VirtioMagmaTest, HandleImportExport) {
   ASSERT_NO_FATAL_FAILURE(CreateImage(connection, &create_info, &image));
 
   {
-    virtio_magma_export_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_EXPORT;
+    virtio_magma_connection_export_buffer_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_EXPORT_BUFFER;
     request.connection = connection;
     request.buffer = image;
-    virtio_magma_export_resp_t response{};
+    virtio_magma_connection_export_buffer_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -662,17 +661,17 @@ TEST_F(VirtioMagmaTest, HandleImportExport) {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_EXPORT);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_EXPORT_BUFFER);
     EXPECT_EQ(response.hdr.flags, 0u);
     EXPECT_EQ(response.buffer_handle_out, kMockVfdId);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
   }
   {
-    virtio_magma_import_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_IMPORT;
+    virtio_magma_connection_import_buffer_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_BUFFER;
     request.connection = connection;
     request.buffer_handle = kMockVfdId;
-    virtio_magma_import_resp_t response{};
+    virtio_magma_connection_import_buffer_resp_t response{};
     uint16_t descriptor_id{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -687,7 +686,7 @@ TEST_F(VirtioMagmaTest, HandleImportExport) {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_IMPORT);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_BUFFER);
     EXPECT_EQ(response.hdr.flags, 0u);
     EXPECT_NE(response.buffer_out, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
@@ -711,11 +710,11 @@ TEST_F(VirtioMagmaTest, BufferHandleMapAndUnmap) {
   magma_handle_t buffer_handle;
   uint64_t buffer_size;
   {
-    virtio_magma_get_buffer_handle2_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_GET_BUFFER_HANDLE2;
+    virtio_magma_buffer_get_handle_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_BUFFER_GET_HANDLE;
     request.buffer = buffer;
     uint16_t descriptor_id{};
-    virtio_magma_get_buffer_handle2_resp_t response{};
+    virtio_magma_buffer_get_handle_resp_t response{};
     void* response_ptr;
     constexpr uint64_t kSizeofResponse = sizeof(response) + sizeof(uint64_t);
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -731,7 +730,7 @@ TEST_F(VirtioMagmaTest, BufferHandleMapAndUnmap) {
     EXPECT_EQ(used_elem->len, kSizeofResponse);
 
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_GET_BUFFER_HANDLE2);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_BUFFER_GET_HANDLE);
     EXPECT_EQ(response.hdr.flags, 0u);
     EXPECT_NE(response.handle_out, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
@@ -841,9 +840,9 @@ TEST_F(VirtioMagmaTest, QueryReturnsBufferMapAndUnmap) {
 
   uint64_t query_id = 0;
   {
-    virtio_magma_query_ctrl_t request{};
-    virtio_magma_query_resp_t response{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_QUERY;
+    virtio_magma_device_query_ctrl_t request{};
+    virtio_magma_device_query_resp_t response{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_DEVICE_QUERY;
     request.device = device;
     request.id = MAGMA_QUERY_VENDOR_ID;
     uint16_t descriptor_id{};
@@ -861,7 +860,7 @@ TEST_F(VirtioMagmaTest, QueryReturnsBufferMapAndUnmap) {
     EXPECT_EQ(used_elem->id, descriptor_id);
     EXPECT_EQ(used_elem->len, sizeof(response));
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_QUERY);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_DEVICE_QUERY);
     EXPECT_EQ(response.hdr.flags, 0u);
     EXPECT_GT(response.result_out, 0u);
     EXPECT_EQ(response.result_buffer_out, 0u);
@@ -880,12 +879,12 @@ TEST_F(VirtioMagmaTest, QueryReturnsBufferMapAndUnmap) {
   magma_handle_t buffer_handle;
   uint64_t buffer_size;
   {
-    virtio_magma_query_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_QUERY;
+    virtio_magma_device_query_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_DEVICE_QUERY;
     request.device = device;
     request.id = query_id;
     uint16_t descriptor_id{};
-    virtio_magma_query_resp_t response{};
+    virtio_magma_device_query_resp_t response{};
     void* response_ptr;
     constexpr uint64_t kSizeofResponse = sizeof(response) + sizeof(uint64_t);
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
@@ -901,7 +900,7 @@ TEST_F(VirtioMagmaTest, QueryReturnsBufferMapAndUnmap) {
     EXPECT_EQ(used_elem->len, kSizeofResponse);
 
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_QUERY);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_DEVICE_QUERY);
     EXPECT_EQ(response.hdr.flags, 0u);
     EXPECT_NE(response.result_buffer_out, 0u);
     ASSERT_EQ(static_cast<magma_status_t>(response.result_return), MAGMA_STATUS_OK);
@@ -1011,8 +1010,8 @@ TEST_F(VirtioMagmaTest, ExecuteCommand) {
   ASSERT_NO_FATAL_FAILURE(CreateBuffer(connection, &buffer));
 
   {
-    virtio_magma_execute_command_ctrl_t request{};
-    request.hdr.type = VIRTIO_MAGMA_CMD_EXECUTE_COMMAND;
+    virtio_magma_connection_execute_command_ctrl_t request{};
+    request.hdr.type = VIRTIO_MAGMA_CMD_CONNECTION_EXECUTE_COMMAND;
     request.connection = connection;
     request.context_id = 0;
 
@@ -1040,7 +1039,7 @@ TEST_F(VirtioMagmaTest, ExecuteCommand) {
     memcpy(request_buffer.data(), &request, sizeof(request));
 
     uint16_t descriptor_id{};
-    virtio_magma_execute_command_resp_t response{};
+    virtio_magma_connection_execute_command_resp_t response{};
     void* response_ptr;
     ASSERT_EQ(DescriptorChainBuilder(out_queue_)
                   .AppendReadableDescriptor(request_buffer.data(),
@@ -1056,7 +1055,7 @@ TEST_F(VirtioMagmaTest, ExecuteCommand) {
     EXPECT_EQ(used_elem->len, sizeof(response));
 
     memcpy(&response, response_ptr, sizeof(response));
-    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_EXECUTE_COMMAND);
+    EXPECT_EQ(response.hdr.type, VIRTIO_MAGMA_RESP_CONNECTION_EXECUTE_COMMAND);
     EXPECT_EQ(response.hdr.flags, 0u);
   }
 

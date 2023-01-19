@@ -48,32 +48,34 @@ class VirtioMagma : public VirtioMagmaGeneric,
              StartCallback callback) override;
 
  private:
-  zx_status_t Handle_read_notification_channel2(VirtioDescriptor* request_desc,
-                                                VirtioDescriptor* response_desc,
-                                                uint32_t* used_out) override;
-  zx_status_t Handle_get_buffer_handle2(VirtioDescriptor* request_desc,
-                                        VirtioDescriptor* response_desc,
-                                        uint32_t* used_out) override;
-  zx_status_t Handle_query(VirtioDescriptor* request_desc, VirtioDescriptor* response_desc,
-                           uint32_t* used_out) override;
-
-  zx_status_t Handle_execute_command(VirtioDescriptor* request_desc,
-                                     VirtioDescriptor* response_desc, uint32_t* used_out) override;
-  zx_status_t Handle_poll(VirtioDescriptor* request_desc, VirtioDescriptor* response_desc,
-                          uint32_t* used_out) override;
-  zx_status_t Handle_virt_create_image(VirtioDescriptor* request_desc,
+  zx_status_t Handle_connection_read_notification_channel(VirtioDescriptor* request_desc,
+                                                          VirtioDescriptor* response_desc,
+                                                          uint32_t* used_out) override;
+  zx_status_t Handle_buffer_get_handle(VirtioDescriptor* request_desc,
                                        VirtioDescriptor* response_desc,
                                        uint32_t* used_out) override;
-  zx_status_t Handle_virt_get_image_info(VirtioDescriptor* request_desc,
-                                         VirtioDescriptor* response_desc,
-                                         uint32_t* used_out) override;
+  zx_status_t Handle_device_query(VirtioDescriptor* request_desc, VirtioDescriptor* response_desc,
+                                  uint32_t* used_out) override;
+
+  zx_status_t Handle_connection_execute_command(VirtioDescriptor* request_desc,
+                                                VirtioDescriptor* response_desc,
+                                                uint32_t* used_out) override;
+  zx_status_t Handle_poll(VirtioDescriptor* request_desc, VirtioDescriptor* response_desc,
+                          uint32_t* used_out) override;
+  zx_status_t Handle_virt_connection_create_image(VirtioDescriptor* request_desc,
+                                                  VirtioDescriptor* response_desc,
+                                                  uint32_t* used_out) override;
+  zx_status_t Handle_virt_connection_get_image_info(VirtioDescriptor* request_desc,
+                                                    VirtioDescriptor* response_desc,
+                                                    uint32_t* used_out) override;
 
   zx_status_t Handle_device_import(const virtio_magma_device_import_ctrl_t* request,
                                    virtio_magma_device_import_resp_t* response) override;
-  zx_status_t Handle_release_connection(const virtio_magma_release_connection_ctrl_t* request,
-                                        virtio_magma_release_connection_resp_t* response) override;
-  zx_status_t Handle_release_buffer(const virtio_magma_release_buffer_ctrl_t* request,
-                                    virtio_magma_release_buffer_resp_t* response) override;
+  zx_status_t Handle_connection_release(const virtio_magma_connection_release_ctrl_t* request,
+                                        virtio_magma_connection_release_resp_t* response) override;
+  zx_status_t Handle_connection_release_buffer(
+      const virtio_magma_connection_release_buffer_ctrl_t* request,
+      virtio_magma_connection_release_buffer_resp_t* response) override;
   zx_status_t Handle_internal_map2(const virtio_magma_internal_map2_ctrl_t* request,
                                    virtio_magma_internal_map2_resp_t* response) override;
   zx_status_t Handle_internal_unmap2(const virtio_magma_internal_unmap2_ctrl_t* request,
@@ -81,10 +83,12 @@ class VirtioMagma : public VirtioMagmaGeneric,
   zx_status_t Handle_internal_release_handle(
       const virtio_magma_internal_release_handle_ctrl_t* request,
       virtio_magma_internal_release_handle_resp_t* response) override;
-  zx_status_t Handle_export(const virtio_magma_export_ctrl_t* request,
-                            virtio_magma_export_resp_t* response) override;
-  zx_status_t Handle_import(const virtio_magma_import_ctrl_t* request,
-                            virtio_magma_import_resp_t* response) override;
+  zx_status_t Handle_connection_export_buffer(
+      const virtio_magma_connection_export_buffer_ctrl_t* request,
+      virtio_magma_connection_export_buffer_resp_t* response) override;
+  zx_status_t Handle_connection_import_buffer(
+      const virtio_magma_connection_import_buffer_ctrl_t* request,
+      virtio_magma_connection_import_buffer_resp_t* response) override;
 
   zx::vmar vmar_;
   VirtioQueue out_queue_;

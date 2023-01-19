@@ -24,10 +24,10 @@ namespace {
 class TestConnection : public magma::TestDeviceBase {
  public:
   TestConnection() : magma::TestDeviceBase(MAGMA_VENDOR_ID_INTEL) {
-    magma_create_connection2(device(), &connection_);
+    magma_device_create_connection(device(), &connection_);
 
-    magma_status_t status =
-        magma_query(device(), kMagmaIntelGenQueryExtraPageCount, nullptr, &extra_page_count_);
+    magma_status_t status = magma_device_query(device(), kMagmaIntelGenQueryExtraPageCount, nullptr,
+                                               &extra_page_count_);
     if (status != MAGMA_STATUS_OK) {
       DLOG("Failed to query kMagmaIntelGenQueryExtraPageCount: %d", status);
       extra_page_count_ = 0;
@@ -36,7 +36,7 @@ class TestConnection : public magma::TestDeviceBase {
 
   ~TestConnection() {
     if (connection_)
-      magma_release_connection(connection_);
+      magma_connection_release(connection_);
   }
 
   static constexpr int64_t kOneSecondInNs = 1000000000;
@@ -45,30 +45,30 @@ class TestConnection : public magma::TestDeviceBase {
     DASSERT(connection_);
 
     uint32_t context_id;
-    magma::Status status = magma_create_context(connection_, &context_id);
+    magma::Status status = magma_connection_create_context(connection_, &context_id);
     if (!status.ok())
       return DRET(status.get());
 
-    status = magma_get_error(connection_);
+    status = magma_connection_get_error(connection_);
     if (!status.ok())
       return DRET(status.get());
 
     uint64_t size;
     magma_buffer_t batch_buffer;
-    status = magma_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer);
+    status = magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &batch_buffer);
     if (!status.ok()) {
-      magma_release_context(connection_, context_id);
+      magma_connection_release_context(connection_, context_id);
       return DRET(status.get());
     }
 
     constexpr uint64_t kMapFlags =
         MAGMA_MAP_FLAG_READ | MAGMA_MAP_FLAG_WRITE | MAGMA_MAP_FLAG_EXECUTE;
 
-    status =
-        magma_map_buffer(connection_, gpu_addr_, batch_buffer, 0, magma::page_size(), kMapFlags);
+    status = magma_connection_map_buffer(connection_, gpu_addr_, batch_buffer, 0,
+                                         magma::page_size(), kMapFlags);
     if (!status.ok()) {
-      magma_release_context(connection_, context_id);
-      magma_release_buffer(connection_, batch_buffer);
+      magma_connection_release_context(connection_, context_id);
+      magma_connection_release_buffer(connection_, batch_buffer);
       return DRET(status.get());
     }
 
@@ -81,10 +81,10 @@ class TestConnection : public magma::TestDeviceBase {
     magma_exec_resource exec_resource;
     EXPECT_TRUE(InitCommand(&descriptor, &command_buffer, &exec_resource, batch_buffer, size));
 
-    status = magma_execute_command(connection_, context_id, &descriptor);
+    status = magma_connection_execute_command(connection_, context_id, &descriptor);
     if (!status.ok()) {
-      magma_release_context(connection_, context_id);
-      magma_release_buffer(connection_, batch_buffer);
+      magma_connection_release_context(connection_, context_id);
+      magma_connection_release_buffer(connection_, batch_buffer);
       return DRET(status.get());
     }
 
@@ -92,10 +92,10 @@ class TestConnection : public magma::TestDeviceBase {
     status = list.WaitForCompletion(connection_, kOneSecondInNs);
     EXPECT_TRUE(status.get() == MAGMA_STATUS_OK || status.get() == MAGMA_STATUS_CONNECTION_LOST);
 
-    magma_release_context(connection_, context_id);
-    magma_release_buffer(connection_, batch_buffer);
+    magma_connection_release_context(connection_, context_id);
+    magma_connection_release_buffer(connection_, batch_buffer);
 
-    status = magma_get_error(connection_);
+    status = magma_connection_get_error(connection_);
     return DRET(status.get());
   }
 
@@ -117,7 +117,7 @@ class TestConnection : public magma::TestDeviceBase {
   bool InitCommand(magma_command_descriptor* descriptor, magma_exec_command_buffer* command_buffer,
                    magma_exec_resource* exec_resource, magma_buffer_t batch_buffer,
                    uint64_t batch_buffer_length) {
-    exec_resource->buffer_id = magma_get_buffer_id(batch_buffer);
+    exec_resource->buffer_id = magma_buffer_get_id(batch_buffer);
     exec_resource->offset = 0;
     exec_resource->length = batch_buffer_length;
 

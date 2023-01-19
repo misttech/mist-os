@@ -38,12 +38,12 @@ class MagmaImageTest : public ::testing::Test {
     ASSERT_GE(fd, 0) << "Failed to open device " << kDevicePath << " (" << errno << ")";
     ASSERT_EQ(MAGMA_STATUS_OK, magma_device_import(fd, &device_));
 
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_create_connection2(device_, &connection_));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_device_create_connection(device_, &connection_));
   }
 
   virtual void TearDown() override {
     if (connection_)
-      magma_release_connection(connection_);
+      magma_connection_release(connection_);
     if (device_)
       magma_device_release(device_);
   }
@@ -66,7 +66,8 @@ TEST_F(MagmaImageTest, CreateInvalidFormat) {
   };
   magma_buffer_t image;
 
-  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_create_image(connection_, &create_info, &image));
+  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
+            magma_virt_connection_create_image(connection_, &create_info, &image));
 }
 
 TEST_F(MagmaImageTest, CreateInvalidModifier) {
@@ -82,7 +83,8 @@ TEST_F(MagmaImageTest, CreateInvalidModifier) {
   }
   magma_buffer_t image;
 
-  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_create_image(connection_, &create_info, &image));
+  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
+            magma_virt_connection_create_image(connection_, &create_info, &image));
 }
 
 TEST_F(MagmaImageTest, CreateInvalidWidth) {
@@ -95,7 +97,8 @@ TEST_F(MagmaImageTest, CreateInvalidWidth) {
   };
   magma_buffer_t image;
 
-  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_create_image(connection_, &create_info, &image));
+  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
+            magma_virt_connection_create_image(connection_, &create_info, &image));
 }
 
 TEST_F(MagmaImageTest, CreateInvalidHeight) {
@@ -108,7 +111,8 @@ TEST_F(MagmaImageTest, CreateInvalidHeight) {
   };
   magma_buffer_t image;
 
-  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_create_image(connection_, &create_info, &image));
+  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
+            magma_virt_connection_create_image(connection_, &create_info, &image));
 }
 
 TEST_F(MagmaImageTest, CreateInvalidFlags) {
@@ -121,7 +125,8 @@ TEST_F(MagmaImageTest, CreateInvalidFlags) {
   };
   magma_buffer_t image;
 
-  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS, magma_virt_create_image(connection_, &create_info, &image));
+  EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
+            magma_virt_connection_create_image(connection_, &create_info, &image));
 }
 
 using DrmFormat = uint64_t;
@@ -132,9 +137,9 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
 
   void MapAndWrite(magma_buffer_t image) {
     magma_handle_t buffer_handle;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_get_buffer_handle2(image, &buffer_handle));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_buffer_get_handle(image, &buffer_handle));
 
-    size_t length = magma_get_buffer_size(image);
+    size_t length = magma_buffer_get_size(image);
 
     int fd = buffer_handle;
     void* addr = mmap(nullptr, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*offset*/);
@@ -148,9 +153,9 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
 
   void MapAndCompare(magma_buffer_t image) {
     magma_handle_t buffer_handle;
-    ASSERT_EQ(MAGMA_STATUS_OK, magma_get_buffer_handle2(image, &buffer_handle));
+    ASSERT_EQ(MAGMA_STATUS_OK, magma_buffer_get_handle(image, &buffer_handle));
 
-    size_t length = magma_get_buffer_size(image);
+    size_t length = magma_buffer_get_size(image);
 
     int fd = buffer_handle;
     void* addr = mmap(nullptr, length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0 /*offset*/);
@@ -177,10 +182,12 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
       };
       magma_buffer_t image;
 
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_virt_create_image(connection_, &create_info, &image));
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_virt_connection_create_image(connection_, &create_info, &image));
 
       magma_image_info_t image_info = {};
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_virt_get_image_info(connection_, image, &image_info));
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_virt_connection_get_image_info(connection_, image, &image_info));
 
       EXPECT_EQ(expected_modifier, image_info.drm_format_modifier);
       if (expected_modifier == DRM_FORMAT_MOD_LINEAR) {
@@ -197,11 +204,12 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
 
       {
         magma_handle_t buffer_handle;
-        EXPECT_EQ(MAGMA_STATUS_OK, magma_export(connection_, image, &buffer_handle));
+        EXPECT_EQ(MAGMA_STATUS_OK,
+                  magma_connection_export_buffer(connection_, image, &buffer_handle));
         fd = buffer_handle;
       }
 
-      magma_release_buffer(connection_, image);
+      magma_connection_release_buffer(connection_, image);
     }
 
     EXPECT_GT(fd, 0);
@@ -213,10 +221,11 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
     {
       magma_buffer_t image;
       magma_handle_t handle = fd;
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_import(connection_, handle, &image));
+      ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_import_buffer(connection_, handle, &image));
 
       magma_image_info_t image_info = {};
-      ASSERT_EQ(MAGMA_STATUS_OK, magma_virt_get_image_info(connection_, image, &image_info));
+      ASSERT_EQ(MAGMA_STATUS_OK,
+                magma_virt_connection_get_image_info(connection_, image, &image_info));
 
       EXPECT_EQ(expected_modifier, image_info.drm_format_modifier);
       if (expected_modifier == DRM_FORMAT_MOD_LINEAR) {
@@ -231,7 +240,7 @@ class MagmaImageTestFormats : public MagmaImageTest, public testing::WithParamIn
 
       MapAndCompare(image);
 
-      magma_release_buffer(connection_, image);
+      magma_connection_release_buffer(connection_, image);
     }
   }
 };

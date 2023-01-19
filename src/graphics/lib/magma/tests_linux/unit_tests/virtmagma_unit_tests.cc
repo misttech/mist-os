@@ -29,11 +29,11 @@ class VirtMagmaUnitTest : public ::testing::Test {
 
 // Bypasses libmagma because passing an invalid buffer would cause a client-side crash.
 TEST_F(VirtMagmaUnitTest, GetIdForInvalidBuffer) {
-  virtio_magma_get_buffer_id_ctrl_t request = {
-      .hdr = {.type = VIRTIO_MAGMA_CMD_GET_BUFFER_ID},
+  virtio_magma_buffer_get_id_ctrl_t request = {
+      .hdr = {.type = VIRTIO_MAGMA_CMD_BUFFER_GET_ID},
       .buffer = 0x12345678abcd1234,
   };
-  virtio_magma_get_buffer_id_resp_t response{};
+  virtio_magma_buffer_get_id_resp_t response{};
 
   virtmagma_ioctl_args_magma_command command = {
       .request_address = reinterpret_cast<uintptr_t>(&request),

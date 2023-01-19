@@ -37,7 +37,8 @@ class TestDeviceBase {
     for (auto& p : std::filesystem::directory_iterator("/dev/class/gpu")) {
       InitializeFromFileName(p.path().c_str());
       uint64_t vendor_id;
-      magma_status_t magma_status = magma_query(device_, MAGMA_QUERY_VENDOR_ID, NULL, &vendor_id);
+      magma_status_t magma_status =
+          magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, NULL, &vendor_id);
       if (magma_status == MAGMA_STATUS_OK && vendor_id == id) {
         return;
       }
@@ -114,7 +115,7 @@ class TestDeviceBase {
 
   uint32_t GetDeviceId() const {
     uint64_t value;
-    magma_status_t status = magma_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, &value);
+    magma_status_t status = magma_device_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, &value);
     if (status != MAGMA_STATUS_OK)
       return 0;
     return static_cast<uint32_t>(value);
@@ -122,7 +123,7 @@ class TestDeviceBase {
 
   uint32_t GetVendorId() const {
     uint64_t value;
-    magma_status_t status = magma_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &value);
+    magma_status_t status = magma_device_query(device_, MAGMA_QUERY_VENDOR_ID, nullptr, &value);
     if (status != MAGMA_STATUS_OK)
       return 0;
     return static_cast<uint32_t>(value);

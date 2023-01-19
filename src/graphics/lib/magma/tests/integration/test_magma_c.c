@@ -53,7 +53,7 @@ bool test_magma_from_c(const char* device_name) {
 #endif
 
   uint64_t device_id = 0;
-  status = magma_query(device, MAGMA_QUERY_DEVICE_ID, NULL, &device_id);
+  status = magma_device_query(device, MAGMA_QUERY_DEVICE_ID, NULL, &device_id);
   if (status != MAGMA_STATUS_OK)
     return DRETF(false, "magma_query return %d", status);
 
@@ -61,11 +61,11 @@ bool test_magma_from_c(const char* device_name) {
     return DRETF(false, "device_id is 0");
 
   magma_connection_t connection;
-  status = magma_create_connection2(device, &connection);
+  status = magma_device_create_connection(device, &connection);
   if (status != MAGMA_STATUS_OK)
     return DRETF(false, "magma_create_connection failed: %d", status);
 
-  magma_release_connection(connection);
+  magma_connection_release(connection);
   magma_device_release(device);
 
   return true;

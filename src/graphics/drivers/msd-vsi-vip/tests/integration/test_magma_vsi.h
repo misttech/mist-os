@@ -41,7 +41,7 @@ class MagmaVsi {
         ASSERT_EQ(magma_device_import(client_end.release(), &(device_)), MAGMA_STATUS_OK);
 
         uint64_t device_id = 0;
-        ASSERT_EQ(magma_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, &device_id),
+        ASSERT_EQ(magma_device_query(device_, MAGMA_QUERY_DEVICE_ID, nullptr, &device_id),
                   MAGMA_STATUS_OK);
 
         if (device_id == kMsdVsiVipDevice8000 || device_id == kMsdVsiVipDevice9000) {
@@ -63,26 +63,26 @@ class MagmaVsi {
   void ConnectionCreate() {
     ASSERT_NE(device_, 0ul);
     ASSERT_EQ(connection_, 0u);
-    EXPECT_EQ(magma_create_connection2(device_, &(connection_)), MAGMA_STATUS_OK);
+    EXPECT_EQ(magma_device_create_connection(device_, &(connection_)), MAGMA_STATUS_OK);
     EXPECT_NE(connection_, 0u);
   }
 
   void ConnectionRelease() {
     ASSERT_NE(connection_, 0u);
-    magma_release_connection(connection_);
+    magma_connection_release(connection_);
     connection_ = 0;
   }
 
   void ContextCreate() {
     ASSERT_NE(connection_, 0u);
     ASSERT_EQ(context_id_, 0u);
-    magma_create_context(connection_, &(context_id_));
+    magma_connection_create_context(connection_, &(context_id_));
     EXPECT_NE(context_id_, 0u);
   }
 
   void ContextRelease() {
     ASSERT_NE(context_id_, 0u);
-    magma_release_context(connection_, context_id_);
+    magma_connection_release_context(connection_, context_id_);
     context_id_ = 0u;
   }
 

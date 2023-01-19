@@ -27,24 +27,24 @@ namespace {
 class TestConnection : public magma::TestDeviceBase {
  public:
   TestConnection() : magma::TestDeviceBase(MAGMA_VENDOR_ID_MALI) {
-    magma_create_connection2(device(), &connection_);
+    magma_device_create_connection(device(), &connection_);
     DASSERT(connection_);
 
-    magma_create_context(connection_, &context_id_);
+    magma_connection_create_context(connection_, &context_id_);
     helper_.emplace(connection_, context_id_);
   }
 
   ~TestConnection() {
-    magma_release_context(connection_, context_id_);
+    magma_connection_release_context(connection_, context_id_);
 
     if (connection_)
-      magma_release_connection(connection_);
+      magma_connection_release(connection_);
   }
 
   bool SupportsProtectedMode() {
     uint64_t value_out;
-    EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_query(device(), kMsdArmVendorQuerySupportsProtectedMode, nullptr, &value_out));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_device_query(device(), kMsdArmVendorQuerySupportsProtectedMode,
+                                                  nullptr, &value_out));
     return !!value_out;
   }
 

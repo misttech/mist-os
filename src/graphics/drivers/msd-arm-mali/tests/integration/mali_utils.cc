@@ -13,11 +13,11 @@ bool AtomHelper::InitJobBuffer(magma_buffer_t buffer, JobBufferType type, uint64
     return DRETF(false, "couldn't map job buffer");
   *job_va = next_job_address_;
   next_job_address_ += 0x5000;
-  magma_map_buffer(
+  magma_connection_map_buffer(
       connection_, *job_va, buffer, 0, magma::page_size(),
       MAGMA_MAP_FLAG_READ | MAGMA_MAP_FLAG_WRITE | kMagmaArmMaliGpuMapFlagInnerShareable);
-  magma_buffer_range_op(connection_, buffer, MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0,
-                        magma::page_size());
+  magma_connection_buffer_range_op(connection_, buffer, MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0,
+                                   magma::page_size());
   JobDescriptorHeader* header = static_cast<JobDescriptorHeader*>(vaddr);
   memset(header, 0, sizeof(*header));
   header->job_descriptor_size = 1;  // Next job address is 64-bit.
@@ -27,7 +27,7 @@ bool AtomHelper::InitJobBuffer(magma_buffer_t buffer, JobBufferType type, uint64
     header->job_type = kJobDescriptorTypeNop;
   }
   header->next_job = 0;
-  magma_clean_cache(buffer, 0, PAGE_SIZE, MAGMA_CACHE_OPERATION_CLEAN);
+  magma_buffer_clean_cache(buffer, 0, PAGE_SIZE, MAGMA_CACHE_OPERATION_CLEAN);
   magma::UnmapCpuHelper(vaddr, size);
   return true;
 }
@@ -64,7 +64,7 @@ void AtomHelper::SubmitCommandBuffer(How how, uint8_t atom_number, uint8_t atom_
   uint64_t size;
   magma_buffer_t job_buffer;
 
-  ASSERT_EQ(magma_create_buffer(connection_, PAGE_SIZE, &size, &job_buffer), 0);
+  ASSERT_EQ(magma_connection_create_buffer(connection_, PAGE_SIZE, &size, &job_buffer), 0);
   uint64_t job_va;
   InitJobBuffer(job_buffer, how == JOB_FAULT ? JobBufferType::kInvalid : JobBufferType::kValid,
                 size, &job_va);
@@ -80,11 +80,11 @@ void AtomHelper::SubmitCommandBuffer(How how, uint8_t atom_number, uint8_t atom_
   command_buffer.size = vaddr.size();
   command_buffer.semaphore_ids = nullptr;
   command_buffer.semaphore_count = 0;
-  EXPECT_EQ(MAGMA_STATUS_OK,
-            magma_execute_immediate_commands2(connection_, context_id_, 1, &command_buffer));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_execute_immediate_commands(connection_, context_id_,
+                                                                         1, &command_buffer));
 
   constexpr uint64_t kOneSecondPerNs = 1000000000;
-  magma_poll_item_t item = {.handle = magma_get_notification_channel_handle(connection_),
+  magma_poll_item_t item = {.handle = magma_connection_get_notification_channel_handle(connection_),
                             .type = MAGMA_POLL_TYPE_HANDLE,
                             .condition = MAGMA_POLL_CONDITION_READABLE};
   EXPECT_EQ(MAGMA_STATUS_OK, magma_poll(&item, 1, kOneSecondPerNs));
@@ -92,8 +92,8 @@ void AtomHelper::SubmitCommandBuffer(How how, uint8_t atom_number, uint8_t atom_
   magma_arm_mali_status status;
   uint64_t status_size;
   magma_bool_t more_data;
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_read_notification_channel2(connection_, &status, sizeof(status),
-                                                              &status_size, &more_data));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_read_notification_channel(
+                                 connection_, &status, sizeof(status), &status_size, &more_data));
   EXPECT_EQ(status_size, sizeof(status));
   EXPECT_EQ(atom_number, status.atom_number);
 
@@ -118,6 +118,6 @@ void AtomHelper::SubmitCommandBuffer(How how, uint8_t atom_number, uint8_t atom_
       break;
   }
 
-  magma_release_buffer(connection_, job_buffer);
+  magma_connection_release_buffer(connection_, job_buffer);
 }
 }  // namespace mali_utils

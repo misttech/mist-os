@@ -13,6 +13,7 @@ source_set("magma") {
 
   sources = [
     "magma/magma.h",
+    "magma/magma_soft_transition.h",
     "magma/magma_sysmem.h",
   ]
 

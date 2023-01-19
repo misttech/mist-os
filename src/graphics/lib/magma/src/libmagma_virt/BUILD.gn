@@ -29,6 +29,7 @@ static_library("libmagma_virt") {
   sources = [
     "$generic_path/magma_generic.cc",
     "magma.cc",
+    "magma_soft_transition.cc",
   ]
 
   if (virtmagma_debug) {

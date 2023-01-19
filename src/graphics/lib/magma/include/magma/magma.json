@@ -4,7 +4,7 @@
         "exports": [
             {
                 "ordinal": 4,
-                "name": "magma_release_connection",
+                "name": "magma_connection_release",
                 "type": "void",
                 "description": "Releases the given connection.",
                 "arguments": [
@@ -17,7 +17,7 @@
             },
             {
                 "ordinal": 5,
-                "name": "magma_get_error",
+                "name": "magma_connection_get_error",
                 "type": "magma_status_t",
                 "description": "When a system driver error occurs, the connection will be closed, and interfaces can return MAGMA_STATUS_CONNECTION_LOST.  In that case, this returns the system driver error.  This may incur a round-trip sync.",
                 "arguments": [
@@ -30,7 +30,7 @@
             },
             {
                 "ordinal": 6,
-                "name": "magma_create_context",
+                "name": "magma_connection_create_context",
                 "type": "magma_status_t",
                 "description": "Creates a context on the given connection.",
                 "arguments": [
@@ -48,7 +48,7 @@
             },
             {
                 "ordinal": 7,
-                "name": "magma_release_context",
+                "name": "magma_connection_release_context",
                 "type": "void",
                 "description": "Releases the context associated with the given id.",
                 "arguments": [
@@ -66,7 +66,7 @@
             },
             {
                 "ordinal": 8,
-                "name": "magma_create_buffer",
+                "name": "magma_connection_create_buffer",
                 "type": "magma_status_t",
                 "description": "Creates a memory buffer of at least the given size.",
                 "arguments": [
@@ -94,7 +94,7 @@
             },
             {
                 "ordinal": 9,
-                "name": "magma_release_buffer",
+                "name": "magma_connection_release_buffer",
                 "type": "void",
                 "description": "Releases the given memory buffer.",
                 "arguments": [
@@ -112,7 +112,7 @@
             },
             {
                 "ordinal": 12,
-                "name": "magma_get_buffer_id",
+                "name": "magma_buffer_get_id",
                 "type": "uint64_t",
                 "description": "Returns a unique id for the given buffer. For performance reasons it's recommended to cache the id rather than call this repeatedly.",
                 "arguments": [
@@ -125,7 +125,7 @@
             },
             {
                 "ordinal": 13,
-                "name": "magma_get_buffer_size",
+                "name": "magma_buffer_get_size",
                 "type": "uint64_t",
                 "description": "Returns the actual size of the given buffer.",
                 "arguments": [
@@ -138,7 +138,7 @@
             },
             {
                 "ordinal": 14,
-                "name": "magma_clean_cache",
+                "name": "magma_buffer_clean_cache",
                 "type": "magma_status_t",
                 "description": "Cleans, and optionally invalidates, the cache for the region of memory specified by the given buffer, offset, and size, and write the contents to ram.",
                 "arguments": [
@@ -166,7 +166,7 @@
             },
             {
                 "ordinal": 15,
-                "name": "magma_set_cache_policy",
+                "name": "magma_buffer_set_cache_policy",
                 "type": "magma_status_t",
                 "description": "Configures the cache for the given buffer.",
                 "arguments": [
@@ -184,7 +184,7 @@
             },
             {
                 "ordinal": 16,
-                "name": "magma_get_buffer_cache_policy",
+                "name": "magma_buffer_get_cache_policy",
                 "type": "magma_status_t",
                 "description": "Queries the cache policy for a buffer.",
                 "arguments": [
@@ -202,7 +202,7 @@
             },
             {
                 "ordinal": 26,
-                "name": "magma_export",
+                "name": "magma_connection_export_buffer",
                 "type": "magma_status_t",
                 "description": "Exports the given buffer, returning a handle that may be imported into another connection.",
                 "arguments": [
@@ -225,7 +225,7 @@
             },
             {
                 "ordinal": 27,
-                "name": "magma_import",
+                "name": "magma_connection_import_buffer",
                 "type": "magma_status_t",
                 "description": "Imports and takes ownership of the buffer referred to by the given handle.",
                 "arguments": [
@@ -248,7 +248,7 @@
             },
             {
                 "ordinal": 33,
-                "name": "magma_execute_immediate_commands2",
+                "name": "magma_connection_execute_immediate_commands",
                 "type": "magma_status_t",
                 "description": "Submits a series of commands for execution on the hardware without using a command buffer.",
                 "arguments": [
@@ -276,7 +276,7 @@
             },
             {
                 "ordinal": 34,
-                "name": "magma_create_semaphore",
+                "name": "magma_connection_create_semaphore",
                 "type": "magma_status_t",
                 "description": "Creates a semaphore.",
                 "arguments": [
@@ -294,7 +294,7 @@
             },
             {
                 "ordinal": 35,
-                "name": "magma_release_semaphore",
+                "name": "magma_connection_release_semaphore",
                 "type": "void",
                 "description": "Releases the given semaphore.",
                 "arguments": [
@@ -312,7 +312,7 @@
             },
             {
                 "ordinal": 36,
-                "name": "magma_get_semaphore_id",
+                "name": "magma_semaphore_get_id",
                 "type": "uint64_t",
                 "description": "Returns a unique id for the given semaphore.",
                 "arguments": [
@@ -325,7 +325,7 @@
             },
             {
                 "ordinal": 37,
-                "name": "magma_signal_semaphore",
+                "name": "magma_semaphore_signal",
                 "type": "void",
                 "description": "Signals the given semaphore.",
                 "arguments": [
@@ -338,7 +338,7 @@
             },
             {
                 "ordinal": 38,
-                "name": "magma_reset_semaphore",
+                "name": "magma_semaphore_reset",
                 "type": "void",
                 "description": "Resets the given semaphore.",
                 "arguments": [
@@ -351,7 +351,7 @@
             },
             {
                 "ordinal": 40,
-                "name": "magma_export_semaphore",
+                "name": "magma_connection_export_semaphore",
                 "type": "magma_status_t",
                 "description": "Exports the given semaphore, returning a handle that may be imported into another connection",
                 "arguments": [
@@ -374,7 +374,7 @@
             },
             {
                 "ordinal": 41,
-                "name": "magma_import_semaphore",
+                "name": "magma_connection_import_semaphore",
                 "type": "magma_status_t",
                 "description": "Imports and takes ownership of the semaphore referred to by the given handle.",
                 "arguments": [
@@ -397,7 +397,7 @@
             },
             {
                 "ordinal": 42,
-                "name": "magma_get_notification_channel_handle",
+                "name": "magma_connection_get_notification_channel_handle",
                 "type": "magma_handle_t",
                 "description": "Returns a handle that can be waited on to determine when the connection has data in the notification channel. This channel has the same lifetime as the connection and must not be closed by the client.",
                 "arguments": [
@@ -454,7 +454,7 @@
             },
             {
                 "ordinal": 81,
-                "name": "magma_query",
+                "name": "magma_device_query",
                 "type": "magma_status_t",
                 "description": "Performs a query synchronously. On MAGMA_STATUS_OK, a given query |id| will return either a buffer in |result_buffer_out|, or a value in |result_out|. A NULL pointer may be provided for whichever result parameter is not needed.",
                 "arguments": [
@@ -482,7 +482,7 @@
             },
             {
                 "ordinal": 50,
-                "name": "magma_create_connection2",
+                "name": "magma_device_create_connection",
                 "type": "magma_status_t",
                 "description": "Opens a connection to a device.",
                 "arguments": [
@@ -781,7 +781,7 @@
             },
             {
                 "ordinal": 65,
-                "name": "magma_buffer_range_op",
+                "name": "magma_connection_buffer_range_op",
                 "type": "magma_status_t",
                 "description": "Perform an operation on a range of a buffer",
                 "arguments": [
@@ -837,7 +837,7 @@
             },
             {
                 "ordinal": 70,
-                "name": "magma_read_notification_channel2",
+                "name": "magma_connection_read_notification_channel",
                 "type": "magma_status_t",
                 "description": "Reads a notification from the channel into the given buffer.  Message sizes may vary depending on the MSD.  If the buffer provided is too small for the message, MAGMA_STATUS_INVALID_ARGS will be returned and the size of message will be returned in the buffer_size_out parameter.",
                 "arguments": [
@@ -870,7 +870,7 @@
             },
             {
                 "ordinal": 71,
-                "name": "magma_virt_create_image",
+                "name": "magma_virt_connection_create_image",
                 "type": "magma_status_t",
                 "description": "Creates an image buffer backed by a buffer collection given a DRM format and optional modifier, as specified in the create info.",
                 "arguments": [
@@ -893,7 +893,7 @@
             },
             {
                 "ordinal": 72,
-                "name": "magma_virt_get_image_info",
+                "name": "magma_virt_connection_get_image_info",
                 "type": "magma_status_t",
                 "description": "Returns parameters for an image created with virtmagma_create_image.",
                 "arguments": [
@@ -916,7 +916,7 @@
             },
             {
                 "ordinal": 75,
-                "name": "magma_get_buffer_handle2",
+                "name": "magma_buffer_get_handle",
                 "type": "magma_status_t",
                 "description": "Gets a platform handle for the given buffer. This can be used to perform a CPU mapping of the buffer using the standard syscall.  The handle may be released without invalidating such CPU mappings.",
                 "arguments": [
@@ -934,7 +934,7 @@
             },
             {
                 "ordinal": 79,
-                "name": "magma_flush",
+                "name": "magma_connection_flush",
                 "type": "magma_status_t",
                 "description": "Incurs a round-trip to the system driver, used to ensure all previous messages have been observed, but not necessarily completed.",
                 "arguments": [
@@ -947,7 +947,7 @@
             },
             {
                 "ordinal": 80,
-                "name": "magma_execute_command",
+                "name": "magma_connection_execute_command",
                 "type": "magma_status_t",
                 "description": "Submits command buffers for execution on the hardware.",
                 "arguments": [
@@ -970,7 +970,7 @@
             },
             {
                 "ordinal": 82,
-                "name": "magma_map_buffer",
+                "name": "magma_connection_map_buffer",
                 "type": "magma_status_t",
                 "description": "Maps a buffer range onto the hardware in the connection's address space at the given address. Depending on the MSD this may automatically commit and populate that range.",
                 "arguments": [
@@ -1008,7 +1008,7 @@
             },
             {
                 "ordinal": 83,
-                "name": "magma_unmap_buffer",
+                "name": "magma_connection_unmap_buffer",
                 "type": "void",
                 "description": "Releases the mapping at the given hardware address.",
                 "arguments": [

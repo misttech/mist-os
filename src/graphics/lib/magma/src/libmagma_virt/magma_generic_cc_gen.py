@@ -217,7 +217,7 @@ def generate_export(export, gen_debug_prints):
 
     ret += '    bool success = virtmagma_send_command(file_descriptor, &request, sizeof(request), &response, sizeof(response));\n'
 
-    if ('release' in name) and (name != 'release_context'):
+    if ('release' in name) and (name != 'connection_release_context'):
         ret += '    delete ' + last_wrapped_parameter + ';\n'
 
     ret += '    if (!success)\n'

@@ -40,9 +40,10 @@ class InflightList {
   // Wait for a completion; returns true if a completion was
   // received before |timeout_ms|.
   magma::Status WaitForCompletion(magma_connection_t connection, int64_t timeout_ns) {
-    magma_poll_item_t item = {.handle = magma_get_notification_channel_handle(connection),
-                              .type = MAGMA_POLL_TYPE_HANDLE,
-                              .condition = MAGMA_POLL_CONDITION_READABLE};
+    magma_poll_item_t item = {
+        .handle = magma_connection_get_notification_channel_handle(connection),
+        .type = MAGMA_POLL_TYPE_HANDLE,
+        .condition = MAGMA_POLL_CONDITION_READABLE};
     return magma::Status(magma_poll(&item, 1, timeout_ns));
   }
 
@@ -52,7 +53,7 @@ class InflightList {
     uint64_t bytes_available = 0;
     magma_bool_t more_data = false;
     while (true) {
-      magma_status_t status = magma_read_notification_channel2(
+      magma_status_t status = magma_connection_read_notification_channel(
           connection, buffer_ids, sizeof(buffer_ids), &bytes_available, &more_data);
       if (status != MAGMA_STATUS_OK) {
         DLOG("magma_read_notification_channel returned %d", status);

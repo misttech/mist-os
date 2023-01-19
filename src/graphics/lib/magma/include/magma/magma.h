@@ -46,7 +46,7 @@ extern "C" {
 /// \brief Releases the given connection.
 /// \param connection An open connection.
 ///
-MAGMA_EXPORT void magma_release_connection(
+MAGMA_EXPORT void magma_connection_release(
     magma_connection_t connection);
 
 ///
@@ -55,7 +55,7 @@ MAGMA_EXPORT void magma_release_connection(
 ///        This may incur a round-trip sync.
 /// \param connection An open connection.
 ///
-MAGMA_EXPORT magma_status_t magma_get_error(
+MAGMA_EXPORT magma_status_t magma_connection_get_error(
     magma_connection_t connection);
 
 ///
@@ -63,7 +63,7 @@ MAGMA_EXPORT magma_status_t magma_get_error(
 /// \param connection An open connection.
 /// \param context_id_out The returned context id.
 ///
-MAGMA_EXPORT magma_status_t magma_create_context(
+MAGMA_EXPORT magma_status_t magma_connection_create_context(
     magma_connection_t connection,
     uint32_t* context_id_out);
 
@@ -72,7 +72,7 @@ MAGMA_EXPORT magma_status_t magma_create_context(
 /// \param connection An open connection.
 /// \param context_id A valid context id.
 ///
-MAGMA_EXPORT void magma_release_context(
+MAGMA_EXPORT void magma_connection_release_context(
     magma_connection_t connection,
     uint32_t context_id);
 
@@ -83,7 +83,7 @@ MAGMA_EXPORT void magma_release_context(
 /// \param size_out The returned buffer's actual size.
 /// \param buffer_out The returned buffer.
 ///
-MAGMA_EXPORT magma_status_t magma_create_buffer(
+MAGMA_EXPORT magma_status_t magma_connection_create_buffer(
     magma_connection_t connection,
     uint64_t size,
     uint64_t* size_out,
@@ -94,7 +94,7 @@ MAGMA_EXPORT magma_status_t magma_create_buffer(
 /// \param connection An open connection.
 /// \param buffer A valid buffer.
 ///
-MAGMA_EXPORT void magma_release_buffer(
+MAGMA_EXPORT void magma_connection_release_buffer(
     magma_connection_t connection,
     magma_buffer_t buffer);
 
@@ -103,14 +103,14 @@ MAGMA_EXPORT void magma_release_buffer(
 ///        cache the id rather than call this repeatedly.
 /// \param buffer A valid buffer.
 ///
-MAGMA_EXPORT uint64_t magma_get_buffer_id(
+MAGMA_EXPORT uint64_t magma_buffer_get_id(
     magma_buffer_t buffer);
 
 ///
 /// \brief Returns the actual size of the given buffer.
 /// \param buffer A valid buffer.
 ///
-MAGMA_EXPORT uint64_t magma_get_buffer_size(
+MAGMA_EXPORT uint64_t magma_buffer_get_size(
     magma_buffer_t buffer);
 
 ///
@@ -122,7 +122,7 @@ MAGMA_EXPORT uint64_t magma_get_buffer_size(
 ///        buffer's size.
 /// \param operation One of MAGMA_CACHE_OPERATION_CLEAN or MAGMA_CACHE_OPERATION_CLEAN_INVALIDATE.
 ///
-MAGMA_EXPORT magma_status_t magma_clean_cache(
+MAGMA_EXPORT magma_status_t magma_buffer_clean_cache(
     magma_buffer_t buffer,
     uint64_t offset,
     uint64_t size,
@@ -133,7 +133,7 @@ MAGMA_EXPORT magma_status_t magma_clean_cache(
 /// \param buffer A valid buffer.
 /// \param policy One of MAGMA_CACHE_POLICY_[CACHED|WRITE_COMBINING|UNCACHED].
 ///
-MAGMA_EXPORT magma_status_t magma_set_cache_policy(
+MAGMA_EXPORT magma_status_t magma_buffer_set_cache_policy(
     magma_buffer_t buffer,
     magma_cache_policy_t policy);
 
@@ -142,7 +142,7 @@ MAGMA_EXPORT magma_status_t magma_set_cache_policy(
 /// \param buffer A valid buffer.
 /// \param cache_policy_out The returned cache policy.
 ///
-MAGMA_EXPORT magma_status_t magma_get_buffer_cache_policy(
+MAGMA_EXPORT magma_status_t magma_buffer_get_cache_policy(
     magma_buffer_t buffer,
     magma_cache_policy_t* cache_policy_out);
 
@@ -153,7 +153,7 @@ MAGMA_EXPORT magma_status_t magma_get_buffer_cache_policy(
 /// \param buffer A valid buffer.
 /// \param buffer_handle_out The returned handle.
 ///
-MAGMA_EXPORT magma_status_t magma_export(
+MAGMA_EXPORT magma_status_t magma_connection_export_buffer(
     magma_connection_t connection,
     magma_buffer_t buffer,
     magma_handle_t* buffer_handle_out);
@@ -164,7 +164,7 @@ MAGMA_EXPORT magma_status_t magma_export(
 /// \param buffer_handle A valid handle.
 /// \param buffer_out The returned buffer.
 ///
-MAGMA_EXPORT magma_status_t magma_import(
+MAGMA_EXPORT magma_status_t magma_connection_import_buffer(
     magma_connection_t connection,
     magma_handle_t buffer_handle,
     magma_buffer_t* buffer_out);
@@ -177,7 +177,7 @@ MAGMA_EXPORT magma_status_t magma_import(
 /// \param command_count The number of commands in the provided buffer.
 /// \param command_buffers An array of command_count magma_inline_command_buffer structs.
 ///
-MAGMA_EXPORT magma_status_t magma_execute_immediate_commands2(
+MAGMA_EXPORT magma_status_t magma_connection_execute_immediate_commands(
     magma_connection_t connection,
     uint32_t context_id,
     uint64_t command_count,
@@ -188,7 +188,7 @@ MAGMA_EXPORT magma_status_t magma_execute_immediate_commands2(
 /// \param connection An open connection.
 /// \param semaphore_out The returned semaphore.
 ///
-MAGMA_EXPORT magma_status_t magma_create_semaphore(
+MAGMA_EXPORT magma_status_t magma_connection_create_semaphore(
     magma_connection_t connection,
     magma_semaphore_t* semaphore_out);
 
@@ -197,7 +197,7 @@ MAGMA_EXPORT magma_status_t magma_create_semaphore(
 /// \param connection An open connection.
 /// \param semaphore A valid semaphore.
 ///
-MAGMA_EXPORT void magma_release_semaphore(
+MAGMA_EXPORT void magma_connection_release_semaphore(
     magma_connection_t connection,
     magma_semaphore_t semaphore);
 
@@ -205,21 +205,21 @@ MAGMA_EXPORT void magma_release_semaphore(
 /// \brief Returns a unique id for the given semaphore.
 /// \param semaphore A valid semaphore.
 ///
-MAGMA_EXPORT uint64_t magma_get_semaphore_id(
+MAGMA_EXPORT uint64_t magma_semaphore_get_id(
     magma_semaphore_t semaphore);
 
 ///
 /// \brief Signals the given semaphore.
 /// \param semaphore A valid semaphore.
 ///
-MAGMA_EXPORT void magma_signal_semaphore(
+MAGMA_EXPORT void magma_semaphore_signal(
     magma_semaphore_t semaphore);
 
 ///
 /// \brief Resets the given semaphore.
 /// \param semaphore A valid semaphore.
 ///
-MAGMA_EXPORT void magma_reset_semaphore(
+MAGMA_EXPORT void magma_semaphore_reset(
     magma_semaphore_t semaphore);
 
 ///
@@ -229,7 +229,7 @@ MAGMA_EXPORT void magma_reset_semaphore(
 /// \param semaphore A valid semaphore.
 /// \param semaphore_handle_out The returned handle.
 ///
-MAGMA_EXPORT magma_status_t magma_export_semaphore(
+MAGMA_EXPORT magma_status_t magma_connection_export_semaphore(
     magma_connection_t connection,
     magma_semaphore_t semaphore,
     magma_handle_t* semaphore_handle_out);
@@ -240,7 +240,7 @@ MAGMA_EXPORT magma_status_t magma_export_semaphore(
 /// \param semaphore_handle A valid semaphore handle.
 /// \param semaphore_out The returned semaphore.
 ///
-MAGMA_EXPORT magma_status_t magma_import_semaphore(
+MAGMA_EXPORT magma_status_t magma_connection_import_semaphore(
     magma_connection_t connection,
     magma_handle_t semaphore_handle,
     magma_semaphore_t* semaphore_out);
@@ -251,7 +251,7 @@ MAGMA_EXPORT magma_status_t magma_import_semaphore(
 ///        be closed by the client.
 /// \param connection An open connection.
 ///
-MAGMA_EXPORT magma_handle_t magma_get_notification_channel_handle(
+MAGMA_EXPORT magma_handle_t magma_connection_get_notification_channel_handle(
     magma_connection_t connection);
 
 ///
@@ -286,7 +286,7 @@ MAGMA_EXPORT void magma_device_release(
 /// \param result_buffer_out Handle to the returned buffer.
 /// \param result_out Pointer to a uint64 result.
 ///
-MAGMA_EXPORT magma_status_t magma_query(
+MAGMA_EXPORT magma_status_t magma_device_query(
     magma_device_t device,
     uint64_t id,
     magma_handle_t* result_buffer_out,
@@ -297,7 +297,7 @@ MAGMA_EXPORT magma_status_t magma_query(
 /// \param device An open device
 /// \param connection_out Returned connection.
 ///
-MAGMA_EXPORT magma_status_t magma_create_connection2(
+MAGMA_EXPORT magma_status_t magma_device_create_connection(
     magma_device_t device,
     magma_connection_t* connection_out);
 
@@ -474,7 +474,7 @@ MAGMA_EXPORT magma_status_t magma_buffer_set_name(
 /// \param start_offset Byte offset into the buffer.
 /// \param length Length (in bytes) of the region to operate on.
 ///
-MAGMA_EXPORT magma_status_t magma_buffer_range_op(
+MAGMA_EXPORT magma_status_t magma_connection_buffer_range_op(
     magma_connection_t connection,
     magma_buffer_t buffer,
     uint32_t options,
@@ -504,7 +504,7 @@ MAGMA_EXPORT magma_status_t magma_buffer_get_info(
 ///        there are no messages pending.
 /// \param more_data_out True if there is more notification data waiting.
 ///
-MAGMA_EXPORT magma_status_t magma_read_notification_channel2(
+MAGMA_EXPORT magma_status_t magma_connection_read_notification_channel(
     magma_connection_t connection,
     void* buffer,
     uint64_t buffer_size,
@@ -518,7 +518,7 @@ MAGMA_EXPORT magma_status_t magma_read_notification_channel2(
 /// \param create_info Input parameters describing the image.
 /// \param image_out The image buffer.
 ///
-MAGMA_EXPORT magma_status_t magma_virt_create_image(
+MAGMA_EXPORT magma_status_t magma_virt_connection_create_image(
     magma_connection_t connection,
     magma_image_create_info_t* create_info,
     magma_buffer_t* image_out);
@@ -529,7 +529,7 @@ MAGMA_EXPORT magma_status_t magma_virt_create_image(
 /// \param image The image buffer.
 /// \param image_info_out Output parameters describing the image.
 ///
-MAGMA_EXPORT magma_status_t magma_virt_get_image_info(
+MAGMA_EXPORT magma_status_t magma_virt_connection_get_image_info(
     magma_connection_t connection,
     magma_buffer_t image,
     magma_image_info_t* image_info_out);
@@ -541,7 +541,7 @@ MAGMA_EXPORT magma_status_t magma_virt_get_image_info(
 /// \param buffer A valid buffer.
 /// \param handle_out Pointer to the returned handle.
 ///
-MAGMA_EXPORT magma_status_t magma_get_buffer_handle2(
+MAGMA_EXPORT magma_status_t magma_buffer_get_handle(
     magma_buffer_t buffer,
     magma_handle_t* handle_out);
 
@@ -550,7 +550,7 @@ MAGMA_EXPORT magma_status_t magma_get_buffer_handle2(
 ///        observed, but not necessarily completed.
 /// \param connection An open connection.
 ///
-MAGMA_EXPORT magma_status_t magma_flush(
+MAGMA_EXPORT magma_status_t magma_connection_flush(
     magma_connection_t connection);
 
 ///
@@ -559,7 +559,7 @@ MAGMA_EXPORT magma_status_t magma_flush(
 /// \param context_id A valid context id.
 /// \param descriptor A pointer to the command descriptor.
 ///
-MAGMA_EXPORT magma_status_t magma_execute_command(
+MAGMA_EXPORT magma_status_t magma_connection_execute_command(
     magma_connection_t connection,
     uint32_t context_id,
     struct magma_command_descriptor* descriptor);
@@ -574,7 +574,7 @@ MAGMA_EXPORT magma_status_t magma_execute_command(
 /// \param length Length in bytes of the range to map.
 /// \param map_flags A valid MAGMA_MAP_FLAGS value.
 ///
-MAGMA_EXPORT magma_status_t magma_map_buffer(
+MAGMA_EXPORT magma_status_t magma_connection_map_buffer(
     magma_connection_t connection,
     uint64_t hw_va,
     magma_buffer_t buffer,
@@ -588,10 +588,12 @@ MAGMA_EXPORT magma_status_t magma_map_buffer(
 /// \param hw_va A hardware virtual address associated with an existing mapping of the given buffer.
 /// \param buffer A valid buffer.
 ///
-MAGMA_EXPORT void magma_unmap_buffer(
+MAGMA_EXPORT void magma_connection_unmap_buffer(
     magma_connection_t connection,
     uint64_t hw_va,
     magma_buffer_t buffer);
+
+#include "magma_soft_transition.h"
 
 #if defined(__cplusplus)
 }
