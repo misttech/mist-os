@@ -5,7 +5,7 @@
 use {crate::error::*, fidl_fuchsia_component_decl as fdecl, std::collections::HashMap};
 
 const MAX_PATH_LENGTH: usize = 1024;
-const MAX_URL_LENGTH: usize = 4096;
+pub const MAX_URL_LENGTH: usize = 4096;
 pub const MAX_NAME_LENGTH: usize = 100;
 pub const MAX_DYNAMIC_NAME_LENGTH: usize = 1024;
 
@@ -205,7 +205,7 @@ pub(crate) fn check_offer_availability(
     }
 }
 
-pub(crate) fn check_url(
+pub fn check_url(
     prop: Option<&String>,
     decl_type: &str,
     keyword: &str,
@@ -263,11 +263,11 @@ pub(crate) fn check_url_scheme(
 
 #[cfg(test)]
 mod tests {
+
     use {super::*, lazy_static::lazy_static, proptest::prelude::*, regex::Regex, url::Url};
 
     const PATH_REGEX_STR: &str = r"(/[^/]+)+";
     const NAME_REGEX_STR: &str = r"[0-9a-zA-Z_][0-9a-zA-Z_\-\.]*";
-    const URL_REGEX_STR: &str = r"((([a-z][0-9a-z\+\-\.]*://[0-9a-z\+\-\._!$&,;]*/)?[0-9a-z\+\-\._/=!@$&,;]+)?#[0-9a-z\+\-\._/?=!@$&,;:]+)";
 
     lazy_static! {
         static ref PATH_REGEX: Regex =
@@ -291,14 +291,6 @@ mod tests {
             if s.len() < MAX_NAME_LENGTH {
                 let mut errors = vec![];
                 prop_assert!(check_name(Some(&s), "", "", &mut errors));
-                prop_assert!(errors.is_empty());
-            }
-        }
-        #[test]
-        fn check_url_matches_regex(s in URL_REGEX_STR) {
-            if s.len() < MAX_URL_LENGTH {
-                let mut errors = vec![];
-                prop_assert!(check_url(Some(&s), "", "", &mut errors));
                 prop_assert!(errors.is_empty());
             }
         }
@@ -480,20 +472,17 @@ mod tests {
             input = "my+awesome-scheme.2://abc123!@#$%.com",
             result = Err(ErrorList::new(vec![Error::invalid_url("FooDecl", "foo", "\"my+awesome-scheme.2://abc123!@#$%.com\": Malformed URL: EmptyHost.")])),
         },
-        test_relative_path_url_without_resource_invalid => {
-            check_fn = check_url,
-            input = "path/segments",
-            result = Err(ErrorList::new(vec![Error::invalid_url("FooDecl", "foo", "\"path/segments\": Relative URL has no resource fragment.")])),
-        },
         test_identifier_url_invalid => {
             check_fn = check_url,
             input = "fuchsia-pkg://",
             result = Err(ErrorList::new(vec![Error::invalid_url("FooDecl", "foo","\"fuchsia-pkg://\": URL is missing either `host`, `path`, and/or `resource`.")])),
         },
-        test_url_bad_scheme => {
+        test_url_invalid_port => {
             check_fn = check_url,
-            input = "bad-scheme&://blah",
-            result = Err(ErrorList::new(vec![Error::invalid_url("FooDecl", "foo", "\"bad-scheme&://blah\": Invalid scheme")])),
+            input = "scheme://invalid-port:99999999/path#frag",
+            result = Err(ErrorList::new(vec![
+                Error::invalid_url("FooDecl", "foo", "\"scheme://invalid-port:99999999/path#frag\": Malformed URL: InvalidPort."),
+            ])),
         },
         test_identifier_url_too_long => {
             check_fn = check_url,

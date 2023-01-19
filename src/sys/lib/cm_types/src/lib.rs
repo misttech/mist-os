@@ -431,12 +431,10 @@ impl Url {
                 if path.starts_with('/') {
                     path = &path[1..];
                 }
-                if is_relative && path.contains("://") {
-                    return Err(ParseError::InvalidComponentUrl {
-                        details: "Invalid scheme".to_string(),
-                    });
-                }
                 if is_relative && url.fragment().is_none() {
+                    // TODO(fxbug.dev/119726): Fragments should be optional
+                    // for relative path URLs.
+                    //
                     // Historically, a component URL string without a scheme
                     // was considered invalid, unless it was only a fragment.
                     // Subpackages allow a relative path URL, and by current

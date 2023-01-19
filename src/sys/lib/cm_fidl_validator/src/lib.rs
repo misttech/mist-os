@@ -6,6 +6,8 @@ pub(crate) mod util;
 
 pub mod error;
 
+pub use crate::util::{check_url, MAX_URL_LENGTH};
+
 use {
     crate::{error::*, util::*},
     directed_graph::DirectedGraph,
@@ -7737,7 +7739,7 @@ mod tests {
                 let mut decl = new_component_decl();
                 decl.children = Some(vec![fdecl::Child{
                     name: Some("^bad".to_string()),
-                    url: Some("bad-scheme&://blah".to_string()),
+                    url: Some("scheme://invalid-port:99999999/path#frag".to_string()),
                     startup: Some(fdecl::StartupMode::Lazy),
                     on_terminate: None,
                     environment: None,
@@ -7747,7 +7749,7 @@ mod tests {
             },
             result = Err(ErrorList::new(vec![
                 Error::invalid_field("Child", "name"),
-                Error::invalid_url("Child", "url", "\"bad-scheme&://blah\": Invalid scheme"),
+                Error::invalid_url("Child", "url", "\"scheme://invalid-port:99999999/path#frag\": Malformed URL: InvalidPort."),
             ])),
         },
         test_validate_children_long_identifiers => {
