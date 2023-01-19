@@ -80,6 +80,7 @@ group("dart_allowlist") {
     "//src/diagnostics/validator/logs/encoding/fidl:*",
     "//src/diagnostics/validator/logs/encoding/puppet/dart:*",
     "//src/experiences/bin/ermine_testserver:*",
+    "//src/experiences/bin/feedback:*",
     "//src/experiences/bin/settings/license:*",
     "//src/experiences/bin/settings/shell:*",
     "//src/experiences/examples/hello_experiences:*",
