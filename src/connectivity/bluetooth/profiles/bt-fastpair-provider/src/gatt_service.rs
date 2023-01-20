@@ -375,7 +375,6 @@ impl GattService {
 
     /// Handle an incoming FIDL request for the local GATT service.
     fn handle_service_request(&mut self, request: LocalServiceRequest) -> Option<GattRequest> {
-        // TODO(fxbug.dev/95542): Handle each GATT request type.
         match request {
             LocalServiceRequest::ReadValue { handle, responder, .. } => {
                 self.handle_read_request(handle, responder);
@@ -386,6 +385,7 @@ impl GattService {
             LocalServiceRequest::CharacteristicConfiguration { responder, .. } => {
                 let _ = responder.send();
             }
+            // TODO(fxbug.dev/96726): Track allocated credits
             LocalServiceRequest::ValueChangedCredit { .. } => {}
             LocalServiceRequest::PeerUpdate { responder, .. } => {
                 // Per FIDL docs, this can be safely ignored
