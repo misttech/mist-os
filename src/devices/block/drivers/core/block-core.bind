@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+using fuchsia.block;
 using fuchsia.hardware.block;
 
 fuchsia.BIND_PROTOCOL == fuchsia.hardware.block.BIND_PROTOCOL.BLOCK_IMPL;
-
+fuchsia.block.IgnoreDevice != true;

@@ -70,7 +70,10 @@ driver_bind_rules("block-core-bind") {
   header_output = "block-core-bind.h"
   bind_output = "block.bindbc"
   tests = "bind-tests.json"
-  deps = [ "//src/devices/bind/fuchsia.hardware.block" ]
+  deps = [
+    "//src/devices/bind/fuchsia.block",
+    "//src/devices/bind/fuchsia.hardware.block",
+  ]
 }
 
 source_set("shared") {
