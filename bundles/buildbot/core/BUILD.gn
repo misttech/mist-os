@@ -72,5 +72,14 @@ group("no_e2e_dep") {
     "//sdk:tests_no_e2e",
     "//src:tests_no_e2e",
     "//tools:tests_no_e2e",
+
+    # Fake build info service.
+    # This is needed by Chromium tests, which run on Core in Fuchsia infra,
+    # until subpackages are supported OOT and fakes are provided with the SDK.
+    # See crbug.com/1326674. Unlike Terminal and Workstation, images of which
+    # are used by Chromium out-of-tree, the package only needs tobe available
+    # on the bot.
+    # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
+    "//src/developer/build_info/testing:fake-build-info",
   ]
 }
