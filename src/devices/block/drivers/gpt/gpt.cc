@@ -24,6 +24,8 @@
 #include <algorithm>
 #include <memory>
 
+#include <bind/fuchsia/block/cpp/bind.h>
+#include <bind/fuchsia/gpt/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 #include "lib/ddk/driver.h"
@@ -64,6 +66,18 @@ void apply_guid_map(const fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::
       return;
     }
   }
+}
+
+bool ignore_device(const fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo>& map,
+                   const char* name) {
+  for (const auto& entry : map) {
+    if (entry.name.get() == name) {
+      return entry.options.has_block_driver_should_ignore_device()
+                 ? entry.options.block_driver_should_ignore_device()
+                 : false;
+    }
+  }
+  return false;
 }
 
 class PlaceholderDevice;
@@ -171,11 +185,20 @@ void PartitionDevice::SetInfo(gpt_entry_t* entry, block_info_t* info, size_t op_
   block_op_size_ = op_size;
 }
 
-zx_status_t PartitionDevice::Add(uint32_t partition_number, uint32_t flags) {
+zx_status_t PartitionDevice::Add(uint32_t partition_number, bool ignore_device) {
   char name[kDeviceNameLength];
   snprintf(name, sizeof(name), "part-%03u", partition_number);
 
-  zx_status_t status = DdkAdd(name);
+  // Previously validated in Bind().
+  ZX_ASSERT(GetPartitionName(gpt_entry_, partition_name_, sizeof(partition_name_)).is_ok());
+
+  const zx_device_str_prop_t str_props[]{
+      {bind_fuchsia_gpt::PARTITIONNAME.c_str(), str_prop_str_val(partition_name_)},
+      {bind_fuchsia_block::IGNOREDEVICE.c_str(), str_prop_bool_val(ignore_device)},
+  };
+
+  zx_status_t status =
+      DdkAdd(ddk::DeviceAddArgs(name).set_str_props({str_props, std::size(str_props)}));
   if (status != ZX_OK) {
     zxlogf(ERROR, "gpt: DdkAdd failed (%d)", status);
   }
@@ -317,8 +340,10 @@ zx_status_t Bind(void* ctx, zx_device_t* parent) {
       zxlogf(ERROR, "gpt: bad partition name, ignoring entry");
       continue;
     }
+    bool ignore = false;
     if (metadata.is_ok() && metadata->has_partition_info()) {
       apply_guid_map(metadata->partition_info(), partition_name, entry->type);
+      ignore = ignore_device(metadata->partition_info(), partition_name);
     }
 
     char type_guid[GPT_GUID_STRLEN] = {};
@@ -330,7 +355,7 @@ zx_status_t Bind(void* ctx, zx_device_t* parent) {
     block_info.block_count = entry->last - entry->first + 1;
     device->SetInfo(entry, &block_info, block_op_size);
 
-    if ((status = device->Add(partitions)) != ZX_OK) {
+    if ((status = device->Add(partitions, ignore)) != ZX_OK) {
       return status;
     }
     device.release();
