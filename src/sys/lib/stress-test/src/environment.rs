@@ -24,4 +24,12 @@ pub trait Environment: Send + Sync + Debug {
 
     /// Reset the environment, when an actor requests one
     async fn reset(&mut self);
+
+    /// An optional hook to invoke when panicking.  Can be used to dump additional state.
+    /// No reference to &self is taken by the function to make it feasible to invoke this hook while
+    /// a &mut exists on the Environment.  Since this is invoked during panic, the function should
+    /// avoid blocking on locks or other resources.
+    fn panic_hook(&self) -> Option<Box<dyn Fn() + 'static + Sync + Send>> {
+        None
+    }
 }

@@ -38,12 +38,16 @@ pub async fn run_test<E: 'static + Environment>(mut env: E) {
     {
         // Setup a panic handler that prints out details of this invocation on crash
         let default_panic_hook = std::panic::take_hook();
+        let custom_panic_hook = env.panic_hook();
         std::panic::set_hook(Box::new(move |panic_info| {
             error!("");
             error!("--------------------- stressor has crashed -----------------------");
             error!("{}", env_string);
             error!("------------------------------------------------------------------");
             error!("");
+            if let Some(hook) = &custom_panic_hook {
+                hook();
+            }
             default_panic_hook(panic_info);
         }));
     }

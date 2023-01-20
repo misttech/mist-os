@@ -6,21 +6,25 @@ use {
     crate::{
         deletion_actor::DeletionActor, file_actor::FileActor, instance_actor::InstanceActor, Args,
     },
+    anyhow::{anyhow, format_err},
     async_trait::async_trait,
+    diagnostics_reader::{ArchiveReader, Inspect},
     either::Either,
     fidl::endpoints::Proxy,
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
     fs_management::{filesystem::Filesystem, FSConfig},
+    fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
+    fuchsia_inspect::hierarchy::DiagnosticsHierarchy,
     fuchsia_zircon::Vmo,
-    futures::lock::Mutex,
+    futures::{lock::Mutex as FuturesMutex, StreamExt as _},
     key_bag::Aes256Key,
     rand::{rngs::SmallRng, Rng, SeedableRng},
     std::ops::Deref,
     std::path::PathBuf,
-    std::sync::Arc,
+    std::sync::{Arc, Mutex},
     std::time::Duration,
     storage_stress_test_utils::{
         data::{Compressibility, FileFactory, UncompressedSize},
@@ -48,6 +52,21 @@ const METADATA_KEY: Aes256Key = Aes256Key::create([
     0x0f, 0x4d, 0xca, 0x6b, 0x35, 0x0e, 0x85, 0x6a, 0xb3, 0x8c, 0xdd, 0xe9, 0xda, 0x0e, 0xc8, 0x22,
     0x8e, 0xea, 0xd8, 0x05, 0xc4, 0xc9, 0x0b, 0xa8, 0xd8, 0x85, 0x87, 0x50, 0x75, 0x40, 0x1c, 0x4c,
 ]);
+
+const INSPECT_POLL_INTERVAL: fuchsia_zircon::Duration = fuchsia_zircon::Duration::from_seconds(1);
+
+fn print_inspect_data(data: &DiagnosticsHierarchy) {
+    match serde_json::to_string_pretty(&data) {
+        Ok(data) => {
+            println!("=== START Inspect Data ===");
+            println!("{}", data);
+            println!("=== END Inspect Data ===");
+        }
+        Err(e) => {
+            eprintln!("Failed to deserialize inspect data: {:?}", e);
+        }
+    }
+}
 
 pub async fn create_hermetic_crypt_service(
     data_key: Aes256Key,
@@ -115,9 +134,11 @@ pub struct FsEnvironment<FSC: FSConfig> {
     volume_guid: Guid,
     config: FSC,
     crypt_realm: Option<RealmInstance>,
-    instance_actor: Arc<Mutex<InstanceActor>>,
-    file_actor: Arc<Mutex<FileActor>>,
-    deletion_actor: Arc<Mutex<DeletionActor>>,
+    instance_actor: Arc<FuturesMutex<InstanceActor>>,
+    file_actor: Arc<FuturesMutex<FileActor>>,
+    deletion_actor: Arc<FuturesMutex<DeletionActor>>,
+    _inspect_poll_task: fasync::Task<()>,
+    inspect: Arc<Mutex<Option<DiagnosticsHierarchy>>>,
 }
 
 impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
@@ -144,6 +165,7 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
             connect_to_protocol_at_path::<fio::NodeMarker>(volume_path.to_str().unwrap()).unwrap();
         let mut fs = Filesystem::from_node(node, config.clone());
         fs.format().await.unwrap();
+        let moniker = fs.get_component_moniker();
 
         let instance = if fs.config().is_multi_volume() {
             let crypt = Some(
@@ -200,16 +222,18 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
             let home_dir = open_dir_at_root("home1");
             let file_actor = FileActor::new(factory, home_dir);
             file_actor.set_progress_timer(std::time::Duration::from_secs(60)).await;
-            Arc::new(Mutex::new(file_actor))
+            Arc::new(FuturesMutex::new(file_actor))
         };
         let deletion_actor = {
             let rng = SmallRng::from_seed(rng.gen());
             let home_dir = open_dir_at_root("home1");
-            Arc::new(Mutex::new(DeletionActor::new(rng, home_dir)))
+            Arc::new(FuturesMutex::new(DeletionActor::new(rng, home_dir)))
         };
 
-        let instance_actor = Arc::new(Mutex::new(InstanceActor::new(fvm, instance)));
+        let instance_actor = Arc::new(FuturesMutex::new(InstanceActor::new(fvm, instance)));
 
+        let inspect = Arc::new(Mutex::new(None));
+        let inspect_cloned = inspect.clone();
         Self {
             seed,
             args,
@@ -220,6 +244,40 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
             deletion_actor,
             instance_actor,
             config,
+            _inspect_poll_task: fasync::Task::spawn(async move {
+                Self::inspect_poll_task(moniker.unwrap(), inspect_cloned).await;
+            }),
+            inspect,
+        }
+    }
+
+    async fn inspect_poll_task(moniker: String, inspect: Arc<Mutex<Option<DiagnosticsHierarchy>>>) {
+        let mut timer = fuchsia_async::Interval::new(INSPECT_POLL_INTERVAL);
+        loop {
+            timer.next().await;
+            match ArchiveReader::new()
+                .select_all_for_moniker(&moniker)
+                .snapshot::<Inspect>()
+                .await
+                .map_err(|e| anyhow!(e))
+                .and_then(|d| {
+                    d.into_iter()
+                        .next()
+                        .and_then(|res| res.payload)
+                        .ok_or(format_err!("expected one inspect hierarchy"))
+                }) {
+                Ok(data) => {
+                    let mut inspect = inspect.lock().unwrap();
+                    if inspect.replace(data).is_none() {
+                        // Whenever we first receive data for a new instance, dump it out.
+                        print_inspect_data(inspect.as_ref().unwrap());
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Failed to read inspect: {:?}", e);
+                    continue;
+                }
+            };
         }
     }
 }
@@ -323,6 +381,8 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
                 Either::Left(instance)
             };
 
+            *self.inspect.lock().unwrap() = None;
+
             // Replace the fvm and fs instances
             actor.instance = Some((fvm, instance));
         }
@@ -337,5 +397,26 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
             let mut actor = self.deletion_actor.lock().await;
             actor.home_dir = open_dir_at_root("home1");
         }
+    }
+
+    fn panic_hook(&self) -> Option<Box<dyn Fn() + 'static + Sync + Send>> {
+        let inspect = self.inspect.clone();
+        Some(Box::new(move || {
+            eprintln!("Printing inspect data for test due to panic.");
+            let mut inspect = match inspect.try_lock() {
+                Ok(v) if v.is_none() => {
+                    eprintln!("No inspect data was collected; can't print additional debug info");
+                    return;
+                }
+                Ok(inspect) => inspect,
+                Err(_) => {
+                    eprintln!("Failed to acquire lock; can't print additional debug info");
+                    return;
+                }
+            };
+            let inspect = inspect.as_mut().unwrap();
+            inspect.sort();
+            print_inspect_data(&*inspect);
+        }))
     }
 }

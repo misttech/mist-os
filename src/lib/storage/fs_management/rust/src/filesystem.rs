@@ -81,6 +81,18 @@ impl Filesystem {
         Ok(Self::from_node(ClientEnd::<fio::NodeMarker>::new(channel).into_proxy()?, config))
     }
 
+    /// If the filesystem is a currently running component, returns its (relative) moniker.
+    pub fn get_component_moniker(&self) -> Option<String> {
+        let component_type = self.config.mode().component_type()?;
+        Some(match component_type {
+            ComponentType::StaticChild => self.config.mode().component_name().unwrap().to_string(),
+            ComponentType::DynamicChild { .. } => {
+                let component = self.component.as_ref()?;
+                format!("{}:{}", component.collection, component.name)
+            }
+        })
+    }
+
     // Clone a Channel to the block device.
     fn get_block_handle(
         &self,
