@@ -52,6 +52,15 @@ LocalTablePayload& LocalTablePayload::operator=(LocalTablePayload&& other) {
 bool LocalTablePayload::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+LocalTablePayload& LocalTablePayload::set_a(uint16_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&a_value_.value, std::move(_value));
+  } else {
+    a_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void LocalTablePayload::Encode(::fidl::Encoder* _encoder, size_t _offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1276,6 +1285,15 @@ MainProtocolOneWayAnonRequest& MainProtocolOneWayAnonRequest::operator=(MainProt
 bool MainProtocolOneWayAnonRequest::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+MainProtocolOneWayAnonRequest& MainProtocolOneWayAnonRequest::set_a(uint16_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&a_value_.value, std::move(_value));
+  } else {
+    a_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void MainProtocolOneWayAnonRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1568,6 +1586,15 @@ MainProtocolTwoWayAnonResponse& MainProtocolTwoWayAnonResponse::operator=(MainPr
 bool MainProtocolTwoWayAnonResponse::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+MainProtocolTwoWayAnonResponse& MainProtocolTwoWayAnonResponse::set_a(uint16_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&a_value_.value, std::move(_value));
+  } else {
+    a_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void MainProtocolTwoWayAnonResponse::Encode(::fidl::Encoder* _encoder, size_t _offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -1682,6 +1709,15 @@ MainProtocolTwoWayAnonWithErrorRequest& MainProtocolTwoWayAnonWithErrorRequest::
 
 bool MainProtocolTwoWayAnonWithErrorRequest::IsEmpty() const {
   return field_presence_.IsEmpty();
+}
+MainProtocolTwoWayAnonWithErrorRequest& MainProtocolTwoWayAnonWithErrorRequest::set_a(uint16_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&a_value_.value, std::move(_value));
+  } else {
+    a_value_.value = std::move(_value);
+  }
+  return *this;
 }
 
 void MainProtocolTwoWayAnonWithErrorRequest::Encode(::fidl::Encoder* _encoder, size_t _offset,
@@ -2384,6 +2420,15 @@ MainProtocol_OnAnonWithError_Response& MainProtocol_OnAnonWithError_Response::op
 
 bool MainProtocol_OnAnonWithError_Response::IsEmpty() const {
   return field_presence_.IsEmpty();
+}
+MainProtocol_OnAnonWithError_Response& MainProtocol_OnAnonWithError_Response::set_a(uint16_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&a_value_.value, std::move(_value));
+  } else {
+    a_value_.value = std::move(_value);
+  }
+  return *this;
 }
 
 void MainProtocol_OnAnonWithError_Response::Encode(::fidl::Encoder* _encoder, size_t _offset,

@@ -53,6 +53,15 @@ TableWithHandle& TableWithHandle::operator=(TableWithHandle&& other) {
 bool TableWithHandle::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+TableWithHandle& TableWithHandle::set_h(::zx::vmo _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&h_value_.value, std::move(_value));
+  } else {
+    h_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void TableWithHandle::Encode(::fidl::Encoder* _encoder, size_t _offset,
                              cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {

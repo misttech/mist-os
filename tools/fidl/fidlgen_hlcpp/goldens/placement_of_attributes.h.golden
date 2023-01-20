@@ -189,15 +189,7 @@ class ExampleTable final {
     }
     return &member_value_.value;
   }
-  ExampleTable& set_member(uint32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&member_value_.value, std::move(_value));
-    } else {
-      member_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  ExampleTable& set_member(uint32_t _value);
   void clear_member() {
     if (!field_presence_.IsSet<0>()) {
       return;

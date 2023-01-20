@@ -510,15 +510,7 @@ class Table final {
     }
     return &Field_value_.value;
   }
-  Table& set_Field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&Field_value_.value, std::move(_value));
-    } else {
-      Field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  Table& set_Field(int32_t _value);
   void clear_Field() {
     if (!field_presence_.IsSet<0>()) {
       return;

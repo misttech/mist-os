@@ -91,15 +91,7 @@ class TableSmallArray final {
     }
     return &a_value_.value;
   }
-  TableSmallArray& set_a(::std::array<uint32_t, 2> _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&a_value_.value, std::move(_value));
-    } else {
-      a_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  TableSmallArray& set_a(::std::array<uint32_t, 2> _value);
   void clear_a() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -177,15 +169,7 @@ class TableLargeArray final {
     }
     return &a_value_.value;
   }
-  TableLargeArray& set_a(::std::array<uint32_t, 100> _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&a_value_.value, std::move(_value));
-    } else {
-      a_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  TableLargeArray& set_a(::std::array<uint32_t, 100> _value);
   void clear_a() {
     if (!field_presence_.IsSet<0>()) {
       return;

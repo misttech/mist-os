@@ -39,15 +39,7 @@ class {{ .Name }} final {
     }
     return &{{ .FieldDataName }}.value;
   }
-  {{ $.Name }}& set_{{ .Name }}({{ .Type }} _value) {
-    if (!{{ .FieldPresenceIsSet }}) {
-      {{ .FieldPresenceSet }};
-      Construct(&{{ .FieldDataName }}.value, std::move(_value));
-    } else {
-      {{ .FieldDataName }}.value = std::move(_value);
-    }
-    return *this;
-  }
+  {{ $.Name }}& set_{{ .Name }}({{ .Type }} _value);
   void {{ .MethodClearName }}() {
     if (!{{ .FieldPresenceIsSet }}) {
       return;
@@ -164,6 +156,18 @@ const fidl_type_t* {{ .Name }}::FidlType = &{{ .CodingTableType.Name }};
 bool {{ .Name }}::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+
+{{- range .Members }}
+{{ $.Name }}& {{ $.Name }}::set_{{ .Name }}({{ .Type }} _value) {
+  if (!{{ .FieldPresenceIsSet }}) {
+    {{ .FieldPresenceSet }};
+    Construct(&{{ .FieldDataName }}.value, std::move(_value));
+  } else {
+    {{ .FieldDataName }}.value = std::move(_value);
+  }
+  return *this;
+}
+{{- end }}
 
 void {{ .Name }}::Encode(::fidl::Encoder* _encoder, size_t _offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {

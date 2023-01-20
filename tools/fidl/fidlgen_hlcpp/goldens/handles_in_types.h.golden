@@ -64,15 +64,7 @@ class TableWithHandle final {
     }
     return &h_value_.value;
   }
-  TableWithHandle& set_h(::zx::vmo _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&h_value_.value, std::move(_value));
-    } else {
-      h_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  TableWithHandle& set_h(::zx::vmo _value);
   void clear_h() {
     if (!field_presence_.IsSet<0>()) {
       return;

@@ -214,15 +214,7 @@ class Table final {
     }
     return &x_value_.value;
   }
-  Table& set_x(uint32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&x_value_.value, std::move(_value));
-    } else {
-      x_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  Table& set_x(uint32_t _value);
   void clear_x() {
     if (!field_presence_.IsSet<0>()) {
       return;

@@ -113,15 +113,7 @@ class LocalTablePayload final {
     }
     return &a_value_.value;
   }
-  LocalTablePayload& set_a(uint16_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&a_value_.value, std::move(_value));
-    } else {
-      a_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  LocalTablePayload& set_a(uint16_t _value);
   void clear_a() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -789,15 +781,7 @@ class MainProtocolOneWayAnonRequest final {
     }
     return &a_value_.value;
   }
-  MainProtocolOneWayAnonRequest& set_a(uint16_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&a_value_.value, std::move(_value));
-    } else {
-      a_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  MainProtocolOneWayAnonRequest& set_a(uint16_t _value);
   void clear_a() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -967,15 +951,7 @@ class MainProtocolTwoWayAnonResponse final {
     }
     return &a_value_.value;
   }
-  MainProtocolTwoWayAnonResponse& set_a(uint16_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&a_value_.value, std::move(_value));
-    } else {
-      a_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  MainProtocolTwoWayAnonResponse& set_a(uint16_t _value);
   void clear_a() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -1054,15 +1030,7 @@ class MainProtocolTwoWayAnonWithErrorRequest final {
     }
     return &a_value_.value;
   }
-  MainProtocolTwoWayAnonWithErrorRequest& set_a(uint16_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&a_value_.value, std::move(_value));
-    } else {
-      a_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  MainProtocolTwoWayAnonWithErrorRequest& set_a(uint16_t _value);
   void clear_a() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -1457,15 +1425,7 @@ class MainProtocol_OnAnonWithError_Response final {
     }
     return &a_value_.value;
   }
-  MainProtocol_OnAnonWithError_Response& set_a(uint16_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&a_value_.value, std::move(_value));
-    } else {
-      a_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  MainProtocol_OnAnonWithError_Response& set_a(uint16_t _value);
   void clear_a() {
     if (!field_presence_.IsSet<0>()) {
       return;

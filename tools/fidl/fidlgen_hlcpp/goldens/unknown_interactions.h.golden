@@ -821,15 +821,7 @@ class UnknownInteractionsProtocolStrictTwoWayTableResponse final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -1465,15 +1457,7 @@ class UnknownInteractionsProtocol_StrictTwoWayTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -2243,15 +2227,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayTable_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsProtocol_FlexibleTwoWayTable_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsProtocol_FlexibleTwoWayTable_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -3111,15 +3087,7 @@ class UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -3476,15 +3444,7 @@ class UnknownInteractionsProtocolStrictEventTableRequest final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsProtocolStrictEventTableRequest& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsProtocolStrictEventTableRequest& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -4120,15 +4080,7 @@ class UnknownInteractionsProtocol_StrictEventTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsProtocol_StrictEventTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsProtocol_StrictEventTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -4455,15 +4407,7 @@ class UnknownInteractionsProtocolFlexibleEventTableRequest final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsProtocolFlexibleEventTableRequest& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsProtocolFlexibleEventTableRequest& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -5099,15 +5043,7 @@ class UnknownInteractionsProtocol_FlexibleEventTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsProtocol_FlexibleEventTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsProtocol_FlexibleEventTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -5953,15 +5889,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayTableResponse final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsAjarProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsAjarProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -6597,15 +6525,7 @@ class UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -6932,15 +6852,7 @@ class UnknownInteractionsAjarProtocolStrictEventTableRequest final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsAjarProtocolStrictEventTableRequest& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsAjarProtocolStrictEventTableRequest& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -7576,15 +7488,7 @@ class UnknownInteractionsAjarProtocol_StrictEventTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsAjarProtocol_StrictEventTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsAjarProtocol_StrictEventTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -7911,15 +7815,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventTableRequest final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsAjarProtocolFlexibleEventTableRequest& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsAjarProtocolFlexibleEventTableRequest& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -8555,15 +8451,7 @@ class UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -9265,15 +9153,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayTableResponse final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsClosedProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsClosedProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -9909,15 +9789,7 @@ class UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -10244,15 +10116,7 @@ class UnknownInteractionsClosedProtocolStrictEventTableRequest final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsClosedProtocolStrictEventTableRequest& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsClosedProtocolStrictEventTableRequest& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -10888,15 +10752,7 @@ class UnknownInteractionsClosedProtocol_StrictEventTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsClosedProtocol_StrictEventTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsClosedProtocol_StrictEventTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -11488,15 +11344,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayTableResponse final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsDriverProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsDriverProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -12132,15 +11980,7 @@ class UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -12910,15 +12750,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -13778,15 +13610,7 @@ class UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -14143,15 +13967,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -14787,15 +14603,7 @@ class UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response final 
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -15122,15 +14930,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse final {
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;
@@ -15766,15 +15566,7 @@ class UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response fina
     }
     return &some_field_value_.value;
   }
-  UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value) {
-    if (!field_presence_.IsSet<0>()) {
-      field_presence_.Set<0>();
-      Construct(&some_field_value_.value, std::move(_value));
-    } else {
-      some_field_value_.value = std::move(_value);
-    }
-    return *this;
-  }
+  UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Response& set_some_field(int32_t _value);
   void clear_some_field() {
     if (!field_presence_.IsSet<0>()) {
       return;

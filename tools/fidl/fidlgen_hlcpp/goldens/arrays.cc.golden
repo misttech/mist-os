@@ -105,6 +105,15 @@ TableSmallArray& TableSmallArray::operator=(TableSmallArray&& other) {
 bool TableSmallArray::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+TableSmallArray& TableSmallArray::set_a(::std::array<uint32_t, 2> _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&a_value_.value, std::move(_value));
+  } else {
+    a_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void TableSmallArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
                              cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -216,6 +225,15 @@ TableLargeArray& TableLargeArray::operator=(TableLargeArray&& other) {
 
 bool TableLargeArray::IsEmpty() const {
   return field_presence_.IsEmpty();
+}
+TableLargeArray& TableLargeArray::set_a(::std::array<uint32_t, 100> _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&a_value_.value, std::move(_value));
+  } else {
+    a_value_.value = std::move(_value);
+  }
+  return *this;
 }
 
 void TableLargeArray::Encode(::fidl::Encoder* _encoder, size_t _offset,

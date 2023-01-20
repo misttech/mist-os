@@ -122,6 +122,24 @@ SimpleTable& SimpleTable::operator=(SimpleTable&& other) {
 bool SimpleTable::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+SimpleTable& SimpleTable::set_x(int64_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&x_value_.value, std::move(_value));
+  } else {
+    x_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SimpleTable& SimpleTable::set_y(int64_t _value) {
+  if (!field_presence_.IsSet<4>()) {
+    field_presence_.Set<4>();
+    Construct(&y_value_.value, std::move(_value));
+  } else {
+    y_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void SimpleTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -282,6 +300,15 @@ OlderSimpleTable& OlderSimpleTable::operator=(OlderSimpleTable&& other) {
 bool OlderSimpleTable::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+OlderSimpleTable& OlderSimpleTable::set_x(int64_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&x_value_.value, std::move(_value));
+  } else {
+    x_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void OlderSimpleTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -430,6 +457,33 @@ NewerSimpleTable& NewerSimpleTable::operator=(NewerSimpleTable&& other) {
 
 bool NewerSimpleTable::IsEmpty() const {
   return field_presence_.IsEmpty();
+}
+NewerSimpleTable& NewerSimpleTable::set_x(int64_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&x_value_.value, std::move(_value));
+  } else {
+    x_value_.value = std::move(_value);
+  }
+  return *this;
+}
+NewerSimpleTable& NewerSimpleTable::set_y(int64_t _value) {
+  if (!field_presence_.IsSet<4>()) {
+    field_presence_.Set<4>();
+    Construct(&y_value_.value, std::move(_value));
+  } else {
+    y_value_.value = std::move(_value);
+  }
+  return *this;
+}
+NewerSimpleTable& NewerSimpleTable::set_z(int64_t _value) {
+  if (!field_presence_.IsSet<5>()) {
+    field_presence_.Set<5>();
+    Construct(&z_value_.value, std::move(_value));
+  } else {
+    z_value_.value = std::move(_value);
+  }
+  return *this;
 }
 
 void NewerSimpleTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
@@ -670,6 +724,33 @@ ReverseOrdinalTable& ReverseOrdinalTable::operator=(ReverseOrdinalTable&& other)
 bool ReverseOrdinalTable::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+ReverseOrdinalTable& ReverseOrdinalTable::set_z(int64_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&z_value_.value, std::move(_value));
+  } else {
+    z_value_.value = std::move(_value);
+  }
+  return *this;
+}
+ReverseOrdinalTable& ReverseOrdinalTable::set_y(int64_t _value) {
+  if (!field_presence_.IsSet<1>()) {
+    field_presence_.Set<1>();
+    Construct(&y_value_.value, std::move(_value));
+  } else {
+    y_value_.value = std::move(_value);
+  }
+  return *this;
+}
+ReverseOrdinalTable& ReverseOrdinalTable::set_x(int64_t _value) {
+  if (!field_presence_.IsSet<2>()) {
+    field_presence_.Set<2>();
+    Construct(&x_value_.value, std::move(_value));
+  } else {
+    x_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void ReverseOrdinalTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
                          cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -874,6 +955,15 @@ TableWithAttributes& TableWithAttributes::operator=(TableWithAttributes&& other)
 
 bool TableWithAttributes::IsEmpty() const {
   return field_presence_.IsEmpty();
+}
+TableWithAttributes& TableWithAttributes::set_x(int64_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&x_value_.value, std::move(_value));
+  } else {
+    x_value_.value = std::move(_value);
+  }
+  return *this;
 }
 
 void TableWithAttributes::Encode(::fidl::Encoder* _encoder, size_t _offset,
@@ -2113,6 +2203,582 @@ SixtyFourOrdinalTable& SixtyFourOrdinalTable::operator=(SixtyFourOrdinalTable&& 
 
 bool SixtyFourOrdinalTable::IsEmpty() const {
   return field_presence_.IsEmpty();
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v1(int64_t _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&v1_value_.value, std::move(_value));
+  } else {
+    v1_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v2(int64_t _value) {
+  if (!field_presence_.IsSet<1>()) {
+    field_presence_.Set<1>();
+    Construct(&v2_value_.value, std::move(_value));
+  } else {
+    v2_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v3(int64_t _value) {
+  if (!field_presence_.IsSet<2>()) {
+    field_presence_.Set<2>();
+    Construct(&v3_value_.value, std::move(_value));
+  } else {
+    v3_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v4(int64_t _value) {
+  if (!field_presence_.IsSet<3>()) {
+    field_presence_.Set<3>();
+    Construct(&v4_value_.value, std::move(_value));
+  } else {
+    v4_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v5(int64_t _value) {
+  if (!field_presence_.IsSet<4>()) {
+    field_presence_.Set<4>();
+    Construct(&v5_value_.value, std::move(_value));
+  } else {
+    v5_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v6(int64_t _value) {
+  if (!field_presence_.IsSet<5>()) {
+    field_presence_.Set<5>();
+    Construct(&v6_value_.value, std::move(_value));
+  } else {
+    v6_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v7(int64_t _value) {
+  if (!field_presence_.IsSet<6>()) {
+    field_presence_.Set<6>();
+    Construct(&v7_value_.value, std::move(_value));
+  } else {
+    v7_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v8(int64_t _value) {
+  if (!field_presence_.IsSet<7>()) {
+    field_presence_.Set<7>();
+    Construct(&v8_value_.value, std::move(_value));
+  } else {
+    v8_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v9(int64_t _value) {
+  if (!field_presence_.IsSet<8>()) {
+    field_presence_.Set<8>();
+    Construct(&v9_value_.value, std::move(_value));
+  } else {
+    v9_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v10(int64_t _value) {
+  if (!field_presence_.IsSet<9>()) {
+    field_presence_.Set<9>();
+    Construct(&v10_value_.value, std::move(_value));
+  } else {
+    v10_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v11(int64_t _value) {
+  if (!field_presence_.IsSet<10>()) {
+    field_presence_.Set<10>();
+    Construct(&v11_value_.value, std::move(_value));
+  } else {
+    v11_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v12(int64_t _value) {
+  if (!field_presence_.IsSet<11>()) {
+    field_presence_.Set<11>();
+    Construct(&v12_value_.value, std::move(_value));
+  } else {
+    v12_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v13(int64_t _value) {
+  if (!field_presence_.IsSet<12>()) {
+    field_presence_.Set<12>();
+    Construct(&v13_value_.value, std::move(_value));
+  } else {
+    v13_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v14(int64_t _value) {
+  if (!field_presence_.IsSet<13>()) {
+    field_presence_.Set<13>();
+    Construct(&v14_value_.value, std::move(_value));
+  } else {
+    v14_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v15(int64_t _value) {
+  if (!field_presence_.IsSet<14>()) {
+    field_presence_.Set<14>();
+    Construct(&v15_value_.value, std::move(_value));
+  } else {
+    v15_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v16(int64_t _value) {
+  if (!field_presence_.IsSet<15>()) {
+    field_presence_.Set<15>();
+    Construct(&v16_value_.value, std::move(_value));
+  } else {
+    v16_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v17(int64_t _value) {
+  if (!field_presence_.IsSet<16>()) {
+    field_presence_.Set<16>();
+    Construct(&v17_value_.value, std::move(_value));
+  } else {
+    v17_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v18(int64_t _value) {
+  if (!field_presence_.IsSet<17>()) {
+    field_presence_.Set<17>();
+    Construct(&v18_value_.value, std::move(_value));
+  } else {
+    v18_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v19(int64_t _value) {
+  if (!field_presence_.IsSet<18>()) {
+    field_presence_.Set<18>();
+    Construct(&v19_value_.value, std::move(_value));
+  } else {
+    v19_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v20(int64_t _value) {
+  if (!field_presence_.IsSet<19>()) {
+    field_presence_.Set<19>();
+    Construct(&v20_value_.value, std::move(_value));
+  } else {
+    v20_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v21(int64_t _value) {
+  if (!field_presence_.IsSet<20>()) {
+    field_presence_.Set<20>();
+    Construct(&v21_value_.value, std::move(_value));
+  } else {
+    v21_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v22(int64_t _value) {
+  if (!field_presence_.IsSet<21>()) {
+    field_presence_.Set<21>();
+    Construct(&v22_value_.value, std::move(_value));
+  } else {
+    v22_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v23(int64_t _value) {
+  if (!field_presence_.IsSet<22>()) {
+    field_presence_.Set<22>();
+    Construct(&v23_value_.value, std::move(_value));
+  } else {
+    v23_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v24(int64_t _value) {
+  if (!field_presence_.IsSet<23>()) {
+    field_presence_.Set<23>();
+    Construct(&v24_value_.value, std::move(_value));
+  } else {
+    v24_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v25(int64_t _value) {
+  if (!field_presence_.IsSet<24>()) {
+    field_presence_.Set<24>();
+    Construct(&v25_value_.value, std::move(_value));
+  } else {
+    v25_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v26(int64_t _value) {
+  if (!field_presence_.IsSet<25>()) {
+    field_presence_.Set<25>();
+    Construct(&v26_value_.value, std::move(_value));
+  } else {
+    v26_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v27(int64_t _value) {
+  if (!field_presence_.IsSet<26>()) {
+    field_presence_.Set<26>();
+    Construct(&v27_value_.value, std::move(_value));
+  } else {
+    v27_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v28(int64_t _value) {
+  if (!field_presence_.IsSet<27>()) {
+    field_presence_.Set<27>();
+    Construct(&v28_value_.value, std::move(_value));
+  } else {
+    v28_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v29(int64_t _value) {
+  if (!field_presence_.IsSet<28>()) {
+    field_presence_.Set<28>();
+    Construct(&v29_value_.value, std::move(_value));
+  } else {
+    v29_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v30(int64_t _value) {
+  if (!field_presence_.IsSet<29>()) {
+    field_presence_.Set<29>();
+    Construct(&v30_value_.value, std::move(_value));
+  } else {
+    v30_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v31(int64_t _value) {
+  if (!field_presence_.IsSet<30>()) {
+    field_presence_.Set<30>();
+    Construct(&v31_value_.value, std::move(_value));
+  } else {
+    v31_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v32(int64_t _value) {
+  if (!field_presence_.IsSet<31>()) {
+    field_presence_.Set<31>();
+    Construct(&v32_value_.value, std::move(_value));
+  } else {
+    v32_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v33(int64_t _value) {
+  if (!field_presence_.IsSet<32>()) {
+    field_presence_.Set<32>();
+    Construct(&v33_value_.value, std::move(_value));
+  } else {
+    v33_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v34(int64_t _value) {
+  if (!field_presence_.IsSet<33>()) {
+    field_presence_.Set<33>();
+    Construct(&v34_value_.value, std::move(_value));
+  } else {
+    v34_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v35(int64_t _value) {
+  if (!field_presence_.IsSet<34>()) {
+    field_presence_.Set<34>();
+    Construct(&v35_value_.value, std::move(_value));
+  } else {
+    v35_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v36(int64_t _value) {
+  if (!field_presence_.IsSet<35>()) {
+    field_presence_.Set<35>();
+    Construct(&v36_value_.value, std::move(_value));
+  } else {
+    v36_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v37(int64_t _value) {
+  if (!field_presence_.IsSet<36>()) {
+    field_presence_.Set<36>();
+    Construct(&v37_value_.value, std::move(_value));
+  } else {
+    v37_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v38(int64_t _value) {
+  if (!field_presence_.IsSet<37>()) {
+    field_presence_.Set<37>();
+    Construct(&v38_value_.value, std::move(_value));
+  } else {
+    v38_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v39(int64_t _value) {
+  if (!field_presence_.IsSet<38>()) {
+    field_presence_.Set<38>();
+    Construct(&v39_value_.value, std::move(_value));
+  } else {
+    v39_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v40(int64_t _value) {
+  if (!field_presence_.IsSet<39>()) {
+    field_presence_.Set<39>();
+    Construct(&v40_value_.value, std::move(_value));
+  } else {
+    v40_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v41(int64_t _value) {
+  if (!field_presence_.IsSet<40>()) {
+    field_presence_.Set<40>();
+    Construct(&v41_value_.value, std::move(_value));
+  } else {
+    v41_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v42(int64_t _value) {
+  if (!field_presence_.IsSet<41>()) {
+    field_presence_.Set<41>();
+    Construct(&v42_value_.value, std::move(_value));
+  } else {
+    v42_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v43(int64_t _value) {
+  if (!field_presence_.IsSet<42>()) {
+    field_presence_.Set<42>();
+    Construct(&v43_value_.value, std::move(_value));
+  } else {
+    v43_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v44(int64_t _value) {
+  if (!field_presence_.IsSet<43>()) {
+    field_presence_.Set<43>();
+    Construct(&v44_value_.value, std::move(_value));
+  } else {
+    v44_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v45(int64_t _value) {
+  if (!field_presence_.IsSet<44>()) {
+    field_presence_.Set<44>();
+    Construct(&v45_value_.value, std::move(_value));
+  } else {
+    v45_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v46(int64_t _value) {
+  if (!field_presence_.IsSet<45>()) {
+    field_presence_.Set<45>();
+    Construct(&v46_value_.value, std::move(_value));
+  } else {
+    v46_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v47(int64_t _value) {
+  if (!field_presence_.IsSet<46>()) {
+    field_presence_.Set<46>();
+    Construct(&v47_value_.value, std::move(_value));
+  } else {
+    v47_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v48(int64_t _value) {
+  if (!field_presence_.IsSet<47>()) {
+    field_presence_.Set<47>();
+    Construct(&v48_value_.value, std::move(_value));
+  } else {
+    v48_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v49(int64_t _value) {
+  if (!field_presence_.IsSet<48>()) {
+    field_presence_.Set<48>();
+    Construct(&v49_value_.value, std::move(_value));
+  } else {
+    v49_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v50(int64_t _value) {
+  if (!field_presence_.IsSet<49>()) {
+    field_presence_.Set<49>();
+    Construct(&v50_value_.value, std::move(_value));
+  } else {
+    v50_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v51(int64_t _value) {
+  if (!field_presence_.IsSet<50>()) {
+    field_presence_.Set<50>();
+    Construct(&v51_value_.value, std::move(_value));
+  } else {
+    v51_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v52(int64_t _value) {
+  if (!field_presence_.IsSet<51>()) {
+    field_presence_.Set<51>();
+    Construct(&v52_value_.value, std::move(_value));
+  } else {
+    v52_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v53(int64_t _value) {
+  if (!field_presence_.IsSet<52>()) {
+    field_presence_.Set<52>();
+    Construct(&v53_value_.value, std::move(_value));
+  } else {
+    v53_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v54(int64_t _value) {
+  if (!field_presence_.IsSet<53>()) {
+    field_presence_.Set<53>();
+    Construct(&v54_value_.value, std::move(_value));
+  } else {
+    v54_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v55(int64_t _value) {
+  if (!field_presence_.IsSet<54>()) {
+    field_presence_.Set<54>();
+    Construct(&v55_value_.value, std::move(_value));
+  } else {
+    v55_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v56(int64_t _value) {
+  if (!field_presence_.IsSet<55>()) {
+    field_presence_.Set<55>();
+    Construct(&v56_value_.value, std::move(_value));
+  } else {
+    v56_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v57(int64_t _value) {
+  if (!field_presence_.IsSet<56>()) {
+    field_presence_.Set<56>();
+    Construct(&v57_value_.value, std::move(_value));
+  } else {
+    v57_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v58(int64_t _value) {
+  if (!field_presence_.IsSet<57>()) {
+    field_presence_.Set<57>();
+    Construct(&v58_value_.value, std::move(_value));
+  } else {
+    v58_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v59(int64_t _value) {
+  if (!field_presence_.IsSet<58>()) {
+    field_presence_.Set<58>();
+    Construct(&v59_value_.value, std::move(_value));
+  } else {
+    v59_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v60(int64_t _value) {
+  if (!field_presence_.IsSet<59>()) {
+    field_presence_.Set<59>();
+    Construct(&v60_value_.value, std::move(_value));
+  } else {
+    v60_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v61(int64_t _value) {
+  if (!field_presence_.IsSet<60>()) {
+    field_presence_.Set<60>();
+    Construct(&v61_value_.value, std::move(_value));
+  } else {
+    v61_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v62(int64_t _value) {
+  if (!field_presence_.IsSet<61>()) {
+    field_presence_.Set<61>();
+    Construct(&v62_value_.value, std::move(_value));
+  } else {
+    v62_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v63(int64_t _value) {
+  if (!field_presence_.IsSet<62>()) {
+    field_presence_.Set<62>();
+    Construct(&v63_value_.value, std::move(_value));
+  } else {
+    v63_value_.value = std::move(_value);
+  }
+  return *this;
+}
+SixtyFourOrdinalTable& SixtyFourOrdinalTable::set_v64(::test::table::ExtensionTable _value) {
+  if (!field_presence_.IsSet<63>()) {
+    field_presence_.Set<63>();
+    Construct(&v64_value_.value, std::move(_value));
+  } else {
+    v64_value_.value = std::move(_value);
+  }
+  return *this;
 }
 
 void SixtyFourOrdinalTable::Encode(::fidl::Encoder* _encoder, size_t _offset,

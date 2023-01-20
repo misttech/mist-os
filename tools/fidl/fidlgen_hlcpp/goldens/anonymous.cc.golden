@@ -134,6 +134,33 @@ FunctionApplication& FunctionApplication::operator=(FunctionApplication&& other)
 bool FunctionApplication::IsEmpty() const {
   return field_presence_.IsEmpty();
 }
+FunctionApplication& FunctionApplication::set_func(::std::string _value) {
+  if (!field_presence_.IsSet<0>()) {
+    field_presence_.Set<0>();
+    Construct(&func_value_.value, std::move(_value));
+  } else {
+    func_value_.value = std::move(_value);
+  }
+  return *this;
+}
+FunctionApplication& FunctionApplication::set_args(::std::vector<::std::unique_ptr<::test::anonymous::Expression>> _value) {
+  if (!field_presence_.IsSet<2>()) {
+    field_presence_.Set<2>();
+    Construct(&args_value_.value, std::move(_value));
+  } else {
+    args_value_.value = std::move(_value);
+  }
+  return *this;
+}
+FunctionApplication& FunctionApplication::set_flags(::test::anonymous::Flags _value) {
+  if (!field_presence_.IsSet<3>()) {
+    field_presence_.Set<3>();
+    Construct(&flags_value_.value, std::move(_value));
+  } else {
+    flags_value_.value = std::move(_value);
+  }
+  return *this;
+}
 
 void FunctionApplication::Encode(::fidl::Encoder* _encoder, size_t _offset,
                                  cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
@@ -818,6 +845,15 @@ TableMember& TableMember::operator=(TableMember&& other) {
 
 bool TableMember::IsEmpty() const {
   return field_presence_.IsEmpty();
+}
+TableMember& TableMember::set_table_data(::std::vector<::test::anonymous::TableData> _value) {
+  if (!field_presence_.IsSet<1>()) {
+    field_presence_.Set<1>();
+    Construct(&table_data_value_.value, std::move(_value));
+  } else {
+    table_data_value_.value = std::move(_value);
+  }
+  return *this;
 }
 
 void TableMember::Encode(::fidl::Encoder* _encoder, size_t _offset,
