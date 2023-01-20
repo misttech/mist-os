@@ -108,12 +108,18 @@ pub enum MemoryError {
     #[error("Guest config didn't specify a memory size")]
     NoMemoryRequested,
 
+    #[error("Guest config contained a malformed virtio-mem config")]
+    BadPluggableMemoryConfig,
+
     #[error(
         "Unable to allocate total memory due to layout restrictions. Allocated {} of {} bytes.",
         actual,
         target
     )]
     FailedToPlaceGuestMemory { actual: u64, target: u64 },
+
+    #[error("Unable to place pluggable memory due to layout and guest RAM restrictions")]
+    FailedToPlacePluggableMemory,
 
     #[error("Failed to allocate child VMAR in host process: {}", status)]
     FailedToAllocateVmar { status: zx::Status },
@@ -134,8 +140,11 @@ pub enum MemoryError {
 impl Into<GuestError> for MemoryError {
     fn into(self) -> GuestError {
         match self {
-            MemoryError::NoMemoryRequested => GuestError::BadConfig,
-            MemoryError::FailedToPlaceGuestMemory { .. } => GuestError::GuestInitializationFailure,
+            MemoryError::NoMemoryRequested | MemoryError::BadPluggableMemoryConfig => {
+                GuestError::BadConfig
+            }
+            MemoryError::FailedToPlaceGuestMemory { .. }
+            | MemoryError::FailedToPlacePluggableMemory => GuestError::GuestInitializationFailure,
             MemoryError::FailedToMapMemoryRegion { .. }
             | MemoryError::FailedToAllocateVmar { .. }
             | MemoryError::FailedToAllocateMemory { .. }
@@ -155,9 +164,9 @@ pub type GuestUsize = u64;
 // (if encompassed by RAM), and pluggable memory regions.
 fn get_guest_physical_address_space_size(
     standard_ram: &Vec<MemoryRegion>,
-    pluggable_ram: &Vec<MemoryRegion>,
+    pluggable_ram: Option<&Vec<MemoryRegion>>,
 ) -> GuestUsize {
-    let region = if let Some(last) = pluggable_ram.last() {
+    let region = if let Some(last) = pluggable_ram.and_then(|x| x.last()) {
         last
     } else {
         standard_ram.last().expect("there must be at least one region of RAM")
@@ -173,7 +182,7 @@ fn generate_guest_ram_regions(
     guest_memory: GuestUsize,
     restrictions: &[MemoryRegion],
 ) -> Result<Vec<MemoryRegion>, MemoryError> {
-    let mut iter = GuestMemoryRegion::new(restrictions);
+    let mut iter = GuestMemoryRegion::new_for_standard_ram(restrictions);
     let mut regions = Vec::new();
     let mut mem_remaining = guest_memory;
 
@@ -193,28 +202,71 @@ fn generate_guest_ram_regions(
     Ok(regions)
 }
 
+// Attempts to place pluggable RAM regions in the guest physical address space. Note that
+// pluggable RAM regions may have different alignment than standard RAM regions.
+fn generate_pluggable_ram_regions(
+    config: Option<PluggableRamConfig>,
+    base_address: GuestUsize,
+    restrictions: &[MemoryRegion],
+) -> Result<Vec<MemoryRegion>, MemoryError> {
+    if config.is_none() {
+        return Ok(vec![]);
+    }
+    let config = config.unwrap();
+
+    let mut iter = GuestMemoryRegion::new_for_pluggable_ram(restrictions, config.alignment);
+    while let Some(region) = iter.next() {
+        let lower = align_memory(std::cmp::max(region.base, base_address), config.alignment);
+        let upper = region.base + region.size;
+
+        // Require that the entire pluggable memory region is contiguous in a single unrestricted
+        // memory region that comes after standard guest RAM. This is an artificial restriction
+        // we should look into lifting.
+        //
+        // TODO(fxbug.dev/102872): Allow non-contiguous pluggable RAM regions.
+        if config.len < lower + upper {
+            return Ok(vec![MemoryRegion::new_tagged(
+                lower,
+                config.len,
+                "Pluggable RAM".to_string(),
+            )]);
+        }
+    }
+
+    Err(MemoryError::FailedToPlacePluggableMemory)
+}
+
 // Page align memory if necessary, rounding up to the nearest page.
 fn page_align_memory(memory: GuestAddress, tag: &str) -> GuestAddress {
-    let page_alignment = memory % *PAGE_SIZE;
-    if page_alignment != 0 {
-        let padding = *PAGE_SIZE - page_alignment;
+    let aligned = align_memory(memory, *PAGE_SIZE);
+    if aligned != memory {
         tracing::info!(
             "Memory ({}b) for {} is not a multiple of page size ({}b), so increasing by {}b.",
             memory,
             tag,
             *PAGE_SIZE,
-            padding
+            aligned - memory
         );
+    }
+
+    aligned
+}
+
+// Align memory, rounding up to the nearest alignment boundary.
+fn align_memory(memory: GuestAddress, alignment: GuestAddress) -> GuestAddress {
+    let offset = memory % alignment;
+    if offset != 0 {
+        let padding = alignment - offset;
         memory + padding
     } else {
         memory
     }
 }
 
-// Page aligns a memory region. The region is reduced when page aligning to avoid encroaching
-// on adjacent restricted regions.
-fn page_align_memory_region(mut region: MemoryRegion) -> Option<MemoryRegion> {
-    if region.size < *PAGE_SIZE {
+// Aligns a memory region. The region is reduced when aligning to avoid encroaching on adjacent
+// restricted regions.
+fn align_memory_region(mut region: MemoryRegion, alignment: GuestUsize) -> Option<MemoryRegion> {
+    if region.size < alignment {
         // This guest region may be bounded by restricted regions, so size cannot be
         // increased. If this region is smaller than a page this region must just be
         // discarded.
@@ -222,13 +274,13 @@ fn page_align_memory_region(mut region: MemoryRegion) -> Option<MemoryRegion> {
     }
 
     let mut start = region.base;
-    if start % *PAGE_SIZE != 0 {
-        start += *PAGE_SIZE - (start % *PAGE_SIZE);
+    if start % alignment != 0 {
+        start += alignment - (start % alignment);
     }
 
     let mut end = start + region.size;
-    if end % *PAGE_SIZE != 0 {
-        end -= end % *PAGE_SIZE;
+    if end % alignment != 0 {
+        end -= end % alignment;
     }
 
     // Require this region be at least a page.
@@ -279,6 +331,7 @@ impl MemoryRegion {
 
     // Helper function to create a memory region from a specific start and end address.
     const fn new_from_range(start: GuestAddress, end: GuestAddress) -> Self {
+        assert!(start < end);
         assert!(start < ALL_REMAINING_MEMORY_RANGE);
         MemoryRegion::new(start, end - start)
     }
@@ -307,11 +360,20 @@ impl MemoryRegion {
 struct GuestMemoryRegion<'a> {
     iter: std::iter::Peekable<std::slice::Iter<'a, MemoryRegion>>,
     first_region: bool,
+    alignment: GuestUsize,
 }
 
 impl<'a> GuestMemoryRegion<'a> {
-    fn new(restrictions: &'a [MemoryRegion]) -> Self {
-        GuestMemoryRegion { iter: restrictions.iter().peekable(), first_region: true }
+    fn new_for_standard_ram(restrictions: &'a [MemoryRegion]) -> Self {
+        GuestMemoryRegion {
+            iter: restrictions.iter().peekable(),
+            first_region: true,
+            alignment: *PAGE_SIZE,
+        }
+    }
+
+    fn new_for_pluggable_ram(restrictions: &'a [MemoryRegion], alignment: GuestUsize) -> Self {
+        GuestMemoryRegion { iter: restrictions.iter().peekable(), first_region: true, alignment }
     }
 }
 
@@ -357,7 +419,30 @@ impl<'a> Iterator for GuestMemoryRegion<'a> {
             MemoryRegion::new(unrestricted_base, unrestricted_size)
         };
 
-        page_align_memory_region(unaligned).or_else(|| self.next())
+        align_memory_region(unaligned, self.alignment).or_else(|| self.next())
+    }
+}
+
+struct PluggableRamConfig {
+    len: GuestUsize,
+    alignment: GuestAddress,
+}
+
+impl PluggableRamConfig {
+    fn new_from_config(cfg: &GuestConfig) -> Result<Option<Self>, MemoryError> {
+        let result = if cfg.virtio_mem.unwrap_or(false) {
+            Some(Self {
+                len: cfg.virtio_mem_region_size.ok_or(MemoryError::BadPluggableMemoryConfig)?,
+                alignment: std::cmp::max(
+                    cfg.virtio_mem_block_size.ok_or(MemoryError::BadPluggableMemoryConfig)?,
+                    cfg.virtio_mem_region_alignment.ok_or(MemoryError::BadPluggableMemoryConfig)?,
+                ),
+            })
+        } else {
+            None
+        };
+
+        Ok(result)
     }
 }
 
@@ -393,18 +478,29 @@ impl<H: Hypervisor> std::ops::Drop for Memory<H> {
 
 impl<H: Hypervisor> Memory<H> {
     pub fn new_from_config(guest_config: &GuestConfig, hypervisor: H) -> Result<Self, MemoryError> {
-        Self::new(guest_config.guest_memory.ok_or(MemoryError::NoMemoryRequested)?, hypervisor)
+        Self::new(
+            guest_config.guest_memory.ok_or(MemoryError::NoMemoryRequested)?,
+            PluggableRamConfig::new_from_config(guest_config)?,
+            hypervisor,
+        )
     }
 
-    fn new(guest_memory_bytes: GuestUsize, hypervisor: H) -> Result<Self, MemoryError> {
+    fn new(
+        guest_memory_bytes: GuestUsize,
+        pluggable_ram_config: Option<PluggableRamConfig>,
+        hypervisor: H,
+    ) -> Result<Self, MemoryError> {
         let guest_memory_bytes = page_align_memory(guest_memory_bytes, "total_guest_memory");
 
         let ram_regions = generate_guest_ram_regions(guest_memory_bytes, &RESTRICTED_RANGES)?;
-        // TODO(fxbug.dev/102872): Support pluggable memory.
-        let pluggable_ram_regions = Vec::new();
+        let pluggable_ram_regions = generate_pluggable_ram_regions(
+            pluggable_ram_config,
+            get_guest_physical_address_space_size(&ram_regions, None),
+            &RESTRICTED_RANGES,
+        )?;
 
         let physical_address_size =
-            get_guest_physical_address_space_size(&ram_regions, &pluggable_ram_regions);
+            get_guest_physical_address_space_size(&ram_regions, Some(&pluggable_ram_regions));
 
         let vmo = hypervisor
             .allocate_memory(physical_address_size)
@@ -532,6 +628,31 @@ mod tests {
     };
 
     #[fuchsia::test]
+    async fn bad_configs() {
+        let hypervisor = MockHypervisor::new();
+
+        let mut config = GuestConfig::EMPTY;
+        assert_eq!(
+            Memory::new_from_config(&config, hypervisor.clone()).err().unwrap(),
+            MemoryError::NoMemoryRequested
+        );
+
+        config.guest_memory = Some(*PAGE_SIZE);
+        assert!(Memory::new_from_config(&config, hypervisor.clone()).is_ok());
+
+        config.virtio_mem = Some(true);
+        assert_eq!(
+            Memory::new_from_config(&config, hypervisor.clone()).err().unwrap(),
+            MemoryError::BadPluggableMemoryConfig
+        );
+
+        config.virtio_mem_region_size = Some(*PAGE_SIZE);
+        config.virtio_mem_block_size = Some(*PAGE_SIZE);
+        config.virtio_mem_region_alignment = Some(*PAGE_SIZE);
+        assert!(Memory::new_from_config(&config, hypervisor.clone()).is_ok());
+    }
+
+    #[fuchsia::test]
     async fn failed_to_allocate_guest_memory_vmo() {
         let hypervisor = MockHypervisor::new();
         hypervisor.on_allocate_memory(MockBehavior::ReturnError(zx::Status::NO_RESOURCES));
@@ -549,7 +670,7 @@ mod tests {
     #[fuchsia::test]
     async fn read_write_vmar_mapping() {
         let hypervisor = MockHypervisor::new();
-        let memory = Memory::new(1 << 32, hypervisor.clone()).unwrap();
+        let memory = Memory::new(1 << 32, None, hypervisor.clone()).unwrap();
 
         // Both the VMO and VMAR should equal all of guest physical memory.
         let info = memory.host_vmar.borrow().inner.info().unwrap();
@@ -624,38 +745,37 @@ mod tests {
     #[fuchsia::test]
     async fn page_align_guest_memory_region() {
         // Page aligned.
-        let actual = page_align_memory_region(MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE)).unwrap();
+        let actual =
+            align_memory_region(MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE), *PAGE_SIZE).unwrap();
         let expected = MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE);
         assert_eq!(actual, expected);
 
         // End is not page aligned, so round it down.
-        let actual = page_align_memory_region(MemoryRegion::new(
+        let actual = align_memory_region(
+            MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE * 3 + *PAGE_SIZE / 2),
             *PAGE_SIZE,
-            *PAGE_SIZE * 3 + *PAGE_SIZE / 2,
-        ))
+        )
         .unwrap();
         let expected = MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE * 3);
         assert_eq!(actual, expected);
 
         // Start is not page aligned, so round it up (note that the second field is size, not the
         // ending address which is why it will also change).
-        let actual = page_align_memory_region(MemoryRegion::new(
-            *PAGE_SIZE / 2,
-            *PAGE_SIZE * 3 + *PAGE_SIZE / 2,
-        ))
+        let actual = align_memory_region(
+            MemoryRegion::new(*PAGE_SIZE / 2, *PAGE_SIZE * 3 + *PAGE_SIZE / 2),
+            *PAGE_SIZE,
+        )
         .unwrap();
         let expected = MemoryRegion::new(*PAGE_SIZE, *PAGE_SIZE * 3);
         assert_eq!(actual, expected);
 
         // After page aligning this is a zero length region, and is thus dropped.
-        assert!(
-            page_align_memory_region(MemoryRegion::new(*PAGE_SIZE / 2, *PAGE_SIZE / 2)).is_none()
-        );
+        assert!(align_memory_region(MemoryRegion::new(*PAGE_SIZE / 2, *PAGE_SIZE / 2), *PAGE_SIZE)
+            .is_none());
 
         // After page aligning this would be a negative length region, and is thus dropped.
-        assert!(
-            page_align_memory_region(MemoryRegion::new(*PAGE_SIZE / 2, *PAGE_SIZE / 4)).is_none()
-        );
+        assert!(align_memory_region(MemoryRegion::new(*PAGE_SIZE / 2, *PAGE_SIZE / 4), *PAGE_SIZE)
+            .is_none());
     }
 
     #[fuchsia::test]
@@ -735,7 +855,7 @@ mod tests {
     #[fuchsia::test]
     async fn page_align_allocated_device_memory_range() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(0x1000, hypervisor.clone()).unwrap();
+        let mut memory = Memory::new(0x1000, None, hypervisor.clone()).unwrap();
 
         let device1 =
             memory.allocate_dynamic_device_address(*PAGE_SIZE / 2, "a".to_string()).unwrap();
@@ -750,7 +870,7 @@ mod tests {
     #[fuchsia::test]
     async fn device_memory_not_overlapping() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(0x1000, hypervisor.clone()).unwrap();
+        let mut memory = Memory::new(0x1000, None, hypervisor.clone()).unwrap();
 
         let devices = 0xc000000;
         memory.add_device_range(devices, 0x1000, "a".to_string()).unwrap();
@@ -762,7 +882,7 @@ mod tests {
     #[fuchsia::test]
     async fn device_memory_overlap() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(0x1000, hypervisor.clone()).unwrap();
+        let mut memory = Memory::new(0x1000, None, hypervisor.clone()).unwrap();
 
         let device_addr = memory.allocate_dynamic_device_address(0x1000, "a".to_string()).unwrap();
 
@@ -780,7 +900,7 @@ mod tests {
     #[fuchsia::test]
     async fn device_memory_invalid_size() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(0x1000, hypervisor.clone()).unwrap();
+        let mut memory = Memory::new(0x1000, None, hypervisor.clone()).unwrap();
 
         assert_eq!(
             memory.add_device_range(0x10000, 0x0, "a".to_string()).err().unwrap(),
@@ -796,7 +916,7 @@ mod tests {
     #[fuchsia::test]
     async fn device_memory_has_guest_memory_overlap() {
         let hypervisor = MockHypervisor::new();
-        let mut memory = Memory::new(1 << 30, hypervisor.clone()).unwrap();
+        let mut memory = Memory::new(1 << 30, None, hypervisor.clone()).unwrap();
 
         assert_eq!(
             memory
@@ -805,5 +925,71 @@ mod tests {
                 .unwrap(),
             MemoryError::AddressConflict { tag1: "RAM".to_string(), tag2: "a".to_string() }
         );
+    }
+
+    #[fuchsia::test]
+    async fn pluggable_region_skips_small_regions_and_aligns() {
+        let starting_base = 160 * ONE_MIB;
+        let len = ONE_GIB;
+        let alignment = 128 * ONE_MIB;
+
+        // There are a few alignment-sized blocks from the end of standard RAM until this
+        // restriction. As we require a single contiguous block for this pluggable region,
+        // the region needs to be placed after the restriction.
+        let restrictions = [MemoryRegion::new_from_range(starting_base + alignment * 4, ONE_GIB)];
+
+        let actual = generate_pluggable_ram_regions(
+            Some(PluggableRamConfig { len, alignment }),
+            starting_base,
+            &restrictions,
+        )
+        .unwrap();
+
+        let expected = [MemoryRegion::new(ONE_GIB, len)];
+        assert!(actual
+            .iter()
+            .zip(expected.iter())
+            .all(|(a, b)| a.base == b.base && a.size == b.size));
+    }
+
+    #[fuchsia::test]
+    async fn check_pluggable_region_real_restrictions() {
+        let starting_base = 20 * ONE_MIB;
+        let len = 8 * ONE_GIB;
+        let alignment = 32 * ONE_MIB;
+
+        let actual = generate_pluggable_ram_regions(
+            Some(PluggableRamConfig { len, alignment }),
+            starting_base,
+            &RESTRICTED_RANGES,
+        )
+        .unwrap();
+
+        #[cfg(target_arch = "x86_64")]
+        let expected = [MemoryRegion::new(4 * ONE_GIB, len)]; // After PCI hole.
+
+        #[cfg(target_arch = "aarch64")]
+        let expected = [MemoryRegion::new(alignment, len)]; // After the starting base and aligned
+
+        assert!(actual
+            .iter()
+            .zip(expected.iter())
+            .all(|(a, b)| a.base == b.base && a.size == b.size));
+    }
+
+    #[fuchsia::test]
+    async fn pluggable_region_required_but_cannot_fit() {
+        let starting_base = 20 * ONE_MIB;
+        let len = ONE_GIB;
+        let alignment = 32 * ONE_MIB;
+
+        let restrictions = [MemoryRegion::new_until_end(ONE_GIB / 2)];
+        let result = generate_pluggable_ram_regions(
+            Some(PluggableRamConfig { len, alignment }),
+            starting_base,
+            &restrictions,
+        );
+
+        assert_eq!(result.err().unwrap(), MemoryError::FailedToPlacePluggableMemory);
     }
 }
