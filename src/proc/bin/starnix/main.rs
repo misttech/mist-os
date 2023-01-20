@@ -16,7 +16,6 @@ use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-use std::sync::Arc;
 
 mod auth;
 mod bpf;
@@ -42,7 +41,7 @@ mod testing;
 
 #[fuchsia::main(logging_tags = ["starnix"])]
 async fn main() -> Result<(), Error> {
-    let galaxy = Arc::new(create_galaxy().await?);
+    let galaxy = create_galaxy().await?;
 
     if let Some(lifecycle) =
         fruntime::take_startup_handle(fruntime::HandleInfo::new(fruntime::HandleType::Lifecycle, 0))

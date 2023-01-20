@@ -3,15 +3,18 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
+use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
+use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect as inspect;
 use fuchsia_runtime as fruntime;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::Task as _;
 use futures::FutureExt;
+use futures::StreamExt;
 use runner::get_value;
 use starnix_kernel_config::Config;
 use std::collections::BTreeMap;
@@ -24,7 +27,7 @@ use crate::execution::*;
 use crate::fs::layeredfs::LayeredFs;
 use crate::fs::tmpfs::TmpFs;
 use crate::fs::*;
-use crate::logging::log_info;
+use crate::logging::{log_error, log_info};
 use crate::task::*;
 use crate::types::*;
 use fidl::HandleBased;
@@ -167,8 +170,13 @@ impl Galaxy {
     }
 }
 
+/// The services that are exposed in the galaxy component's outgoing directory.
+enum ExposedServices {
+    ComponentRunner(frunner::ComponentRunnerRequestStream),
+}
+
 /// Creates a new galaxy.
-pub async fn create_galaxy() -> Result<Galaxy, Error> {
+pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
     const DEFAULT_INIT: &str = "/galaxy/init";
     let mut config = get_config();
 
@@ -226,7 +234,34 @@ pub async fn create_galaxy() -> Result<Galaxy, Error> {
         wait_for_init_file(&startup_file_path, &system_task).await?;
     };
 
-    Ok(Galaxy { kernel, root_fs, system_task, _node: node })
+    let galaxy = Arc::new(Galaxy { kernel, root_fs, system_task, _node: node });
+
+    if let Some(outgoing_dir_channel) = config.outgoing_dir.take() {
+        let galaxy_clone = galaxy.clone();
+        // Add `ComponentRunner` to the exposed services of the galaxy, and then serve the
+        // outgoing directory.
+        let mut outgoing_directory = ServiceFs::new_local();
+        outgoing_directory.dir("svc").add_fidl_service(ExposedServices::ComponentRunner);
+        outgoing_directory
+            .serve_connection(outgoing_dir_channel.into())
+            .map_err(|_| errno!(EINVAL))?;
+
+        fasync::Task::local(async move {
+            while let Some(ExposedServices::ComponentRunner(request_stream)) =
+                outgoing_directory.next().await
+            {
+                match serve_component_runner(request_stream, galaxy_clone.clone()).await {
+                    Ok(_) => {}
+                    Err(e) => {
+                        log_error!("Error serving component runner: {:?}", e);
+                    }
+                }
+            }
+        })
+        .detach();
+    }
+
+    Ok(galaxy)
 }
 
 fn create_fs_context(
