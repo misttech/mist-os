@@ -147,11 +147,20 @@ protocol ImagePipe2 {
 
     /// Enqueues the specified image for presentation by the consumer.
     ///
-    /// The `acquire_fences` are a set of fences which must all be signaled by the
-    /// producer before the consumer presents the image.
-    /// The `release_fences` are set of fences which must all be signaled by the
-    /// consumer before it is safe for the producer to free or modify the image or re-use the
-    /// acquire fences. The acquire fences are not unsignaled by the consumer.
+    /// The `acquire_fences` are a set of fences which must all be signaled by
+    /// the producer before the consumer presents the image.
+    /// The `release_fences` are a set of fences which inform the producer that
+    /// it's safe to free or modify the `image_id` image, and it's safe to
+    /// re-use the fences in `acquire_fences`. The consumer must signal all the
+    /// fences in `release_fences` after `image_id` is no longer being
+    /// presented. The producer may reuse resources after any of the
+    /// `release_fences` is signaled.
+    ///
+    /// This design allows a producer to distribute image processing across
+    /// multiple threads / processes without unnecessary coordination delay.
+    /// Each thread / process signals its own fence in `acquire_fences` when
+    /// it's done rendering its piece of `image_id`, and waits on its own fence
+    /// in `release_fences` to render new content in `image_id`.
     ///
     /// `presentation_time` specifies the time on or after which the
     /// client would like the enqueued operations should take visible effect
