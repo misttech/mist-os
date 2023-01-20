@@ -28,6 +28,16 @@ source_set("command_buffer_helper") {
   deps = [ "$magma_build_root/src/sys_driver" ]
 }
 
+source_set("command_buffer_helper_cpp") {
+  public_configs = [ "$magma_build_root:magma_tests_include_config" ]
+
+  public_deps = [ "$magma_build_root/src/magma_util/platform:device" ]
+
+  sources = [ "command_buffer_helper_cpp.h" ]
+
+  deps = [ "$magma_build_root/src/sys_driver_cpp" ]
+}
+
 source_set("test_device_helper") {
   testonly = true
   public_configs = [ "//src/graphics/lib/magma:magma_tests_include_config" ]

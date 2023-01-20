@@ -43,6 +43,7 @@ source_set("magma_system_tests") {
     "test_magma_system_device.cc",
   ]
 
+  assert_no_deps = [ "//src/graphics/lib/magma/src/sys_driver_cpp" ]
   deps = [
     "$magma_build_root/src/magma_util:macros",
     "$magma_build_root/src/magma_util/platform:event",
