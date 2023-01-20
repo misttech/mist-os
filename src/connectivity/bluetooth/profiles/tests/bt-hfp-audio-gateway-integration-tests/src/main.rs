@@ -436,7 +436,6 @@ async fn test_hfp_full_slc_init_procedure(tf: HfpAgIntegrationTest) {
 
     // Peer sends its HF features to the HFP component (AG) - we expect HFP to send
     // its AG features back.
-    // TODO: We shouldn't need to assert on the specific features in the response.
     let hf_features_cmd = at::Command::Brsf { features: 0b11_1111_1111_1111 };
     send_command_and_expect_response(
         &mut remote,

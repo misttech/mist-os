@@ -823,8 +823,6 @@ mod tests {
     }
 
     /// Validates the result of the is_terminated() check on various input flags.
-    // TODO: We should probably do some sort of comprehensive list of all permutations
-    // of input flags.
     #[test]
     fn check_is_terminated_on_last_mandatory_step() {
         let mut state = AgIndicatorStatusEnableReceived { state: SlcState::default() };

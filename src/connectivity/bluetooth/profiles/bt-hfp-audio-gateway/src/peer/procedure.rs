@@ -172,7 +172,6 @@ impl From<&at::Command> for ProcedureError {
 }
 
 /// A unique identifier associated with an HFP procedure.
-// TODO(fxbug.dev/70591): Add to this enum as more procedures are implemented.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum ProcedureMarker {
     /// The Service Level Connection Initialization procedure as defined in HFP v1.8 Section 4.2.

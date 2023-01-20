@@ -17,7 +17,6 @@ use crate::{
 
 /// A request made by the Service Level Connection for more information from the
 /// HFP component.
-// TODO(fxbug.dev/70591): Add to this list once more procedures are implemented.
 pub enum SlcRequest {
     GetAgFeatures {
         response: Box<dyn FnOnce(AgFeatures) -> AgUpdate>,
