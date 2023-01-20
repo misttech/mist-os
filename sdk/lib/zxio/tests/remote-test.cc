@@ -80,7 +80,7 @@ class Remote : public zxtest::Test {
 
   void TearDown() final {
     ASSERT_EQ(0, server_->num_close());
-    ASSERT_OK(zxio_close(&remote_.io));
+    ASSERT_OK(zxio_close_new_transitional(&remote_.io, /*should_wait=*/true));
     ASSERT_EQ(1, server_->num_close());
   }
 

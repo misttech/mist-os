@@ -22,7 +22,11 @@ __BEGIN_CDECLS
 typedef struct zxio_ops {
   // Releases all resources held by |io|.
   // After |close| returns, any further ops must not be called relative to |io|.
-  zx_status_t (*close)(zxio_t* io);
+  //
+  // The parameter |should_wait| indicates whether the function should wait for a response from
+  // remote connections. If set to |false|, the function will not wait for the operation to be
+  // acknowledged.
+  zx_status_t (*close)(zxio_t* io, bool should_wait);
 
   // After |release| returns, any further ops most not be called relative to |io|,
   // except |close|.

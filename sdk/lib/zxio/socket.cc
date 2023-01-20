@@ -2184,10 +2184,10 @@ static SynchronousDatagramSocket::Storage& zxio_synchronous_datagram_socket(zxio
 
 static constexpr zxio_ops_t zxio_synchronous_datagram_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
-  ops.close = [](zxio_t* io) {
+  ops.close = [](zxio_t* io, const bool should_wait) {
     SynchronousDatagramSocket::Storage& zs = zxio_synchronous_datagram_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid()) {
+    if (zs.client.is_valid() && should_wait) {
       status = base_socket(zs.client).CloseSocket();
     }
     zs.~Storage();
@@ -2703,10 +2703,10 @@ struct datagram_socket
 
 static constexpr zxio_ops_t zxio_datagram_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
-  ops.close = [](zxio_t* io) {
+  ops.close = [](zxio_t* io, const bool should_wait) {
     zxio_datagram_socket_t& zs = zxio_datagram_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid()) {
+    if (zs.client.is_valid() && should_wait) {
       status = base_socket(zs.client).CloseSocket();
     }
     zs.~zxio_datagram_socket();
@@ -3061,10 +3061,10 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
 
 static constexpr zxio_ops_t zxio_stream_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
-  ops.close = [](zxio_t* io) {
+  ops.close = [](zxio_t* io, const bool should_wait) {
     zxio_stream_socket_t& zs = zxio_stream_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid()) {
+    if (zs.client.is_valid() && should_wait) {
       status = base_socket(zs.client).CloseSocket();
     }
     zs.~zxio_stream_socket_t();
@@ -3282,10 +3282,10 @@ static RawSocket::Storage& zxio_raw_socket(zxio_t* io) {
 
 static constexpr zxio_ops_t zxio_raw_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
-  ops.close = [](zxio_t* io) {
+  ops.close = [](zxio_t* io, const bool should_wait) {
     RawSocket::Storage& zs = zxio_raw_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid()) {
+    if (zs.client.is_valid() && should_wait) {
       status = base_socket(zs.client).CloseSocket();
     }
     zs.~Storage();
@@ -3486,10 +3486,10 @@ static PacketSocket::Storage& zxio_packet_socket(zxio_t* io) {
 
 static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
   zxio_ops_t ops = zxio_default_socket_ops;
-  ops.close = [](zxio_t* io) {
+  ops.close = [](zxio_t* io, const bool should_wait) {
     PacketSocket::Storage& zs = zxio_packet_socket(io);
     zx_status_t status = ZX_OK;
-    if (zs.client.is_valid()) {
+    if (zs.client.is_valid() && should_wait) {
       status = base_socket(zs.client).CloseSocket();
     }
     zs.~Storage();

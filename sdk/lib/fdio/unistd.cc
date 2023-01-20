@@ -173,6 +173,19 @@ fdio_ptr fdio_iodir(int dirfd, std::string_view& in_out_path) {
   return fd_to_io_locked(dirfd);
 }
 
+static int close_impl(int fd, bool should_wait) {
+  fdio_ptr io = unbind_from_fd(fd);
+  if (io == nullptr) {
+    return ERRNO(EBADF);
+  }
+  std::variant reference = GetLastReference(std::move(io));
+  auto* ptr = std::get_if<fdio::last_reference>(&reference);
+  if (ptr) {
+    return STATUS(ptr->Close(should_wait));
+  }
+  return 0;
+}
+
 namespace fdio_internal {
 
 zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, int flags, uint32_t mode,
@@ -733,18 +746,7 @@ ssize_t write(int fd, const void* buf, size_t count) {
 }
 
 __EXPORT
-int close(int fd) {
-  fdio_ptr io = unbind_from_fd(fd);
-  if (io == nullptr) {
-    return ERRNO(EBADF);
-  }
-  std::variant reference = GetLastReference(std::move(io));
-  auto* ptr = std::get_if<fdio::last_reference>(&reference);
-  if (ptr) {
-    return STATUS(ptr->Close());
-  }
-  return 0;
-}
+int close(int fd) { return close_impl(fd, /*should_wait=*/true); }
 
 __EXPORT
 int dup2(int oldfd, int newfd) {
@@ -1524,8 +1526,9 @@ DIR* opendir(const char* name) {
   if (fd < 0)
     return nullptr;
   DIR* dir = internal_opendir(fd);
-  if (dir == nullptr)
-    close(fd);
+  if (dir == nullptr) {
+    close_impl(fd, /*should_wait=*/true);
+  }
   return dir;
 }
 
@@ -1551,7 +1554,7 @@ int closedir(DIR* dir) {
     io->dirent_iterator_destroy(dir->iterator.get());
     dir->iterator.reset();
   }
-  close(dir->fd);
+  close_impl(dir->fd, /*should_wait=*/true);
   delete dir;
   return 0;
 }
@@ -2150,7 +2153,7 @@ int statfs(const char* path, struct statfs* buf) {
     return fd;
   }
   const int rv = fstatfs(fd, buf);
-  close(fd);
+  close_impl(fd, /*should_wait=*/true);
   return rv;
 }
 
@@ -2205,7 +2208,7 @@ int statvfs(const char* path, struct statvfs* buf) {
     return fd;
   }
   const int rv = fstatvfs(fd, buf);
-  close(fd);
+  close_impl(fd, /*should_wait=*/true);
   return rv;
 }
 

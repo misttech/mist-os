@@ -63,7 +63,7 @@ static_assert(sizeof(FdioInotify) <= sizeof(zxio_storage_t),
 
 inline FdioInotify* zxio_to_inotify(zxio_t* zxio) { return reinterpret_cast<FdioInotify*>(zxio); }
 
-zx_status_t inotify_close(zxio_t* io) {
+zx_status_t inotify_close(zxio_t* io, const bool should_wait) {
   FdioInotify* inotify = reinterpret_cast<FdioInotify*>(io);
   inotify->~FdioInotify();
   return ZX_OK;

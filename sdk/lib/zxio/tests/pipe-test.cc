@@ -18,7 +18,7 @@ TEST(Pipe, Create) {
   ASSERT_OK(zxio_create(socket0.release(), &storage));
   zxio_t* io = &storage.io;
 
-  ASSERT_OK(zxio_close(io));
+  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
 }
 
 TEST(Pipe, CreateWithAllocator) {
@@ -37,7 +37,7 @@ TEST(Pipe, CreateWithAllocator) {
   std::unique_ptr<zxio_storage_t> storage(static_cast<zxio_storage_t*>(context));
   zxio_t* io = &storage->io;
 
-  ASSERT_OK(zxio_close(io));
+  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
 }
 
 TEST(Pipe, Basic) {
@@ -59,7 +59,7 @@ TEST(Pipe, Basic) {
   EXPECT_EQ(actual, sizeof(buffer));
   EXPECT_EQ(buffer, data);
 
-  ASSERT_OK(zxio_close(io));
+  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
 }
 
 TEST(Pipe, GetReadBufferAvailable) {
@@ -90,7 +90,7 @@ TEST(Pipe, GetReadBufferAvailable) {
   ASSERT_OK(zxio_get_read_buffer_available(io, &available));
   EXPECT_EQ(0u, available);
 
-  ASSERT_OK(zxio_close(io));
+  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
 }
 
 // Test that after shutting a pipe endpoint down for reading that reading from
@@ -131,7 +131,7 @@ TEST(Pipe, ShutdownRead) {
   EXPECT_EQ(actual, 0u);
   actual = 0u;
 
-  ASSERT_OK(zxio_close(io));
+  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
 }
 
 // Test that after shutting a pipe endpoint down for writing that writing to
@@ -160,7 +160,7 @@ TEST(Pipe, ShutdownWrite) {
   EXPECT_STATUS(zxio_write(io, &data, sizeof(data), 0u, &actual), ZX_ERR_BAD_STATE);
   EXPECT_EQ(actual, 0u);
 
-  ASSERT_OK(zxio_close(io));
+  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
 }
 
 // Test that after shutting a pipe endpoint down for reading and writing that
@@ -207,5 +207,5 @@ TEST(Pipe, ShutdownReadWrite) {
   EXPECT_STATUS(zxio_write(io, &data, sizeof(data), 0u, &actual), ZX_ERR_BAD_STATE);
   EXPECT_EQ(actual, 0u);
 
-  ASSERT_OK(zxio_close(io));
+  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
 }

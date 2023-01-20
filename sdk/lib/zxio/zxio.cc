@@ -73,14 +73,16 @@ const zxio_ops_t* zxio_get_ops(zxio_t* io) {
   return zio->ops;
 }
 
-zx_status_t zxio_close(zxio_t* io) {
+zx_status_t zxio_close(zxio_t* io) { return zxio_close_new_transitional(io, /*should_wait=*/true); }
+
+zx_status_t zxio_close_new_transitional(zxio_t* io, const bool should_wait) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;
   }
   static_assert(std::is_trivially_destructible<zxio_internal_t>::value,
                 "zxio_internal_t must have trivial destructor");
   zxio_internal_t* zio = to_internal(io);
-  zx_status_t status = zio->ops->close(io);
+  zx_status_t status = zio->ops->close(io, should_wait);
   // Poison the object. Double destruction is undefined behavior.
   zio->ops = nullptr;
   return status;

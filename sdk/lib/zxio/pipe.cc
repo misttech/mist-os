@@ -13,7 +13,7 @@ static zxio_pipe_t& zxio_get_pipe(zxio_t* io) { return *reinterpret_cast<zxio_pi
 
 static constexpr zxio_ops_t zxio_pipe_ops = []() {
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = [](zxio_t* io) {
+  ops.close = [](zxio_t* io, const bool should_wait) {
     zxio_get_pipe(io).~zxio_pipe_t();
     return ZX_OK;
   };

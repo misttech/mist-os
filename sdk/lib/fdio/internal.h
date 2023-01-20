@@ -183,13 +183,13 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   // Used to implement SO_SNDTIMEO. See `man 7 socket` for details.
   zx::duration& sndtimeo() { return sndtimeo_; }
 
-  // Automatically calls |fdio_t::Close| on drop.
+  // Automatically calls |fdio_t::close| on drop.
   struct last_reference {
    public:
     explicit last_reference(fdio_t* ptr) : ptr_(ptr, deleter) {}
     ~last_reference() {
       if (ptr_) {
-        ptr_->close();
+        ptr_->close(/*should_wait=*/true);
       }
     }
 
@@ -201,7 +201,9 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
     zx_status_t unwrap(zx_handle_t* out_handle) { return ptr_->unwrap(out_handle); }
 
     // Close and destroy the underlying object.
-    zx_status_t Close() { return std::exchange(ptr_, nullptr)->close(); }
+    zx_status_t Close(const bool should_wait) {
+      return std::exchange(ptr_, nullptr)->close(should_wait);
+    }
 
    private:
     // Custom deleter to keep the destructor buried.
@@ -238,7 +240,7 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   virtual ~fdio();
 
   void fbl_recycle() {
-    close();
+    close(/*should_wait=*/true);
     delete this;
   }
 
@@ -248,7 +250,7 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
 
   static zx::result<fdio_ptr> create(void*& context, zx_status_t status);
 
-  virtual zx_status_t close() = 0;
+  virtual zx_status_t close(bool should_wait) = 0;
 
   uint32_t ioflag_ = 0;
 

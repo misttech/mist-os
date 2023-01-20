@@ -8,7 +8,7 @@
 
 #include <cerrno>
 
-zx_status_t zxio_default_close(zxio_t* io) { return ZX_OK; }
+zx_status_t zxio_default_close(zxio_t* io, const bool should_wait) { return ZX_OK; }
 
 zx_status_t zxio_default_release(zxio_t* io, zx_handle_t* out_handle) {
   return ZX_ERR_NOT_SUPPORTED;

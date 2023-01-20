@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.pty/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fit/defer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
 #include <lib/zxio/cpp/vector.h>
@@ -340,22 +341,20 @@ class Remote : public HasIo {
   Remote(fidl::ClientEnd<Protocol> client_end, const zxio_ops_t& ops)
       : HasIo(ops), client_(std::move(client_end)) {}
 
-  zx_status_t Close() {
-    const zx_status_t status = [this]() {
-      if (client_.is_valid()) {
-        const fidl::WireResult result = client_->Close();
-        if (!result.ok()) {
-          return result.status();
-        }
-        const auto& response = result.value();
-        if (response.is_error()) {
-          return response.error_value();
-        }
+  zx_status_t Close(const bool should_wait) {
+    auto cleanup = fit::defer([this] { this->~Remote(); });
+
+    if (client_.is_valid() && should_wait) {
+      const fidl::WireResult result = client_->Close();
+      if (!result.ok()) {
+        return result.status();
       }
-      return ZX_OK;
-    }();
-    this->~Remote();
-    return status;
+      const auto& response = result.value();
+      if (response.is_error()) {
+        return response.error_value();
+      }
+    }
+    return ZX_OK;
   }
 
   zx_status_t Release(zx_handle_t* out_handle) {
@@ -455,8 +454,8 @@ class Pty : public Remote<fuchsia_hardware_pty::Device> {
   Pty(fidl::ClientEnd<fuchsia_hardware_pty::Device> client_end, zx::eventpair event)
       : Remote(std::move(client_end), kOps), event_(std::move(event)) {}
 
-  zx_status_t Close() {
-    const zx_status_t status = Remote::Close();
+  zx_status_t Close(const bool should_wait) {
+    const zx_status_t status = Remote::Close(should_wait);
     this->~Pty();
     return status;
   }
@@ -1251,8 +1250,8 @@ class File : public Remote<fio::File> {
       : Remote(std::move(client_end), kOps), event_(std::move(event)), stream_(std::move(stream)) {}
 
  private:
-  zx_status_t Close() {
-    const zx_status_t status = Remote::Close();
+  zx_status_t Close(const bool should_wait) {
+    const zx_status_t status = Remote::Close(should_wait);
     this->~File();
     return status;
   }

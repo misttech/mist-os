@@ -111,7 +111,7 @@ TEST(Tty, Basic) {
   EXPECT_EQ(42, width);
   EXPECT_EQ(57, height);
 
-  ASSERT_OK(zxio_close(io));
+  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
 
   device_control_loop.Shutdown();
 }

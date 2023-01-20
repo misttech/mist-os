@@ -101,7 +101,7 @@ class DirentTest : public zxtest::Test {
 
   void TearDown() final {
     ASSERT_EQ(0, server_->num_close());
-    ASSERT_OK(zxio_close(&dir_.io));
+    ASSERT_OK(zxio_close_new_transitional(&dir_.io, /*should_wait=*/true));
     ASSERT_EQ(1, server_->num_close());
   }
 

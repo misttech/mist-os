@@ -57,7 +57,7 @@ LocalConnection::LocalConnection(fbl::RefPtr<const fdio_namespace> fs, fbl::RefP
 struct local_connection : public fdio_t {
   LocalConnection& local_dir() { return *reinterpret_cast<LocalConnection*>(&zxio_storage().io); }
 
-  zx_status_t close() override {
+  zx_status_t close(const bool should_wait) override {
     auto& dir = local_dir();
     dir.~LocalConnection();
     return ZX_OK;

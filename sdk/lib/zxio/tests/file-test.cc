@@ -95,7 +95,7 @@ class File : public zxtest::Test {
 
   void TearDown() override {
     ASSERT_EQ(0, server_->num_close());
-    ASSERT_OK(zxio_close(&file_.io));
+    ASSERT_OK(zxio_close_new_transitional(&file_.io, /*should_wait=*/true));
     ASSERT_EQ(1, server_->num_close());
   }
 

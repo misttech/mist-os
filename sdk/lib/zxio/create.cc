@@ -39,7 +39,7 @@ zxio_handle_holder& zxio_get_handle_holder(zxio_t* io) {
 
 constexpr zxio_ops_t zxio_handle_holder_ops = []() {
   zxio_ops_t ops = zxio_default_ops;
-  ops.close = [](zxio_t* io) {
+  ops.close = [](zxio_t* io, const bool should_wait) {
     zxio_get_handle_holder(io).~zxio_handle_holder();
     return ZX_OK;
   };

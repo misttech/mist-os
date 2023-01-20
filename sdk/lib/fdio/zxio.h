@@ -13,7 +13,7 @@ struct zxio : public fdio_t {
   static zx::result<fdio_ptr> create();
   static zx::result<fdio_ptr> create_null();
 
-  zx_status_t close() override;
+  zx_status_t close(bool should_wait) override;
   zx_status_t borrow_channel(zx_handle_t* out_borrowed) final;
   zx_status_t clone(zx_handle_t* out_handle) override;
   zx_status_t unwrap(zx_handle_t* out_handle) override;

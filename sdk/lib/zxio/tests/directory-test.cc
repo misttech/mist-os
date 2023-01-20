@@ -174,7 +174,7 @@ TEST_F(Directory, Open) {
                       kTestPath.length(), &file_storage));
   zxio_t* file = &file_storage.io;
 
-  ASSERT_OK(zxio_close(directory()));
+  ASSERT_OK(zxio_close_new_transitional(directory(), /*should_wait=*/true));
 
   // Sanity check the zxio by reading some test data from the server.
   char buffer[sizeof(zxio_tests::TestReadFileServer::kTestData)];
@@ -185,7 +185,7 @@ TEST_F(Directory, Open) {
   EXPECT_EQ(sizeof(buffer), actual);
   EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
 
-  ASSERT_OK(zxio_close(file));
+  ASSERT_OK(zxio_close_new_transitional(file, /*should_wait=*/true));
 }
 
 TEST_F(Directory, Unlink) {
@@ -196,7 +196,7 @@ TEST_F(Directory, Unlink) {
   // correctly.
   ASSERT_OK(zxio_unlink(directory(), name.data(), 2, 0));
 
-  ASSERT_OK(zxio_close(directory()));
+  ASSERT_OK(zxio_close_new_transitional(directory(), /*should_wait=*/true));
 
   StopServerThread();
 
@@ -227,7 +227,7 @@ TEST_F(Directory, Link) {
   ASSERT_OK(zxio_token_get(directory(), &directory_token));
   ASSERT_OK(zxio_link(directory(), src.data(), src.length(), directory_token, dst.data(), 1));
 
-  ASSERT_OK(zxio_close(directory()));
+  ASSERT_OK(zxio_close_new_transitional(directory(), /*should_wait=*/true));
 
   StopServerThread();
 
@@ -267,7 +267,7 @@ TEST_F(Directory, Rename) {
   ASSERT_OK(zxio_token_get(directory(), &directory_token));
   ASSERT_OK(zxio_rename(directory(), src.data(), src.length(), directory_token, dst.data(), 1));
 
-  ASSERT_OK(zxio_close(directory()));
+  ASSERT_OK(zxio_close_new_transitional(directory(), /*should_wait=*/true));
 
   StopServerThread();
 

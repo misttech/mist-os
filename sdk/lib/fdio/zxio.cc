@@ -46,7 +46,9 @@ zx::result<fdio_ptr> zxio::create_null() {
   return zx::ok(io);
 }
 
-zx_status_t zxio::close() { return zxio_close(&zxio_storage().io); }
+zx_status_t zxio::close(const bool should_wait) {
+  return zxio_close_new_transitional(&zxio_storage().io, should_wait);
+}
 
 zx_status_t zxio::borrow_channel(zx_handle_t* out_borrowed) {
   return zxio_borrow(&zxio_storage().io, out_borrowed);

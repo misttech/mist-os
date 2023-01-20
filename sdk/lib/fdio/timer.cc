@@ -50,7 +50,7 @@ static bool timespec_to_duration(const struct timespec* spec, zx::duration* out_
   return true;
 }
 
-static zx_status_t fdio_timer_close(zxio_t* io) {
+static zx_status_t fdio_timer_close(zxio_t* io, const bool should_wait) {
   auto* timer = reinterpret_cast<fdio_timer_t*>(io);
   timer->~fdio_timer_t();
   return ZX_OK;

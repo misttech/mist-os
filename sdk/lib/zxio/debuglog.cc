@@ -22,7 +22,7 @@ class Debuglog : public HasIo {
   explicit Debuglog(zx::debuglog debuglog) : HasIo(kOps), handle_(std::move(debuglog)) {}
 
  private:
-  zx_status_t Close();
+  zx_status_t Close(bool should_wait);
   zx_status_t Clone(zx_handle_t* out_handle);
   zx_status_t Writev(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
                      size_t* out_actual);
@@ -50,7 +50,7 @@ constexpr zxio_ops_t Debuglog::kOps = ([]() {
   return ops;
 })();
 
-zx_status_t Debuglog::Close() {
+zx_status_t Debuglog::Close(const bool should_wait) {
   this->~Debuglog();
   return ZX_OK;
 }

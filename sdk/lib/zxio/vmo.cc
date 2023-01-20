@@ -25,7 +25,7 @@ class Vmo : public HasIo {
   zx::stream stream_;
 
  protected:
-  zx_status_t Close() {
+  zx_status_t Close(const bool should_wait) {
     this->~Vmo();
     return ZX_OK;
   }

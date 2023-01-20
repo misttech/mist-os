@@ -7,6 +7,7 @@
 		zxio_bind;
 		zxio_clone;
 		zxio_close;
+		zxio_close_new_transitional;
 		zxio_connect;
 		zxio_create;
 		zxio_create_with_info;

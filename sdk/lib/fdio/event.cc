@@ -37,7 +37,7 @@ struct fdio_event_t {
 static_assert(sizeof(fdio_event_t) <= sizeof(zxio_storage_t),
               "fdio_event_t must fit inside zxio_storage_t.");
 
-static zx_status_t fdio_event_close(zxio_t* io) {
+static zx_status_t fdio_event_close(zxio_t* io, const bool should_wait) {
   fdio_event_t* event = reinterpret_cast<fdio_event_t*>(io);
   event->handle.reset();
   return ZX_OK;

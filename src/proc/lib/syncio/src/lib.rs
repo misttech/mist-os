@@ -673,7 +673,7 @@ impl Zxio {
 impl Drop for Zxio {
     fn drop(&mut self) {
         unsafe {
-            zxio::zxio_close(self.as_ptr());
+            zxio::zxio_close_new_transitional(self.as_ptr(), true);
         };
     }
 }
@@ -985,7 +985,7 @@ mod test {
         };
         assert_eq!(status, zx::sys::ZX_OK);
         let io = &storage.io as *const zxio::zxio_t as *mut zxio::zxio_t;
-        let close_status = unsafe { zxio::zxio_close(io) };
+        let close_status = unsafe { zxio::zxio_close_new_transitional(io, true) };
         assert_eq!(close_status, zx::sys::ZX_OK);
         Ok(())
     }

@@ -116,11 +116,13 @@ zx_status_t zxio_create_with_type(zxio_storage_t* storage, zxio_object_type_t ty
 
 // Attempt to close |io|.
 //
-// Where applicable, waits for an acknowledgement from the server which may communicate any I/O
-// errors.
+// The parameter |should_wait| indicates whether the function should wait for a response from
+// remote connections. If set to |false|, the function will not wait for the operation to be
+// acknowledged.
 //
 // Always consumes |io|.
 ZXIO_EXPORT zx_status_t zxio_close(zxio_t* io);
+ZXIO_EXPORT zx_status_t zxio_close_new_transitional(zxio_t* io, bool should_wait);
 
 // Extracts the underlying |zx_handle_t| for |io| if one exists. Does not
 // terminate the connection with the server.

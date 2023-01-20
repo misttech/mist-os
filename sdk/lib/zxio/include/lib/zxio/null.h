@@ -24,7 +24,7 @@ __BEGIN_CDECLS
 
 zx_status_t zxio_default_release(zxio_t* io, zx_handle_t* out_handle);
 zx_status_t zxio_default_borrow(zxio_t* io, zx_handle_t* out_handle);
-zx_status_t zxio_default_close(zxio_t* io);
+zx_status_t zxio_default_close(zxio_t* io, bool should_wait);
 zx_status_t zxio_default_clone(zxio_t* io, zx_handle_t* out_handle);
 void zxio_default_wait_begin(zxio_t* io, zxio_signals_t zxio_signals, zx_handle_t* out_handle,
                              zx_signals_t* out_zx_signals);
