@@ -12,7 +12,10 @@ group("test") {
   # Therefore we disable the test now for mac platform. Once upstream
   # avb is updated to fix the endian.h header issue, re-enable it.
   if (host_os != "mac") {
-    deps = [ ":firmware_zircon_boot_test($host_toolchain)" ]
+    deps = [
+      ":firmware_zircon_boot_test($host_toolchain)",
+      ":gpt_boot_demo_test($host_toolchain)",
+    ]
   }
 }
 
@@ -44,6 +47,10 @@ test("firmware_zircon_boot_test") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+}
+
+test("gpt_boot_demo_test") {
+  deps = [ "..:gpt_boot_demo_lib" ]
 }
 
 # The factory bootfs zbi util implementation is tested directly with the

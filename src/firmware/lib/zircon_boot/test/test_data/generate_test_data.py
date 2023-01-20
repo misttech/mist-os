@@ -39,12 +39,12 @@ def GenerateTestImageCArrayDeclaration(
     """Generates kernel/vbmeta image for a slot and their C array declarations """
     decls = []
     with tempfile.TemporaryDirectory() as temp_dir:
-        kernel = f'{temp_dir}/test_zircon_{ab_suffix}.bin'
-        kernel_zbi = f'{temp_dir}/test_zircon_{ab_suffix}.zbi'
+        temp_dir = pathlib.Path(temp_dir)
+        kernel = temp_dir / f'test_zircon_{ab_suffix}.bin'
+        kernel_zbi = temp_dir / f'test_zircon_{ab_suffix}.zbi'
 
         # Generate random kernel image
-        with open(kernel, 'wb') as f:
-            f.write(bytes(os.urandom(KERNEL_IMG_SIZE)))
+        kernel.write_bytes(bytes(os.urandom(KERNEL_IMG_SIZE)))
         # Put image in a zbi container.
         subprocess.run(
             [
@@ -54,6 +54,14 @@ def GenerateTestImageCArrayDeclaration(
                 '--type=KERNEL_ARM64',
                 kernel,
             ])
+
+        # Set reserved scratch memory size to 0. Otherwise it's a random (huge) number
+        kernel_zbi_bytes = bytearray(kernel_zbi.read_bytes())
+        # See `zircon_kernel_t`` defined at zircon/system/public/zircon/boot/image.h
+        # 2*zbi_header_t + uint64_t = 2 * 32 + 8
+        kernel_zbi_bytes[72:80] = b"\x00" * 8
+        kernel_zbi.write_bytes(kernel_zbi_bytes)
+
         # Generate C array declaration
         with open(kernel_zbi, 'rb') as zbi:
             data = zbi.read()

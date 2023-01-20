@@ -48,3 +48,24 @@ zx_library("in_tree") {
   public_deps += [ "//third_party/android/platform/external/avb:lib" ]
   deps = [ "//zircon/system/public" ]
 }
+
+source_set("gpt_boot_demo_lib") {
+  sources = [
+    "gpt_boot_demo.cc",
+    "gpt_boot_reference.c",
+  ]
+  deps = [
+    ":in_tree",
+    "//src/firmware/lib/storage",
+    "//third_party/android/platform/external/avb:sysdeps-posix",
+  ]
+}
+
+executable("gpt_boot_demo_exe") {
+  output_name = "gpt_boot_demo"
+  deps = [ ":gpt_boot_demo_lib" ]
+}
+
+group("gpt_boot_demo") {
+  deps = [ ":gpt_boot_demo_exe($host_toolchain)" ]
+}
