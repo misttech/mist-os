@@ -977,7 +977,6 @@
             protocol: [
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.component.DetectBinder",
                 "fuchsia.component.KcounterBinder",
                 "fuchsia.component.LogStatsBinder",
                 "fuchsia.component.PersistenceBinder",
@@ -988,6 +987,13 @@
 
             // Weak to resolve dependency cycles
             dependency: "weak",
+        },
+        {
+            protocol: [ "fuchsia.component.DetectBinder" ],
+            from: "parent",
+            to: "#archivist",
+            dependency: "weak",
+            availability: "same_as_target",
         },
 
         // Optional services from appmgr

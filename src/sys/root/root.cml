@@ -194,7 +194,6 @@
         // Non-zircon services for archivist, svchost, and console.
         {
             protocol: [
-                "fuchsia.component.DetectBinder",
                 "fuchsia.component.KcounterBinder",
                 "fuchsia.component.LogStatsBinder",
                 "fuchsia.component.PersistenceBinder",
@@ -214,6 +213,13 @@
             from: "#core",
             to: "#bootstrap",
             dependency: "weak",
+        },
+        {
+            protocol: [ "fuchsia.component.DetectBinder" ],
+            from: "#core",
+            to: "#bootstrap",
+            dependency: "weak",
+            availability: "same_as_target",
         },
         {
             protocol: [
