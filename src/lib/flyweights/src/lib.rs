@@ -47,19 +47,19 @@ use std::{
 
 /// The global string cache for `FlyStr`.
 ///
-/// If a live `FlyStr` contains an `Arc<String>`, the `Arc<String>` must also be in this cache and
-/// it must have a refcount of >= 2.
+/// If a live `FlyStr` contains an `Arc<Box<str>>`, the `Arc<Box<str>>` must also be in this cache
+/// and it must have a refcount of >= 2.
 static CACHE: Lazy<Mutex<HashSet<Storage>>> = Lazy::new(|| Mutex::new(HashSet::new()));
 
 /// Wrapper type for stored `Arc`s that lets us query the cache without an owned value. Implementing
-/// `Borrow<str> for Arc<String>` upstream *might* be possible with specialization but this is easy
-/// enough.
+/// `Borrow<str> for Arc<Box<str>>` upstream *might* be possible with specialization but this is
+/// easy enough.
 #[derive(Eq, Hash, PartialEq)]
-struct Storage(Arc<String>);
+struct Storage(Arc<Box<str>>);
 
 impl Borrow<str> for Storage {
     fn borrow(&self) -> &str {
-        self.0.as_str()
+        self.0.as_ref()
     }
 }
 
@@ -77,7 +77,7 @@ impl Borrow<str> for Storage {
 /// The string value itself is dropped from the global cache when the last `FlyStr` referencing it
 /// is dropped.
 #[derive(Clone)]
-pub struct FlyStr(Arc<String>);
+pub struct FlyStr(Arc<Box<str>>);
 
 static_assertions::const_assert_eq!(std::mem::size_of::<FlyStr>(), std::mem::size_of::<usize>());
 
@@ -97,7 +97,7 @@ impl FlyStr {
         if let Some(existing) = cache.get(s.as_ref()) {
             Self(existing.0.clone())
         } else {
-            let new = Arc::new(s.into());
+            let new = Arc::new(s.into().into_boxed_str());
             cache.insert(Storage(Arc::clone(&new)));
             Self(new)
         }
