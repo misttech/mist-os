@@ -111,7 +111,7 @@ static const fpbus::Node xhci_dev = []() {
   dev.name() = "xhci";
   dev.vid() = PDEV_VID_GENERIC;
   dev.pid() = PDEV_PID_GENERIC;
-  dev.did() = PDEV_DID_USB_XHCI;
+  dev.did() = PDEV_DID_USB_XHCI_COMPOSITE;
   dev.mmio() = xhci_mmios;
   dev.irq() = xhci_irqs;
   dev.bti() = usb_btis;
@@ -186,35 +186,35 @@ zx_status_t Av400::UsbInit() {
   // Create USB Phy Device
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('USB_');
-  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
+  auto result = pbus_.buffer(arena)->AddComposite(
       fidl::ToWire(fidl_arena, usb_phy_dev),
       platform_bus_composite::MakeFidlFragment(fidl_arena, usb_phy_fragments,
                                                std::size(usb_phy_fragments)),
-      {});
+      "pdev");
   if (!result.ok()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(usb_phy_dev) request failed: %s",
+    zxlogf(ERROR, "AddComposite Usb(usb_phy_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(usb_phy_dev) failed: %s",
+    zxlogf(ERROR, "AddComposite Usb(usb_phy_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
   // Create XHCI device.
-  result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-      fidl::ToWire(fidl_arena, xhci_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, xhci_fragments,
-                                               std::size(xhci_fragments)),
-      "xhci-phy");
+  result =
+      pbus_.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, xhci_dev),
+                                        platform_bus_composite::MakeFidlFragment(
+                                            fidl_arena, xhci_fragments, std::size(xhci_fragments)),
+                                        "xhci-phy");
   if (!result.ok()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(xhci_dev) request failed: %s",
+    zxlogf(ERROR, "AddComposite Usb(xhci_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(xhci_dev) failed: %s",
+    zxlogf(ERROR, "AddComposite Usb(xhci_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -242,17 +242,17 @@ zx_status_t Av400::UsbInit() {
     return dev;
   }();
 
-  result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
+  result = pbus_.buffer(arena)->AddComposite(
       fidl::ToWire(fidl_arena, udc_dev),
       platform_bus_composite::MakeFidlFragment(fidl_arena, udc_fragments, std::size(udc_fragments)),
       "udc-phy");
   if (!result.ok()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(udc_dev) request failed: %s",
+    zxlogf(ERROR, "AddComposite Usb(udc_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(udc_dev) failed: %s",
+    zxlogf(ERROR, "AddComposite Usb(udc_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

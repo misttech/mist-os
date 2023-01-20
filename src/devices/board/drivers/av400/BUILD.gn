@@ -89,6 +89,7 @@ driver_bind_rules("usb-phy-bind") {
   bind_output = "usb-phy-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.registers",
   ]
 }
