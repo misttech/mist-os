@@ -49,7 +49,7 @@ class span {
   using const_pointer = const T*;
   using reference = T&;
   using const_reference = const T&;
-  using iterator = T*;
+  using iterator = internal::span_iterator<T>;
   using reverse_iterator = std::reverse_iterator<iterator>;
 
   static constexpr size_t extent = Extent;
@@ -158,8 +158,8 @@ class span {
     return data()[index];
   }
 
-  constexpr iterator begin() const noexcept { return data(); }
-  constexpr iterator end() const noexcept { return data() + size(); }
+  constexpr iterator begin() const noexcept { return iterator(extent_.data()); }
+  constexpr iterator end() const noexcept { return iterator(extent_.data() + size()); }
 
   constexpr reverse_iterator rbegin() const noexcept { return std::make_reverse_iterator(end()); }
   constexpr reverse_iterator rend() const noexcept { return std::make_reverse_iterator(begin()); }

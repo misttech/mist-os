@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstddef>
+#include <iterator>
 #include <limits>
 #include <type_traits>
 #include <utility>
@@ -60,6 +61,80 @@ class extent<T, dynamic_extent> {
  private:
   T* data_;
   std::size_t size_;
+};
+
+// Iterator implementation that hides the pointer-based implementation behind an opaque type.
+template <typename T>
+class span_iterator {
+ public:
+  using difference_type = ptrdiff_t;
+  using value_type = std::remove_cv_t<T>;
+  using pointer = T*;
+  using reference = T&;
+  using iterator_category = std::random_access_iterator_tag;
+
+  constexpr explicit span_iterator() : span_iterator(nullptr) {}
+  constexpr explicit span_iterator(T* t) : ptr_(t) {}
+
+  constexpr span_iterator(const span_iterator<T>& other) : ptr_(other.ptr_) {}
+  constexpr span_iterator(span_iterator<T>&& other) noexcept : ptr_(other.ptr_) {}
+
+  span_iterator& operator=(span_iterator<T> other) {
+    if (this != &other) {
+      ptr_ = other.ptr_;
+    }
+    return *this;
+  }
+
+  // Allow implicit conversion of span_iterator<V> to span_iterator<const V>.
+  // NOLINTNEXTLINE(google-explicit-constructor)
+  constexpr operator span_iterator<const T>() const {
+    return span_iterator<const T>(static_cast<const T*>(ptr_));
+  }
+
+  constexpr reference operator*() const { return *ptr_; }
+  constexpr pointer operator->() const { return ptr_; }
+  constexpr reference operator[](difference_type offset) { return *(ptr_ + offset); }
+
+  constexpr bool operator==(span_iterator<T> other) const { return ptr_ == other.ptr_; }
+  constexpr bool operator!=(span_iterator<T> other) const { return ptr_ != other.ptr_; }
+  constexpr bool operator<(span_iterator<T> other) const { return ptr_ < other.ptr_; }
+  constexpr bool operator<=(span_iterator<T> other) const { return ptr_ <= other.ptr_; }
+  constexpr bool operator>(span_iterator<T> other) const { return ptr_ > other.ptr_; }
+  constexpr bool operator>=(span_iterator<T> other) const { return ptr_ >= other.ptr_; }
+
+  constexpr span_iterator<T>& operator++() {
+    ptr_ += 1;
+    return *this;
+  }
+  constexpr span_iterator<T> operator++(int) {
+    span_iterator<T> before = *this;
+    ++(*this);
+    return before;
+  }
+  constexpr span_iterator<T>& operator--() {
+    ptr_ -= 1;
+    return *this;
+  }
+  constexpr span_iterator<T>& operator--(int) {
+    *this -= 1;
+    return *this;
+  }
+  constexpr span_iterator<T> operator+=(difference_type n) {
+    ptr_ += n;
+    return *this;
+  }
+  constexpr span_iterator<T> operator-=(difference_type n) {
+    ptr_ -= n;
+    return *this;
+  }
+  constexpr span_iterator<T> operator-(difference_type n) const { return span_iterator(ptr_ - n); }
+  constexpr span_iterator<T> operator+(difference_type n) const { return span_iterator(ptr_ + n); }
+
+  constexpr difference_type operator-(span_iterator<T> other) { return ptr_ - other.ptr_; }
+
+ private:
+  T* ptr_;
 };
 
 }  // namespace internal

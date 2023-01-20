@@ -387,7 +387,7 @@ TEST(SpanTest, BracketOperator) {
 }
 
 template <typename T, size_t Extent, size_t ElementCount = Extent>
-constexpr bool span_iterator_check() {
+constexpr bool span_iterator_element_check() {
   std::array<T, ElementCount> kContainer = {};
   cpp20::span<T, Extent> view(kContainer);
   const cpp20::span<T, Extent> const_view(kContainer);
@@ -419,16 +419,66 @@ constexpr bool span_iterator_check() {
   return check(view) && check(const_view);
 }
 
-TEST(SpanTest, IteratorCheck) {
-  static_assert(span_iterator_check<int, cpp20::dynamic_extent, 40>(),
+TEST(SpanTest, IteratorElementCheck) {
+  static_assert(span_iterator_element_check<int, cpp20::dynamic_extent, 40>(),
                 "Iterators for span with dynamic extent are not set correctly.");
-  static_assert(span_iterator_check<const int, cpp20::dynamic_extent, 40>(),
+  static_assert(span_iterator_element_check<const int, cpp20::dynamic_extent, 40>(),
                 "Iterators for span with dynamic extent are not set correctly.");
 
-  static_assert(span_iterator_check<int, 40>(),
+  static_assert(span_iterator_element_check<int, 40>(),
                 "Iterators for span with dynamic extent are not set correctly.");
-  static_assert(span_iterator_check<const int, 40>(),
+  static_assert(span_iterator_element_check<const int, 40>(),
                 "Iterators for span with dynamic extent are not set correctly.");
+}
+
+template <typename T, size_t Extent, size_t ElementCount = Extent>
+constexpr bool span_iterator_difference_check() {
+  std::array<T, ElementCount> kContainer = {};
+  cpp20::span<T, Extent> view(kContainer);
+  const cpp20::span<T, Extent> const_view(kContainer);
+
+  constexpr auto check = [](auto& view) {
+    for (ssize_t i = 0; i < static_cast<ssize_t>(view.size()); ++i) {
+      for (ssize_t j = 0; j < static_cast<ssize_t>(view.size()); ++j) {
+        auto it = view.begin();
+        if ((it + i) - (it + j) != i - j) {
+          return false;
+        }
+      }
+    }
+
+    return true;
+  };
+
+  return check(view) && check(const_view);
+}
+
+TEST(SpanTest, IteratorDifferenceCheck) {
+  static_assert(span_iterator_difference_check<int, cpp20::dynamic_extent, 40>(),
+                "Iterator difference for span with dynamic extent is not correct");
+  static_assert(span_iterator_difference_check<const int, cpp20::dynamic_extent, 40>(),
+                "Iterator difference for span with dynamic extent is not correct");
+
+  static_assert(span_iterator_difference_check<int, 40>(),
+                "Iterator difference for span with dynamic extent is not correct");
+  static_assert(span_iterator_difference_check<const int, 40>(),
+                "Iterator difference for span with dynamic extent is not correct");
+}
+
+template <typename T>
+constexpr bool span_iterator_conversion_check() {
+  cpp20::span<T> kContainer = {};
+  cpp20::span<const T> kContainerOfConst = {};
+
+  return std::is_convertible_v<typename decltype(kContainer)::iterator,
+                               typename decltype(kContainerOfConst)::iterator>;
+}
+
+TEST(SpanTest, IteratorConversionCheck) {
+  static_assert(span_iterator_conversion_check<int>(),
+                "Iterator for span with mutable elements can't be converted correctly.");
+  static_assert(span_iterator_conversion_check<const int>(),
+                "Iterator for span with mutable elements can't be converted correctly.");
 }
 
 template <typename T, size_t Extent, size_t ElementCount = Extent>
