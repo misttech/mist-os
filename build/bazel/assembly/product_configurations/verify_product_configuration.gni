@@ -69,6 +69,8 @@ template("verify_product_configuration") {
         get_label_info(invoker.gn_product_config_target, "name")
     _gn_product_config_file = "${_gn_product_config_out_dir}/${_gn_product_config_name}/product_assembly_config.json"
 
+    depfile = "${target_gen_dir}/${target_name}.d"
+
     inputs = [
       _gn_product_config_file,
       "${target_gen_dir}/${_bazel_product_config_file}",
@@ -93,6 +95,8 @@ template("verify_product_configuration") {
       rebase_path(inputs[1], root_build_dir),
       "--root_dir2",
       bazel_main_top_dir_rebased + "/workspace",
+      "--depfile",
+      rebase_path(depfile, root_build_dir),
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]

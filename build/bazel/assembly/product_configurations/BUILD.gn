@@ -27,8 +27,10 @@ verify_product_configuration("verify_workstation_eng_product_configuration") {
 group("verifications") {
   testonly = true
   deps = [
-    ":verify_core_product_configuration",
     ":verify_minimal_product_configuration",
     ":verify_workstation_eng_product_configuration",
+
+    # TODO(jayzhuang): Add core product config verifications when driver packages are added in its Bazel target.
+    # ":verify_core_product_configuration",
   ]
 }

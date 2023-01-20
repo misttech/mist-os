@@ -39,3 +39,8 @@ if (use_bringup_assembly) {
     bazel_assembly_target = "//build/bazel/assembly:workstation_eng"
   }
 }
+
+group("verifications") {
+  testonly = true
+  deps = [ "product_configurations:verifications" ]
+}

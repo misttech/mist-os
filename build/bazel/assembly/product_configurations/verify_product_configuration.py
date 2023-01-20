@@ -29,7 +29,7 @@ def normalize_platform(config, root_dir):
         platform["additional_serial_log_tags"] = []
 
 
-def normalize_product(config, root_dir):
+def normalize_product(config, root_dir, extra_files_read):
     if "product" not in config:
         return
 
@@ -42,8 +42,10 @@ def normalize_product(config, root_dir):
                 continue
 
             for pkg in packages[pkg_set]:
-                with open(os.path.join(root_dir, pkg["manifest"]), "r") as f:
+                p = os.path.join(root_dir, pkg["manifest"])
+                with open(p, "r") as f:
                     manifest = json.load(f)
+                    extra_files_read.append(p)
                     pkg["name"] = manifest["package"]["name"]
                     pkg["version"] = manifest["package"]["version"]
 
@@ -67,10 +69,11 @@ def normalize_product(config, root_dir):
                     # Config data source can have different paths, but they
                     # should have consistent content, so replace them with a
                     # file hash for comparison.
-                    config_data["source_sha1"] = file_sha1(
-                        os.path.join(root_dir, config_data["source"]))
-                    config_data["package_name"] = pkg["name"]
+                    p = os.path.join(root_dir, config_data["source"])
                     config_data.pop("source", None)
+                    config_data["package_name"] = pkg["name"]
+                    config_data["source_sha1"] = file_sha1(p)
+                    extra_files_read.append(p)
 
             packages[pkg_set].sort(key=lambda x: x["name"])
 
@@ -82,9 +85,9 @@ def normalize_product(config, root_dir):
     return
 
 
-def normalize(config, root_dir):
+def normalize(config, root_dir, extra_files_read):
     normalize_platform(config, root_dir)
-    normalize_product(config, root_dir)
+    normalize_product(config, root_dir, extra_files_read)
 
 
 def main():
@@ -102,14 +105,16 @@ def main():
         "--root_dir2",
         help="Directory where paths in --product_config2 are relative to",
         required=True)
+    parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
     parser.add_argument("--output", type=argparse.FileType("w"), required=True)
     args = parser.parse_args()
 
     product_config_json1 = json.load(args.product_config1)
     product_config_json2 = json.load(args.product_config2)
 
-    normalize(product_config_json1, args.root_dir1)
-    normalize(product_config_json2, args.root_dir2)
+    extra_files_read = []
+    normalize(product_config_json1, args.root_dir1, extra_files_read)
+    normalize(product_config_json2, args.root_dir2, extra_files_read)
 
     canon1 = json.dumps(
         product_config_json1, sort_keys=True, indent=2).splitlines()
@@ -124,6 +129,9 @@ def main():
         lineterm="")
     diffstr = "\n".join(diff)
     args.output.write(diffstr)
+
+    args.depfile.write(
+        "{}: {}".format(args.output.name, ' '.join(extra_files_read)))
 
     if (len(diffstr) != 0):
         print(f"Error: non-empty diff product configs:\n{diffstr}")
