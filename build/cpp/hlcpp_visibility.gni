@@ -118,7 +118,7 @@ hlcpp_visibility = [
   "//src/connectivity/network/testing/netemul/network-context/lib:*",
   "//src/connectivity/network/testing/netemul/sync-manager/fidl:*",
   "//src/connectivity/network/testing/netemul/sync-manager/lib:*",
-  "//src/connectivity/network/tests/syscall:*",
+  "//src/connectivity/network/tests/socket:*",
   "//src/connectivity/openthread/third_party/openthread/platform:*",
   "//src/connectivity/weave/adaptation:*",
   "//src/connectivity/weave/weavestack:*",

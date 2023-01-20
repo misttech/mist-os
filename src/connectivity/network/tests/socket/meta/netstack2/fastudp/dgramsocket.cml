@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/connectivity/network/tests/syscall/meta/netstack3/syscall_tests.shard.cml" ],
+    include: [ "//src/connectivity/network/tests/socket/meta/netstack2/fastudp/fastudp_socket_test.shard.cml" ],
     program: {
-        binary: "test/netstack_if_nameindex_test",
+        binary: "test/netstack_dgramsocket_test",
     },
 }

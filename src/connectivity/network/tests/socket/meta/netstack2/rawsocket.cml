@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/connectivity/network/tests/syscall/meta/netstack2/syncudp_syscall_test.shard.cml" ],
+    include: [ "//src/connectivity/network/tests/socket/meta/netstack2/syncudp_socket_test.shard.cml" ],
     program: {
-        binary: "test/netstack_packetsocket_test",
+        binary: "test/netstack_rawsocket_test",
     },
     use: [
         {
-            protocol: [ "fuchsia.posix.socket.packet.Provider" ],
+            protocol: [ "fuchsia.posix.socket.raw.Provider" ],
             from: "#netstack",
         },
     ],

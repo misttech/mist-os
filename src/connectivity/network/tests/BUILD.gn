@@ -12,7 +12,7 @@ group("tests") {
     "getifaddrs:tests",
     "integration:tests",
     "multi_nic:tests",
-    "syscall:tests",
+    "socket:tests",
     "//third_party/gvisor_syscall_tests:tests",
   ]
 }
