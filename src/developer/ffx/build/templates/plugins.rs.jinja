@@ -24,6 +24,26 @@ pub async fn ffx_plugin_impl(
 {% endif %}
 }
 
+pub fn ffx_plugin_redact_args(
+  _app: &fho::macro_deps::FfxCommandLine,
+  _cmd: &{{suite_args_lib}}::FfxPluginCommand
+) -> Vec<String>
+{
+{% if includes_subcommands %}
+{% if includes_execution %}
+  match &_cmd.subcommand {
+{% else %}
+  match Some(&_cmd.subcommand) {
+{% endif %}
+{% for plugin in plugins %}
+    Some({{suite_subcommand_lib}}::SubCommand::{{plugin.enum}}(c)) => return _app.redact_subcmd(c),
+{% endfor %}
+    None => {},
+  }
+{% endif %}
+  vec![]
+}
+
 pub fn ffx_plugin_writer_all_output(_level: usize) {
 {% if includes_subcommands %}
 {% for plugin in plugins %}

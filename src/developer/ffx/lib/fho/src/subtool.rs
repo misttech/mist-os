@@ -6,7 +6,8 @@ use argh::{CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_error};
 use ffx_command::{
-    DaemonVersionCheck, Error, FfxCommandLine, FfxContext, Result, ToolRunner, ToolSuite,
+    DaemonVersionCheck, Error, FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner,
+    ToolSuite,
 };
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
@@ -126,38 +127,44 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
         T::forces_stdout_log()
     }
 
-    async fn run(self: Box<Self>) -> Result<ExitStatus> {
+    async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
         match self.command.subcommand {
             FhoHandler::Metadata(metadata) => metadata.print(T::Command::COMMAND),
             FhoHandler::Standalone(tool) => {
-                let cache_path = self.suite.context.get_cache_path()?;
-                let hoist_cache_dir = std::fs::create_dir_all(&cache_path)
-                    .and_then(|_| tempfile::tempdir_in(&cache_path))
-                    .with_user_message(|| format!(
-                        "Could not create hoist cache root in {}. Do you have permission to write to its parent?",
-                        cache_path.display()
-                    ))?;
-                let build_info = self.suite.context.build_info();
-                let injector = self
-                    .ffx
-                    .global
-                    .initialize_overnet(
-                        hoist_cache_dir.path(),
-                        None,
-                        DaemonVersionCheck::SameVersionInfo(build_info),
-                    )
-                    .await?;
-                let env = FhoEnvironment {
-                    ffx: &self.ffx,
-                    context: &self.suite.context,
-                    injector: &injector,
-                };
-                let writer = TryFromEnv::try_from_env(&env).await?;
-                let main = T::from_env(env, tool).await?;
-                main.main(&writer).await.map(|_| ExitStatus::from_raw(0))
+                metrics.print_notice(&mut std::io::stderr()).await?;
+                let redacted_args = self.ffx.redact_subcmd(&tool);
+                let res = run_main(self.suite, self.ffx, tool).await;
+                metrics.command_finished(res.is_ok(), &redacted_args).await.and(res)
             }
         }
     }
+}
+
+async fn run_main<T: FfxTool>(
+    suite: FhoSuite<T>,
+    cmd: FfxCommandLine,
+    tool: T::Command,
+) -> Result<ExitStatus> {
+    let cache_path = suite.context.get_cache_path()?;
+    let hoist_cache_dir = std::fs::create_dir_all(&cache_path)
+        .and_then(|_| tempfile::tempdir_in(&cache_path))
+        .with_user_message(|| format!(
+            "Could not create hoist cache root in {}. Do you have permission to write to its parent?",
+            cache_path.display()
+        ))?;
+    let build_info = suite.context.build_info();
+    let injector = cmd
+        .global
+        .initialize_overnet(
+            hoist_cache_dir.path(),
+            None,
+            DaemonVersionCheck::SameVersionInfo(build_info),
+        )
+        .await?;
+    let env = FhoEnvironment { ffx: &cmd, context: &suite.context, injector: &injector };
+    let writer = TryFromEnv::try_from_env(&env).await?;
+    let main = T::from_env(env, tool).await?;
+    main.main(&writer).await.map(|_| ExitStatus::from_raw(0))
 }
 
 #[async_trait::async_trait(?Send)]
@@ -183,13 +190,6 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
                 .map_err(|err| Error::from_early_exit(&cmd.command, err))?,
         };
         Ok(Some(Box::new(found)))
-    }
-
-    fn redact_arg_values(&self, cmd: &FfxCommandLine) -> Result<Vec<String>> {
-        let args = Vec::from_iter(cmd.global.subcommand.iter().map(String::as_str));
-        let cmd_vec = Vec::from_iter(cmd.cmd_iter());
-        ToolCommand::<M>::redact_arg_values(&cmd_vec, &args)
-            .map_err(|err| Error::from_early_exit(&cmd.command, err))
     }
 }
 
@@ -525,18 +525,20 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn present_metadata() {
+        let test_env = ffx_config::test_init().await.expect("Test env initialization failed");
         let tmpdir = tempfile::tempdir().expect("tempdir");
 
         let ffx = FfxCommandLine::new(None, &["ffx"]).expect("ffx command line to parse");
-        let context = EnvironmentContext::default();
-        let suite: FhoSuite<FakeTool> = FhoSuite { context, _p: Default::default() };
+        let suite: FhoSuite<FakeTool> =
+            FhoSuite { context: test_env.context.clone(), _p: Default::default() };
         let output_path = tmpdir.path().join("metadata.json");
         let subcommand =
             FhoHandler::Metadata(MetadataCmd { output_path: Some(output_path.clone()) });
         let command = ToolCommand { subcommand };
         let tool = Box::new(FhoTool { ffx, suite, command });
+        let metrics = MetricsSession::start(&test_env.context).await.expect("Session start");
 
-        tool.run().await.expect("running metadata command");
+        tool.run(metrics).await.expect("running metadata command");
 
         let read_metadata: FhoToolMetadata =
             serde_json::from_reader(File::open(output_path).expect("opening metadata"))

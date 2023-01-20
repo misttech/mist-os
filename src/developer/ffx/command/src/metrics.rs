@@ -6,6 +6,7 @@ use analytics::{get_notice, opt_out_for_this_invocation};
 use ffx_config::EnvironmentContext;
 use ffx_metrics::{add_ffx_launch_and_timing_events, init_metrics_svc};
 use fuchsia_async::TimeoutExt;
+use itertools::Itertools;
 use std::{
     io::Write,
     time::{Duration, Instant},
@@ -61,13 +62,14 @@ impl MetricsSession {
     pub async fn command_finished(
         self,
         success: bool,
-        sanitized_args: String,
+        sanitized_args: &[impl AsRef<str>],
     ) -> Result<CommandStats> {
         let command_done = Instant::now();
         let command_duration = command_done - self.session_start;
         let analytics_duration = if self.enabled {
             tracing::info!("Command completed. Success: {}", success);
             let timing_in_millis = command_duration.as_millis().to_string();
+            let sanitized_args = sanitized_args.iter().map(AsRef::as_ref).join(" ");
 
             let analytics_task = fuchsia_async::Task::local(async move {
                 if let Err(e) =

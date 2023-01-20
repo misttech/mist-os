@@ -4,7 +4,6 @@
 
 use errors::{ffx_error, IntoExitCode};
 use fuchsia_async::TimeoutExt;
-use itertools::Itertools;
 use std::fs::File;
 use std::io::Write;
 use std::process::ExitStatus;
@@ -74,11 +73,6 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
     let tools = T::from_env(&context)?;
 
     let tool = tools.try_from_args(&cmd).await?;
-    // If the line above succeeds, then this will succeed as well.
-    let sanitized_args = match tools.redact_arg_values(&cmd) {
-        Ok(a) => format!("{} {}", cmd.redact_args_flags_only(), a[1..].join(" ")).trim().to_owned(),
-        Err(e) => format!("{e}"),
-    };
 
     let log_to_stdio = tool.as_ref().map(|tool| tool.forces_stdout_log()).unwrap_or(false);
     ffx_config::logging::init(log_to_stdio || app.verbose, !log_to_stdio).await?;
@@ -91,20 +85,13 @@ pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
     })?;
 
     let metrics = MetricsSession::start(&context).await?;
-    metrics.print_notice(&mut std::io::stderr()).await?;
 
     let stamp = stamp_file(&app.stamp)?;
-    let res = if let Some(tool) = tool {
-        tool.run().await
-    } else {
-        Err(ffx_error!(
-            "No configured tool suites were able to handle the command line: {}",
-            cmd.all_iter().join(" ")
-        )
-        .into())
+    let res = match tool {
+        Some(tool) => tool.run(metrics).await,
+        // since we didn't run a subtool, do the metrics ourselves
+        None => Err(cmd.no_handler_help(metrics, &tools).await?),
     };
-
-    metrics.command_finished(res.is_ok(), sanitized_args).await?;
 
     // Write to our stamp file if it was requested
     if let Some(mut stamp) = stamp {

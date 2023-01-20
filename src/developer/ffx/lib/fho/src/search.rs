@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::FromArgs;
-use ffx_command::{Error, FfxContext, Result};
-use ffx_command::{Ffx, FfxCommandLine, FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
+use ffx_command::{FfxCommandLine, FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
+use ffx_command::{FfxContext, MetricsSession, Result};
 use ffx_config::{EnvironmentContext, Sdk};
 use std::{
     collections::HashMap,
@@ -44,7 +43,7 @@ impl ToolRunner for ExternalSubTool {
         false
     }
 
-    async fn run(self: Box<Self>) -> Result<ExitStatus> {
+    async fn run(self: Box<Self>, _metrics: MetricsSession) -> Result<ExitStatus> {
         // fho v0: Run the exact same command, just with the first argument replaced with the 'real' tool
         // location.
         std::process::Command::new(&self.path)
@@ -58,6 +57,8 @@ impl ToolRunner for ExternalSubTool {
             .spawn()
             .and_then(|mut child| child.wait())
             .bug_context("Running external subtool")
+        // note: we specifically do not want to report metrics here, as we're running the command externally.
+        // The final command is the one that knows how to redact its own args, so it will do it itself.
     }
 }
 
@@ -143,18 +144,6 @@ impl ToolSuite for ExternalSubToolSuite {
         }
         // and we're done
         Ok(None)
-    }
-
-    fn redact_arg_values(&self, ffx_cmd: &FfxCommandLine) -> Result<Vec<String>> {
-        if self.find_workspace_tool(ffx_cmd).is_none() {
-            return Ok(Vec::new());
-        }
-        // This will likely double-report if this is given to analytics.
-        let mut res = Ffx::redact_arg_values(&Vec::from_iter(ffx_cmd.cmd_iter()), &vec!["n_o_o_p"])
-            .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))?;
-        res.pop();
-        res.push(ffx_cmd.global.subcommand.first().unwrap().to_owned());
-        Ok(res)
     }
 }
 
@@ -242,6 +231,7 @@ impl SubToolLocation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ffx_command::Ffx;
     use std::{collections::HashSet, io::Write};
 
     enum MockMetadata<'a> {

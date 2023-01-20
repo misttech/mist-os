@@ -5,8 +5,8 @@
 use argh::{FromArgs, SubCommands};
 use errors::ffx_error;
 use ffx_command::{
-    DaemonVersionCheck, Error, Ffx, FfxCommandLine, FfxContext, FfxToolInfo, Result, ToolRunner,
-    ToolSuite,
+    DaemonVersionCheck, Error, FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Result,
+    ToolRunner, ToolSuite,
 };
 use ffx_config::EnvironmentContext;
 use ffx_lib_args::FfxBuiltIn;
@@ -68,37 +68,8 @@ impl ToolSuite for FfxSuite {
                     .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))?;
                 Ok(Some(Box::new(FfxSubCommand { cmd, context, app })))
             }
-            Some(name) => match self.external_commands.try_from_args(ffx_cmd).await? {
-                Some(tool) => Ok(Some(tool)),
-                _ => {
-                    let mut output = format!(
-                        "Unknown ffx tool `{name}`. Did you mean one of the following?\n\n"
-                    );
-                    self.print_command_list(&mut output).await.ok();
-                    let code = 1;
-                    return Err(Error::Help { command: ffx_cmd.command.clone(), output, code });
-                }
-            },
-            None => {
-                let help_res = Ffx::from_args(&Vec::from_iter(ffx_cmd.cmd_iter()), &["help"]);
-                match help_res {
-                    Ok(_) => Ok(None),
-                    Err(help_err) => {
-                        let mut output = help_err.output;
-                        let code = help_err.status.map_or(1, |_| 0);
-                        self.print_command_list(&mut output).await.ok();
-                        Err(Error::Help { command: ffx_cmd.command.clone(), output, code })
-                    }
-                }
-            }
+            _ => self.external_commands.try_from_args(ffx_cmd).await,
         }
-    }
-
-    fn redact_arg_values(&self, ffx_cmd: &FfxCommandLine) -> Result<Vec<String>> {
-        let args = Vec::from_iter(ffx_cmd.global.subcommand.iter().map(String::as_str));
-        let cmd_vec = Vec::from_iter(ffx_cmd.cmd_iter());
-        FfxBuiltIn::redact_arg_values(&cmd_vec, &args)
-            .map_err(|err| Error::from_early_exit(&ffx_cmd.command, err))
     }
 }
 
@@ -112,7 +83,7 @@ impl ToolRunner for FfxSubCommand {
         }
     }
 
-    async fn run(self: Box<Self>) -> Result<ExitStatus> {
+    async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
         use SubCommand::FfxSchema;
         match self.cmd {
             FfxBuiltIn { subcommand: Some(FfxSchema(_)) } => {
@@ -125,9 +96,13 @@ impl ToolRunner for FfxSubCommand {
                 {
                     Err(ffx_error!("The machine flag is not supported for this subcommand").into())
                 } else {
-                    run_legacy_subcommand(self.app.global, self.context, subcommand)
+                    metrics.print_notice(&mut std::io::stderr()).await?;
+                    let redacted_args =
+                        ffx_lib_suite::ffx_plugin_redact_args(&self.app, &subcommand);
+                    let res = run_legacy_subcommand(self.app, self.context, subcommand)
                         .await
-                        .map(|_| ExitStatus::from_raw(0))
+                        .map(|_| ExitStatus::from_raw(0));
+                    metrics.command_finished(res.is_ok(), &redacted_args).await.and(res)
                 }
             }
         }
@@ -135,7 +110,7 @@ impl ToolRunner for FfxSubCommand {
 }
 
 async fn run_legacy_subcommand(
-    app: Ffx,
+    app: FfxCommandLine,
     context: EnvironmentContext,
     subcommand: FfxBuiltIn,
 ) -> Result<()> {
@@ -145,6 +120,7 @@ async fn run_legacy_subcommand(
         .and_then(|_| tempfile::tempdir_in(&cache_path))
         .user_message("Unable to create hoist cache directory")?;
     let injector = app
+        .global
         .initialize_overnet(
             hoist_cache_dir.path(),
             router_interval,

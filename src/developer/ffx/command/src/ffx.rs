@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::FfxContext;
 use crate::{Error, Result};
+use crate::{FfxContext, MetricsSession};
 use anyhow::Context;
 use argh::FromArgs;
 use errors::ffx_error;
@@ -60,32 +60,75 @@ impl FfxCommandLine {
         Ok(Self { command, ffx_args, global })
     }
 
-    /// Create a string of the current process's `env::args` that replaces user-supplied parameter
-    /// values with the parameter name to enable safe analytics data collection.
-    ///
-    /// This function will exit early from the current process if argument parsing
-    /// was unsuccessful or if information like `--help` was requested.
-    pub fn redact_arg_values(&self) -> String {
-        let x = Ffx::redact_arg_values(
-            &["ffx"],
-            &Vec::from_iter(self.ffx_args_iter().chain(self.subcmd_iter())),
-        );
-        match x {
-            Ok(s) => s[1..].join(" "),
-            Err(e) => e.output,
-        }
-    }
-
-    /// Creates a string of the process `env::args` but with user-supplied parameter values removed
+    /// Creates a string of the ffx part of the command, but with user-supplied parameter values removed
     /// for analytics. This only contains the top-level flags before any subcommands have been
     /// entered.
-    pub fn redact_args_flags_only(&self) -> String {
-        let x = Ffx::redact_arg_values(&["ffx"], &Vec::from_iter(self.ffx_args_iter()));
-        let res = match x {
-            Ok(s) => s[1..].join("sep"),
-            Err(e) => e.output,
+    pub fn redact_ffx_cmd(&self) -> Vec<String> {
+        Ffx::redact_arg_values(
+            &Vec::from_iter(self.cmd_iter()),
+            &Vec::from_iter(self.ffx_args_iter()),
+        )
+        .expect("Already parsed args should be redactable")
+    }
+
+    /// Redacts the full command line using type `C` to decide how to redact the subcommand arguments.
+    ///
+    /// May panic if you try to use the wrong type `C`, so you should only use this after you've
+    /// successfully parsed the arguments. That's why this takes a ref to the command struct in
+    /// `_cmd` argument even though it doesn't use it, to make sure you've parsed it first.
+    pub fn redact_subcmd<C: FromArgs>(&self, _cmd: &C) -> Vec<String> {
+        let mut args = self.redact_ffx_cmd();
+        let tool_cmd = Vec::from_iter(self.subcmd_iter().take(1));
+        let tool_args = Vec::from_iter(self.subcmd_iter().skip(1));
+        args.append(
+            &mut C::redact_arg_values(&tool_cmd, &tool_args)
+                .expect("Already parsed command line should redact ok"),
+        );
+        args
+    }
+
+    /// This produces an error type that will print help appropriate help output
+    /// for what the command line looks like, and do the appropriate metrics
+    /// logic.
+    ///
+    /// Note that both the Ok() and Err() returns of this are Errors. The Ok
+    /// result is the proper help output, while the other kind of error is an
+    /// error on metrics submission.
+    pub async fn no_handler_help<T: crate::ToolSuite>(
+        &self,
+        metrics: MetricsSession,
+        suite: &T,
+    ) -> Result<Error> {
+        metrics.print_notice(&mut std::io::stderr()).await?;
+
+        let subcmd_name = self.global.subcommand.first();
+        let help_err = match subcmd_name {
+            Some(name) => {
+                let mut output =
+                    format!("Unknown ffx tool `{name}`. Did you mean one of the following?\n\n");
+                suite.print_command_list(&mut output).await.ok();
+                let code = 1;
+                Error::Help { command: self.command.clone(), output, code }
+            }
+            None => {
+                let help_err = Ffx::from_args(&Vec::from_iter(self.cmd_iter()), &["help"])
+                    .expect_err("argh should always return help from a help command");
+                let mut output = help_err.output;
+                let code = help_err.status.map_or(1, |_| 0);
+                suite.print_command_list(&mut output).await.ok();
+                Error::Help { command: self.command.clone(), output, code }
+            }
         };
-        res
+        // construct a 'sanitized' argument list that includes an indication of whether
+        // it was just no arguments passed or an unknown subtool.
+        let redacted: Vec<_> = self
+            .redact_ffx_cmd()
+            .into_iter()
+            .chain(subcmd_name.map(|_| "<unknown-subtool>".to_owned()).into_iter())
+            .collect();
+
+        metrics.command_finished(help_err.exit_code() == 0, &redacted).await?;
+        Ok(help_err)
     }
 
     /// Returns an iterator of the command part of the command line
@@ -250,5 +293,38 @@ mod test {
             FfxCommandLine::new(Some("fx ffx"), &args).expect("Command line should parse");
         assert_eq!(cmd_line.command, vec!["fx", "ffx"]);
         assert_eq!(cmd_line.ffx_args, vec!["--verbose"]);
+    }
+
+    /// A subcommand
+    #[derive(FromArgs, Default)]
+    #[argh(subcommand, name = "subcommand")]
+    #[allow(unused)]
+    struct TestCmd {
+        /// an argument
+        #[argh(switch)]
+        arg: bool,
+        /// another argument
+        #[argh(option)]
+        stuff: String,
+    }
+
+    #[test]
+    fn redact_ffx_args() {
+        let args = ["ffx", "-v", "--env", "boom", "subcommand", "--arg"];
+        let cmd_line = FfxCommandLine::new(None, &args).expect("Command line should parse");
+        assert_eq!(cmd_line.command, vec!["ffx"]);
+        assert_eq!(cmd_line.ffx_args, vec!["-v", "--env", "boom"]);
+        assert_eq!(cmd_line.redact_ffx_cmd(), vec!["ffx", "--env", "-v"]);
+    }
+
+    #[test]
+    fn redact_subcmd_args() {
+        let args = ["ffx", "-v", "--env", "boom", "subcommand", "--arg", "--stuff", "wee"];
+        let cmd_line = FfxCommandLine::new(None, &args).expect("Command line should parse");
+        assert_eq!(cmd_line.global.subcommand, vec!["subcommand", "--arg", "--stuff", "wee"]);
+        assert_eq!(
+            cmd_line.redact_subcmd(&TestCmd::default()),
+            vec!["ffx", "--env", "-v", "subcommand", "--arg", "--stuff"]
+        );
     }
 }

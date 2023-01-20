@@ -4,7 +4,7 @@
 
 use std::{fmt::Write, path::PathBuf, process::ExitStatus};
 
-use crate::{Error, FfxCommandLine};
+use crate::{Error, FfxCommandLine, MetricsSession};
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
@@ -52,7 +52,7 @@ impl From<&argh::CommandInfo> for FfxToolInfo {
 #[async_trait(?Send)]
 pub trait ToolRunner {
     fn forces_stdout_log(&self) -> bool;
-    async fn run(self: Box<Self>) -> Result<ExitStatus, Error>;
+    async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus, Error>;
 }
 
 /// Implements discovering and loading the subtools a particular ffx binary
@@ -78,10 +78,6 @@ pub trait ToolSuite: Sized {
         &self,
         cmd: &FfxCommandLine,
     ) -> Result<Option<Box<dyn ToolRunner + '_>>, Error>;
-
-    /// Parses the given command line into a command, then returns a redacted string usable in
-    /// analytics. See [`FromArgs::redact_arg_values`] for the kind of output to expect.
-    fn redact_arg_values(&self, cmd: &FfxCommandLine) -> Result<Vec<String>, Error>;
 
     /// Parses the given command line information into a runnable command
     /// object, exiting and printing the early exit output if help is requested
