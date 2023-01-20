@@ -5,9 +5,9 @@
 use fidl_fuchsia_ui_gfx::Command as GfxCommand;
 use fidl_fuchsia_ui_gfx::{
     AddChildCmd, AddLayerCmd, AddPartCmd, ColorRgb, ColorRgbValue, ColorRgba, ColorRgbaValue,
-    CreateResourceCmd, DetachCmd, DetachLightCmd, DetachLightsCmd, Quaternion, QuaternionValue,
-    ReleaseResourceCmd, RemoveAllLayersCmd, RemoveLayerCmd, ResourceArgs, SceneAddAmbientLightCmd,
-    SceneAddDirectionalLightCmd, SceneAddPointLightCmd, SetAnchorCmd,
+    CreateResourceCmd, DetachChildrenCmd, DetachCmd, DetachLightCmd, DetachLightsCmd, Quaternion,
+    QuaternionValue, ReleaseResourceCmd, RemoveAllLayersCmd, RemoveLayerCmd, ResourceArgs,
+    SceneAddAmbientLightCmd, SceneAddDirectionalLightCmd, SceneAddPointLightCmd, SetAnchorCmd,
     SetCameraClipSpaceTransformCmd, SetCameraCmd, SetClipCmd, SetColorCmd,
     SetDisplayRotationCmdHack, SetEventMaskCmd, SetLayerStackCmd, SetLightColorCmd,
     SetLightDirectionCmd, SetMaterialCmd, SetRendererCmd, SetRotationCmd, SetScaleCmd, SetShapeCmd,
@@ -95,8 +95,13 @@ pub fn add_part(node_id: u32, part_id: u32) -> Command {
     Command::Gfx(GfxCommand::AddPart(cmd))
 }
 
-pub fn detach(id: u32) -> Command {
-    let cmd = DetachCmd { id };
+pub fn detach_children(parent_id: u32) -> Command {
+    let cmd = DetachChildrenCmd { node_id: parent_id };
+    Command::Gfx(GfxCommand::DetachChildren(cmd))
+}
+
+pub fn detach(child_id: u32) -> Command {
+    let cmd = DetachCmd { id: child_id };
     Command::Gfx(GfxCommand::Detach(cmd))
 }
 

@@ -682,6 +682,10 @@ impl View {
     pub fn detach_child(&self, child: &Node) {
         self.resource.enqueue(cmd::detach(child.id()))
     }
+
+    pub fn detach_children(&self) {
+        self.resource.enqueue(cmd::detach_children(self.id()));
+    }
 }
 
 pub struct ViewHolder(Node);
@@ -768,6 +772,10 @@ impl ContainerNode {
 
     pub fn remove_child(&self, node: &Node) {
         self.enqueue(cmd::detach(node.id()));
+    }
+
+    pub fn remove_all_children(&self) {
+        self.enqueue(cmd::detach_children(self.id()));
     }
 
     pub fn add_part(&self, node: &Node) {
