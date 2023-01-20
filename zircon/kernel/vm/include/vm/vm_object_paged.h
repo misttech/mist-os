@@ -194,6 +194,11 @@ class VmObjectPaged final : public VmObject {
     DumpLocked(depth, verbose);
   }
 
+  uint32_t DebugLookupDepth() const override {
+    Guard<CriticalMutex> guard{lock()};
+    return cow_pages_locked()->DebugLookupDepthLocked();
+  }
+
   zx_status_t LookupPagesLocked(uint64_t offset, uint pf_flags, DirtyTrackingAction mark_dirty,
                                 uint64_t max_out_pages, uint64_t max_waitable_pages,
                                 list_node* alloc_list, LazyPageRequest* page_request,

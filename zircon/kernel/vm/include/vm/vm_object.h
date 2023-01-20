@@ -526,6 +526,13 @@ class VmObject : public VmHierarchyBase,
 
   virtual void Dump(uint depth, bool verbose) = 0;
 
+  // Returns the number of lookup steps that might be done by operations on this VMO. This would
+  // typically be the depth of a parent chain and represent how many parents might need to be
+  // traversed to find a page.
+  // What this returns is imprecise and not well defined, and so is for debug / diagnostic usage
+  // only.
+  virtual uint32_t DebugLookupDepth() const { return 0; }
+
   // perform a cache maintenance operation against the vmo.
   enum class CacheOpType { Invalidate, Clean, CleanInvalidate, Sync };
   virtual zx_status_t CacheOp(uint64_t offset, uint64_t len, CacheOpType type) {

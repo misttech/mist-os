@@ -1194,6 +1194,19 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
   }
 }
 
+uint32_t VmCowPages::DebugLookupDepthLocked() const {
+  // Count the number of parents we need to traverse to find the root, and call this our lookup
+  // depth. Slices don't need to be explicitly handled as they are just a parent.
+  uint32_t depth = 0;
+  const VmCowPages* cur = this;
+  AssertHeld(cur->lock_ref());
+  while (cur->parent_) {
+    depth++;
+    cur = cur->parent_.get();
+  }
+  return depth;
+}
+
 VmCowPages::AttributionCounts VmCowPages::AttributedPagesInRangeLocked(uint64_t offset,
                                                                        uint64_t len) const {
   canary_.Assert();

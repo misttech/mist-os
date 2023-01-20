@@ -393,7 +393,7 @@ const char* VmoRightsToString(uint32_t rights, char str[kRightsStrLen]) {
 // Prints a header for the columns printed by DumpVmObject.
 // If |handles| is true, the dumped objects are expected to have handle info.
 void PrintVmoDumpHeader(bool handles) {
-  printf("%s koid obj                parent #chld #map #shr    size   alloc name\n",
+  printf("%s koid obj                parent #depth #chld #map #shr    size   alloc name\n",
          handles ? "      handle rights " : "           -      - ");
 }
 
@@ -449,6 +449,8 @@ void DumpVmObject(const VmObject& vmo, pretty::SizeUnit format_unit, zx_handle_t
       " "     // koid
       "%p "   // vm_object
       "%6s "  // child parent koid
+      "%6" PRIu32
+      " "  // lookup depth
       "%5" PRIu32
       " "  // number of children
       "%4" PRIu32
@@ -458,8 +460,8 @@ void DumpVmObject(const VmObject& vmo, pretty::SizeUnit format_unit, zx_handle_t
       "%7s "   // size in bytes
       "%7s "   // allocated bytes
       "%s\n",  // name
-      handle_str, rights_str, koid, &vmo, child_str, vmo.num_children(), vmo.num_mappings(),
-      vmo.share_count(), size_str.c_str(), alloc_str, name);
+      handle_str, rights_str, koid, &vmo, child_str, vmo.DebugLookupDepth(), vmo.num_children(),
+      vmo.num_mappings(), vmo.share_count(), size_str.c_str(), alloc_str, name);
 }
 
 // If |hidden_only| is set, will only dump VMOs that are not mapped

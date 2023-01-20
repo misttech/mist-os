@@ -541,6 +541,9 @@ class VmCowPages final : public VmHierarchyBase,
 
   void DumpLocked(uint depth, bool verbose) const TA_REQ(lock());
 
+  // see VmObject::DebugLookupDepth
+  uint32_t DebugLookupDepthLocked() const TA_REQ(lock());
+
   // VMO_VALIDATION
   bool DebugValidatePageSplitsLocked() const TA_REQ(lock());
   bool DebugValidateBacklinksLocked() const TA_REQ(lock());
