@@ -153,8 +153,8 @@ struct SError {
 };
 
 void timer_maybe_interrupt(GuestState* guest_state, GichState* gich_state);
-zx_status_t vmexit_handler(uint64_t* hcr, GuestState* guest_state, GichState* gich_state,
-                           hypervisor::GuestPhysicalAspace* gpa, hypervisor::TrapMap* traps,
-                           zx_port_packet_t* packet);
+zx::result<> vmexit_handler(uint64_t* hcr, GuestState* guest_state, GichState* gich_state,
+                            hypervisor::GuestPhysicalAspace* gpa, hypervisor::TrapMap* traps,
+                            zx_port_packet_t* packet);
 
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_HYPERVISOR_VMEXIT_PRIV_H_

@@ -308,7 +308,8 @@ zx::result<> Vcpu::Enter(zx_port_packet_t& packet) {
       status = ZX_OK;
     } else if (status == ZX_OK) {
       status = vmexit_handler(&hcr_, guest_state, &gich_state_, &guest_.AddressSpace(),
-                              &guest_.Traps(), &packet);
+                              &guest_.Traps(), &packet)
+                   .status_value();
     } else {
       ktrace_vcpu_exit(VCPU_FAILURE, guest_state->system_state.elr_el2);
       dprintf(INFO, "hypervisor: VCPU enter failed: %d\n", status);

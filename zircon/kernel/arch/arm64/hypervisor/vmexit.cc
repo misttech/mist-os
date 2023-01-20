@@ -28,12 +28,12 @@
 #define LOCAL_TRACE 0
 
 #define SET_SYSREG(sysreg)                                                  \
-  ({                                                                        \
+  {                                                                         \
     guest_state->system_state.sysreg = reg;                                 \
     LTRACEF("guest " #sysreg ": %#lx\n", guest_state->system_state.sysreg); \
     next_pc(guest_state);                                                   \
-    ZX_OK;                                                                  \
-  })
+    return zx::ok();                                                        \
+  }
 
 namespace {
 
@@ -67,34 +67,34 @@ bool timer_enabled(GuestState* guest_state) {
   return enabled && !masked;
 }
 
-zx_status_t handle_wfi_wfe_instruction(uint32_t iss, GuestState* guest_state,
-                                       GichState* gich_state) {
+zx::result<> handle_wfi_wfe_instruction(uint32_t iss, GuestState* guest_state,
+                                        GichState* gich_state) {
   next_pc(guest_state);
   const WaitInstruction wi(iss);
   if (wi.is_wfe) {
     ktrace_vcpu_exit(VCPU_WFE_INSTRUCTION, guest_state->system_state.elr_el2);
-    return ZX_OK;
+    return zx::ok();
   }
   ktrace_vcpu_exit(VCPU_WFI_INSTRUCTION, guest_state->system_state.elr_el2);
 
   // If a list register is in use, then we have an active interrupt.
   if (gich_state->IsUsingListRegister()) {
-    return ZX_OK;
+    return zx::ok();
   }
 
   zx_time_t deadline = ZX_TIME_INFINITE;
   if (timer_enabled(guest_state)) {
     zx_ticks_t guest_ticks_deadline = convert_raw_ticks_to_ticks(guest_state->cntv_cval_el0);
     if (current_ticks() >= guest_ticks_deadline) {
-      return ZX_OK;
+      return zx::ok();
     }
     deadline = platform_get_ticks_to_time_ratio().Scale(guest_ticks_deadline);
   }
   return gich_state->Wait(deadline);
 }
 
-zx_status_t handle_smc_instruction(uint32_t iss, GuestState* guest_state,
-                                   zx_port_packet_t* packet) {
+zx::result<> handle_smc_instruction(uint32_t iss, GuestState* guest_state,
+                                    zx_port_packet_t* packet) {
   const SmcInstruction si(iss);
   if (si.imm != kSmcPsci) {
     dprintf(CRITICAL, "hypervisor: Unhandled guest SMC instruction %#lx\n", guest_state->x[0]);
@@ -102,7 +102,7 @@ zx_status_t handle_smc_instruction(uint32_t iss, GuestState* guest_state,
     // value of (-1) that is returned in R0, W0 or X0 register.
     guest_state->x[0] = ~0ul;
     next_pc(guest_state);
-    return ZX_OK;
+    return zx::ok();
   }
 
   next_pc(guest_state);
@@ -110,7 +110,7 @@ zx_status_t handle_smc_instruction(uint32_t iss, GuestState* guest_state,
     case PSCI64_PSCI_VERSION:
       // See ARM PSCI Platform Design Document, Section 5.1.1.
       guest_state->x[0] = (kPsciMajorVersion << 16) | kPsciMinorVersion;
-      return ZX_OK;
+      return zx::ok();
     case PSCI64_CPU_ON:
       memset(packet, 0, sizeof(*packet));
       packet->type = ZX_PKT_TYPE_GUEST_VCPU;
@@ -118,19 +118,19 @@ zx_status_t handle_smc_instruction(uint32_t iss, GuestState* guest_state,
       packet->guest_vcpu.startup.id = guest_state->x[1];
       packet->guest_vcpu.startup.entry = guest_state->x[2];
       guest_state->x[0] = PSCI_SUCCESS;
-      return ZX_ERR_NEXT;
+      return zx::error(ZX_ERR_NEXT);
     case PSCI64_CPU_OFF:
-      return ZX_ERR_STOP;
+      return zx::error(ZX_ERR_STOP);
     case PSCI64_SYSTEM_OFF:
-      return ZX_ERR_UNAVAILABLE;
+      return zx::error(ZX_ERR_UNAVAILABLE);
     case PSCI64_SYSTEM_RESET:
       // See ARM PSCI Platform Design Document, Section 5.11.
-      return ZX_ERR_CANCELED;
+      return zx::error(ZX_ERR_CANCELED);
     default:
       dprintf(CRITICAL, "hypervisor: Unhandled guest SMC PSCI instruction %#lx\n",
               guest_state->x[0]);
       guest_state->x[0] = PSCI_NOT_SUPPORTED;
-      return ZX_OK;
+      return zx::ok();
   }
 }
 
@@ -155,18 +155,18 @@ void clean_invalidate_cache(zx_paddr_t table, size_t index_shift) {
   arch::InvalidateGlobalInstructionCache();
 }
 
-zx_status_t handle_system_instruction(uint32_t iss, uint64_t& hcr, GuestState* guest_state,
-                                      hypervisor::GuestPhysicalAspace* gpa,
-                                      zx_port_packet_t* packet) {
+zx::result<> handle_system_instruction(uint32_t iss, uint64_t& hcr, GuestState* guest_state,
+                                       hypervisor::GuestPhysicalAspace* gpa,
+                                       zx_port_packet_t* packet) {
   const SystemInstruction si(iss);
   const uint64_t reg = guest_state->x[si.xt];
 
   switch (si.sysreg) {
     case SystemRegister::MAIR_EL1:
-      return SET_SYSREG(mair_el1);
+      SET_SYSREG(mair_el1);
     case SystemRegister::SCTLR_EL1: {
       if (si.read) {
-        return ZX_ERR_NOT_SUPPORTED;
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
       }
 
       uint32_t sctlr_el1 = reg & UINT32_MAX;
@@ -192,14 +192,14 @@ zx_status_t handle_system_instruction(uint32_t iss, uint64_t& hcr, GuestState* g
 
       guest_state->system_state.sctlr_el1 = sctlr_el1;
       next_pc(guest_state);
-      return ZX_OK;
+      return zx::ok();
     }
     case SystemRegister::TCR_EL1:
-      return SET_SYSREG(tcr_el1);
+      SET_SYSREG(tcr_el1);
     case SystemRegister::TTBR0_EL1:
-      return SET_SYSREG(ttbr0_el1);
+      SET_SYSREG(ttbr0_el1);
     case SystemRegister::TTBR1_EL1:
-      return SET_SYSREG(ttbr1_el1);
+      SET_SYSREG(ttbr1_el1);
     case SystemRegister::OSLAR_EL1:
     case SystemRegister::OSLSR_EL1:
     case SystemRegister::OSDLR_EL1:
@@ -209,15 +209,15 @@ zx_status_t handle_system_instruction(uint32_t iss, uint64_t& hcr, GuestState* g
       if (si.read) {
         guest_state->x[si.xt] = 0;
       }
-      return ZX_OK;
+      return zx::ok();
     case SystemRegister::ICC_SGI1R_EL1: {
       if (si.read) {
         // ICC_SGI1R_EL1 is write-only.
-        return ZX_ERR_INVALID_ARGS;
+        return zx::error(ZX_ERR_INVALID_ARGS);
       }
       SgiRegister sgi(reg);
       if (sgi.aff3 != 0 || sgi.aff2 != 0 || sgi.aff1 != 0 || sgi.rs != 0) {
-        return ZX_ERR_NOT_SUPPORTED;
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
       }
 
       memset(packet, 0, sizeof(*packet));
@@ -231,7 +231,7 @@ zx_status_t handle_system_instruction(uint32_t iss, uint64_t& hcr, GuestState* g
       }
       packet->guest_vcpu.interrupt.vector = sgi.int_id;
       next_pc(guest_state);
-      return ZX_ERR_NEXT;
+      return zx::error(ZX_ERR_NEXT);
     }
     case SystemRegister::DC_ISW:
     case SystemRegister::DC_CISW:
@@ -271,12 +271,12 @@ zx_status_t handle_system_instruction(uint32_t iss, uint64_t& hcr, GuestState* g
       }
 
       next_pc(guest_state);
-      return ZX_OK;
+      return zx::ok();
     }
     default:
       dprintf(CRITICAL, "hypervisor: Unhandled guest system register %#x access\n",
               static_cast<uint16_t>(si.sysreg));
-      return ZX_ERR_NOT_SUPPORTED;
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 }
 
@@ -311,38 +311,36 @@ bool hpfar_valid(uint64_t hpfar_el2, uint32_t esr_el2) {
   return true;
 }
 
-zx_status_t handle_instruction_abort(GuestState* guest_state,
-                                     hypervisor::GuestPhysicalAspace* gpa) {
+zx::result<> handle_instruction_abort(GuestState* guest_state,
+                                      hypervisor::GuestPhysicalAspace* gpa) {
   if (!hpfar_valid(guest_state->hpfar_el2, guest_state->esr_el2)) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   const zx_vaddr_t guest_paddr = guest_state->hpfar_el2;
-  if (auto result = gpa->PageFault(guest_paddr); result.is_error()) {
+  auto result = gpa->PageFault(guest_paddr);
+  if (result.is_error()) {
     dprintf(CRITICAL, "hypervisor: Unhandled guest instruction abort %#lx\n", guest_paddr);
-    return result.status_value();
   }
-  return ZX_OK;
+  return result;
 }
 
-zx_status_t handle_data_abort(uint32_t iss, GuestState* guest_state,
-                              hypervisor::GuestPhysicalAspace* gpa, hypervisor::TrapMap* traps,
-                              zx_port_packet_t* packet) {
+zx::result<> handle_data_abort(uint32_t iss, GuestState* guest_state,
+                               hypervisor::GuestPhysicalAspace* gpa, hypervisor::TrapMap* traps,
+                               zx_port_packet_t* packet) {
   if (!hpfar_valid(guest_state->hpfar_el2, guest_state->esr_el2)) {
-    return ZX_ERR_NOT_SUPPORTED;
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   zx_vaddr_t guest_paddr = guest_state->hpfar_el2;
   zx::result<hypervisor::Trap*> trap = traps->FindTrap(ZX_GUEST_TRAP_BELL, guest_paddr);
-  switch (trap.status_value()) {
-    case ZX_ERR_NOT_FOUND:
-      if (auto result = gpa->PageFault(guest_paddr); result.is_error()) {
-        dprintf(CRITICAL, "hypervisor: Unhandled guest data abort %#lx\n", guest_paddr);
-        return result.status_value();
-      }
-      return ZX_OK;
-    case ZX_OK:
-      break;
-    default:
-      return trap.status_value();
+  if (trap.status_value() == ZX_ERR_NOT_FOUND) {
+    auto result = gpa->PageFault(guest_paddr);
+    if (result.is_error()) {
+      dprintf(CRITICAL, "hypervisor: Unhandled guest data abort %#lx\n", guest_paddr);
+    }
+    return result;
+  }
+  if (trap.is_error()) {
+    return trap.take_error();
   }
   next_pc(guest_state);
 
@@ -354,18 +352,18 @@ zx_status_t handle_data_abort(uint32_t iss, GuestState* guest_state,
   switch ((*trap)->kind()) {
     case ZX_GUEST_TRAP_BELL:
       if (data_abort.read) {
-        return ZX_ERR_NOT_SUPPORTED;
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
       }
       packet->key = (*trap)->key();
       packet->type = ZX_PKT_TYPE_GUEST_BELL;
       packet->guest_bell.addr = guest_paddr;
       if (!(*trap)->HasPort()) {
-        return ZX_ERR_BAD_STATE;
+        return zx::error(ZX_ERR_BAD_STATE);
       }
-      return (*trap)->Queue(*packet).status_value();
+      return (*trap)->Queue(*packet);
     case ZX_GUEST_TRAP_MEM:
       if (!data_abort.valid) {
-        return ZX_ERR_IO_DATA_INTEGRITY;
+        return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
       }
       packet->key = (*trap)->key();
       packet->type = ZX_PKT_TYPE_GUEST_MEM;
@@ -377,9 +375,9 @@ zx_status_t handle_data_abort(uint32_t iss, GuestState* guest_state,
       if (!data_abort.read) {
         packet->guest_mem.data = guest_state->x[data_abort.xt];
       }
-      return ZX_ERR_NEXT;
+      return zx::error(ZX_ERR_NEXT);
     default:
-      return ZX_ERR_BAD_STATE;
+      return zx::error(ZX_ERR_BAD_STATE);
   }
 }
 
@@ -411,7 +409,7 @@ std::string_view DataFaultStatusCodeToString(SError::DataFaultStatusCode code) {
   }
 }
 
-zx_status_t handle_serror_interrupt(GuestState* guest_state, uint32_t iss) {
+void handle_serror_interrupt(GuestState* guest_state, uint32_t iss) {
   // We received a system error (SError) exception.
   //
   // This isn't necessarily the guest's fault. It might be the host (kernel or
@@ -431,7 +429,6 @@ zx_status_t handle_serror_interrupt(GuestState* guest_state, uint32_t iss) {
           static_cast<int>(aet_string.size()), aet_string.data(), serror.ea(),
           static_cast<uint32_t>(serror.dfsc()), static_cast<int>(dfsc_string.size()),
           dfsc_string.data());
-  return ZX_OK;
 }
 
 }  // namespace
@@ -478,59 +475,59 @@ void timer_maybe_interrupt(GuestState* guest_state, GichState* gich_state) {
   }
 }
 
-zx_status_t vmexit_handler(uint64_t* hcr, GuestState* guest_state, GichState* gich_state,
-                           hypervisor::GuestPhysicalAspace* gpa, hypervisor::TrapMap* traps,
-                           zx_port_packet_t* packet) {
+zx::result<> vmexit_handler(uint64_t* hcr, GuestState* guest_state, GichState* gich_state,
+                            hypervisor::GuestPhysicalAspace* gpa, hypervisor::TrapMap* traps,
+                            zx_port_packet_t* packet) {
   LTRACEF("guest esr_el1: %#x\n", guest_state->system_state.esr_el1);
   LTRACEF("guest esr_el2: %#x\n", guest_state->esr_el2);
   LTRACEF("guest elr_el2: %#lx\n", guest_state->system_state.elr_el2);
   LTRACEF("guest spsr_el2: %#x\n", guest_state->system_state.spsr_el2);
 
   ExceptionSyndrome syndrome(guest_state->esr_el2);
-  zx_status_t status;
+  zx::result<> result = zx::ok();
   switch (syndrome.ec) {
     case ExceptionClass::WFI_WFE_INSTRUCTION:
       LTRACEF("handling wfi/wfe instruction, iss %#x\n", syndrome.iss);
       GUEST_STATS_INC(wfi_wfe_instructions);
-      status = handle_wfi_wfe_instruction(syndrome.iss, guest_state, gich_state);
+      result = handle_wfi_wfe_instruction(syndrome.iss, guest_state, gich_state);
       break;
     case ExceptionClass::SMC_INSTRUCTION:
       LTRACEF("handling smc instruction, iss %#x func %#lx\n", syndrome.iss, guest_state->x[0]);
       GUEST_STATS_INC(smc_instructions);
       ktrace_vcpu_exit(VCPU_SMC_INSTRUCTION, guest_state->system_state.elr_el2);
-      status = handle_smc_instruction(syndrome.iss, guest_state, packet);
+      result = handle_smc_instruction(syndrome.iss, guest_state, packet);
       break;
     case ExceptionClass::SYSTEM_INSTRUCTION:
       LTRACEF("handling system instruction\n");
       GUEST_STATS_INC(system_instructions);
       ktrace_vcpu_exit(VCPU_SYSTEM_INSTRUCTION, guest_state->system_state.elr_el2);
-      status = handle_system_instruction(syndrome.iss, *hcr, guest_state, gpa, packet);
+      result = handle_system_instruction(syndrome.iss, *hcr, guest_state, gpa, packet);
       break;
     case ExceptionClass::INSTRUCTION_ABORT:
       LTRACEF("handling instruction abort at %#lx\n", guest_state->hpfar_el2);
       GUEST_STATS_INC(instruction_aborts);
       ktrace_vcpu_exit(VCPU_INSTRUCTION_ABORT, guest_state->system_state.elr_el2);
-      status = handle_instruction_abort(guest_state, gpa);
+      result = handle_instruction_abort(guest_state, gpa);
       break;
     case ExceptionClass::DATA_ABORT:
       LTRACEF("handling data abort at %#lx\n", guest_state->hpfar_el2);
       GUEST_STATS_INC(data_aborts);
       ktrace_vcpu_exit(VCPU_DATA_ABORT, guest_state->system_state.elr_el2);
-      status = handle_data_abort(syndrome.iss, guest_state, gpa, traps, packet);
+      result = handle_data_abort(syndrome.iss, guest_state, gpa, traps, packet);
       break;
     case ExceptionClass::SERROR_INTERRUPT:
       LTRACEF("handling serror interrupt at %#lx\n", guest_state->hpfar_el2);
       ktrace_vcpu_exit(VCPU_SERROR_INTERRUPT, guest_state->system_state.elr_el2);
-      status = handle_serror_interrupt(guest_state, syndrome.iss);
+      handle_serror_interrupt(guest_state, syndrome.iss);
       break;
     default:
       LTRACEF("unhandled exception syndrome, ec %#x iss %#x\n", static_cast<uint32_t>(syndrome.ec),
               syndrome.iss);
       ktrace_vcpu_exit(VCPU_NOT_SUPPORTED, guest_state->system_state.elr_el2);
-      status = ZX_ERR_NOT_SUPPORTED;
+      result = zx::error(ZX_ERR_NOT_SUPPORTED);
       break;
   }
-  switch (status) {
+  switch (result.status_value()) {
     case ZX_OK:
     case ZX_ERR_NEXT:
     case ZX_ERR_STOP:
@@ -541,8 +538,8 @@ zx_status_t vmexit_handler(uint64_t* hcr, GuestState* guest_state, GichState* gi
     default:
       dprintf(CRITICAL, "hypervisor: VM exit handler for %u (%s) in EL%u at %#lx returned %d\n",
               static_cast<uint32_t>(syndrome.ec), exception_class_name(syndrome.ec),
-              guest_state->el(), guest_state->system_state.elr_el2, status);
+              guest_state->el(), guest_state->system_state.elr_el2, result.status_value());
       break;
   }
-  return status;
+  return result;
 }
