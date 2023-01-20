@@ -30,8 +30,6 @@ sdk_source_set("ipc") {
     "unwinder_support.h",
   ]
 
-  public_configs = [ ":fuchsia_api_level" ]
-
   deps = [
     "//src/developer/debug/shared",
     "//zircon/system/public",
@@ -40,14 +38,6 @@ sdk_source_set("ipc") {
   public_deps = [
     "//src/developer/debug/unwinder",
     "//src/lib/fxl",
-  ]
-}
-
-config("fuchsia_api_level") {
-  defines = [
-    # This is defined as __Fuchsia_API_level__ by clang if the target is Fuchsia.
-    # However, we also need this for host tools.
-    "FUCHSIA_API_LEVEL=${platform_version.in_development_api_level}",
   ]
 }
 

@@ -7,6 +7,7 @@ import("//build/config/clang/crash_diagnostics.gni")
 import("//build/config/clang/stack_size_section.gni")
 import("//build/config/clang/time_trace.gni")
 import("//build/config/compiler.gni")
+import("//build/config/fuchsia/platform_version.gni")
 import("//build/config/linker.gni")
 import("//build/rust/config.gni")
 import("//build/toolchain/ccache.gni")
@@ -120,6 +121,9 @@ config("compiler") {
   if (current_os == "fuchsia") {
     configs += [ "//build/config/fuchsia:compiler" ]
   } else {
+    # The non-Fuchsia targets need to know the platform's target API level for
+    # compatibility support.
+    configs += [ ":fuchsia_api_level" ]
     if (current_os == "linux") {
       configs += [ "//build/config/linux:compiler" ]
     } else if (current_os == "mac") {
@@ -1146,4 +1150,12 @@ if (current_toolchain == default_toolchain) {
   pool("highmem") {
     depth = 1
   }
+}
+
+config("fuchsia_api_level") {
+  defines = [
+    # This is defined as __Fuchsia_API_level__ by clang if the target is Fuchsia.
+    # However, we also need this for host tools.
+    "FUCHSIA_API_LEVEL=${platform_version.in_development_api_level}",
+  ]
 }
