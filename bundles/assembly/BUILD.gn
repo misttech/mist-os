@@ -272,6 +272,17 @@ assembly_input_bundle("common_minimal") {
           rebase_path(
               "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
               root_build_dir),
+          rebase_path(
+              "//src/diagnostics/kcounter/meta/diagnostics-kcounter.core_shard.cml",
+              root_build_dir),
+          rebase_path(
+              "//src/diagnostics/log-stats/meta/log-stats.core_shard.cml",
+              root_build_dir),
+          rebase_path(
+              "//src/diagnostics/persistence/meta/diagnostics-persistence.core_shard.cml",
+              root_build_dir),
+          rebase_path("//src/diagnostics/sampler/meta/sampler.core_shard.cml",
+                      root_build_dir),
         ]
       }
     },
@@ -311,6 +322,16 @@ assembly_input_bundle("common_minimal_eng") {
 #
 assembly_input_bundle("common_minimal_userdebug") {
   base_packages = [ "//src/diagnostics/detect:triage-detect" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        core =
+            [ rebase_path("//src/diagnostics/detect/meta/detect.core_shard.cml",
+                          root_build_dir) ]
+      }
+    },
+  ]
 }
 
 # This is the "emulator support" bundle, which provides the kernel that can be
