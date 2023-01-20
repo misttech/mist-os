@@ -14,9 +14,11 @@ variant("asan") {
     "-mllvm",
     "-asan-use-private-alias=1",
 
-    # TODO(fxbug.dev/114037): Investigate if we can turn -fsanitize-address-use-odr-indicator on.
-    # It creates global symbols which we don't want as they change the abi of our shared objects.
-    # We should see if we can change the way the odr checking another way.
+    # -fsanitize-address-use-odr-indicator (the default) adds default visibility
+    # symbols to check at runtime if any symbols have been interposed upon,
+    # meaning there were multiple definitions of a symbol at runtime. We don't
+    # want ASan to change the abi by introducing new symbols. Moreover, having
+    # the same symbol defined in multiple shared objects is well defined.
     "-fno-sanitize-address-use-odr-indicator",
   ]
 
