@@ -30,15 +30,6 @@ template("generate_chromium_targets") {
     ]
   }
 
-  # TODO(fxbug.dev/119212): Determine how to handle dependant tests and whether
-  # the deps below is needed.
-  group("uses_web_engine") {
-    testonly = true
-    deps = [
-      # ":web_engine",
-    ]
-  }
-
   # TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
   if (use_chromium_canary) {
     package_flavor_selections += [

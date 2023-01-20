@@ -10,12 +10,7 @@ group("tests") {
   testonly = true
   public_deps = [
     ":web_runner_pixel_test",
-
-    # TODO(fxbug.dev/119212): These should be provided by the Product
-    # configurations on which these tests run rather than as deps.
-    # TODO(fxbug.dev/119212): Should these be deps of the individual test
-    # targets above?
-    "//src/chromium:uses_web_engine",
+    "//src/chromium:web_engine",
     "//src/graphics/bin/vulkan_loader",
   ]
 }

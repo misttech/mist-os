@@ -25,9 +25,7 @@ group("tests") {
     "//src/ui/testing/test_ui_stack:test-ui-stack-flavors",
 
     # The deps below are necessary on minimal product configs.
-    # TODO(fxbug.dev/119212): These should be provided by the Product
-    # configurations on which these tests run rather than as deps.
-    "//src/chromium:uses_web_engine",
+    "//src/chromium:web_engine",
     "//src/flutter",
   ]
 }
@@ -104,12 +102,7 @@ fuchsia_test_package("text-input-test") {
     ":single-font-collection",
     "text-input-chromium:text-input-chromium-component",
     "text-input-flutter:realm",
-
-    # TODO(fxbug.dev/119212): These should be provided by the Product
-    # configurations on which these tests run rather than as deps.
-    # TODO(fxbug.dev/119212): Should these be deps of the individual test
-    # targets above?
-    "//src/chromium:uses_web_engine",
+    "//src/chromium:web_engine",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/connectivity/network/netstack:component",
     "//src/developer/build_info/testing:fake-build-info-component",

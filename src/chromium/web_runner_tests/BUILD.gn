@@ -69,17 +69,14 @@ fuchsia_test_package("web_runner_tests") {
   test_components = [ ":web_runner_integration_tests" ]
 
   deps = [
-    # TODO(fxbug.dev/119212): These should be provided by the Product
-    # configurations on which these tests run rather than as deps.
-    "//src/chromium:uses_web_engine",
+    # Provides a fake implementation for `fuchsia.intl.ProfileProvider`.  This
+    # just declares that the binary needs to be compiled, but doesn't actually
+    # add the package.  That happens below in the "tests" group.
+    "//src/chromium:web_engine",
     "//src/connectivity/network/netstack:component",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/media/testing/mock_profile_provider",
     "//src/sys/stash:stash_secure_v2",
-
-    # Provides a fake implementation for `fuchsia.intl.ProfileProvider`.  This
-    # just declares that the binary needs to be compiled, but doesn't actually
-    # add the package.  That happens below in the "tests" group.
     "//src/testing/fidl/intl_property_manager",
     "//src/ui/testing/test_ui_stack:test-ui-stack",
   ]

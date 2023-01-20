@@ -58,11 +58,6 @@ group("eng_paused") {
   deps = [
     "//src/testing/system-validation:tests",
     "//src/testing/system-validation:tests_with_host_script",
-
-    # Web-related system integration tests require WebEngine, which must be
-    # provided by the Product. See fxbug.dev/119212. Workstation does not
-    # currently include WebEngine, so provide it to the buildbot.
-    "//src/chromium:web_engine",
   ]
 }
 
