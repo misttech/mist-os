@@ -43,6 +43,46 @@ extern "C" {
 #endif
 
 ///
+/// \brief Imports and takes ownership of a channel to a device.
+/// \param device_channel A channel connecting to a gpu class device.
+/// \param device_out Returned device.
+///
+MAGMA_EXPORT magma_status_t magma_device_import(
+    magma_handle_t device_channel,
+    magma_device_t* device_out);
+
+///
+/// \brief Releases a handle to a device
+/// \param device An open device.
+///
+MAGMA_EXPORT void magma_device_release(
+    magma_device_t device);
+
+///
+/// \brief Performs a query synchronously. On MAGMA_STATUS_OK, a given query |id| will return either
+///        a buffer in |result_buffer_out|, or a value in |result_out|. A NULL pointer may be
+///        provided for whichever result parameter is not needed.
+/// \param device An open device.
+/// \param id A vendor-specific ID.
+/// \param result_buffer_out Handle to the returned buffer.
+/// \param result_out Pointer to a uint64 result.
+///
+MAGMA_EXPORT magma_status_t magma_device_query(
+    magma_device_t device,
+    uint64_t id,
+    magma_handle_t* result_buffer_out,
+    uint64_t* result_out);
+
+///
+/// \brief Opens a connection to a device.
+/// \param device An open device
+/// \param connection_out Returned connection.
+///
+MAGMA_EXPORT magma_status_t magma_device_create_connection(
+    magma_device_t device,
+    magma_connection_t* connection_out);
+
+///
 /// \brief Releases the given connection.
 /// \param connection An open connection.
 ///
@@ -99,6 +139,175 @@ MAGMA_EXPORT void magma_connection_release_buffer(
     magma_buffer_t buffer);
 
 ///
+/// \brief Exports the given buffer, returning a handle that may be imported into another
+///        connection.
+/// \param connection An open connection.
+/// \param buffer A valid buffer.
+/// \param buffer_handle_out The returned handle.
+///
+MAGMA_EXPORT magma_status_t magma_connection_export_buffer(
+    magma_connection_t connection,
+    magma_buffer_t buffer,
+    magma_handle_t* buffer_handle_out);
+
+///
+/// \brief Imports and takes ownership of the buffer referred to by the given handle.
+/// \param connection An open connection.
+/// \param buffer_handle A valid handle.
+/// \param buffer_out The returned buffer.
+///
+MAGMA_EXPORT magma_status_t magma_connection_import_buffer(
+    magma_connection_t connection,
+    magma_handle_t buffer_handle,
+    magma_buffer_t* buffer_out);
+
+///
+/// \brief Creates a semaphore.
+/// \param connection An open connection.
+/// \param semaphore_out The returned semaphore.
+///
+MAGMA_EXPORT magma_status_t magma_connection_create_semaphore(
+    magma_connection_t connection,
+    magma_semaphore_t* semaphore_out);
+
+///
+/// \brief Releases the given semaphore.
+/// \param connection An open connection.
+/// \param semaphore A valid semaphore.
+///
+MAGMA_EXPORT void magma_connection_release_semaphore(
+    magma_connection_t connection,
+    magma_semaphore_t semaphore);
+
+///
+/// \brief Exports the given semaphore, returning a handle that may be imported into another
+///        connection
+/// \param connection An open connection.
+/// \param semaphore A valid semaphore.
+/// \param semaphore_handle_out The returned handle.
+///
+MAGMA_EXPORT magma_status_t magma_connection_export_semaphore(
+    magma_connection_t connection,
+    magma_semaphore_t semaphore,
+    magma_handle_t* semaphore_handle_out);
+
+///
+/// \brief Imports and takes ownership of the semaphore referred to by the given handle.
+/// \param connection An open connection.
+/// \param semaphore_handle A valid semaphore handle.
+/// \param semaphore_out The returned semaphore.
+///
+MAGMA_EXPORT magma_status_t magma_connection_import_semaphore(
+    magma_connection_t connection,
+    magma_handle_t semaphore_handle,
+    magma_semaphore_t* semaphore_out);
+
+///
+/// \brief Perform an operation on a range of a buffer
+/// \param connection An open connection.
+/// \param buffer A valid buffer.
+/// \param options Options for the operation.
+/// \param start_offset Byte offset into the buffer.
+/// \param length Length (in bytes) of the region to operate on.
+///
+MAGMA_EXPORT magma_status_t magma_connection_buffer_range_op(
+    magma_connection_t connection,
+    magma_buffer_t buffer,
+    uint32_t options,
+    uint64_t start_offset,
+    uint64_t length);
+
+///
+/// \brief Maps a buffer range onto the hardware in the connection's address space at the given
+///        address. Depending on the MSD this may automatically commit and populate that range.
+/// \param connection An open connection.
+/// \param hw_va Destination virtual address for the mapping.
+/// \param buffer A valid buffer.
+/// \param offset Offset into the buffer.
+/// \param length Length in bytes of the range to map.
+/// \param map_flags A valid MAGMA_MAP_FLAGS value.
+///
+MAGMA_EXPORT magma_status_t magma_connection_map_buffer(
+    magma_connection_t connection,
+    uint64_t hw_va,
+    magma_buffer_t buffer,
+    uint64_t offset,
+    uint64_t length,
+    uint64_t map_flags);
+
+///
+/// \brief Releases the mapping at the given hardware address.
+/// \param connection An open connection.
+/// \param hw_va A hardware virtual address associated with an existing mapping of the given buffer.
+/// \param buffer A valid buffer.
+///
+MAGMA_EXPORT void magma_connection_unmap_buffer(
+    magma_connection_t connection,
+    uint64_t hw_va,
+    magma_buffer_t buffer);
+
+///
+/// \brief Submits command buffers for execution on the hardware.
+/// \param connection An open connection.
+/// \param context_id A valid context id.
+/// \param descriptor A pointer to the command descriptor.
+///
+MAGMA_EXPORT magma_status_t magma_connection_execute_command(
+    magma_connection_t connection,
+    uint32_t context_id,
+    struct magma_command_descriptor* descriptor);
+
+///
+/// \brief Submits a series of commands for execution on the hardware without using a command
+///        buffer.
+/// \param connection An open connection.
+/// \param context_id A valid context ID.
+/// \param command_count The number of commands in the provided buffer.
+/// \param command_buffers An array of command_count magma_inline_command_buffer structs.
+///
+MAGMA_EXPORT magma_status_t magma_connection_execute_immediate_commands(
+    magma_connection_t connection,
+    uint32_t context_id,
+    uint64_t command_count,
+    struct magma_inline_command_buffer* command_buffers);
+
+///
+/// \brief Incurs a round-trip to the system driver, used to ensure all previous messages have been
+///        observed, but not necessarily completed.
+/// \param connection An open connection.
+///
+MAGMA_EXPORT magma_status_t magma_connection_flush(
+    magma_connection_t connection);
+
+///
+/// \brief Returns a handle that can be waited on to determine when the connection has data in the
+///        notification channel. This channel has the same lifetime as the connection and must not
+///        be closed by the client.
+/// \param connection An open connection.
+///
+MAGMA_EXPORT magma_handle_t magma_connection_get_notification_channel_handle(
+    magma_connection_t connection);
+
+///
+/// \brief Reads a notification from the channel into the given buffer.  Message sizes may vary
+///        depending on the MSD.  If the buffer provided is too small for the message,
+///        MAGMA_STATUS_INVALID_ARGS will be returned and the size of message will be returned in
+///        the buffer_size_out parameter.
+/// \param connection An open connection.
+/// \param buffer Buffer into which to read notification data.
+/// \param buffer_size Size of the given buffer.
+/// \param buffer_size_out Returned size of the notification data written to the buffer, or 0 if
+///        there are no messages pending.
+/// \param more_data_out True if there is more notification data waiting.
+///
+MAGMA_EXPORT magma_status_t magma_connection_read_notification_channel(
+    magma_connection_t connection,
+    void* buffer,
+    uint64_t buffer_size,
+    uint64_t* buffer_size_out,
+    magma_bool_t* more_data_out);
+
+///
 /// \brief Returns a unique id for the given buffer. For performance reasons it's recommended to
 ///        cache the id rather than call this repeatedly.
 /// \param buffer A valid buffer.
@@ -147,59 +356,35 @@ MAGMA_EXPORT magma_status_t magma_buffer_get_cache_policy(
     magma_cache_policy_t* cache_policy_out);
 
 ///
-/// \brief Exports the given buffer, returning a handle that may be imported into another
-///        connection.
+/// \brief Sets a name for the buffer for use in debugging tools.
+/// \param buffer A valid buffer.
+/// \param name The 0-terminated name of the buffer. May be truncated.
+///
+MAGMA_EXPORT magma_status_t magma_buffer_set_name(
+    magma_buffer_t buffer,
+    const char* name);
+
+///
+/// \brief Get information on a magma buffer
 /// \param connection An open connection.
 /// \param buffer A valid buffer.
-/// \param buffer_handle_out The returned handle.
+/// \param info_out Pointer to struct that receives the buffer info.
 ///
-MAGMA_EXPORT magma_status_t magma_connection_export_buffer(
+MAGMA_EXPORT magma_status_t magma_buffer_get_info(
     magma_connection_t connection,
     magma_buffer_t buffer,
-    magma_handle_t* buffer_handle_out);
+    magma_buffer_info_t* info_out);
 
 ///
-/// \brief Imports and takes ownership of the buffer referred to by the given handle.
-/// \param connection An open connection.
-/// \param buffer_handle A valid handle.
-/// \param buffer_out The returned buffer.
+/// \brief Gets a platform handle for the given buffer. This can be used to perform a CPU mapping of
+///        the buffer using the standard syscall.  The handle may be released without invalidating
+///        such CPU mappings.
+/// \param buffer A valid buffer.
+/// \param handle_out Pointer to the returned handle.
 ///
-MAGMA_EXPORT magma_status_t magma_connection_import_buffer(
-    magma_connection_t connection,
-    magma_handle_t buffer_handle,
-    magma_buffer_t* buffer_out);
-
-///
-/// \brief Submits a series of commands for execution on the hardware without using a command
-///        buffer.
-/// \param connection An open connection.
-/// \param context_id A valid context ID.
-/// \param command_count The number of commands in the provided buffer.
-/// \param command_buffers An array of command_count magma_inline_command_buffer structs.
-///
-MAGMA_EXPORT magma_status_t magma_connection_execute_immediate_commands(
-    magma_connection_t connection,
-    uint32_t context_id,
-    uint64_t command_count,
-    struct magma_inline_command_buffer* command_buffers);
-
-///
-/// \brief Creates a semaphore.
-/// \param connection An open connection.
-/// \param semaphore_out The returned semaphore.
-///
-MAGMA_EXPORT magma_status_t magma_connection_create_semaphore(
-    magma_connection_t connection,
-    magma_semaphore_t* semaphore_out);
-
-///
-/// \brief Releases the given semaphore.
-/// \param connection An open connection.
-/// \param semaphore A valid semaphore.
-///
-MAGMA_EXPORT void magma_connection_release_semaphore(
-    magma_connection_t connection,
-    magma_semaphore_t semaphore);
+MAGMA_EXPORT magma_status_t magma_buffer_get_handle(
+    magma_buffer_t buffer,
+    magma_handle_t* handle_out);
 
 ///
 /// \brief Returns a unique id for the given semaphore.
@@ -223,92 +408,6 @@ MAGMA_EXPORT void magma_semaphore_reset(
     magma_semaphore_t semaphore);
 
 ///
-/// \brief Exports the given semaphore, returning a handle that may be imported into another
-///        connection
-/// \param connection An open connection.
-/// \param semaphore A valid semaphore.
-/// \param semaphore_handle_out The returned handle.
-///
-MAGMA_EXPORT magma_status_t magma_connection_export_semaphore(
-    magma_connection_t connection,
-    magma_semaphore_t semaphore,
-    magma_handle_t* semaphore_handle_out);
-
-///
-/// \brief Imports and takes ownership of the semaphore referred to by the given handle.
-/// \param connection An open connection.
-/// \param semaphore_handle A valid semaphore handle.
-/// \param semaphore_out The returned semaphore.
-///
-MAGMA_EXPORT magma_status_t magma_connection_import_semaphore(
-    magma_connection_t connection,
-    magma_handle_t semaphore_handle,
-    magma_semaphore_t* semaphore_out);
-
-///
-/// \brief Returns a handle that can be waited on to determine when the connection has data in the
-///        notification channel. This channel has the same lifetime as the connection and must not
-///        be closed by the client.
-/// \param connection An open connection.
-///
-MAGMA_EXPORT magma_handle_t magma_connection_get_notification_channel_handle(
-    magma_connection_t connection);
-
-///
-/// \brief Initializes tracing
-/// \param channel An open connection to a tracing provider.
-///
-MAGMA_EXPORT magma_status_t magma_initialize_tracing(
-    magma_handle_t channel);
-
-///
-/// \brief Imports and takes ownership of a channel to a device.
-/// \param device_channel A channel connecting to a gpu class device.
-/// \param device_out Returned device.
-///
-MAGMA_EXPORT magma_status_t magma_device_import(
-    magma_handle_t device_channel,
-    magma_device_t* device_out);
-
-///
-/// \brief Releases a handle to a device
-/// \param device An open device.
-///
-MAGMA_EXPORT void magma_device_release(
-    magma_device_t device);
-
-///
-/// \brief Performs a query synchronously. On MAGMA_STATUS_OK, a given query |id| will return either
-///        a buffer in |result_buffer_out|, or a value in |result_out|. A NULL pointer may be
-///        provided for whichever result parameter is not needed.
-/// \param device An open device.
-/// \param id A vendor-specific ID.
-/// \param result_buffer_out Handle to the returned buffer.
-/// \param result_out Pointer to a uint64 result.
-///
-MAGMA_EXPORT magma_status_t magma_device_query(
-    magma_device_t device,
-    uint64_t id,
-    magma_handle_t* result_buffer_out,
-    uint64_t* result_out);
-
-///
-/// \brief Opens a connection to a device.
-/// \param device An open device
-/// \param connection_out Returned connection.
-///
-MAGMA_EXPORT magma_status_t magma_device_create_connection(
-    magma_device_t device,
-    magma_connection_t* connection_out);
-
-///
-/// \brief Initializes logging; used for debug and some exceptional error reporting.
-/// \param channel An open connection to the syslog service.
-///
-MAGMA_EXPORT magma_status_t magma_initialize_logging(
-    magma_handle_t channel);
-
-///
 /// \brief Waits for at least one of the given items to meet a condition. Does not reset any
 ///        semaphores. Results are returned in the items array.
 /// \param items Array of poll items. Type should be either MAGMA_POLL_TYPE_SEMAPHORE or
@@ -323,6 +422,20 @@ MAGMA_EXPORT magma_status_t magma_poll(
     magma_poll_item_t* items,
     uint32_t count,
     uint64_t timeout_ns);
+
+///
+/// \brief Initializes tracing
+/// \param channel An open connection to a tracing provider.
+///
+MAGMA_EXPORT magma_status_t magma_initialize_tracing(
+    magma_handle_t channel);
+
+///
+/// \brief Initializes logging; used for debug and some exceptional error reporting.
+/// \param channel An open connection to the syslog service.
+///
+MAGMA_EXPORT magma_status_t magma_initialize_logging(
+    magma_handle_t channel);
 
 ///
 /// \brief Tries to enable access to performance counters. Returns MAGMA_STATUS_OK if counters were
@@ -456,60 +569,6 @@ MAGMA_EXPORT magma_status_t magma_connection_read_performance_counter_completion
     uint32_t* result_flags_out);
 
 ///
-/// \brief Sets a name for the buffer for use in debugging tools.
-/// \param buffer A valid buffer.
-/// \param name The 0-terminated name of the buffer. May be truncated.
-///
-MAGMA_EXPORT magma_status_t magma_buffer_set_name(
-    magma_buffer_t buffer,
-    const char* name);
-
-///
-/// \brief Perform an operation on a range of a buffer
-/// \param connection An open connection.
-/// \param buffer A valid buffer.
-/// \param options Options for the operation.
-/// \param start_offset Byte offset into the buffer.
-/// \param length Length (in bytes) of the region to operate on.
-///
-MAGMA_EXPORT magma_status_t magma_connection_buffer_range_op(
-    magma_connection_t connection,
-    magma_buffer_t buffer,
-    uint32_t options,
-    uint64_t start_offset,
-    uint64_t length);
-
-///
-/// \brief Get information on a magma buffer
-/// \param connection An open connection.
-/// \param buffer A valid buffer.
-/// \param info_out Pointer to struct that receives the buffer info.
-///
-MAGMA_EXPORT magma_status_t magma_buffer_get_info(
-    magma_connection_t connection,
-    magma_buffer_t buffer,
-    magma_buffer_info_t* info_out);
-
-///
-/// \brief Reads a notification from the channel into the given buffer.  Message sizes may vary
-///        depending on the MSD.  If the buffer provided is too small for the message,
-///        MAGMA_STATUS_INVALID_ARGS will be returned and the size of message will be returned in
-///        the buffer_size_out parameter.
-/// \param connection An open connection.
-/// \param buffer Buffer into which to read notification data.
-/// \param buffer_size Size of the given buffer.
-/// \param buffer_size_out Returned size of the notification data written to the buffer, or 0 if
-///        there are no messages pending.
-/// \param more_data_out True if there is more notification data waiting.
-///
-MAGMA_EXPORT magma_status_t magma_connection_read_notification_channel(
-    magma_connection_t connection,
-    void* buffer,
-    uint64_t buffer_size,
-    uint64_t* buffer_size_out,
-    magma_bool_t* more_data_out);
-
-///
 /// \brief Creates an image buffer backed by a buffer collection given a DRM format and optional
 ///        modifier, as specified in the create info.
 /// \param connection An open connection.
@@ -531,65 +590,6 @@ MAGMA_EXPORT magma_status_t magma_virt_connection_get_image_info(
     magma_connection_t connection,
     magma_buffer_t image,
     magma_image_info_t* image_info_out);
-
-///
-/// \brief Gets a platform handle for the given buffer. This can be used to perform a CPU mapping of
-///        the buffer using the standard syscall.  The handle may be released without invalidating
-///        such CPU mappings.
-/// \param buffer A valid buffer.
-/// \param handle_out Pointer to the returned handle.
-///
-MAGMA_EXPORT magma_status_t magma_buffer_get_handle(
-    magma_buffer_t buffer,
-    magma_handle_t* handle_out);
-
-///
-/// \brief Incurs a round-trip to the system driver, used to ensure all previous messages have been
-///        observed, but not necessarily completed.
-/// \param connection An open connection.
-///
-MAGMA_EXPORT magma_status_t magma_connection_flush(
-    magma_connection_t connection);
-
-///
-/// \brief Submits command buffers for execution on the hardware.
-/// \param connection An open connection.
-/// \param context_id A valid context id.
-/// \param descriptor A pointer to the command descriptor.
-///
-MAGMA_EXPORT magma_status_t magma_connection_execute_command(
-    magma_connection_t connection,
-    uint32_t context_id,
-    struct magma_command_descriptor* descriptor);
-
-///
-/// \brief Maps a buffer range onto the hardware in the connection's address space at the given
-///        address. Depending on the MSD this may automatically commit and populate that range.
-/// \param connection An open connection.
-/// \param hw_va Destination virtual address for the mapping.
-/// \param buffer A valid buffer.
-/// \param offset Offset into the buffer.
-/// \param length Length in bytes of the range to map.
-/// \param map_flags A valid MAGMA_MAP_FLAGS value.
-///
-MAGMA_EXPORT magma_status_t magma_connection_map_buffer(
-    magma_connection_t connection,
-    uint64_t hw_va,
-    magma_buffer_t buffer,
-    uint64_t offset,
-    uint64_t length,
-    uint64_t map_flags);
-
-///
-/// \brief Releases the mapping at the given hardware address.
-/// \param connection An open connection.
-/// \param hw_va A hardware virtual address associated with an existing mapping of the given buffer.
-/// \param buffer A valid buffer.
-///
-MAGMA_EXPORT void magma_connection_unmap_buffer(
-    magma_connection_t connection,
-    uint64_t hw_va,
-    magma_buffer_t buffer);
 
 #if defined(__cplusplus)
 }
