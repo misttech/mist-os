@@ -8,28 +8,55 @@
 #include <lib/async/cpp/task.h>
 #include <lib/zx/time.h>
 
+#include <utility>
+
 namespace forensics::stubs {
 namespace {
 
+using fuchsia::intl::LocaleId;
 using fuchsia::intl::Profile;
 using fuchsia::intl::TimeZoneId;
 
-Profile MakeProfile(std::string_view timezone) {
+Profile MakeProfile(const std::optional<std::string>& locale,
+                    const std::optional<std::string>& timezone) {
   Profile profile;
-  profile.set_time_zones({
-      TimeZoneId{
-          .id = std::string(timezone),
-      },
-  });
+  if (locale.has_value()) {
+    profile.set_locales({
+        LocaleId{
+            .id = *locale,
+        },
+    });
+  }
+
+  if (timezone.has_value()) {
+    profile.set_time_zones({
+        TimeZoneId{
+            .id = *timezone,
+        },
+    });
+  }
 
   return profile;
 }
 
 }  // namespace
 
-IntlProvider::IntlProvider(std::string_view default_timezone) : timezone_(default_timezone) {}
+IntlProvider::IntlProvider(std::optional<std::string> default_locale,
+                           std::optional<std::string> default_timezone)
+    : locale_(std::move(default_locale)), timezone_(std::move(default_timezone)) {}
 
-void IntlProvider::GetProfile(GetProfileCallback callback) { callback(MakeProfile(timezone_)); }
+void IntlProvider::GetProfile(GetProfileCallback callback) {
+  callback(MakeProfile(locale_, timezone_));
+}
+
+void IntlProvider::SetLocale(std::string_view locale) {
+  locale_ = std::string(locale);
+  if (!binding() || !binding()->is_bound()) {
+    return;
+  }
+
+  binding()->events().OnChange();
+}
 
 void IntlProvider::SetTimezone(std::string_view timezone) {
   timezone_ = std::string(timezone);
@@ -42,13 +69,19 @@ void IntlProvider::SetTimezone(std::string_view timezone) {
 
 IntlProviderDelaysResponse::IntlProviderDelaysResponse(async_dispatcher_t* dispatcher,
                                                        zx::duration delay,
-                                                       std::string_view default_timezone)
-    : dispatcher_(dispatcher), delay_(delay), timezone_(default_timezone) {}
+                                                       std::optional<std::string> default_locale,
+                                                       std::optional<std::string> default_timezone)
+    : dispatcher_(dispatcher),
+      delay_(delay),
+      locale_(std::move(default_locale)),
+      timezone_(std::move(default_timezone)) {}
 
 void IntlProviderDelaysResponse::GetProfile(GetProfileCallback callback) {
   async::PostDelayedTask(
       dispatcher_,
-      [timezone = timezone_, callback = std::move(callback)] { callback(MakeProfile(timezone)); },
+      [locale = locale_, timezone = timezone_, callback = std::move(callback)] {
+        callback(MakeProfile(locale, timezone));
+      },
       delay_);
 }
 

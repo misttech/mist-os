@@ -24,6 +24,7 @@
         "system.boot-id.previous",
         "system.last-reboot.reason",
         "system.last-reboot.uptime",
+        "system.locale.primary",
         "system.timezone.primary",
         "system.update-channel.current",
         "system.update-channel.target",

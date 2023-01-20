@@ -21,7 +21,7 @@
 
 namespace forensics::feedback {
 
-// Caches the most up-to-date version of the system timezone.
+// Caches the most up-to-date version of the system locale and timezone.
 //
 // fuchsia.intl.PropertyProvider must be in |services|.
 class IntlProvider : public CachedAsyncAnnotationProvider {
@@ -34,12 +34,14 @@ class IntlProvider : public CachedAsyncAnnotationProvider {
   void GetOnUpdate(::fit::function<void(Annotations)> callback) override;
 
  private:
-  void GetTimezone();
+  void GetInternationalization();
   void OnError(zx_status_t status);
+  void OnUpdate();
 
   async_dispatcher_t* dispatcher_;
   const std::shared_ptr<sys::ServiceDirectory> services_;
 
+  std::optional<std::string> locale_{std::nullopt};
   std::optional<std::string> timezone_{std::nullopt};
   fuchsia::intl::PropertyProviderPtr property_provider_ptr_;
   std::unique_ptr<backoff::Backoff> backoff_;

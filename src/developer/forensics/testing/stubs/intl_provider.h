@@ -21,21 +21,25 @@ using IntlProviderBase = SINGLE_BINDING_STUB_FIDL_SERVER(fuchsia::intl, Property
 
 class IntlProvider : public IntlProviderBase {
  public:
-  explicit IntlProvider(std::string_view default_timezone);
+  explicit IntlProvider(std::optional<std::string> default_locale,
+                        std::optional<std::string> default_timezone);
 
+  void SetLocale(std::string_view locale);
   void SetTimezone(std::string_view timezone);
 
   // |fuchsia::intl::PropertyProvider|
   void GetProfile(GetProfileCallback callback) override;
 
  private:
-  std::string timezone_;
+  std::optional<std::string> locale_;
+  std::optional<std::string> timezone_;
 };
 
 class IntlProviderDelaysResponse : public IntlProviderBase {
  public:
   IntlProviderDelaysResponse(async_dispatcher_t* dispatcher, zx::duration delay,
-                             std::string_view default_timezone);
+                             std::optional<std::string> default_locale,
+                             std::optional<std::string> default_timezone);
 
   // |fuchsia::intl::PropertyProvider|
   void GetProfile(GetProfileCallback callback) override;
@@ -43,7 +47,8 @@ class IntlProviderDelaysResponse : public IntlProviderBase {
  private:
   async_dispatcher_t* dispatcher_;
   zx::duration delay_;
-  std::string timezone_;
+  std::optional<std::string> locale_;
+  std::optional<std::string> timezone_;
 };
 
 }  // namespace forensics::stubs

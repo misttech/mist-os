@@ -19,7 +19,8 @@ IntlProvider::IntlProvider(async_dispatcher_t* dispatcher,
                            std::unique_ptr<backoff::Backoff> backoff)
     : dispatcher_(dispatcher), services_(services), backoff_(std::move(backoff)) {
   services_->Connect(property_provider_ptr_.NewRequest(dispatcher_));
-  property_provider_ptr_.events().OnChange = ::fit::bind_member<&IntlProvider::GetTimezone>(this);
+  property_provider_ptr_.events().OnChange =
+      ::fit::bind_member<&IntlProvider::GetInternationalization>(this);
 
   property_provider_ptr_.set_error_handler([this](const zx_status_t status) {
     FX_PLOGS(WARNING, status) << "Lost connection to fuchsia.intl.PropertyProvider";
@@ -30,48 +31,61 @@ IntlProvider::IntlProvider(async_dispatcher_t* dispatcher,
         [self] {
           if (self) {
             self->services_->Connect(self->property_provider_ptr_.NewRequest(self->dispatcher_));
-            self->GetTimezone();
+            self->GetInternationalization();
           }
         },
         backoff_->GetNext());
   });
 
-  GetTimezone();
+  GetInternationalization();
 }
 
 std::set<std::string> IntlProvider::GetKeys() const {
   return {
+      kSystemLocalePrimaryKey,
       kSystemTimezonePrimaryKey,
   };
+}
+
+void IntlProvider::OnUpdate() {
+  Annotations annotations;
+
+  if (locale_.has_value()) {
+    annotations.insert({kSystemLocalePrimaryKey, *locale_});
+  }
+
+  if (timezone_.has_value()) {
+    annotations.insert({kSystemTimezonePrimaryKey, *timezone_});
+  }
+
+  if (!annotations.empty()) {
+    on_update_(annotations);
+  }
 }
 
 void IntlProvider::GetOnUpdate(::fit::function<void(Annotations)> callback) {
   on_update_ = std::move(callback);
 
-  if (timezone_.has_value()) {
-    on_update_({
-        {kSystemTimezonePrimaryKey, *timezone_},
-    });
-  }
+  OnUpdate();
 }
 
-void IntlProvider::GetTimezone() {
+void IntlProvider::GetInternationalization() {
   FX_CHECK(property_provider_ptr_.is_bound());
 
   property_provider_ptr_->GetProfile([this](const fuchsia::intl::Profile profile) {
-    if (!profile.has_time_zones()) {
-      return;
+    if (profile.has_locales()) {
+      if (const auto& locales = profile.locales(); !locales.empty()) {
+        locale_ = locales.front().id;
+      }
     }
 
-    const auto& time_zones = profile.time_zones();
-    if (time_zones.empty()) {
-      return;
+    if (profile.has_time_zones()) {
+      if (const auto& time_zones = profile.time_zones(); !time_zones.empty()) {
+        timezone_ = time_zones.front().id;
+      }
     }
 
-    timezone_ = time_zones.front().id;
-    on_update_({
-        {kSystemTimezonePrimaryKey, *timezone_},
-    });
+    OnUpdate();
   });
 }
 

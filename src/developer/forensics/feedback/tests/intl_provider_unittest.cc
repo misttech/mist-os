@@ -46,11 +46,43 @@ using IntlProviderTest = UnitTestFixture;
 
 TEST_F(IntlProviderTest, GetKeys) {
   IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
-  EXPECT_THAT(provider.GetKeys(), UnorderedElementsAreArray({kSystemTimezonePrimaryKey}));
+  EXPECT_THAT(provider.GetKeys(), UnorderedElementsAreArray({
+                                      kSystemLocalePrimaryKey,
+                                      kSystemTimezonePrimaryKey,
+                                  }));
 }
 
-TEST_F(IntlProviderTest, GetOnUpdate) {
-  stubs::IntlProvider server("timezone-one");
+TEST_F(IntlProviderTest, GetOnUpdateLocale) {
+  stubs::IntlProvider server("locale-one", /*default_timezone=*/std::nullopt);
+  InjectServiceProvider(&server);
+
+  IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
+  Annotations annotations;
+
+  provider.GetOnUpdate([&annotations](Annotations result) { annotations = std::move(result); });
+
+  EXPECT_THAT(annotations, IsEmpty());
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({
+                               Pair(kSystemLocalePrimaryKey, "locale-one"),
+                           }));
+
+  server.SetLocale("locale-two");
+
+  // The change hasn't propagated yet.
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({
+                               Pair(kSystemLocalePrimaryKey, "locale-one"),
+                           }));
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({
+                               Pair(kSystemLocalePrimaryKey, "locale-two"),
+                           }));
+}
+
+TEST_F(IntlProviderTest, GetOnUpdateTimezone) {
+  stubs::IntlProvider server(/*default_locale=*/std::nullopt, "timezone-one");
   InjectServiceProvider(&server);
 
   IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
@@ -78,8 +110,42 @@ TEST_F(IntlProviderTest, GetOnUpdate) {
                            }));
 }
 
+TEST_F(IntlProviderTest, GetOnUpdate) {
+  stubs::IntlProvider server("locale-one", "timezone-one");
+  InjectServiceProvider(&server);
+
+  IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
+  Annotations annotations;
+
+  provider.GetOnUpdate([&annotations](Annotations result) { annotations = std::move(result); });
+
+  EXPECT_THAT(annotations, IsEmpty());
+
+  RunLoopUntilIdle();
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({
+                               Pair(kSystemLocalePrimaryKey, "locale-one"),
+                               Pair(kSystemTimezonePrimaryKey, "timezone-one"),
+                           }));
+
+  server.SetLocale("locale-two");
+  RunLoopUntilIdle();
+
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({
+                               Pair(kSystemLocalePrimaryKey, "locale-two"),
+                               Pair(kSystemTimezonePrimaryKey, "timezone-one"),
+                           }));
+
+  server.SetTimezone("timezone-two");
+  RunLoopUntilIdle();
+
+  EXPECT_THAT(annotations, UnorderedElementsAreArray({
+                               Pair(kSystemLocalePrimaryKey, "locale-two"),
+                               Pair(kSystemTimezonePrimaryKey, "timezone-two"),
+                           }));
+}
+
 TEST_F(IntlProviderTest, Reconnects) {
-  stubs::IntlProvider server("timezone-one");
+  stubs::IntlProvider server(/*default_locale=*/std::nullopt, "timezone-one");
   InjectServiceProvider(&server);
 
   IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
