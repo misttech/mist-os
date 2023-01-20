@@ -10,6 +10,7 @@ use {
     diagnostics_data::{LogsData, Severity, Timestamp},
     errors::{ffx_bail, ffx_error},
     ffx_config::get,
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_core::ffx_plugin,
     ffx_log_args::{DumpCommand, LogCommand, LogSubCommand, TimeFormat, WatchCommand},
     ffx_log_data::{EventType, LogData, LogEntry},
@@ -654,7 +655,7 @@ async fn log_cmd<W: std::io::Write>(
             target_info_result.map_err(|e| anyhow!("failed to get target info: {:?}", e))?;
         target_info.nodename.context("missing nodename")?
     } else if let LogSubCommand::Dump(..) = sub_command {
-        let default: String = get("target.default")
+        let default: String = get(TARGET_DEFAULT_KEY)
             .await
             .map_err(|e| ffx_error!("{}\n\nError was: {}", DUMP_TARGET_CHOICE_HELP, e))?;
         if default.is_empty() {

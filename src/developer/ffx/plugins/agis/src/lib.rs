@@ -6,6 +6,7 @@ use {
     anyhow::{anyhow, Result},
     errors::ffx_error,
     ffx_agis_args::{AgisCommand, ListenOp, Operation, RegisterOp},
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_core::ffx_plugin,
     fidl_fuchsia_developer_ffx::ListenerProxy,
     fidl_fuchsia_developer_ffx::TargetQuery,
@@ -121,7 +122,7 @@ async fn listener_listen(
     listener: ListenerProxy,
     op: ListenOp,
 ) -> Result<AgisResult, anyhow::Error> {
-    let target_name = ffx_config::get("target.default").await?;
+    let target_name = ffx_config::get(TARGET_DEFAULT_KEY).await?;
     let target_query = TargetQuery { string_matcher: target_name, ..TargetQuery::EMPTY };
     listener
         .listen(target_query, op.global_id)

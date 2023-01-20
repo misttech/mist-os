@@ -6,6 +6,7 @@ use {
     anyhow::{anyhow, Context, Result},
     diagnostics_data::Inspect,
     errors::{ffx_error, FfxError},
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_core::ffx_plugin,
     ffx_flutter_tunnel_args::TunnelCommand,
     ffx_flutter_tunnel_ctrlc::wait_for_kill,
@@ -95,7 +96,7 @@ pub async fn tunnel_impl<W: std::io::Write>(
     // TODO(fxb/80802): Keep ssh address resolution in sync with get_ssh_address_impl
     // in src/developer/ffx/plugins/target/get-ssh-address until extracted out to shared
     // location.
-    let target: Option<String> = ffx_config::get("target.default").await?;
+    let target: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
     let res = timeout(Duration::from_secs(1), target_proxy.get_ssh_address()).await.map_err(
         |_timeout_err| FfxError::DaemonError {
             err: DaemonError::Timeout,

@@ -11,7 +11,7 @@ use {
     async_trait::async_trait,
     doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder},
     errors::ffx_bail,
-    ffx_config::{environment::EnvironmentContext, get, global_env_context, print_config},
+    ffx_config::{environment::EnvironmentContext, keys::TARGET_DEFAULT_KEY, get, global_env_context, print_config},
     ffx_core::ffx_plugin,
     ffx_doctor_args::DoctorCommand,
     fidl::{endpoints::create_proxy, prelude::*},
@@ -40,7 +40,6 @@ mod constants;
 mod doctor_ledger;
 mod ledger_view;
 
-const DEFAULT_TARGET_CONFIG: &str = "target.default";
 const DOCTOR_OUTPUT_FILENAME: &str = "doctor_output.txt";
 const PLATFORM_INFO_FILENAME: &str = "platform.json";
 const USER_CONFIG_FILENAME: &str = "user_config.txt";
@@ -297,7 +296,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
 
     let recorder = Arc::new(Mutex::new(DoctorRecorder::new()));
     let mut handler = DefaultDoctorStepHandler::new(recorder.clone(), Box::new(writer));
-    let default_target = get(DEFAULT_TARGET_CONFIG)
+    let default_target = get(TARGET_DEFAULT_KEY)
         .await
         .map_err(|e: ffx_config::api::ConfigError| format!("{:?}", e).replace("\n", ""));
 

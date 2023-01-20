@@ -5,6 +5,7 @@
 use {
     anyhow::{anyhow, Context, Result},
     errors::ffx_bail,
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_core::ffx_plugin,
     ffx_trace_args::{TraceCommand, TraceSubCommand},
     ffx_writer::Writer,
@@ -214,7 +215,7 @@ pub async fn trace(
     #[ffx(machine = TraceOutput)] writer: Writer,
     cmd: TraceCommand,
 ) -> Result<()> {
-    let default_target: Option<String> = ffx_config::get("target.default").await?;
+    let default_target: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
     match cmd.sub_cmd {
         TraceSubCommand::ListCategories(_) => {
             let mut categories = handle_fidl_error(controller.get_known_categories().await)?;
@@ -254,7 +255,7 @@ pub async fn trace(
             }
         }
         TraceSubCommand::Start(opts) => {
-            let string_matcher: Option<String> = ffx_config::get("target.default").await.ok();
+            let string_matcher: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await.ok();
             let default = ffx::TargetQuery { string_matcher, ..ffx::TargetQuery::EMPTY };
             let triggers = if opts.trigger.is_empty() { None } else { Some(opts.trigger) };
             if triggers.is_some() && !opts.background {
@@ -415,7 +416,7 @@ async fn handle_recording_result(
     res: Result<ffx::TargetInfo, RecordingError>,
     output: &String,
 ) -> Result<ffx::TargetInfo> {
-    let default: Option<String> = ffx_config::get("target.default").await.ok();
+    let default: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await.ok();
     match res {
         Ok(t) => Ok(t),
         Err(e) => match e {

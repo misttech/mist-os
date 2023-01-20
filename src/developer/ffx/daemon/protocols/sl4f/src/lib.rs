@@ -6,6 +6,7 @@ use {
     anyhow::Result,
     async_net::TcpListener,
     async_trait::async_trait,
+    ffx_config::keys::TARGET_DEFAULT_KEY,
     ffx_config::{self},
     fidl_fuchsia_developer_ffx as ffx,
     fidl_fuchsia_sl4f_ffx::{Sl4fBridgeMarker, Sl4fBridgeProxy, Sl4fBridgeRequest},
@@ -102,7 +103,7 @@ impl FidlProtocol for Sl4fBridge {
         let proxy = cx.open_target_proxy::<Sl4fBridgeMarker>(None, SL4F_BRIDGE_SELECTOR).await?;
         let proxy = Arc::new(proxy);
         let target: Option<String> =
-            ffx_config::get("target.default").await.expect("couldn't read default target");
+            ffx_config::get(TARGET_DEFAULT_KEY).await.expect("couldn't read default target");
         let make_svc = make_service_fn(move |_: &ConnectionStream| {
             let proxy = BridgeProxy { proxy: proxy.clone(), target: target.clone() };
             futures::future::ok::<_, Infallible>(service_fn(move |request| {
