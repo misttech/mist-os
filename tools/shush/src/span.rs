@@ -13,11 +13,7 @@ pub struct Span {
 }
 
 // This is needed because the upstream LineColumn type doesn't derive Hash
-// TODO(fxbug.dev/119817): The clippy lint has been renamed to derived_hash_with_manual_eq and so
-// temporarily allow the old lint to be used until the toolchain rolls and the new lint can be
-// specified.
-#[allow(renamed_and_removed_lints)]
-#[allow(clippy::derive_hash_xor_eq)]
+#[allow(clippy::derived_hash_with_manual_eq)]
 impl Hash for Span {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.start.line.hash(state);

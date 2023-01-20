@@ -435,11 +435,7 @@ impl MultiCharRange for CharCollection {
     }
 }
 
-// TODO(fxbug.dev/119817): The clippy lint has been renamed to derived_hash_with_manual_eq and so
-// temporarily allow the old lint to be used until the toolchain rolls and the new lint can be
-// specified.
-#[allow(renamed_and_removed_lints)]
-#[allow(clippy::derive_hash_xor_eq)] // TODO(fxbug.dev/95047)
+#[allow(clippy::derived_hash_with_manual_eq)] // TODO(fxbug.dev/95047)
 impl Hash for CharCollection {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.ranges.iter().for_each(|range| hash_char_range(range, state));
