@@ -5359,6 +5359,11 @@ const VmCowPages* VmCowPages::GetRootLocked() const {
   return cow_pages;
 }
 
+fbl::RefPtr<VmCowPages> VmCowPages::DebugGetParent() {
+  Guard<CriticalMutex> guard{lock()};
+  return parent_;
+}
+
 fbl::RefPtr<PageSource> VmCowPages::GetRootPageSourceLocked() const {
   auto root = GetRootLocked();
   // The root will never be null. It will either point to a valid parent, or |this| if there's no
@@ -5590,9 +5595,105 @@ bool VmCowPages::RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset,
   return true;
 }
 
-bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action) {
-  Guard<CriticalMutex> guard{lock()};
+bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset,
+                                                VmCompressor* compressor,
+                                                Guard<CriticalMutex>& guard) {
+  DEBUG_ASSERT(compressor);
+  DEBUG_ASSERT(!page_source_);
+  ASSERT(page->object.pin_count == 0);
+  DEBUG_ASSERT(!page->is_loaned());
+  DEBUG_ASSERT(!discardable_tracker_);
+  DEBUG_ASSERT(can_decommit_zero_pages_locked());
+  if (paged_ref_) {
+    AssertHeld(paged_ref_->lock_ref());
+    if ((paged_ref_->GetMappingCachePolicyLocked() & ZX_CACHE_POLICY_MASK) !=
+        ZX_CACHE_POLICY_CACHED) {
+      // Cannot compress uncached mappings. To avoid this page remaining in the reclamation list we
+      // simulate an access.
+      UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+      return false;
+    }
+  }
 
+  // Use a sub-scope as the page_or_marker will become invalid as we will drop the lock later.
+  {
+    VmPageOrMarkerRef page_or_marker = page_list_.LookupMutable(offset);
+    DEBUG_ASSERT(page_or_marker);
+    DEBUG_ASSERT(page_or_marker->IsPage());
+    DEBUG_ASSERT(page_or_marker->Page() == page);
+
+    RangeChangeUpdateLocked(offset, PAGE_SIZE, RangeChangeOp::Unmap);
+
+    // Start compression of the page by swapping the page list to contain the temporary reference.
+    [[maybe_unused]] vm_page_t* compress_page =
+        page_or_marker.SwapPageForReference(compressor->Start(page));
+    DEBUG_ASSERT(compress_page == page);
+  }
+  pmm_page_queues()->Remove(page);
+  // Going to drop the lock so need to indicate that we've modified the hierarchy by putting in the
+  // temporary reference.
+  IncrementHierarchyGenerationCountLocked();
+
+  // We now stack own the page (and guarantee to the compressor that it will not be modified) and
+  // the VMO owns the temporary reference. We can safely drop the VMO lock and perform the
+  // compression step.
+  VmCompressor::CompressResult compression_result = VmCompressor::FailTag{};
+  guard.CallUnlocked(
+      [compressor, &compression_result] { compression_result = compressor->Compress(); });
+
+  // We hold the VMO lock again and need to reclaim the temporary reference. Either the
+  // temporary reference is still installed, and since we hold the VMO lock we now own both the
+  // temp reference and the place, or the temporary reference got replaced, in which case it no
+  // longer exists and is not referring to page and so we own page.
+  //
+  // Determining what state we are in just requires re-looking up the slot and see if the temporary
+  // reference we installed is still there.
+  VmPageOrMarker* slot = page_list_.LookupOrAllocate(offset);
+  if (slot && slot->IsReference() && compressor->IsTempReference(slot->Reference())) {
+    // Still the original reference, need to replace it with the result of compression.
+    VmPageOrMarker::ReferenceValue old_ref{0};
+    if (const VmPageOrMarker::ReferenceValue* ref =
+            ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
+      // Compression succeeded, put the new reference in.
+      old_ref = VmPageOrMarkerRef(slot).ChangeReferenceValue(*ref);
+    } else if (ktl::holds_alternative<VmCompressor::FailTag>(compression_result)) {
+      // Compression failed, but the page back in.
+      old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
+      SetNotPinnedLocked(page, offset);
+      // Page stays owned by the VMO.
+      page = nullptr;
+    } else {
+      ASSERT(ktl::holds_alternative<VmCompressor::ZeroTag>(compression_result));
+      // TODO(fxb/60238): determine if we can decommit the slot instead of placing a marker.
+      old_ref = slot->ReleaseReference();
+      *slot = VmPageOrMarker::Marker();
+    }
+    // Temporary reference has been replaced, can return it to the compressor.
+    compressor->ReturnTempReference(old_ref);
+    // Have done a modification.
+    IncrementHierarchyGenerationCountLocked();
+  } else {
+    // The temporary reference is no longer there. We know nothing else about the state of the VMO
+    // at this point and will just free any compression result and exit.
+    if (const VmPageOrMarker::ReferenceValue* ref =
+            ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
+      compressor->Free(*ref);
+    }
+    // To avoid claiming that |page| got reclaimed when it didn't, separately free it.
+    FreePageLocked(page, true);
+    page = nullptr;
+  }
+  // One way or another the temporary reference has been returned, and so we can finalize.
+  compressor->Finalize();
+
+  // Return whether we ended up reclaiming the page or not. That is, whether we currently own it and
+  // it needs to be freed.
+  return page != nullptr;
+}
+
+bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
+                             VmCompressor* compressor) {
+  Guard<CriticalMutex> guard{lock()};
   // Check this page is still a part of this VMO.
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
   if (!page_or_marker || !page_or_marker->IsPage() || page_or_marker->Page() != page) {
@@ -5607,6 +5708,8 @@ bool VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintActio
   // See if we can reclaim by eviction.
   if (can_evict()) {
     return RemovePageForEvictionLocked(page, offset, hint_action);
+  } else if (compressor && !page_source_ && !discardable_tracker_) {
+    return RemovePageForCompressionLocked(page, offset, compressor, guard);
   }
   // No other reclamation strategies, so to avoid this page remaining in a reclamation list we
   // simulate an access.

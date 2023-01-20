@@ -23,6 +23,7 @@
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
+#include <vm/compressor.h>
 #include <vm/page_source.h>
 #include <vm/physical_page_borrowing_config.h>
 #include <vm/pmm.h>
@@ -497,9 +498,11 @@ class VmCowPages final : public VmHierarchyBase,
   //    removed from any candidate reclamation lists (such as the DontNeed pager backed list).
   // The effect of (2) is that the caller can assume in the case of reclamation failure it will not
   // keep finding this page as a reclamation candidate and infinitely retry it.
+  // If the |compressor| is non-null then it must have just had |Arm| called on it.
   //
   // |hint_action| indicates whether the |always_need| eviction hint should be respected or ignored.
-  bool ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action);
+  bool ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
+                   VmCompressor* compressor);
 
   // Swap an old page for a new page.  The old page must be at offset.  The new page must be in
   // ALLOC state.  On return, the old_page is owned by the caller.  Typically the caller will
@@ -618,6 +621,10 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Walks up the parent tree and returns the root, or |this| if there is no parent.
   const VmCowPages* GetRootLocked() const TA_REQ(lock());
+
+  // Returns the parent of this cow pages, may be null. Generally the parent should never be
+  // directly accessed externally, but this exposed specifically for tests.
+  fbl::RefPtr<VmCowPages> DebugGetParent();
 
   // Only for use by loaned page reclaim.
   VmCowPagesContainer* raw_container();
@@ -1130,6 +1137,14 @@ class VmCowPages final : public VmHierarchyBase,
   // Assumes that the page is owned by this VMO at the specified offset.
   bool RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action)
       TA_REQ(lock());
+
+  // Internal helper for performing reclamation via compression on an anonymous VMO. Assumes that
+  // the page is owned by this VMO at the specified offset.
+  // Assumes that the provided |compressor| is not-null.
+  //
+  // Borrows the guard for |lock_| and may drop the lock temporarily during execution.
+  bool RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset, VmCompressor* compressor,
+                                      Guard<CriticalMutex>& guard) TA_REQ(lock());
 
   // Eviction wrapper that exists to be called from the VmCowPagesContainer. Unlike ReclaimPage this
   // wrapper can assume it just needs to evict, and has no requirements on updating any reclamation
