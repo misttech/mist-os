@@ -204,15 +204,6 @@ test("gwp-asan-test") {
     "//zircon/system/ulib/zxtest",
   ]
   data_deps = [ ":gwp-asan-test-helper" ]
-
-  # TODO(fxbug.dev/119315): Remove this after gwp-asan has rolled.
-  gwp_asan_git_revision =
-      read_file("//third_party/scudo/gwp_asan/.git/HEAD", "list lines")
-  if (gwp_asan_git_revision != [ "130625efe629f3aa66b700a2b16e92baea0df6ad" ]) {
-    defines += [ "NEW_CRASH_ADDR_API=0" ]
-  } else {
-    defines += [ "NEW_CRASH_ADDR_API=1" ]
-  }
 }
 
 executable("gwp-asan-test-helper") {

@@ -122,14 +122,9 @@ TEST(GwpAsanTest, HandleGwpAsanException) {
 
   // Since it's a use-after-free, ErrorPtr must be provided for the correct detection.
   ASSERT_FALSE(__gwp_asan_error_is_mine(&state, 0));
-// And it's not an internal error.
-// TODO(fxbug.dev/119315): Remove this workaround after gwp-asan rolls
-#if !NEW_CRASH_ADDR_API
-  ASSERT_EQ(0, __gwp_asan_get_internal_crash_address(&state));
-#else
+  // And it's not an internal error.
   ASSERT_EQ(0, __gwp_asan_get_internal_crash_address(&state,
                                                      state.internallyDetectedErrorFaultAddress()));
-#endif
 
   // Read the faulting address.
   zx::thread thread;
