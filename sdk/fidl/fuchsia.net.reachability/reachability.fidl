@@ -44,4 +44,12 @@ protocol Monitor {
 type Snapshot = table {
     /// Signifies whether internet reachability is available.
     1: internet_available bool;
+    /// Indicates whether any default gateway is reachable at least via
+    /// link layer.
+    @available(added=11)
+    2: gateway_reachable bool;
+    /// Indicates whether DNS services are functional via any configured
+    /// network.
+    @available(added=11)
+    3: dns_active bool;
 };

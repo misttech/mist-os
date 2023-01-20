@@ -21,6 +21,18 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.net.reachability/Snapshot.dns_active",
+        "ordinal": "3",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.reachability/Snapshot.gateway_reachable",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.net.reachability/Snapshot.internet_available",
         "ordinal": "1",
         "type": "bool"
