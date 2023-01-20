@@ -78,35 +78,6 @@ zx_status_t Vnode::GetNodeInfo(Rights rights, VnodeRepresentation* info) {
 
 void Vnode::Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) {}
 
-#endif  // __Fuchsia__
-
-bool Vnode::Supports(VnodeProtocolSet protocols) const {
-  return (GetProtocols() & protocols).any();
-}
-
-bool Vnode::ValidateRights([[maybe_unused]] Rights rights) const { return true; }
-
-zx::result<Vnode::ValidatedOptions> Vnode::ValidateOptions(VnodeConnectionOptions options) const {
-  auto protocols = options.protocols();
-  if (!Supports(protocols)) {
-    if (protocols == VnodeProtocol::kDirectory) {
-      return zx::error(ZX_ERR_NOT_DIR);
-    }
-    return zx::error(ZX_ERR_NOT_FILE);
-  }
-  if (!ValidateRights(options.rights)) {
-    return zx::error(ZX_ERR_ACCESS_DENIED);
-  }
-  return zx::ok(Validated(options));
-}
-
-VnodeProtocol Vnode::Negotiate(VnodeProtocolSet protocols) const {
-  auto protocol = protocols.first();
-  ZX_DEBUG_ASSERT(protocol.has_value());
-  return *protocol;
-}
-
-#ifdef __Fuchsia__
 zx_status_t Vnode::InsertInotifyFilter(fio::wire::InotifyWatchMask filter,
                                        uint32_t watch_descriptor, zx::socket socket) {
   // TODO add basic checks for filter and watch_descriptor.
@@ -156,7 +127,80 @@ zx_status_t Vnode::CheckInotifyFilterAndNotify(fio::wire::InotifyWatchMask event
   }
   return ZX_OK;
 }
-#endif
+
+zx_status_t Vnode::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+zx::result<std::string> Vnode::GetDevicePath() const { return zx::error(ZX_ERR_NOT_SUPPORTED); }
+
+zx_status_t Vnode::OpenRemote(fuchsia_io::OpenFlags, uint32_t, fidl::StringView,
+                              fidl::ServerEnd<fuchsia_io::Node>) const {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+std::shared_ptr<file_lock::FileLock> Vnode::GetVnodeFileLock() {
+  std::lock_guard lock_access(gLockAccess);
+  auto lock = gLockMap.find(this);
+  if (lock == gLockMap.end()) {
+    auto inserted = gLockMap.emplace(std::pair(this, std::make_shared<file_lock::FileLock>()));
+    if (inserted.second) {
+      lock = inserted.first;
+    } else {
+      return nullptr;
+    }
+  }
+  return lock->second;
+}
+
+bool Vnode::DeleteFileLock(zx_koid_t owner) {
+  std::lock_guard lock_access(gLockAccess);
+  bool deleted = false;
+  auto lock = gLockMap.find(this);
+  if (lock != gLockMap.end()) {
+    deleted = lock->second->Forget(owner);
+    if (lock->second->NoLocksHeld()) {
+      gLockMap.erase(this);
+    }
+  }
+  return deleted;
+}
+
+// There is no guard here, as the connection is in teardown.
+bool Vnode::DeleteFileLockInTeardown(zx_koid_t owner) {
+  if (gLockMap.find(this) == gLockMap.end()) {
+    return false;
+  }
+  return DeleteFileLock(owner);
+}
+
+#endif  // __Fuchsia__
+
+bool Vnode::Supports(VnodeProtocolSet protocols) const {
+  return (GetProtocols() & protocols).any();
+}
+
+bool Vnode::ValidateRights([[maybe_unused]] Rights rights) const { return true; }
+
+zx::result<Vnode::ValidatedOptions> Vnode::ValidateOptions(VnodeConnectionOptions options) const {
+  auto protocols = options.protocols();
+  if (!Supports(protocols)) {
+    if (protocols == VnodeProtocol::kDirectory) {
+      return zx::error(ZX_ERR_NOT_DIR);
+    }
+    return zx::error(ZX_ERR_NOT_FILE);
+  }
+  if (!ValidateRights(options.rights)) {
+    return zx::error(ZX_ERR_ACCESS_DENIED);
+  }
+  return zx::ok(Validated(options));
+}
+
+VnodeProtocol Vnode::Negotiate(VnodeProtocolSet protocols) const {
+  auto protocol = protocols.first();
+  ZX_DEBUG_ASSERT(protocol.has_value());
+  return *protocol;
+}
 
 zx_status_t Vnode::Open(ValidatedOptions options, fbl::RefPtr<Vnode>* out_redirect) {
   {
@@ -249,55 +293,6 @@ zx_status_t Vnode::Link(std::string_view name, fbl::RefPtr<Vnode> target) {
 void Vnode::Sync(SyncCallback closure) { closure(ZX_ERR_NOT_SUPPORTED); }
 
 bool Vnode::IsRemote() const { return false; }
-
-#ifdef __Fuchsia__
-
-zx_status_t Vnode::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx::result<std::string> Vnode::GetDevicePath() const { return zx::error(ZX_ERR_NOT_SUPPORTED); }
-
-zx_status_t Vnode::OpenRemote(fuchsia_io::OpenFlags, uint32_t, fidl::StringView,
-                              fidl::ServerEnd<fuchsia_io::Node>) const {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-std::shared_ptr<file_lock::FileLock> Vnode::GetVnodeFileLock() {
-  std::lock_guard lock_access(gLockAccess);
-  auto lock = gLockMap.find(this);
-  if (lock == gLockMap.end()) {
-    auto inserted = gLockMap.emplace(std::pair(this, std::make_shared<file_lock::FileLock>()));
-    if (inserted.second) {
-      lock = inserted.first;
-    } else {
-      return nullptr;
-    }
-  }
-  return lock->second;
-}
-bool Vnode::DeleteFileLock(zx_koid_t owner) {
-  std::lock_guard lock_access(gLockAccess);
-  bool deleted = false;
-  auto lock = gLockMap.find(this);
-  if (lock != gLockMap.end()) {
-    deleted = lock->second->Forget(owner);
-    if (lock->second->NoLocksHeld()) {
-      gLockMap.erase(this);
-    }
-  }
-  return deleted;
-}
-
-// There is no guard here, as the connection is in teardown.
-bool Vnode::DeleteFileLockInTeardown(zx_koid_t owner) {
-  if (gLockMap.find(this) == gLockMap.end()) {
-    return false;
-  }
-  return DeleteFileLock(owner);
-}
-
-#endif  // __Fuchsia__
 
 DirentFiller::DirentFiller(void* ptr, size_t len)
     : ptr_(static_cast<char*>(ptr)), pos_(0), len_(len) {}

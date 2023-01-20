@@ -250,7 +250,39 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   zx_status_t InsertInotifyFilter(fuchsia_io::wire::InotifyWatchMask filter,
                                   uint32_t watch_descriptor, zx::socket socket)
       __TA_EXCLUDES(gInotifyLock);
-#endif
+
+  // Acquire a vmo from a vnode.
+  //
+  // At the moment, mmap can only map files from read-only filesystems, since (without paging) there
+  // is no mechanism to update either
+  // 1) The file by writing to the mapping, or
+  // 2) The mapping by writing to the underlying file.
+  virtual zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo);
+
+  // Returns the name of the device backing the filesystem, if one exists.
+  virtual zx::result<std::string> GetDevicePath() const;
+
+  // Implements fuchsia.io/Openable.Open by forwarding requests to the remote end. Supported iff
+  // `IsRemote()`.
+  virtual zx_status_t OpenRemote(fuchsia_io::OpenFlags, uint32_t, fidl::StringView,
+                                 fidl::ServerEnd<fuchsia_io::Node>) const;
+
+  // Check existing inotify watches and issue inotify events.
+  zx_status_t CheckInotifyFilterAndNotify(fuchsia_io::wire::InotifyWatchMask event)
+      __TA_EXCLUDES(gInotifyLock);
+
+  // Instead of adding a |file_lock::FileLock| member variable to |Vnode|,
+  // maintain a map from |this| to the lock objects. This is done, because
+  // file locking only applies to regular files, so we want to avoid the
+  // memory overhead for all other |Vnode| types.
+  std::shared_ptr<file_lock::FileLock> GetVnodeFileLock();
+
+  bool DeleteFileLock(zx_koid_t owner);
+
+  // This is the same as |DeleteFileLock|, but if there is no
+  // lock, do not acquire |gLockAccess|.
+  bool DeleteFileLockInTeardown(zx_koid_t owner);
+#endif  // __Fuchsia__
 
   // Closes the vnode. Will be called once for each successful Open().
   //
@@ -297,16 +329,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 
   // Change the size of the vnode.
   virtual zx_status_t Truncate(size_t len);
-
-#ifdef __Fuchsia__
-  // Acquire a vmo from a vnode.
-  //
-  // At the moment, mmap can only map files from read-only filesystems, since (without paging) there
-  // is no mechanism to update either
-  // 1) The file by writing to the mapping, or
-  // 2) The mapping by writing to the underlying file.
-  virtual zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo);
-#endif  // __Fuchsia__
 
   // Syncs the vnode with its underlying storage.
   //
@@ -364,20 +386,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // are still honored).
   virtual bool IsService() const { return false; }
 
-#ifdef __Fuchsia__
-  // Returns the name of the device backing the filesystem, if one exists.
-  virtual zx::result<std::string> GetDevicePath() const;
-
-  // Implements fuchsia.io/Openable.Open by forwarding requests to the remote end. Supported iff
-  // `IsRemote()`.
-  virtual zx_status_t OpenRemote(fuchsia_io::OpenFlags, uint32_t, fidl::StringView,
-                                 fidl::ServerEnd<fuchsia_io::Node>) const;
-
-  // Check existing inotify watches and issue inotify events.
-  zx_status_t CheckInotifyFilterAndNotify(fuchsia_io::wire::InotifyWatchMask event)
-      __TA_EXCLUDES(gInotifyLock);
-#endif  // __Fuchsia__
-
  protected:
   DISALLOW_COPY_ASSIGN_AND_MOVE(Vnode);
 
@@ -415,21 +423,9 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // Returns the number of open connections, not counting node_reference connections. See Open().
   size_t open_count() const __TA_REQUIRES_SHARED(mutex_) { return open_count_; }
 
-#ifdef __Fuchsia__
- public:
-  // Instead of adding a |file_lock::FileLock| member variable to |Vnode|,
-  // maintain a map from |this| to the lock objects. This is done, because
-  // file locking only applies to regular files, so we want to avoid the
-  // memory overhead for all other |Vnode| types.
-  std::shared_ptr<file_lock::FileLock> GetVnodeFileLock();
-  bool DeleteFileLock(zx_koid_t owner);
-  // This is the same as |DeleteFileLock|, but if there is no
-  // lock, do not acquire |gLockAccess|.
-  bool DeleteFileLockInTeardown(zx_koid_t owner);
-#endif
-
  private:
   size_t open_count_ __TA_GUARDED(mutex_) = 0;
+
 #ifdef __Fuchsia__
   static std::mutex gLockAccess;
   static std::map<const Vnode*, std::shared_ptr<file_lock::FileLock>> gLockMap;
