@@ -65,6 +65,9 @@ use notify::PollWatcher as RecommendedWatcher;
 
 // Daemon
 
+/// Determines if targets discovered should expire. Defaults to "true"
+const DISCOVERY_EXPIRE_TARGETS: &str = "discovery.expire_targets";
+
 // This is just for mocking config values for unit testing.
 #[async_trait(?Send)]
 trait ConfigReader: Send + Sync {
@@ -346,7 +349,7 @@ impl Daemon {
         self.start_ascendd(hoist).await?;
         let _socket_file_watcher =
             self.start_socket_watch(quit_tx.clone()).await.context("Starting socket watcher")?;
-        let should_start_expiry = ffx_config::get("discovery.expire_targets").await.unwrap_or(true);
+        let should_start_expiry = ffx_config::get(DISCOVERY_EXPIRE_TARGETS).await.unwrap_or(true);
         if should_start_expiry == true {
             self.start_target_expiry(Duration::from_secs(1));
         }

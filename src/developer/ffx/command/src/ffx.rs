@@ -23,6 +23,8 @@ pub use ffx_daemon_proxy::DaemonVersionCheck;
 /// output.
 const FFX_WRAPPER_INVOKE: &'static str = "FFX_WRAPPER_INVOKE";
 
+const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
+
 #[derive(Clone, Debug, PartialEq)]
 /// The relevant argument and environment variables necessary to parse or
 /// reconstruct an ffx command invocation.
@@ -252,7 +254,7 @@ impl Ffx {
 
         let target = match self.target().await? {
             Some(t) => {
-                if ffx_config::get("ffx.fastboot.inline_target").await.unwrap_or(false) {
+                if ffx_config::get(FASTBOOT_INLINE_TARGET).await.unwrap_or(false) {
                     Some(TargetKind::FastbootInline(t))
                 } else {
                     Some(TargetKind::Normal(t))

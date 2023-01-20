@@ -12,10 +12,45 @@ When updating, please add the value in alphabetical order.
 
 | Configuration Value                     | Documentation                      |
 | --------------------------------------- | ---------------------------------- |
+| `discovery.expire_targets`              | Determines if targets discovered   |
+:                                         : should expire. Defaults to `true`  :
 | `discovery.zedboot.advert_port`         | Zedboot discovery port (must be a  |
 :                                         : nonzero u16)                       :
 | `discovery.zedboot.enabled`             | Determines if zedboot discovery is |
 :                                         : enabled. Defaults to false         :
+| `emu.console.enabled`                   | The experimental flag for the      |
+:                                         : console subcommand. Defaults to    :
+:                                         : false.                             :
+| `emu.device`                            | The default virtual device name to |
+:                                         : configure the emulator. Defaults   :
+:                                         : to the empty string, but can be    :
+:                                         : overridden by the user.            :
+| `emu.engine`                            | The default engine to launch from  |
+:                                         : `ffx emu start`. Defaults to femu, :
+:                                         : but can be overridden by the user. :
+| `emu.gpu`                               | The default gpu type to use in     |
+:                                         : `ffx emu start`. Defaults to       :
+:                                         : "auto", but can be overridden by   :
+:                                         : the user.                          :
+| `emu.instance_dir`                      | The root directory for storing     |
+:                                         : instance specific data. Instances  :
+:                                         : should create a subdirectory in    :
+:                                         : this directory to store data.      :
+| `emu.kvm_path`                          | The filesystem path to the         |
+:                                         : system's KVM device. Must be       :
+:                                         : writable by the running process to :
+:                                         : utilize KVM for acceleration.      :
+| `emu.start.timeout`                     | The duration (in seconds) to       |
+:                                         : attempt to establish an RCS        :
+:                                         : connection with a new emulator     :
+:                                         : before returning to the terminal.  :
+:                                         : Not used in --console or           :
+:                                         : ---monitor modes. Defaults to 60   :
+:                                         : seconds.                           :
+| `emu.upscript`                          | The full path to the script to run |
+:                                         : initializing any network           :
+:                                         : interfaces before starting the     :
+:                                         : emulator.                          :
 | `fastboot.flash.min_timeout_secs`       | The minimum flash timeout (in      |
 :                                         : seconds) for flashing to a target  :
 :                                         : device                             :
@@ -33,6 +68,10 @@ When updating, please add the value in alphabetical order.
 :                                         : over TCP                           :
 | `fastboot.usb.disabled`                 | Disables fastboot usb discovery if |
 :                                         : set to true.                       :
+| `ffx.fastboot.inline_target`            | Boolean value to signal that the   |
+:                                         : target is in fastboot, and to      :
+:                                         : communicate directly with it as    :
+:                                         : opposed to doing discovery.        :
 | `proactive_log.cache_directory`         | Location for target logs to be     |
 :                                         : cached                             :
 | `proactive_log.enabled`                 | Flag to enable proactive log       |
@@ -45,6 +84,17 @@ When updating, please add the value in alphabetical order.
 :                                         : symbolizer. Defaults to false      :
 | `proactive_log.symbolize.extra_args`    | Additional arguments to add to the |
 :                                         : symbolizer.                        :
+| `repository.repositories`               |                                    |
+| `repository.registrations`              |                                    |
+| `repository.default`                    |                                    |
+| `repository.server.mode`                |                                    |
+| `repository.server.enabled`             | If the repository server is        |
+:                                         : enabled. Defaults to `false`       :
+| `repository.server.listen`              |                                    |
+| `repository.server.last_used_address`   |                                    |
+| `ssh.auth-sock`                         | If set, the path to the            |
+:                                         : authorization socket for SSH used  :
+:                                         : by overnet                         :
 | `target.default`                        | The default target to use if one   |
 :                                         : is unspecified                     :
 | `targets.manual`                        | Contains the list of manual        |
