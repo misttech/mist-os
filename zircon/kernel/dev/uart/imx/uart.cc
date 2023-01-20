@@ -438,30 +438,31 @@ static inline void imx_uart_unmask_rx() TA_REQ(uart_spinlock::Get()) {
 static void imx_uart_irq_handler(void* arg) {
   while ((UARTREG(imx_uart_base, USR1) & USR1_RRDY_MASK)) {
     // if we're out of rx buffer, mask the irq instead of handling it
-    //
-    // This critical section is paired with the one in |imx_uart_getc|
-    // where RX is unmasked. This is necessary to avoid the following race
-    // condition:
-    //
-    // Assume we have two threads, a reader R and a writer W, and the
-    // buffer is full. For simplicity, let us assume the buffer size is 1;
-    // the same process applies with a larger buffer and more readers.
-    //
-    // W: Observes the buffer is full.
-    // R: Reads a character. The buffer is now empty.
-    // R: Unmasks RX.
-    // W: Masks RX.
-    //
-    // At this point, we have an empty buffer and RX interrupts are masked -
-    // we're stuck! Thus, to avoid this, we acquire the spinlock before
-    // checking if the buffer is full, and release after (conditionally)
-    // masking RX interrupts. By pairing this with the acquisition of the
-    // same lock around unmasking RX interrupts, we prevent the writer above
-    // from being interrupted by a read-and-unmask.
-    Guard<MonitoredSpinLock, NoIrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
-    if (uart_rx_buf.Full()) {
-      imx_uart_mask_rx();
-      break;
+    {
+      // This critical section is paired with the one in |imx_uart_getc|
+      // where RX is unmasked. This is necessary to avoid the following race
+      // condition:
+      //
+      // Assume we have two threads, a reader R and a writer W, and the
+      // buffer is full. For simplicity, let us assume the buffer size is 1;
+      // the same process applies with a larger buffer and more readers.
+      //
+      // W: Observes the buffer is full.
+      // R: Reads a character. The buffer is now empty.
+      // R: Unmasks RX.
+      // W: Masks RX.
+      //
+      // At this point, we have an empty buffer and RX interrupts are masked -
+      // we're stuck! Thus, to avoid this, we acquire the spinlock before
+      // checking if the buffer is full, and release after (conditionally)
+      // masking RX interrupts. By pairing this with the acquisition of the
+      // same lock around unmasking RX interrupts, we prevent the writer above
+      // from being interrupted by a read-and-unmask.
+      Guard<MonitoredSpinLock, NoIrqSave> guard{uart_spinlock::Get(), SOURCE_TAG};
+      if (uart_rx_buf.Full()) {
+        imx_uart_mask_rx();
+        break;
+      }
     }
 
     char c = (char)(UARTREG(imx_uart_base, URXD) & URXD_RX_DATA_MASK) >> URXD_RX_DATA_SHIFT;
