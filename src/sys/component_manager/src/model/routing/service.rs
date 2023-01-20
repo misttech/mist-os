@@ -1316,7 +1316,7 @@ mod tests {
             .await
             .expect("failed to find baz instance");
         // Test that removal of instances works
-        baz_component.stop(false).await.expect("failed to shutdown component");
+        baz_component.stop().await.expect("failed to shutdown component");
         let updated_entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(updated_entries.len(), 2);
 
@@ -1374,7 +1374,7 @@ mod tests {
             .expect("failed to find baz instance");
 
         // Test that removal of instances works
-        baz_component.stop(false).await.expect("failed to shutdown component");
+        baz_component.stop().await.expect("failed to shutdown component");
         let updated_entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(updated_entries.len(), 2);
     }

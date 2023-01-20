@@ -194,7 +194,7 @@ async fn stop_component(realm_ref: &RealmInstance, child_name: &str) {
         .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
         .expect("Failed to connect to LifecycleController");
     lifecycle
-        .stop(&format!("./{child_name}"), true)
+        .stop(&format!("./{child_name}"), false)
         .await
         .expect(&format!("Failed to stop child: {child_name}"))
         .expect(&format!("Failed to unwrap stop child result: {child_name}"));

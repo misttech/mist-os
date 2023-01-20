@@ -396,7 +396,7 @@ mod tests {
         }
 
         {
-            ActionSet::register(child.clone(), StopAction::new(false, false))
+            ActionSet::register(child.clone(), StopAction::new(false))
                 .await
                 .expect("failed to stop child");
             let execution = child.lock_execution().await;
@@ -429,7 +429,7 @@ mod tests {
         }
 
         {
-            let () = ActionSet::register(child.clone(), StopAction::new(false, false))
+            let () = ActionSet::register(child.clone(), StopAction::new(false))
                 .await
                 .expect("failed to stop child");
             let execution = child.lock_execution().await;
@@ -516,7 +516,7 @@ mod tests {
         }
 
         // Check for shut_down:
-        let _ = child.stop_instance_internal(true, false).await;
+        let _ = child.stop_instance_internal(true).await;
         let execution = child.lock_execution().await;
         assert!(execution.is_shut_down());
         assert_matches!(

@@ -494,7 +494,7 @@ mod tests {
         assert!(execution.out_dir.is_none());
         assert!(execution.runtime_dir.is_none());
 
-        component_a.stop_instance_internal(false, false).await.unwrap();
+        component_a.stop_instance_internal(false).await.unwrap();
 
         // `a` should be stopped
         let (info, resolved) = query.get_instance_info("./my_coll:a").await.unwrap().unwrap();
@@ -583,7 +583,7 @@ mod tests {
         assert!(execution.out_dir.is_none());
         assert!(execution.runtime_dir.is_none());
 
-        component_a.stop_instance_internal(false, false).await.unwrap();
+        component_a.stop_instance_internal(false).await.unwrap();
 
         // `a` should be stopped
         let (info, resolved) = query.get_instance_info(".").await.unwrap().unwrap();

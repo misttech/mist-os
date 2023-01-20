@@ -168,6 +168,9 @@ protocol LifecycleController {
     /// Stops the instance identified by the given moniker.
     ///
     /// The function returns once the instance has been stopped.
+    ///
+    /// Note: `is_recursive` is no longer supported by component manager.
+    ///       Setting it to true will return Error::Unsupported.
     @available(added=7, deprecated=11, removed=12, note="Use StopInstance instead", legacy=true)
     Stop(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;

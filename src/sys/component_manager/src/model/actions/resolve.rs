@@ -164,7 +164,7 @@ pub mod tests {
         assert!(is_resolved(&component_a).await);
 
         // Stop, then it's ok to resolve again.
-        ActionSet::register(component_a.clone(), StopAction::new(false, true)).await.unwrap();
+        ActionSet::register(component_a.clone(), StopAction::new(false)).await.unwrap();
         assert!(is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
 

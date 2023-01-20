@@ -454,7 +454,7 @@ mod tests {
         assert_eq!(info.state, fsys::InstanceState::Started);
         assert!(info.instance_id.is_none());
 
-        component_a.stop_instance_internal(false, false).await.unwrap();
+        component_a.stop_instance_internal(false).await.unwrap();
 
         // `a` should be stopped
         let info = get_instance_info(&explorer, 2, "./my_coll:a").await;
@@ -519,7 +519,7 @@ mod tests {
         assert_eq!(info.state, fsys::InstanceState::Started);
         assert!(info.instance_id.is_none());
 
-        component_a.stop_instance_internal(false, false).await.unwrap();
+        component_a.stop_instance_internal(false).await.unwrap();
 
         // `a` should be stopped
         let info = get_instance_info(&explorer, 1, ".").await;

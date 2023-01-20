@@ -184,7 +184,7 @@ async fn stop_component(realm_ref: &RealmInstance, child_name: &str) {
         realm_ref.root.get_exposed_dir(),
     )
     .expect("Failed to connect to LifecycleController");
-    lifecycle.stop(&format!("./{}", child_name), true).await.unwrap().unwrap();
+    lifecycle.stop(&format!("./{}", child_name), false).await.unwrap().unwrap();
 }
 
 async fn new_test_context() -> Result<TestContext, Error> {

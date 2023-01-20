@@ -51,7 +51,7 @@ async fn shutdown_component(target: ShutdownInfo) -> Result<ComponentRef, ModelE
             // TODO: Put `self` in a "shutting down" state so that if it creates
             // new instances after this point, they are created in a shut down
             // state.
-            target.component.stop_instance_internal(true, false).await?;
+            target.component.stop_instance_internal(true).await?;
         }
         ComponentRef::Child(_) => {
             ActionSet::register(target.component, ShutdownAction::new()).await?;
@@ -246,7 +246,7 @@ async fn do_shutdown(component: &Arc<ComponentInstance>) -> Result<(), ModelErro
     // Control flow arrives here if the component isn't resolved.
     // TODO: Put this component in a "shutting down" state so that if it creates new instances
     // after this point, they are created in a shut down state.
-    component.stop_instance_internal(true, false).await?;
+    component.stop_instance_internal(true).await?;
 
     Ok(())
 }
@@ -2668,7 +2668,7 @@ mod tests {
         // Register some actions, and get notifications. Use `register_inner` so we can register
         // the action without immediately running it.
         let (task1, nf1) = action_set.register_inner(&component, ShutdownAction::new());
-        let (task2, nf2) = action_set.register_inner(&component, StopAction::new(false, false));
+        let (task2, nf2) = action_set.register_inner(&component, StopAction::new(false));
 
         drop(action_set);
 
@@ -2693,8 +2693,8 @@ mod tests {
         // Register some actions, and get notifications. Use `register_inner` so we can register
         // the action without immediately running it.
         let (task1, nf1) = action_set.register_inner(&component, ShutdownAction::new());
-        let (task2, nf2) = action_set.register_inner(&component, StopAction::new(false, false));
-        let (task3, nf3) = action_set.register_inner(&component, StopAction::new(false, false));
+        let (task2, nf2) = action_set.register_inner(&component, StopAction::new(false));
+        let (task3, nf3) = action_set.register_inner(&component, StopAction::new(false));
 
         drop(action_set);
 

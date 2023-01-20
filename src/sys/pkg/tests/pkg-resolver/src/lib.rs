@@ -913,7 +913,7 @@ impl<B: Blobfs> TestEnv<B> {
             .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
             .unwrap();
         let () = lifecycle_controller
-            .stop(&format!("./{PKG_RESOLVER_CHILD_NAME}"), true)
+            .stop(&format!("./{PKG_RESOLVER_CHILD_NAME}"), false)
             .await
             .unwrap()
             .unwrap();

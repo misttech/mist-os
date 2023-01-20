@@ -15,12 +15,11 @@ use {
 /// Stops a component instance.
 pub struct StopAction {
     shut_down: bool,
-    is_recursive: bool,
 }
 
 impl StopAction {
-    pub fn new(shut_down: bool, is_recursive: bool) -> Self {
-        Self { shut_down, is_recursive }
+    pub fn new(shut_down: bool) -> Self {
+        Self { shut_down }
     }
 }
 
@@ -28,7 +27,7 @@ impl StopAction {
 impl Action for StopAction {
     type Output = Result<(), ModelError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
-        component.stop_instance_internal(self.shut_down, self.is_recursive).await
+        component.stop_instance_internal(self.shut_down).await
     }
     fn key(&self) -> ActionKey {
         ActionKey::Stop
@@ -68,7 +67,7 @@ pub mod tests {
         // Register `stopped` action, and wait for it. Component should be stopped.
         let component_root = test.look_up(AbsoluteMoniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        ActionSet::register(component_a.clone(), StopAction::new(false, false))
+        ActionSet::register(component_a.clone(), StopAction::new(false))
             .await
             .expect("stop failed");
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
@@ -86,7 +85,7 @@ pub mod tests {
         }
 
         // Execute action again, same state and no new events.
-        ActionSet::register(component_a.clone(), StopAction::new(false, false))
+        ActionSet::register(component_a.clone(), StopAction::new(false))
             .await
             .expect("stop failed");
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
@@ -180,7 +179,7 @@ pub mod tests {
         let component_root = test.look_up(AbsoluteMoniker::root()).await;
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let mut actions = component_a.lock_actions().await;
-        let nf = actions.register_no_wait(&component_a, StopAction::new(false, false));
+        let nf = actions.register_no_wait(&component_a, StopAction::new(false));
         drop(actions);
         stopped_rx.await.unwrap();
 
@@ -206,72 +205,6 @@ pub mod tests {
                 })
                 .collect();
             assert_eq!(events, vec![Lifecycle::Stop(vec!["a"].try_into().unwrap())],);
-        }
-    }
-
-    #[fuchsia::test]
-    async fn stopped_recursive() {
-        let components = vec![
-            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
-            ("a", ComponentDeclBuilder::new().add_lazy_child("aa").build()),
-            ("aa", component_decl_with_test_runner()),
-        ];
-        let test = ActionsTest::new("root", components, None).await;
-
-        // Start component so we can witness it getting stopped.
-        test.start(vec!["a"].try_into().unwrap()).await;
-        test.start(vec!["a", "aa"].try_into().unwrap()).await;
-
-        // Register `stopped` action, and wait for it. Component should be stopped.
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
-        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
-        ActionSet::register(component_a.clone(), StopAction::new(false, true))
-            .await
-            .expect("stop failed");
-        assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
-        assert!(is_stopped(&component_a, &"aa".try_into().unwrap()).await);
-        {
-            let events: Vec<_> = test
-                .test_hook
-                .lifecycle()
-                .into_iter()
-                .filter(|e| match e {
-                    Lifecycle::Stop(_) => true,
-                    _ => false,
-                })
-                .collect();
-            assert_eq!(
-                events,
-                vec![
-                    Lifecycle::Stop(vec!["a", "aa"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["a"].try_into().unwrap()),
-                ],
-            );
-        }
-
-        // Execute action again, same state and no new events.
-        ActionSet::register(component_a.clone(), StopAction::new(false, true))
-            .await
-            .expect("stop failed");
-        assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);
-        assert!(is_stopped(&component_a, &"aa".try_into().unwrap()).await);
-        {
-            let events: Vec<_> = test
-                .test_hook
-                .lifecycle()
-                .into_iter()
-                .filter(|e| match e {
-                    Lifecycle::Stop(_) => true,
-                    _ => false,
-                })
-                .collect();
-            assert_eq!(
-                events,
-                vec![
-                    Lifecycle::Stop(vec!["a", "aa"].try_into().unwrap()),
-                    Lifecycle::Stop(vec!["a"].try_into().unwrap()),
-                ],
-            );
         }
     }
 }

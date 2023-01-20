@@ -745,10 +745,8 @@ impl ComponentInstance {
     }
 
     /// Stops this component.
-    ///
-    /// If `is_recursive` is true, all descendants will be stopped as well as the component itself.
-    pub async fn stop(self: &Arc<Self>, is_recursive: bool) -> Result<(), ModelError> {
-        ActionSet::register(self.clone(), StopAction::new(false, is_recursive)).await
+    pub async fn stop(self: &Arc<Self>) -> Result<(), ModelError> {
+        ActionSet::register(self.clone(), StopAction::new(false)).await
     }
 
     /// Shuts down this component. This means the component and its subrealm are stopped and never
@@ -769,7 +767,6 @@ impl ComponentInstance {
     pub async fn stop_instance_internal(
         self: &Arc<Self>,
         shut_down: bool,
-        is_recursive: bool,
     ) -> Result<(), ModelError> {
         let (was_running, stop_result) = {
             let mut execution = self.lock_execution().await;
@@ -841,11 +838,6 @@ impl ComponentInstance {
             (was_running, component_stop_result)
         };
 
-        // If is_recursive is true, stop all the child instances of the component.
-        if is_recursive {
-            self.stop_children(shut_down, is_recursive).await?;
-        }
-
         // When the component is stopped, any child instances in collections must be destroyed.
         self.destroy_dynamic_children().await?;
         if was_running {
@@ -912,41 +904,6 @@ impl ComponentInstance {
             }
         }
         Ok(())
-    }
-
-    /// Registers actions to stop all the children of this instance.
-    async fn stop_children(
-        self: &Arc<Self>,
-        shut_down: bool,
-        is_recursive: bool,
-    ) -> Result<(), ModelError> {
-        let child_instances: Vec<_> = {
-            let state = self.lock_resolved_state().await?;
-            state.children().map(|(_, v)| v.clone()).collect()
-        };
-
-        let mut futures = vec![];
-        for child_instance in child_instances {
-            let nf = ActionSet::register(
-                child_instance.clone(),
-                StopAction::new(shut_down, is_recursive),
-            );
-            futures.push(nf);
-        }
-        join_all(futures)
-            .await
-            .into_iter()
-            .map(|r| match r {
-                // There's a chance that this races with child destruction, since we dropped the
-                // lock for our resolved state after grabbing the list of children. A non-existent
-                // child is obviously a child that is not running, so we can safely ignore if we
-                // failed to stop the child because it doesn't exist
-                Err(ModelError::ComponentInstanceError {
-                    err: ComponentInstanceError::InstanceNotFound { .. },
-                }) => Ok(()),
-                r => r,
-            })
-            .fold(Ok(()), |acc, r| acc.and_then(|_| r))
     }
 
     /// Destroys this component instance.
@@ -1926,8 +1883,7 @@ impl Runtime {
                 epitaph_fut.await;
                 if let Ok(component) = component.upgrade() {
                     let mut actions = component.lock_actions().await;
-                    let stop_nf =
-                        actions.register_no_wait(&component, StopAction::new(false, false));
+                    let stop_nf = actions.register_no_wait(&component, StopAction::new(false));
                     drop(actions);
                     component
                         .nonblocking_task_scope()

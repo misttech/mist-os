@@ -111,12 +111,10 @@ impl LifecycleController {
         let moniker =
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::StopError::BadMoniker)?;
         let instance = self.model.find(&moniker).await.ok_or(fsys::StopError::InstanceNotFound)?;
-        ActionSet::register(instance.clone(), StopAction::new(false, false)).await.map_err(
-            |error| {
-                warn!(%moniker, %error, "failed to stop instance");
-                fsys::StopError::Internal
-            },
-        )?;
+        ActionSet::register(instance.clone(), StopAction::new(false)).await.map_err(|error| {
+            warn!(%moniker, %error, "failed to stop instance");
+            fsys::StopError::Internal
+        })?;
         Ok(())
     }
 
@@ -528,7 +526,15 @@ mod deprecated {
     ) -> Result<(), fcomponent::Error> {
         let moniker = join_monikers(scope_moniker, &moniker)?;
         let component = model.find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
-        component.stop(is_recursive).await.map_err(|error| {
+
+        if is_recursive {
+            // Recursive stop is no longer supported by CF and will
+            // be removed from the LifecycleController API entirely in
+            // a future API version.
+            return Err(fcomponent::Error::Unsupported);
+        }
+
+        component.stop().await.map_err(|error| {
             warn!(%moniker, ?error, "LifecycleController could not stop");
             fcomponent::Error::Internal
         })

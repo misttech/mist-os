@@ -548,7 +548,7 @@ async fn on_terminate_stop_triggers_reboot() {
         .unwrap();
     let component = test.model.look_up(&vec!["system"].try_into().unwrap()).await.unwrap();
     let stop = async move {
-        ActionSet::register(component.clone(), StopAction::new(false, false)).await.unwrap();
+        ActionSet::register(component.clone(), StopAction::new(false)).await.unwrap();
     };
     let recv_reboot = async move {
         let reason = match receiver.next().await.unwrap() {
