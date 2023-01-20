@@ -29,7 +29,7 @@ use std::collections::{BTreeSet, HashMap};
 /// println!("{:?}", serde_json::to_value(manifest).unwrap());
 /// ```
 ///
-#[derive(Clone, Deserialize, Serialize, PartialEq, Debug, Default)]
+#[derive(Clone, Deserialize, Serialize, Eq, PartialEq, Debug, Default)]
 #[serde(transparent)]
 pub struct AssemblyManifest {
     /// List of images in the manifest.
@@ -37,7 +37,7 @@ pub struct AssemblyManifest {
 }
 
 /// A specific Image type.
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Image {
     /// Base Package.
     BasePackage(Utf8PathBuf),
@@ -203,7 +203,7 @@ impl Serialize for Image {
 }
 
 /// Detailed metadata on the contents of a particular image output.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BlobfsContents {
     /// Information about packages included in the image.
     pub packages: PackagesMetadata,
@@ -279,7 +279,7 @@ impl BlobfsContents {
 }
 
 /// Metadata on packages included in a given image.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PackagesMetadata {
     /// Paths to package manifests for the base package set.
     pub base: PackageSetMetadata,
@@ -288,12 +288,12 @@ pub struct PackagesMetadata {
 }
 
 /// Metadata for a certain package set (e.g. base or cache).
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(transparent)]
 pub struct PackageSetMetadata(pub Vec<PackageMetadata>);
 
 /// Metadata on a single package included in a given image.
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PackageMetadata {
     /// The package's name.
     pub name: String,
