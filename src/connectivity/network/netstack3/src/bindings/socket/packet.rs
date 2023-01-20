@@ -11,7 +11,7 @@ pub(crate) async fn serve(stream: fppacket::ProviderRequestStream) -> Result<(),
         .try_for_each(|req| {
             match req {
                 fppacket::ProviderRequest::Socket { responder, kind: _ } => {
-                    log::error!("TODO(https://fxbug.dev/106735): Support packet sockets");
+                    log::warn!("TODO(https://fxbug.dev/106735): Support packet sockets");
                     responder_send!(responder, &mut Err(fposix::Errno::Enoprotoopt));
                 }
             };

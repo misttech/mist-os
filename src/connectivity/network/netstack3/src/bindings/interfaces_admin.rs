@@ -550,7 +550,7 @@ async fn dispatch_control_request(
             if config.ipv4.map_or(false, |c| c.forwarding == Some(false))
                 && config.ipv6.map_or(false, |c| c.forwarding == Some(false))
             {
-                log::error!("TODO(https://fxbug.dev/76987) support enable/disable forwarding");
+                log::warn!("TODO(https://fxbug.dev/76987) support enable/disable forwarding");
                 responder.send(&mut Ok(fnet_interfaces_admin::Configuration::EMPTY))
             } else {
                 todo!("https://fxbug.dev/76987 support enable/disable forwarding")
