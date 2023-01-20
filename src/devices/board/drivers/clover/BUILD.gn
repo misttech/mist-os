@@ -77,6 +77,7 @@ driver_bind_rules("clover-dsp-bind") {
   bind_output = "clover-dsp-bind.bc"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.amlogic.platform.a1",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.mailbox",

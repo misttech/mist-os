@@ -80,7 +80,6 @@ extend uint fuchsia.BIND_PLATFORM_DEV_DID {
   TDM_USE_DSP = 0x33,
   PDM_USE_DSP = 0x34,
   SPI_NAND = 0x35,
-  PL_MAILBOX = 0x36,
 };
 
 extend uint fuchsia.BIND_REGISTER_ID {

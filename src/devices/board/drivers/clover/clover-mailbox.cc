@@ -18,7 +18,7 @@
 namespace clover {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
-static const std::vector<fpbus::Mmio> mailbox_mmios{
+static const std::vector<fpbus::Mmio> mailbox0_mmios{
     {{
         .base = A1_DSPA_BASE,
         .length = A1_DSPA_BASE_LENGTH,
@@ -29,32 +29,72 @@ static const std::vector<fpbus::Mmio> mailbox_mmios{
     }},
 };
 
-static const std::vector<fpbus::Irq> mailbox_irqs{
+static const std::vector<fpbus::Irq> mailbox0_irqs{
     {{
         .irq = A1_DSPA_RECV_IRQ,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
 };
 
+static const std::vector<fpbus::Mmio> mailbox1_mmios{
+    {{
+        .base = A1_DSPB_BASE,
+        .length = A1_DSPB_BASE_LENGTH,
+    }},
+    {{
+        .base = A1_DSPB_PAYLOAD_BASE,
+        .length = A1_DSPB_PAYLOAD_BASE_LENGTH,
+    }},
+};
+
+static const std::vector<fpbus::Irq> mailbox1_irqs{
+    {{
+        .irq = A1_DSPB_RECV_IRQ,
+        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+    }},
+};
+
 zx_status_t Clover::MailboxInit() {
-  fpbus::Node mailbox_dev;
-  mailbox_dev.name() = "mailbox";
-  mailbox_dev.vid() = PDEV_VID_AMLOGIC;
-  mailbox_dev.pid() = PDEV_PID_AMLOGIC_A1;
-  mailbox_dev.did() = PDEV_DID_AMLOGIC_MAILBOX;
-  mailbox_dev.mmio() = mailbox_mmios;
-  mailbox_dev.irq() = mailbox_irqs;
+  fpbus::Node mailbox0_dev;
+  mailbox0_dev.name() = "mailbox0";
+  mailbox0_dev.vid() = PDEV_VID_AMLOGIC;
+  mailbox0_dev.pid() = PDEV_PID_AMLOGIC_A1;
+  mailbox0_dev.did() = PDEV_DID_AMLOGIC_MAILBOX;
+  mailbox0_dev.instance_id() = 0;
+  mailbox0_dev.mmio() = mailbox0_mmios;
+  mailbox0_dev.irq() = mailbox0_irqs;
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('MAIL');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, mailbox_dev));
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, mailbox0_dev));
   if (!result.ok()) {
-    zxlogf(ERROR, "NodeAdd Mailbox(mailbox_dev) request failed: %s",
+    zxlogf(ERROR, "NodeAdd Mailbox(mailbox0_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "NodeAdd Mailbox(mailbox_dev) failed: %s",
+    zxlogf(ERROR, "NodeAdd Mailbox(mailbox0_dev) failed: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+
+  fpbus::Node mailbox1_dev;
+  mailbox1_dev.name() = "mailbox1";
+  mailbox1_dev.vid() = PDEV_VID_AMLOGIC;
+  mailbox1_dev.pid() = PDEV_PID_AMLOGIC_A1;
+  mailbox1_dev.did() = PDEV_DID_AMLOGIC_MAILBOX;
+  mailbox1_dev.instance_id() = 1;
+  mailbox1_dev.mmio() = mailbox1_mmios;
+  mailbox1_dev.irq() = mailbox1_irqs;
+
+  result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, mailbox1_dev));
+  if (!result.ok()) {
+    zxlogf(ERROR, "NodeAdd Mailbox(mailbox1_dev) request failed: %s",
+           result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "NodeAdd Mailbox(mailbox1_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

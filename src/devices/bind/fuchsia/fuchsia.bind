@@ -103,3 +103,6 @@ uint BIND_REGISTER_ID;
 
 // Power sensor bind properties.
 uint BIND_POWER_SENSOR_DOMAIN;
+
+// Mailbox bind properties.
+uint BIND_MAILBOX_ID;

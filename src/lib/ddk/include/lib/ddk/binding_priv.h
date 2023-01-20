@@ -154,6 +154,9 @@ __BEGIN_CDECLS
 #define BIND_POWER_SENSOR_DOMAIN 0x0A90
 // LINT.ThenChange(/sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h)
 
+// Mailbox binding variables at 0x0AAX
+#define BIND_MAILBOX_ID 0x0AA0
+
 typedef struct zx_bind_inst {
   uint32_t op;
   uint32_t arg;

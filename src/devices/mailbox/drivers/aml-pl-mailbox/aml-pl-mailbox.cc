@@ -215,8 +215,16 @@ zx_status_t AmlPlMailbox::Bind() {
       fidl::DiscoverableProtocolName<fuchsia_hardware_mailbox::Device>,
   };
 
-  zx_status_t add_status = DdkAdd(ddk::DeviceAddArgs("aml-pl-mailbox")
+  char device_name[32] = {};
+  snprintf(device_name, sizeof(device_name), "aml-pl-mailbox%d", mailbox_id_);
+
+  zx_device_prop_t props[] = {
+      {BIND_MAILBOX_ID, 0, mailbox_id_},
+  };
+
+  zx_status_t add_status = DdkAdd(ddk::DeviceAddArgs(device_name)
                                       .set_flags(DEVICE_ADD_MUST_ISOLATE)
+                                      .set_props(props)
                                       .set_fidl_protocol_offers(offers)
                                       .set_outgoing_dir(endpoints->client.TakeChannel())
                                       .set_proto_id(ZX_PROTOCOL_AML_MAILBOX));
@@ -259,10 +267,15 @@ zx_status_t AmlPlMailbox::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
+  uint8_t mailbox_id = 0;
+  if (!strncmp(info.name, "mailbox1", 8)) {
+    mailbox_id = 1;
+  }
+
   async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  auto dev = fbl::make_unique_checked<AmlPlMailbox>(&ac, parent, *std::move(dsp_mmio),
-                                                    *std::move(dsp_payload_mmio),
-                                                    std::move(dsp_recv_irq), dispatcher);
+  auto dev = fbl::make_unique_checked<AmlPlMailbox>(
+      &ac, parent, *std::move(dsp_mmio), *std::move(dsp_payload_mmio), std::move(dsp_recv_irq),
+      mailbox_id, dispatcher);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

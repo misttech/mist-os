@@ -91,3 +91,8 @@ uint GPIOA_PIN_ID {
     PIN_10 = 60,
     PIN_11 = 61,
 };
+
+extend uint fuchsia.BIND_MAILBOX_ID {
+    MAILBOX_ID0 = 0,
+    MAILBOX_ID1 = 1,
+};

@@ -332,6 +332,9 @@ fn deprecated_keys() -> Vec<(String, u32)> {
     // Power sensor binding variables at 0x0A9X
     keys.push(("BIND_POWER_SENSOR_DOMAIN".to_string(), 0x0A90));
 
+    // Mailbox binding variables at 0x0AAX
+    keys.push(("BIND_MAILBOX_ID".to_string(), 0x0AA0));
+
     keys
 }
 
@@ -444,6 +447,9 @@ pub fn get_deprecated_key_identifier(key: u32) -> Option<String> {
         // Power sensor binding variables at 0x0A9X.
         0x0A90 => Some("fuchsia.BIND_POWER_SENSOR_DOMAIN".to_string()),
 
+        // Mailbox binding variables at 0x0AAX.
+        0x0AA0 => Some("fuchsia.BIND_MAILBOX_ID".to_string()),
+
         _ => None,
     }
 }
@@ -540,6 +546,9 @@ pub fn get_deprecated_key_value(key: &str) -> Option<u32> {
 
         // Power sensor binding variables at 0x0A9X
         "fuchsia.BIND_POWER_SENSOR_DOMAIN" => Some(0x0A90),
+
+        // Mailbox binding variables at 0x0AAX
+        "fuchsia.BIND_MAILBOX_ID" => Some(0x0AA0),
 
         _ => None,
     }

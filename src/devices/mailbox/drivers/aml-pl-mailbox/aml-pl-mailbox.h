@@ -35,11 +35,12 @@ using DeviceType =
 class AmlPlMailbox : public DeviceType {
  public:
   AmlPlMailbox(zx_device_t* parent, fdf::MmioBuffer dsp_mmio, fdf::MmioBuffer dsp_payload_mmio,
-               zx::interrupt dsp_recv_irq, async_dispatcher_t* dispatcher)
+               zx::interrupt dsp_recv_irq, uint8_t mailbox_id, async_dispatcher_t* dispatcher)
       : DeviceType(parent),
         dsp_mmio_(std::move(dsp_mmio)),
         dsp_payload_mmio_(std::move(dsp_payload_mmio)),
         dsp_recv_irq_(std::move(dsp_recv_irq)),
+        mailbox_id_(mailbox_id),
         outgoing_(dispatcher),
         dispatcher_(dispatcher) {}
 
@@ -71,6 +72,7 @@ class AmlPlMailbox : public DeviceType {
   zx::interrupt dsp_recv_irq_;
   thrd_t dsp_recv_irq_thread_;
   uint8_t rx_flag_ = 0;
+  uint8_t mailbox_id_ = 0;
   std::array<uint8_t, kMboxFifoSize> channels_;
 
   fidl::ServerBindingGroup<fuchsia_hardware_mailbox::Device> bindings_;

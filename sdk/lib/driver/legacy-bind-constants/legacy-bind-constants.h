@@ -103,4 +103,7 @@
 #define BIND_POWER_SENSOR_DOMAIN 0x0A90
 // LINT.ThenChange(/src/lib/ddk/include/lib/ddk/binding_priv.h)
 
+// Mailbox binding variables at 0x0AAX
+#define BIND_MAILBOX_ID 0x0AA0
+
 #endif  // LIB_DRIVER_LEGACY_BIND_CONSTANTS_LEGACY_BIND_CONSTANTS_H_

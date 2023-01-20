@@ -5,6 +5,7 @@
 composite clover_dsp;
 
 using fuchsia.amlogic.platform;
+using fuchsia.amlogic.platform.a1;
 using fuchsia.amlogic.platform.meson;
 using fuchsia.platform;
 using fuchsia.clock;
@@ -30,4 +31,5 @@ node "dsp-clk-gate" {
 
 node "dsp-mailbox" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.mailbox.BIND_FIDL_PROTOCOL.DEVICE;
+  fuchsia.BIND_MAILBOX_ID == fuchsia.amlogic.platform.a1.BIND_MAILBOX_ID.MAILBOX_ID0;
 }
