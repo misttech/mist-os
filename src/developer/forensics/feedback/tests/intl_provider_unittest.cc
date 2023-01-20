@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/forensics/feedback/annotations/timezone_provider.h"
+#include "src/developer/forensics/feedback/annotations/intl_provider.h"
 
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
@@ -16,7 +16,7 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/feedback/annotations/constants.h"
-#include "src/developer/forensics/testing/stubs/timezone_provider.h"
+#include "src/developer/forensics/testing/stubs/intl_provider.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/errors.h"
 #include "src/lib/backoff/backoff.h"
@@ -42,18 +42,18 @@ class MonotonicBackoff : public backoff::Backoff {
   zx::duration backoff_{zx::sec(1)};
 };
 
-using TimezoneProviderTest = UnitTestFixture;
+using IntlProviderTest = UnitTestFixture;
 
-TEST_F(TimezoneProviderTest, GetKeys) {
-  TimezoneProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
+TEST_F(IntlProviderTest, GetKeys) {
+  IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
   EXPECT_THAT(provider.GetKeys(), UnorderedElementsAreArray({kSystemTimezonePrimaryKey}));
 }
 
-TEST_F(TimezoneProviderTest, GetOnUpdate) {
-  stubs::TimezoneProvider server("timezone-one");
+TEST_F(IntlProviderTest, GetOnUpdate) {
+  stubs::IntlProvider server("timezone-one");
   InjectServiceProvider(&server);
 
-  TimezoneProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
+  IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
   Annotations annotations;
 
   provider.GetOnUpdate([&annotations](Annotations result) { annotations = std::move(result); });
@@ -78,11 +78,11 @@ TEST_F(TimezoneProviderTest, GetOnUpdate) {
                            }));
 }
 
-TEST_F(TimezoneProviderTest, Reconnects) {
-  stubs::TimezoneProvider server("timezone-one");
+TEST_F(IntlProviderTest, Reconnects) {
+  stubs::IntlProvider server("timezone-one");
   InjectServiceProvider(&server);
 
-  TimezoneProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
+  IntlProvider provider(dispatcher(), services(), std::make_unique<MonotonicBackoff>());
   Annotations annotations;
 
   provider.GetOnUpdate([&annotations](Annotations result) { annotations = std::move(result); });

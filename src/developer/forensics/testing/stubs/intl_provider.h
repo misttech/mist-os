@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_FORENSICS_TESTING_STUBS_TIMEZONE_PROVIDER_H_
-#define SRC_DEVELOPER_FORENSICS_TESTING_STUBS_TIMEZONE_PROVIDER_H_
+#ifndef SRC_DEVELOPER_FORENSICS_TESTING_STUBS_INTL_PROVIDER_H_
+#define SRC_DEVELOPER_FORENSICS_TESTING_STUBS_INTL_PROVIDER_H_
 
 #include <fuchsia/intl/cpp/fidl.h>
 #include <fuchsia/intl/cpp/fidl_test_base.h>
@@ -17,11 +17,11 @@
 
 namespace forensics::stubs {
 
-using TimezoneProviderBase = SINGLE_BINDING_STUB_FIDL_SERVER(fuchsia::intl, PropertyProvider);
+using IntlProviderBase = SINGLE_BINDING_STUB_FIDL_SERVER(fuchsia::intl, PropertyProvider);
 
-class TimezoneProvider : public TimezoneProviderBase {
+class IntlProvider : public IntlProviderBase {
  public:
-  explicit TimezoneProvider(std::string_view default_timezone);
+  explicit IntlProvider(std::string_view default_timezone);
 
   void SetTimezone(std::string_view timezone);
 
@@ -32,10 +32,10 @@ class TimezoneProvider : public TimezoneProviderBase {
   std::string timezone_;
 };
 
-class TimezoneProviderDelaysResponse : public TimezoneProviderBase {
+class IntlProviderDelaysResponse : public IntlProviderBase {
  public:
-  TimezoneProviderDelaysResponse(async_dispatcher_t* dispatcher, zx::duration delay,
-                                 std::string_view default_timezone);
+  IntlProviderDelaysResponse(async_dispatcher_t* dispatcher, zx::duration delay,
+                             std::string_view default_timezone);
 
   // |fuchsia::intl::PropertyProvider|
   void GetProfile(GetProfileCallback callback) override;
@@ -48,4 +48,4 @@ class TimezoneProviderDelaysResponse : public TimezoneProviderBase {
 
 }  // namespace forensics::stubs
 
-#endif  // SRC_DEVELOPER_FORENSICS_TESTING_STUBS_TIMEZONE_PROVIDER_H_
+#endif  // SRC_DEVELOPER_FORENSICS_TESTING_STUBS_INTL_PROVIDER_H_

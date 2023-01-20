@@ -17,11 +17,11 @@
 #include "src/developer/forensics/feedback/annotations/board_info_provider.h"
 #include "src/developer/forensics/feedback/annotations/current_channel_provider.h"
 #include "src/developer/forensics/feedback/annotations/data_register.h"
+#include "src/developer/forensics/feedback/annotations/intl_provider.h"
 #include "src/developer/forensics/feedback/annotations/product_info_provider.h"
 #include "src/developer/forensics/feedback/annotations/provider.h"
 #include "src/developer/forensics/feedback/annotations/target_channel_provider.h"
 #include "src/developer/forensics/feedback/annotations/time_provider.h"
-#include "src/developer/forensics/feedback/annotations/timezone_provider.h"
 #include "src/developer/forensics/feedback/annotations/ui_state_provider.h"
 #include "src/lib/backoff/backoff.h"
 
@@ -50,7 +50,7 @@ class AnnotationProviders {
   BoardInfoProvider board_info_provider_;
   ProductInfoProvider product_info_provider_;
   CurrentChannelProvider current_channel_provider_;
-  TimezoneProvider timezone_provider_;
+  IntlProvider intl_provider_;
   std::unique_ptr<CachedAsyncAnnotationProvider> device_id_provider_;
   TargetChannelProvider target_channel_provider_;
   UIStateProvider ui_state_provider_;

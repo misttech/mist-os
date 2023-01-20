@@ -131,6 +131,24 @@ source_set("fidl_provider") {
   ]
 }
 
+source_set("intl_provider") {
+  sources = [
+    "intl_provider.cc",
+    "intl_provider.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/sys/cpp",
+    "//src/developer/forensics/feedback/annotations",
+    "//src/lib/backoff",
+    "//src/lib/fxl",
+  ]
+
+  deps = [ "//zircon/system/ulib/async" ]
+}
+
 source_set("product_info_provider") {
   sources = [
     "product_info_provider.cc",
@@ -167,24 +185,6 @@ source_set("time_provider") {
     "//src/developer/forensics/feedback/annotations",
     "//src/lib/timekeeper",
   ]
-}
-
-source_set("timezone_provider") {
-  sources = [
-    "timezone_provider.cc",
-    "timezone_provider.h",
-  ]
-
-  public_deps = [
-    "//sdk/fidl/fuchsia.intl:fuchsia.intl_hlcpp",
-    "//sdk/lib/fit",
-    "//sdk/lib/sys/cpp",
-    "//src/developer/forensics/feedback/annotations",
-    "//src/lib/backoff",
-    "//src/lib/fxl",
-  ]
-
-  deps = [ "//zircon/system/ulib/async" ]
 }
 
 source_set("ui_state_provider") {

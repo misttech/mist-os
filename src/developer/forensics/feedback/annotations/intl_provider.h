@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_ANNOTATIONS_TIMEZONE_PROVIDER_H_
-#define SRC_DEVELOPER_FORENSICS_FEEDBACK_ANNOTATIONS_TIMEZONE_PROVIDER_H_
+#ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_ANNOTATIONS_INTL_PROVIDER_H_
+#define SRC_DEVELOPER_FORENSICS_FEEDBACK_ANNOTATIONS_INTL_PROVIDER_H_
 
 #include <fuchsia/intl/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
@@ -24,10 +24,10 @@ namespace forensics::feedback {
 // Caches the most up-to-date version of the system timezone.
 //
 // fuchsia.intl.PropertyProvider must be in |services|.
-class TimezoneProvider : public CachedAsyncAnnotationProvider {
+class IntlProvider : public CachedAsyncAnnotationProvider {
  public:
-  TimezoneProvider(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
-                   std::unique_ptr<backoff::Backoff> backoff);
+  IntlProvider(async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
+               std::unique_ptr<backoff::Backoff> backoff);
 
   std::set<std::string> GetKeys() const override;
 
@@ -46,9 +46,9 @@ class TimezoneProvider : public CachedAsyncAnnotationProvider {
 
   ::fit::function<void(Annotations)> on_update_;
 
-  fxl::WeakPtrFactory<TimezoneProvider> ptr_factory_{this};
+  fxl::WeakPtrFactory<IntlProvider> ptr_factory_{this};
 };
 
 }  // namespace forensics::feedback
 
-#endif  // SRC_DEVELOPER_FORENSICS_FEEDBACK_ANNOTATIONS_TIMEZONE_PROVIDER_H_
+#endif  // SRC_DEVELOPER_FORENSICS_FEEDBACK_ANNOTATIONS_INTL_PROVIDER_H_

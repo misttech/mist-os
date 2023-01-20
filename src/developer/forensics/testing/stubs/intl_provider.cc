@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/forensics/testing/stubs/timezone_provider.h"
+#include "src/developer/forensics/testing/stubs/intl_provider.h"
 
 #include <fuchsia/intl/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
@@ -27,12 +27,11 @@ Profile MakeProfile(std::string_view timezone) {
 
 }  // namespace
 
-TimezoneProvider::TimezoneProvider(std::string_view default_timezone)
-    : timezone_(default_timezone) {}
+IntlProvider::IntlProvider(std::string_view default_timezone) : timezone_(default_timezone) {}
 
-void TimezoneProvider::GetProfile(GetProfileCallback callback) { callback(MakeProfile(timezone_)); }
+void IntlProvider::GetProfile(GetProfileCallback callback) { callback(MakeProfile(timezone_)); }
 
-void TimezoneProvider::SetTimezone(std::string_view timezone) {
+void IntlProvider::SetTimezone(std::string_view timezone) {
   timezone_ = std::string(timezone);
   if (!binding() || !binding()->is_bound()) {
     return;
@@ -41,12 +40,12 @@ void TimezoneProvider::SetTimezone(std::string_view timezone) {
   binding()->events().OnChange();
 }
 
-TimezoneProviderDelaysResponse::TimezoneProviderDelaysResponse(async_dispatcher_t* dispatcher,
-                                                               zx::duration delay,
-                                                               std::string_view default_timezone)
+IntlProviderDelaysResponse::IntlProviderDelaysResponse(async_dispatcher_t* dispatcher,
+                                                       zx::duration delay,
+                                                       std::string_view default_timezone)
     : dispatcher_(dispatcher), delay_(delay), timezone_(default_timezone) {}
 
-void TimezoneProviderDelaysResponse::GetProfile(GetProfileCallback callback) {
+void IntlProviderDelaysResponse::GetProfile(GetProfileCallback callback) {
   async::PostDelayedTask(
       dispatcher_,
       [timezone = timezone_, callback = std::move(callback)] { callback(MakeProfile(timezone)); },

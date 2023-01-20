@@ -249,6 +249,24 @@ executable("inspect_unittest_exe") {
   ]
 }
 
+executable("intl_provider_unittest_exe") {
+  testonly = true
+
+  sources = [ "intl_provider_unittest.cc" ]
+
+  deps = [
+    "//src/developer/forensics/feedback:constants",
+    "//src/developer/forensics/feedback/annotations:intl_provider",
+    "//src/developer/forensics/testing:gtest_with_syslog_main",
+    "//src/developer/forensics/testing:unit_test_fixture",
+    "//src/developer/forensics/testing/stubs:intl_provider",
+    "//src/lib/timekeeper:testing",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 executable("previous_boot_log_unittest_exe") {
   testonly = true
 
@@ -478,24 +496,6 @@ executable("time_provider_unittest_exe") {
   ]
 }
 
-executable("timezone_provider_unittest_exe") {
-  testonly = true
-
-  sources = [ "timezone_provider_unittest.cc" ]
-
-  deps = [
-    "//src/developer/forensics/feedback:constants",
-    "//src/developer/forensics/feedback/annotations:timezone_provider",
-    "//src/developer/forensics/testing:gtest_with_syslog_main",
-    "//src/developer/forensics/testing:unit_test_fixture",
-    "//src/developer/forensics/testing/stubs:timezone_provider",
-    "//src/lib/timekeeper:testing",
-    "//third_party/googletest:gmock",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 executable("ui_state_provider_unittest_exe") {
   testonly = true
 
@@ -613,6 +613,10 @@ fuchsia_unittest_component("inspect_unittest") {
   ]
 }
 
+fuchsia_unittest_component("intl_provider_unittest") {
+  deps = [ ":intl_provider_unittest_exe" ]
+}
+
 fuchsia_unittest_component("previous_boot_log_unittest") {
   deps = [
     ":previous_boot_log_unittest_exe",
@@ -686,10 +690,6 @@ fuchsia_unittest_component("time_provider_unittest") {
   deps = [ ":time_provider_unittest_exe" ]
 }
 
-fuchsia_unittest_component("timezone_provider_unittest") {
-  deps = [ ":timezone_provider_unittest_exe" ]
-}
-
 fuchsia_unittest_component("ui_state_provider_unittest") {
   deps = [ ":ui_state_provider_unittest_exe" ]
 }
@@ -714,6 +714,7 @@ fuchsia_test_package("feedback-tests") {
     ":last_reboot_unittest",
     ":kernel_log_integration_test",
     ":inspect_unittest",
+    ":intl_provider_unittest",
     ":previous_boot_log_unittest",
     ":main_service_unittest",
     ":namespace_init_unittest",
@@ -724,7 +725,6 @@ fuchsia_test_package("feedback-tests") {
     ":system_log_unittest",
     ":target_channel_provider_unittest",
     ":time_provider_unittest",
-    ":timezone_provider_unittest",
     ":ui_state_provider_unittest",
   ]
 

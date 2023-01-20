@@ -25,7 +25,7 @@ AnnotationProviders::AnnotationProviders(
       board_info_provider_(dispatcher_, services, AnnotationProviderBackoff()),
       product_info_provider_(dispatcher_, services, AnnotationProviderBackoff()),
       current_channel_provider_(dispatcher_, services, AnnotationProviderBackoff()),
-      timezone_provider_(dispatcher_, services, AnnotationProviderBackoff()),
+      intl_provider_(dispatcher_, services, AnnotationProviderBackoff()),
       device_id_provider_(std::move(device_id_provider)),
       target_channel_provider_(dispatcher_, services, AnnotationProviderBackoff()),
       ui_state_provider_(dispatcher_, services, std::make_unique<timekeeper::SystemClock>(),
@@ -34,7 +34,7 @@ AnnotationProviders::AnnotationProviders(
           dispatcher_, allowlist, static_annotations, &data_register_,
           {&time_provider_, &ui_state_provider_},
           {&board_info_provider_, &product_info_provider_, &current_channel_provider_},
-          {&timezone_provider_, device_id_provider_.get(), &ui_state_provider_},
+          {&intl_provider_, device_id_provider_.get(), &ui_state_provider_},
           {&target_channel_provider_}) {
   FX_CHECK(allowlist.size() <= kMaxNumPlatformAnnotations)
       << "Requesting " << allowlist.size() << " annotations when " << kMaxNumPlatformAnnotations

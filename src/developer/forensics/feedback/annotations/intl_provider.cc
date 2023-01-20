@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/forensics/feedback/annotations/timezone_provider.h"
+#include "src/developer/forensics/feedback/annotations/intl_provider.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
@@ -14,13 +14,12 @@
 
 namespace forensics::feedback {
 
-TimezoneProvider::TimezoneProvider(async_dispatcher_t* dispatcher,
-                                   std::shared_ptr<sys::ServiceDirectory> services,
-                                   std::unique_ptr<backoff::Backoff> backoff)
+IntlProvider::IntlProvider(async_dispatcher_t* dispatcher,
+                           std::shared_ptr<sys::ServiceDirectory> services,
+                           std::unique_ptr<backoff::Backoff> backoff)
     : dispatcher_(dispatcher), services_(services), backoff_(std::move(backoff)) {
   services_->Connect(property_provider_ptr_.NewRequest(dispatcher_));
-  property_provider_ptr_.events().OnChange =
-      ::fit::bind_member<&TimezoneProvider::GetTimezone>(this);
+  property_provider_ptr_.events().OnChange = ::fit::bind_member<&IntlProvider::GetTimezone>(this);
 
   property_provider_ptr_.set_error_handler([this](const zx_status_t status) {
     FX_PLOGS(WARNING, status) << "Lost connection to fuchsia.intl.PropertyProvider";
@@ -40,13 +39,13 @@ TimezoneProvider::TimezoneProvider(async_dispatcher_t* dispatcher,
   GetTimezone();
 }
 
-std::set<std::string> TimezoneProvider::GetKeys() const {
+std::set<std::string> IntlProvider::GetKeys() const {
   return {
       kSystemTimezonePrimaryKey,
   };
 }
 
-void TimezoneProvider::GetOnUpdate(::fit::function<void(Annotations)> callback) {
+void IntlProvider::GetOnUpdate(::fit::function<void(Annotations)> callback) {
   on_update_ = std::move(callback);
 
   if (timezone_.has_value()) {
@@ -56,7 +55,7 @@ void TimezoneProvider::GetOnUpdate(::fit::function<void(Annotations)> callback) 
   }
 }
 
-void TimezoneProvider::GetTimezone() {
+void IntlProvider::GetTimezone() {
   FX_CHECK(property_provider_ptr_.is_bound());
 
   property_provider_ptr_->GetProfile([this](const fuchsia::intl::Profile profile) {
