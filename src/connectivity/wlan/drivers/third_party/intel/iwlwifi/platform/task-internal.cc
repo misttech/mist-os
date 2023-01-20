@@ -41,7 +41,9 @@ TaskInternal::TaskInternal(async_dispatcher_t* dispatcher, FuncType func, void* 
 
 TaskInternal::~TaskInternal() {
   CancelSync();
-  ZX_DEBUG_ASSERT(cpp20::atomic_ref<zx_futex_t>(state_).load() == TaskState::kIdle);
+  auto state = cpp20::atomic_ref<zx_futex_t>(state_).load();
+  ZX_DEBUG_ASSERT_MSG(state == TaskState::kIdle, "Task state is %u, but expected %u", state,
+                      TaskState::kIdle);
 }
 
 zx_status_t TaskInternal::Post(zx_duration_t delay) {
@@ -109,13 +111,23 @@ zx_status_t TaskInternal::Cancel() {
 
 zx_status_t TaskInternal::CancelSync() {
   // Cancel the task.
-  zx_status_t status = ZX_OK;
-  if ((status = Cancel()) != ZX_OK) {
-    return status;
+  zx_status_t status = Cancel();
+
+  // Cancelling the task can fail if the task is currently executing.
+  // There might be an edge case here where we fail to cancel the task because the task is
+  // executing, but by the time we reach this check the task finishes executing and has returned to
+  // TaskState::kIdle. In that case, it's okay to not call Wait() and just return the status. We can
+  // consider that case equivalent to the task being idle before calling Cancel().
+  if (status != ZX_OK && cpp20::atomic_ref<zx_futex_t>(state_).load() == TaskState::kExecuting) {
+    // For CancelSync(), we'll allow the task to finish executing by calling Wait().
+    return Wait();
   }
 
-  // Now wait for completion.
-  return Wait();
+  // Otherwise, the following cases can occur:
+  // * Task was already idle, and cancelling failed => return error
+  // * Task was queued and cancelled successfully => return ZX_OK
+  // * Task was queued but not cancelled successfully => return error
+  return status;
 }
 
 }  // namespace wlan::iwlwifi

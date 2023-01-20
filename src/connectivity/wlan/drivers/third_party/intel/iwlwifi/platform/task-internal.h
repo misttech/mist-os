@@ -31,11 +31,17 @@ class TaskInternal : private async_task_t {
 
   // Cancel the task, non-blocking.  May return:
   // * ZX_OK if the task was cancelled.
-  // * ZX_ERR_NOT_FOUND if the task was not queued and thus not cancelled.
+  // * ZX_ERR_NOT_FOUND if the task was not queued and thus not cancelled. This includes the case
+  //   where the task is currently executing.
   // * Other errors in other error cases.
   zx_status_t Cancel();
 
-  // Cancel the task, blocking.
+  // Cancel the task, blocking. Task should in Idle state after this function returns.
+  // If the task is currently executing, this will wait until the task completes.
+  // * ZX_OK if the task was cancelled successfully
+  // * ZX_ERR_NOT_FOUND if the task was not queued and thus not cancelled. This includes the case
+  //   where the task is currently executing.
+  // * Other errors in other error cases.
   zx_status_t CancelSync();
 
  private:
