@@ -34,15 +34,8 @@ use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
 use std::collections::HashSet;
 use std::sync::Arc;
 
-// The types of data that can be sent.
-#[cfg_attr(test, derive(PartialEq))]
-#[derive(Clone, Debug)]
-pub(crate) enum TestEnvironmentPayload {
-    Request(SettingRequest),
-}
-
-type Delegate = crate::message::delegate::Delegate<TestEnvironmentPayload>;
-type Receptor = crate::message::receptor::Receptor<TestEnvironmentPayload>;
+type Delegate = service::message::Delegate;
+type Receptor = service::message::Receptor;
 type Signature = crate::message::base::Signature;
 
 struct TestEnvironment {
@@ -52,12 +45,13 @@ struct TestEnvironment {
     /// A newly created AudioPolicyHandler.
     handler: AudioPolicyHandler,
 
-    /// Factory for internal message hub.
+    /// Used for a message broker that monitors settings requests.
     internal_delegate: Delegate,
 
     setting_handler_signature: Signature,
 
-    delegate: service::message::Delegate,
+    /// Primary message hub used for setting up policy handlers.
+    delegate: Delegate,
 }
 
 impl TestEnvironment {
@@ -82,10 +76,10 @@ impl TestEnvironment {
         let (messenger, _) =
             delegate.create(MessengerType::Unbound).await.expect("core messenger created");
 
-        let test_delegate = crate::message::message_hub::MessageHub::create();
+        let internal_delegate = service::MessageHub::create_hub();
 
-        let handler_signature =
-            TestEnvironment::spawn_setting_handler(&delegate, &test_delegate).await;
+        let setting_handler_signature =
+            TestEnvironment::spawn_setting_handler(&delegate, &internal_delegate).await;
 
         let client_proxy = ClientProxy::new(messenger);
 
@@ -133,16 +127,10 @@ impl TestEnvironment {
             _ => panic!("Failed to restore policy handler: {result:?}"),
         }
 
-        Self {
-            store,
-            handler,
-            internal_delegate: test_delegate,
-            setting_handler_signature: handler_signature,
-            delegate,
-        }
+        Self { store, handler, internal_delegate, setting_handler_signature, delegate }
     }
 
-    async fn create_volume_listener(&self) -> service::message::Receptor {
+    async fn create_volume_listener(&self) -> Receptor {
         let messenger = self
             .delegate
             .create(MessengerType::Unbound)
@@ -162,7 +150,10 @@ impl TestEnvironment {
         self.internal_delegate
             .create(MessengerType::Broker(Some(filter::Builder::single(
                 filter::Condition::Custom(Arc::new(move |message| {
-                    matches!(message.payload(), TestEnvironmentPayload::Request(_))
+                    matches!(
+                        message.payload(),
+                        service::Payload::Setting(SettingPayload::Request(_))
+                    )
                 })),
             ))))
             .await
@@ -171,7 +162,7 @@ impl TestEnvironment {
     }
 
     async fn spawn_setting_handler(
-        service_delegate: &service::message::Delegate,
+        service_delegate: &Delegate,
         test_delegate: &Delegate,
     ) -> Signature {
         let receptor = service_delegate
@@ -211,7 +202,8 @@ impl TestEnvironment {
                             // Echo request to those listening.
                             let _ = test_messenger
                                 .message(
-                                    TestEnvironmentPayload::Request(request.clone()),
+                                    service::Payload::Setting(
+                                        SettingPayload::Request(request.clone())),
                                     Audience::Broadcast,
                                 )
                                 .send();
@@ -402,8 +394,10 @@ async fn verify_stream_set(receptor: &mut Receptor, stream: impl Into<SetAudioSt
     while let Some(message_event) = receptor.next().await {
         if let MessageEvent::Message(incoming_payload, client) = message_event {
             client.acknowledge().await;
-            if let TestEnvironmentPayload::Request(SettingRequest::SetVolume(streams, _)) =
-                incoming_payload
+            if let service::Payload::Setting(SettingPayload::Request(SettingRequest::SetVolume(
+                streams,
+                _,
+            ))) = incoming_payload
             {
                 assert_eq!(vec![stream.into()], streams);
                 return;
@@ -703,10 +697,7 @@ async fn test_handler_add_policy_does_not_modify_internal_volume_within_limits()
 
 /// Verifies that the requestor in the test environment received a changed notification with the
 /// given audio info.
-async fn verify_media_volume_changed(
-    receptor: &mut service::message::Receptor,
-    audio_info: AudioInfo,
-) {
+async fn verify_media_volume_changed(receptor: &mut Receptor, audio_info: AudioInfo) {
     verify_payload(SettingPayload::Response(Ok(Some(audio_info.into()))).into(), receptor, None)
         .await;
 }
