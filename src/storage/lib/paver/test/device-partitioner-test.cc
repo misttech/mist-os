@@ -2137,6 +2137,8 @@ TEST_F(PinecrestPartitionerTests, FindPartition) {
       {GPT_ZIRCON_B_NAME, kDummyType, 0x60400, 0x10000},
       {GPT_ZIRCON_R_NAME, kDummyType, 0x70400, 0x10000},
       {GPT_FVM_NAME, kNewFvmType, 0x80400, 0x10000},
+      {GPT_BOOTLOADER_A_NAME, kDummyType, 0x90400, 0x10000},
+      {GPT_BOOTLOADER_B_NAME, kDummyType, 0xA0400, 0x10000},
   };
   ASSERT_NO_FATAL_FAILURE(InitializeStartingGPTPartitions(gpt_dev.get(), kPinecrestNewPartitions));
 
@@ -2147,6 +2149,8 @@ TEST_F(PinecrestPartitionerTests, FindPartition) {
   std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
 
   // Make sure we can find the important partitions.
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderA)));
+  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kBootloaderB)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconR)));
@@ -2167,6 +2171,8 @@ TEST_F(PinecrestPartitionerTests, SupportsPartition) {
   ASSERT_OK(status);
   std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
 
+  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderA)));
+  EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kBootloaderB)));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconA)));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconR)));

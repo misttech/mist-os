@@ -77,6 +77,8 @@ zx::result<std::unique_ptr<DevicePartitioner>> PinecrestPartitioner::Initialize(
 
 bool PinecrestPartitioner::SupportsPartition(const PartitionSpec& spec) const {
   const PartitionSpec supported_specs[] = {
+      PartitionSpec(paver::Partition::kBootloaderA),
+      PartitionSpec(paver::Partition::kBootloaderB),
       PartitionSpec(paver::Partition::kZirconA),
       PartitionSpec(paver::Partition::kZirconB),
       PartitionSpec(paver::Partition::kZirconR),
@@ -101,6 +103,8 @@ zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartition
     const PartitionSpec& spec) const {
   std::function<bool(const gpt_partition_t&)> filter;
   switch (spec.partition) {
+    case Partition::kBootloaderA:
+    case Partition::kBootloaderB:
     case Partition::kZirconA:
     case Partition::kZirconB:
     case Partition::kZirconR:
