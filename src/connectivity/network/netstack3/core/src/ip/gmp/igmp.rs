@@ -155,7 +155,7 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>, B: BufferMut>
                 return;
             }
             _ => {
-                debug!("We do not support IGMPv3 yet");
+                debug!("TODO(https://fxbug.dev/120293): Support IGMPv3");
                 return;
             }
         } {
