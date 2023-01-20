@@ -38,22 +38,22 @@ class DLog {
 
   virtual ~DLog() = default;
 
-  void StartThreads();
+  void StartThreads() TA_EXCL(lock_);
 
   // Mark this DLog as being shutdown, then shutdown all threads.  Once called,
   // subsequent |write| operations will fail.
-  zx_status_t Shutdown(zx_time_t deadline);
+  zx_status_t Shutdown(zx_time_t deadline) TA_EXCL(lock_);
 
   // See |dlog_panic_start|.
-  void PanicStart();
+  void PanicStart() TA_EXCL(lock_);
 
   // See |dlog_bluescreen_init|.
-  void BluescreenInit();
+  void BluescreenInit() TA_EXCL(lock_);
 
   // See "dlog_render_to_crashlog" in include/lib/debuglog.h
-  size_t RenderToCrashlog(ktl::span<char> target) const;
+  size_t RenderToCrashlog(ktl::span<char> target) const TA_EXCL(lock_);
 
-  zx_status_t Write(uint32_t severity, uint32_t flags, ktl::string_view str);
+  zx_status_t Write(uint32_t severity, uint32_t flags, ktl::string_view str) TA_EXCL(lock_);
 
  protected:
   // Methods that can be overridden for tests.
@@ -180,8 +180,18 @@ class DLog {
     }
 
     if (ret.hdr.datalen) {
+      // Figure out if the payload portion of the record needs to be represented
+      // by one contiguous region, or two.  Start by computing the offset into
+      // the ring buffer where the data region begins.  Next compute the
+      // distance from this offset to the end of the ring buffer.  This is the
+      // total amount of contiguous space we have for the payload.  If the
+      // length of the payload is larger than this region, we need to produce
+      // two regions, one from the start of the payload to the end of the ring,
+      // and the other from the start of the ring to the end of the payload.
+      // Otherwise, we can just produce a single contiguous region and be done
+      // with it.
       const size_t data_offset = (offset + sizeof(ret.hdr)) & DLOG_MASK;
-      const size_t fifospace = DLOG_SIZE - offset;
+      const size_t fifospace = DLOG_SIZE - data_offset;
       const char* const char_data = reinterpret_cast<const char*>(data_);
       if (ret.hdr.datalen <= fifospace) {
         ret.region1 = {char_data + data_offset, ret.hdr.datalen};

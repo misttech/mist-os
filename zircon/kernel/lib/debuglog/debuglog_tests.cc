@@ -6,6 +6,7 @@
 
 #include <lib/debuglog.h>
 #include <lib/unittest/unittest.h>
+#include <lib/zircon-internal/macros.h>
 #include <zircon/types.h>
 
 #include <ktl/string_view.h>
@@ -394,6 +395,122 @@ struct DebuglogTests {
     END_TEST;
   }
 
+  // This is a regression test introduced after discovering fxb/120254.  It
+  // attempt to make sure that the internal methods ReadRecord and
+  // ReassembleFromOffset return proper results, even when headers and payload
+  // span the break in the ring buffer.
+  static bool read_record() {
+    BEGIN_TEST;
+
+    fbl::AllocChecker ac;
+    ktl::unique_ptr<DLog> log = ktl::make_unique<DLog>(&ac);
+    ASSERT_TRUE(ac.check());
+
+    const char kPayloadData[] = {
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
+        0x0c, 0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+        0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f, 0x20,
+    };
+    const ktl::string_view kPayload{kPayloadData, ktl::size(kPayloadData)};
+    const size_t kPayloadSize = sizeof(kPayloadData);
+    const size_t kTotalRecordSize = sizeof(dlog_header_t) + kPayloadSize;
+
+    constexpr uint8_t kTestSeverity = 0xba;
+    constexpr uint8_t kTestFlags = 0xad;
+    const uint64_t our_tid = Thread::Current::Get()->tid();
+
+    static_assert(
+        (kPayloadSize % 4) == 0,
+        "Payload data must be a multiple of 4 bytes in order to be able to align its end exactly "
+        "with the end of the ring buffer");
+
+    constexpr ktl::array kOffsets = {
+        static_cast<size_t>(0),                             // Start of the buffer
+        DLOG_SIZE - kTotalRecordSize,                       // Aligned with end
+        DLOG_SIZE - kTotalRecordSize + (kPayloadSize / 2),  // Splitting the payload
+        DLOG_SIZE - (sizeof(dlog_header_t) / 2),            // Splitting the header
+    };
+
+    for (const size_t offset : kOffsets) {
+      Guard<MonitoredSpinLock, IrqSave> guard{&log->lock_, SOURCE_TAG};
+
+      // Set up the logs ring buffer so that it looks like it is empty, but
+      // ready to write the next record starting at the test vector offset.
+      // Also, zero out our entire ring buffer just so we are starting from a
+      // known state with each vector.
+      ASSERT_TRUE((offset % 4) == 0);  // Records must start on 4 byte boundaries.
+      ASSERT_LT(offset, DLOG_SIZE);
+      log->head_ = log->tail_ = offset;
+      memset(log->data_, 0, sizeof(log->data_));
+
+      // Go ahead and write our record, then confirm that head and tail end up
+      // where we expect them to.  Note that these pointers are always absolute
+      // pointers, to compute offsets from them, one needs to & with the
+      // DLOG_MASK.
+      zx_status_t status = ZX_ERR_INTERNAL;
+
+      const zx_time_t before_ts = current_time();
+      guard.CallUnlocked([&log, &status, kPayload]() {
+        status = log->Write(kTestSeverity, kTestFlags, kPayload);
+      });
+      const zx_time_t after_ts = current_time();
+
+      ASSERT_OK(status);
+      EXPECT_EQ(offset, log->tail_);
+      EXPECT_EQ(offset + kTotalRecordSize, log->head_);
+
+      // Reassemble the header from the offset and make sure it looks right.
+      dlog_header_t hdr;
+      memset(&hdr, 0, sizeof(hdr));
+      log->ReassembleFromOffset(offset, {reinterpret_cast<uint8_t*>(&hdr), sizeof(hdr)});
+
+      EXPECT_EQ(DLOG_HDR_GET_FIFOLEN(hdr.preamble), kTotalRecordSize);
+      EXPECT_EQ(DLOG_HDR_GET_READLEN(hdr.preamble), kTotalRecordSize);
+      EXPECT_EQ(kPayloadSize, hdr.datalen);
+      EXPECT_GE(hdr.timestamp, before_ts);
+      EXPECT_LE(hdr.timestamp, after_ts);
+      EXPECT_EQ(kTestSeverity, hdr.severity);
+      EXPECT_EQ(kTestFlags, hdr.flags);
+      EXPECT_EQ(0u, hdr.pid);  // Kernel PID is always 0
+      EXPECT_EQ(our_tid, hdr.tid);
+      EXPECT_EQ(log->sequence_count_ - 1u, hdr.sequence);
+
+      // Now attempt to read the record info at the same offset.  We should get
+      // the same header base, and regions which exist completely within the
+      // ring buffer, and have the test vector pattern in them.
+      const zx::result<DLog::Record> maybe_record = log->ReadRecord(offset);
+      ASSERT_TRUE(maybe_record.is_ok());
+      const DLog::Record& record = maybe_record.value();
+      const uintptr_t log_data = reinterpret_cast<uintptr_t>(log->data_);
+
+      EXPECT_BYTES_EQ(reinterpret_cast<const uint8_t*>(&hdr),
+                      reinterpret_cast<const uint8_t*>(&record.hdr), sizeof(hdr));
+      EXPECT_GT(record.region1.size(), 0u);
+      EXPECT_LE(record.region1.size(), DLOG_MAX_RECORD);
+      ASSERT_GE(reinterpret_cast<uintptr_t>(record.region1.data()), log_data);
+      ASSERT_LE(reinterpret_cast<uintptr_t>(record.region1.data()) + record.region1.size(),
+                log_data + DLOG_SIZE);
+
+      if (record.region2.size() > 0u) {
+        EXPECT_LE(record.region2.size(), DLOG_MAX_RECORD);
+        ASSERT_GE(reinterpret_cast<uintptr_t>(record.region2.data()), log_data);
+        ASSERT_LE(reinterpret_cast<uintptr_t>(record.region2.data()) + record.region2.size(),
+                  log_data + DLOG_SIZE);
+      }
+
+      ASSERT_EQ(kPayloadSize, record.region1.size() + record.region2.size());
+      EXPECT_BYTES_EQ(reinterpret_cast<const uint8_t*>(kPayloadData),
+                      reinterpret_cast<const uint8_t*>(record.region1.data()),
+                      record.region1.size());
+      EXPECT_BYTES_EQ(reinterpret_cast<const uint8_t*>(kPayloadData) + record.region1.size(),
+                      reinterpret_cast<const uint8_t*>(record.region2.data()),
+                      record.region2.size());
+      EXPECT_FALSE(record.ends_with_newline);
+    }
+
+    END_TEST;
+  }
+
   // Test that write fails with an error once the |DLog| has been shutdown.
   static bool shutdown() {
     BEGIN_TEST;
@@ -433,5 +550,6 @@ DEBUGLOG_UNITTEST(DebuglogTests::log_reader_read)
 DEBUGLOG_UNITTEST(DebuglogTests::log_reader_dataloss)
 DEBUGLOG_UNITTEST(DebuglogTests::log_dumper_test)
 DEBUGLOG_UNITTEST(DebuglogTests::render_to_crashlog)
+DEBUGLOG_UNITTEST(DebuglogTests::read_record)
 DEBUGLOG_UNITTEST(DebuglogTests::shutdown)
 UNITTEST_END_TESTCASE(debuglog_tests, "debuglog_tests", "Debuglog test")
