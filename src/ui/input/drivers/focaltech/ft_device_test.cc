@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fake-i2c/fake-i2c.h>
@@ -142,12 +143,9 @@ class FakeFtDevice : public fake_i2c::FakeI2c {
   uint32_t firmware_write_size_ = 0;
 };
 
-class FocaltechTest : public zxtest::Test {
+class FocaltechTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
-  FocaltechTest()
-      : fake_parent_(MockDevice::FakeRootParent()),
-        loop_(&kAsyncLoopConfigNeverAttachToThread),
-        outgoing_(loop_.dispatcher()) {}
+  FocaltechTest() : fake_parent_(MockDevice::FakeRootParent()), outgoing_(dispatcher()) {}
 
   void SetUp() override {
     fake_parent_->AddProtocol(ZX_PROTOCOL_GPIO, interrupt_gpio_.GetProto()->ops,
@@ -157,7 +155,7 @@ class FocaltechTest : public zxtest::Test {
 
     auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
         fuchsia_hardware_i2c::Service::InstanceHandler(
-            {.device = i2c_.bind_handler(loop_.dispatcher())}));
+            {.device = i2c_.bind_handler(dispatcher())}));
     ZX_ASSERT(service_result.is_ok());
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -173,11 +171,7 @@ class FocaltechTest : public zxtest::Test {
     interrupt_gpio_.ExpectConfigIn(ZX_OK, GPIO_NO_PULL)
         .ExpectGetInterrupt(ZX_OK, ZX_INTERRUPT_MODE_EDGE_LOW, std::move(interrupt));
     reset_gpio_.ExpectConfigOut(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
-
-    EXPECT_OK(loop_.StartThread());
   }
-
-  void TearDown() override { loop_.Shutdown(); }
 
  protected:
   std::shared_ptr<MockDevice> fake_parent_;
@@ -186,7 +180,6 @@ class FocaltechTest : public zxtest::Test {
  private:
   ddk::MockGpio interrupt_gpio_;
   ddk::MockGpio reset_gpio_;
-  async::Loop loop_;
   component::OutgoingDirectory outgoing_;
 };
 
@@ -198,11 +191,14 @@ TEST_F(FocaltechTest, Metadata3x27) {
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt3x27Metadata, sizeof(kFt3x27Metadata));
 
   FtDevice dut(fake_parent_.get());
-  EXPECT_OK(dut.Init());
+  PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
 
   uint8_t actual_descriptor[1024];
   size_t actual_size = 0;
-  EXPECT_OK(dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
+  PerformBlockingWork([&] {
+    EXPECT_OK(
+        dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
+  });
 
   const uint8_t* expected_descriptor;
   const size_t expected_size = get_ft3x27_report_desc(&expected_descriptor);
@@ -218,11 +214,14 @@ TEST_F(FocaltechTest, Metadata5726) {
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt5726Metadata, sizeof(kFt5726Metadata));
 
   FtDevice dut(fake_parent_.get());
-  EXPECT_OK(dut.Init());
+  PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
 
   uint8_t actual_descriptor[1024];
   size_t actual_size = 0;
-  EXPECT_OK(dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
+  PerformBlockingWork([&] {
+    EXPECT_OK(
+        dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
+  });
 
   const uint8_t* expected_descriptor;
   const size_t expected_size = get_ft5726_report_desc(&expected_descriptor);
@@ -238,11 +237,14 @@ TEST_F(FocaltechTest, Metadata6336) {
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt6336Metadata, sizeof(kFt6336Metadata));
 
   FtDevice dut(fake_parent_.get());
-  EXPECT_OK(dut.Init());
+  PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
 
   uint8_t actual_descriptor[1024];
   size_t actual_size = 0;
-  EXPECT_OK(dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
+  PerformBlockingWork([&] {
+    EXPECT_OK(
+        dut.HidbusGetDescriptor(0, actual_descriptor, sizeof(actual_descriptor), &actual_size));
+  });
 
   const uint8_t* expected_descriptor;
   const size_t expected_size = get_ft6336_report_desc(&expected_descriptor);
@@ -260,7 +262,7 @@ TEST_F(FocaltechTest, Firmware5726) {
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt5726Metadata, sizeof(kFt5726Metadata));
 
   FtDevice dut(fake_parent_.get());
-  EXPECT_OK(dut.Init());
+  PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
   EXPECT_EQ(i2c_.firmware_write_size(), sizeof(kFirmware3));
 }
 
@@ -274,7 +276,7 @@ TEST_F(FocaltechTest, Firmware5726UpToDate) {
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kFt5726Metadata, sizeof(kFt5726Metadata));
 
   FtDevice dut(fake_parent_.get());
-  EXPECT_OK(dut.Init());
+  PerformBlockingWork([&] { EXPECT_OK(dut.Init()); });
   EXPECT_EQ(i2c_.firmware_write_size(), 0);
 }
 
