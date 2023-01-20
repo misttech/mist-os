@@ -1116,10 +1116,8 @@ zx::result<> NormalVcpu::Enter(zx_port_packet_t& packet) {
   };
   auto post_exit = [this](AutoVmcs& vmcs, zx_port_packet_t& packet) -> zx::result<> {
     auto& guest = static_cast<NormalGuest&>(guest_);
-    zx_status_t status =
-        vmexit_handler_normal(vmcs, vmx_state_.guest_state, local_apic_state_, pv_clock_state_,
-                              guest.PhysicalAspace(), guest.Traps(), packet);
-    return zx::make_result(status);
+    return vmexit_handler_normal(vmcs, vmx_state_.guest_state, local_apic_state_, pv_clock_state_,
+                                 guest.PhysicalAspace(), guest.Traps(), packet);
   };
   return EnterInternal(ktl::move(pre_enter), ktl::move(post_exit), packet);
 }
@@ -1191,8 +1189,7 @@ zx::result<> DirectVcpu::Enter(zx_port_packet_t& packet) {
     return zx::ok();
   };
   auto post_exit = [this](AutoVmcs& vmcs, zx_port_packet_t& packet) -> zx::result<> {
-    zx_status_t status = vmexit_handler_direct(vmcs, vmx_state_.guest_state, fs_base_, packet);
-    return zx::make_result(status);
+    return vmexit_handler_direct(vmcs, vmx_state_.guest_state, fs_base_, packet);
   };
   auto& shared_aspace = static_cast<DirectGuest&>(guest_).SharedAspace();
   VmAspace& host_aspace = hypervisor::switch_aspace(shared_aspace);
