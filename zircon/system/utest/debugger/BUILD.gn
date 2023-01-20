@@ -32,7 +32,7 @@ test("debugger") {
   ]
 
   deps = [
-    "//src/lib/tbi",
+    "//sdk/lib/tbi",
     "//zircon/system/ulib/backtrace-request",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/runtime",
