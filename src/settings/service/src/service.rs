@@ -102,6 +102,7 @@ pub enum Payload {
 
 #[cfg(test)]
 pub(crate) mod test {
+    use crate::audio::types::AudioInfo;
     use crate::payload_convert;
 
     /// This payload should be expanded to include any sort of data that tests would send that is
@@ -109,6 +110,7 @@ pub(crate) mod test {
     #[derive(PartialEq, Clone, Debug)]
     pub enum Payload {
         Integer(i64),
+        Audio(AudioInfo),
     }
 
     // Conversions for Handler Payload.

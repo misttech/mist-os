@@ -400,9 +400,11 @@ mod tests {
             );
 
             // Confirm received value matches the value sent from workload.
-            let test::Payload::Integer(value) =
-                receptor.next_of::<test::Payload>().await.expect("should have payload").0;
-            assert_eq!(value, result);
+            if let test::Payload::Integer(value) =
+                receptor.next_of::<test::Payload>().await.expect("should have payload").0
+            {
+                assert_eq!(value, result);
+            }
 
             handler
                 .handle_job_completion(execution_rx.next().await.expect("should have gotten job"));
@@ -453,9 +455,11 @@ mod tests {
         handler.cancel();
 
         // Confirm received value matches the value sent from workload.
-        let test::Payload::Integer(value) =
-            receptor.next_of::<test::Payload>().await.expect("should have payload").0;
-        assert_eq!(value, result);
+        if let test::Payload::Integer(value) =
+            receptor.next_of::<test::Payload>().await.expect("should have payload").0
+        {
+            assert_eq!(value, result);
+        }
 
         handler.handle_job_completion(execution_rx.next().await.expect("should have gotten job"));
 

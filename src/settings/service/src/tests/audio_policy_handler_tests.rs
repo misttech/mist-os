@@ -39,7 +39,6 @@ use std::sync::Arc;
 #[derive(Clone, Debug)]
 pub(crate) enum TestEnvironmentPayload {
     Request(SettingRequest),
-    Serve(AudioInfo),
 }
 
 type Delegate = crate::message::delegate::Delegate<TestEnvironmentPayload>;
@@ -175,22 +174,15 @@ impl TestEnvironment {
         service_delegate: &service::message::Delegate,
         test_delegate: &Delegate,
     ) -> Signature {
-        let cmd_receptor = test_delegate
-            .create(MessengerType::Unbound)
-            .await
-            .expect("receptor for handler should be created")
-            .1;
-
-        let signature = cmd_receptor.get_signature();
-
         let receptor = service_delegate
             .create(MessengerType::Addressable(service::Address::Handler(SettingType::Audio)))
             .await
             .expect("should create setting messenger")
             .1;
 
+        let signature = receptor.get_signature();
+
         let receptor_fuse = receptor.fuse();
-        let cmd_receptor_fuse = cmd_receptor.fuse();
 
         let test_messenger = test_delegate
             .create(MessengerType::Unbound)
@@ -199,21 +191,22 @@ impl TestEnvironment {
             .0;
 
         Task::spawn(async move {
-            futures::pin_mut!(receptor_fuse, cmd_receptor_fuse);
+            futures::pin_mut!(receptor_fuse);
             let mut listeners = Vec::new();
             let mut audio_info = default_audio_info();
 
             loop {
                 futures::select! {
-                    event = cmd_receptor_fuse.select_next_some() => {
-                        if let MessageEvent::Message(TestEnvironmentPayload::Serve(info),
-                                client) = event {
-                            client.acknowledge().await;
-                            audio_info = info;
-                        }
-                    }
                     event = receptor_fuse.select_next_some() => {
-                        if let Ok((SettingPayload::Request(request), client)) =
+                        // NB: We can't use `try_from_with_client` here since it consumes the event
+                        // and the event isn't cloneable.
+                        type TestMessage = service::Payload;
+                        type TestPayload = service::test::Payload;
+                        if let service::message::MessageEvent::Message(
+                                    TestMessage::Test(TestPayload::Audio(info)), client) = &event {
+                            client.acknowledge().await;
+                            audio_info = info.clone();
+                        } else if let Ok((SettingPayload::Request(request), client)) =
                                 SettingPayload::try_from_with_client(event) {
                             // Echo request to those listening.
                             let _ = test_messenger
@@ -245,6 +238,8 @@ impl TestEnvironment {
                                 _ => {
                                 }
                             }
+                        } else {
+                            tracing::warn!("Unhandled event");
                         }
                     }
                 }
@@ -257,14 +252,14 @@ impl TestEnvironment {
 
     async fn serve_audio_info(&mut self, audio_info: AudioInfo) {
         let messenger = self
-            .internal_delegate
+            .delegate
             .create(MessengerType::Unbound)
             .await
             .expect("receptor for handler should be created")
             .0;
         let mut receptor = messenger
             .message(
-                TestEnvironmentPayload::Serve(audio_info),
+                service::Payload::Test(service::test::Payload::Audio(audio_info)),
                 Audience::Messenger(self.setting_handler_signature),
             )
             .send();
