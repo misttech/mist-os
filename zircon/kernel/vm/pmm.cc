@@ -169,6 +169,12 @@ PageQueues* pmm_page_queues() { return pmm_node.GetPageQueues(); }
 
 Evictor* pmm_evictor() { return pmm_node.GetEvictor(); }
 
+VmCompression* pmm_page_compression() { return pmm_node.GetPageCompression(); }
+
+zx_status_t pmm_set_page_compression(fbl::RefPtr<VmCompression> compression) {
+  return pmm_node.SetPageCompression(ktl::move(compression));
+}
+
 PhysicalPageBorrowingConfig* pmm_physical_page_borrowing_config() {
   // singleton
   return &ppb_config;

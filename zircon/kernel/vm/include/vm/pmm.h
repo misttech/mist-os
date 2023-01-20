@@ -25,6 +25,7 @@ typedef struct pmm_arena_info {
   size_t size;
 } pmm_arena_info_t;
 
+class VmCompression;
 class PhysicalPageBorrowingConfig;
 class LoanSweeper;
 
@@ -143,6 +144,13 @@ PageQueues* pmm_page_queues();
 
 // Return the Evictor.
 Evictor* pmm_evictor();
+
+// Retrieve any page compression instance. If this returns non-null then it's return value will not
+// change and the result can be cached.
+VmCompression* pmm_page_compression();
+
+// Set the page compression instance. Returns an error if one has already been set.
+zx_status_t pmm_set_page_compression(fbl::RefPtr<VmCompression> compression);
 
 // Return the singleton PhysicalPageBorrowingConfig.
 PhysicalPageBorrowingConfig* pmm_physical_page_borrowing_config();

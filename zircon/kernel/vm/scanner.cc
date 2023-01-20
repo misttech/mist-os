@@ -15,6 +15,7 @@
 #include <kernel/thread.h>
 #include <ktl/algorithm.h>
 #include <lk/init.h>
+#include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/physical_page_borrowing_config.h>
 #include <vm/scanner.h>
@@ -90,6 +91,9 @@ void scanner_print_stats() {
   printf("[SCAN]: Found %lu locked pages in discardable vmos\n", counts.locked);
   printf("[SCAN]: Found %lu unlocked pages in discardable vmos\n", counts.unlocked);
   pmm_page_queues()->Dump();
+  if (VmCompression *compression = pmm_page_compression()) {
+    compression->Dump();
+  }
 }
 
 zx_time_t calc_next_zero_scan_deadline(zx_time_t current) {
@@ -376,6 +380,11 @@ static void scanner_init_func(uint level) {
                                   ZX_SEC(gBootOptions->page_scanner_max_aging_interval));
   // Ensure at least 1 second between access scans.
   accessed_scan_period = ZX_SEC(ktl::max(gBootOptions->page_scanner_min_aging_interval, 1u));
+
+  if (fbl::RefPtr<VmCompression> compression = VmCompression::CreateDefault()) {
+    zx_status_t status = pmm_set_page_compression(ktl::move(compression));
+    ASSERT_MSG(status == ZX_OK, "status: %d", status);
+  }
 
   thread->Resume();
 }

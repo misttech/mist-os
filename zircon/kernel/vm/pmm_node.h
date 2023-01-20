@@ -11,6 +11,7 @@
 #include <kernel/event.h>
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
+#include <vm/compression.h>
 #include <vm/loan_sweeper.h>
 #include <vm/physical_page_borrowing_config.h>
 #include <vm/pmm.h>
@@ -95,6 +96,15 @@ class PmmNode {
   void AddFreePages(list_node* list);
 
   PageQueues* GetPageQueues() { return &page_queues_; }
+
+  // See |pmm_get_page_compression|
+  VmCompression* GetPageCompression() {
+    Guard<Mutex> guard{&compression_lock_};
+    return page_compression_.get();
+  }
+
+  // See |pmm_set_page_compression|.
+  zx_status_t SetPageCompression(fbl::RefPtr<VmCompression> compression);
 
   // Fill all free pages (both non-loaned and loaned) with a pattern and arm the checker.  See
   // |PmmChecker|.
@@ -236,6 +246,12 @@ class PmmNode {
   PageQueues page_queues_;
 
   Evictor evictor_;
+
+  // The page_compression_ is a lazily initialized RefPtr to keep the PmmNode constructor simple, at
+  // the cost needing to hold a lock to read the RefPtr. To avoid unnecessarily contending on the
+  // main pmm lock_, use a separate one.
+  DECLARE_MUTEX(PmmNode) compression_lock_;
+  fbl::RefPtr<VmCompression> page_compression_ TA_GUARDED(compression_lock_);
 
   bool free_fill_enabled_ TA_GUARDED(lock_) = false;
   PmmChecker checker_ TA_GUARDED(lock_);

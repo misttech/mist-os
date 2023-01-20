@@ -1098,3 +1098,12 @@ void PmmNode::SeedRandomShouldWait() {
                                              sizeof(random_should_wait_seed_));
   }
 }
+
+zx_status_t PmmNode::SetPageCompression(fbl::RefPtr<VmCompression> compression) {
+  Guard<Mutex> guard{&compression_lock_};
+  if (page_compression_) {
+    return ZX_ERR_ALREADY_EXISTS;
+  }
+  page_compression_ = ktl::move(compression);
+  return ZX_OK;
+}
