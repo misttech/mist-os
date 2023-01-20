@@ -305,6 +305,130 @@ class OpenTargetServer : public fidl::Server<fidl_serversuite::OpenTarget> {
   std::optional<fidl::ServerBindingRef<fidl_serversuite::OpenTargetController>> controller_binding_;
 };
 
+class LargeMessageTargetServer : public fidl::Server<fidl_serversuite::LargeMessageTarget> {
+ public:
+  explicit LargeMessageTargetServer(
+      fidl::ServerEnd<fidl_serversuite::LargeMessageTargetController> controller)
+      : controller_(std::move(controller)) {}
+
+  void DecodeBoundedKnownToBeSmall(::fidl_serversuite::BoundedKnownToBeSmall& request,
+                                   DecodeBoundedKnownToBeSmallCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.DecodeBoundedKnownToBeSmall()" << std::endl;
+    auto result =
+        fidl::SendEvent(controller_)
+            ->ReceivedOneWay(
+                ::fidl_serversuite::LargeMessageTargetOneWayMethod::kDecodeBoundedKnownToBeSmall);
+    ZX_ASSERT(result.is_ok());
+  }
+  void DecodeBoundedMaybeLarge(::fidl_serversuite::BoundedMaybeLarge& request,
+                               DecodeBoundedMaybeLargeCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.DecodeBoundedMaybeLarge()" << std::endl;
+    auto result =
+        fidl::SendEvent(controller_)
+            ->ReceivedOneWay(
+                ::fidl_serversuite::LargeMessageTargetOneWayMethod::kDecodeBoundedMaybeLarge);
+    ZX_ASSERT(result.is_ok());
+  }
+  void DecodeSemiBoundedBelievedToBeSmall(
+      ::fidl_serversuite::SemiBoundedBelievedToBeSmall& request,
+      DecodeSemiBoundedBelievedToBeSmallCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.DecodeSemiBoundedBelievedToBeSmall()" << std::endl;
+    auto result = fidl::SendEvent(controller_)
+                      ->ReceivedOneWay(::fidl_serversuite::LargeMessageTargetOneWayMethod::
+                                           kDecodeSemiBoundedBelievedToBeSmall);
+    ZX_ASSERT(result.is_ok());
+  }
+  void DecodeSemiBoundedMaybeLarge(::fidl_serversuite::SemiBoundedMaybeLarge& request,
+                                   DecodeSemiBoundedMaybeLargeCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.DecodeSemiBoundedMaybeLarge()" << std::endl;
+    auto result =
+        fidl::SendEvent(controller_)
+            ->ReceivedOneWay(
+                ::fidl_serversuite::LargeMessageTargetOneWayMethod::kDecodeSemiBoundedMaybeLarge);
+    ZX_ASSERT(result.is_ok());
+  }
+  void DecodeUnboundedMaybeLargeValue(
+      ::fidl_serversuite::UnboundedMaybeLargeValue& request,
+      DecodeUnboundedMaybeLargeValueCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.DecodeUnboundedMaybeLargeValue()" << std::endl;
+    auto result = fidl::SendEvent(controller_)
+                      ->ReceivedOneWay(::fidl_serversuite::LargeMessageTargetOneWayMethod::
+                                           kDecodeUnboundedMaybeLargeValue);
+    ZX_ASSERT(result.is_ok());
+  }
+  void DecodeUnboundedMaybeLargeResource(
+      ::fidl_serversuite::UnboundedMaybeLargeResource& request,
+      DecodeUnboundedMaybeLargeResourceCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.DecodeUnboundedMaybeLargeResource()" << std::endl;
+    auto result = fidl::SendEvent(controller_)
+                      ->ReceivedOneWay(::fidl_serversuite::LargeMessageTargetOneWayMethod::
+                                           kDecodeUnboundedMaybeLargeResource);
+    ZX_ASSERT(result.is_ok());
+  }
+  void EncodeBoundedKnownToBeSmall(::fidl_serversuite::BoundedKnownToBeSmall& request,
+                                   EncodeBoundedKnownToBeSmallCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.EncodeBoundedKnownToBeSmall()" << std::endl;
+    completer.Reply(request.bytes());
+  }
+  void EncodeBoundedMaybeLarge(::fidl_serversuite::BoundedMaybeLarge& request,
+                               EncodeBoundedMaybeLargeCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.EncodeBoundedMaybeLarge()" << std::endl;
+    completer.Reply(request.bytes());
+  }
+  void EncodeSemiBoundedBelievedToBeSmall(
+      ::fidl_serversuite::SemiBoundedBelievedToBeSmall& request,
+      EncodeSemiBoundedBelievedToBeSmallCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.EncodeSemiBoundedBelievedToBeSmall()" << std::endl;
+    completer.Reply(request);
+  }
+  void EncodeSemiBoundedMaybeLarge(::fidl_serversuite::SemiBoundedMaybeLarge& request,
+                                   EncodeSemiBoundedMaybeLargeCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.EncodeSemiBoundedMaybeLarge()" << std::endl;
+    completer.Reply(request);
+  }
+  void EncodeUnboundedMaybeLargeValue(
+      ::fidl_serversuite::UnboundedMaybeLargeValue& request,
+      EncodeUnboundedMaybeLargeValueCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.EncodeUnboundedMaybeLargeValue()" << std::endl;
+    completer.Reply(request.bytes());
+  }
+  void EncodeUnboundedMaybeLargeResource(
+      ::fidl_serversuite::LargeMessageTargetEncodeUnboundedMaybeLargeResourceRequest& request,
+      EncodeUnboundedMaybeLargeResourceCompleter::Sync& completer) override {
+    std::cout << "LargeMessageTarget.EncodeUnboundedMaybeLargeResource()" << std::endl;
+    // TODO(fxbug.dev/114263): Support populating unset handles.
+    completer.Reply(std::move(request.data().elements()));
+  }
+
+  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fidl_serversuite::LargeMessageTarget>) {
+    if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() && !info.is_peer_closed()) {
+      std::cout << "LargeMessageTarget unbound with error: " << info.FormatDescription()
+                << std::endl;
+    }
+    (void)fidl::SendEvent(controller_)->WillTeardown(servertest_util::ClassifyTeardownReason(info));
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fidl_serversuite::LargeMessageTarget> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    fidl_serversuite::UnknownMethodType method_type;
+    switch (metadata.unknown_method_type) {
+      case fidl::UnknownMethodType::kOneWay:
+        method_type = fidl_serversuite::UnknownMethodType::kOneWay;
+        break;
+      case fidl::UnknownMethodType::kTwoWay:
+        method_type = fidl_serversuite::UnknownMethodType::kTwoWay;
+        break;
+    }
+    auto result =
+        fidl::SendEvent(controller_)->ReceivedUnknownMethod({metadata.method_ordinal, method_type});
+    ZX_ASSERT(result.is_ok());
+  }
+
+ private:
+  fidl::ServerEnd<fidl_serversuite::LargeMessageTargetController> controller_;
+};
+
 class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
  public:
   explicit RunnerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
@@ -323,18 +447,11 @@ class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
         case fidl_serversuite::Test::kTwoWayNoPayloadWithZeroTxid:
           return false;
 
-        case fidl_serversuite::Test::kGoodDecodeBoundedKnownSmallMessage:
-        case fidl_serversuite::Test::kGoodDecodeBoundedMaybeSmallMessage:
         case fidl_serversuite::Test::kGoodDecodeBoundedMaybeLargeMessage:
-        case fidl_serversuite::Test::kGoodDecodeSemiBoundedUnknowableSmallMessage:
         case fidl_serversuite::Test::kGoodDecodeSemiBoundedUnknowableLargeMessage:
-        case fidl_serversuite::Test::kGoodDecodeSemiBoundedMaybeSmallMessage:
         case fidl_serversuite::Test::kGoodDecodeSemiBoundedMaybeLargeMessage:
-        case fidl_serversuite::Test::kGoodDecodeUnboundedSmallMessage:
         case fidl_serversuite::Test::kGoodDecodeUnboundedLargeMessage:
-        case fidl_serversuite::Test::kGoodDecode64HandleSmallMessage:
         case fidl_serversuite::Test::kGoodDecode63HandleLargeMessage:
-        case fidl_serversuite::Test::kGoodDecodeUnknownSmallMessage:
         case fidl_serversuite::Test::kGoodDecodeUnknownLargeMessage:
         case fidl_serversuite::Test::kBadDecodeByteOverflowFlagSetOnBoundedSmallMessage:
         case fidl_serversuite::Test::kBadDecodeByteOverflowFlagSetOnUnboundedSmallMessage:
@@ -357,15 +474,9 @@ class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
           // TODO(fxbug.dev/114261): Test decoding large messages.
           return false;
 
-        case fidl_serversuite::Test::kGoodEncodeBoundedKnownSmallMessage:
-        case fidl_serversuite::Test::kGoodEncodeBoundedMaybeSmallMessage:
         case fidl_serversuite::Test::kGoodEncodeBoundedMaybeLargeMessage:
-        case fidl_serversuite::Test::kGoodEncodeSemiBoundedKnownSmallMessage:
-        case fidl_serversuite::Test::kGoodEncodeSemiBoundedMaybeSmallMessage:
         case fidl_serversuite::Test::kGoodEncodeSemiBoundedMaybeLargeMessage:
-        case fidl_serversuite::Test::kGoodEncodeUnboundedSmallMessage:
         case fidl_serversuite::Test::kGoodEncodeUnboundedLargeMessage:
-        case fidl_serversuite::Test::kGoodEncode64HandleSmallMessage:
         case fidl_serversuite::Test::kGoodEncode63HandleLargeMessage:
         case fidl_serversuite::Test::kBadEncode64HandleLargeMessage:
           // TODO(fxbug.dev/114263): Test encoding large messages.
@@ -391,15 +502,15 @@ class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
         auto controller_server = std::make_shared<ClosedTargetControllerServer>();
         auto sut_server = std::make_shared<ClosedTargetServer>();
 
-        auto controller_binding = fidl::BindServer(
-            dispatcher_, std::move(server_pair.controller()), controller_server,
-            [](auto*, fidl::UnbindInfo info, auto) {
-              if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
-                  !info.is_peer_closed()) {
-                std::cerr << "OpenTargetController unbound with error: " << info.FormatDescription()
-                          << std::endl;
-              }
-            });
+        auto controller_binding =
+            fidl::BindServer(dispatcher_, std::move(server_pair.controller()), controller_server,
+                             [](auto*, fidl::UnbindInfo info, auto) {
+                               if (!info.is_dispatcher_shutdown() && !info.is_user_initiated() &&
+                                   !info.is_peer_closed()) {
+                                 std::cerr << "ClosedTargetController unbound with error: "
+                                           << info.FormatDescription() << std::endl;
+                               }
+                             });
         auto sut_binding = fidl::BindServer(dispatcher_, std::move(server_pair.sut()), sut_server,
                                             std::mem_fn(&ClosedTargetServer::OnUnbound));
 
@@ -444,9 +555,13 @@ class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
         break;
       }
       case fidl_serversuite::AnyTarget::Tag::kLargeMessageTarget: {
-        // TODO(fxbug.dev/114261): Test decoding large messages.
-        // TODO(fxbug.dev/114263): Test encoding large messages.
-        ZX_PANIC("Large messages not yet supported in C++ natural bindings");
+        auto& server_pair = request.target().large_message_target().value();
+        auto sut_server =
+            std::make_unique<LargeMessageTargetServer>(std::move(server_pair.controller()));
+        fidl::BindServer(dispatcher_, std::move(server_pair.sut()), std::move(sut_server),
+                         std::mem_fn(&LargeMessageTargetServer::OnUnbound));
+        completer.Reply();
+        break;
       }
     }
   }
