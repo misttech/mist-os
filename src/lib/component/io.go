@@ -94,9 +94,9 @@ func (s *Service) Clone(ctx fidl.Context, flags io.OpenFlags, req io.NodeWithCtx
 	return s.addConnection(ctx, flags, 0, req)
 }
 
-func (s *Service) Reopen(ctx fidl.Context, rights *io.RightsRequest, channel zx.Channel) error {
+func (s *Service) Reopen(ctx fidl.Context, rights *io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
 	// TODO(https://fxbug.dev/77623): implement.
-	_ = channel.Close()
+	_ = req.Close()
 	return nil
 }
 
@@ -248,9 +248,9 @@ func (dirState *directoryState) Clone(ctx fidl.Context, flags io.OpenFlags, req 
 	return dirState.addConnection(ctx, flags, 0, req)
 }
 
-func (dirState *directoryState) Reopen(ctx fidl.Context, rights *io.RightsRequest, channel zx.Channel) error {
+func (dirState *directoryState) Reopen(ctx fidl.Context, rights *io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
 	// TODO(https://fxbug.dev/77623): implement.
-	_ = channel.Close()
+	_ = req.Close()
 	return nil
 }
 
@@ -590,9 +590,9 @@ func (fState *fileState) Clone(ctx fidl.Context, flags io.OpenFlags, req io.Node
 	return fState.addConnection(ctx, flags, 0, req)
 }
 
-func (fState *fileState) Reopen(ctx fidl.Context, rights *io.RightsRequest, channel zx.Channel) error {
+func (fState *fileState) Reopen(ctx fidl.Context, rights *io.RightsRequest, req io.NodeWithCtxInterfaceRequest) error {
 	// TODO(https://fxbug.dev/77623): implement.
-	_ = channel.Close()
+	_ = req.Close()
 	return nil
 }
 

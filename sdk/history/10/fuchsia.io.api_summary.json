@@ -263,7 +263,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.Reopen",
         "ordinal": "7675434429343513249",
-        "type": "(box<fuchsia.io/RightsRequest> rights_request,zx/handle:CHANNEL object_request)"
+        "type": "(box<fuchsia.io/RightsRequest> rights_request,server_end:fuchsia.io/Node object_request)"
     },
     {
         "kind": "protocol/member",
@@ -457,7 +457,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory2.Reopen",
         "ordinal": "7675434429343513249",
-        "type": "(box<fuchsia.io/RightsRequest> rights_request,zx/handle:CHANNEL object_request)"
+        "type": "(box<fuchsia.io/RightsRequest> rights_request,server_end:fuchsia.io/Node object_request)"
     },
     {
         "kind": "protocol/member",
@@ -739,7 +739,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/File.Reopen",
         "ordinal": "7675434429343513249",
-        "type": "(box<fuchsia.io/RightsRequest> rights_request,zx/handle:CHANNEL object_request)"
+        "type": "(box<fuchsia.io/RightsRequest> rights_request,server_end:fuchsia.io/Node object_request)"
     },
     {
         "kind": "protocol/member",
@@ -1436,7 +1436,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Node.Reopen",
         "ordinal": "7675434429343513249",
-        "type": "(box<fuchsia.io/RightsRequest> rights_request,zx/handle:CHANNEL object_request)"
+        "type": "(box<fuchsia.io/RightsRequest> rights_request,server_end:fuchsia.io/Node object_request)"
     },
     {
         "kind": "protocol/member",
@@ -1546,7 +1546,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Node2.Reopen",
         "ordinal": "7675434429343513249",
-        "type": "(box<fuchsia.io/RightsRequest> rights_request,zx/handle:CHANNEL object_request)"
+        "type": "(box<fuchsia.io/RightsRequest> rights_request,server_end:fuchsia.io/Node object_request)"
     },
     {
         "kind": "protocol/member",
