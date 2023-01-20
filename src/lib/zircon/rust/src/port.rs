@@ -91,6 +91,53 @@ impl Packet {
         })
     }
 
+    /// Creates a new packet with `GuestMemPacket` data.
+    pub fn from_guest_mem_packet(key: u64, status: i32, mem: GuestMemPacket) -> Packet {
+        let mut raw = sys::zx_port_packet_t {
+            key,
+            packet_type: sys::zx_packet_type_t::ZX_PKT_TYPE_GUEST_MEM,
+            status,
+            union: Default::default(),
+        };
+        // transmute_copy doesn't work because the mem packet is too small and
+        // transmute_copy requires that Dst is not larger than Src.
+        //
+        // Note that at the time of writing this only applied to arm64 builds;
+        // x64 builds work fine with transmute_copy. This is because the
+        // underlying `zx_packet_guest_mem_t` struct has a different size on x64
+        // vs arm64.
+        let bytes: &[u8; std::mem::size_of::<sys::zx_packet_guest_mem_t>()] =
+            unsafe { mem::transmute(&mem.0) };
+        raw.union[0..std::mem::size_of::<sys::zx_packet_guest_mem_t>()].copy_from_slice(bytes);
+        Packet(raw)
+    }
+
+    /// Creates a new packet with `GuestIoPacket` data.
+    pub fn from_guest_io_packet(key: u64, status: i32, io: GuestIoPacket) -> Packet {
+        let mut raw = sys::zx_port_packet_t {
+            key,
+            packet_type: sys::zx_packet_type_t::ZX_PKT_TYPE_GUEST_IO,
+            status,
+            union: Default::default(),
+        };
+        // transmute_copy doesn't work because the io packet is too small and
+        // transmute_copy requires that Dst is not larger than Src.
+        let bytes: &[u8; std::mem::size_of::<sys::zx_packet_guest_io_t>()] =
+            unsafe { mem::transmute(&io.0) };
+        raw.union[0..std::mem::size_of::<sys::zx_packet_guest_io_t>()].copy_from_slice(bytes);
+        Packet(raw)
+    }
+
+    /// Creates a new packet with `GuestVcpuPacket` data.
+    pub fn from_guest_vcpu_packet(key: u64, status: i32, vcpu: GuestVcpuPacket) -> Packet {
+        Packet(sys::zx_port_packet_t {
+            key,
+            packet_type: sys::zx_packet_type_t::ZX_PKT_TYPE_GUEST_VCPU,
+            status,
+            union: unsafe { mem::transmute_copy(&vcpu.0) },
+        })
+    }
+
     /// The packet's key.
     pub fn key(&self) -> u64 {
         self.0.key
@@ -192,6 +239,10 @@ impl GuestBellPacket {
 }
 
 impl GuestMemPacket {
+    pub fn from_raw(mem: sys::zx_packet_guest_mem_t) -> GuestMemPacket {
+        GuestMemPacket(mem)
+    }
+
     /// The guest physical address that was accessed that triggered this signal.
     pub fn addr(&self) -> GPAddr {
         GPAddr(self.0.addr)
@@ -256,6 +307,10 @@ impl GuestMemPacket {
 }
 
 impl GuestIoPacket {
+    pub fn from_raw(io: sys::zx_packet_guest_io_t) -> GuestIoPacket {
+        GuestIoPacket(io)
+    }
+
     /// First port number of the attempted access
     pub fn port(&self) -> u16 {
         self.0.port
@@ -305,6 +360,10 @@ impl GuestIoPacket {
 }
 
 impl GuestVcpuPacket {
+    pub fn from_raw(vcpu: sys::zx_packet_guest_vcpu_t) -> GuestVcpuPacket {
+        GuestVcpuPacket(vcpu)
+    }
+
     pub fn contents(&self) -> VcpuContents {
         match self.0.r#type {
             sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_INTERRUPT => unsafe {
@@ -415,6 +474,7 @@ bitflags! {
 mod tests {
     use super::*;
     use crate::{DurationNum, Event};
+    use assert_matches::assert_matches;
 
     #[test]
     fn port_basic() {
@@ -493,5 +553,131 @@ mod tests {
         assert!(port.cancel(&event, key).is_ok());
         assert!(event.signal_handle(Signals::NONE, Signals::USER_0).is_ok());
         assert_eq!(port.wait(Time::after(ten_ms)), Err(Status::TIMED_OUT));
+    }
+
+    #[test]
+    fn guest_mem_packet() {
+        #[cfg(target_arch = "x86_64")]
+        const GUEST_MEM_PACKET: sys::zx_packet_guest_mem_t = sys::zx_packet_guest_mem_t {
+            addr: 0xaaaabbbbccccdddd,
+            cr3: 0x0123456789abcdef,
+            rip: 0xffffffff00000000,
+            instruction_size: 8,
+            default_operand_size: 2,
+        };
+        #[cfg(target_arch = "aarch64")]
+        const GUEST_MEM_PACKET: sys::zx_packet_guest_mem_t = sys::zx_packet_guest_mem_t {
+            addr: 0x8877665544332211,
+            access_size: 8,
+            sign_extend: true,
+            xt: 0xf3,
+            read: false,
+            data: 0x1122334455667788,
+        };
+        const KEY: u64 = 0x5555555555555555;
+        const STATUS: i32 = sys::ZX_ERR_INTERNAL;
+
+        let packet =
+            Packet::from_guest_mem_packet(KEY, STATUS, GuestMemPacket::from_raw(GUEST_MEM_PACKET));
+
+        assert_matches!(packet.contents(), PacketContents::GuestMem(GuestMemPacket(packet)) if packet == GUEST_MEM_PACKET);
+        assert_eq!(packet.key(), KEY);
+        assert_eq!(packet.status(), STATUS);
+    }
+
+    #[test]
+    fn guest_io_packet() {
+        const GUEST_IO_PACKET: sys::zx_packet_guest_io_t = sys::zx_packet_guest_io_t {
+            port: 0xabcd,
+            access_size: 4,
+            input: true,
+            data: [0xaa, 0xbb, 0xcc, 0xdd],
+        };
+        const KEY: u64 = 0x0123456789abcdef;
+        const STATUS: i32 = sys::ZX_ERR_NO_RESOURCES;
+
+        let packet =
+            Packet::from_guest_io_packet(KEY, STATUS, GuestIoPacket::from_raw(GUEST_IO_PACKET));
+
+        assert_matches!(packet.contents(), PacketContents::GuestIo(GuestIoPacket(packet)) if packet == GUEST_IO_PACKET);
+        assert_eq!(packet.key(), KEY);
+        assert_eq!(packet.status(), STATUS);
+    }
+
+    #[test]
+    fn guest_vcpu_interrupt_packet() {
+        // Unable to use 'const' here because we need Default::default to initialize the PadBytes.
+        let guest_vcpu_packet: sys::zx_packet_guest_vcpu_t = sys::zx_packet_guest_vcpu_t {
+            r#type: sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_INTERRUPT,
+            union: sys::zx_packet_guest_vcpu_union_t {
+                interrupt: sys::zx_packet_guest_vcpu_interrupt_t {
+                    mask: 0xaaaaaaaaaaaaaaaa,
+                    vector: 0x12,
+                    padding1: Default::default(),
+                },
+            },
+            padding1: Default::default(),
+            reserved: 0,
+        };
+        const KEY: u64 = 0x0123456789abcdef;
+        const STATUS: i32 = sys::ZX_ERR_NO_RESOURCES;
+
+        let packet = Packet::from_guest_vcpu_packet(
+            KEY,
+            STATUS,
+            GuestVcpuPacket::from_raw(guest_vcpu_packet),
+        );
+
+        assert_matches!(packet.contents(), PacketContents::GuestVcpu(GuestVcpuPacket(packet)) if packet == guest_vcpu_packet);
+        assert_eq!(packet.key(), KEY);
+        assert_eq!(packet.status(), STATUS);
+    }
+
+    #[test]
+    fn guest_vcpu_startup_packet() {
+        let guest_vcpu_packet: sys::zx_packet_guest_vcpu_t = sys::zx_packet_guest_vcpu_t {
+            r#type: sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_STARTUP,
+            union: sys::zx_packet_guest_vcpu_union_t {
+                startup: sys::zx_packet_guest_vcpu_startup_t { id: 16, entry: 0xffffffff11111111 },
+            },
+            padding1: Default::default(),
+            reserved: 0,
+        };
+        const KEY: u64 = 0x0123456789abcdef;
+        const STATUS: i32 = sys::ZX_ERR_NO_RESOURCES;
+
+        let packet = Packet::from_guest_vcpu_packet(
+            KEY,
+            STATUS,
+            GuestVcpuPacket::from_raw(guest_vcpu_packet),
+        );
+
+        assert_matches!(packet.contents(), PacketContents::GuestVcpu(GuestVcpuPacket(packet)) if packet == guest_vcpu_packet);
+        assert_eq!(packet.key(), KEY);
+        assert_eq!(packet.status(), STATUS);
+    }
+
+    #[test]
+    fn guest_vcpu_exit_packet() {
+        let guest_vcpu_packet: sys::zx_packet_guest_vcpu_t = sys::zx_packet_guest_vcpu_t {
+            r#type: sys::zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_EXIT,
+            union: sys::zx_packet_guest_vcpu_union_t {
+                exit: sys::zx_packet_guest_vcpu_exit_t { retcode: 12345678, reserved: 0 },
+            },
+            padding1: Default::default(),
+            reserved: 0,
+        };
+        const KEY: u64 = 0x0123456789abcdef;
+        const STATUS: i32 = sys::ZX_ERR_NO_RESOURCES;
+
+        let packet = Packet::from_guest_vcpu_packet(
+            KEY,
+            STATUS,
+            GuestVcpuPacket::from_raw(guest_vcpu_packet),
+        );
+
+        assert_matches!(packet.contents(), PacketContents::GuestVcpu(GuestVcpuPacket(packet)) if packet == guest_vcpu_packet);
+        assert_eq!(packet.key(), KEY);
+        assert_eq!(packet.status(), STATUS);
     }
 }

@@ -846,7 +846,7 @@ pub struct zx_packet_guest_io_t {
 pub struct zx_packet_guest_vcpu_interrupt_t {
     pub mask: u64,
     pub vector: u8,
-    padding1: [PadByte; 7],
+    pub padding1: [PadByte; 7],
 }
 
 #[repr(C)]
@@ -860,7 +860,7 @@ pub struct zx_packet_guest_vcpu_startup_t {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_packet_guest_vcpu_exit_t {
     pub retcode: i64,
-    reserved: u64,
+    pub reserved: u64,
 }
 
 #[repr(C)]
@@ -875,10 +875,33 @@ pub union zx_packet_guest_vcpu_union_t {
 #[derive(Copy, Clone)]
 pub struct zx_packet_guest_vcpu_t {
     pub r#type: zx_packet_guest_vcpu_type_t,
-    padding1: [PadByte; 4],
+    pub padding1: [PadByte; 4],
     pub union: zx_packet_guest_vcpu_union_t,
-    reserved: u64,
+    pub reserved: u64,
 }
+
+impl PartialEq for zx_packet_guest_vcpu_t {
+    fn eq(&self, other: &Self) -> bool {
+        if self.r#type != other.r#type {
+            return false;
+        }
+        match self.r#type {
+            zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_INTERRUPT => unsafe {
+                self.union.interrupt == other.union.interrupt
+            },
+            zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_STARTUP => unsafe {
+                self.union.startup == other.union.startup
+            },
+            zx_packet_guest_vcpu_type_t::ZX_PKT_GUEST_VCPU_EXIT => unsafe {
+                self.union.exit == other.union.exit
+            },
+            // No equality relationship is defined for invalid types.
+            _ => false,
+        }
+    }
+}
+
+impl Eq for zx_packet_guest_vcpu_t {}
 
 impl Debug for zx_packet_guest_vcpu_t {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
