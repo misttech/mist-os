@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_sys_internal::{LogConnection, LogConnectionListenerRequest, LogConnectorProxy},
     fuchsia_zircon as zx,
     futures::StreamExt,
-    std::convert::TryFrom,
+    std::{convert::TryFrom, sync::Arc},
     tracing::{error, warn},
 };
 
@@ -48,7 +48,7 @@ impl LogConnector {
                     ..
                 } => {
                     let component = match ComponentIdentity::try_from(source_identity) {
-                        Ok(identity) => identity,
+                        Ok(identity) => Arc::new(identity),
                         Err(err) => {
                             error!(%err, "Consuming SourceIdentity");
                             continue;
@@ -141,7 +141,7 @@ mod tests {
                 component,
                 request_stream: Some(_),
             }) => {
-                assert_eq!(component, expected_identity);
+                assert_eq!(*component, expected_identity);
             }
             payload => unreachable!("should never get {:?}", payload),
         }

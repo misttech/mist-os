@@ -412,17 +412,19 @@ mod tests {
     const TEST_URL: &str = "NO-OP URL";
     const FAKE_TIMESTAMP: i64 = 5;
     lazy_static! {
-        static ref IDENTITY: ComponentIdentity = ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::parse_from_moniker("./a/b").unwrap(),
-            TEST_URL
-        );
-        static ref LEGACY_IDENTITY: ComponentIdentity = ComponentIdentity::from_identifier_and_url(
-            ComponentIdentifier::Legacy {
-                instance_id: "12345".to_string(),
-                moniker: vec!["a", "b", "foo.cmx"].into(),
-            },
-            TEST_URL
-        );
+        static ref IDENTITY: Arc<ComponentIdentity> =
+            Arc::new(ComponentIdentity::from_identifier_and_url(
+                ComponentIdentifier::parse_from_moniker("./a/b").unwrap(),
+                TEST_URL
+            ));
+        static ref LEGACY_IDENTITY: Arc<ComponentIdentity> =
+            Arc::new(ComponentIdentity::from_identifier_and_url(
+                ComponentIdentifier::Legacy {
+                    instance_id: "12345".to_string(),
+                    moniker: vec!["a", "b", "foo.cmx"].into(),
+                },
+                TEST_URL
+            ));
     }
 
     #[derive(Default)]
@@ -431,7 +433,7 @@ mod tests {
     }
 
     impl TestEventProducer {
-        async fn emit(&mut self, event_type: EventType, identity: ComponentIdentity) {
+        async fn emit(&mut self, event_type: EventType, identity: Arc<ComponentIdentity>) {
             let event = match event_type {
                 EventType::DiagnosticsReady => Event {
                     timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
@@ -717,10 +719,10 @@ mod tests {
         });
 
         let identity = |moniker| {
-            ComponentIdentity::from_identifier_and_url(
+            Arc::new(ComponentIdentity::from_identifier_and_url(
                 ComponentIdentifier::parse_from_moniker(moniker).unwrap(),
                 TEST_URL,
-            )
+            ))
         };
 
         producer1.emit(EventType::DiagnosticsReady, identity("./a")).await;
@@ -800,7 +802,7 @@ mod tests {
         }
     }
 
-    fn diagnostics_ready(identity: ComponentIdentity) -> Event {
+    fn diagnostics_ready(identity: Arc<ComponentIdentity>) -> Event {
         Event {
             timestamp: zx::Time::from_nanos(FAKE_TIMESTAMP),
             payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {

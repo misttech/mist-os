@@ -17,7 +17,7 @@ use fidl_fuchsia_sys_internal::{
 };
 use fuchsia_zircon as zx;
 use futures::StreamExt;
-use std::convert::TryFrom;
+use std::{convert::TryFrom, sync::Arc};
 use tracing::{debug, warn};
 
 pub struct ComponentEventProvider {
@@ -74,7 +74,7 @@ impl ComponentEventProvider {
         component: SourceIdentity,
         directory: fidl::endpoints::ClientEnd<fio::DirectoryMarker>,
     ) -> Result<(), EventError> {
-        let component = ComponentIdentity::try_from(component)?;
+        let component = Arc::new(ComponentIdentity::try_from(component)?);
         if let Ok(directory) = directory.into_proxy() {
             self.dispatcher.emit(Event {
                 timestamp: zx::Time::get_monotonic(),

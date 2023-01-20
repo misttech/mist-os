@@ -129,7 +129,7 @@ pub mod tests {
             EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
                 component,
                 directory: Some(_),
-            }) => assert_eq!(component, expected_identity),
+            }) => assert_eq!(*component, expected_identity),
             other => panic!("unexpected event payload: {other:?}"),
         }
 
@@ -137,7 +137,7 @@ pub mod tests {
         let event = event_stream.next().await.unwrap();
         match event.payload {
             EventPayload::LogSinkRequested(LogSinkRequestedPayload { component, .. }) => {
-                assert_eq!(component, expected_identity)
+                assert_eq!(*component, expected_identity)
             }
             other => panic!("unexpected event payload: {other:?}"),
         }

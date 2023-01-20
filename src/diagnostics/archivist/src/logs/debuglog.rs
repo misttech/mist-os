@@ -18,14 +18,15 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
 use futures::stream::{unfold, Stream, TryStreamExt};
 use lazy_static::lazy_static;
+use std::sync::Arc;
 
 pub const KERNEL_URL: &str = "fuchsia-boot://kernel";
 lazy_static! {
-    pub static ref KERNEL_IDENTITY: ComponentIdentity = {
-        ComponentIdentity::from_identifier_and_url(
+    pub static ref KERNEL_IDENTITY: Arc<ComponentIdentity> = {
+        Arc::new(ComponentIdentity::from_identifier_and_url(
             ComponentIdentifier::parse_from_moniker("./klog").unwrap(),
             KERNEL_URL,
-        )
+        ))
     };
 }
 

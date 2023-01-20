@@ -284,7 +284,7 @@ impl LogReader for DefaultLogReader {
     async fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
         let (log_sink_proxy, log_sink_stream) =
             fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
-        let container = self.log_manager.get_log_container((*self.identity).clone()).await;
+        let container = self.log_manager.get_log_container(self.identity.clone()).await;
         container.handle_log_sink(log_sink_stream, log_sender).await;
         log_sink_proxy
     }

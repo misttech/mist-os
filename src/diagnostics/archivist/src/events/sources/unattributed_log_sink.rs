@@ -11,6 +11,7 @@ use crate::{
 };
 use fidl_fuchsia_logger as flogger;
 use fuchsia_zircon as zx;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct UnattributedLogSinkSource {
@@ -23,7 +24,7 @@ impl UnattributedLogSinkSource {
             .emit(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
-                    component: ComponentIdentity::unknown(),
+                    component: Arc::new(ComponentIdentity::unknown()),
                     request_stream: Some(stream),
                 }),
             })
@@ -70,7 +71,7 @@ mod tests {
                 component,
                 request_stream: Some(_),
             }) => {
-                assert_eq!(component, expected_identity);
+                assert_eq!(*component, expected_identity);
             }
             payload => unreachable!("{:?} never gets here", payload),
         }

@@ -727,13 +727,14 @@ mod tests {
                     Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
 
                 for (cid, proxy) in id_and_directory_proxy {
-                    let identity = ComponentIdentity::from_identifier_and_url(cid, TEST_URL);
+                    let identity =
+                        Arc::new(ComponentIdentity::from_identifier_and_url(cid, TEST_URL));
                     inspect_repo
                         .clone()
                         .handle(Event {
                             timestamp: zx::Time::get_monotonic(),
                             payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                                component: identity.clone(),
+                                component: identity,
                                 directory: Some(proxy),
                             }),
                         })
@@ -878,7 +879,7 @@ mod tests {
 
         let inspector_arc = Arc::new(inspector);
 
-        let identity = ComponentIdentity::from_identifier_and_url(component_id, TEST_URL);
+        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         inspect_repo
             .clone()
             .handle(Event {
@@ -990,7 +991,7 @@ mod tests {
 
         let test_batch_iterator_stats2 = Arc::new(test_accessor_stats.new_inspect_batch_iterator());
 
-        inspect_repo.terminate_inspect(&identity).await;
+        inspect_repo.terminate_inspect(identity.as_ref()).await;
         {
             let result_json = read_snapshot(
                 inspect_repo.clone(),

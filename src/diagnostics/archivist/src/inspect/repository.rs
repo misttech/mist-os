@@ -68,12 +68,11 @@ impl InspectRepository {
 
     async fn add_inspect_artifacts(
         self: &Arc<Self>,
-        identity: ComponentIdentity,
+        identity: Arc<ComponentIdentity>,
         directory_proxy: fio::DirectoryProxy,
     ) -> Result<(), Error> {
         let mut guard = self.inner.write().await;
 
-        let identity = Arc::new(identity);
         if let Some(on_closed_fut) =
             guard.insert_inspect_artifact_container(identity.clone(), directory_proxy).await?
         {
@@ -108,7 +107,7 @@ impl InspectRepository {
 
     async fn handle_diagnostics_ready(
         self: Arc<Self>,
-        component: ComponentIdentity,
+        component: Arc<ComponentIdentity>,
         directory: Option<fio::DirectoryProxy>,
     ) {
         debug!(identity = %component, "Diagnostics directory is ready.");
@@ -272,7 +271,7 @@ mod tests {
         let instance_id = "1234".to_string();
 
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
-        let identity = ComponentIdentity::from_identifier_and_url(component_id, TEST_URL);
+        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
 
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -312,7 +311,7 @@ mod tests {
         let instance_id = "1234".to_string();
 
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
-        let identity = ComponentIdentity::from_identifier_and_url(component_id, TEST_URL);
+        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
 
@@ -340,7 +339,7 @@ mod tests {
         let moniker = vec!["a", "b", "foo.cmx"].into();
         let instance_id = "1234".to_string();
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
-        let identity = ComponentIdentity::from_identifier_and_url(component_id, TEST_URL);
+        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         {
@@ -371,7 +370,7 @@ mod tests {
         let moniker = vec!["a", "b", "foo.cmx"].into();
         let instance_id = "1234".to_string();
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
-        let identity = ComponentIdentity::from_identifier_and_url(component_id, TEST_URL);
+        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         {
@@ -419,7 +418,7 @@ mod tests {
         let mut moniker = realm_path.clone();
         moniker.push("foo.cmx".to_string());
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker: moniker.into() };
-        let identity = ComponentIdentity::from_identifier_and_url(component_id, TEST_URL);
+        let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
 
         data_repo
             .clone()
@@ -444,7 +443,8 @@ mod tests {
             instance_id: "12345".to_string(),
             moniker: moniker.into(),
         };
-        let identity2 = ComponentIdentity::from_identifier_and_url(component_id2, TEST_URL);
+        let identity2 =
+            Arc::new(ComponentIdentity::from_identifier_and_url(component_id2, TEST_URL));
 
         data_repo
             .clone()

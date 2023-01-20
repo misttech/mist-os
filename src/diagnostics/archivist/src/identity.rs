@@ -10,7 +10,7 @@ use diagnostics_message::MonikerWithUrl;
 use fidl_fuchsia_sys_internal::SourceIdentity;
 use std::convert::TryFrom;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct ComponentIdentity {
     /// Relative moniker of the component that this artifacts container
     /// is representing.

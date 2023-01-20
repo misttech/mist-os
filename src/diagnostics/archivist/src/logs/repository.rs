@@ -139,7 +139,7 @@ impl LogsRepository {
 
     pub async fn get_log_container(
         &self,
-        identity: ComponentIdentity,
+        identity: Arc<ComponentIdentity>,
     ) -> Arc<LogsArtifactsContainer> {
         self.mutable_state.write().await.get_log_container(identity).await
     }
@@ -276,7 +276,7 @@ impl LogsRepositoryState {
     /// necessary.
     pub async fn get_log_container(
         &mut self,
-        identity: ComponentIdentity,
+        identity: Arc<ComponentIdentity>,
     ) -> Arc<LogsArtifactsContainer> {
         let trie_key: Vec<_> = identity.unique_key().into();
 
@@ -284,7 +284,7 @@ impl LogsRepositoryState {
             None => {
                 let container = Arc::new(
                     LogsArtifactsContainer::new(
-                        Arc::new(identity),
+                        identity,
                         &self.logs_interest,
                         &self.inspect_node,
                         self.logs_budget.handle(),
@@ -418,16 +418,16 @@ mod tests {
     async fn data_repo_filters_logs_by_selectors() {
         let repo = LogsRepository::default().await;
         let foo_container = repo
-            .get_log_container(ComponentIdentity::from_identifier_and_url(
+            .get_log_container(Arc::new(ComponentIdentity::from_identifier_and_url(
                 ComponentIdentifier::parse_from_moniker("./foo").unwrap(),
                 "fuchsia-pkg://foo",
-            ))
+            )))
             .await;
         let bar_container = repo
-            .get_log_container(ComponentIdentity::from_identifier_and_url(
+            .get_log_container(Arc::new(ComponentIdentity::from_identifier_and_url(
                 ComponentIdentifier::parse_from_moniker("./bar").unwrap(),
                 "fuchsia-pkg://bar",
-            ))
+            )))
             .await;
 
         foo_container.ingest_message(make_message("a", 1)).await;

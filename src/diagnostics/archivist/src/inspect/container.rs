@@ -359,7 +359,7 @@ mod test {
     use futures::StreamExt;
 
     lazy_static! {
-        static ref EMPTY_IDENTITY: ComponentIdentity = ComponentIdentity::unknown();
+        static ref EMPTY_IDENTITY: Arc<ComponentIdentity> = Arc::new(ComponentIdentity::unknown());
     }
 
     #[fuchsia::test]
@@ -376,7 +376,7 @@ mod test {
         .detach();
 
         let container = UnpopulatedInspectDataContainer {
-            identity: Arc::new(EMPTY_IDENTITY.clone()),
+            identity: EMPTY_IDENTITY.clone(),
             component_diagnostics_proxy: directory,
             inspect_matcher: None,
         };
@@ -399,7 +399,7 @@ mod test {
             fuchsia_fs::directory::open_in_namespace("/tmp", fuchsia_fs::OpenFlags::RIGHT_READABLE)
                 .unwrap();
         let container = UnpopulatedInspectDataContainer {
-            identity: Arc::new(EMPTY_IDENTITY.clone()),
+            identity: EMPTY_IDENTITY.clone(),
             component_diagnostics_proxy: directory,
             inspect_matcher: None,
         };

@@ -14,7 +14,7 @@ use fidl_fuchsia_logger as flogger;
 use fidl_fuchsia_sys_internal::SourceIdentity;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_zircon as zx;
-use std::{convert::TryFrom, ops::Deref};
+use std::{convert::TryFrom, ops::Deref, sync::Arc};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Moniker(Vec<String>);
@@ -117,7 +117,7 @@ pub enum EventPayload {
 #[derive(Debug)]
 pub struct DiagnosticsReadyPayload {
     /// The component which diagnostics directory is available.
-    pub component: ComponentIdentity,
+    pub component: Arc<ComponentIdentity>,
     /// The `out/diagnostics` directory of the component.
     pub directory: Option<fio::DirectoryProxy>,
 }
@@ -131,7 +131,7 @@ impl Clone for DiagnosticsReadyPayload {
 /// Payload for a connection to the `LogSink` protocol.
 pub struct LogSinkRequestedPayload {
     /// The component that is connecting to `LogSink`.
-    pub component: ComponentIdentity,
+    pub component: Arc<ComponentIdentity>,
     /// The stream containing requests made on the `LogSink` channel by the component.
     pub request_stream: Option<flogger::LogSinkRequestStream>,
 }
@@ -313,7 +313,7 @@ impl TryFrom<fcomponent::Event> for Event {
                     Ok(Event {
                         timestamp: zx::Time::from_nanos(event.header.timestamp),
                         payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                            component: identity,
+                            component: Arc::new(identity),
                             directory: Some(directory),
                         }),
                     })
@@ -341,7 +341,7 @@ impl TryFrom<fcomponent::Event> for Event {
                     Ok(Event {
                         timestamp: zx::Time::from_nanos(event.header.timestamp),
                         payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
-                            component: identity,
+                            component: Arc::new(identity),
                             request_stream: Some(request_stream),
                         }),
                     })
