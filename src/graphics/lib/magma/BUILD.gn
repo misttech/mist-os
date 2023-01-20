@@ -32,7 +32,6 @@ sdk_static_library("magma_client") {
   public = [
     "include/magma/magma.h",
     "include/magma/magma_common_defs.h",
-    "include/magma/magma_soft_transition.h",
     "include/magma/magma_sysmem.h",
   ]
   deps = [ "src/libmagma:magma_client" ]

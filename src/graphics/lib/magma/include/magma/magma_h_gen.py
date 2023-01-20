@@ -117,10 +117,6 @@ def genformatoff():
     return '// clang-format off\n'
 
 
-def soft_transition():
-    return '#include "magma_soft_transition.h"\n'
-
-
 def main():
     if (len(sys.argv) != 3):
         usage()
@@ -139,7 +135,6 @@ def main():
                     externs(True),
                 ]
                 lines.extend(format_export(e) for e in magma['exports'])
-                lines.append(soft_transition())
                 lines.append(externs(False))
                 lines.append(guards(False))
                 lines.append('')

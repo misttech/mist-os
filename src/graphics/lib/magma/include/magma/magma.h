@@ -591,8 +591,6 @@ MAGMA_EXPORT void magma_connection_unmap_buffer(
     uint64_t hw_va,
     magma_buffer_t buffer);
 
-#include "magma_soft_transition.h"
-
 #if defined(__cplusplus)
 }
 #endif
