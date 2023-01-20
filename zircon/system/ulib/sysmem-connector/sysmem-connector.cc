@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -81,7 +82,7 @@ class SysmemConnector : public sysmem_connector {
   // Only touched from process_queue_loop_'s one thread.
   //
 
-  fidl::ClientEnd<fuchsia_sysmem::DriverConnector> driver_connector_client_;
+  fidl::ClientEnd<fuchsia_sysmem2::DriverConnector> driver_connector_client_;
   async::WaitMethod<SysmemConnector, &SysmemConnector::OnSysmemPeerClosed> wait_sysmem_peer_closed_;
 
   //
@@ -160,7 +161,7 @@ zx_status_t SysmemConnector::DeviceAdded(int dirfd, int event, const char* filen
 
   {
     const fdio_cpp::UnownedFdioCaller caller(dirfd);
-    zx::result status = component::ConnectAt<fuchsia_sysmem::DriverConnector>(
+    zx::result status = component::ConnectAt<fuchsia_sysmem2::DriverConnector>(
         caller.borrow_as<fuchsia_io::Directory>(), filename);
     if (status.is_error()) {
       printf("sysmem-connector: component::ConnectAt(%s, %s): %s\n", sysmem_directory_path_,
@@ -285,7 +286,7 @@ void SysmemConnector::ProcessQueue() {
     const auto [name, status] = std::visit(
         overloaded{[this](fidl::ServerEnd<fuchsia_sysmem::Allocator> allocator_request) {
                      return std::make_pair("Connect", fidl::WireCall(driver_connector_client_)
-                                                          ->Connect(std::move(allocator_request))
+                                                          ->ConnectV1(std::move(allocator_request))
                                                           .status());
                    },
                    [this](fidl::ClientEnd<fuchsia_io::Directory> service_directory) {

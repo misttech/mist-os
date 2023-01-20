@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-testing/test_loop.h>
 #include <lib/async/cpp/task.h>
@@ -27,6 +28,7 @@
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/lib/fsl/handles/object_info.h"
 namespace sysmem = fuchsia_sysmem;
+namespace sysmem2 = fuchsia_sysmem2;
 
 namespace display {
 class IntegrationTest : public TestBase, public zxtest::WithParamInterface<bool> {
@@ -101,7 +103,7 @@ class IntegrationTest : public TestBase, public zxtest::WithParamInterface<bool>
     TestBase::SetUp();
     zx::channel client, server;
     EXPECT_OK(zx::channel::create(0, &client, &server));
-    EXPECT_TRUE(fidl::WireCall(sysmem_fidl())->Connect(std::move(server)).ok());
+    EXPECT_TRUE(fidl::WireCall(sysmem_fidl())->ConnectV1(std::move(server)).ok());
     sysmem_ = fidl::WireSyncClient<sysmem::Allocator>(std::move(client));
     // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
     (void)sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(fsl::GetCurrentProcessName()),

@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.sysinfo/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -82,7 +83,8 @@ class TestObserver : public zxtest::LifecycleObserver {
 TestObserver test_observer;
 
 zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_service();
-zx_status_t verify_connectivity(fidl::WireSyncClient<fuchsia_sysmem::Allocator>& allocator);
+zx_status_t verify_connectivity_v1(fidl::WireSyncClient<fuchsia_sysmem::Allocator>& allocator);
+zx_status_t verify_connectivity_v2(fidl::SyncClient<fuchsia_sysmem2::Allocator>& allocator);
 
 #define IF_FAILURES_RETURN()           \
   do {                                 \
@@ -98,10 +100,10 @@ zx_status_t verify_connectivity(fidl::WireSyncClient<fuchsia_sysmem::Allocator>&
     }                                  \
   } while (0)
 
-zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_driver() {
+zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_driver_v1() {
   fbl::unique_fd sysmem_dir(open(kSysmemClassPath, O_RDONLY));
 
-  zx::result<fidl::ClientEnd<fuchsia_sysmem::DriverConnector>> client_end;
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>> client_end;
   zx_status_t status = fdio_watch_directory(
       sysmem_dir.get(),
       [](int dirfd, int event, const char* fn, void* cookie) {
@@ -112,8 +114,8 @@ zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_dr
           return ZX_OK;
         }
         fdio_cpp::UnownedFdioCaller caller(dirfd);
-        *reinterpret_cast<zx::result<fidl::ClientEnd<fuchsia_sysmem::DriverConnector>>*>(cookie) =
-            component::ConnectAt<fuchsia_sysmem::DriverConnector>(caller.directory(), fn);
+        *reinterpret_cast<zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>>*>(cookie) =
+            component::ConnectAt<fuchsia_sysmem2::DriverConnector>(caller.directory(), fn);
         return ZX_ERR_STOP;
       },
       ZX_TIME_INFINITE, &client_end);
@@ -136,7 +138,7 @@ zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_dr
     return zx::error(allocator_endpoints.status_value());
   }
 
-  auto connect_result = connector->Connect(std::move(allocator_endpoints->server));
+  auto connect_result = connector->ConnectV1(std::move(allocator_endpoints->server));
   EXPECT_OK(connect_result);
   if (!connect_result.ok()) {
     return zx::error(connect_result.status());
@@ -146,6 +148,59 @@ zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_dr
   const fidl::Status result =
       allocator->SetDebugClientInfo(fidl::StringView::FromExternal(current_test_name), 0u);
   EXPECT_OK(result.status());
+  return zx::ok(std::move(allocator));
+}
+
+zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_driver_v2() {
+  fbl::unique_fd sysmem_dir(open(kSysmemClassPath, O_RDONLY));
+
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>> client_end;
+  zx_status_t status = fdio_watch_directory(
+      sysmem_dir.get(),
+      [](int dirfd, int event, const char* fn, void* cookie) {
+        if (std::string_view{fn} == ".") {
+          return ZX_OK;
+        }
+        if (event != WATCH_EVENT_ADD_FILE) {
+          return ZX_OK;
+        }
+        fdio_cpp::UnownedFdioCaller caller(dirfd);
+        *reinterpret_cast<zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>>*>(cookie) =
+            component::ConnectAt<fuchsia_sysmem2::DriverConnector>(caller.directory(), fn);
+        return ZX_ERR_STOP;
+      },
+      ZX_TIME_INFINITE, &client_end);
+  EXPECT_STATUS(status, ZX_ERR_STOP);
+  if (status != ZX_ERR_STOP) {
+    if (status == ZX_OK) {
+      status = ZX_ERR_BAD_STATE;
+    }
+    return zx::error(status);
+  }
+  EXPECT_OK(client_end);
+  if (!client_end.is_ok()) {
+    return zx::error(client_end.status_value());
+  }
+  fidl::WireSyncClient connector{std::move(client_end.value())};
+
+  auto allocator_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
+  EXPECT_OK(allocator_endpoints);
+  if (!allocator_endpoints.is_ok()) {
+    return zx::error(allocator_endpoints.status_value());
+  }
+
+  auto connect_result = connector->ConnectV2(std::move(allocator_endpoints->server));
+  EXPECT_OK(connect_result);
+  if (!connect_result.ok()) {
+    return zx::error(connect_result.status());
+  }
+
+  fidl::SyncClient allocator{std::move(allocator_endpoints->client)};
+  fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
+  request.name() = current_test_name;
+  request.id() = 0u;
+  auto result = allocator->SetDebugClientInfo(std::move(request));
+  EXPECT_TRUE(result.is_ok());
   return zx::ok(std::move(allocator));
 }
 
@@ -176,7 +231,7 @@ zx_koid_t get_related_koid(zx_handle_t handle) {
   return info.related_koid;
 }
 
-zx_status_t verify_connectivity(fidl::WireSyncClient<fuchsia_sysmem::Allocator>& allocator) {
+zx_status_t verify_connectivity_v1(fidl::WireSyncClient<fuchsia_sysmem::Allocator>& allocator) {
   zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   EXPECT_OK(collection_endpoints);
   if (!collection_endpoints.is_ok()) {
@@ -199,6 +254,31 @@ zx_status_t verify_connectivity(fidl::WireSyncClient<fuchsia_sysmem::Allocator>&
   return ZX_OK;
 }
 
+zx_status_t verify_connectivity_v2(fidl::SyncClient<fuchsia_sysmem2::Allocator>& allocator) {
+  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
+  EXPECT_OK(collection_endpoints);
+  if (!collection_endpoints.is_ok()) {
+    return collection_endpoints.status_value();
+  }
+  auto [collection_client_end, collection_server_end] = std::move(*collection_endpoints);
+
+  fuchsia_sysmem2::AllocatorAllocateNonSharedCollectionRequest request;
+  request.collection_request().emplace(std::move(collection_server_end));
+  auto result = allocator->AllocateNonSharedCollection(std::move(request));
+  EXPECT_TRUE(result.is_ok());
+  if (result.is_error()) {
+    return result.error_value().status();
+  }
+
+  fidl::SyncClient collection{std::move(collection_client_end)};
+  auto sync_result = collection->Sync();
+  EXPECT_TRUE(sync_result.is_ok());
+  if (sync_result.is_error()) {
+    return sync_result.error_value().status();
+  }
+  return ZX_OK;
+}
+
 static void SetDefaultCollectionName(
     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection, fbl::String suffix = "") {
   constexpr uint32_t kPriority = 1000000;
@@ -212,10 +292,10 @@ static void SetDefaultCollectionName(
 zx::result<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
 make_single_participant_collection() {
   // We could use AllocateNonSharedCollection() to implement this function, but we're already
-  // using AllocateNonSharedCollection() during verify_connectivity(), so instead just set up the
+  // using AllocateNonSharedCollection() during verify_connectivity_v1(), so instead just set up the
   // more general (and more real) way here.
 
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
   EXPECT_OK(allocator.status_value());
   if (!allocator.is_ok()) {
     return zx::error(allocator.status_value());
@@ -709,7 +789,7 @@ bool AttachTokenSucceeds(
     fit::function<void(fuchsia_sysmem::wire::BufferCollectionInfo2& to_verify)> verify_info,
     uint32_t expected_buffer_count = 6) {
   ZX_DEBUG_ASSERT(!fail_attached_early || attach_before_also);
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
   EXPECT_OK(allocator);
   IF_FAILURES_RETURN_FALSE();
 
@@ -820,7 +900,7 @@ bool AttachTokenSucceeds(
   IF_FAILURES_RETURN_FALSE();
 
   // Client 2 connects to sysmem separately.
-  auto allocator_2 = connect_to_sysmem_driver();
+  auto allocator_2 = connect_to_sysmem_driver_v1();
   EXPECT_OK(allocator_2);
   IF_FAILURES_RETURN_FALSE();
 
@@ -1124,20 +1204,26 @@ bool AttachTokenSucceeds(
 
 }  // namespace
 
-TEST(Sysmem, DriverConnection) {
-  auto allocator = connect_to_sysmem_driver();
+TEST(Sysmem, DriverConnectionV1) {
+  auto allocator = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator);
-  ASSERT_OK(verify_connectivity(allocator.value()));
+  ASSERT_OK(verify_connectivity_v1(allocator.value()));
+}
+
+TEST(Sysmem, DriverConnectionV2) {
+  auto allocator = connect_to_sysmem_driver_v2();
+  ASSERT_TRUE(allocator.is_ok());
+  ASSERT_OK(verify_connectivity_v2(allocator.value()));
 }
 
 TEST(Sysmem, ServiceConnection) {
   auto allocator = connect_to_sysmem_service();
   ASSERT_OK(allocator);
-  ASSERT_OK(verify_connectivity(allocator.value()));
+  ASSERT_OK(verify_connectivity_v1(allocator.value()));
 }
 
 TEST(Sysmem, VerifyBufferCollectionToken) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator);
 
   auto token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -1368,7 +1454,7 @@ TEST(Sysmem, AttachLifetimeTracking) {
       std::move(*attached_collection_endpoints);
   fidl::WireSyncClient attached_collection{std::move(attached_collection_client)};
 
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator);
   auto bind_result = allocator->BindSharedCollection(std::move(attached_token_client),
                                                      std::move(attached_collection_server));
@@ -1616,7 +1702,7 @@ TEST(Sysmem, BufferName) {
 }
 
 TEST(Sysmem, NoToken) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
   zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(collection_endpoints);
   auto [collection_client_end, collection_server_end] = std::move(*collection_endpoints);
@@ -1676,7 +1762,7 @@ TEST(Sysmem, NoToken) {
 }
 
 TEST(Sysmem, NoSync) {
-  auto allocator_1 = connect_to_sysmem_driver();
+  auto allocator_1 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_1);
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -1746,7 +1832,7 @@ TEST(Sysmem, NoSync) {
 }
 
 TEST(Sysmem, MultipleParticipants) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_OK(token_endpoints_1);
@@ -1854,7 +1940,7 @@ TEST(Sysmem, MultipleParticipants) {
   ASSERT_OK(collection_1->SetConstraints(true, std::move(constraints_1)));
 
   // Client 2 connects to sysmem separately.
-  auto allocator_2 = connect_to_sysmem_driver();
+  auto allocator_2 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_2);
 
   auto collection_endpoints_2 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
@@ -2032,7 +2118,7 @@ TEST(Sysmem, MultipleParticipants) {
 
 // This test is mainly to have something in the fuzzer corpus using format modifiers.
 TEST(Sysmem, ComplicatedFormatModifiers) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_OK(token_endpoints_1);
@@ -2135,7 +2221,7 @@ TEST(Sysmem, ComplicatedFormatModifiers) {
 }
 
 TEST(Sysmem, MultipleParticipantsColorspaceRanking) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_OK(token_endpoints_1);
@@ -2350,7 +2436,7 @@ TEST(Sysmem, MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_Compa
 }
 
 TEST(Sysmem, DuplicateSync) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_OK(token_endpoints_1);
@@ -2463,7 +2549,7 @@ TEST(Sysmem, DuplicateSync) {
 }
 
 TEST(Sysmem, CloseWithOutstandingWait) {
-  auto allocator_1 = connect_to_sysmem_driver();
+  auto allocator_1 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_1);
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -2532,11 +2618,11 @@ TEST(Sysmem, CloseWithOutstandingWait) {
 
   wait_thread.join();
 
-  ASSERT_OK(verify_connectivity(*allocator_1));
+  ASSERT_OK(verify_connectivity_v1(*allocator_1));
 }
 
 TEST(Sysmem, ConstraintsRetainedBeyondCleanClose) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_OK(token_endpoints_1);
@@ -2595,7 +2681,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondCleanClose) {
   ASSERT_OK(collection_1->SetConstraints(true, constraints_1));
 
   // Client 2 connects to sysmem separately.
-  auto allocator_2 = connect_to_sysmem_driver();
+  auto allocator_2 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_2);
 
   auto collection_endpoints_2 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
@@ -2802,7 +2888,7 @@ TEST(Sysmem, RequiredSize) {
 }
 
 TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraints) {
-  auto allocator_1 = connect_to_sysmem_driver();
+  auto allocator_1 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_1);
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -2854,7 +2940,7 @@ TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraints) {
 
   ASSERT_OK(collection_1->SetConstraints(true, std::move(constraints_1)));
 
-  auto allocator_2 = connect_to_sysmem_driver();
+  auto allocator_2 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_2);
 
   auto collection_endpoints_2 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
@@ -3094,7 +3180,7 @@ TEST(Sysmem, NoneUsageAndOtherUsageFromSingleParticipantFails) {
 }
 
 TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceeds) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_OK(token_endpoints_1);
@@ -3157,7 +3243,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceeds) {
   ASSERT_OK(collection_1->SetConstraints(true, std::move(constraints_1)));
 
   // Client 2 connects to sysmem separately.
-  auto allocator_2 = connect_to_sysmem_driver();
+  auto allocator_2 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_2);
 
   auto collection_endpoints_2 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
@@ -3286,7 +3372,7 @@ TEST(Sysmem, PixelFormatBgr24) {
 
 // Test that closing a token handle that's had Close() called on it doesn't crash sysmem.
 TEST(Sysmem, CloseToken) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_OK(token_endpoints_1);
@@ -3972,7 +4058,7 @@ TEST(Sysmem, DefaultAttributes) {
 
 // Check that the server validates how many image format constraints there are.
 TEST(Sysmem, TooManyFormats) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator);
 
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -4017,12 +4103,12 @@ TEST(Sysmem, TooManyFormats) {
   auto allocate_result = collection->WaitForBuffersAllocated();
   EXPECT_NE(allocate_result.status(), ZX_OK);
 
-  verify_connectivity(*allocator);
+  verify_connectivity_v1(*allocator);
 }
 
 // Check that the server checks for min_buffer_count too large.
 TEST(Sysmem, TooManyBuffers) {
-  auto allocator = connect_to_sysmem_driver();
+  auto allocator = connect_to_sysmem_driver_v1();
 
   zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(collection_endpoints);
@@ -4045,7 +4131,7 @@ TEST(Sysmem, TooManyBuffers) {
   auto allocation_result = collection->WaitForBuffersAllocated();
   EXPECT_NE(allocation_result.status(), ZX_OK);
 
-  verify_connectivity(*allocator);
+  verify_connectivity_v1(*allocator);
 }
 
 bool BasicAllocationSucceeds(
@@ -4395,7 +4481,7 @@ TEST(Sysmem, SetDispensable) {
   constexpr Variant variants[] = {Variant::kDispensableFailureBeforeAllocation,
                                   Variant::kDispensableFailureAfterAllocation};
   for (Variant variant : variants) {
-    auto allocator = connect_to_sysmem_driver();
+    auto allocator = connect_to_sysmem_driver_v1();
 
     auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
     ASSERT_OK(token_endpoints_1);
@@ -4456,7 +4542,7 @@ TEST(Sysmem, SetDispensable) {
     ASSERT_EQ(constraints_2.min_buffer_count_for_camping, 2);
 
     // Client 2 connects to sysmem separately.
-    auto allocator_2 = connect_to_sysmem_driver();
+    auto allocator_2 = connect_to_sysmem_driver_v1();
     ASSERT_OK(allocator_2);
 
     auto collection_endpoints_2 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();

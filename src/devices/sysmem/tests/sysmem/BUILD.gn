@@ -23,6 +23,9 @@ test("sysmem") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+
+  # Uncomment this when narrowing down failures.
+  cflags_cc = [ "-Wno-unused-function" ]
 }
 
 fuchsia_unittest_package("sysmem-test") {

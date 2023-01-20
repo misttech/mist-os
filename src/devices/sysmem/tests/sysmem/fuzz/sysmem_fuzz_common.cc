@@ -57,9 +57,9 @@ zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> FakeDdkSysmem::Connect() 
 
   auto [allocator_client_end, allocator_server_end] = std::move(*allocator_endpoints);
 
-  fidl::Status result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_sysmem::DriverConnector>(
+  fidl::Status result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_sysmem2::DriverConnector>(
                                            zx::unowned(ddk_.FidlClient())))
-                            ->Connect(std::move(allocator_server_end));
+                            ->ConnectV1(std::move(allocator_server_end));
   if (!result.ok()) {
     return zx::error(result.status());
   }

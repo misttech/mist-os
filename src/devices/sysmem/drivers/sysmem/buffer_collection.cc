@@ -55,14 +55,14 @@ const uint32_t kMaxClientVmoRights =
 // static
 BufferCollection& BufferCollection::EmplaceInTree(
     fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection, BufferCollectionToken* token,
-    zx::unowned_channel server_end) {
+    const CollectionServerEnd& server_end) {
   // The token is passed in as a pointer because this method deletes token, but the caller must
   // provide non-nullptr token.
   ZX_DEBUG_ASSERT(token);
   // This conversion from unique_ptr<> to RefPtr<> will go away once we move BufferCollection to
   // LLCPP FIDL server binding.
-  fbl::RefPtr<Node> node(fbl::AdoptRef(
-      new BufferCollection(logical_buffer_collection, *token, std::move(server_end))));
+  fbl::RefPtr<Node> node(
+      fbl::AdoptRef(new BufferCollection(logical_buffer_collection, *token, server_end)));
   BufferCollection* buffer_collection_ptr = static_down_cast<BufferCollection*>(node.get());
   // This also deletes token.
   token->node_properties().SetNode(std::move(node));
@@ -85,6 +85,10 @@ void BufferCollection::CloseServerBinding(zx_status_t epitaph) {
   server_binding_v2_ = {};
 }
 
+void BufferCollection::Bind(CollectionServerEnd collection_server_end) {
+  Node::Bind(TakeNodeServerEnd(std::move(collection_server_end)));
+}
+
 void BufferCollection::BindInternalV1(zx::channel collection_request,
                                       ErrorHandlerWrapper error_handler_wrapper) {
   v1_server_.emplace(*this);
@@ -93,8 +97,7 @@ void BufferCollection::BindInternalV1(zx::channel collection_request,
       fidl::ServerEnd<fuchsia_sysmem::BufferCollection>(std::move(collection_request)),
       &v1_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
-          BufferCollection::V1* collection, fidl::UnbindInfo info,
-          fidl::ServerEnd<fuchsia_sysmem::BufferCollection> channel) {
+          BufferCollection::V1* collection, fidl::UnbindInfo info, CollectionServerEndV1 channel) {
         error_handler_wrapper(info);
       });
 }
@@ -107,8 +110,7 @@ void BufferCollection::BindInternalV2(zx::channel collection_request,
       fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>(std::move(collection_request)),
       &v2_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
-          BufferCollection::V2* collection, fidl::UnbindInfo info,
-          fidl::ServerEnd<fuchsia_sysmem2::BufferCollection> channel) {
+          BufferCollection::V2* collection, fidl::UnbindInfo info, CollectionServerEndV2 channel) {
         error_handler_wrapper(info);
       });
 }
@@ -706,9 +708,9 @@ fuchsia_sysmem2::BufferCollectionConstraints BufferCollection::CloneConstraints(
 
 BufferCollection::BufferCollection(
     fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection_param,
-    const BufferCollectionToken& token, zx::unowned_channel server_end)
+    const BufferCollectionToken& token, const CollectionServerEnd& server_end)
     : Node(std::move(logical_buffer_collection_param), &token.node_properties(),
-           std::move(server_end)) {
+           GetUnownedChannel(server_end)) {
   TRACE_DURATION("gfx", "BufferCollection::BufferCollection", "this", this,
                  "logical_buffer_collection", &this->logical_buffer_collection());
   ZX_DEBUG_ASSERT(shared_logical_buffer_collection());

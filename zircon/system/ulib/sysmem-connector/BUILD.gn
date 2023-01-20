@@ -9,7 +9,8 @@ zx_library("sysmem-connector") {
   sdk_headers = [ "lib/sysmem-connector/sysmem-connector.h" ]
   sources = [ "sysmem-connector.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/async",

@@ -428,6 +428,37 @@ void LogicalBufferCollection::CreateV2(zx::channel buffer_collection_token_reque
 }
 
 // static
+fit::result<zx_status_t, BufferCollectionToken*> LogicalBufferCollection::CommonConvertToken(
+    Device* parent_device, zx::channel buffer_collection_token,
+    const ClientDebugInfo* client_debug_info, const char* fidl_message_name) {
+  ZX_DEBUG_ASSERT(buffer_collection_token);
+
+  zx_koid_t token_client_koid;
+  zx_koid_t token_server_koid;
+  zx_status_t status = get_handle_koids(buffer_collection_token, &token_client_koid,
+                                        &token_server_koid, ZX_OBJ_TYPE_CHANNEL);
+  if (status != ZX_OK) {
+    LogErrorStatic(FROM_HERE, client_debug_info, "Failed to get channel koids - %d", status);
+    // ~buffer_collection_token
+    return fit::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  BufferCollectionToken* token = parent_device->FindTokenByServerChannelKoid(token_server_koid);
+  if (!token) {
+    // The most likely scenario for why the token was not found is that Sync() was not called on
+    // either the BufferCollectionToken or the BufferCollection.
+    LogErrorStatic(FROM_HERE, client_debug_info,
+                   "BindSharedCollection could not find token from server channel koid %ld; "
+                   "perhaps BufferCollectionToken.Sync() was not called",
+                   token_server_koid);
+    // ~buffer_collection_token
+    return fit::error(ZX_ERR_NOT_FOUND);
+  }
+
+  return fit::success(token);
+}
+
+// static
 //
 // The buffer_collection_token is the client end of the BufferCollectionToken
 // which the client is exchanging for the BufferCollection (which the client is
@@ -446,36 +477,17 @@ void LogicalBufferCollection::CreateV2(zx::channel buffer_collection_token_reque
 // So this method will close the buffer_collection_token and when it closes via
 // normal FIDL processing path, the token will remember the
 // buffer_collection_request to essentially convert itself into.
-void LogicalBufferCollection::CommonBindSharedCollection(Device* parent_device,
-                                                         zx::channel buffer_collection_token,
-                                                         zx::channel buffer_collection_request,
-                                                         const ClientDebugInfo* client_debug_info) {
-  ZX_DEBUG_ASSERT(buffer_collection_token);
-  ZX_DEBUG_ASSERT(buffer_collection_request);
-
-  zx_koid_t token_client_koid;
-  zx_koid_t token_server_koid;
-  zx_status_t status = get_handle_koids(buffer_collection_token, &token_client_koid,
-                                        &token_server_koid, ZX_OBJ_TYPE_CHANNEL);
-  if (status != ZX_OK) {
-    LogErrorStatic(FROM_HERE, client_debug_info, "Failed to get channel koids");
-    // ~buffer_collection_token
-    // ~buffer_collection_request
+void LogicalBufferCollection::BindSharedCollection(Device* parent_device,
+                                                   zx::channel buffer_collection_token,
+                                                   CollectionServerEnd buffer_collection_request,
+                                                   const ClientDebugInfo* client_debug_info) {
+  auto result = CommonConvertToken(parent_device, std::move(buffer_collection_token),
+                                   client_debug_info, "BindSharedCollection");
+  if (result.is_error()) {
     return;
   }
 
-  BufferCollectionToken* token = parent_device->FindTokenByServerChannelKoid(token_server_koid);
-  if (!token) {
-    // The most likely scenario for why the token was not found is that Sync() was not called on
-    // either the BufferCollectionToken or the BufferCollection.
-    LogErrorStatic(FROM_HERE, client_debug_info,
-                   "BindSharedCollection could not find token from server channel koid %ld; "
-                   "perhaps BufferCollectionToken.Sync() was not called",
-                   token_server_koid);
-    // ~buffer_collection_token
-    // ~buffer_collection_request
-    return;
-  }
+  BufferCollectionToken* token = result.value();
 
   // This will token->FailAsync() if the token has already got one, or if the
   // token already saw token->Close().
@@ -499,116 +511,104 @@ void LogicalBufferCollection::CommonBindSharedCollection(Device* parent_device,
   // ~buffer_collection_token
 }
 
-void LogicalBufferCollection::BindSharedCollectionV1(Device* parent_device,
-                                                     zx::channel buffer_collection_token,
-                                                     zx::channel buffer_collection_request,
-                                                     const ClientDebugInfo* client_debug_info) {
-  CommonBindSharedCollection(parent_device, std::move(buffer_collection_token),
-                             std::move(buffer_collection_request), client_debug_info);
-}
-
-void LogicalBufferCollection::BindSharedCollectionV2(Device* parent_device,
-                                                     zx::channel buffer_collection_token,
-                                                     zx::channel buffer_collection_request,
-                                                     const ClientDebugInfo* client_debug_info) {
-  CommonBindSharedCollection(parent_device, std::move(buffer_collection_token),
-                             std::move(buffer_collection_request), client_debug_info);
-}
-
 zx_status_t LogicalBufferCollection::ValidateBufferCollectionToken(Device* parent_device,
                                                                    zx_koid_t token_server_koid) {
   BufferCollectionToken* token = parent_device->FindTokenByServerChannelKoid(token_server_koid);
   return token ? ZX_OK : ZX_ERR_NOT_FOUND;
 }
 
+void LogicalBufferCollection::HandleTokenFailure(BufferCollectionToken& token, zx_status_t status) {
+  // Clean close from FIDL channel point of view is ZX_ERR_PEER_CLOSED,
+  // and ZX_OK is never passed to the error handler.
+  ZX_DEBUG_ASSERT(status != ZX_OK);
+
+  // The dispatcher shut down before we were able to Bind(...)
+  if (status == ZX_ERR_BAD_STATE) {
+    LogAndFailRootNode(FROM_HERE, status, "sysmem dispatcher shutting down - status: %d", status);
+    return;
+  }
+
+  // We know |this| is alive because the token is alive and the token has
+  // a fbl::RefPtr<LogicalBufferCollection>.  The token is alive because
+  // the token is still under the tree rooted at root_.
+  //
+  // Any other deletion of the token_ptr out of the tree at root_ (outside of
+  // this error handler) doesn't run this error handler.
+  ZX_DEBUG_ASSERT(root_);
+
+  std::optional<CollectionServerEnd> buffer_collection_request =
+      token.TakeBufferCollectionRequest();
+
+  if (!(status == ZX_ERR_PEER_CLOSED &&
+        (token.is_done() || buffer_collection_request.has_value()))) {
+    // LogAndFailDownFrom() will also remove any no-longer-needed nodes from the tree.
+    //
+    // A token whose error handler sees anything other than clean close
+    // with is_done() implies LogicalBufferCollection failure.  The
+    // ability to detect unexpected closure of a token is a main reason
+    // we use a channel for BufferCollectionToken instead of an
+    // eventpair.
+    //
+    // If a participant for some reason finds itself with an extra token it doesn't need, the
+    // participant should use Close() to avoid triggering this failure.
+    NodeProperties* tree_to_fail = FindTreeToFail(&token.node_properties());
+    if (tree_to_fail == root_.get()) {
+      LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
+                         "Token failure causing LogicalBufferCollection failure - status: %d",
+                         status);
+    } else {
+      LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
+                         "Token failure causing AttachToken() sub-tree failure - status: %d",
+                         status);
+    }
+    return;
+  }
+
+  // At this point we know the token channel was closed, and that the client either did a Close()
+  // or the token was dispensable, or allocator::BindSharedCollection() was used.
+  ZX_DEBUG_ASSERT(status == ZX_ERR_PEER_CLOSED &&
+                  (token.is_done() || buffer_collection_request.has_value()));
+  // BufferCollectionToken enforces that these never both become true; the BufferCollectionToken
+  // will fail instead.
+  ZX_DEBUG_ASSERT(!(token.is_done() && buffer_collection_request.has_value()));
+
+  if (!buffer_collection_request.has_value()) {
+    ZX_DEBUG_ASSERT(token.is_done());
+    // This was a token::Close().  We want to stop tracking the token now that we've processed all
+    // its previously-queued inbound messages.  This might be the last token, so we
+    // MaybeAllocate().  This path isn't a failure (unless there are also zero BufferCollection
+    // views in which case MaybeAllocate() calls Fail()).
+    //
+    // Keep self alive via "self" in case this will drop connected_node_count_ to zero.
+    auto self = token.shared_logical_buffer_collection();
+    ZX_DEBUG_ASSERT(self.get() == this);
+    // This token never had any constraints, and it was Close()ed, but we need to keep the
+    // NodeProperties because it may have child NodeProperties under it, and it may have had
+    // SetDispensable() called on it.
+    //
+    // This OrphanedNode has no BufferCollectionConstraints.
+    ZX_DEBUG_ASSERT(!token.node_properties().buffers_logically_allocated());
+    NodeProperties& node_properties = token.node_properties();
+    // This replaces token with an OrphanedNode, and also de-refs token.  Not possible to send an
+    // epitaph because ZX_ERR_PEER_CLOSED.
+    OrphanedNode::EmplaceInTree(fbl::RefPtr(this), &node_properties);
+    MaybeAllocate();
+    // ~self may delete "this"
+  } else {
+    // At this point we know that this was a BindSharedCollection().  We need to convert the
+    // BufferCollectionToken into a BufferCollection.  The NodeProperties remains, with its Node
+    // set to the new BufferCollection instead of the old BufferCollectionToken.
+    //
+    // ~token during this call
+    BindSharedCollectionInternal(&token, std::move(buffer_collection_request.value()));
+  }
+}
+
 bool LogicalBufferCollection::CommonCreateBufferCollectionTokenStage1(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    zx::unowned_channel token_request, BufferCollectionToken** out_token) {
-  auto& token =
-      BufferCollectionToken::EmplaceInTree(self, new_node_properties, std::move(token_request));
-  token.SetErrorHandler([this, &token](zx_status_t status) {
-    // Clean close from FIDL channel point of view is ZX_ERR_PEER_CLOSED,
-    // and ZX_OK is never passed to the error handler.
-    ZX_DEBUG_ASSERT(status != ZX_OK);
-
-    // The dispatcher shut down before we were able to Bind(...)
-    if (status == ZX_ERR_BAD_STATE) {
-      LogAndFailRootNode(FROM_HERE, status, "sysmem dispatcher shutting down - status: %d", status);
-      return;
-    }
-
-    // We know |this| is alive because the token is alive and the token has
-    // a fbl::RefPtr<LogicalBufferCollection>.  The token is alive because
-    // the token is still under the tree rooted at root_.
-    //
-    // Any other deletion of the token_ptr out of the tree at root_ (outside of
-    // this error handler) doesn't run this error handler.
-    ZX_DEBUG_ASSERT(root_);
-
-    zx::channel buffer_collection_request = token.TakeBufferCollectionRequest();
-
-    if (!(status == ZX_ERR_PEER_CLOSED && (token.is_done() || buffer_collection_request))) {
-      // LogAndFailDownFrom() will also remove any no-longer-needed nodes from the tree.
-      //
-      // A token whose error handler sees anything other than clean close
-      // with is_done() implies LogicalBufferCollection failure.  The
-      // ability to detect unexpected closure of a token is a main reason
-      // we use a channel for BufferCollectionToken instead of an
-      // eventpair.
-      //
-      // If a participant for some reason finds itself with an extra token it doesn't need, the
-      // participant should use Close() to avoid triggering this failure.
-      NodeProperties* tree_to_fail = FindTreeToFail(&token.node_properties());
-      if (tree_to_fail == root_.get()) {
-        LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
-                           "Token failure causing LogicalBufferCollection failure - status: %d",
-                           status);
-      } else {
-        LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
-                           "Token failure causing AttachToken() sub-tree failure - status: %d",
-                           status);
-      }
-      return;
-    }
-
-    // At this point we know the token channel was closed, and that the client either did a Close()
-    // or the token was dispensable, or allocator::BindSharedCollection() was used.
-    ZX_DEBUG_ASSERT(status == ZX_ERR_PEER_CLOSED && (token.is_done() || buffer_collection_request));
-    // BufferCollectionToken enforces that these never both become true; the BufferCollectionToken
-    // will fail instead.
-    ZX_DEBUG_ASSERT(!(token.is_done() && buffer_collection_request));
-
-    if (!buffer_collection_request) {
-      ZX_DEBUG_ASSERT(token.is_done());
-      // This was a token::Close().  We want to stop tracking the token now that we've processed all
-      // its previously-queued inbound messages.  This might be the last token, so we
-      // MaybeAllocate().  This path isn't a failure (unless there are also zero BufferCollection
-      // views in which case MaybeAllocate() calls Fail()).
-      //
-      // Keep self alive via "self" in case this will drop connected_node_count_ to zero.
-      auto self = token.shared_logical_buffer_collection();
-      ZX_DEBUG_ASSERT(self.get() == this);
-      // This token never had any constraints, and it was Close()ed, but we need to keep the
-      // NodeProperties because it may have child NodeProperties under it, and it may have had
-      // SetDispensable() called on it.
-      //
-      // This OrphanedNode has no BufferCollectionConstraints.
-      ZX_DEBUG_ASSERT(!token.node_properties().buffers_logically_allocated());
-      NodeProperties& node_properties = token.node_properties();
-      // This replaces token with an OrphanedNode, and also de-refs token.  Not possible to send an
-      // epitaph because ZX_ERR_PEER_CLOSED.
-      OrphanedNode::EmplaceInTree(fbl::RefPtr(this), &node_properties);
-      MaybeAllocate();
-      // ~self may delete "this"
-    } else {
-      // At this point we know that this was a BindSharedCollection().  We need to convert the
-      // BufferCollectionToken into a BufferCollection.  The NodeProperties remains, with its Node
-      // set to the new BufferCollection instead of the old BufferCollectionToken.
-      //
-      // ~token during this call
-      BindSharedCollectionInternal(&token, std::move(buffer_collection_request));
-    }
-  });
+    const TokenServerEnd& token_request, BufferCollectionToken** out_token) {
+  auto& token = BufferCollectionToken::EmplaceInTree(self, new_node_properties, token_request);
+  token.SetErrorHandler([this, &token](zx_status_t status) { HandleTokenFailure(token, status); });
 
   if (token.create_status() != ZX_OK) {
     LogAndFailNode(FROM_HERE, &token.node_properties(), token.create_status(),
@@ -632,37 +632,33 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenStage1(
 
 void LogicalBufferCollection::CreateBufferCollectionTokenV1(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken> token_request) {
-  ZX_DEBUG_ASSERT(token_request);
-
+    TokenServerEndV1 token_request_v1) {
+  ZX_DEBUG_ASSERT(token_request_v1);
+  TokenServerEnd token_request(std::move(token_request_v1));
   BufferCollectionToken* token;
-  if (!CommonCreateBufferCollectionTokenStage1(
-          self, new_node_properties, zx::unowned_channel(token_request.channel()), &token)) {
+  if (!CommonCreateBufferCollectionTokenStage1(self, new_node_properties, token_request, &token)) {
     return;
   }
-
-  token->BindV1(token_request.TakeChannel());
+  token->Bind(std::move(token_request));
 }
 
 void LogicalBufferCollection::CreateBufferCollectionTokenV2(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionToken> token_request) {
-  ZX_DEBUG_ASSERT(token_request);
-
+    TokenServerEndV2 token_request_v2) {
+  ZX_DEBUG_ASSERT(token_request_v2);
+  TokenServerEnd token_request(std::move(token_request_v2));
   BufferCollectionToken* token;
-  if (!CommonCreateBufferCollectionTokenStage1(
-          self, new_node_properties, zx::unowned_channel(token_request.channel()), &token)) {
+  if (!CommonCreateBufferCollectionTokenStage1(self, new_node_properties, std::move(token_request),
+                                               &token)) {
     return;
   }
-
-  token->BindV2(token_request.TakeChannel());
+  token->Bind(std::move(token_request));
 }
 
 bool LogicalBufferCollection::CommonCreateBufferCollectionTokenGroupStage1(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    zx::unowned_channel group_request, BufferCollectionTokenGroup** out_group) {
-  auto& group = BufferCollectionTokenGroup::EmplaceInTree(self, new_node_properties,
-                                                          std::move(group_request));
+    const GroupServerEnd& group_request, BufferCollectionTokenGroup** out_group) {
+  auto& group = BufferCollectionTokenGroup::EmplaceInTree(self, new_node_properties, group_request);
   group.SetErrorHandler([this, &group](zx_status_t status) {
     // Clean close from FIDL channel point of view is ZX_ERR_PEER_CLOSED,
     // and ZX_OK is never passed to the error handler.
@@ -756,26 +752,28 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenGroupStage1(
 
 void LogicalBufferCollection::CreateBufferCollectionTokenGroupV1(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    fidl::ServerEnd<fuchsia_sysmem::BufferCollectionTokenGroup> group_request) {
-  ZX_DEBUG_ASSERT(group_request);
+    GroupServerEndV1 group_request_v1) {
+  ZX_DEBUG_ASSERT(group_request_v1);
+  GroupServerEnd group_request(std::move(group_request_v1));
   BufferCollectionTokenGroup* group;
-  if (!CommonCreateBufferCollectionTokenGroupStage1(
-          self, new_node_properties, zx::unowned_channel(group_request.channel()), &group)) {
+  if (!CommonCreateBufferCollectionTokenGroupStage1(self, new_node_properties, group_request,
+                                                    &group)) {
     return;
   }
-  group->BindV1(group_request.TakeChannel());
+  group->Bind(std::move(group_request));
 }
 
 void LogicalBufferCollection::CreateBufferCollectionTokenGroupV2(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionTokenGroup> group_request) {
-  ZX_DEBUG_ASSERT(group_request);
+    GroupServerEndV2 group_request_v2) {
+  ZX_DEBUG_ASSERT(group_request_v2);
+  GroupServerEnd group_request(std::move(group_request_v2));
   BufferCollectionTokenGroup* group;
-  if (!CommonCreateBufferCollectionTokenGroupStage1(
-          self, new_node_properties, zx::unowned_channel(group_request.channel()), &group)) {
+  if (!CommonCreateBufferCollectionTokenGroupStage1(self, new_node_properties, group_request,
+                                                    &group)) {
     return;
   }
-  group->BindV2(group_request.TakeChannel());
+  group->Bind(std::move(group_request));
 }
 
 void LogicalBufferCollection::AttachLifetimeTracking(zx::eventpair server_end,
@@ -1829,16 +1827,14 @@ void LogicalBufferCollection::SetSucceededLateLogicalAllocationResult(
   }
 }
 
-void LogicalBufferCollection::BindSharedCollectionInternal(BufferCollectionToken* token,
-                                                           zx::channel buffer_collection_request) {
-  ZX_DEBUG_ASSERT(buffer_collection_request.get());
+void LogicalBufferCollection::BindSharedCollectionInternal(
+    BufferCollectionToken* token, CollectionServerEnd buffer_collection_request) {
   auto self = fbl::RefPtr(this);
   // This links the new collection into the tree under root_ in the same place as the token was, and
   // deletes the token.
   //
   // ~BufferCollectionToken calls UntrackTokenKoid().
-  auto& collection =
-      BufferCollection::EmplaceInTree(self, token, zx::unowned_channel(buffer_collection_request));
+  auto& collection = BufferCollection::EmplaceInTree(self, token, buffer_collection_request);
   token = nullptr;
   collection.SetErrorHandler([this, &collection](zx_status_t status) {
     // status passed to an error handler is never ZX_OK.  Clean close is
@@ -1934,7 +1930,7 @@ void LogicalBufferCollection::BindSharedCollectionInternal(BufferCollectionToken
     return;
   }
 
-  collection.BindV1(std::move(buffer_collection_request));
+  collection.Bind(std::move(buffer_collection_request));
   // ~self
 }
 

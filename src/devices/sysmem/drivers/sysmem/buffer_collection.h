@@ -27,12 +27,16 @@ namespace sysmem_driver {
 // one-way message with no parameters.
 class BufferCollection : public Node {
  public:
+  using ServerEndV1 = fidl::ServerEnd<typename fuchsia_sysmem::BufferCollection>;
+  using ServerEndV2 = fidl::ServerEnd<typename fuchsia_sysmem2::BufferCollection>;
+  using ServerEnd = std::variant<ServerEndV1, ServerEndV2>;
+
   // Use EmplaceInTree() instead of Create() (until we switch to llcpp when we can have a new
   // Create() that does what EmplaceInTree() currently does).  The returned reference is valid while
   // this Node is in the tree under root_.
   static BufferCollection& EmplaceInTree(
       fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection, BufferCollectionToken* token,
-      zx::unowned_channel server_end);
+      const CollectionServerEnd& server_end);
   ~BufferCollection() override;
 
   //
@@ -66,6 +70,8 @@ class BufferCollection : public Node {
   bool is_connected_type() const override;
   bool is_currently_connected() const override;
   const char* node_type_string() const override;
+
+  void Bind(CollectionServerEnd collection_server_end);
 
  protected:
   void BindInternalV1(zx::channel collection_request,
@@ -157,7 +163,8 @@ class BufferCollection : public Node {
   };
 
   explicit BufferCollection(fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
-                            const BufferCollectionToken& token, zx::unowned_channel server_end);
+                            const BufferCollectionToken& token,
+                            const CollectionServerEnd& server_end);
 
   void CloseServerBinding(zx_status_t epitaph) override;
 

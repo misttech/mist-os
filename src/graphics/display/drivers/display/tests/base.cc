@@ -81,7 +81,7 @@ bool TestBase::RunLoopWithTimeoutOrUntil(fit::function<bool()>&& condition, zx::
   return result->load();
 }
 
-fidl::UnownedClientEnd<fuchsia_sysmem::DriverConnector> TestBase::sysmem_fidl() {
+fidl::UnownedClientEnd<fuchsia_sysmem2::DriverConnector> TestBase::sysmem_fidl() {
   return tree_->sysmem_client();
 }
 

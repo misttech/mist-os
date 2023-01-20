@@ -23,6 +23,8 @@ using zx;
 /// TEE, as the plumbing goes from the bootloader to the TEE.  However, this
 /// protocol intentionally doesn't care which heaps are dynamically-allocated
 /// and which are fixed-location.
+//
+// TODO(fxb/114670): Move SecureMem from fuchsia.sysmem to fuchsia.sysmem2.
 protocol SecureMem {
     /// Gets the physical address and length of any secure heap whose physical
     /// range is configured via the TEE.

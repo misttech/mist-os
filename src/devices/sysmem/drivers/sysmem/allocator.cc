@@ -94,9 +94,8 @@ void Allocator::V1::AllocateNonSharedCollection(
   // goes to BindSharedCollection().  The BindSharedCollection() will figure
   // out which token we're talking about based on the koid(s), as usual.
   LogicalBufferCollection::CreateV1(std::move(token_server), allocator_->parent_device_);
-  LogicalBufferCollection::BindSharedCollectionV1(
-      allocator_->parent_device_, std::move(token_client),
-      request.collection_request().TakeChannel(),
+  LogicalBufferCollection::BindSharedCollection(
+      allocator_->parent_device_, std::move(token_client), std::move(request.collection_request()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 
   // Now the client can SetConstraints() on the BufferCollection, etc.  The
@@ -121,15 +120,15 @@ void Allocator::V2::AllocateNonSharedCollection(
     return;
   }
   auto endpoints = std::move(result.value());
-  auto& [token_client, token_server] = endpoints;
+  auto [token_client, token_server] = std::move(endpoints);
 
   // The server end of the local token goes to Create(), and the client end
   // goes to BindSharedCollection().  The BindSharedCollection() will figure
   // out which token we're talking about based on the koid(s), as usual.
   LogicalBufferCollection::CreateV2(std::move(token_server), allocator_->parent_device_);
-  LogicalBufferCollection::BindSharedCollectionV2(
+  LogicalBufferCollection::BindSharedCollection(
       allocator_->parent_device_, std::move(token_client),
-      request.collection_request()->TakeChannel(),
+      std::move(request.collection_request().value()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 
   // Now the client can SetConstraints() on the BufferCollection, etc.  The
@@ -193,9 +192,9 @@ void Allocator::V1::BindSharedCollection(BindSharedCollectionRequest& request,
   // we have to look it up by koid.  The koid table is held by
   // LogicalBufferCollection, so delegate over to LogicalBufferCollection for
   // this request.
-  LogicalBufferCollection::BindSharedCollectionV1(
+  LogicalBufferCollection::BindSharedCollection(
       allocator_->parent_device_, request.token().TakeChannel(),
-      request.buffer_collection_request().TakeChannel(),
+      std::move(request.buffer_collection_request()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 }
 
@@ -222,9 +221,9 @@ void Allocator::V2::BindSharedCollection(BindSharedCollectionRequest& request,
   // we have to look it up by koid.  The koid table is held by
   // LogicalBufferCollection, so delegate over to LogicalBufferCollection for
   // this request.
-  LogicalBufferCollection::BindSharedCollectionV2(
+  LogicalBufferCollection::BindSharedCollection(
       allocator_->parent_device_, request.token()->TakeChannel(),
-      request.buffer_collection_request()->TakeChannel(),
+      std::move(request.buffer_collection_request().value()),
       allocator_->client_debug_info_.has_value() ? &*allocator_->client_debug_info_ : nullptr);
 }
 

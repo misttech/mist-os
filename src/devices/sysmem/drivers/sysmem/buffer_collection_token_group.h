@@ -22,7 +22,7 @@ class BufferCollectionTokenGroup : public Node {
  public:
   static BufferCollectionTokenGroup& EmplaceInTree(
       fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
-      NodeProperties* node_properties, zx::unowned_channel server_end);
+      NodeProperties* node_properties, const GroupServerEnd& server_end);
 
   // Node interface
   bool ReadyForAllocation() override;
@@ -39,6 +39,8 @@ class BufferCollectionTokenGroup : public Node {
   bool is_connected_type() const override;
   bool is_currently_connected() const override;
   const char* node_type_string() const override;
+
+  void Bind(GroupServerEnd server_end);
 
  protected:
   void BindInternalV1(zx::channel group_request,
@@ -108,7 +110,7 @@ class BufferCollectionTokenGroup : public Node {
   };
 
   BufferCollectionTokenGroup(fbl::RefPtr<LogicalBufferCollection> parent,
-                             NodeProperties* new_node_properties, zx::unowned_channel server_end);
+                             NodeProperties* new_node_properties, const GroupServerEnd& server_end);
 
   template <typename Completer>
   bool CommonCreateChildStage1(Completer& completer,

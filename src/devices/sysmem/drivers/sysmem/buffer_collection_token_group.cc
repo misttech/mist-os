@@ -273,7 +273,7 @@ void BufferCollectionTokenGroup::V2::AllChildrenPresent(
 
 BufferCollectionTokenGroup& BufferCollectionTokenGroup::EmplaceInTree(
     fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
-    NodeProperties* new_node_properties, zx::unowned_channel server_end) {
+    NodeProperties* new_node_properties, const GroupServerEnd& server_end) {
   auto group = fbl::AdoptRef(new BufferCollectionTokenGroup(
       std::move(logical_buffer_collection), new_node_properties, std::move(server_end)));
   auto group_ptr = group.get();
@@ -283,13 +283,17 @@ BufferCollectionTokenGroup& BufferCollectionTokenGroup::EmplaceInTree(
 
 BufferCollectionTokenGroup::BufferCollectionTokenGroup(fbl::RefPtr<LogicalBufferCollection> parent,
                                                        NodeProperties* new_node_properties,
-                                                       zx::unowned_channel server_end)
-    : Node(std::move(parent), new_node_properties, std::move(server_end)) {
+                                                       const GroupServerEnd& server_end)
+    : Node(std::move(parent), new_node_properties, GetUnownedChannel(server_end)) {
   TRACE_DURATION("gfx", "BufferCollectionTokenGroup::BufferCollectionTokenGroup", "this", this,
                  "logical_buffer_collection", &this->logical_buffer_collection());
   ZX_DEBUG_ASSERT(shared_logical_buffer_collection());
   inspect_node_ =
       this->logical_buffer_collection().inspect_node().CreateChild(CreateUniqueName("group-"));
+}
+
+void BufferCollectionTokenGroup::Bind(GroupServerEnd server_end) {
+  Node::Bind(TakeNodeServerEnd(std::move(server_end)));
 }
 
 void BufferCollectionTokenGroup::BindInternalV1(zx::channel group_request,
@@ -300,8 +304,7 @@ void BufferCollectionTokenGroup::BindInternalV1(zx::channel group_request,
       fidl::ServerEnd<fuchsia_sysmem::BufferCollectionTokenGroup>(std::move(group_request)),
       &v1_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
-          BufferCollectionTokenGroup::V1* group, fidl::UnbindInfo info,
-          fidl::ServerEnd<fuchsia_sysmem::BufferCollectionTokenGroup> channel) {
+          BufferCollectionTokenGroup::V1* group, fidl::UnbindInfo info, GroupServerEndV1 channel) {
         error_handler_wrapper(info);
       });
 }
@@ -314,8 +317,7 @@ void BufferCollectionTokenGroup::BindInternalV2(zx::channel group_request,
       fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionTokenGroup>(std::move(group_request)),
       &v2_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
-          BufferCollectionTokenGroup::V2* group, fidl::UnbindInfo info,
-          fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionTokenGroup> channel) {
+          BufferCollectionTokenGroup::V2* group, fidl::UnbindInfo info, GroupServerEndV2 channel) {
         error_handler_wrapper(info);
       });
 }

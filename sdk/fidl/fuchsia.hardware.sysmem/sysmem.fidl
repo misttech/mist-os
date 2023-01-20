@@ -3,19 +3,28 @@
 // found in the LICENSE file.
 library fuchsia.hardware.sysmem;
 
-using zx;
 using fuchsia.sysmem;
 using fuchsia.sysmem2;
+using zx;
 
+/// This interface is for driver-to-driver connection to sysmem. This includes both connection to
+/// both sysmem/sysmem2 `Allocator`, and special-purpose connection for custom heaps and secure
+/// memory.
 @discoverable
 protocol Sysmem {
     /// Takes the server end of a FIDL connection that'll serve
     /// fuchsia.sysmem.Allocator.  If the connection fails, the channel will
     /// close.
-    ///
-    /// TODO(fxb/104188): Remove this method.
+    //
+    // TODO(fxb/104188): Maybe remove this method (see discussion in bug).
     ConnectServer(resource struct {
         allocator_request server_end:fuchsia.sysmem.Allocator;
+    });
+
+    // TODO(fxb/104188): Maybe remove this method (see discussion in bug).
+    //@transitional("Switch to requesting Allocator instead of serving this method.")
+    ConnectServerV2(resource table {
+        1: allocator_request server_end:fuchsia.sysmem2.Allocator;
     });
 
     /// Takes the client end of a FIDL connection that'll serve
@@ -36,8 +45,4 @@ protocol Sysmem {
     /// will be closing soon, and that this channel closure should not be
     /// considered an error.
     UnregisterSecureMem() -> () error zx.status;
-};
-
-service Service {
-    device client_end:Sysmem;
 };

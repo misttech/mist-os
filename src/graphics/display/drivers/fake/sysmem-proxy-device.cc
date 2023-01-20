@@ -43,8 +43,18 @@ SysmemProxyDevice::SysmemProxyDevice(zx_device_t* parent_device,
   ZX_ASSERT(status == ZX_OK);
 }
 
-void SysmemProxyDevice::Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) {
+void SysmemProxyDevice::ConnectV1(ConnectV1RequestView request,
+                                  ConnectV1Completer::Sync& completer) {
   zx_status_t status = SysmemConnect(request->allocator_request.TakeChannel());
+  if (status != ZX_OK) {
+    LOG(INFO, "SysmemConnect() failed");
+    return;
+  }
+}
+
+void SysmemProxyDevice::ConnectV2(ConnectV2RequestView request,
+                                  ConnectV2Completer::Sync& completer) {
+  zx_status_t status = SysmemConnectV2(request->allocator_request.TakeChannel());
   if (status != ZX_OK) {
     LOG(INFO, "SysmemConnect() failed");
     return;
@@ -58,6 +68,12 @@ void SysmemProxyDevice::SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView
 
 zx_status_t SysmemProxyDevice::SysmemConnect(zx::channel allocator_request) {
   const char* kSvcPath = "/svc/fuchsia.sysmem.Allocator";
+  LOG(INFO, "fdio_service_connect to service service: %s", kSvcPath);
+  return fdio_service_connect(kSvcPath, allocator_request.release());
+}
+
+zx_status_t SysmemProxyDevice::SysmemConnectV2(zx::channel allocator_request) {
+  const char* kSvcPath = "/svc/fuchsia.sysmem2.Allocator";
   LOG(INFO, "fdio_service_connect to service service: %s", kSvcPath);
   return fdio_service_connect(kSvcPath, allocator_request.release());
 }

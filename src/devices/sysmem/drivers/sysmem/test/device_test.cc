@@ -4,8 +4,9 @@
 
 #include "device.h"
 
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/natural_types.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
@@ -211,17 +212,16 @@ class FakeDdkSysmem : public zxtest::Test {
     EXPECT_OK(allocator_endpoints);
     auto [allocator_client_end, allocator_server_end] = std::move(*allocator_endpoints);
 
-    zx::result connector_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::DriverConnector>();
+    zx::result connector_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::DriverConnector>();
     EXPECT_OK(connector_endpoints);
     auto [connector_client_end, connector_server_end] = std::move(*connector_endpoints);
 
     fidl::BindServer(loop_.dispatcher(), std::move(connector_server_end), sysmem_.get());
     EXPECT_OK(loop_.StartThread());
 
-    fidl::Status result =
-        fidl::WireCall(connector_client_end)->Connect(std::move(allocator_server_end));
-
+    auto result = fidl::WireCall(connector_client_end)->ConnectV1(std::move(allocator_server_end));
     EXPECT_OK(result);
+
     return std::move(allocator_client_end);
   }
 
@@ -259,10 +259,10 @@ TEST_F(FakeDdkSysmem, TearDownLoop) {
 TEST_F(FakeDdkSysmem, DummySecureMem) {
   zx::channel securemem_server, securemem_client;
   ASSERT_OK(zx::channel::create(0u, &securemem_server, &securemem_client));
-  EXPECT_EQ(ZX_OK, sysmem_->SysmemRegisterSecureMem(std::move(securemem_server)));
+  EXPECT_EQ(ZX_OK, sysmem_->CommonSysmemRegisterSecureMem(std::move(securemem_server)));
 
   // This shouldn't deadlock waiting for a message on the channel.
-  EXPECT_EQ(ZX_OK, sysmem_->SysmemUnregisterSecureMem());
+  EXPECT_EQ(ZX_OK, sysmem_->CommonSysmemUnregisterSecureMem());
 
   // This shouldn't cause a panic due to receiving peer closed.
   securemem_client.reset();

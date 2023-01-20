@@ -44,12 +44,16 @@ void BufferCollectionToken::CloseServerBinding(zx_status_t epitaph) {
 // static
 BufferCollectionToken& BufferCollectionToken::EmplaceInTree(
     fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
-    NodeProperties* new_node_properties, zx::unowned_channel server_end) {
+    NodeProperties* new_node_properties, const TokenServerEnd& server_end) {
   auto token = fbl::AdoptRef(new BufferCollectionToken(std::move(logical_buffer_collection),
-                                                       new_node_properties, std::move(server_end)));
+                                                       new_node_properties, server_end));
   auto token_ptr = token.get();
   new_node_properties->SetNode(token);
   return *token_ptr;
+}
+
+void BufferCollectionToken::Bind(TokenServerEnd token_server_end) {
+  Node::Bind(TakeNodeServerEnd(std::move(token_server_end)));
 }
 
 void BufferCollectionToken::BindInternalV1(zx::channel token_request,
@@ -60,8 +64,7 @@ void BufferCollectionToken::BindInternalV1(zx::channel token_request,
       fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(token_request)),
       &v1_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
-          BufferCollectionToken::V1* token, fidl::UnbindInfo info,
-          fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken> channel) {
+          BufferCollectionToken::V1* token, fidl::UnbindInfo info, TokenServerEndV1 channel) {
         error_handler_wrapper(info);
       });
 }
@@ -74,8 +77,7 @@ void BufferCollectionToken::BindInternalV2(zx::channel token_request,
       fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(token_request)),
       &v2_server_.value(),
       [error_handler_wrapper = std::move(error_handler_wrapper)](
-          BufferCollectionToken::V2* token, fidl::UnbindInfo info,
-          fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionToken> channel) {
+          BufferCollectionToken::V2* token, fidl::UnbindInfo info, TokenServerEndV2 channel) {
         error_handler_wrapper(info);
       });
 }
@@ -260,8 +262,9 @@ void BufferCollectionToken::OnServerKoid() {
 
 bool BufferCollectionToken::is_done() { return is_done_; }
 
-void BufferCollectionToken::SetBufferCollectionRequest(zx::channel buffer_collection_request) {
-  if (is_done_ || buffer_collection_request_) {
+void BufferCollectionToken::SetBufferCollectionRequest(
+    CollectionServerEnd buffer_collection_request) {
+  if (is_done_ || buffer_collection_request_.has_value()) {
     FailAsync(FROM_HERE, ZX_ERR_BAD_STATE,
               "BufferCollectionToken::SetBufferCollectionRequest() attempted "
               "when already is_done_ || buffer_collection_request_");
@@ -271,8 +274,8 @@ void BufferCollectionToken::SetBufferCollectionRequest(zx::channel buffer_collec
   buffer_collection_request_ = std::move(buffer_collection_request);
 }
 
-zx::channel BufferCollectionToken::TakeBufferCollectionRequest() {
-  return std::move(buffer_collection_request_);
+std::optional<CollectionServerEnd> BufferCollectionToken::TakeBufferCollectionRequest() {
+  return std::exchange(buffer_collection_request_, std::nullopt);
 }
 
 void BufferCollectionToken::V1::SetName(SetNameRequest& request,
@@ -415,8 +418,9 @@ void BufferCollectionToken::V2::IsAlternateFor(IsAlternateForRequest& request,
 
 BufferCollectionToken::BufferCollectionToken(
     fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection_param,
-    NodeProperties* new_node_properties, zx::unowned_channel server_end)
-    : Node(std::move(logical_buffer_collection_param), new_node_properties, std::move(server_end)),
+    NodeProperties* new_node_properties, const TokenServerEnd& server_end)
+    : Node(std::move(logical_buffer_collection_param), new_node_properties,
+           GetUnownedChannel(server_end)),
       LoggingMixin("BufferCollectionToken") {
   TRACE_DURATION("gfx", "BufferCollectionToken::BufferCollectionToken", "this", this,
                  "logical_buffer_collection", &logical_buffer_collection());

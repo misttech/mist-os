@@ -29,6 +29,7 @@
 #include <unordered_set>
 
 #include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/vector.h>
 #include <region-alloc/region-alloc.h>
 
@@ -41,9 +42,15 @@ class ServiceDirectory;
 
 namespace sysmem_driver {
 
+// For now, sysmem-connector (not a driver) uses DriverConnector, both to get Allocator channels,
+// and to notice when/if sysmem crashes.  Iff DFv2 allows for sysmem-connector to potentially
+// connect via FidlDevice (see below) instead, we could potentially move this protocol to FidlDevice
+// or combine with fuchsia_hardware_sysmem::Sysmem.  But for now DriverConnector is still a separate
+// protocol for use by sysmem-connector, not for use by other drivers.
+
 class Device;
 using DdkDeviceType =
-    ddk::Device<Device, ddk::Messageable<fuchsia_sysmem::DriverConnector>::Mixin, ddk::Unbindable>;
+    ddk::Device<Device, ddk::Messageable<fuchsia_sysmem2::DriverConnector>::Mixin, ddk::Unbindable>;
 
 class Driver;
 class BufferCollectionToken;
@@ -56,6 +63,9 @@ struct Settings {
 };
 
 class Device final : public DdkDeviceType,
+                     // This needs to remain until clients requesting "sysmem" for the banjo
+                     // protocol at least change to request "sysmem-banjo", or preferably switch to
+                     // fidl and request "sysmem-fidl".
                      public ddk::SysmemProtocol<Device, ddk::base_protocol>,
                      public MemoryAllocator::Owner {
  public:
@@ -75,8 +85,21 @@ class Device final : public DdkDeviceType,
   // The rest of the methods are only valid to call after Bind().
   //
 
-  // SysmemProtocol Banjo implementation. This will be removed soon in favor of
-  // a FIDL implementation.
+  [[nodiscard]] zx_status_t CommonSysmemConnectV1(zx::channel allocator_request);
+  [[nodiscard]] zx_status_t CommonSysmemConnectV2(zx::channel allocator_request);
+  [[nodiscard]] zx_status_t CommonSysmemRegisterHeap(uint64_t heap, zx::channel heap_connection);
+  [[nodiscard]] zx_status_t CommonSysmemRegisterSecureMem(zx::channel tee_connection);
+  [[nodiscard]] zx_status_t CommonSysmemUnregisterSecureMem();
+
+  // SysmemProtocol "direct == true" Banjo implementation. This will be removed soon in favor of
+  // a FIDL implementation.  Currently these complain to the log on first use, and then delegate to
+  // the "Common" methods above.
+  //
+  // This "direct == true" implementation is used when the banjo protocol is requested on
+  // "sysmem" instead of "sysmem-banjo".
+  //
+  // Requesting banjo using "sysmem-banjo" is slightly preferred over "sysmem" (worth the CL), but
+  // switching to sysmem FIDL is much better, since sysmem banjo is deprecated.
   [[nodiscard]] zx_status_t SysmemConnect(zx::channel allocator_request);
   [[nodiscard]] zx_status_t SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection);
   [[nodiscard]] zx_status_t SysmemRegisterSecureMem(zx::channel tee_connection);
@@ -97,7 +120,8 @@ class Device final : public DdkDeviceType,
 
   inspect::Node* heap_node() override { return &heaps_; }
 
-  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;
+  void ConnectV1(ConnectV1RequestView request, ConnectV1Completer::Sync& completer) override;
+  void ConnectV2(ConnectV2RequestView request, ConnectV2Completer::Sync& completer) override;
   void SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
                               SetAuxServiceDirectoryCompleter::Sync& completer) override;
 
@@ -286,16 +310,14 @@ class Device final : public DdkDeviceType,
 };
 
 class FidlDevice;
-
-using DdkFidlDeviceType =
-    ddk::Device<FidlDevice, ddk::Messageable<fuchsia_hardware_sysmem::Sysmem>::Mixin>;
+using DdkFidlDeviceBase = ddk::Device<FidlDevice>;
 
 // This device offers a FIDL interface of the fuchsia.hardware.sysmem protocol,
 // using Device's Banjo implementation under the hood. It will only exist as
 // long as we are incrementally migrating sysmem clients from Banjo to FIDL.
 // Once all clients are on FIDL, the Device class will be changed into a FIDL
 // server and this class will be removed.
-class FidlDevice : public DdkFidlDeviceType {
+class FidlDevice : public DdkFidlDeviceBase, public fidl::Server<fuchsia_hardware_sysmem::Sysmem> {
  public:
   FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device,
              async_dispatcher_t* dispatcher);
@@ -304,11 +326,12 @@ class FidlDevice : public DdkFidlDeviceType {
   void DdkRelease() { delete this; }
 
   // SysmemProtocol FIDL implementation.
-  void ConnectServer(ConnectServerRequestView request,
+  void ConnectServer(ConnectServerRequest& request,
                      ConnectServerCompleter::Sync& completer) override;
-  void RegisterHeap(RegisterHeapRequestView request,
-                    RegisterHeapCompleter::Sync& completer) override;
-  void RegisterSecureMem(RegisterSecureMemRequestView request,
+  void ConnectServerV2(ConnectServerV2Request& request,
+                       ConnectServerV2Completer::Sync& completer) override;
+  void RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::Sync& completer) override;
+  void RegisterSecureMem(RegisterSecureMemRequest& request,
                          RegisterSecureMemCompleter::Sync& completer) override;
   void UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) override;
 
@@ -323,6 +346,12 @@ class BanjoDevice;
 
 using DdkBanjoDeviceType = ddk::Device<BanjoDevice>;
 
+// SysmemProtocol "direct == false" Banjo implementation. This will be removed soon in favor of
+// a FIDL implementation.  Currently these complain to the log on first use, and then delegate to
+// the "Common" methods above via the sysmem_device pointer.
+//
+// This "direct == false" implementation is used when the banjo protocol is requested on
+// "sysmem-banjo" instead of "sysmem".
 class BanjoDevice : public DdkBanjoDeviceType,
                     public ddk::SysmemProtocol<BanjoDevice, ddk::base_protocol> {
  public:

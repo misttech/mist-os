@@ -28,6 +28,7 @@
 #include "logging.h"
 #include "node_properties.h"
 #include "utils.h"
+#include "versions.h"
 
 namespace sysmem_driver {
 
@@ -68,12 +69,9 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // |buffer_collection_request| the server end of a BufferCollection channel
   // to be served by the LogicalBufferCollection associated with
   // buffer_collection_token.
-  static void BindSharedCollectionV1(Device* parent_device, zx::channel buffer_collection_token,
-                                     zx::channel buffer_collection_request,
-                                     const ClientDebugInfo* client_debug_info);
-  static void BindSharedCollectionV2(Device* parent_device, zx::channel buffer_collection_token,
-                                     zx::channel buffer_collection_request,
-                                     const ClientDebugInfo* client_debug_info);
+  static void BindSharedCollection(Device* parent_device, zx::channel buffer_collection_token,
+                                   CollectionServerEnd buffer_collection_request,
+                                   const ClientDebugInfo* client_debug_info);
 
   // ZX_OK if the token is known to the server.
   // ZX_ERR_NOT_FOUND if the token isn't known to the server.
@@ -86,24 +84,24 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // The |self| parameter exists only because LogicalBufferCollection can't
   // hold a std::weak_ptr<> to itself because that requires libc++ (the binary
   // not just the headers) which isn't available in Zircon so far.
-  void CreateBufferCollectionTokenV1(
-      fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-      fidl::ServerEnd<fuchsia_sysmem::BufferCollectionToken> token_request);
-  void CreateBufferCollectionTokenV2(
-      fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-      fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionToken> token_request);
+  void CreateBufferCollectionTokenV1(fbl::RefPtr<LogicalBufferCollection> self,
+                                     NodeProperties* new_node_properties,
+                                     TokenServerEndV1 token_request);
+  void CreateBufferCollectionTokenV2(fbl::RefPtr<LogicalBufferCollection> self,
+                                     NodeProperties* new_node_properties,
+                                     TokenServerEndV2 token_request);
 
   // This is used by BufferCollectionToken to create a BufferCollectionTokenGroup during the
   // FIDL request of the same name.
-  void CreateBufferCollectionTokenGroupV1(
-      fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-      fidl::ServerEnd<fuchsia_sysmem::BufferCollectionTokenGroup> group_request);
-  void CreateBufferCollectionTokenGroupV2(
-      fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-      fidl::ServerEnd<fuchsia_sysmem2::BufferCollectionTokenGroup> group_request);
+  void CreateBufferCollectionTokenGroupV1(fbl::RefPtr<LogicalBufferCollection> self,
+                                          NodeProperties* new_node_properties,
+                                          GroupServerEndV1 group_request);
+  void CreateBufferCollectionTokenGroupV2(fbl::RefPtr<LogicalBufferCollection> self,
+                                          NodeProperties* new_node_properties,
+                                          GroupServerEndV2 group_request);
   bool CommonCreateBufferCollectionTokenGroupStage1(fbl::RefPtr<LogicalBufferCollection> self,
                                                     NodeProperties* new_node_properties,
-                                                    zx::unowned_channel group_request,
+                                                    const GroupServerEnd& group_request,
                                                     BufferCollectionTokenGroup** out_group);
 
   void AttachLifetimeTracking(zx::eventpair server_end, uint32_t buffers_remaining);
@@ -157,6 +155,10 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   inspect::Node& inspect_node() { return inspect_node_; }
 
   bool is_verbose_logging() const { return is_verbose_logging_; }
+
+  static fit::result<zx_status_t, BufferCollectionToken*> CommonConvertToken(
+      Device* parent_device, zx::channel buffer_collection_token,
+      const ClientDebugInfo* client_debug_info, const char* fidl_message_name);
 
  private:
   friend class NodeProperties;
@@ -271,7 +273,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
                                                std::vector<NodeProperties*> whole_pruned_sub_tree);
 
   void BindSharedCollectionInternal(BufferCollectionToken* token,
-                                    zx::channel buffer_collection_request);
+                                    CollectionServerEnd buffer_collection_request);
 
   fpromise::result<fuchsia_sysmem2::BufferCollectionConstraints, void> CombineConstraints(
       ConstraintsList* constraints_list);
@@ -591,12 +593,10 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   bool CommonCreateBufferCollectionTokenStage1(fbl::RefPtr<LogicalBufferCollection> self,
                                                NodeProperties* new_node_properties,
-                                               zx::unowned_channel token_request,
+                                               const TokenServerEnd& token_request,
                                                BufferCollectionToken** out_token);
 
-  static void CommonBindSharedCollection(Device* parent_device, zx::channel buffer_collection_token,
-                                         zx::channel buffer_collection_request,
-                                         const ClientDebugInfo* client_debug_info);
+  void HandleTokenFailure(BufferCollectionToken& token, zx_status_t status);
 
   Device* parent_device_ = nullptr;
 

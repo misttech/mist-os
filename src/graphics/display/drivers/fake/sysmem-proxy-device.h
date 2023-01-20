@@ -35,7 +35,7 @@ namespace display {
 
 class SysmemProxyDevice;
 using DdkDeviceType2 =
-    ddk::Device<SysmemProxyDevice, ddk::Messageable<fuchsia_sysmem::DriverConnector>::Mixin,
+    ddk::Device<SysmemProxyDevice, ddk::Messageable<fuchsia_sysmem2::DriverConnector>::Mixin,
                 ddk::Unbindable>;
 
 // SysmemProxyDevice is a replacement for sysmem_driver::Device, intended for use in tests.  Instead
@@ -58,6 +58,7 @@ class SysmemProxyDevice final : public DdkDeviceType2,
 
   // SysmemProtocol implementation.
   zx_status_t SysmemConnect(zx::channel allocator_request);
+  zx_status_t SysmemConnectV2(zx::channel allocator_request);
   zx_status_t SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection);
   zx_status_t SysmemRegisterSecureMem(zx::channel tee_connection);
   zx_status_t SysmemUnregisterSecureMem();
@@ -70,7 +71,8 @@ class SysmemProxyDevice final : public DdkDeviceType2,
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease() { delete this; }
 
-  void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override;
+  void ConnectV1(ConnectV1RequestView request, ConnectV1Completer::Sync& completer) override;
+  void ConnectV2(ConnectV2RequestView request, ConnectV2Completer::Sync& completer) override;
   void SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
                               SetAuxServiceDirectoryCompleter::Sync& completer) override;
 

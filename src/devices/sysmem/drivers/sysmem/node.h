@@ -26,6 +26,7 @@
 #include "device.h"
 #include "koid_util.h"
 #include "logical_buffer_collection.h"
+#include "versions.h"
 
 namespace sysmem_driver {
 
@@ -52,8 +53,7 @@ class Node : public fbl::RefCounted<Node> {
   zx_status_t create_status() const;
   virtual ~Node();
 
-  void BindV1(zx::channel server_end);
-  void BindV2(zx::channel server_end);
+  void Bind(NodeServerEnd server_end);
 
   void SetErrorHandler(fit::function<void(zx_status_t)> error_handler);
 

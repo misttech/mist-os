@@ -45,50 +45,36 @@ Node::~Node() {
   // Ok to untrack zx_koid_t{}; also ok to untrack same zx_koid_t again.
 }
 
-void Node::BindV1(zx::channel server_end) {
+void Node::Bind(NodeServerEnd server_end) {
   zx_info_handle_basic_t info;
-  zx_status_t status =
-      server_end.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  zx_status_t status = GetUnownedChannel(server_end)
+                           ->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status == ZX_OK) {
     inspect_node_.CreateUint("channel_koid", info.koid, &properties_);
   }
+  auto error_handler_wrapper = [this, this_ref = fbl::RefPtr<Node>(this)](fidl::UnbindInfo info) {
+    if (error_handler_) {
+      zx_status_t status = info.status();
+      if (async_failure_result_.has_value() && info.reason() == fidl::Reason::kClose) {
+        // On kClose the error is always ZX_OK, so report the real error to
+        // LogicalBufferCollection if the close was caused by FailAsync or FailSync.
+        status = *async_failure_result_;
+      }
+      error_handler_(status);
+    }
+  };
   // We need to keep a refptr to this class, since the unbind happens asynchronously and can run
   // after the parent closes a handle to this class.
-  BindInternalV1(
-      std::move(server_end), [this, this_ref = fbl::RefPtr<Node>(this)](fidl::UnbindInfo info) {
-        if (error_handler_) {
-          zx_status_t status = info.status();
-          if (async_failure_result_.has_value() && info.reason() == fidl::Reason::kClose) {
-            // On kClose the error is always ZX_OK, so report the real error to
-            // LogicalBufferCollection if the close was caused by FailAsync or FailSync.
-            status = *async_failure_result_;
-          }
-          error_handler_(status);
-        }
-      });
-}
-
-void Node::BindV2(zx::channel server_end) {
-  zx_info_handle_basic_t info;
-  zx_status_t status =
-      server_end.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  if (status == ZX_OK) {
-    inspect_node_.CreateUint("channel_koid", info.koid, &properties_);
+  switch (server_end.index()) {
+    case kVersionIndexV1:
+      BindInternalV1(std::move(std::get<kVersionIndexV1>(server_end)),
+                     std::move(error_handler_wrapper));
+      break;
+    case kVersionIndexV2:
+      BindInternalV2(std::move(std::get<kVersionIndexV2>(server_end)),
+                     std::move(error_handler_wrapper));
+      break;
   }
-  // We need to keep a refptr to this class, since the unbind happens asynchronously and can run
-  // after the parent closes a handle to this class.
-  BindInternalV2(
-      std::move(server_end), [this, this_ref = fbl::RefPtr<Node>(this)](fidl::UnbindInfo info) {
-        if (error_handler_) {
-          zx_status_t status = info.status();
-          if (async_failure_result_.has_value() && info.reason() == fidl::Reason::kClose) {
-            // On kClose the error is always ZX_OK, so report the real error to
-            // LogicalBufferCollection if the close was caused by FailAsync or FailSync.
-            status = *async_failure_result_;
-          }
-          error_handler_(status);
-        }
-      });
 }
 
 void Node::SetErrorHandler(fit::function<void(zx_status_t)> error_handler) {

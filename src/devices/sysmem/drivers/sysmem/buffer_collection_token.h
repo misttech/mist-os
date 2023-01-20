@@ -24,7 +24,7 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   // logical_buffer_collection->root_.
   static BufferCollectionToken& EmplaceInTree(
       fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection,
-      NodeProperties* new_node_properties, zx::unowned_channel server_end);
+      NodeProperties* new_node_properties, const TokenServerEnd& server_end);
 
   template <class CompleterSync>
   void TokenCloseImpl(CompleterSync& completer) {
@@ -45,9 +45,9 @@ class BufferCollectionToken : public Node, public LoggingMixin {
 
   bool is_done();
 
-  void SetBufferCollectionRequest(zx::channel buffer_collection_request);
+  void SetBufferCollectionRequest(CollectionServerEnd buffer_collection_request);
 
-  zx::channel TakeBufferCollectionRequest();
+  std::optional<CollectionServerEnd> TakeBufferCollectionRequest();
 
   void CloseServerBinding(zx_status_t epitaph) override;
 
@@ -65,6 +65,8 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   bool is_connected_type() const override;
   bool is_currently_connected() const override;
   const char* node_type_string() const override;
+
+  void Bind(TokenServerEnd server_end);
 
  protected:
   void BindInternalV1(zx::channel token_request,
@@ -151,7 +153,7 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   };
 
   BufferCollectionToken(fbl::RefPtr<LogicalBufferCollection> parent,
-                        NodeProperties* new_node_properties, zx::unowned_channel server_end);
+                        NodeProperties* new_node_properties, const TokenServerEnd& server_end);
 
   void FailAsync(Location location, zx_status_t status, const char* format, ...);
 
@@ -178,8 +180,9 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   // the BufferCollection that the token was exchanged for.  This way, inbound
   // Duplicate() messages in the BufferCollectionToken are seen before any
   // BufferCollection::SetConstraints() (which might otherwise try to allocate
-  // buffers too soon before all tokens are gone).
-  zx::channel buffer_collection_request_;
+  // buffers too soon before all tokens are gone)
+
+  std::optional<CollectionServerEnd> buffer_collection_request_;
 
   inspect::Node inspect_node_;
   inspect::UintProperty debug_id_property_;

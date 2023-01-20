@@ -5,9 +5,7 @@
 #include "device.h"
 
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
-#include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/sysmem/c/banjo.h>
 #include <inttypes.h>
 #include <lib/async/dispatcher.h>
@@ -35,8 +33,6 @@
 #include "contiguous_pooled_memory_allocator.h"
 #include "driver.h"
 #include "external_memory_allocator.h"
-#include "fidl/fuchsia.sysmem/cpp/markers.h"
-#include "fidl/fuchsia.sysmem/cpp/wire_types.h"
 #include "lib/ddk/debug.h"
 #include "lib/ddk/driver.h"
 #include "macros.h"
@@ -690,11 +686,19 @@ zx_status_t Device::Bind() {
   return ZX_OK;
 }
 
-void Device::Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) {
+void Device::ConnectV1(ConnectV1RequestView request, ConnectV1Completer::Sync& completer) {
   async::PostTask(loop_.dispatcher(),
                   [this, allocator_request = std::move(request->allocator_request)]() mutable {
                     // The Allocator is channel-owned / self-owned.
                     Allocator::CreateChannelOwnedV1(allocator_request.TakeChannel(), this);
+                  });
+}
+
+void Device::ConnectV2(ConnectV2RequestView request, ConnectV2Completer::Sync& completer) {
+  async::PostTask(loop_.dispatcher(),
+                  [this, allocator_request = std::move(request->allocator_request)]() mutable {
+                    // The Allocator is channel-owned / self-owned.
+                    Allocator::CreateChannelOwnedV2(allocator_request.TakeChannel(), this);
                   });
 }
 
@@ -710,7 +714,7 @@ void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequestView request,
   });
 }
 
-zx_status_t Device::SysmemConnect(zx::channel allocator_request) {
+zx_status_t Device::CommonSysmemConnectV1(zx::channel allocator_request) {
   // The Allocator is channel-owned / self-owned.
   return async::PostTask(loop_.dispatcher(),
                          [this, allocator_request = std::move(allocator_request)]() mutable {
@@ -719,7 +723,16 @@ zx_status_t Device::SysmemConnect(zx::channel allocator_request) {
                          });
 }
 
-zx_status_t Device::SysmemRegisterHeap(uint64_t heap_param, zx::channel heap_connection) {
+zx_status_t Device::CommonSysmemConnectV2(zx::channel allocator_request) {
+  // The Allocator is channel-owned / self-owned.
+  return async::PostTask(loop_.dispatcher(),
+                         [this, allocator_request = std::move(allocator_request)]() mutable {
+                           // The Allocator is channel-owned / self-owned.
+                           Allocator::CreateChannelOwnedV2(std::move(allocator_request), this);
+                         });
+}
+
+zx_status_t Device::CommonSysmemRegisterHeap(uint64_t heap_param, zx::channel heap_connection) {
   // External heaps should not have bit 63 set but bit 60 must be set.
   if ((heap_param & 0x8000000000000000) || !(heap_param & 0x1000000000000000)) {
     DRIVER_ERROR("Invalid external heap");
@@ -783,7 +796,7 @@ zx_status_t Device::SysmemRegisterHeap(uint64_t heap_param, zx::channel heap_con
                          });
 }
 
-zx_status_t Device::SysmemRegisterSecureMem(zx::channel secure_mem_connection) {
+zx_status_t Device::CommonSysmemRegisterSecureMem(zx::channel secure_mem_connection) {
   LOG(DEBUG, "sysmem RegisterSecureMem begin");
 
   current_close_is_abort_ = std::make_shared<std::atomic_bool>(true);
@@ -970,7 +983,7 @@ zx_status_t Device::SysmemRegisterSecureMem(zx::channel secure_mem_connection) {
 
 // This call allows us to tell the difference between expected vs. unexpected close of the tee_
 // channel.
-zx_status_t Device::SysmemUnregisterSecureMem() {
+zx_status_t Device::CommonSysmemUnregisterSecureMem() {
   // By this point, the aml-securemem driver's suspend(mexec) has already prepared for mexec.
   //
   // In this path, the server end of the channel hasn't closed yet, but will be closed shortly after
@@ -985,6 +998,50 @@ zx_status_t Device::SysmemUnregisterSecureMem() {
     secure_mem_.reset();
     LOG(DEBUG, "end UnregisterSecureMem()");
   });
+}
+
+// "Direct" sysmem banjo is sysmem banjo directly on the sysmem device instead of on the
+// "sysmem-banjo" child.  We want clients to at least request "sysmem-banjo" to essentially tag
+// places that need to move to sysmem FIDL.  Or ideally, move directly to sysmem FIDL instead of
+// sysmem banjo.
+//
+// By default this only complains up to ~once for direct false, and up to ~once for direct true.
+//
+// Once all deprecated sysmem banjo is at least dead/unused code (or preferably removed entirely),
+// we'll see this warning zero times, at which point we'll put a ZX_PANIC() at the start of this
+// function in case we missed any, and then remove banjo handling once we're sure we have zero
+// banjo-using clients.
+static void WarnOfDeprecatedSysmemBanjo(bool direct) {
+  // This might occasionally output ~one extra time, if more than one thread gets involved, but not
+  // worth using std::atomic<> since a low number of additional log lines isn't a significant
+  // downside.
+  static bool warning_logged[2] = {};
+  if (warning_logged[direct]) {
+    return;
+  }
+  LOG(WARNING, "Deprecated sysmem banjo detected.  Please switch to sysmem FIDL.  direct: %u",
+      direct);
+  warning_logged[direct] = true;
+}
+
+zx_status_t Device::SysmemConnect(zx::channel allocator_request) {
+  WarnOfDeprecatedSysmemBanjo(true);
+  return CommonSysmemConnectV1(std::move(allocator_request));
+}
+
+zx_status_t Device::SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
+  WarnOfDeprecatedSysmemBanjo(true);
+  return CommonSysmemRegisterHeap(heap, std::move(heap_connection));
+}
+
+zx_status_t Device::SysmemRegisterSecureMem(zx::channel tee_connection) {
+  WarnOfDeprecatedSysmemBanjo(true);
+  return CommonSysmemRegisterSecureMem(std::move(tee_connection));
+}
+
+zx_status_t Device::SysmemUnregisterSecureMem() {
+  WarnOfDeprecatedSysmemBanjo(true);
+  return CommonSysmemUnregisterSecureMem();
 }
 
 const zx::bti& Device::bti() { return bti_; }
@@ -1096,7 +1153,7 @@ zx_handle_t Device::SecureMemConnection::channel() {
 
 FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device,
                        async_dispatcher_t* dispatcher)
-    : DdkFidlDeviceType(parent),
+    : DdkFidlDeviceBase(parent),
       sysmem_device_(sysmem_device),
       dispatcher_(dispatcher),
       outgoing_(dispatcher) {
@@ -1105,13 +1162,35 @@ FidlDevice::FidlDevice(zx_device_t* parent, sysmem_driver::Device* sysmem_device
 }
 
 zx_status_t FidlDevice::Bind() {
-  zx::result status = outgoing_.AddUnmanagedProtocol(
+  auto status = outgoing_.AddUnmanagedProtocol(
       bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
       fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>);
   if (status.is_error()) {
-    zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory: %s",
+    zxlogf(ERROR, "failed to add FIDL protocol to the outgoing directory (sysmem): %s",
            status.status_string());
     return status.status_value();
+  }
+
+  status = outgoing_.AddUnmanagedProtocol<fuchsia_sysmem::Allocator>(
+      [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
+        zx_status_t status = sysmem_device_->CommonSysmemConnectV1(request.TakeChannel());
+        if (status != ZX_OK) {
+          LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
+        }
+      });
+  if (status.is_error()) {
+    return status.error_value();
+  }
+
+  status = outgoing_.AddUnmanagedProtocol<fuchsia_sysmem2::Allocator>(
+      [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
+        zx_status_t status = sysmem_device_->CommonSysmemConnectV2(request.TakeChannel());
+        if (status != ZX_OK) {
+          LOG(INFO, "Direct connect to fuchsia_sysmem2::Allocator() failed");
+        }
+      });
+  if (status.is_error()) {
+    return status.error_value();
   }
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -1122,6 +1201,8 @@ zx_status_t FidlDevice::Bind() {
   status = outgoing_.Serve(std::move(endpoints->server));
   std::array offers = {
       fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
+      fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>,
+      fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>,
   };
 
   zx_status_t add_status =
@@ -1129,45 +1210,64 @@ zx_status_t FidlDevice::Bind() {
                  .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE | DEVICE_ADD_MUST_ISOLATE)
                  .set_fidl_protocol_offers(offers)
                  .set_outgoing_dir(endpoints->client.TakeChannel()));
-
   if (add_status != ZX_OK) {
     DRIVER_ERROR("Failed to bind FIDL device");
+    return add_status;
   }
-  return add_status;
+
+  return ZX_OK;
 }
 
-void FidlDevice::ConnectServer(ConnectServerRequestView request,
+void FidlDevice::ConnectServer(ConnectServerRequest& request,
                                ConnectServerCompleter::Sync& completer) {
-  zx_status_t status = sysmem_device_->SysmemConnect(request->allocator_request.TakeChannel());
-  if (status != ZX_OK) {
-    completer.Close(status);
-  }
-}
-
-void FidlDevice::RegisterHeap(RegisterHeapRequestView request,
-                              RegisterHeapCompleter::Sync& completer) {
   zx_status_t status =
-      sysmem_device_->SysmemRegisterHeap(request->heap, request->heap_connection.TakeChannel());
+      sysmem_device_->CommonSysmemConnectV1(request.allocator_request().TakeChannel());
   if (status != ZX_OK) {
     completer.Close(status);
+    return;
   }
 }
 
-void FidlDevice::RegisterSecureMem(RegisterSecureMemRequestView request,
+void FidlDevice::ConnectServerV2(ConnectServerV2Request& request,
+                                 ConnectServerV2Completer::Sync& completer) {
+  if (!request.allocator_request().has_value()) {
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  zx_status_t status =
+      sysmem_device_->CommonSysmemConnectV2(request.allocator_request()->TakeChannel());
+  if (status != ZX_OK) {
+    completer.Close(status);
+    return;
+  }
+}
+
+void FidlDevice::RegisterHeap(RegisterHeapRequest& request,
+                              RegisterHeapCompleter::Sync& completer) {
+  zx_status_t status = sysmem_device_->CommonSysmemRegisterHeap(
+      request.heap(), request.heap_connection().TakeChannel());
+  if (status != ZX_OK) {
+    completer.Close(status);
+    return;
+  }
+}
+
+void FidlDevice::RegisterSecureMem(RegisterSecureMemRequest& request,
                                    RegisterSecureMemCompleter::Sync& completer) {
   zx_status_t status =
-      sysmem_device_->SysmemRegisterSecureMem(request->secure_mem_connection.TakeChannel());
+      sysmem_device_->CommonSysmemRegisterSecureMem(request.secure_mem_connection().TakeChannel());
   if (status != ZX_OK) {
     completer.Close(status);
+    return;
   }
 }
 
 void FidlDevice::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) {
-  zx_status_t status = sysmem_device_->SysmemUnregisterSecureMem();
+  zx_status_t status = sysmem_device_->CommonSysmemUnregisterSecureMem();
   if (status == ZX_OK) {
-    completer.ReplySuccess();
+    completer.Reply(fit::ok());
   } else {
-    completer.ReplyError(status);
+    completer.Reply(fit::error(status));
   }
 }
 
@@ -1182,19 +1282,23 @@ zx_status_t BanjoDevice::Bind() {
 }
 
 zx_status_t BanjoDevice::SysmemConnect(zx::channel allocator_request) {
-  return sysmem_device_->SysmemConnect(std::move(allocator_request));
+  WarnOfDeprecatedSysmemBanjo(false);
+  return sysmem_device_->CommonSysmemConnectV1(std::move(allocator_request));
 }
 
 zx_status_t BanjoDevice::SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
-  return sysmem_device_->SysmemRegisterHeap(heap, std::move(heap_connection));
+  WarnOfDeprecatedSysmemBanjo(false);
+  return sysmem_device_->CommonSysmemRegisterHeap(heap, std::move(heap_connection));
 }
 
 zx_status_t BanjoDevice::SysmemRegisterSecureMem(zx::channel tee_connection) {
-  return sysmem_device_->SysmemRegisterSecureMem(std::move(tee_connection));
+  WarnOfDeprecatedSysmemBanjo(false);
+  return sysmem_device_->CommonSysmemRegisterSecureMem(std::move(tee_connection));
 }
 
 zx_status_t BanjoDevice::SysmemUnregisterSecureMem() {
-  return sysmem_device_->SysmemUnregisterSecureMem();
+  WarnOfDeprecatedSysmemBanjo(false);
+  return sysmem_device_->CommonSysmemUnregisterSecureMem();
 }
 
 }  // namespace sysmem_driver

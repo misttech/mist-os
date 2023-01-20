@@ -22,6 +22,7 @@ test("display-core-unittests") {
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire_testing",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
     "//zircon/system/ulib/async-testing",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
@@ -50,6 +51,7 @@ static_library("base") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/graphics/display/drivers/display:shared",
     "//src/graphics/display/drivers/fake:mock-display-device-tree",

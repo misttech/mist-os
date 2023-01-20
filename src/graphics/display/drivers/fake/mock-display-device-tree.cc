@@ -33,11 +33,11 @@ MockDisplayDeviceTree::MockDisplayDeviceTree(std::shared_ptr<zx_device> mock_roo
   }
   sysmem_driver::Device* sysmem_device =
       mock_root_->GetLatestChild()->GetDeviceContext<sysmem_driver::Device>();
-  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::DriverConnector>();
+  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::DriverConnector>();
   fidl::BindServer(sysmem_loop_.dispatcher(), std::move(sysmem_endpoints->server), sysmem_device);
   sysmem_loop_.StartThread("sysmem-server-thread");
   sysmem_client_ =
-      fidl::WireSyncClient<fuchsia_sysmem::DriverConnector>(std::move(sysmem_endpoints->client));
+      fidl::WireSyncClient<fuchsia_sysmem2::DriverConnector>(std::move(sysmem_endpoints->client));
 
   // Fragment for fake-display
   mock_root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_banjo_.proto()->ops, pdev_banjo_.proto()->ctx,
@@ -110,7 +110,7 @@ zx::unowned_channel MockDisplayDeviceTree::display_client() {
   return display_provider_client_.client_end().borrow().channel();
 }
 
-fidl::UnownedClientEnd<fuchsia_sysmem::DriverConnector> MockDisplayDeviceTree::sysmem_client() {
+fidl::UnownedClientEnd<fuchsia_sysmem2::DriverConnector> MockDisplayDeviceTree::sysmem_client() {
   return sysmem_client_.client_end().borrow();
 }
 
