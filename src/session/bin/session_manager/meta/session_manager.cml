@@ -80,6 +80,7 @@
                 "fuchsia.net.http.Loader",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.mdns.Publisher",
+                "fuchsia.net.mdns.ServiceInstanceResolver",
                 "fuchsia.net.mdns.ServiceSubscriber2",
                 "fuchsia.net.mdns.Subscriber",
                 "fuchsia.net.reachability.Monitor",
