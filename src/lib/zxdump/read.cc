@@ -165,12 +165,29 @@ class StringViewStream {
   std::string_view data_;
 };
 
+template <class TaskType>
+struct LiveTaskHandle {
+  using type = LiveHandle;
+};
+
+template <class TaskType>
+using LiveTask = typename LiveTaskHandle<TaskType>::type;
+
 #ifdef __Fuchsia__
-using LiveJob = zx::job;
-using LiveProcess = zx::process;
-#else
-using LiveJob = LiveHandle;
-using LiveProcess = LiveHandle;
+template <>
+struct LiveTaskHandle<Job> {
+  using type = zx::job;
+};
+
+template <>
+struct LiveTaskHandle<Process> {
+  using type = zx::process;
+};
+
+template <>
+struct LiveTaskHandle<Thread> {
+  using type = zx::thread;
+};
 #endif
 
 using InsertChild = std::variant<std::monostate, Job, Process, Thread, Resource>;
@@ -205,84 +222,361 @@ class TaskHolder::JobTree {
     if (file.size() == 0) {
       dumps_.pop_front();
     }
-    Reroot();
     return result;
   }
 
-  // Insert a live task.
-  auto Insert(LiveHandle live, InsertChild* parent)
-      -> fit::result<Error, std::reference_wrapper<Object>> {
+  // This implements Job::children(), Job::processes(), and Process::threads().
+  // If the map is empty in a live task, fill it.
+  template <zx_object_info_topic_t KoidListTopic, auto KoidMapMember, class Parent>
+  auto GetChildren(Parent& parent)
+      -> fit::result<Error, decltype(std::ref(parent.*KoidMapMember))> {
+    using Child = typename std::decay_t<decltype(parent.*KoidMapMember)>::mapped_type;
+
+    if ((parent.*KoidMapMember).empty() && parent.live()) {
+      // The first time called on a live task (or on repeated calls iff the
+      // first time there were no children), populate the whole list.
+      // Start by fetching a fresh list of child KOIDs.
+      auto koids = parent.template get_info<KoidListTopic>(true);
+      if (koids.is_error()) {
+        return koids.take_error();
+      }
+
+      for (zx_koid_t koid : *koids) {
+        if (koid == ZX_KOID_INVALID) {
+          continue;
+        }
+
+        auto live_child = GetLiveChild(parent, koid, kGetChildRights<Child>);
+        if (live_child.is_error()) {
+          if (live_child.error_value().status_ == ZX_ERR_NOT_FOUND) {
+            // It's not an error if the child died since we collected the list.
+            continue;
+          }
+          return live_child.take_error();
+        }
+
+        auto result = PlaceLiveChild<KoidMapMember>(parent, *std::move(live_child));
+        if (result.is_error()) {
+          return result.take_error();
+        }
+      }
+    }
+    return fit::ok(std::ref(parent.*KoidMapMember));
+  }
+
+  template <class Parent, auto KoidMapMember>
+  using ChildType =
+      typename std::decay_t<decltype(std::declval<Parent>().*KoidMapMember)>::mapped_type;
+
+  template <class Parent>
+  using GetChildRef =
+      std::reference_wrapper<std::conditional_t<std::is_same_v<Parent, Process>, Thread, Task>>;
+
+  template <class Parent>
+  using GetChildResult = fit::result<Error, GetChildRef<Parent>>;
+
+  template <auto... KoidMapMember, class Parent>
+  GetChildResult<Parent> GetChild(Parent& parent, zx_koid_t koid) {
+    GetChildResult<Parent> result = kChildNotFound;
+
+    auto find = [&](auto children) -> bool {
+      auto found = (parent.*children).find(koid);
+      if (found == (parent.*children).end()) {
+        return false;
+      }
+      result = fit::ok(std::ref(found->second));
+      return true;
+    };
+
+    if (!(find(KoidMapMember) || ...) && parent.live()) {
+      result = PlaceLiveChild<KoidMapMember...>(parent, koid);
+    }
+
+    return result;
+  }
+
+  fit::result<Error, std::reference_wrapper<Task>> FindChild(Job& job, zx_koid_t koid) {
+    auto parent = parent_map_.find(koid);
+    if (parent != parent_map_.end() && &parent->second.get() != &superroot_) {
+      // This is a known KOID.  Go directly to its parent.
+      return job.get_child(koid);
+    }
+
+    // The superroot might have live children.  Otherwise, if the job is from
+    // a dump, it's not going to have any new children to find.
+    if (&job != &superroot_ && !job.live()) {
+      return kChildNotFound;
+    }
+
+    // First check this job itself for a direct child.
+    // Ignore the error of just not finding it, but not other errors.
+    auto result = job.get_child(koid);
+    if (result.is_ok() || result.error_value().status_ != ZX_ERR_NOT_FOUND) {
+      return result;
+    }
+
+    auto check_children = [koid, &result](auto list) -> bool {
+      if (list.is_error()) {
+        result = list.take_error();
+        return true;
+      }
+      for (auto& [child_koid, child] : list->get()) {
+        ZX_DEBUG_ASSERT(child_koid != koid);
+        result = child.get_child(koid);
+        if (result.is_ok() || result.error_value().status_ != ZX_ERR_NOT_FOUND) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // Check all the processes first, in case this is a thread KOID.
+    // Finally, recurse on all child jobs.
+
+    check_children(job.processes()) || check_children(job.children());
+
+    return result;
+  }
+
+  // A live parent is looking for a direct child by KOID.
+  // Fetch the live child handle and then place it in the parent.
+  template <auto... KoidMapMember, class Parent>
+  GetChildResult<Parent> PlaceLiveChild(Parent& parent, zx_koid_t koid) {
+    constexpr zx_rights_t kRights = (kGetChildRights<ChildType<Parent, KoidMapMember>> | ...);
+
+    auto live_child = GetLiveChild(parent, koid, kRights);
+    if (live_child.is_error()) {
+      return live_child.take_error();
+    }
+
+    return PlaceLiveChild<KoidMapMember...>(parent, *std::move(live_child));
+  }
+
+  // A parent has a new live child to consider.  Make sure the handle is kosher
+  // for one of the parent's lists, and place the new child.
+  template <auto... KoidMapMember, class Parent>
+  GetChildResult<Parent> PlaceLiveChild(Parent& parent, LiveHandle live,
+                                        std::optional<zx_info_handle_basic_t> info = std::nullopt) {
+    if (!info) {
+      info.emplace();
+      zx_status_t status =
+          live.get_info(ZX_INFO_HANDLE_BASIC, &*info, sizeof(*info), nullptr, nullptr);
+      if (status != ZX_OK) {
+        return fit::error(Error{"invalid live task", status});
+      }
+    }
+
+    GetChildResult<Parent> result = kWrongType;
+
+    auto place = [&](auto& children) -> bool {
+      using Child = typename std::decay_t<decltype(children)>::mapped_type;
+
+      if (info->type != kObjType<Child>) {
+        return false;
+      }
+
+      auto [it, unique] = children.try_emplace(info->koid, *this);
+      Child& child = it->second;
+
+      if (child.live() && !unique) {
+        result = fit::error{Error{
+            "same live task inserted twice",
+            ZX_ERR_ALREADY_EXISTS,
+        }};
+        return false;
+      }
+
+      // Record the time of the first sample from this task.
+      // If the task was already inserted from a dump, keep its old stamp.
+      if (unique || child.date_ == 0) {
+        child.date_ = time(nullptr);
+      }
+
+      // Store the basic info we already collected.  If the task was already
+      // inserted from a dump, the new live info will override the past info.
+      // Other topics with old info from the dump remain, however.
+      auto buffer = GetBuffer(sizeof(*info));
+      memcpy(buffer, &*info, sizeof(*info));
+      ByteView data{buffer, sizeof(*info)};
+      child.info_.insert_or_assign(ZX_INFO_HANDLE_BASIC, data);
+
+      child.live_ = std::move(live);
+      ReifyTask(child);
+
+      result = fit::ok(std::ref(child));
+      return true;
+    };
+
+    (place(parent.*KoidMapMember) || ...);
+
+    return result;
+  }
+
+  template <class Parent>
+  static fit::result<Error, LiveHandle> GetLiveChild(Parent& parent, zx_koid_t koid,
+                                                     zx_rights_t rights) {
+    // Use a momentary move to get the object into the right type.  This
+    // has the same in effect as using zx::unowned_* types but doesn't
+    // require the non-Fuchsia LiveHandle stub to have unowned support.
+    LiveTask<Parent> live_parent(std::move(parent.live()));
+    auto restore_live =
+        fit::defer([&parent, &live_parent]() { parent.live() = std::move(live_parent); });
+    LiveHandle live_child;
+    zx_status_t status = live_parent.get_child(koid, rights, &live_child);
+    if (status != ZX_OK) {
+      return fit::error(Error{"zx_object_get_child", status});
+    }
+    return fit::ok(std::move(live_child));
+  }
+
+  fit::result<Error, std::reference_wrapper<Object>> Insert(LiveHandle live) {
     zx_info_handle_basic_t info;
     if (zx_status_t status =
             live.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
         status != ZX_OK) {
-      return fit::error(Error{"invalid live task", status});
+      return fit::error(Error{"invalid live handle", status});
     }
-
-    // Place the basic info into a new Task object now that it's known valid.
-    // Everything relies on the basic info always being available in the map.
-    auto ingest = [&](auto attach, auto task)  //
-        -> fit::result<Error, std::reference_wrapper<Object>> {
-      task.date_ = time(nullptr);  // Time of first data sample from this task.
-      auto buffer = GetBuffer(sizeof(info));
-      memcpy(buffer, &info, sizeof(info));
-      task.info_.emplace(ZX_INFO_HANDLE_BASIC, ByteView{buffer, sizeof(info)});
-      ReifyLive(task);
-      if (parent) {
-        *parent = std::move(task);
-        return fit::ok(std::ref(std::get<decltype(task)>(*parent)));
-      }
-      return (this->*attach)(std::move(task));
-    };
 
     switch (info.type) {
       case ZX_OBJ_TYPE_RESOURCE:
-        return ingest(&JobTree::AttachResource, Resource{*this, std::move(live)});
+        return InsertLiveResource(std::move(live), info);
+
       case ZX_OBJ_TYPE_JOB:
-        return ingest(&JobTree::AttachJob, Job{*this, std::move(live)});
       case ZX_OBJ_TYPE_PROCESS:
-        return ingest(&JobTree::AttachProcess, Process{*this, std::move(live)});
-      case ZX_OBJ_TYPE_THREAD:
-        if (parent) {
-          return ingest(static_cast<fit::error<Error> (JobTree::*)(Thread)>(nullptr),
-                        Thread{*this, std::move(live)});
-        }
-        [[fallthrough]];
+        return InsertLiveTask(std::move(live), info);
+
       default:
-        return fit::error(Error{"not a valid job or process handle", ZX_ERR_BAD_HANDLE});
+        return kWrongType;
     }
+  }
+
+  fit::result<Error, std::reference_wrapper<Resource>> InsertLiveResource(
+      LiveHandle live, const zx_info_handle_basic_t& info) {
+    zx_info_resource_t resource;
+    if (zx_status_t status =
+            live.get_info(ZX_INFO_RESOURCE, &resource, sizeof(resource), nullptr, nullptr);
+        status != ZX_OK) {
+      return fit::error(Error{"invalid resource handle", status});
+    }
+
+    if (resource.kind != ZX_RSRC_KIND_ROOT) {
+      return fit::error{Error{
+          "non-root resources not supported",
+          ZX_ERR_NOT_SUPPORTED,
+      }};
+    }
+
+    if (root_resource_.live()) {
+      // There's already a live root resource attached.
+      return fit::error{Error{
+          "live root resource handle already inserted",
+          ZX_ERR_ALREADY_EXISTS,
+      }};
+    }
+
+    // Clear out any old data from dumps and inject the basic data we have now.
+    root_resource_.info_.clear();
+    root_resource_.properties_.clear();
+
+    auto inject = [this](zx_object_info_topic_t topic, auto& info) {
+      auto buffer = GetBuffer(sizeof(info));
+      memcpy(buffer, &info, sizeof(info));
+      root_resource_.info_.emplace(topic, ByteView{buffer, sizeof(info)});
+    };
+
+    inject(ZX_INFO_HANDLE_BASIC, info);
+    inject(ZX_INFO_RESOURCE, resource);
+
+    root_resource_.live_ = std::move(live);
+
+    return fit::ok(std::ref(root_resource_));
+  }
+
+  fit::result<Error, std::reference_wrapper<Task>> InsertLiveTask(
+      LiveHandle live, const zx_info_handle_basic_t& info) {
+    auto place = EnterChild(info.koid);
+    auto& [is_new, parent] = place;
+
+    if (!is_new && parent.type() != ZX_OBJ_TYPE_JOB) {
+      // Some existing process expects this to be a thread KOID.  But we
+      // already know it's not a thread handle, so something is fishy.
+      return fit::error{Error{
+          "live handle matches dangling thread KOID; corrupted dump?",
+          ZX_ERR_IO_DATA_INTEGRITY,
+      }};
+    }
+
+    Job& job = static_cast<Job&>(parent);
+    return PlaceLiveChild<&Job::children_, &Job::processes_>(job, std::move(live), info);
+  }
+
+  std::pair<bool, Task&> EnterChild(zx_koid_t koid) {
+    // If this is a known KOID, find its expectant parent.
+    // Otherwise, it will be adopted by the superroot.
+    auto [it, unique] = parent_map_.try_emplace(koid, superroot_);
+    auto& [parent_koid, parent] = *it;
+    ZX_DEBUG_ASSERT(parent_koid == koid);
+    return {unique, parent};
+  }
+
+  template <auto KoidMapMember, class Child>
+  fit::result<Error> PlaceDump(Child&& child) {
+    zx_koid_t koid = child.koid();
+
+    auto place = EnterChild(koid);
+    auto& [new_child, parent_task] = place;
+
+    if (!new_child && parent_task.type() != ZX_INFO_JOB) {
+      return fit::error{Error{
+          "dumped task KOID matches dangling thread KOID; corrupted dump?",
+          ZX_ERR_IO_DATA_INTEGRITY,
+      }};
+    }
+    Job& parent_job = static_cast<Job&>(parent_task);
+
+    // Place the new Child into the parent's (children or processes) list.
+    // This constructs a fresh Child in place because only that constructor is
+    // public.  Then we can move the pending data into the placed object via
+    // the private move-assignment operator.
+    auto [it, unique] = (parent_job.*KoidMapMember).try_emplace(koid, *this);
+    Child& placed_child = it->second;
+    if (!unique) {
+      return kDuplicate<Child>;
+    }
+    placed_child = std::forward<Child>(child);
+
+    // Reify the task so parent_map_ lists all its children.
+    ReifyTask(placed_child);
+
+    return fit::ok();
   }
 
   void AssertIsSuperroot(Object& object) { ZX_DEBUG_ASSERT(&object == &superroot_); }
 
   // Unlike generic get_info, the view is always fully aligned for casting.
   fit::result<Error, ByteView> GetSuperrootInfo(zx_object_info_topic_t topic) {
+    auto children_koid_list = [this](auto children, auto& info_children) {
+      if (!info_children) {
+        // No value cached.
+        zx_koid_t* p = new zx_koid_t[(superroot_.*children).size()];
+        info_children.reset(p);
+        for (const auto& [koid, job] : superroot_.*children) {
+          *p++ = koid;
+        }
+      }
+      return fit::ok(ByteView{
+          reinterpret_cast<const std::byte*>(info_children.get()),
+          (superroot_.*children).size(),
+      });
+    };
+
     switch (topic) {
       case ZX_INFO_JOB_CHILDREN:
-        if (!superroot_info_children_) {
-          // No value cached.
-          zx_koid_t* p = new zx_koid_t[superroot_.children_.size()];
-          superroot_info_children_.reset(p);
-          for (const auto& [koid, job] : superroot_.children_) {
-            *p++ = koid;
-          }
-        }
-        return fit::ok(ByteView{
-            reinterpret_cast<const std::byte*>(superroot_info_children_.get()),
-            superroot_.children()->get().size(),
-        });
+        return children_koid_list(&Job::children_, superroot_info_children_);
 
       case ZX_INFO_JOB_PROCESSES:
-        if (!superroot_info_processes_) {
-          // No value cached.
-          zx_koid_t* p = new zx_koid_t[superroot_.processes_.size()];
-          superroot_info_processes_.reset(p);
-          for (const auto& [koid, job] : superroot_.processes_) {
-            *p++ = koid;
-          }
-        }
-        return fit::ok(ByteView{reinterpret_cast<const std::byte*>(superroot_info_processes_.get()),
-                                superroot_.processes()->get().size()});
+        return children_koid_list(&Job::processes_, superroot_info_processes_);
+        ;
 
       default:
         return fit::error(Error{"fake root job info", ZX_ERR_NOT_SUPPORTED});
@@ -320,6 +614,39 @@ class TaskHolder::JobTree {
 #endif
 
  private:
+  using ParentMap = std::map<zx_koid_t, std::reference_wrapper<Task>>;
+
+  template <class Child>
+  static constexpr auto kDuplicate =
+      fit::error(Error{"duplicate job KOID", ZX_ERR_IO_DATA_INTEGRITY});
+
+  template <>
+  static constexpr auto kDuplicate<Process> =
+      fit::error(Error{"duplicate process KOID", ZX_ERR_IO_DATA_INTEGRITY});
+
+  static constexpr auto kChildNotFound = fit::error{Error{"zx_object_get_child", ZX_ERR_NOT_FOUND}};
+
+  static constexpr auto kWrongType =
+      fit::error{Error{"live handle has wrong type", ZX_ERR_WRONG_TYPE}};
+
+  template <class Child>
+  static constexpr zx_rights_t kGetChildRights = kChildRights;
+
+  template <>
+  static constexpr zx_rights_t kGetChildRights<Thread> = kThreadRights;
+
+  template <class ObjectType>
+  static constexpr zx_obj_type_t kObjType = ZX_OBJ_TYPE_NONE;
+
+  template <>
+  static constexpr zx_obj_type_t kObjType<Job> = ZX_OBJ_TYPE_JOB;
+
+  template <>
+  static constexpr zx_obj_type_t kObjType<Process> = ZX_OBJ_TYPE_PROCESS;
+
+  template <>
+  static constexpr zx_obj_type_t kObjType<Thread> = ZX_OBJ_TYPE_THREAD;
+
   // This is the actual reader, implemented below.
   fit::result<Error> Read(DumpFile& file, bool read_memory, FileRange where, time_t date = 0);
   fit::result<Error> ReadElf(DumpFile& file, FileRange where, time_t date, ByteView header,
@@ -330,11 +657,14 @@ class TaskHolder::JobTree {
   fit::result<Error> ReadSystemNote(ByteView data);
   const rapidjson::Value* GetSystemJsonData(const char* key) const;
 
-  // Prepare a freshly-inserted live object to be ingested.  Only processes
-  // have something to do.  (This code is unreachable on non-Fuchsia but needs
-  // to exist statically before it's compiled away.)
-  void ReifyLive(Object& object) {}
-  void ReifyLive(Process& process) {
+  // Reify a freshly-inserted task.  This populates parent_map_ with all its
+  // child KOIDs.  Threads have nothing to do.
+
+  void ReifyTask(Thread& thread) {}
+
+  void ReifyTask(Process& process) {
+    ReifyChildren<ZX_INFO_PROCESS_THREADS, &Process::threads_>(process);
+
 #ifdef __Fuchsia__
     // Fix the proper page size even before any memory is actually read.
     // The dumper relies on this to do layout alignment.  When reading
@@ -346,6 +676,47 @@ class TaskHolder::JobTree {
     // what the value is since there is no memory to contemplate anyway.
     process.dump_page_size_ = zx_system_get_page_size();
 #endif
+
+    //
+  }
+
+  void ReifyTask(Job& job) {
+    // Reify both lists.
+    ReifyChildren<ZX_INFO_JOB_CHILDREN, &Job::children_>(job);
+    ReifyChildren<ZX_INFO_JOB_PROCESSES, &Job::processes_>(job);
+
+    // That might have moved some child tasks out of the superroot if they were
+    // inserted before the new job.  The new job might also be the sole child
+    // of the superroot so it should become the new root.
+    Reroot();
+  }
+
+  template <zx_object_info_topic_t Topic, auto KoidMapMember, class Parent>
+  void ReifyChildren(Parent& parent) {
+    auto children = parent.template get_info<Topic>();
+    if (children.is_ok()) {
+      for (zx_koid_t koid : *children) {
+        // Put each child's KOID into the parent map so that it can be matched
+        // up when PlaceLiveChild or PlaceDump encounters the same task.
+        auto [it, unique] = parent_map_.try_emplace(koid, parent);
+
+        // If it was already there, the child has already been seen.  If it's
+        // actually already reified in a different parent, that's a bogus
+        // situation but harmless enough to ignore.  More likely it was reified
+        // as child of the superroot when it was seen as an orphan.  Move it
+        // from the superroot's child list to the proper parent's list.
+        if constexpr (Topic != ZX_INFO_PROCESS_THREADS) {
+          if (!unique && &it->second.get() == &superroot_) {
+            auto& parent_children = parent.*KoidMapMember;
+            auto& superroot_children = superroot_.*KoidMapMember;
+            auto found = superroot_children.find(koid);
+            if (found != superroot_children.end()) {
+              parent_children.insert(superroot_children.extract(found));
+            }
+          }
+        }
+      }
+    }
   }
 
   // Snap the root job pointer to the sole job or back to the superroot.
@@ -354,131 +725,14 @@ class TaskHolder::JobTree {
     if (superroot_.processes_.empty() && superroot_.children_.size() == 1) {
       auto& [koid, job] = *superroot_.children_.begin();
       root_job_ = std::ref(job);
+    } else if (&root_job_.get() == &superroot_) {
+      // Don't clear the caches if nothing is changing.
+      return;
     } else {
       root_job_ = std::ref(superroot_);
     }
     superroot_info_children_.reset();
     superroot_info_processes_.reset();
-  }
-
-  fit::result<Error, std::reference_wrapper<Job>> AttachJob(Job&& job) {
-    // See if any of the orphan jobs are this job's children.
-    // If a child job is found in the superroot, claim it.
-    if (!superroot_.children_.empty()) {
-      auto result = job.get_info<ZX_INFO_JOB_CHILDREN>();
-      if (result.is_ok()) {
-        for (zx_koid_t koid : result.value()) {
-          auto it = superroot_.children_.find(koid);
-          if (it != superroot_.children_.end()) {
-            superroot_info_children_.reset();  // Clear stale cache.
-            auto [job_it, unique] = job.children_.insert(std::move(*it));
-            superroot_.children_.erase(it);
-            if (!unique) {
-              return fit::error(Error{
-                  "duplicate job KOID",
-                  ZX_ERR_IO_DATA_INTEGRITY,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    // See if any of the orphaned processes belong to this job.
-    // If a process is found in the superroot, claim it.
-    if (!superroot_.processes_.empty()) {
-      auto result = job.get_info<ZX_INFO_JOB_PROCESSES>();
-      if (result.is_ok()) {
-        for (zx_koid_t koid : result.value()) {
-          auto it = superroot_.processes_.find(koid);
-          if (it != superroot_.processes_.end()) {
-            superroot_info_processes_.reset();  // Clear stale cache.
-            auto [job_it, unique] = job.processes_.insert(std::move(*it));
-            superroot_.processes_.erase(it);
-            if (!unique) {
-              return fit::error(Error{
-                  "duplicate process KOID",
-                  ZX_ERR_IO_DATA_INTEGRITY,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    // Now that it has wrangled its children, find this job's own parent.
-    zx_koid_t koid = job.koid();
-    if (auto it = missing_.find(koid); it != missing_.end()) {
-      // There is a parent looking for this lost child!
-      auto& [parent_koid, parent] = *it;
-      auto [j, unique] = parent.children_.try_emplace(koid, std::move(job));
-      ZX_DEBUG_ASSERT(unique);
-      missing_.erase(it);
-      return fit::ok(std::ref(j->second));
-    } else {
-      // The superroot fosters the orphan until its parent appears (if ever).
-      auto [j, unique] = superroot_.children_.try_emplace(koid, std::move(job));
-      if (!unique) {
-        return fit::error(Error{
-            "duplicate job KOID",
-            ZX_ERR_IO_DATA_INTEGRITY,
-        });
-      }
-      return fit::ok(std::ref(j->second));
-    }
-  }
-
-  fit::result<Error, std::reference_wrapper<Process>> AttachProcess(Process&& process) {
-    zx_koid_t koid = process.koid();
-    if (auto it = missing_.find(koid); it != missing_.end()) {
-      // There is a job looking for this lost process!
-      auto& [job_koid, job] = *it;
-      auto [p, unique] = job.processes_.try_emplace(koid, std::move(process));
-      ZX_DEBUG_ASSERT(unique);
-      missing_.erase(it);
-      return fit::ok(std::ref(p->second));
-    }
-
-    // The superroot holds the process until a job claims it (if ever).
-    auto [it, unique] = superroot_.processes_.try_emplace(koid, std::move(process));
-    if (!unique) {
-      return fit::error(Error{
-          "duplicate process KOID",
-          ZX_ERR_IO_DATA_INTEGRITY,
-      });
-    }
-
-    return fit::ok(std::ref(it->second));
-  }
-
-  fit::result<Error, std::reference_wrapper<Resource>> AttachResource(Resource&& resource) {
-    zx_info_resource_t info;
-    if (auto result = resource.get_info<ZX_INFO_RESOURCE>(); result.is_error()) {
-      return result.take_error();
-    } else {
-      info = result.value();
-    }
-    if (info.kind != ZX_RSRC_KIND_ROOT) {
-      return fit::error{Error{
-          "non-root resources not supported",
-          ZX_ERR_NOT_SUPPORTED,
-      }};
-    }
-    if (root_resource_.live()) {
-      // There's already a live root resource attached.
-      return fit::error{Error{
-          "live root resource handle already inserted",
-          ZX_ERR_ALREADY_EXISTS,
-      }};
-    }
-    if (root_resource_.info_.empty()) {
-      // This is our real root resource!
-      root_resource_ = std::move(resource);
-    } else {
-      // There's already some dump data attached.  Just take the live handle.
-      root_resource_.live() = std::move(resource.live());
-    }
-    return fit::ok(std::ref(root_resource_));
   }
 
   fit::result<Error> ReadKernelNote(zx_object_info_topic_t topic, ByteView data) {
@@ -495,10 +749,12 @@ class TaskHolder::JobTree {
   // claimed by a parent job.
   Job superroot_{*this};
 
-  // This records any dangling child or process KOIDs required by jobs already
-  // in the holder.  When a matching task is attached, it goes to that job
-  // instead of the superroot.
-  std::map<zx_koid_t, Job&> missing_;
+  // This records task KOID ever encountered: either a task that's already in
+  // the holder; or a task whose KOID was listed on its (presumed) parent's
+  // children, processes, or threads list, but is not yet in the holder.  Each
+  // KOID is associated with the parent Job or Process that has this KOID on
+  // one of its lists.
+  ParentMap parent_map_;
 
   // These are the buffers for the synthetic ZX_INFO_JOB_CHILDREN and
   // ZX_INFO_JOB_PROCESSES results returned by get_info calls on the superroot.
@@ -532,8 +788,8 @@ fit::result<Error> TaskHolder::Insert(fbl::unique_fd fd, bool read_memory) {
   return tree_->Insert(std::move(fd), read_memory);
 }
 
-fit::result<Error, std::reference_wrapper<Object>> TaskHolder::Insert(LiveHandle task) {
-  return tree_->Insert(std::move(task), nullptr);
+fit::result<Error, std::reference_wrapper<Object>> TaskHolder::Insert(LiveHandle obj) {
+  return tree_->Insert(std::move(obj));
 }
 
 Object::~Object() = default;
@@ -549,128 +805,15 @@ Thread::~Thread() = default;
 Resource::~Resource() = default;
 
 fit::result<Error, std::reference_wrapper<zxdump::Job::JobMap>> Job::children() {
-  if (children_.empty() && live()) {
-    // The first time called on a live task (or on repeated calls iff the first
-    // time there were no children), populate the whole list.
-    auto result = get_info<ZX_INFO_JOB_CHILDREN>();
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    LiveJob job{std::move(live())};
-    auto restore = fit::defer([&]() { live() = std::move(job); });
-    for (zx_koid_t koid : result.value()) {
-      if (koid == ZX_KOID_INVALID) {
-        continue;
-      }
-      LiveHandle live_child;
-      zx_status_t status = job.get_child(koid, kChildRights, &live_child);
-      switch (status) {
-        case ZX_OK:
-          break;
-
-        case ZX_ERR_NOT_FOUND:
-          // It's not an error if the child has simply died already so the
-          // KOID is no longer valid.
-          continue;
-
-        default:
-          return fit::error(Error{"zx_object_get_child", status});
-      }
-
-      InsertChild child;
-      auto result = tree().Insert(std::move(live_child), &child);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-      Job& child_job = std::get<Job>(child);
-      ZX_ASSERT(child_job.koid() == koid);
-      [[maybe_unused]] auto [it, unique] = children_.emplace(koid, std::move(child_job));
-      ZX_DEBUG_ASSERT(unique);
-    }
-  }
-  return fit::ok(std::ref(children_));
+  return tree().GetChildren<ZX_INFO_JOB_CHILDREN, &Job::children_>(*this);
 }
 
 fit::result<Error, std::reference_wrapper<zxdump::Job::ProcessMap>> Job::processes() {
-  if (processes_.empty() && live()) {
-    // The first time called on a live task (or on repeated calls iff the first
-    // time there were no processes), populate the whole list.
-    auto result = get_info<ZX_INFO_JOB_PROCESSES>();
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    LiveJob job{std::move(live())};
-    auto restore = fit::defer([&]() { live() = std::move(job); });
-    for (zx_koid_t koid : result.value()) {
-      LiveHandle live_process;
-      zx_status_t status = job.get_child(koid, kChildRights, &live_process);
-      switch (status) {
-        case ZX_OK:
-          break;
-
-        case ZX_ERR_NOT_FOUND:
-          // It's not an error if the process has simply died already so the
-          // KOID is no longer valid.
-          continue;
-
-        default:
-          return fit::error(Error{"zx_object_get_child", status});
-      }
-
-      InsertChild child;
-      auto result = tree().Insert(std::move(live_process), &child);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-      Process& process = std::get<Process>(child);
-      ZX_ASSERT(process.koid() == koid);
-      [[maybe_unused]] auto [it, unique] = processes_.emplace(koid, std::move(process));
-      ZX_DEBUG_ASSERT(unique);
-    }
-  }
-  return fit::ok(std::ref(processes_));
+  return tree().GetChildren<ZX_INFO_JOB_PROCESSES, &Job::processes_>(*this);
 }
 
 fit::result<Error, std::reference_wrapper<zxdump::Process::ThreadMap>> Process::threads() {
-  if (threads_.empty() && live()) {
-    // The first time called on a live task (or on repeated calls iff the first
-    // time there were no processes), populate the whole list.
-    auto result = get_info<ZX_INFO_PROCESS_THREADS>();
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    LiveProcess process{std::move(live())};
-    auto restore = fit::defer([&]() { live() = std::move(process); });
-    for (zx_koid_t koid : result.value()) {
-      LiveHandle live_thread;
-      zx_status_t status = process.get_child(koid, kChildRights, &live_thread);
-      switch (status) {
-        case ZX_OK:
-          break;
-
-        case ZX_ERR_NOT_FOUND:
-          // It's not an error if the thread has simply died already so the
-          // KOID is no longer valid.
-          continue;
-
-        default:
-          return fit::error(Error{"zx_object_get_child", status});
-      }
-
-      InsertChild child;
-      auto result = tree().Insert(std::move(live_thread), &child);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-
-      Thread& thread = std::get<Thread>(child);
-      ZX_ASSERT(thread.koid() == koid);
-      [[maybe_unused]] auto [it, unique] = threads_.emplace(koid, std::move(thread));
-      ZX_DEBUG_ASSERT(unique);
-    }
-  }
-
-  return fit::ok(std::ref(threads_));
+  return tree().GetChildren<ZX_INFO_PROCESS_THREADS, &Process::threads_>(*this);
 }
 
 std::byte* Object::GetBuffer(size_t size) { return tree().GetBuffer(size); }
@@ -828,11 +971,18 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
   // note is seen.
   std::optional<Thread> thread;
 
-  auto reify_thread = [&process, &thread]() {
+  auto reify_thread = [this, &process, &thread]() {
     if (thread) {
       zx_koid_t koid = thread->koid();
+      // Construct a new empty thread since only that constructor is public.
+      // Then we can use the private move-assignment operator on it.
+      auto it = process.threads_.emplace_hint(process.threads_.end(), koid, *this);
+      auto& [thread_koid, placed_thread] = *it;
+      ZX_DEBUG_ASSERT(thread_koid == koid);
       // Ignore duplicates here since they do no real harm.
-      process.threads_.emplace_hint(process.threads_.end(), koid, std::move(*thread));
+      if (placed_thread.empty()) {
+        placed_thread = *std::move(thread);
+      }
     }
   };
 
@@ -946,10 +1096,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
           // bogus KOIDs, even if they are never in the ZX_INFO_PROCESS_THREADS
           // list.  That behavior is inconsistent with a real live process but
           // it's consistent with the way the dump was actually written.
-          //
-          // This can't use emplace because the default constructor is private,
-          // but the move constructor and move assignment operator are public.
-          thread = {Thread{*this}};
+          thread.emplace(*this);
         } else if (!thread) {
           return fit::error(Error{
               "first thread info note is not ZX_INFO_HANDLE_BASIC",
@@ -1095,10 +1242,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
 
   // Looks like a valid dump.  Finish out the last pending thread.
   reify_thread();
-  if (auto result = AttachProcess(std::move(process)); result.is_error()) {
-    return result.take_error();
-  }
-  return fit::ok();
+  return PlaceDump<&Job::processes_>(std::move(process));
 }
 
 fit::result<Error> TaskHolder::JobTree::ReadArchive(DumpFile& file, FileRange archive,
@@ -1281,9 +1425,11 @@ fit::result<Error> TaskHolder::JobTree::ReadArchive(DumpFile& file, FileRange ar
       break;
     }
 
-    if (auto result = next(true); result.is_error()) {
+    auto result = next(true);
+    if (result.is_error()) {
       return result.take_error();
-    } else if (!result.value()) {
+    }
+    if (!result.value()) {
       break;
     }
   }
@@ -1291,11 +1437,7 @@ fit::result<Error> TaskHolder::JobTree::ReadArchive(DumpFile& file, FileRange ar
   // End of the archive.  Reify the job.
   if (job.koid() != ZX_KOID_INVALID) {
     // Looks like a valid job.
-    auto result = AttachJob(std::move(job));
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    return fit::ok();
+    return PlaceDump<&Job::children_>(std::move(job));
   }
 
   if (job.info_.empty() && job.properties_.empty()) {
@@ -1394,70 +1536,20 @@ fit::result<Error, Buffer<>> Process::ReadLiveMemory(uint64_t vaddr, size_t size
   return live_memory_->ReadLiveMemory(vaddr, size, size_mode, live(), tree().live_memory_cache());
 }
 
-fit::result<Error, std::reference_wrapper<Object>> Job::get_child(zx_koid_t koid) {
-  if (auto found = children_.find(koid); found != children_.end()) {
-    return fit::ok(std::ref(found->second));
-  }
-  if (auto found = processes_.find(koid); found != processes_.end()) {
-    return fit::ok(std::ref(found->second));
-  }
-  if (live()) {
-    // Those maps aren't populated eagerly for live tasks.
-    // Instead, just query the kernel for this one KOID.
-    LiveHandle live_child;
-
-    // zx::handle doesn't permit get_child, so momentarily move the live()
-    // handle to a zx::job.  On non-Fuchsia, it's all still no-ops.
-    LiveJob job{std::move(live())};
-    zx_status_t status = job.get_child(koid, kChildRights, &live_child);
-    live() = std::move(job);
-
-    if (status == ZX_OK) {
-      // This is a child of ours, just not inserted yet.
-      InsertChild child;
-      auto result = tree().Insert(std::move(live_child), &child);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-
-      if (auto job = std::get_if<Job>(&child)) {
-        ZX_ASSERT(job->koid() == koid);
-        auto [it, unique] = children_.emplace(koid, std::move(*job));
-        ZX_DEBUG_ASSERT(unique);
-        return fit::ok(std::ref(it->second));
-      }
-
-      auto& process = std::get<Process>(child);
-      ZX_ASSERT(process.koid() == koid);
-      auto [it, unique] = processes_.emplace(koid, std::move(process));
-      ZX_DEBUG_ASSERT(unique);
-      return fit::ok(std::ref(it->second));
-    }
-  }
-  return fit::error{Error{"zx_object_get_child", ZX_ERR_NOT_FOUND}};
+fit::result<Error, std::reference_wrapper<Task>> Job::get_child(zx_koid_t koid) {
+  return tree().GetChild<&Job::children_, &Job::processes_>(*this, koid);
 }
 
-fit::result<Error, std::reference_wrapper<Object>> Process::get_child(zx_koid_t koid) {
-  if (auto found = threads_.find(koid); found != threads_.end()) {
-    return fit::ok(std::ref(found->second));
+fit::result<Error, std::reference_wrapper<Thread>> Process::get_child(zx_koid_t koid) {
+  return tree().GetChild<&Process::threads_>(*this, koid);
+}
+
+fit::result<Error, std::reference_wrapper<Task>> Job::find(zx_koid_t match) {
+  if (koid() == match) {
+    return fit::ok(std::ref(*this));
   }
-  if (live()) {
-    LiveHandle live_child;
-    LiveProcess process{std::move(live())};
-    zx_status_t status = process.get_child(koid, kThreadRights, &live_child);
-    live() = std::move(process);
-    if (status != ZX_OK) {
-      return fit::error{Error{"zx_object_get_child", status}};
-    }
-    InsertChild child;
-    if (auto result = tree().Insert(std::move(live_child), &child); result.is_error()) {
-      return result.take_error();
-    }
-    Thread& thread = std::get<Thread>(child);
-    auto it = threads_.try_emplace(threads_.end(), koid, std::move(thread));
-    return fit::ok(std::ref(it->second));
-  }
-  return fit::error{Error{"zx_object_get_child", ZX_ERR_NOT_FOUND}};
+
+  return tree().FindChild(*this, match);
 }
 
 }  // namespace zxdump

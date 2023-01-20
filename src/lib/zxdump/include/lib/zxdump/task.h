@@ -172,7 +172,7 @@ class TaskHolder {
 
   // Insert a live task (job or process) or resource.  Live threads cannot be
   // inserted alone, only their containing process.
-  fit::result<Error, std::reference_wrapper<Object>> Insert(LiveHandle task);
+  fit::result<Error, std::reference_wrapper<Object>> Insert(LiveHandle obj);
 
   // Insert system data (returned by system_get_*, below) taken from the
   // currently running system.
@@ -232,6 +232,18 @@ class TaskHolder {
 // All the methods here correspond to the generic zx::object methods.
 class Object {
  public:
+  // None of the Object types can be constructed in any way.
+  // They are only used via references returned by the owning TaskHolder.
+  Object(const Object&) = delete;
+
+  // The subclass constructors need to be public so that they can be called by
+  // the std::optional and std::map emplace methods, but they are intended as
+  // private so none of these objects can exist outside the TaskHolder.  Since
+  // the JobTree& is a required argument in the subclass constructors and the
+  // class is private, outside code cannot construct new objects.
+  explicit Object(TaskHolder::JobTree& tree, LiveHandle live = {})
+      : tree_{tree}, live_(std::move(live)) {}
+
   struct WaitItem {
     std::reference_wrapper<Object> handle;
     zx_signals_t waitfor = 0;
@@ -239,9 +251,6 @@ class Object {
   };
 
   using WaitItemVector = std::vector<WaitItem>;
-
-  Object(Object&&) = default;
-  Object& operator=(Object&&) = default;
 
   // Every task has a KOID.  This is just shorthand for extracting it from
   // ZX_INFO_HANDLE_BASIC.  The fake root job returns zero (ZX_KOID_INVALID).
@@ -366,14 +375,17 @@ class Object {
   // The class is abstract.  Only the subclasses can be created and destroyed.
   Object() = delete;
 
-  explicit Object(TaskHolder::JobTree& tree, LiveHandle live = {})
-      : tree_{tree}, live_(std::move(live)) {}
+  // Move construction and assignment are only used during initial creation.
+  Object(Object&&) noexcept = default;
+  Object& operator=(Object&&) noexcept = default;
 
   ~Object();
 
   LiveHandle& live() { return live_; }
 
   TaskHolder::JobTree& tree() { return tree_; }
+
+  bool empty() const { return info_.empty(); }
 
  private:
   friend TaskHolder::JobTree;
@@ -397,14 +409,14 @@ class Object {
 // As with zx::task, this is the superclass of Job, Process, and Thread.
 class Task : public Object {
  public:
-  Task(Task&&) = default;
-  Task& operator=(Task&&) = default;
+  using Object::Object;
 
   // This returns a suspend token.
   fit::result<Error, LiveHandle> suspend();
 
  protected:
-  using Object::Object;
+  Task(Task&&) noexcept = default;
+  Task& operator=(Task&&) noexcept = default;
 
   ~Task();
 };
@@ -412,8 +424,7 @@ class Task : public Object {
 // A Thread is a Task and also has register state.
 class Thread : public Task {
  public:
-  Thread(Thread&&) noexcept = default;
-  Thread& operator=(Thread&&) noexcept = default;
+  using Task::Task;
 
   ~Thread();
 
@@ -423,7 +434,8 @@ class Thread : public Task {
   friend Process;
   friend TaskHolder::JobTree;
 
-  using Task::Task;
+  Thread(Thread&&) noexcept = default;
+  Thread& operator=(Thread&&) noexcept = default;
 
   std::map<zx_thread_state_topic_t, ByteView> state_;
 };
@@ -433,8 +445,7 @@ class Process : public Task {
  public:
   using ThreadMap = std::map<zx_koid_t, Thread>;
 
-  Process(Process&&) noexcept = default;
-  Process& operator=(Process&&) noexcept = default;
+  using Task::Task;
 
   ~Process();
 
@@ -456,7 +467,7 @@ class Process : public Task {
   fit::result<Error, std::reference_wrapper<Task>> find(zx_koid_t koid);
 
   // zxdump::Object::get_child actually just dispatches to this method.
-  fit::result<Error, std::reference_wrapper<Object>> get_child(zx_koid_t koid);
+  fit::result<Error, std::reference_wrapper<Thread>> get_child(zx_koid_t koid);
 
   // Read process memory at the given vaddr.  This tries to read at least count
   // contiguous elements of type T, and succeeds if that was valid memory of
@@ -552,11 +563,12 @@ class Process : public Task {
   friend TaskHolder;
   class LiveMemory;
 
+  Process(Process&&) noexcept = default;
+  Process& operator=(Process&&) noexcept = default;
+
   struct Segment {
     uint64_t offset, filesz, memsz;
   };
-
-  using Task::Task;
 
   fit::result<Error, Buffer<>> ReadMemoryImpl(uint64_t vaddr, size_t size,
                                               ReadMemorySize size_mode);
@@ -594,8 +606,7 @@ class Job : public Task {
   using JobMap = std::map<zx_koid_t, Job>;
   using ProcessMap = std::map<zx_koid_t, Process>;
 
-  Job(Job&&) noexcept = default;
-  Job& operator=(Job&&) noexcept = default;
+  using Task::Task;
 
   ~Job();
 
@@ -615,12 +626,13 @@ class Job : public Task {
   fit::result<Error, std::reference_wrapper<Task>> find(zx_koid_t koid);
 
   // zxdump::Object::get_child actually just dispatches to this method.
-  fit::result<Error, std::reference_wrapper<Object>> get_child(zx_koid_t koid);
+  fit::result<Error, std::reference_wrapper<Task>> get_child(zx_koid_t koid);
 
  private:
   friend TaskHolder::JobTree;
 
-  using Task::Task;
+  Job(Job&&) noexcept = default;
+  Job& operator=(Job&&) noexcept = default;
 
   fit::result<Error, ByteView> GetSuperrootInfo(zx_object_info_topic_t topic);
 
@@ -631,15 +643,14 @@ class Job : public Task {
 // Resource objects just hold access to information, but are a distinct type.
 class Resource : public Object {
  public:
-  Resource(Resource&&) = default;
-  Resource& operator=(Resource&&) = default;
+  using Object::Object;
 
   ~Resource();
 
  private:
   friend TaskHolder::JobTree;
 
-  using Object::Object;
+  Resource& operator=(Resource&&) noexcept = default;
 };
 
 // Get the live root job of the running system, e.g. for TaskHolder::Insert.

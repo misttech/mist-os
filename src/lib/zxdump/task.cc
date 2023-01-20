@@ -178,63 +178,12 @@ fit::result<Error, std::reference_wrapper<Object>> Object::find(zx_koid_t match)
   return fit::error{kTaskNotFound};
 }
 
-fit::result<Error, std::reference_wrapper<Task>> Job::find(zx_koid_t match) {
-  if (koid() == match) {
-    return fit::ok(std::ref(*this));
-  }
-
-  // First check our immediate child tasks.
-  if (auto result = get_child(match); result.is_ok()) {
-    Object& child = result.value();
-    return fit::ok(std::ref(static_cast<Task&>(child)));
-  } else if (result.error_value().status_ != ZX_ERR_NOT_FOUND) {
-    return result.take_error();
-  }
-
-  // For a live job, processes() actively fills the processes_ list.
-  if (auto result = processes(); result.is_error()) {
-    return result.take_error();
-  }
-
-  // Recurse on the child processes.
-  for (auto& [koid, process] : processes_) {
-    ZX_DEBUG_ASSERT(koid != match || live());
-    auto result = process.find(match);
-    if (result.is_ok()) {
-      return result;
-    }
-  }
-
-  // For a live job, children() actively fills the children_ list.
-  if (auto result = children(); result.is_error()) {
-    return result.take_error();
-  }
-
-  // Recurse on the child jobs.
-  for (auto& [koid, job] : children_) {
-    ZX_DEBUG_ASSERT(koid != match || live());
-    auto result = job.find(match);
-    if (result.is_ok()) {
-      return result;
-    }
-  }
-
-  return fit::error{kTaskNotFound};
-}
-
 fit::result<Error, std::reference_wrapper<Task>> Process::find(zx_koid_t match) {
   if (koid() == match) {
     return fit::ok(std::ref(*this));
   }
 
-  auto result = get_child(match);
-  if (result.is_error()) {
-    return result.take_error();
-  }
-
-  Object& thread = result.value();
-  ZX_ASSERT(thread.type() == ZX_OBJ_TYPE_THREAD);
-  return fit::ok(std::ref(static_cast<Thread&>(thread)));
+  return get_child(match);
 }
 
 fit::result<Error> Object::wait_many(Object::WaitItemVector& items) {

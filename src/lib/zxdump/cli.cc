@@ -65,16 +65,15 @@ void CommandLineHelper::KoidArguments(int argc, char** argv, int i, bool allow_j
       // The dumps didn't form a single whole job tree, so the root job is not
       // a real task and shouldn't itself be dumped.  Instead act like all its
       // immediate children (jobs and processes) had been on the command line.
-      if (auto result = root_job.children(); Ok(result, "root children")) {
-        for (auto& [koid, child] : result.value().get()) {
-          tasks_.emplace(child);
+      auto queue_tasks = [this](auto&& list, std::string_view name) {
+        if (Ok(list, name)) {
+          for (auto& [koid, child] : list->get()) {
+            tasks_.emplace(child);
+          }
         }
-      }
-      if (auto result = root_job.processes(); Ok(result, "root processes")) {
-        for (auto& [koid, process] : result.value().get()) {
-          tasks_.emplace(process);
-        }
-      }
+      };
+      queue_tasks(root_job.children(), "root children");
+      queue_tasks(root_job.processes(), "root processes");
     }
   }
 
