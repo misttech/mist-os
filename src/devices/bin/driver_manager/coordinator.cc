@@ -853,6 +853,22 @@ void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
                                 GetDeviceInfoCompleter::Sync& completer) {
   std::vector<fbl::RefPtr<const Device>> device_list;
   for (auto& device : device_manager_->devices()) {
+    // TODO(fxb/118905): Remove debug logs once the flake is resolved.
+    if (device.name() == "i2c-2-44") {
+      LOGF(INFO, "Flake debug(fxb/118905): Found i2c-2-44 node.");
+      for (const auto& child : device.children()) {
+        LOGF(INFO, "i2c-2-44 child: %s", child->name().c_str());
+      }
+    }
+
+    if (device.name() == "backlight") {
+      LOGF(INFO, "Flake debug(fxb/118905): Found backlight node.");
+    }
+
+    if (device.name() == "ti-lp8556") {
+      LOGF(INFO, "Flake debug(fxb/118905): Found ti-lp8556 node.");
+    }
+
     if (device.is_fragment_proxy_device()) {
       continue;
     }
