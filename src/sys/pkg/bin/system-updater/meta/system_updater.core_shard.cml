@@ -6,6 +6,8 @@
         {
             name: "system-updater",
             url: "fuchsia-pkg://fuchsia.com/system-updater#meta/system-updater.cm",
+
+            // Eager to expose the update history over inspect
             startup: "eager",
         },
     ],
