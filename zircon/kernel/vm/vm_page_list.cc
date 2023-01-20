@@ -13,6 +13,7 @@
 
 #include <fbl/alloc_checker.h>
 #include <ktl/move.h>
+#include <vm/compression.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>
 #include <vm/vm_object_paged.h>
@@ -386,9 +387,9 @@ void VmPageSpliceList::FreeAllPages() {
     if (page.IsPage()) {
       pmm_free_page(page.ReleasePage());
     } else if (page.IsReference()) {
-      // TODO(fxbug.dev/60238): Implement this once compressed pages are supported and Reference
-      // types can be generated.
-      panic("Reference should never be generated.");
+      auto compression = pmm_page_compression();
+      DEBUG_ASSERT(compression);
+      compression->Free(page.ReleaseReference());
     }
   }
 }

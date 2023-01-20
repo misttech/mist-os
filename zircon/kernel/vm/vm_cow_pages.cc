@@ -14,6 +14,7 @@
 #include <ktl/move.h>
 #include <lk/init.h>
 #include <vm/anonymous_page_requester.h>
+#include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/fault.h>
 #include <vm/physmap.h>
@@ -97,10 +98,10 @@ inline uint64_t CheckedAdd(uint64_t a, uint64_t b) {
   return result;
 }
 
-// TODO(fxbug.dev/60238): Implement this once compressed pages are supported and Reference types
-// can be generated.
 void FreeReference(VmPageOrMarker::ReferenceValue content) {
-  panic("Reference should never be generated.");
+  VmCompression* compression = pmm_page_compression();
+  DEBUG_ASSERT(compression);
+  compression->Free(content);
 }
 
 }  // namespace
@@ -262,12 +263,24 @@ void VmCowPages::CacheFree(vm_page_t* p) {
   page_cache_.Free(ktl::move(list));
 }
 
-// TODO(fxbug.dev/60238): Implement this once compressed pages are supported and Reference types
-// can be generated.
 zx_status_t VmCowPages::MakePageFromReference(VmPageOrMarkerRef page_or_mark,
                                               LazyPageRequest* page_request) {
   DEBUG_ASSERT(page_or_mark->IsReference());
-  panic("Reference should never be generated.");
+  VmCompression* compression = pmm_page_compression();
+  DEBUG_ASSERT(compression);
+  vm_page_t* p;
+  zx_status_t status = pmm_alloc_page(pmm_alloc_flags_, &p);
+  if (status != ZX_OK) {
+    if (status == ZX_ERR_SHOULD_WAIT) {
+      status = AnonymousPageRequester::Get().FillRequest(page_request->get());
+    }
+    return status;
+  }
+  InitializeVmPage(p);
+  p->object.cow_left_split = page_or_mark->PageOrRefLeftSplit();
+  p->object.cow_right_split = page_or_mark->PageOrRefRightSplit();
+  const auto ref = page_or_mark.SwapReferenceForPage(p);
+  compression->Decompress(ref, paddr_to_physmap(p->paddr()));
   return ZX_OK;
 }
 
@@ -995,9 +1008,11 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     {
       size_t batch_count{0};
       PageQueues* pq = pmm_page_queues();
+      VmCompression* compression = pmm_page_compression();
       Guard<SpinLock, IrqSave> guard{pq->get_lock()};
 
-      page_list_.ForEveryPage([pq, &child, &batch_count, &guard](auto* p, uint64_t off) {
+      page_list_.ForEveryPageMutable([this, pq, &child, &guard, &compression, &batch_count](
+                                         VmPageOrMarkerRef p, uint64_t off) {
         // If we have processed our batch limit, drop the page_queue lock to
         // give other threads a chance to perform operations, before
         // re-acquiring the lock and continuing.
@@ -1010,9 +1025,22 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
             arch::Yield();
           });
         }
-
-        // Only actual content pages have backlinks, References do not and so do
-        // not need to be updated.
+        if (p->IsReference()) {
+          // A regular reference we can move, a temporary reference we need to turn back into
+          // its page so we can move it. To determine if we have a temporary reference we can just
+          // attempt to move it, and if it was a temporary reference we will get a page returned.
+          if (auto page = compression->MoveReference(p->Reference())) {
+            InitializeVmPage(*page);
+            // Dropping the page queues lock is inefficient, but this is an unlikely edge case that
+            // can happen exactly once (due to only one temporary reference).
+            guard.CallUnlocked([this, page, off] {
+              AssertHeld(lock_ref());
+              SetNotPinnedLocked(*page, off);
+            });
+            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*page);
+            ASSERT(compression->IsTempReference(ref));
+          }
+        }
         if (p->IsPage()) {
           AssertHeld<Lock<SpinLock>, IrqSave>(*pq->get_lock());
 
@@ -1054,11 +1082,13 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
       uint64_t merge_start_offset;
       VmCowPages* child;
       BatchPQRemove* page_remover;
-    } state = {pmm_page_queues(), removed_left, merge_start_offset, &child, &page_remover};
+      VmCompression* compression;
+    } state = {pmm_page_queues(), removed_left,          merge_start_offset, &child,
+               &page_remover,     pmm_page_compression()};
     child.page_list_.MergeFrom(
         page_list_, merge_start_offset, merge_end_offset,
         [&page_remover](VmPageOrMarker&& p, uint64_t offset) { page_remover.PushContent(&p); },
-        [&state](VmPageOrMarker* page_or_marker, uint64_t offset) {
+        [this, &state](VmPageOrMarker* page_or_marker, uint64_t offset) {
           DEBUG_ASSERT(page_or_marker->IsPageOrRef());
           DEBUG_ASSERT(page_or_marker->IsReference() ||
                        page_or_marker->Page()->object.pin_count == 0);
@@ -1073,6 +1103,24 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
             // page, then neither of its children do.
             page_or_marker->SetPageOrRefLeftSplit(false);
             page_or_marker->SetPageOrRefRightSplit(false);
+            if (page_or_marker->IsReference()) {
+              // A regular reference we can move, a temporary reference we need to turn back into
+              // its page so we can move it. To determine if we have a temporary reference we can
+              // just attempt to move it, and if it was a temporary reference we will get a page
+              // returned.
+              if (auto page = state.compression->MoveReference(page_or_marker->Reference())) {
+                InitializeVmPage(*page);
+                // For simplicity, since this is a very uncommon edge case, just update the page in
+                // place in this page list, then move it as a regular page.
+                AssertHeld(lock_ref());
+                SetNotPinnedLocked(*page, offset);
+                VmPageOrMarker::ReferenceValue ref =
+                    VmPageOrMarkerRef(page_or_marker).SwapReferenceForPage(*page);
+                ASSERT(state.compression->IsTempReference(ref));
+              }
+            }
+            // Not an else-if to intentionally perform this if the previous block turned a reference
+            // into a page.
             if (page_or_marker->IsPage()) {
               state.pq->ChangeObjectOffset(page_or_marker->Page(), state.child,
                                            offset - state.merge_start_offset);
@@ -4394,15 +4442,26 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   if (children_list_len_) {
     return ZX_ERR_BAD_STATE;
   }
+  VmCompression* compression = pmm_page_compression();
 
-  page_list_.ForEveryPageInRange(
-      [](const auto* p, uint64_t off) {
+  page_list_.ForEveryPageInRangeMutable(
+      [&compression, this](VmPageOrMarkerRef p, uint64_t off) {
         if (p->IsPage()) {
           DEBUG_ASSERT(p->Page()->object.pin_count == 0);
           pmm_page_queues()->Remove(p->Page());
+        } else if (p->IsReference()) {
+          // A regular reference we can move are permitted in the VmPageSpliceList, it is up to the
+          // receiver of the pages to reject or otherwise deal with them. A temporary reference we
+          // need to turn back into its page so we can move it.
+          if (auto page = compression->MoveReference(p->Reference())) {
+            InitializeVmPage(*page);
+            AssertHeld(lock_ref());
+            // Don't insert the page in the page queues, since we're trying to remove the pages,
+            // just update the page list reader for TakePages below.
+            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*page);
+            ASSERT(compression->IsTempReference(ref));
+          }
         }
-        // Reference types are permitted in the VmPageSpliceList, it is up to the receiver of the
-        // pages to reject or otherwise deal with them.
         return ZX_ERR_NEXT;
       },
       offset, offset + len);
