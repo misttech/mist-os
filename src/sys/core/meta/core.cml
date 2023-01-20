@@ -119,10 +119,12 @@
         {
             name: "remote-control",
             url: "fuchsia-pkg://fuchsia.com/remote-control#meta/remote-control.cm",
+            environment: "#core-env",
         },
         {
             name: "remote-diagnostics-bridge",
             url: "fuchsia-pkg://fuchsia.com/remote-diagnostics-bridge#meta/remote-diagnostics-bridge.cm",
+            environment: "#core-env",
         },
         {
             name: "debug_serial",
