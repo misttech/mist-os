@@ -1122,6 +1122,10 @@ if (current_os == "fuchsia") {
   }
 }
 
+group("vm-device") {
+  public_deps = [ ":vm-device-v0_1_0" ]
+}
+
 group("vte") {
   public_deps = [ ":vte-v0_3_3" ]
 }
@@ -12378,6 +12382,26 @@ rust_library("vk-sys-v0_7_0") {
     "--edition=2018",
     "-Cmetadata=51e1ef19b2b5f263",
     "-Cextra-filename=-51e1ef19b2b5f263",
+  ]
+
+  visibility = [ ":*" ]
+}
+
+rust_library("vm-device-v0_1_0") {
+  crate_name = "vm_device"
+  crate_root = "//third_party/rust_crates/vendor/vm-device-0.1.0/src/lib.rs"
+  output_name = "vm_device-63a24e49faaabd29"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=63a24e49faaabd29",
+    "-Cextra-filename=-63a24e49faaabd29",
   ]
 
   visibility = [ ":*" ]
