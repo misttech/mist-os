@@ -763,11 +763,6 @@
                 "description": "Sets a name for the buffer for use in debugging tools.",
                 "arguments": [
                     {
-                        "name": "connection",
-                        "type": "magma_connection_t",
-                        "description": "An open connection."
-                    },
-                    {
                         "name": "buffer",
                         "type": "magma_buffer_t",
                         "description": "A valid buffer."
