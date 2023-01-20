@@ -62,17 +62,6 @@ import("fuchsia_package.gni")
 #     Type: list of strings
 #     Default: []
 #
-#   renameable_subpackages (optional)
-#      A list of subpackages defined by scoped variables `package` (a
-#     `fuchsia_package()` target) and an optional `name`. See
-#     `fuchsia_package()` for more details.
-#     Type: list of scopes
-#
-#   subpackages (optional)
-#     A list of `fuchsia_package` targets. See `fuchsia_package()` for more
-#     details.
-#     Type: list of targets
-#
 #   check_includes (optional)
 #     Check against expect_includes() in deps.
 #     Warning: Do not disable this unless there is a good, documented reason.
