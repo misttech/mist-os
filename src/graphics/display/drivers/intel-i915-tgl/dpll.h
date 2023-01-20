@@ -27,10 +27,9 @@ namespace i915_tgl {
 // This structure omits some low-level details needed to configure a PLL for DDI
 // usage. The omitted details are fully determined by (and can be derived from)
 // the information here.
+//
+// The default-constructed instance is an empty value.
 struct DdiPllConfig {
-  // The default-constructed instance is empty.
-  DdiPllConfig() = default;
-
   // The DDI clock rate.
   //
   // This is half the bitrate on each link lane, because DDIs use both clock
