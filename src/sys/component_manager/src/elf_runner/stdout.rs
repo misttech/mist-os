@@ -12,10 +12,15 @@ use {
     fidl_fuchsia_process as fproc, fuchsia_async as fasync,
     fuchsia_runtime::{HandleInfo, HandleType},
     fuchsia_zircon as zx,
-    futures::AsyncReadExt,
+    futures::{Stream, StreamExt},
     once_cell::unsync::OnceCell,
     runner::component::ComponentNamespace,
-    std::{boxed::Box, num::NonZeroUsize, sync::Arc},
+    std::{
+        boxed::Box,
+        pin::Pin,
+        sync::Arc,
+        task::{Context, Poll},
+    },
     tracing::{info, warn, Subscriber},
     zx::HandleBased,
 };
@@ -113,49 +118,159 @@ fn new_socket_bound_to_fd(fd: i32) -> (zx::Socket, fproc::HandleInfo) {
 /// are split into lines and separated into chunks no greater than
 /// MAX_MESSAGE_SIZE.
 async fn drain_lines(socket: zx::Socket, writer: &mut dyn LogWriter) -> Result<(), Error> {
-    let mut buffer = vec![0; MAX_MESSAGE_SIZE * 2];
-    let mut offset = 0;
+    let chunker = NewlineChunker::new(socket)?;
+    futures::pin_mut!(chunker);
 
-    let mut socket = fasync::Socket::from_socket(socket)
-        .map_err(|s| anyhow!("Failed to create fasync::socket from zx::socket: {}", s))?;
-    while let Some(bytes_read) = NonZeroUsize::new(
-        socket
-            .read(&mut buffer[offset..])
-            .await
-            .map_err(|err| anyhow!("Failed to read socket: {}", err))?,
-    ) {
-        let bytes_read = bytes_read.get();
-        let end_pos = offset + bytes_read;
-
-        if let Some(last_newline_pos) = buffer[..end_pos].iter().rposition(|&x| x == NEWLINE) {
-            for line in buffer[..last_newline_pos].split(|&x| x == NEWLINE) {
-                for chunk in line.chunks(MAX_MESSAGE_SIZE) {
-                    let () = writer.write(chunk).await?;
-                }
-            }
-
-            buffer.copy_within(last_newline_pos + 1..end_pos, 0);
-            offset = end_pos - last_newline_pos - 1;
-        } else {
-            offset += bytes_read;
-
-            while offset >= MAX_MESSAGE_SIZE {
-                let () = writer.write(&buffer[..MAX_MESSAGE_SIZE]).await?;
-                buffer.copy_within(MAX_MESSAGE_SIZE..offset, 0);
-                offset -= MAX_MESSAGE_SIZE;
-            }
-        }
-    }
-
-    // We need to write any remaining bytes, while still maintaining
-    // constraints of MAX_MESSAGE_SIZE.
-    if offset != 0 {
-        for chunk in buffer[..offset].chunks(MAX_MESSAGE_SIZE) {
-            let () = writer.write(&chunk).await?;
-        }
+    while let Some(chunk_or_line) = chunker.next().await {
+        writer.write(&chunk_or_line?).await?;
     }
 
     Ok(())
+}
+
+/// Splits the bytes from a streaming socket into newlines suitable for forwarding to LogSink.
+/// Returned chunks may not be complete newlines if single lines are over the size limit for a log
+/// message.
+///
+/// This implementation prioritizes standing memory usage over the number of copies or allocations
+/// made. Log forwarding is not particularly throughput sensitive, but keeping around lots of large
+/// buffers takes up memory.
+struct NewlineChunker {
+    socket: fasync::Socket,
+    buffer: Vec<u8>,
+    is_terminated: bool,
+}
+
+impl NewlineChunker {
+    fn new(socket: zx::Socket) -> Result<Self, Error> {
+        let socket = fasync::Socket::from_socket(socket)
+            .map_err(|s| anyhow!("Failed to create fasync::socket from zx::socket: {}", s))?;
+        Ok(Self { socket, buffer: vec![], is_terminated: false })
+    }
+
+    /// Removes and returns the next line or maximum-size chunk from the head of the buffer if
+    /// available.
+    fn next_chunk_from_buffer(&mut self) -> Option<Vec<u8>> {
+        let new_tail_start =
+            if let Some(mut newline_pos) = self.buffer.iter().position(|&b| b == NEWLINE) {
+                // start the tail 1 past the last newline encountered
+                while let Some(&NEWLINE) = self.buffer.get(newline_pos + 1) {
+                    newline_pos += 1;
+                }
+                newline_pos + 1
+            } else if self.buffer.len() >= MAX_MESSAGE_SIZE {
+                // we have to check the length *after* looking for newlines in case a single socket
+                // read was larger than the max size but contained newlines in the first
+                // MAX_MESSAGE_SIZE bytes
+                MAX_MESSAGE_SIZE
+            } else {
+                // no newlines, and the bytes in the buffer are too few to force chunking
+                return None;
+            };
+
+        // the tail becomes the head for the next chunk
+        let new_tail = self.buffer.split_off(new_tail_start);
+        let mut next_chunk = std::mem::replace(&mut self.buffer, new_tail);
+
+        // remove the newlines from the end of the chunk we're returning
+        while let Some(&NEWLINE) = next_chunk.last() {
+            next_chunk.pop();
+        }
+        Some(next_chunk)
+    }
+
+    fn end_of_stream(&mut self) -> Poll<Option<Result<Vec<u8>, Error>>> {
+        if !self.buffer.is_empty() {
+            // the buffer is under the forced chunk size because the first return didn't happen
+            Poll::Ready(Some(Ok(std::mem::replace(&mut self.buffer, vec![]))))
+        } else {
+            // end the stream
+            self.is_terminated = true;
+            Poll::Ready(None)
+        }
+    }
+}
+
+impl Stream for NewlineChunker {
+    type Item = Result<Vec<u8>, Error>;
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let this = self.get_mut();
+
+        if this.is_terminated {
+            return Poll::Ready(None);
+        }
+
+        // first check to see if previous socket reads have left us with lines in the buffer
+        if let Some(chunk) = this.next_chunk_from_buffer() {
+            return Poll::Ready(Some(Ok(chunk)));
+        }
+
+        // we don't have a chunk to return, find out how much buffer we should make available
+        let bytes_in_socket = match this.socket.as_ref().outstanding_read_bytes()? {
+            0 => {
+                // if there are no bytes available this socket should not be considered readable
+                this.socket.reacquire_read_signal()?;
+
+                // if the socket has no contents we need to wait for them or handle it being closed
+                let is_closed = futures::ready!(this.socket.poll_read_task(cx))?;
+                if is_closed {
+                    return this.end_of_stream();
+                } else {
+                    // the socket got data in between our first call and poll_read_task,
+                    // otherwise poll_read_task would either have returned Poll::Pending (no data)
+                    // or `is_closed` would be `true`
+                    let outstanding = this.socket.as_ref().outstanding_read_bytes()?;
+                    if outstanding == 0 {
+                        return Poll::Ready(Some(Err(anyhow::format_err!(
+                            "socket signals are readable but kernel says no bytes available"
+                        ))));
+                    }
+                    outstanding
+                }
+            }
+            n => n,
+        };
+
+        // don't make the buffer bigger than necessary to get a chunk out
+        let bytes_to_read = std::cmp::min(bytes_in_socket, MAX_MESSAGE_SIZE);
+        let prev_len = this.buffer.len();
+
+        // grow the size of the buffer to make space for the pending read, if it fails we'll need
+        // to shrink it back down before any subsequent calls to poll_next
+        this.buffer.resize(prev_len + bytes_to_read, 0);
+
+        let bytes_read = match this.socket.poll_read_ref(cx, &mut this.buffer[prev_len..]) {
+            Poll::Ready(Ok(b)) => b,
+            Poll::Ready(Err(e)) => {
+                // reset the size of the buffer to exclude the 0's we wrote above
+                this.buffer.truncate(prev_len);
+                return Poll::Ready(Some(Err(e.into())));
+            }
+            Poll::Pending => {
+                // reset the size of the buffer to exclude the 0's we wrote above
+                this.buffer.truncate(prev_len);
+                return Poll::Pending;
+            }
+        };
+
+        // handle possible short reads
+        this.buffer.truncate(prev_len + bytes_read);
+
+        if bytes_read == 0 {
+            // no bytes read and no pending returned, the socket is closed
+            this.end_of_stream()
+        } else {
+            // we got something out of the socket
+            if let Some(chunk) = this.next_chunk_from_buffer() {
+                // and its enough for a chunk
+                Poll::Ready(Some(Ok(chunk)))
+            } else {
+                // it is not enough for a chunk, request notification when there's more
+                this.socket.need_read(cx, false /* clear_closed */)?;
+                Poll::Pending
+            }
+        }
+    }
 }
 
 /// Object capable of writing a stream of bytes.
@@ -201,10 +316,10 @@ mod tests {
             MockServiceRequest,
         },
         anyhow::{anyhow, format_err, Context, Error},
-        assert_matches::assert_matches,
         async_trait::async_trait,
         fidl_fuchsia_component_runner as fcrunner,
         fidl_fuchsia_logger::LogSinkRequest,
+        fuchsia_async::Task,
         fuchsia_zircon as zx,
         futures::{channel::mpsc, try_join, FutureExt, SinkExt, StreamExt},
         rand::{
@@ -345,17 +460,19 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn drain_lines_return_error_if_stream_polls_err() -> Result<(), Error> {
-        let (tx, rx) = create_sockets()?;
-        // A closed socket should yield an error when stream is polled.
-        let () = rx.half_close()?;
-        let () = tx.half_close()?;
-        let (mut sender, _recv) = create_mock_logger();
+    async fn drain_lines_collapses_repeated_newlines() {
+        let (tx, rx) = create_sockets().unwrap();
+        let (mut sender, mut recv) = create_mock_logger();
 
-        let result = drain_lines(rx, &mut sender).await;
+        let drainer = Task::spawn(async move { drain_lines(rx, &mut sender).await });
 
-        assert_matches!(result, Err(_));
-        Ok(())
+        write_to_socket(&tx, "Hello\n\nWorld\n").unwrap();
+        assert_eq!(recv.next().await.unwrap(), "Hello");
+        assert_eq!(recv.next().await.unwrap(), "World");
+
+        drop(tx);
+        drainer.await.unwrap();
+        assert_eq!(recv.next().await, None);
     }
 
     async fn write_to_syslog_or_panic(
