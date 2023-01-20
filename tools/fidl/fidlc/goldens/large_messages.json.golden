@@ -1,0 +1,2389 @@
+{
+  "name": "test.largemessages",
+  "experiments": [
+    "allow_overflowing",
+    "no_optional_structs",
+    "output_index_json",
+    "simple_empty_response_syntax",
+    "unknown_interactions"
+  ],
+  "library_dependencies": [
+    {
+      "name": "zx",
+      "declarations": {
+        "zx/rights": {
+          "kind": "bits"
+        },
+        "zx/CHANNEL_MAX_MSG_BYTES": {
+          "kind": "const"
+        },
+        "zx/CHANNEL_MAX_MSG_HANDLES": {
+          "kind": "const"
+        },
+        "zx/DEFAULT_CHANNEL_RIGHTS": {
+          "kind": "const"
+        },
+        "zx/DEFAULT_EVENT_RIGHTS": {
+          "kind": "const"
+        },
+        "zx/MAX_CPUS": {
+          "kind": "const"
+        },
+        "zx/MAX_NAME_LEN": {
+          "kind": "const"
+        },
+        "zx/RIGHTS_BASIC": {
+          "kind": "const"
+        },
+        "zx/RIGHTS_IO": {
+          "kind": "const"
+        },
+        "zx/RIGHTS_POLICY": {
+          "kind": "const"
+        },
+        "zx/RIGHTS_PROPERTY": {
+          "kind": "const"
+        },
+        "zx/obj_type": {
+          "kind": "enum"
+        },
+        "zx/handle": {
+          "kind": "experimental_resource"
+        },
+        "zx/duration": {
+          "kind": "alias"
+        },
+        "zx/gpaddr": {
+          "kind": "alias"
+        },
+        "zx/koid": {
+          "kind": "alias"
+        },
+        "zx/off": {
+          "kind": "alias"
+        },
+        "zx/paddr": {
+          "kind": "alias"
+        },
+        "zx/paddr32": {
+          "kind": "alias"
+        },
+        "zx/procarg": {
+          "kind": "alias"
+        },
+        "zx/signals": {
+          "kind": "alias"
+        },
+        "zx/status": {
+          "kind": "alias"
+        },
+        "zx/ticks": {
+          "kind": "alias"
+        },
+        "zx/time": {
+          "kind": "alias"
+        },
+        "zx/vaddr": {
+          "kind": "alias"
+        }
+      }
+    }
+  ],
+  "bits_declarations": [],
+  "const_declarations": [
+    {
+      "name": "test.largemessages/FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 138,
+        "column": 7,
+        "length": 34
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint32",
+        "type_shape_v1": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "1000",
+        "expression": "1000",
+        "literal": {
+          "kind": "numeric",
+          "value": "1000",
+          "expression": "1000"
+        }
+      }
+    },
+    {
+      "name": "test.largemessages/HANDLE_CARRYING_ELEMENTS_COUNT",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 131,
+        "column": 7,
+        "length": 30
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint32",
+        "type_shape_v1": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "64",
+        "expression": "64",
+        "literal": {
+          "kind": "numeric",
+          "value": "64",
+          "expression": "64"
+        }
+      }
+    },
+    {
+      "name": "test.largemessages/LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 146,
+        "column": 7,
+        "length": 35
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint32",
+        "type_shape_v1": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "985",
+        "expression": "985",
+        "literal": {
+          "kind": "numeric",
+          "value": "985",
+          "expression": "985"
+        }
+      }
+    },
+    {
+      "name": "test.largemessages/LARGE_STRUCT_BYTE_VECTOR_SIZE",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 46,
+        "column": 7,
+        "length": 29
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint32",
+        "type_shape_v1": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "65505",
+        "expression": "65505",
+        "literal": {
+          "kind": "numeric",
+          "value": "65505",
+          "expression": "65505"
+        }
+      }
+    },
+    {
+      "name": "test.largemessages/LARGE_UNION_BYTE_VECTOR_SIZE",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 91,
+        "column": 7,
+        "length": 28
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint32",
+        "type_shape_v1": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "65489",
+        "expression": "65489",
+        "literal": {
+          "kind": "numeric",
+          "value": "65489",
+          "expression": "65489"
+        }
+      }
+    },
+    {
+      "name": "test.largemessages/SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 145,
+        "column": 7,
+        "length": 35
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint32",
+        "type_shape_v1": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "976",
+        "expression": "976",
+        "literal": {
+          "kind": "numeric",
+          "value": "976",
+          "expression": "976"
+        }
+      }
+    },
+    {
+      "name": "test.largemessages/SMALL_STRUCT_BYTE_VECTOR_SIZE",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 24,
+        "column": 7,
+        "length": 29
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint32",
+        "type_shape_v1": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "65504",
+        "expression": "65504",
+        "literal": {
+          "kind": "numeric",
+          "value": "65504",
+          "expression": "65504"
+        }
+      }
+    },
+    {
+      "name": "test.largemessages/SMALL_UNION_BYTE_VECTOR_SIZE",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 69,
+        "column": 7,
+        "length": 28
+      },
+      "type": {
+        "kind": "primitive",
+        "subtype": "uint32",
+        "type_shape_v1": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
+        "type_shape_v2": {
+          "inline_size": 4,
+          "alignment": 4,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        }
+      },
+      "value": {
+        "kind": "literal",
+        "value": "65488",
+        "expression": "65488",
+        "literal": {
+          "kind": "numeric",
+          "value": "65488",
+          "expression": "65488"
+        }
+      }
+    }
+  ],
+  "enum_declarations": [],
+  "experimental_resource_declarations": [],
+  "protocol_declarations": [
+    {
+      "name": "test.largemessages/Overflowing",
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 148,
+        "column": 15,
+        "length": 11
+      },
+      "openness": "open",
+      "composed_protocols": [],
+      "methods": [
+        {
+          "ordinal": 5952259942637616356,
+          "name": "DecodeBoundedKnownToBeSmall",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 150,
+            "column": 12,
+            "length": 27
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 149,
+                    "column": 31,
+                    "length": 12
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 149,
+                "column": 5,
+                "length": 39
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/BoundedKnownToBeSmall",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": false,
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 4844409317800064506,
+          "name": "DecodeBoundedMaybeLarge",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 152,
+            "column": 12,
+            "length": 23
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 151,
+                    "column": 31,
+                    "length": 12
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 151,
+                "column": 5,
+                "length": 39
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/BoundedMaybeLarge",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": false,
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 9033523515723994320,
+          "name": "DecodeSemiBoundedBelievedToBeSmall",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 154,
+            "column": 12,
+            "length": 34
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 153,
+                    "column": 31,
+                    "length": 12
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 153,
+                "column": 5,
+                "length": 39
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/SemiBoundedBelievedToBeSmall",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 24,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            }
+          },
+          "has_response": false,
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 2934974775967009888,
+          "name": "DecodeSemiBoundedMaybeLarge",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 156,
+            "column": 12,
+            "length": 27
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 155,
+                    "column": 31,
+                    "length": 12
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 155,
+                "column": 5,
+                "length": 39
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/SemiBoundedMaybeLarge",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 24,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            }
+          },
+          "has_response": false,
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 6619820881740926511,
+          "name": "DecodeUnboundedMaybeLargeValue",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 158,
+            "column": 12,
+            "length": 30
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 157,
+                    "column": 31,
+                    "length": 12
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 157,
+                "column": 5,
+                "length": 39
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/UnboundedMaybeLargeValue",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": false,
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 4562382013720126356,
+          "name": "DecodeUnboundedMaybeLargeResource",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 160,
+            "column": 12,
+            "length": 33
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 159,
+                    "column": 31,
+                    "length": 12
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 159,
+                "column": 5,
+                "length": 39
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/UnboundedMaybeLargeResource",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 1536,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 64,
+              "max_out_of_line": 64000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 1536,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 64,
+              "max_out_of_line": 64000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": false,
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 6548039810775918803,
+          "name": "EncodeBoundedKnownToBeSmall",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 162,
+            "column": 12,
+            "length": 27
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 161,
+                    "column": 31,
+                    "length": 12
+                  }
+                },
+                {
+                  "name": "response",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 161,
+                    "column": 45,
+                    "length": 13
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 161,
+                "column": 5,
+                "length": 54
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/BoundedKnownToBeSmall",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": true,
+          "maybe_response_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/BoundedKnownToBeSmall",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 3946825660199764192,
+          "name": "EncodeBoundedMaybeLarge",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 164,
+            "column": 12,
+            "length": 23
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 163,
+                    "column": 31,
+                    "length": 12
+                  }
+                },
+                {
+                  "name": "response",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 163,
+                    "column": 45,
+                    "length": 13
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 163,
+                "column": 5,
+                "length": 54
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/BoundedMaybeLarge",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": true,
+          "maybe_response_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/BoundedMaybeLarge",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 4256297304861928433,
+          "name": "EncodeSemiBoundedBelievedToBeSmall",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 166,
+            "column": 12,
+            "length": 34
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 165,
+                    "column": 31,
+                    "length": 12
+                  }
+                },
+                {
+                  "name": "response",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 165,
+                    "column": 45,
+                    "length": 13
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 165,
+                "column": 5,
+                "length": 54
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/SemiBoundedBelievedToBeSmall",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 24,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            }
+          },
+          "has_response": true,
+          "maybe_response_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/SemiBoundedBelievedToBeSmall",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 24,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            }
+          },
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 2268007598729864303,
+          "name": "EncodeSemiBoundedMaybeLarge",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 168,
+            "column": 12,
+            "length": 27
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 167,
+                    "column": 31,
+                    "length": 12
+                  }
+                },
+                {
+                  "name": "response",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 167,
+                    "column": 45,
+                    "length": 13
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 167,
+                "column": 5,
+                "length": 54
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/SemiBoundedMaybeLarge",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 24,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            }
+          },
+          "has_response": true,
+          "maybe_response_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/SemiBoundedMaybeLarge",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 24,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": true,
+              "has_flexible_envelope": true
+            }
+          },
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 3417738688177890202,
+          "name": "EncodeUnboundedMaybeLargeValue",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 170,
+            "column": 12,
+            "length": 30
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 169,
+                    "column": 31,
+                    "length": 12
+                  }
+                },
+                {
+                  "name": "response",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 169,
+                    "column": 45,
+                    "length": 13
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 169,
+                "column": 5,
+                "length": 54
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/UnboundedMaybeLargeValue",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": true,
+          "maybe_response_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/UnboundedMaybeLargeValue",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "is_composed": false,
+          "has_error": false
+        },
+        {
+          "ordinal": 343754737384884834,
+          "name": "EncodeUnboundedMaybeLargeResource",
+          "strict": true,
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 190,
+            "column": 12,
+            "length": 33
+          },
+          "has_request": true,
+          "maybe_attributes": [
+            {
+              "name": "experimental_overflowing",
+              "arguments": [
+                {
+                  "name": "request",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 189,
+                    "column": 31,
+                    "length": 12
+                  }
+                },
+                {
+                  "name": "response",
+                  "type": "bool",
+                  "value": {
+                    "kind": "literal",
+                    "value": "true",
+                    "expression": "true",
+                    "literal": {
+                      "kind": "bool",
+                      "value": "true",
+                      "expression": "true"
+                    }
+                  },
+                  "location": {
+                    "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                    "line": 189,
+                    "column": 45,
+                    "length": 13
+                  }
+                }
+              ],
+              "location": {
+                "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+                "line": 189,
+                "column": 5,
+                "length": 54
+              }
+            }
+          ],
+          "maybe_request_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/UnboundedMaybeLargeResource",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 1536,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 64,
+              "max_out_of_line": 64000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 1536,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 64,
+              "max_out_of_line": 64000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "has_response": true,
+          "maybe_response_payload": {
+            "kind": "identifier",
+            "identifier": "test.largemessages/UnboundedMaybeLargeResource",
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 1536,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 64,
+              "max_out_of_line": 64000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 1536,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 64,
+              "max_out_of_line": 64000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "is_composed": false,
+          "has_error": false
+        }
+      ]
+    }
+  ],
+  "service_declarations": [],
+  "struct_declarations": [
+    {
+      "name": "test.largemessages/BoundedKnownToBeSmall",
+      "naming_context": [
+        "BoundedKnownToBeSmall"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 16,
+        "column": 6,
+        "length": 21
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "vector",
+            "element_type": {
+              "kind": "primitive",
+              "subtype": "uint8",
+              "type_shape_v1": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
+              "type_shape_v2": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              }
+            },
+            "maybe_element_count": 65504,
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65504,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "bytes",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 17,
+            "column": 5,
+            "length": 5
+          },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 0
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": false,
+      "type_shape_v1": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 65504,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 65504,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.largemessages/BoundedMaybeLarge",
+      "naming_context": [
+        "BoundedMaybeLarge"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 38,
+        "column": 6,
+        "length": 17
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "vector",
+            "element_type": {
+              "kind": "primitive",
+              "subtype": "uint8",
+              "type_shape_v1": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
+              "type_shape_v2": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              }
+            },
+            "maybe_element_count": 65505,
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65512,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "bytes",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 39,
+            "column": 5,
+            "length": 5
+          },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 0
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": false,
+      "type_shape_v1": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 65512,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 65512,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.largemessages/Elements",
+      "naming_context": [
+        "UnboundedMaybeLargeResource",
+        "elements"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 120,
+        "column": 21,
+        "length": 121
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "handle",
+            "obj_type": 0,
+            "subtype": "handle",
+            "rights": 2147483648,
+            "nullable": true,
+            "resource_identifier": "zx/handle",
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 1,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 1,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "handle",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 121,
+            "column": 9,
+            "length": 6
+          },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 4
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 4
+          }
+        },
+        {
+          "type": {
+            "kind": "vector",
+            "element_type": {
+              "kind": "primitive",
+              "subtype": "uint8",
+              "type_shape_v1": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
+              "type_shape_v2": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              }
+            },
+            "maybe_element_count": 1000,
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 1000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 1000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "bytes",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 122,
+            "column": 9,
+            "length": 5
+          },
+          "field_shape_v1": {
+            "offset": 8,
+            "padding": 0
+          },
+          "field_shape_v2": {
+            "offset": 8,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": true,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 1,
+        "max_out_of_line": 1000,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 1,
+        "max_out_of_line": 1000,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.largemessages/UnboundedMaybeLargeResource",
+      "naming_context": [
+        "UnboundedMaybeLargeResource"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 119,
+        "column": 6,
+        "length": 27
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "array",
+            "element_type": {
+              "kind": "identifier",
+              "identifier": "test.largemessages/Elements",
+              "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 24,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 1,
+                "max_out_of_line": 1000,
+                "has_padding": true,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
+              "type_shape_v2": {
+                "inline_size": 24,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 1,
+                "max_out_of_line": 1000,
+                "has_padding": true,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              }
+            },
+            "element_count": 64,
+            "type_shape_v1": {
+              "inline_size": 1536,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 64,
+              "max_out_of_line": 64000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 1536,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 64,
+              "max_out_of_line": 64000,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "elements",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 120,
+            "column": 5,
+            "length": 8
+          },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 0
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": true,
+      "type_shape_v1": {
+        "inline_size": 1536,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 64,
+        "max_out_of_line": 64000,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 1536,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 64,
+        "max_out_of_line": 64000,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      }
+    },
+    {
+      "name": "test.largemessages/UnboundedMaybeLargeValue",
+      "naming_context": [
+        "UnboundedMaybeLargeValue"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 96,
+        "column": 6,
+        "length": 24
+      },
+      "members": [
+        {
+          "type": {
+            "kind": "vector",
+            "element_type": {
+              "kind": "primitive",
+              "subtype": "uint8",
+              "type_shape_v1": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
+              "type_shape_v2": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              }
+            },
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "name": "bytes",
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 97,
+            "column": 5,
+            "length": 5
+          },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 0
+          },
+          "field_shape_v2": {
+            "offset": 0,
+            "padding": 0
+          }
+        }
+      ],
+      "resource": false,
+      "type_shape_v1": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 4294967295,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 4294967295,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      }
+    }
+  ],
+  "external_struct_declarations": [],
+  "table_declarations": [],
+  "union_declarations": [
+    {
+      "name": "test.largemessages/SemiBoundedBelievedToBeSmall",
+      "naming_context": [
+        "SemiBoundedBelievedToBeSmall"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 61,
+        "column": 6,
+        "length": 28
+      },
+      "members": [
+        {
+          "ordinal": 1,
+          "reserved": false,
+          "name": "bytes",
+          "type": {
+            "kind": "vector",
+            "element_type": {
+              "kind": "primitive",
+              "subtype": "uint8",
+              "type_shape_v1": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
+              "type_shape_v2": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              }
+            },
+            "maybe_element_count": 65488,
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65488,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65488,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 62,
+            "column": 8,
+            "length": 5
+          }
+        }
+      ],
+      "strict": false,
+      "resource": false,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 65504,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 65504,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      }
+    },
+    {
+      "name": "test.largemessages/SemiBoundedMaybeLarge",
+      "naming_context": [
+        "SemiBoundedMaybeLarge"
+      ],
+      "location": {
+        "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "line": 83,
+        "column": 6,
+        "length": 21
+      },
+      "members": [
+        {
+          "ordinal": 1,
+          "reserved": false,
+          "name": "bytes",
+          "type": {
+            "kind": "vector",
+            "element_type": {
+              "kind": "primitive",
+              "subtype": "uint8",
+              "type_shape_v1": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
+              "type_shape_v2": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              }
+            },
+            "maybe_element_count": 65489,
+            "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65496,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
+            "type_shape_v2": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 65496,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            }
+          },
+          "location": {
+            "filename": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "line": 84,
+            "column": 8,
+            "length": 5
+          }
+        }
+      ],
+      "strict": false,
+      "resource": false,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 65512,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      },
+      "type_shape_v2": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 65512,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      }
+    }
+  ],
+  "alias_declarations": [],
+  "new_type_declarations": [],
+  "declaration_order": [
+    "test.largemessages/UnboundedMaybeLargeValue",
+    "test.largemessages/SemiBoundedMaybeLarge",
+    "test.largemessages/SemiBoundedBelievedToBeSmall",
+    "test.largemessages/SMALL_UNION_BYTE_VECTOR_SIZE",
+    "test.largemessages/SMALL_STRUCT_BYTE_VECTOR_SIZE",
+    "test.largemessages/SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE",
+    "test.largemessages/LARGE_UNION_BYTE_VECTOR_SIZE",
+    "test.largemessages/LARGE_STRUCT_BYTE_VECTOR_SIZE",
+    "test.largemessages/LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE",
+    "test.largemessages/HANDLE_CARRYING_ELEMENTS_COUNT",
+    "test.largemessages/FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE",
+    "test.largemessages/Elements",
+    "test.largemessages/UnboundedMaybeLargeResource",
+    "test.largemessages/BoundedMaybeLarge",
+    "test.largemessages/BoundedKnownToBeSmall",
+    "test.largemessages/Overflowing"
+  ],
+  "declarations": {
+    "test.largemessages/FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE": "const",
+    "test.largemessages/HANDLE_CARRYING_ELEMENTS_COUNT": "const",
+    "test.largemessages/LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE": "const",
+    "test.largemessages/LARGE_STRUCT_BYTE_VECTOR_SIZE": "const",
+    "test.largemessages/LARGE_UNION_BYTE_VECTOR_SIZE": "const",
+    "test.largemessages/SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE": "const",
+    "test.largemessages/SMALL_STRUCT_BYTE_VECTOR_SIZE": "const",
+    "test.largemessages/SMALL_UNION_BYTE_VECTOR_SIZE": "const",
+    "test.largemessages/Overflowing": "protocol",
+    "test.largemessages/BoundedKnownToBeSmall": "struct",
+    "test.largemessages/BoundedMaybeLarge": "struct",
+    "test.largemessages/Elements": "struct",
+    "test.largemessages/UnboundedMaybeLargeResource": "struct",
+    "test.largemessages/UnboundedMaybeLargeValue": "struct",
+    "test.largemessages/SemiBoundedBelievedToBeSmall": "union",
+    "test.largemessages/SemiBoundedMaybeLarge": "union"
+  }
+}

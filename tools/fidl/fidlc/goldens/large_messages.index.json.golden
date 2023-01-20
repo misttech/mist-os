@@ -1,0 +1,1091 @@
+{
+  "name": "test.largemessages",
+  "lib_declarations": [
+    {
+      "is_virtual": false,
+      "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+      "data": "test.largemessages",
+      "start_offset": 172,
+      "end_offset": 190
+    }
+  ],
+  "using_declarations": [
+    {
+      "library_name": "zx",
+      "referenced_at": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "zx",
+        "start_offset": 199,
+        "end_offset": 201
+      }
+    }
+  ],
+  "dependencies": [
+    {
+      "library_name": "zx",
+      "library_location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/overview.fidl",
+        "data": "@available(platform=\"fuchsia\", added=7)\nlibrary zx",
+        "start_offset": 164,
+        "end_offset": 214
+      }
+    }
+  ],
+  "dependency_identifiers": [
+    {
+      "identifier": "zx/CHANNEL_MAX_MSG_BYTES",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "CHANNEL_MAX_MSG_BYTES",
+        "start_offset": 1980,
+        "end_offset": 2001
+      }
+    },
+    {
+      "identifier": "zx/CHANNEL_MAX_MSG_HANDLES",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "CHANNEL_MAX_MSG_HANDLES",
+        "start_offset": 2024,
+        "end_offset": 2047
+      }
+    },
+    {
+      "identifier": "zx/DEFAULT_CHANNEL_RIGHTS",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/rights.fidl",
+        "data": "DEFAULT_CHANNEL_RIGHTS",
+        "start_offset": 1397,
+        "end_offset": 1419
+      }
+    },
+    {
+      "identifier": "zx/DEFAULT_EVENT_RIGHTS",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/rights.fidl",
+        "data": "DEFAULT_EVENT_RIGHTS",
+        "start_offset": 1540,
+        "end_offset": 1560
+      }
+    },
+    {
+      "identifier": "zx/MAX_CPUS",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "MAX_CPUS",
+        "start_offset": 2099,
+        "end_offset": 2107
+      }
+    },
+    {
+      "identifier": "zx/MAX_NAME_LEN",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "MAX_NAME_LEN",
+        "start_offset": 2067,
+        "end_offset": 2079
+      }
+    },
+    {
+      "identifier": "zx/RIGHTS_BASIC",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/rights.fidl",
+        "data": "RIGHTS_BASIC",
+        "start_offset": 1106,
+        "end_offset": 1118
+      }
+    },
+    {
+      "identifier": "zx/RIGHTS_IO",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/rights.fidl",
+        "data": "RIGHTS_IO",
+        "start_offset": 1201,
+        "end_offset": 1210
+      }
+    },
+    {
+      "identifier": "zx/RIGHTS_POLICY",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/rights.fidl",
+        "data": "RIGHTS_POLICY",
+        "start_offset": 1328,
+        "end_offset": 1341
+      }
+    },
+    {
+      "identifier": "zx/RIGHTS_PROPERTY",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/rights.fidl",
+        "data": "RIGHTS_PROPERTY",
+        "start_offset": 1254,
+        "end_offset": 1269
+      }
+    },
+    {
+      "identifier": "zx/obj_type",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "obj_type",
+        "start_offset": 2164,
+        "end_offset": 2172
+      }
+    },
+    {
+      "identifier": "zx/obj_type.NONE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "NONE",
+        "start_offset": 2202,
+        "end_offset": 2206
+      }
+    },
+    {
+      "identifier": "zx/obj_type.PROCESS",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "PROCESS",
+        "start_offset": 2216,
+        "end_offset": 2223
+      }
+    },
+    {
+      "identifier": "zx/obj_type.THREAD",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "THREAD",
+        "start_offset": 2233,
+        "end_offset": 2239
+      }
+    },
+    {
+      "identifier": "zx/obj_type.VMO",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "VMO",
+        "start_offset": 2249,
+        "end_offset": 2252
+      }
+    },
+    {
+      "identifier": "zx/obj_type.CHANNEL",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "CHANNEL",
+        "start_offset": 2262,
+        "end_offset": 2269
+      }
+    },
+    {
+      "identifier": "zx/obj_type.EVENT",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "EVENT",
+        "start_offset": 2279,
+        "end_offset": 2284
+      }
+    },
+    {
+      "identifier": "zx/obj_type.PORT",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "PORT",
+        "start_offset": 2294,
+        "end_offset": 2298
+      }
+    },
+    {
+      "identifier": "zx/obj_type.INTERRUPT",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "INTERRUPT",
+        "start_offset": 2308,
+        "end_offset": 2317
+      }
+    },
+    {
+      "identifier": "zx/obj_type.PCI_DEVICE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "PCI_DEVICE",
+        "start_offset": 2327,
+        "end_offset": 2337
+      }
+    },
+    {
+      "identifier": "zx/obj_type.LOG",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "LOG",
+        "start_offset": 2348,
+        "end_offset": 2351
+      }
+    },
+    {
+      "identifier": "zx/obj_type.SOCKET",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "SOCKET",
+        "start_offset": 2362,
+        "end_offset": 2368
+      }
+    },
+    {
+      "identifier": "zx/obj_type.RESOURCE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "RESOURCE",
+        "start_offset": 2379,
+        "end_offset": 2387
+      }
+    },
+    {
+      "identifier": "zx/obj_type.EVENTPAIR",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "EVENTPAIR",
+        "start_offset": 2398,
+        "end_offset": 2407
+      }
+    },
+    {
+      "identifier": "zx/obj_type.JOB",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "JOB",
+        "start_offset": 2418,
+        "end_offset": 2421
+      }
+    },
+    {
+      "identifier": "zx/obj_type.VMAR",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "VMAR",
+        "start_offset": 2432,
+        "end_offset": 2436
+      }
+    },
+    {
+      "identifier": "zx/obj_type.FIFO",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "FIFO",
+        "start_offset": 2447,
+        "end_offset": 2451
+      }
+    },
+    {
+      "identifier": "zx/obj_type.GUEST",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "GUEST",
+        "start_offset": 2462,
+        "end_offset": 2467
+      }
+    },
+    {
+      "identifier": "zx/obj_type.VCPU",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "VCPU",
+        "start_offset": 2478,
+        "end_offset": 2482
+      }
+    },
+    {
+      "identifier": "zx/obj_type.TIMER",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "TIMER",
+        "start_offset": 2493,
+        "end_offset": 2498
+      }
+    },
+    {
+      "identifier": "zx/obj_type.IOMMU",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "IOMMU",
+        "start_offset": 2509,
+        "end_offset": 2514
+      }
+    },
+    {
+      "identifier": "zx/obj_type.BTI",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "BTI",
+        "start_offset": 2525,
+        "end_offset": 2528
+      }
+    },
+    {
+      "identifier": "zx/obj_type.PROFILE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "PROFILE",
+        "start_offset": 2539,
+        "end_offset": 2546
+      }
+    },
+    {
+      "identifier": "zx/obj_type.PMT",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "PMT",
+        "start_offset": 2557,
+        "end_offset": 2560
+      }
+    },
+    {
+      "identifier": "zx/obj_type.SUSPEND_TOKEN",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "SUSPEND_TOKEN",
+        "start_offset": 2571,
+        "end_offset": 2584
+      }
+    },
+    {
+      "identifier": "zx/obj_type.PAGER",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "PAGER",
+        "start_offset": 2595,
+        "end_offset": 2600
+      }
+    },
+    {
+      "identifier": "zx/obj_type.EXCEPTION",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "EXCEPTION",
+        "start_offset": 2611,
+        "end_offset": 2620
+      }
+    },
+    {
+      "identifier": "zx/obj_type.CLOCK",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "CLOCK",
+        "start_offset": 2631,
+        "end_offset": 2636
+      }
+    },
+    {
+      "identifier": "zx/obj_type.STREAM",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "STREAM",
+        "start_offset": 2647,
+        "end_offset": 2653
+      }
+    },
+    {
+      "identifier": "zx/obj_type.MSI",
+      "location": {
+        "is_virtual": false,
+        "file": "../../zircon/vdso/zx_common.fidl",
+        "data": "MSI",
+        "start_offset": 2664,
+        "end_offset": 2667
+      }
+    }
+  ],
+  "consts": [
+    {
+      "identifier": "test.largemessages/FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "FIRST_63_ELEMENTS_BYTE_VECTOR_SIZE",
+        "start_offset": 6360,
+        "end_offset": 6394
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.largemessages/HANDLE_CARRYING_ELEMENTS_COUNT",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "HANDLE_CARRYING_ELEMENTS_COUNT",
+        "start_offset": 5902,
+        "end_offset": 5932
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.largemessages/LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "LARGE_LAST_ELEMENT_BYTE_VECTOR_SIZE",
+        "start_offset": 6905,
+        "end_offset": 6940
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.largemessages/LARGE_STRUCT_BYTE_VECTOR_SIZE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "LARGE_STRUCT_BYTE_VECTOR_SIZE",
+        "start_offset": 1836,
+        "end_offset": 1865
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.largemessages/LARGE_UNION_BYTE_VECTOR_SIZE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "LARGE_UNION_BYTE_VECTOR_SIZE",
+        "start_offset": 3960,
+        "end_offset": 3988
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.largemessages/SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "SMALL_LAST_ELEMENT_BYTE_VECTOR_SIZE",
+        "start_offset": 6849,
+        "end_offset": 6884
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.largemessages/SMALL_STRUCT_BYTE_VECTOR_SIZE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "SMALL_STRUCT_BYTE_VECTOR_SIZE",
+        "start_offset": 969,
+        "end_offset": 998
+      },
+      "value": {
+        "type": "literal"
+      }
+    },
+    {
+      "identifier": "test.largemessages/SMALL_UNION_BYTE_VECTOR_SIZE",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "SMALL_UNION_BYTE_VECTOR_SIZE",
+        "start_offset": 3050,
+        "end_offset": 3078
+      },
+      "value": {
+        "type": "literal"
+      }
+    }
+  ],
+  "enums": [],
+  "unions": [
+    {
+      "is_anonymous": false,
+      "identifier": "test.largemessages/SemiBoundedBelievedToBeSmall",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "SemiBoundedBelievedToBeSmall",
+        "start_offset": 2581,
+        "end_offset": 2609
+      },
+      "members": [
+        {
+          "is_reserved": false,
+          "name": "bytes",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "bytes",
+            "start_offset": 2636,
+            "end_offset": 2641
+          },
+          "type": {
+            "kind": "vector"
+          }
+        }
+      ]
+    },
+    {
+      "is_anonymous": false,
+      "identifier": "test.largemessages/SemiBoundedMaybeLarge",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "SemiBoundedMaybeLarge",
+        "start_offset": 3503,
+        "end_offset": 3524
+      },
+      "members": [
+        {
+          "is_reserved": false,
+          "name": "bytes",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "bytes",
+            "start_offset": 3551,
+            "end_offset": 3556
+          },
+          "type": {
+            "kind": "vector"
+          }
+        }
+      ]
+    }
+  ],
+  "tables": [],
+  "structs": [
+    {
+      "is_anonymous": false,
+      "identifier": "test.largemessages/BoundedKnownToBeSmall",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "BoundedKnownToBeSmall",
+        "start_offset": 527,
+        "end_offset": 548
+      },
+      "members": [
+        {
+          "name": "bytes",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "bytes",
+            "start_offset": 564,
+            "end_offset": 569
+          },
+          "type": {
+            "kind": "vector"
+          }
+        }
+      ]
+    },
+    {
+      "is_anonymous": false,
+      "identifier": "test.largemessages/BoundedMaybeLarge",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "BoundedMaybeLarge",
+        "start_offset": 1400,
+        "end_offset": 1417
+      },
+      "members": [
+        {
+          "name": "bytes",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "bytes",
+            "start_offset": 1433,
+            "end_offset": 1438
+          },
+          "type": {
+            "kind": "vector"
+          }
+        }
+      ]
+    },
+    {
+      "is_anonymous": true,
+      "identifier": "test.largemessages/Elements",
+      "members": [
+        {
+          "name": "handle",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "handle",
+            "start_offset": 5306,
+            "end_offset": 5312
+          },
+          "type": {
+            "kind": "handle"
+          }
+        },
+        {
+          "name": "bytes",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "bytes",
+            "start_offset": 5341,
+            "end_offset": 5346
+          },
+          "type": {
+            "kind": "vector"
+          }
+        }
+      ]
+    },
+    {
+      "is_anonymous": false,
+      "identifier": "test.largemessages/UnboundedMaybeLargeResource",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "UnboundedMaybeLargeResource",
+        "start_offset": 5212,
+        "end_offset": 5239
+      },
+      "members": [
+        {
+          "name": "elements",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "elements",
+            "start_offset": 5264,
+            "end_offset": 5272
+          },
+          "type": {
+            "kind": "array"
+          }
+        }
+      ]
+    },
+    {
+      "is_anonymous": false,
+      "identifier": "test.largemessages/UnboundedMaybeLargeValue",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "UnboundedMaybeLargeValue",
+        "start_offset": 4266,
+        "end_offset": 4290
+      },
+      "members": [
+        {
+          "name": "bytes",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "bytes",
+            "start_offset": 4306,
+            "end_offset": 4311
+          },
+          "type": {
+            "kind": "vector"
+          }
+        }
+      ]
+    }
+  ],
+  "protocols": [
+    {
+      "identifier": "test.largemessages/Overflowing",
+      "location": {
+        "is_virtual": false,
+        "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+        "data": "Overflowing",
+        "start_offset": 6970,
+        "end_offset": 6981
+      },
+      "methods": [
+        {
+          "identifier": "DecodeBoundedKnownToBeSmall",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "DecodeBoundedKnownToBeSmall",
+            "start_offset": 7039,
+            "end_offset": 7066
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/BoundedKnownToBeSmall",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "BoundedKnownToBeSmall",
+              "start_offset": 7067,
+              "end_offset": 7088
+            }
+          }
+        },
+        {
+          "identifier": "DecodeBoundedMaybeLarge",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "DecodeBoundedMaybeLarge",
+            "start_offset": 7146,
+            "end_offset": 7169
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/BoundedMaybeLarge",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "BoundedMaybeLarge",
+              "start_offset": 7170,
+              "end_offset": 7187
+            }
+          }
+        },
+        {
+          "identifier": "DecodeSemiBoundedBelievedToBeSmall",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "DecodeSemiBoundedBelievedToBeSmall",
+            "start_offset": 7245,
+            "end_offset": 7279
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/SemiBoundedBelievedToBeSmall",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "SemiBoundedBelievedToBeSmall",
+              "start_offset": 7280,
+              "end_offset": 7308
+            }
+          }
+        },
+        {
+          "identifier": "DecodeSemiBoundedMaybeLarge",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "DecodeSemiBoundedMaybeLarge",
+            "start_offset": 7366,
+            "end_offset": 7393
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/SemiBoundedMaybeLarge",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "SemiBoundedMaybeLarge",
+              "start_offset": 7394,
+              "end_offset": 7415
+            }
+          }
+        },
+        {
+          "identifier": "DecodeUnboundedMaybeLargeValue",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "DecodeUnboundedMaybeLargeValue",
+            "start_offset": 7473,
+            "end_offset": 7503
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/UnboundedMaybeLargeValue",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "UnboundedMaybeLargeValue",
+              "start_offset": 7504,
+              "end_offset": 7528
+            }
+          }
+        },
+        {
+          "identifier": "DecodeUnboundedMaybeLargeResource",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "DecodeUnboundedMaybeLargeResource",
+            "start_offset": 7586,
+            "end_offset": 7619
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/UnboundedMaybeLargeResource",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "UnboundedMaybeLargeResource",
+              "start_offset": 7620,
+              "end_offset": 7647
+            }
+          }
+        },
+        {
+          "identifier": "EncodeBoundedKnownToBeSmall",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "EncodeBoundedKnownToBeSmall",
+            "start_offset": 7720,
+            "end_offset": 7747
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/BoundedKnownToBeSmall",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "BoundedKnownToBeSmall",
+              "start_offset": 7748,
+              "end_offset": 7769
+            }
+          },
+          "response_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/BoundedKnownToBeSmall",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "BoundedKnownToBeSmall",
+              "start_offset": 7775,
+              "end_offset": 7796
+            }
+          }
+        },
+        {
+          "identifier": "EncodeBoundedMaybeLarge",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "EncodeBoundedMaybeLarge",
+            "start_offset": 7869,
+            "end_offset": 7892
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/BoundedMaybeLarge",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "BoundedMaybeLarge",
+              "start_offset": 7893,
+              "end_offset": 7910
+            }
+          },
+          "response_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/BoundedMaybeLarge",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "BoundedMaybeLarge",
+              "start_offset": 7916,
+              "end_offset": 7933
+            }
+          }
+        },
+        {
+          "identifier": "EncodeSemiBoundedBelievedToBeSmall",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "EncodeSemiBoundedBelievedToBeSmall",
+            "start_offset": 8006,
+            "end_offset": 8040
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/SemiBoundedBelievedToBeSmall",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "SemiBoundedBelievedToBeSmall",
+              "start_offset": 8041,
+              "end_offset": 8069
+            }
+          },
+          "response_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/SemiBoundedBelievedToBeSmall",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "SemiBoundedBelievedToBeSmall",
+              "start_offset": 8075,
+              "end_offset": 8103
+            }
+          }
+        },
+        {
+          "identifier": "EncodeSemiBoundedMaybeLarge",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "EncodeSemiBoundedMaybeLarge",
+            "start_offset": 8176,
+            "end_offset": 8203
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/SemiBoundedMaybeLarge",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "SemiBoundedMaybeLarge",
+              "start_offset": 8204,
+              "end_offset": 8225
+            }
+          },
+          "response_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/SemiBoundedMaybeLarge",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "SemiBoundedMaybeLarge",
+              "start_offset": 8231,
+              "end_offset": 8252
+            }
+          }
+        },
+        {
+          "identifier": "EncodeUnboundedMaybeLargeValue",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "EncodeUnboundedMaybeLargeValue",
+            "start_offset": 8325,
+            "end_offset": 8355
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/UnboundedMaybeLargeValue",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "UnboundedMaybeLargeValue",
+              "start_offset": 8356,
+              "end_offset": 8380
+            }
+          },
+          "response_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/UnboundedMaybeLargeValue",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "UnboundedMaybeLargeValue",
+              "start_offset": 8386,
+              "end_offset": 8410
+            }
+          }
+        },
+        {
+          "identifier": "EncodeUnboundedMaybeLargeResource",
+          "location": {
+            "is_virtual": false,
+            "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+            "data": "EncodeUnboundedMaybeLargeResource",
+            "start_offset": 9853,
+            "end_offset": 9886
+          },
+          "request_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/UnboundedMaybeLargeResource",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "UnboundedMaybeLargeResource",
+              "start_offset": 9887,
+              "end_offset": 9914
+            }
+          },
+          "response_type": {
+            "kind": "identifier",
+            "is_anonymous": false,
+            "type_identifier": "test.largemessages/UnboundedMaybeLargeResource",
+            "type_referenced_at": {
+              "is_virtual": false,
+              "file": "../../tools/fidl/fidlc/testdata/large_messages.test.fidl",
+              "data": "UnboundedMaybeLargeResource",
+              "start_offset": 9920,
+              "end_offset": 9947
+            }
+          }
+        }
+      ],
+      "composed_protocols": []
+    }
+  ]
+}

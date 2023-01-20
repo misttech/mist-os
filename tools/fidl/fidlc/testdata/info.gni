@@ -300,17 +300,12 @@ fidl_testdata_info = [
     ]
   },
   {
-    name = "overflowing"
-    target = "//tools/fidl/fidlc/testdata:test.overflowing"
+    name = "large_messages"
+    target = "//tools/fidl/fidlc/testdata:test.largemessages"
     denylist = [
       # TODO(fxbug.dev/100478): Re-enable before landing
       "fidldoc",
 
-      # TODO(fxbug.dev/114261): Re-enable some of these tests when decoding is enabled.
-      # TODO(fxbug.dev/114263): Remove from denylist when encoding is enabled as well.
-      "fidlgen_cpp",
-      "fidlgen_dart",
-      "fidlgen_hlcpp",
       "fidlgen_libfuzzer",
       "fidlgen_syzkaller",
 
