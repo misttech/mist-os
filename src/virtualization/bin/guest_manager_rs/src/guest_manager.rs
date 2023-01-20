@@ -8,22 +8,24 @@
 use {
     crate::guest_config,
     anyhow::{anyhow, Error},
-    fidl::endpoints::{Proxy, ServerEnd},
+    fidl::endpoints::{create_proxy, Proxy, ServerEnd},
+    fidl_fuchsia_hardware_network,
     fidl_fuchsia_net::MacAddress,
     fidl_fuchsia_net_interfaces as ninterfaces,
     fidl_fuchsia_virtualization::{
-        GuestConfig, GuestDescriptor, GuestError, GuestLifecycleMarker, GuestLifecycleProxy,
-        GuestManagerConnectResponder, GuestManagerError, GuestManagerForceShutdownResponder,
-        GuestManagerGetInfoResponder, GuestManagerLaunchResponder, GuestManagerRequest,
-        GuestManagerRequestStream, GuestMarker, GuestStatus, NetSpec,
+        GuestConfig, GuestDescriptor, GuestError, GuestInfo, GuestLifecycleMarker,
+        GuestLifecycleProxy, GuestManagerConnectResponder, GuestManagerError,
+        GuestManagerForceShutdownResponder, GuestManagerGetInfoResponder,
+        GuestManagerLaunchResponder, GuestManagerRequest, GuestManagerRequestStream, GuestMarker,
+        GuestStatus, NetSpec,
     },
     fuchsia_async as fasync,
     fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol},
     fuchsia_zircon as zx,
     futures::{
         future, select_biased,
-        stream::{FuturesUnordered, SelectAll},
-        FutureExt, Stream, StreamExt,
+        stream::{try_unfold, FuturesUnordered, SelectAll},
+        FutureExt, Stream, StreamExt, TryFutureExt, TryStreamExt,
     },
     std::collections::HashSet,
     std::{fmt, fs, rc::Rc},
@@ -60,6 +62,7 @@ macro_rules! send_checked {
     };
 }
 
+#[derive(Debug, PartialEq)]
 enum GuestNetworkState {
     // There are at least enough virtual device interfaces to match the guest configuration, and
     // if there is a bridged configuration, there's at least one bridged interface. This doesn't
@@ -90,10 +93,29 @@ enum GuestNetworkState {
 
 impl fmt::Display for GuestNetworkState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Provide a user friendly explanation for each network state. See
-        // GuestManager::GuestNetworkStateToStringExplanation for an example.
-        // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-        unimplemented!();
+        write!(
+            f,
+            "{}",
+            match self {
+                GuestNetworkState::Ok =>
+                    "Guest network likely configured correctly; \
+                     check host connectivity if suspected network failure",
+                GuestNetworkState::NoNetworkDevice =>
+                    "Guest not configured with a network device; \
+                     check guest configuration if networking is required",
+                GuestNetworkState::FailedToQuery => "Failed to query guest network status",
+                GuestNetworkState::NoHostNetworking =>
+                    "Host has no network interfaces; guest networking will not work",
+                GuestNetworkState::MissingVirtualInterfaces =>
+                    "Fewer than expected virtual interfaces; guest failed network device startup",
+                GuestNetworkState::NoBridgeCreated =>
+                    "No bridge between guest and host network interaces; \
+                     this may be transient so retrying is recommended",
+                GuestNetworkState::AttemptedToBridgeWithWlan =>
+                    "Cannot create bridged guest network when host is using WiFi; \
+                     disconnect WiFi and connect via ethernet",
+            }
+        )
     }
 }
 
@@ -104,6 +126,14 @@ enum GuestManagerStateUpdate {
     Stopped(zx::Time),
     Error(GuestError),
     ClearError,
+}
+
+#[derive(Default)]
+struct HostNetworkState {
+    has_bridge: bool,
+    has_ethernet: bool,
+    has_wlan: bool,
+    num_virtual: u32,
 }
 
 pub struct GuestManager {
@@ -255,14 +285,16 @@ impl GuestManager {
                             unimplemented!();
                         }
                         GuestManagerRequest::GetInfo { responder } => {
-                            // Get the network interface watcher proxy, copy the descriptor, and
-                            // call query_guest_network_state to retrieve the network state. Use
-                            // that state to get diagnostic strings via check_for_problems, and
-                            // ultimately call get_info with the data.
-                            // TODO(fxbug.dev/115695): Remove this comment when done.
-                            unimplemented!();
+                            let network_state = GuestManager::host_network_state().await
+                                .map(|host_state| self.guest_network_state(host_state))
+                                .unwrap_or_else(|err| {
+                                    tracing::warn!(%err, "Unable to query host network interface.");
+                                    GuestNetworkState::FailedToQuery
+                                });
+
+                            send_checked!(responder, self.guest_info(GuestManager::check_for_problems(network_state)));
                         }
-                    };
+                    }
                 }
             }
         }
@@ -319,33 +351,125 @@ impl GuestManager {
         Ok(merged)
     }
 
-    pub fn get_info(
-        &self,
-        detected_problems: Vec<String>,
-        responder: GuestManagerGetInfoResponder,
-    ) -> Result<(), Error> {
-        // Fill a GuestInfo message and send it via the responder. See GuestManager::GetInfo
-        // for an example.
-        // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-        unimplemented!();
+    // Build a GuestInfo from the current configuration and the given list of problems.
+    pub fn guest_info(&self, detected_problems: Vec<String>) -> GuestInfo {
+        let mut info = GuestInfo {
+            guest_status: Some(self.status),
+            detected_problems: if detected_problems.len() > 0 {
+                Some(detected_problems)
+            } else {
+                None
+            },
+            ..GuestInfo::EMPTY
+        };
+
+        match self.status {
+            _ if self.is_guest_started() => {
+                info.uptime = Some((fasync::Time::now().into_zx() - self.start_time).into_nanos());
+                info.guest_descriptor = Some(self.guest_descriptor.clone());
+            }
+            GuestStatus::Stopped => {
+                info.uptime = Some((self.stop_time - self.start_time).into_nanos());
+                info.stop_error = self.last_error;
+            }
+            _ => (),
+        };
+        info
     }
 
-    async fn query_guest_network_state(
-        descriptor: GuestDescriptor,
-        watcher: ninterfaces::WatcherProxy,
-    ) -> GuestNetworkState {
-        // Check the guest network config settings (stored via snapshot_config) against the
-        // host network interfaces to get a network state. See GuestManager::QueryGuestNetworkState
-        // for an example.
-        // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-        unimplemented!();
+    async fn host_network_state() -> Result<HostNetworkState, Error> {
+        // Connect to interface watcher.
+        let state_proxy = connect_to_protocol::<ninterfaces::StateMarker>()?;
+        let (watcher_proxy, watcher_server) = create_proxy::<ninterfaces::WatcherMarker>()?;
+        state_proxy.get_watcher(ninterfaces::WatcherOptions::EMPTY, watcher_server)?;
+
+        // Collect interface state events until Idle is received, indicating the end of current
+        // events at the time of the query.
+        let stream = try_unfold(watcher_proxy, |watcher| async move {
+            match watcher.watch().await {
+                Err(e) => Err(e),
+                Ok(ninterfaces::Event::Idle(_)) => Ok(None),
+                Ok(event) => Ok(Some((event, watcher))),
+            }
+        });
+
+        stream
+            .try_filter_map(|event| async move {
+                // Only consider existing properties at the time of this query.
+                if let ninterfaces::Event::Existing(properties) = event {
+                    // Only consider active, non-loopback devices
+                    if !properties.online.unwrap_or(false) {
+                        return Ok(None);
+                    }
+                    match properties.device_class {
+                        None => Ok(None),
+                        Some(ninterfaces::DeviceClass::Loopback(_)) => Ok(None),
+                        Some(ninterfaces::DeviceClass::Device(net_device)) => Ok(Some(net_device)),
+                    }
+                } else {
+                    Ok(None)
+                }
+            })
+            .try_fold(HostNetworkState::default(), |mut host_state, net_device| async move {
+                match net_device {
+                    fidl_fuchsia_hardware_network::DeviceClass::Virtual => {
+                        host_state.num_virtual += 1
+                    }
+                    fidl_fuchsia_hardware_network::DeviceClass::Ethernet => {
+                        host_state.has_ethernet = true
+                    }
+                    fidl_fuchsia_hardware_network::DeviceClass::Wlan => host_state.has_wlan = true,
+                    fidl_fuchsia_hardware_network::DeviceClass::Bridge => {
+                        host_state.has_bridge = true
+                    }
+                    _ => (),
+                };
+                Ok(host_state)
+            })
+            .err_into::<anyhow::Error>()
+            .await
+    }
+
+    // Check the guest network settings against the state of the host network interfaces to
+    // generate a guest network state.
+    fn guest_network_state(&self, host: HostNetworkState) -> GuestNetworkState {
+        let expected_bridge =
+            self.guest_descriptor.networks.iter().flatten().any(|net_spec| net_spec.enable_bridge);
+        let guest_num_networks =
+            self.guest_descriptor.networks.as_ref().map(Vec::len).unwrap_or(0) as u32;
+
+        if guest_num_networks == 0 {
+            return GuestNetworkState::NoNetworkDevice;
+        }
+        if !host.has_ethernet && !host.has_wlan {
+            return GuestNetworkState::NoHostNetworking;
+        }
+        if host.num_virtual < guest_num_networks {
+            return GuestNetworkState::MissingVirtualInterfaces;
+        }
+        if expected_bridge && !host.has_bridge {
+            if !host.has_ethernet {
+                return GuestNetworkState::AttemptedToBridgeWithWlan;
+            }
+            return GuestNetworkState::NoBridgeCreated;
+        }
+        GuestNetworkState::Ok
     }
 
     fn check_for_problems(network_state: GuestNetworkState) -> Vec<String> {
-        // Helper function called by get_info to obtain some diagnostic strings. Ignore the
-        // memory pressure handler for now. See GuestManager::CheckForProblems for an example.
-        // TODO(fxbug.dev/115695): Implement this function and remove this comment.
-        unimplemented!();
+        // TODO: Check if host is experiencing memory pressure.
+        let mut problems = Vec::<String>::new();
+        if matches!(
+            network_state,
+            GuestNetworkState::FailedToQuery
+                | GuestNetworkState::NoHostNetworking
+                | GuestNetworkState::MissingVirtualInterfaces
+                | GuestNetworkState::NoBridgeCreated
+                | GuestNetworkState::AttemptedToBridgeWithWlan
+        ) {
+            problems.push(network_state.to_string());
+        }
+        problems
     }
 
     fn get_default_guest_config(&self) -> Result<GuestConfig, Error> {
@@ -418,16 +542,86 @@ mod tests {
         async_utils::PollExt,
         fidl::endpoints::{create_endpoints, create_proxy_and_stream},
         fidl_fuchsia_virtualization::{
-            GuestLifecycleRequest, GuestLifecycleRequestStream, GuestManagerMarker,
-            GuestManagerProxy, GuestManagerRequestStream, HostVsockAcceptorMarker, Listener,
+            GuestLifecycleRequest, GuestLifecycleRequestStream, GuestLifecycleRunResponder,
+            GuestManagerMarker, GuestManagerProxy, GuestManagerRequestStream,
+            HostVsockAcceptorMarker, Listener,
         },
         fuchsia_async::WaitState,
         fuchsia_fs::{file, OpenFlags},
         futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
+        futures::future::{self, join, Either},
+        futures::select,
         std::cell::{Cell, Ref, RefCell},
         std::io::Write,
         tempfile::{NamedTempFile, TempPath},
     };
+
+    #[derive(PartialEq, Debug)]
+    enum VmmState {
+        NotCreated,
+        Running,
+        NotRunning,
+    }
+    struct MockVmm {
+        state: VmmState,
+        request_stream: GuestLifecycleRequestStream,
+        // GuestManager expects to wait on this response whilst the VMM is running.
+        running_vmm: Option<GuestLifecycleRunResponder>,
+    }
+
+    impl MockVmm {
+        fn new(request_stream: GuestLifecycleRequestStream) -> MockVmm {
+            MockVmm { state: VmmState::NotCreated, request_stream, running_vmm: None }
+        }
+
+        fn handle_request(&mut self, req: GuestLifecycleRequest) {
+            match req {
+                GuestLifecycleRequest::Create { guest_config, responder } => {
+                    self.state = VmmState::NotRunning;
+                    responder.send(&mut Ok(())).expect("stream should not be closed");
+                }
+                GuestLifecycleRequest::Bind { guest, control_handle } => {
+                    ();
+                }
+                GuestLifecycleRequest::Run { responder } => {
+                    self.state = VmmState::Running;
+                    self.running_vmm = Some(responder);
+                }
+                GuestLifecycleRequest::Stop { responder } => {
+                    self.stop();
+                    responder.send().expect("stream should not be closed");
+                }
+            }
+        }
+
+        // Simulate guest shutdown.
+        fn stop(&mut self) {
+            self.state = VmmState::NotRunning;
+            self.running_vmm
+                .take()
+                .expect("VMM should be running")
+                .send(&mut Ok(()))
+                .expect("stream should not be closed");
+        }
+
+        // Pull the next request off the queue to handle manually.
+        async fn next(&mut self) -> GuestLifecycleRequest {
+            self.request_stream.next().await.unwrap().unwrap()
+        }
+
+        // Successfully handle a single request.
+        async fn run_once(&mut self) {
+            let req = self.next().await;
+            self.handle_request(req);
+        }
+
+        // Long running future successfully handling all VMM requests.
+        async fn run(&mut self) {
+            while let Some(req) = self.request_stream.next().await {
+                self.handle_request(req.unwrap());
+            }
+        }
+    }
 
     // A test fixture to manage the state for a running GuestManager.
     struct ManagerFixture {
@@ -436,10 +630,11 @@ mod tests {
         manager: RefCell<GuestManager>,
         stream_tx: UnboundedSender<GuestManagerRequestStream>,
         state_rx: Cell<Option<UnboundedReceiver<GuestManagerRequestStream>>>,
-        lifecycle_stream: RefCell<GuestLifecycleRequestStream>,
+        vmm: RefCell<MockVmm>,
         lifecycle_proxy: Cell<Option<GuestLifecycleProxy>>,
         config_path: Option<TempPath>,
     }
+
     impl ManagerFixture {
         fn new(config: &str) -> ManagerFixture {
             let mut tmpfile = NamedTempFile::new().expect("failed to create tempfile");
@@ -461,7 +656,7 @@ mod tests {
                 manager: RefCell::new(GuestManager::new(path)),
                 stream_tx,
                 state_rx: Cell::new(Some(state_rx)),
-                lifecycle_stream: RefCell::new(lifecycle_stream),
+                vmm: RefCell::new(MockVmm::new(lifecycle_stream)),
                 lifecycle_proxy: Cell::new(Some(lifecycle_proxy)),
                 config_path: None,
             }
@@ -494,19 +689,8 @@ mod tests {
             manager_proxy
         }
 
-        // Handle a VMM request coming from the GuestManager by calling f on the first request.
-        async fn handle_vmm_request<F: Fn(GuestLifecycleRequest) -> ()>(&self, f: F) {
-            f(self.lifecycle_stream.borrow_mut().next().await.unwrap().unwrap());
-        }
-
-        // Handle a VMM request by assuming everything is always successful.
-        fn vmm_handler_success(req: GuestLifecycleRequest) {
-            match req {
-                GuestLifecycleRequest::Create { guest_config, responder } => {
-                    responder.send(&mut Ok(())).expect("stream should not be closed");
-                }
-                _ => unimplemented!(),
-            };
+        async fn run_vmm(&self) -> () {
+            self.vmm.borrow_mut().run().await;
         }
     }
 
@@ -557,6 +741,27 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn user_provided_initial_listeners() {
+        let manager = ManagerFixture::new_with_defaults();
+        let (listener_client, listener_server) =
+            create_endpoints::<HostVsockAcceptorMarker>().unwrap();
+        let (listener_client2, listener_server2) =
+            create_endpoints::<HostVsockAcceptorMarker>().unwrap();
+        let user_config = GuestConfig {
+            virtio_vsock: Some(true),
+            vsock_listeners: Some(vec![
+                Listener { port: 2011, acceptor: listener_client },
+                Listener { port: 2022, acceptor: listener_client2 },
+            ]),
+            ..GuestConfig::EMPTY
+        };
+
+        let merged = manager.manager().get_merged_config(user_config).unwrap();
+        assert_eq!(merged.vsock_listeners.unwrap().len(), 2);
+        assert_eq!(merged.virtio_vsock, Some(true));
+    }
+
+    #[fuchsia::test]
     fn vmm_component_crash() {
         let mut executor = fasync::TestExecutor::new();
         let mut manager = GuestManager::new("foo".to_string());
@@ -589,129 +794,232 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn launch_fails_due_to_invalid_config_path() {
-        let mut executor = fasync::TestExecutor::new();
+    async fn launch_fails_due_to_invalid_config_path() {
         let manager = ManagerFixture::new_with_config_file(String::from("foo"));
-        let run_fut = manager.run();
+        let run_fut = manager.run().fuse();
         futures::pin_mut!(run_fut);
 
         let (guest_client_end, guest_server_end) =
             fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
         let manager_proxy = manager.new_proxy();
-        let launch_fut = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end);
-        futures::pin_mut!(launch_fut);
 
-        assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        assert_eq!(
-            executor.run_singlethreaded(&mut launch_fut).unwrap(),
-            Err(GuestManagerError::BadConfig)
-        );
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end).fuse() => {
+                assert_eq!(result.unwrap(), Err(GuestManagerError::BadConfig));
+            }
+        }
     }
 
     #[fuchsia::test]
-    fn launch_fails_due_to_bad_config_schema() {
-        let mut executor = fasync::TestExecutor::new();
+    async fn launch_fails_due_to_bad_config_schema() {
         let config = r#"{"invalid": "field"}"#;
         let manager = ManagerFixture::new(config);
-        let run_fut = manager.run();
+        let run_fut = manager.run().fuse();
         futures::pin_mut!(run_fut);
 
         let (guest_client_end, guest_server_end) =
             fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
 
         let manager_proxy = manager.new_proxy();
-        let launch_fut = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end);
-        futures::pin_mut!(launch_fut);
 
-        assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        assert_eq!(
-            executor.run_singlethreaded(&mut launch_fut).unwrap(),
-            Err(GuestManagerError::BadConfig)
-        );
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end).fuse() => {
+                assert_eq!(result.unwrap(), Err(GuestManagerError::BadConfig));
+            }
+        }
     }
 
     #[fuchsia::test]
-    fn double_launch_fails() {
-        let mut executor = fasync::TestExecutor::new();
+    async fn double_launch_fails() {
         let manager = ManagerFixture::new_with_defaults();
-        let run_fut = manager.run();
+        let run_fut = manager.run().fuse();
         futures::pin_mut!(run_fut);
+        let manager_proxy = manager.new_proxy();
 
         let (guest_client_end1, guest_server_end1) =
             fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
         let (guest_client_end2, guest_server_end2) =
             fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
 
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-
-        // Launch guest.
-        let manager_proxy = manager.new_proxy();
-        let launch_fut = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end1);
-        futures::pin_mut!(launch_fut);
-        assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        executor
-            .run_singlethreaded(manager.handle_vmm_request(ManagerFixture::vmm_handler_success));
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        assert_eq!(executor.run_singlethreaded(&mut launch_fut).unwrap(), Ok(()));
+        // Lanuch Guest
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = manager.run_vmm().fuse() => {
+                panic!("vmm should not complete");
+            }
+            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end1).fuse() => {
+                assert!(result.is_ok());
+            }
+        }
 
         // Try second launch and fail with AlreadyRunning.
-        let launch_fut = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end2);
-        futures::pin_mut!(launch_fut);
-        assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        assert_eq!(
-            executor.run_singlethreaded(&mut launch_fut).unwrap(),
-            Err(GuestManagerError::AlreadyRunning)
-        );
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = manager.run_vmm().fuse() => {
+                panic!("vmm should not complete");
+            }
+            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end2).fuse() => {
+                assert_eq!(result.unwrap(), Err(GuestManagerError::AlreadyRunning));
+            }
+        }
     }
 
     #[fuchsia::test]
-    fn failed_to_create_and_initialize_vmm_with_restart() {
-        // Fail to create the VMM when launch is called, then call launch again and succeed
-        // the second time.
-        let mut executor = fasync::TestExecutor::new();
+    async fn failed_to_create_and_initialize_vmm_with_restart() {
         let manager = ManagerFixture::new_with_defaults();
-        let run_fut = manager.run();
+        let run_fut = manager.run().fuse();
         futures::pin_mut!(run_fut);
-
+        let manager_proxy = manager.new_proxy();
         let (guest_client_end1, guest_server_end1) =
             fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
         let (guest_client_end2, guest_server_end2) =
             fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
 
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-
-        // Launch guest and fail to start the VMM.
-        let manager_proxy = manager.new_proxy();
-        let launch_fut = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end1);
-        futures::pin_mut!(launch_fut);
-        assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        executor.run_singlethreaded(manager.handle_vmm_request(|req| {
-            if let GuestLifecycleRequest::Create { guest_config, responder } = req {
-                responder
-                    .send(&mut Err(GuestError::InternalError))
-                    .expect("stream should not be closed");
+        // Lanuch Guest and fail to start the VMM
+        let launch_fut = join(manager_proxy.launch(GuestConfig::EMPTY, guest_server_end1), async {
+            match manager.vmm.borrow_mut().next().await {
+                GuestLifecycleRequest::Create { guest_config, responder } => {
+                    responder
+                        .send(&mut Err(GuestError::InternalError))
+                        .expect("stream should not be closed");
+                }
+                req => panic!("vmm: expected create, got {:?}", req),
             }
-        }));
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        assert_eq!(
-            executor.run_singlethreaded(&mut launch_fut).unwrap(),
-            Err(GuestManagerError::StartFailure)
-        );
+        })
+        .fuse();
+        futures::pin_mut!(launch_fut);
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            result = launch_fut => {
+                assert_eq!(result.0.unwrap(), Err(GuestManagerError::StartFailure));
+            }
+        }
 
         // Second launch succeeds.
-        let launch_fut = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end2);
-        futures::pin_mut!(launch_fut);
-        assert!(executor.run_until_stalled(&mut launch_fut).is_pending());
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        executor
-            .run_singlethreaded(manager.handle_vmm_request(ManagerFixture::vmm_handler_success));
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-        assert_eq!(executor.run_singlethreaded(&mut launch_fut).unwrap(), Ok(()));
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = manager.run_vmm().fuse() => {
+                panic!("vmm should not complete");
+            }
+            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end2).fuse() => {
+                assert!(result.is_ok());
+            }
+        }
+    }
+
+    #[fuchsia::test]
+    async fn get_guest_info_new_guest() {
+        let manager = ManagerFixture::new_with_defaults();
+        let problems = vec![String::from("test problem")];
+        let info = manager.manager().guest_info(problems.clone());
+
+        assert_eq!(info.guest_status, Some(GuestStatus::NotStarted));
+        assert_eq!(info.detected_problems, Some(problems));
+    }
+
+    #[fuchsia::test]
+    async fn launch_and_get_info() {
+        let manager = ManagerFixture::new_with_defaults();
+
+        let (guest_client_end, guest_server_end) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+
+        let run_fut = manager.run().fuse();
+        futures::pin_mut!(run_fut);
+
+        let manager_proxy = manager.new_proxy();
+
+        // Lanuch Guest
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = manager.run_vmm().fuse() => {
+                panic!("vmm should not complete");
+            }
+            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end).fuse() => {
+                assert!(result.is_ok());
+            }
+        }
+
+        // Get info and check that settings are correctly inherited or overridden.
+        let guest_info = select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            result = manager_proxy.get_info().fuse() => {
+                result.unwrap()
+            }
+        };
+
+        assert_eq!(guest_info.guest_status, Some(GuestStatus::Running));
+        assert!(guest_info.uptime.unwrap() > 0);
+        let descriptor = GuestDescriptor {
+            num_cpus: Some(get_default_num_cpus()),
+            guest_memory: Some(get_default_guest_memory()),
+            ..GuestDescriptor::EMPTY
+        };
+        assert_eq!(guest_info.guest_descriptor, Some(descriptor));
+        assert_eq!(
+            guest_info.detected_problems,
+            Some(vec![GuestNetworkState::FailedToQuery.to_string()])
+        );
+    }
+
+    #[fuchsia::test]
+    async fn launch_and_apply_user_guest_config() {
+        let manager =
+            ManagerFixture::new(r#"{"virtio-gpu": false, "virtio-balloon": false, "cpus": 4}"#);
+        let user_config =
+            GuestConfig { virtio_gpu: Some(true), cpus: Some(8), ..GuestConfig::EMPTY };
+
+        let (guest_client_end, guest_server_end) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+        let manager_proxy = manager.new_proxy();
+
+        let run_fut = manager.run().fuse();
+        futures::pin_mut!(run_fut);
+
+        // Lanuch Guest
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = manager.run_vmm().fuse() => {
+                panic!("vmm should not complete");
+            }
+            result = manager_proxy.launch(user_config, guest_server_end).fuse() => {
+                assert!(result.is_ok());
+            }
+        }
+
+        // Get info and check that settings are correctly inherited or overridden.
+        let guest_descriptor = select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            result = manager_proxy.get_info() => {
+                result.unwrap().guest_descriptor.unwrap()
+            }
+        };
+
+        assert_eq!(guest_descriptor.num_cpus, Some(8));
+        assert_eq!(guest_descriptor.balloon, Some(false));
+        assert_eq!(guest_descriptor.gpu, Some(true));
     }
 
     #[fuchsia::test]
@@ -734,69 +1042,118 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn launch_and_apply_user_guest_config() {
-        // Provide a user guest config and check the launch result for whether its merged.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
-    }
-
-    #[fuchsia::test]
-    fn launch_and_get_info() {
-        // Call launch, and then call get_info and check the results.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
-    }
-
-    #[fuchsia::test]
     fn connect_to_vmm() {
         // Call connect, and ensure failure. Call launch, call connect, and check for success.
         // TODO(fxbug.dev/115695): Write this test and remove this comment.
     }
 
-    #[fuchsia::test]
-    fn user_provided_initial_listeners() {
-        // Set listeners, call launch, check config.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    const DEFAULT_NET_DEVICE: NetSpec =
+        NetSpec { mac_address: DEFAULT_GUEST_MAC_ADDRESS, enable_bridge: true };
+
+    fn guest_network_test(
+        host_state: HostNetworkState,
+        guest_networks: Option<Vec<NetSpec>>,
+    ) -> GuestNetworkState {
+        let manager = ManagerFixture::new_with_defaults();
+        let mut guest_manager = manager.manager.borrow_mut();
+        guest_manager.guest_descriptor =
+            GuestDescriptor { networks: guest_networks, ..GuestDescriptor::EMPTY };
+
+        guest_manager.guest_network_state(host_state)
     }
 
     #[fuchsia::test]
-    fn guest_probably_has_networking() {
-        // Create a situation where querying guest network state returns an ok.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn guest_probably_has_networking() {
+        let guest_state = guest_network_test(
+            HostNetworkState {
+                has_ethernet: true,
+                num_virtual: 1,
+                has_bridge: true,
+                ..HostNetworkState::default()
+            },
+            Some(vec![DEFAULT_NET_DEVICE]),
+        );
+
+        assert_eq!(guest_state, GuestNetworkState::Ok);
     }
 
     #[fuchsia::test]
-    fn guest_no_network_devices() {
-        // Create a situation where querying guest network state returns no network device.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn guest_no_network_devices() {
+        let guest_state = guest_network_test(HostNetworkState::default(), None);
+        assert_eq!(guest_state, GuestNetworkState::NoNetworkDevice);
     }
 
     #[fuchsia::test]
-    fn guest_bridging_required_but_host_on_wifi() {
-        // Create a situation where querying guest network state returns attempted to bridge with
-        // wlan.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn guest_bridging_required_but_host_on_wifi() {
+        let guest_state = guest_network_test(
+            HostNetworkState {
+                has_wlan: true,
+                has_bridge: false,
+                num_virtual: 1,
+                has_ethernet: false,
+            },
+            Some(vec![DEFAULT_NET_DEVICE]),
+        );
+
+        assert_eq!(guest_state, GuestNetworkState::AttemptedToBridgeWithWlan);
     }
 
     #[fuchsia::test]
-    fn guest_bridging_required_and_host_on_wifi_and_ethernet() {
-        // Create a situation where querying guest network state returns no bridge created.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn guest_bridging_required_and_host_on_wifi_and_ethernet() {
+        let guest_state = guest_network_test(
+            HostNetworkState {
+                has_wlan: true,
+                has_bridge: false,
+                num_virtual: 1,
+                has_ethernet: true,
+            },
+            Some(vec![DEFAULT_NET_DEVICE]),
+        );
+
+        assert_eq!(guest_state, GuestNetworkState::NoBridgeCreated);
     }
 
     #[fuchsia::test]
-    fn guest_bridging_required_and_host_on_ethernet() {
-        // Create a situation where querying guest network state returns no bridge created.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn guest_bridging_required_and_host_on_ethernet() {
+        let guest_state = guest_network_test(
+            HostNetworkState {
+                has_wlan: false,
+                has_bridge: false,
+                num_virtual: 1,
+                has_ethernet: true,
+            },
+            Some(vec![DEFAULT_NET_DEVICE]),
+        );
+
+        assert_eq!(guest_state, GuestNetworkState::NoBridgeCreated);
     }
 
     #[fuchsia::test]
-    fn not_enough_virtual_interfaces_for_guest() {
-        // Create a situation where querying guest network state returns missing virtual interfaces.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn not_enough_virtual_interfaces_for_guest() {
+        let guest_state = guest_network_test(
+            HostNetworkState {
+                has_wlan: false,
+                has_bridge: true,
+                num_virtual: 0,
+                has_ethernet: true,
+            },
+            Some(vec![DEFAULT_NET_DEVICE]),
+        );
+
+        assert_eq!(guest_state, GuestNetworkState::MissingVirtualInterfaces);
     }
 
     #[fuchsia::test]
-    fn guest_requires_networking_but_no_host_networking() {
-        // Create a situation where querying guest network state returns no host networking.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn guest_requires_networking_but_no_host_networking() {
+        let guest_state = guest_network_test(
+            HostNetworkState {
+                has_wlan: false,
+                has_ethernet: false,
+                ..HostNetworkState::default()
+            },
+            Some(vec![DEFAULT_NET_DEVICE]),
+        );
+
+        assert_eq!(guest_state, GuestNetworkState::NoHostNetworking);
     }
 }
