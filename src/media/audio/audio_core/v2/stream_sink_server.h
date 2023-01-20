@@ -67,7 +67,7 @@ class StreamSinkServer
   void CloseWithReason(fuchsia_media2::ConsumerClosedReason reason);
 
   const Format format_;
-  const std::shared_ptr<StreamConverter> stream_converter_;
+  const StreamConverter stream_converter_;
   const std::shared_ptr<MemoryMappedBuffer> payload_buffer_;
 
   struct PendingPacket {

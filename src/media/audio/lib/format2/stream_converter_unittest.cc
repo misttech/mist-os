@@ -57,8 +57,8 @@ void TestSilence(NumberType expected_silent_value) {
   constexpr int64_t kNumFrames = 4;
   std::vector<NumberType> vec(kNumFrames * format.channels());
 
-  auto converter = StreamConverter::Create(format, format);
-  converter->WriteSilence(vec.data(), kNumFrames);
+  StreamConverter converter(format, format);
+  converter.WriteSilence(vec.data(), kNumFrames);
 
   for (size_t k = 0; k < vec.size(); k++) {
     EXPECT_EQ(vec[k], expected_silent_value) << "k=" << k;
@@ -103,12 +103,12 @@ void TestCopy(const std::vector<DestNumberType>& expected_dest,
   });
 
   auto dest = std::vector<DestNumberType>(expected_dest.size());
-  auto converter = StreamConverter::Create(source_format, dest_format);
+  StreamConverter converter(source_format, dest_format);
 
   if (clip) {
-    converter->CopyAndClip(source.data(), dest.data(), source.size() / channels);
+    converter.CopyAndClip(source.data(), dest.data(), source.size() / channels);
   } else {
-    converter->Copy(source.data(), dest.data(), source.size() / channels);
+    converter.Copy(source.data(), dest.data(), source.size() / channels);
   }
   EXPECT_THAT(dest, ::testing::Pointwise(::testing::Eq(), expected_dest));
 }
@@ -396,8 +396,8 @@ TEST(StreamConverterTest, ClipInfinitiesFloat32) {
       std::numeric_limits<float>::infinity(),
   };
   auto dest = std::vector<float>(2);
-  auto converter = StreamConverter::Create(format, format);
-  converter->CopyAndClip(source.data(), dest.data(), 2);
+  StreamConverter converter(format, format);
+  converter.CopyAndClip(source.data(), dest.data(), 2);
 
   // Should be clamped.
   EXPECT_FLOAT_EQ(dest[0], -1.0f);
@@ -417,8 +417,8 @@ TEST(StreamConverterTest, DISABLED_NanFloat32) {
 
   auto source = std::vector<float>{NAN};
   auto dest = std::vector<float>(1);
-  auto converter = StreamConverter::Create(format, format);
-  converter->Copy(source.data(), dest.data(), 1);
+  StreamConverter converter(format, format);
+  converter.Copy(source.data(), dest.data(), 1);
 
   // Should be clamped.
   EXPECT_FLOAT_EQ(dest[0], 0.0f);
@@ -437,8 +437,8 @@ TEST(StreamConverterTest, DISABLED_SubnormalsFloat32) {
 
   auto source = std::vector<float>{std::numeric_limits<float>::denorm_min()};
   auto dest = std::vector<float>(1);
-  auto converter = StreamConverter::Create(format, format);
-  converter->Copy(source.data(), dest.data(), 1);
+  StreamConverter converter(format, format);
+  converter.Copy(source.data(), dest.data(), 1);
 
   // Should be clamped.
   EXPECT_FLOAT_EQ(dest[0], 0.0f);

@@ -26,7 +26,7 @@ using ::fuchsia_audio::SampleType;
 const auto kFormat = Format::CreateOrDie({SampleType::kFloat32, 2, 48000});
 const auto kFramesPerPacket = 10;
 const auto kBytesPerPacket = kFramesPerPacket * kFormat.bytes_per_frame();
-const auto stream_converter = StreamConverter::Create(kFormat, kFormat);
+const auto stream_converter = StreamConverter(kFormat, kFormat);
 
 struct TestHarness {
   fidl::Endpoints<fuchsia_audio::StreamSink> endpoints;

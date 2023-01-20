@@ -33,7 +33,7 @@ class RingBufferConsumerWriter : public ConsumerStage::Writer {
  private:
   void WriteInternal(int64_t start_frame, int64_t frame_count, const void* payload);
 
-  const std::shared_ptr<StreamConverter> stream_converter_;
+  const StreamConverter stream_converter_;
   const std::shared_ptr<RingBuffer> buffer_;
 };
 

@@ -14,7 +14,7 @@ StreamSinkConsumerWriter::Packet::Packet(std::shared_ptr<MemoryMappedBuffer> buf
       payload_range_offset_(payload_range.offset),
       payload_range_max_size_(payload_range.size) {}
 
-void StreamSinkConsumerWriter::Packet::Recycle(std::shared_ptr<StreamConverter> stream_converter,
+void StreamSinkConsumerWriter::Packet::Recycle(StreamConverter stream_converter,
                                                std::optional<int64_t> timestamp) {
   write_offset_ = 0;
   stream_converter_ = std::move(stream_converter);
@@ -25,6 +25,7 @@ int64_t StreamSinkConsumerWriter::Packet::AppendData(int64_t frame_count, const 
   frame_count = std::min(frame_count, FramesRemaining());
   if (frame_count > 0) {
     // Since this data is going to an external consumer, it should be normalized (clipped).
+    FX_CHECK(stream_converter_.has_value());
     stream_converter_->CopyAndClip(data, buffer_->offset(payload_range_offset_ + write_offset_),
                                    frame_count);
     write_offset_ += frame_count * bytes_per_frame();
@@ -35,6 +36,7 @@ int64_t StreamSinkConsumerWriter::Packet::AppendData(int64_t frame_count, const 
 int64_t StreamSinkConsumerWriter::Packet::AppendSilence(int64_t frame_count) {
   frame_count = std::min(frame_count, FramesRemaining());
   if (frame_count > 0) {
+    FX_CHECK(stream_converter_.has_value());
     stream_converter_->WriteSilence(buffer_->offset(payload_range_offset_ + write_offset_),
                                     frame_count);
     write_offset_ += frame_count * bytes_per_frame();
@@ -63,7 +65,7 @@ fuchsia_audio::wire::Packet StreamSinkConsumerWriter::Packet::ToFidl(fidl::AnyAr
 }
 
 StreamSinkConsumerWriter::StreamSinkConsumerWriter(Args args)
-    : stream_converter_(StreamConverter::Create(args.source_format, args.dest_format)),
+    : stream_converter_(args.source_format, args.dest_format),
       media_ticks_per_frame_(TimelineRate::Product(args.media_ticks_per_ns,
                                                    args.dest_format.frames_per_ns().Inverse())),
       call_put_packet_(std::move(args.call_put_packet)),
@@ -135,7 +137,7 @@ void StreamSinkConsumerWriter::WriteInternal(int64_t start_frame, int64_t length
     next_continuous_frame_ = start_frame;
     if (data) {
       data = static_cast<const char*>(data) +
-             frames_written * stream_converter_->dest_format().bytes_per_frame();
+             frames_written * stream_converter_.dest_format().bytes_per_frame();
     }
 
     // Emit the packet if full.

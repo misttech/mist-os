@@ -8,8 +8,7 @@ namespace media_audio {
 
 RingBufferConsumerWriter::RingBufferConsumerWriter(std::shared_ptr<RingBuffer> buffer,
                                                    const Format& source_format)
-    : stream_converter_(StreamConverter::Create(source_format, buffer->format())),
-      buffer_(std::move(buffer)) {}
+    : stream_converter_(source_format, buffer->format()), buffer_(std::move(buffer)) {}
 
 void RingBufferConsumerWriter::WriteData(int64_t start_frame, int64_t frame_count,
                                          const void* data) {
@@ -33,10 +32,10 @@ void RingBufferConsumerWriter::WriteInternal(int64_t start_frame, int64_t frame_
   while (start_frame < end_frame) {
     auto packet = buffer_->PrepareToWrite(start_frame, frame_count);
     if (data) {
-      stream_converter_->CopyAndClip(data, packet.payload(), packet.frame_count());
+      stream_converter_.CopyAndClip(data, packet.payload(), packet.frame_count());
       data = static_cast<const char*>(data) + packet.frame_count() * bytes_per_frame;
     } else {
-      stream_converter_->WriteSilence(packet.payload(), packet.frame_count());
+      stream_converter_.WriteSilence(packet.payload(), packet.frame_count());
     }
 
     start_frame += packet.frame_count();

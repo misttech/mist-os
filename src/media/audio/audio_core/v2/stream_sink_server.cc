@@ -197,7 +197,7 @@ void StreamSinkServer::ServePendingCaptures() {
         const auto silent_duration = format_.duration_per(Fixed(silent_frames));
         const auto silent_bytes = silent_frames * format_.bytes_per_frame();
 
-        stream_converter_->WriteSilence(capture.data, silent_frames);
+        stream_converter_.WriteSilence(capture.data, silent_frames);
         capture.bytes_remaining -= silent_bytes;
         capture.bytes_captured += silent_bytes;
         *capture.next_timestamp += silent_duration;

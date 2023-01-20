@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.audio/cpp/wire.h>
 #include <lib/fidl/cpp/wire/client.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include <memory>
 #include <optional>
@@ -39,8 +40,7 @@ class StreamSinkConsumerWriter : public ConsumerStage::Writer {
     // `timestamp` is the media timestamp of the first frame in the packet. This is either an
     // explicit int64_t value or the special value `std::nullopt`, which means "continuous with the
     // prior packet".
-    void Recycle(std::shared_ptr<StreamConverter> stream_converter,
-                 std::optional<int64_t> timestamp);
+    void Recycle(StreamConverter stream_converter, std::optional<int64_t> timestamp);
 
     // Appends data to this packet, advancing the packet's write pointer by up to `frame_count`.
     // Returns the number of frames appended, or zero if full.
@@ -58,7 +58,10 @@ class StreamSinkConsumerWriter : public ConsumerStage::Writer {
     fuchsia_audio::wire::Packet ToFidl(fidl::AnyArena& arena) const;
 
    private:
-    int64_t bytes_per_frame() const { return stream_converter_->dest_format().bytes_per_frame(); }
+    int64_t bytes_per_frame() const {
+      FX_CHECK(stream_converter_.has_value());
+      return stream_converter_->dest_format().bytes_per_frame();
+    }
 
     // We hold `buffer_` to ensure that the underlying VMO is not unmapped before this packet is
     // discarded. This avoids accidental memory errors in `Append` methods.
@@ -69,7 +72,7 @@ class StreamSinkConsumerWriter : public ConsumerStage::Writer {
 
     // These are reset by Recycle.
     uint64_t write_offset_ = 0;  // relative to buffer_->offset(payload_range_offset_)
-    std::shared_ptr<StreamConverter> stream_converter_;
+    std::optional<StreamConverter> stream_converter_;
     std::optional<int64_t> timestamp_;
   };
 
@@ -118,7 +121,7 @@ class StreamSinkConsumerWriter : public ConsumerStage::Writer {
   void WriteInternal(int64_t start_frame, int64_t length, const void* payload);
   void SendCurrentPacket();
 
-  const std::shared_ptr<StreamConverter> stream_converter_;
+  const StreamConverter stream_converter_;
   const TimelineRate media_ticks_per_frame_;
   const std::function<void(std::unique_ptr<Packet>)> call_put_packet_;
   const std::function<void()> call_end_;
