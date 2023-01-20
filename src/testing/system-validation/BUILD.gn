@@ -36,7 +36,12 @@ group("tests") {
     "ui:system_validation_test_pkg",
     "web:dynamic_elements_web_system_validation_test_pkg",
     "web:simple_png_web_system_validation_test_pkg",
-    "//src/chromium:web_engine",
+
+    # TODO(fxbug.dev/119212): These should be provided by the Product
+    # configurations on which these tests run rather than as deps.
+    # TODO(fxbug.dev/119212): Should these be deps of the individual test
+    # targets above?
+    "//src/chromium:uses_web_engine",
     "//src/connectivity/network/tests/benchmarks:netstack_perftest_pkg",
   ]
 }
