@@ -10,7 +10,6 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
-#include <ddk/metadata/gpt.h>
 #include <soc/aml-a5/a5-gpio.h>
 #include <soc/aml-a5/a5-hw.h>
 #include <soc/aml-common/aml-sdmmc.h>

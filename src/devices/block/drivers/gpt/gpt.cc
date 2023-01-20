@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <fcntl.h>
+#include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <inttypes.h>
 #include <lib/cksum.h>
 #include <lib/ddk/debug.h>
@@ -55,10 +56,11 @@ void uint8_to_guid_string(char* dst, const uint8_t* src) {
           guid->data4[4], guid->data4[5], guid->data4[6], guid->data4[7]);
 }
 
-void apply_guid_map(const guid_map_t* guid_map, size_t entries, const char* name, uint8_t* type) {
-  for (size_t i = 0; i < entries; i++) {
-    if (strncmp(name, guid_map[i].name, GPT_NAME_LEN) == 0) {
-      memcpy(type, guid_map[i].guid, GPT_GUID_LEN);
+void apply_guid_map(const fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo>& map,
+                    const char* name, uint8_t* type) {
+  for (const auto& entry : map) {
+    if (entry.name.get() == name && entry.options.has_type_guid_override()) {
+      memcpy(type, entry.options.type_guid_override().value.data(), GPT_GUID_LEN);
       return;
     }
   }
@@ -218,26 +220,12 @@ zx_status_t ReadBlocks(block_impl_protocol_t* block_protocol, size_t block_op_si
 }
 
 zx_status_t Bind(void* ctx, zx_device_t* parent) {
-  size_t actual;
-  uint64_t guid_map_entries = 0;
-  guid_map_t guid_map[DEVICE_METADATA_GUID_MAP_MAX_ENTRIES]{};
-  zx_status_t status =
-      device_get_metadata(parent, DEVICE_METADATA_GUID_MAP, guid_map, sizeof(guid_map), &actual);
-  // If the block device doesn't have a GUID override mapping defined in its metadata,
-  // device_get_metadata() returns ZX_ERR_NOT_FOUND.
-  if (status != ZX_OK && status != ZX_ERR_NOT_FOUND) {
-    zxlogf(ERROR, "gpt: device_get_metadata failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  if (status == ZX_OK) {
-    if (actual % sizeof(guid_map[0]) != 0) {
-      zxlogf(ERROR, "gpt: GUID map size is invalid (%lu)", actual);
-      return ZX_ERR_BAD_STATE;
-    }
-    guid_map_entries = actual / sizeof(guid_map[0]);
-  } else {
-    zxlogf(DEBUG, "gpt: device metadata does not contain a GUID map");
+  auto metadata = ddk::GetEncodedMetadata<fuchsia_hardware_gpt_metadata::wire::GptInfo>(
+      parent, DEVICE_METADATA_GPT_INFO);
+  if (!metadata.is_ok() && metadata.status_value() != ZX_ERR_NOT_FOUND) {
+    zxlogf(ERROR, "gpt: GetEncodedMetadata failed: %s",
+           zx_status_get_string(metadata.status_value()));
+    return metadata.status_value();
   }
 
   block_impl_protocol_t block_protocol;
@@ -286,7 +274,8 @@ zx_status_t Bind(void* ctx, zx_device_t* parent) {
     return ZX_ERR_BAD_STATE;
   }
 
-  status = ReadBlocks(&block_protocol, block_op_size, block_info, gpt_block_count, 1, buffer.get());
+  zx_status_t status =
+      ReadBlocks(&block_protocol, block_op_size, block_info, gpt_block_count, 1, buffer.get());
   if (status != ZX_OK) {
     return status;
   }
@@ -328,7 +317,9 @@ zx_status_t Bind(void* ctx, zx_device_t* parent) {
       zxlogf(ERROR, "gpt: bad partition name, ignoring entry");
       continue;
     }
-    apply_guid_map(guid_map, guid_map_entries, partition_name, entry->type);
+    if (metadata.is_ok() && metadata->has_partition_info()) {
+      apply_guid_map(metadata->partition_info(), partition_name, entry->type);
+    }
 
     char type_guid[GPT_GUID_STRLEN] = {};
     uint8_to_guid_string(type_guid, entry->type);

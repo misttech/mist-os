@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.gpt.metadata/cpp/fidl.h>
 #include <fuchsia/hardware/block/c/banjo.h>
 #include <fuchsia/hardware/block/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
@@ -211,10 +212,22 @@ TEST_F(GptDeviceTest, ValidatePartitionGuid) {
 TEST_F(GptDeviceTest, ValidatePartitionGuidWithMap) {
   Init();
 
-  const guid_map_t guid_map[] = {
-      {"Linux filesystem", GUID_METADATA},
-  };
-  fake_parent_->SetMetadata(DEVICE_METADATA_GUID_MAP, &guid_map, sizeof(guid_map));
+  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
+      .partition_info = {{
+          {{
+              .name = "Linux filesystem",
+              .options = {{
+                  .type_guid_override = {{std::array<uint8_t, 16>{GUID_METADATA}}},
+              }},
+          }},
+      }},
+  }};
+
+  fit::result encoded = fidl::Persist(metadata);
+  ASSERT_TRUE(encoded.is_ok());
+
+  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
+                            encoded.value().size());
 
   ASSERT_OK(Bind(nullptr, fake_parent_.get()));
   ASSERT_EQ(fake_parent_->child_count(), 2);
@@ -257,22 +270,47 @@ TEST_F(GptDeviceTest, ValidatePartitionGuidWithMap) {
 
 TEST_F(GptDeviceTest, CorruptMetadataMap) {
   Init();
-  const guid_map_t guid_map[] = {
-      {"Linux filesystem", GUID_METADATA},
-  };
+
+  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
+      .partition_info = {{
+          {{
+              .name = "Linux filesystem",
+              .options = {{
+                  .type_guid_override = {{std::array<uint8_t, 16>{GUID_METADATA}}},
+              }},
+          }},
+      }},
+  }};
+
+  fit::result encoded = fidl::Persist(metadata);
+  ASSERT_TRUE(encoded.is_ok());
+
   // Set the length of the metadata to be one byte smaller than is expected, which should then fail
   // loading the driver (rather than continuing with a corrupt GUID map).
-  fake_parent_->SetMetadata(DEVICE_METADATA_GUID_MAP, &guid_map, sizeof(guid_map) - 1);
-  ASSERT_EQ(ZX_ERR_BAD_STATE, Bind(nullptr, fake_parent_.get()));
+  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
+                            encoded.value().size() - 1);
+  ASSERT_EQ(ZX_ERR_INTERNAL, Bind(nullptr, fake_parent_.get()));
 }
 
 TEST_F(GptDeviceTest, BlockOpsPropagate) {
   Init();
 
-  const guid_map_t guid_map[] = {
-      {"Linux filesystem", GUID_METADATA},
-  };
-  fake_parent_->SetMetadata(DEVICE_METADATA_GUID_MAP, &guid_map, sizeof(guid_map));
+  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
+      .partition_info = {{
+          {{
+              .name = "Linux filesystem",
+              .options = {{
+                  .type_guid_override = {{std::array<uint8_t, 16>{GUID_METADATA}}},
+              }},
+          }},
+      }},
+  }};
+
+  fit::result encoded = fidl::Persist(metadata);
+  ASSERT_TRUE(encoded.is_ok());
+
+  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
+                            encoded.value().size());
 
   ASSERT_OK(Bind(nullptr, fake_parent_.get()));
   ASSERT_EQ(fake_parent_->child_count(), 2);
@@ -344,10 +382,22 @@ TEST_F(GptDeviceTest, BlockOpsPropagate) {
 TEST_F(GptDeviceTest, BlockOpsOutOfBounds) {
   Init();
 
-  const guid_map_t guid_map[] = {
-      {"Linux filesystem", GUID_METADATA},
-  };
-  fake_parent_->SetMetadata(DEVICE_METADATA_GUID_MAP, &guid_map, sizeof(guid_map));
+  const fuchsia_hardware_gpt_metadata::GptInfo metadata = {{
+      .partition_info = {{
+          {{
+              .name = "Linux filesystem",
+              .options = {{
+                  .type_guid_override = {{std::array<uint8_t, 16>{GUID_METADATA}}},
+              }},
+          }},
+      }},
+  }};
+
+  fit::result encoded = fidl::Persist(metadata);
+  ASSERT_TRUE(encoded.is_ok());
+
+  fake_parent_->SetMetadata(DEVICE_METADATA_GPT_INFO, encoded.value().data(),
+                            encoded.value().size());
 
   ASSERT_OK(Bind(nullptr, fake_parent_.get()));
   ASSERT_EQ(fake_parent_->child_count(), 2);

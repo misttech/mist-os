@@ -11,7 +11,6 @@
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 
-#include <ddk/metadata/gpt.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-common/aml-sdmmc.h>

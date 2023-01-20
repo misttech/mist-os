@@ -15,7 +15,6 @@
 #include <lib/sync/completion.h>
 #include <zircon/types.h>
 
-#include <ddk/metadata/gpt.h>
 #include <ddktl/device.h>
 #include <fbl/macros.h>
 #include <gpt/c/gpt.h>

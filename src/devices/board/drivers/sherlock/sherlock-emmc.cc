@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
@@ -13,9 +14,9 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/handle.h>
+#include <zircon/hw/gpt.h>
 
 #include <ddk/metadata/emmc.h>
-#include <ddk/metadata/gpt.h>
 #include <soc/aml-common/aml-sdmmc.h>
 #include <soc/aml-t931/t931-gpio.h>
 #include <soc/aml-t931/t931-hw.h>
@@ -73,50 +74,18 @@ const emmc_config_t sherlock_emmc_config = {
     .enable_trim = false,
 };
 
-static const guid_map_t guid_map[] = {
+static const struct {
+  const fidl::StringView name;
+  const fuchsia_hardware_block_partition::wire::Guid guid;
+} guid_map[] = {
     {"boot", GUID_ZIRCON_A_VALUE},
     {"system", GUID_ZIRCON_B_VALUE},
     {"recovery", GUID_ZIRCON_R_VALUE},
     {"cache", GUID_FVM_VALUE},
 };
 
-static_assert(sizeof(guid_map) / sizeof(guid_map[0]) <= DEVICE_METADATA_GUID_MAP_MAX_ENTRIES);
-
-static const std::vector<fpbus::Metadata> sherlock_emmc_metadata{
-    {{
-        .type = DEVICE_METADATA_PRIVATE,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&sherlock_config),
-            reinterpret_cast<const uint8_t*>(&sherlock_config) + sizeof(sherlock_config)),
-    }},
-    {{
-        .type = DEVICE_METADATA_GUID_MAP,
-        .data =
-            std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&guid_map),
-                                 reinterpret_cast<const uint8_t*>(&guid_map) + sizeof(guid_map)),
-    }},
-    {{
-        .type = DEVICE_METADATA_EMMC_CONFIG,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&sherlock_emmc_config),
-            reinterpret_cast<const uint8_t*>(&sherlock_emmc_config) + sizeof(sherlock_emmc_config)),
-    }},
-};
-
-static const std::vector<fpbus::Metadata> luis_emmc_metadata{
-    {{
-        .type = DEVICE_METADATA_PRIVATE,
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&luis_config),
-            reinterpret_cast<const uint8_t*>(&luis_config) + sizeof(luis_config)),
-    }},
-    {{
-        .type = DEVICE_METADATA_GUID_MAP,
-        .data =
-            std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&guid_map),
-                                 reinterpret_cast<const uint8_t*>(&guid_map) + sizeof(guid_map)),
-    }},
-};
+static_assert(sizeof(guid_map) / sizeof(guid_map[0]) <=
+              fuchsia_hardware_gpt_metadata::wire::kMaxPartitions);
 
 static const std::vector<fpbus::BootMetadata> emmc_boot_metadata{
     {{
@@ -168,6 +137,61 @@ zx_status_t Sherlock::EmmcInit() {
   gpio_impl_.ConfigIn(T931_EMMC_CMD, GPIO_PULL_UP);
   gpio_impl_.ConfigIn(T931_EMMC_DS, GPIO_PULL_DOWN);
 
+  fidl::Arena<> fidl_arena;
+
+  fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo> partition_info(
+      fidl_arena, std::size(guid_map));
+
+  for (size_t i = 0; i < std::size(guid_map); i++) {
+    partition_info[i].name = guid_map[i].name;
+    partition_info[i].options =
+        fuchsia_hardware_gpt_metadata::wire::PartitionOptions::Builder(fidl_arena)
+            .type_guid_override(guid_map[i].guid)
+            .Build();
+  }
+
+  fit::result encoded =
+      fidl::Persist(fuchsia_hardware_gpt_metadata::wire::GptInfo::Builder(fidl_arena)
+                        .partition_info(partition_info)
+                        .Build());
+  if (!encoded.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPT metadata: %s",
+           encoded.error_value().FormatDescription().c_str());
+    return encoded.error_value().status();
+  }
+
+  static const std::vector<fpbus::Metadata> sherlock_emmc_metadata{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&sherlock_config),
+              reinterpret_cast<const uint8_t*>(&sherlock_config) + sizeof(sherlock_config)),
+      }},
+      {{
+          .type = DEVICE_METADATA_GPT_INFO,
+          .data = std::move(encoded.value()),
+      }},
+      {{
+          .type = DEVICE_METADATA_EMMC_CONFIG,
+          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&sherlock_emmc_config),
+                                       reinterpret_cast<const uint8_t*>(&sherlock_emmc_config) +
+                                           sizeof(sherlock_emmc_config)),
+      }},
+  };
+
+  static const std::vector<fpbus::Metadata> luis_emmc_metadata{
+      {{
+          .type = DEVICE_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&luis_config),
+              reinterpret_cast<const uint8_t*>(&luis_config) + sizeof(luis_config)),
+      }},
+      {{
+          .type = DEVICE_METADATA_GPT_INFO,
+          .data = std::move(encoded.value()),
+      }},
+  };
+
   fpbus::Node emmc_dev;
   emmc_dev.name() = "sherlock-emmc";
   emmc_dev.vid() = PDEV_VID_AMLOGIC;
@@ -183,7 +207,6 @@ zx_status_t Sherlock::EmmcInit() {
     emmc_dev.metadata() = luis_emmc_metadata;
   }
 
-  fidl::Arena<> fidl_arena;
   fdf::Arena arena('EMMC');
   auto result = pbus_.buffer(arena)->AddComposite(
       fidl::ToWire(fidl_arena, emmc_dev),

@@ -437,6 +437,7 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
+    "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_c",
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
