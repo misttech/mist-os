@@ -8,10 +8,11 @@
 
 use {
     fidl_fuchsia_component_decl as fdecl,
+    flyweights::FlyStr,
     lazy_static::lazy_static,
     serde::de,
     serde::{Deserialize, Serialize},
-    std::{borrow::Cow, default::Default, fmt, str::FromStr},
+    std::{default::Default, fmt, str::FromStr},
     thiserror::Error,
     url,
 };
@@ -109,17 +110,16 @@ pub type LongName = BoundedName<MAX_LONG_NAME_LENGTH>;
 
 /// A `BoundedName` is a `Name` that can have a max length of `N` bytes.
 #[derive(Serialize, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct BoundedName<const N: usize>(String);
+pub struct BoundedName<const N: usize>(FlyStr);
 
 impl<const N: usize> BoundedName<N> {
     /// Creates a `BoundedName` from a `String`, returning an `Err` if the string
     /// fails validation. The string must be non-empty, no more than `N`
     /// characters in length, and consist of one or more of the
     /// following characters: `a-z`, `0-9`, `_`, `.`, `-`.
-    pub fn try_new(name: impl Into<String>) -> Result<Self, ParseError> {
-        let name = name.into();
-        Self::validate(&name)?;
-        Ok(Self(name))
+    pub fn try_new(name: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
+        Self::validate(name.as_ref())?;
+        Ok(Self(FlyStr::new(name)))
     }
 
     pub fn validate(name: &str) -> Result<(), ParseError> {
@@ -139,7 +139,7 @@ impl<const N: usize> BoundedName<N> {
     }
 
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        &self.0
     }
 
     pub fn is_empty(&self) -> bool {
@@ -149,19 +149,19 @@ impl<const N: usize> BoundedName<N> {
 
 impl<const N: usize> PartialEq<&str> for BoundedName<N> {
     fn eq(&self, o: &&str) -> bool {
-        self.0 == *o
+        &*self.0 == *o
     }
 }
 
 impl<const N: usize> PartialEq<String> for BoundedName<N> {
     fn eq(&self, o: &String) -> bool {
-        self.0 == *o
+        &*self.0 == *o
     }
 }
 
 impl<const N: usize> fmt::Display for BoundedName<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        <String as fmt::Display>::fmt(&self.0, f)
+        <FlyStr as fmt::Display>::fmt(&self.0, f)
     }
 }
 
@@ -169,14 +169,13 @@ impl<const N: usize> FromStr for BoundedName<N> {
     type Err = ParseError;
 
     fn from_str(name: &str) -> Result<Self, Self::Err> {
-        Self::validate(name)?;
-        Ok(Self(name.to_owned()))
+        Self::try_new(name)
     }
 }
 
 impl<const N: usize> From<BoundedName<N>> for String {
     fn from(name: BoundedName<N>) -> String {
-        name.0
+        name.0.into()
     }
 }
 
@@ -224,17 +223,16 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
 
 /// A filesystem path.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Path(String);
+pub struct Path(FlyStr);
 
 impl Path {
     /// Creates a `Path` from a `String`, returning an `Err` if the string
     /// fails validation. The string must be non-empty, no more than 1024
     /// characters in length, start with a leading `/`, and contain no empty
     /// path segments.
-    pub fn new(path: impl Into<String>) -> Result<Self, ParseError> {
-        let path = path.into();
-        Self::validate(&path)?;
-        Ok(Path(path))
+    pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
+        Self::validate(path.as_ref())?;
+        Ok(Path(FlyStr::new(path)))
     }
 
     /// Validates `path` but does not construct a new `Path` object.
@@ -252,7 +250,7 @@ impl Path {
     }
 
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        &*self.0
     }
 }
 
@@ -260,14 +258,13 @@ impl FromStr for Path {
     type Err = ParseError;
 
     fn from_str(path: &str) -> Result<Self, Self::Err> {
-        Self::validate(path)?;
-        Ok(Path(path.to_string()))
+        Self::new(path)
     }
 }
 
 impl From<Path> for String {
     fn from(path: Path) -> String {
-        path.0
+        (*path.0).to_owned()
     }
 }
 
@@ -314,28 +311,25 @@ impl<'de> de::Deserialize<'de> for Path {
 
 /// A relative filesystem path.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
-pub struct RelativePath(String);
+pub struct RelativePath(FlyStr);
 
 impl RelativePath {
     /// Creates a `RelativePath` from a `String`, returning an `Err` if the string fails
     /// validation. The string must be non-empty, no more than 1024 characters in length, not start
     /// with a `/`, and contain no empty path segments.
-    pub fn new(path: String) -> Result<Self, ParseError> {
-        Self::from_str_impl(Cow::Owned(path))
-    }
-
-    fn from_str_impl(path: Cow<'_, str>) -> Result<Self, ParseError> {
-        if path.is_empty() || path.len() > 1024 {
+    pub fn new(path: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
+        let p = path.as_ref();
+        if p.is_empty() || p.len() > 1024 {
             return Err(ParseError::InvalidLength);
         }
-        if !path.split('/').all(|part| !part.is_empty()) {
+        if !p.split('/').all(|part| !part.is_empty()) {
             return Err(ParseError::InvalidValue);
         }
-        return Ok(Self(path.into_owned()));
+        return Ok(Self(FlyStr::new(path)));
     }
 
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        &*self.0
     }
 }
 
@@ -343,13 +337,13 @@ impl FromStr for RelativePath {
     type Err = ParseError;
 
     fn from_str(path: &str) -> Result<Self, Self::Err> {
-        Self::from_str_impl(Cow::Borrowed(path))
+        Self::new(path)
     }
 }
 
 impl From<RelativePath> for String {
     fn from(path: RelativePath) -> String {
-        path.0
+        path.0.into()
     }
 }
 
@@ -397,20 +391,15 @@ impl<'de> de::Deserialize<'de> for RelativePath {
 /// A component URL. The URL is validated, but represented as a string to avoid
 /// normalization and retain the original representation.
 #[derive(Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Url(String);
+pub struct Url(FlyStr);
 
 impl Url {
     /// Creates a `Url` from a `String`, returning an `Err` if the string fails
     /// validation. The string must be non-empty, no more than 4096 characters
     /// in length, and be a valid URL. See the [`url`](../../url/index.html) crate.
-    pub fn new(url: impl Into<String>) -> Result<Self, ParseError> {
-        let url = url.into();
-        Self::from_str_impl(Cow::Owned(url))
-    }
-
-    fn from_str_impl(url_str: Cow<'_, str>) -> Result<Self, ParseError> {
-        Self::validate(&url_str)?;
-        Ok(Self(url_str.into_owned()))
+    pub fn new(url: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
+        Self::validate(url.as_ref())?;
+        Ok(Self(FlyStr::new(url)))
     }
 
     /// Verifies the given string is a valid absolute or relative component URL.
@@ -468,7 +457,7 @@ impl Url {
     }
 
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        &*self.0
     }
 }
 
@@ -476,13 +465,13 @@ impl FromStr for Url {
     type Err = ParseError;
 
     fn from_str(url: &str) -> Result<Self, Self::Err> {
-        Self::from_str_impl(Cow::Borrowed(url))
+        Self::new(url)
     }
 }
 
 impl From<Url> for String {
     fn from(url: Url) -> String {
-        url.0
+        (*url.0).to_owned()
     }
 }
 
@@ -523,17 +512,17 @@ impl<'de> de::Deserialize<'de> for Url {
 }
 
 /// A URL scheme.
-#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize)]
-pub struct UrlScheme(String);
+#[derive(Serialize, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct UrlScheme(FlyStr);
 
 impl UrlScheme {
     /// Creates a `UrlScheme` from a `String`, returning an `Err` if the string fails
     /// validation. The string must be non-empty and no more than 100 characters
     /// in length. It must start with a lowercase ASCII letter (a-z),
     /// and contain only lowercase ASCII letters, digits, `+`, `-`, and `.`.
-    pub fn new(url_scheme: String) -> Result<Self, ParseError> {
-        Self::validate(&url_scheme)?;
-        Ok(UrlScheme(url_scheme))
+    pub fn new(url_scheme: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
+        Self::validate(url_scheme.as_ref())?;
+        Ok(UrlScheme(FlyStr::new(url_scheme)))
     }
 
     /// Validates `url_scheme` but does not construct a new `UrlScheme` object.
@@ -556,7 +545,7 @@ impl UrlScheme {
     }
 
     pub fn as_str(&self) -> &str {
-        self.0.as_str()
+        &*self.0
     }
 }
 
@@ -570,14 +559,13 @@ impl FromStr for UrlScheme {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::validate(s)?;
-        Ok(UrlScheme(s.to_string()))
+        Self::new(s)
     }
 }
 
 impl From<UrlScheme> for String {
     fn from(u: UrlScheme) -> String {
-        u.0
+        u.0.into()
     }
 }
 

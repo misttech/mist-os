@@ -70,7 +70,7 @@ impl InstancedChildMoniker {
         instance: IncarnationId,
     ) -> Result<Self, MonikerError>
     where
-        S: Into<String>,
+        S: AsRef<str> + Into<String>,
     {
         let name = LongName::try_new(name)?;
         let collection = match collection {
