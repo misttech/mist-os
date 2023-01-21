@@ -48,12 +48,7 @@ impl ToolRunner for ExternalSubTool {
         // location.
         std::process::Command::new(&self.path)
             .env(EnvironmentContext::FFX_BIN_ENV, self.context.rerun_bin().await?)
-            .args(
-                self.cmd_line
-                    .cmd_iter()
-                    .skip(1)
-                    .chain(self.cmd_line.ffx_args_iter().chain(self.cmd_line.subcmd_iter())),
-            )
+            .args(self.cmd_line.ffx_args_iter().chain(self.cmd_line.subcmd_iter()))
             .spawn()
             .and_then(|mut child| child.wait())
             .bug_context("Running external subtool")
