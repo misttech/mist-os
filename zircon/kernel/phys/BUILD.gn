@@ -11,6 +11,7 @@ import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/arch/$zircon_cpu/phys/phys.gni")
 import("//zircon/kernel/params.gni")
+import("kernel_elf_interp.gni")
 import("zbi_executable.gni")
 
 arch_phys = "//zircon/kernel/arch/$zircon_cpu/phys"
@@ -121,7 +122,7 @@ if (toolchain_environment == "kernel.phys" ||
     ldflags = [ "-Wl,-defsym,PHYS_LOAD_ADDRESS=0" ]
   }
 
-  source_set("symbolize") {
+  static_library("symbolize") {
     public = [
       "include/phys/frame-pointer.h",
       "include/phys/symbolize.h",
@@ -163,7 +164,7 @@ if (toolchain_environment == "kernel.phys" ||
 
   # This is used implicitly by phys_executable() targets,
   # including zbi_executable() targets.
-  source_set("phys_executable.deps") {
+  group("phys_executable.deps") {
     deps = [
       ":symbolize",
       "$arch_phys",
@@ -190,7 +191,7 @@ if (toolchain_environment == "kernel.phys" ||
     ]
   }
 
-  source_set("kernel-package") {
+  static_library("kernel-package") {
     public = [ "include/phys/kernel-package.h" ]
     public_deps = [
       ":allocation",
@@ -608,7 +609,62 @@ if (toolchain_environment == "kernel.phys") {
   }
 }
 
+zbi_executable("physload") {
+  sources = [ "physload.cc" ]
+  deps = [
+    ":allocation",
+    ":elf-image",
+    ":handoff",
+    ":kernel-package",
+    ":main",
+    ":physload.header",
+    ":stdio",
+    ":symbolize",
+    "//src/lib/elfldltl",
+    "//src/lib/zbitl",
+    "//zircon/kernel/lib/boot-options",
+  ]
+}
+
+kernel_elf_interp("physload.interp") {
+  visibility = [ ":*" ]
+  deps = [ ":physload" ]
+}
+
 if (is_kernel) {
+  source_set("physload.header") {
+    visibility = [ ":*" ]
+    public = [ "physload.h" ]
+    public_deps = [
+      ":handoff",
+      ":kernel-package",
+    ]
+  }
+
+  # A physload-compatible module depends on this.
+  group("physload.module") {
+    visibility = [ "./*" ]
+    public_deps = [ ":physload.header" ]
+    public_configs = [ ":physload.module.config" ]
+    deps = [ ":physload.interp" ]
+    data_deps = [ ":physload" ]
+  }
+
+  config("physload.module.config") {
+    visibility = [ ":*" ]
+    ldflags = [ "-Wl,-e,PhysLoadHandoff" ]
+
+    # The GNU linkers don't do page-aligned segments by default like LLD,
+    # so a linker script is required.
+    if (is_gcc) {
+      inputs = [ "phys-elf-module.ld" ]
+      ldflags += [
+        "-Wl,-z,relro",
+        "-Wl,-T," + rebase_path(inputs[0], root_build_dir),
+      ]
+    }
+  }
+
   source_set("handoff") {
     public = [
       "//zircon/kernel/arch/${zircon_cpu}/phys/include/phys/arch/arch-handoff.h",

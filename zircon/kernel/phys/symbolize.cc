@@ -87,6 +87,10 @@ void Symbolize::OnLoad(const ElfImage& loaded) {
   AddModule(&loaded);
 }
 
+void Symbolize::LogHandoff(ktl::string_view name, uintptr_t entry_pc) {
+  writer_.Prefix(name_).Literal({"Hand off to ", name, " at "}).Code(entry_pc).Newline();
+}
+
 void Symbolize::BackTraceFrame(unsigned int n, uintptr_t pc, bool interrupt) {
   // Just print the line in markup format.  Context() was called earlier.
   writer_.Prefix(name_);

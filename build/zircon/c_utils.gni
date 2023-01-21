@@ -52,12 +52,6 @@ template("toolchain_utils_action") {
   assert(defined(invoker.utils),
          "toolchain_utils_action(\"$target_name\") requires `utils`")
 
-  target_type = "action"
-  extra_params = {
-  }
-
-  forward_variables_from(invoker, [ "script" ])
-
   utils_inputs = []
   utils_paths = []
 
@@ -74,13 +68,11 @@ template("toolchain_utils_action") {
     utils_paths += [ rebase_path(util_path, root_build_dir) ]
   }
 
-  target(target_type, target_name) {
-    forward_variables_from(extra_params, "*")
+  action(target_name) {
     forward_variables_from(invoker,
                            "*",
                            [
                              "args",
-                             "script",
                              "target",
                              "utils",
                            ])

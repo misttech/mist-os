@@ -85,6 +85,8 @@ class Symbolize {
   // for the new module.
   void OnLoad(const ElfImage& loaded);
 
+  void LogHandoff(ktl::string_view name, uintptr_t entry_pc);
+
   // Print the presentation markup element for one frame of a backtrace.
   void BackTraceFrame(unsigned int n, uintptr_t pc, bool interrupt = false);
 

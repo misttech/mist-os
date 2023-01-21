@@ -188,6 +188,9 @@ Allocation ElfImage::Load(bool in_place_ok) {
 
   SetLoadAddress(reinterpret_cast<uintptr_t>(image.get()));
 
+  // Hereafter image_ refers to the now-loaded image, not the original file.
+  image_.set_image(image.data());
+
   return image;
 }
 

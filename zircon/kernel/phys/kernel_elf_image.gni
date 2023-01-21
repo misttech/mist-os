@@ -147,8 +147,14 @@ template("kernel_elf_image") {
   # before packing.  This also provides an opportunity to inject the metadata
   # for the image filesystem layout.
   toolchain_utils_action(image_target) {
-    visibility = [ ":*" ]
-    forward_variables_from(invoker, [ "testonly" ])
+    forward_variables_from(invoker,
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+    if (defined(visibility)) {
+      visibility += [ ":*" ]
+    }
 
     outputs = [ image_file ]
 

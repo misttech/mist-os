@@ -3136,6 +3136,7 @@ template("loadable_module") {
                            [
                              "metadata",
                              "visibility",
+                             "target_name",
                            ])
 
     if (!defined(output_dir)) {

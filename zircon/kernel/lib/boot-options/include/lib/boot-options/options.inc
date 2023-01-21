@@ -293,9 +293,13 @@ free memory, while out-of-memory will be signaled at 50MB free memory.
 )""")
 
 DEFINE_OPTION("kernel.oom.trigger-on-alloc-failure", bool, oom_trigger_on_alloc_failure, {true},
-R"""(
+              R"""(
 This option controls whether potentially user-visible PMM allocation failures due to running out of
 memory trigger an OOM response.
+)""")
+
+DEFINE_OPTION("kernel.phys.next", SmallString, phys_next, {"physboot"}, R"""(
+The name of the file within the kernel storage filesystem physload will load.
 )""")
 
 DEFINE_OPTION("kernel.phys.verbose", bool, phys_verbose, {true}, R"""(
@@ -730,7 +734,7 @@ assigns an address in early boot.
 )""")
 
 DEFINE_OPTION("kernel.port.max-observers", uint64_t, max_port_observers, {50000},
-R"""(
+              R"""(
 Specifies the maximum number of observers any single port may have. When this limit is reached, a
 Zircon exception is raised in the process that crosses the limit. This value should be high enough
 that well behaved programs will not hit the limit, but low enough to terminate misbehaving programs

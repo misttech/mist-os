@@ -40,9 +40,9 @@ template("kernel_elf_binary") {
   binary_target = "$target_name.binary"
 
   if (defined(invoker.target_type)) {
-    target_type = invoker.target_type
+    binary_target_type = invoker.target_type
   } else {
-    target_type = "executable"
+    binary_target_type = "executable"
   }
 
   kernel_elf_image(image_target) {
@@ -52,14 +52,13 @@ template("kernel_elf_binary") {
                              "has_patches",
                              "metadata",
                              "output_name",
-                             "target_type",
                              "testonly",
                              "visibility",
                            ])
     deps = [ ":$binary_target" ]
   }
 
-  target(target_type, binary_target) {
+  target(binary_target_type, binary_target) {
     forward_variables_from(invoker,
                            "*",
                            [

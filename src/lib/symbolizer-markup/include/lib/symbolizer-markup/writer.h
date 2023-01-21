@@ -12,6 +12,7 @@
 #include <climits>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
 #include <string_view>
 #include <type_traits>
@@ -198,6 +199,13 @@ class Writer {
   constexpr Writer& Literal(std::string_view str) {
     if (!str.empty()) {
       sink_(str);
+    }
+    return *this;
+  }
+
+  constexpr Writer& Literal(std::initializer_list<std::string_view> strs) {
+    for (std::string_view str : strs) {
+      Literal(str);
     }
     return *this;
   }

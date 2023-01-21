@@ -9,10 +9,12 @@ import("//build/testing/boot_test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 import("//build/zbi/zbi_input.gni")
 import("//src/bringup/lib/mexec/testing/zbi_test.gni")
+import("//zircon/kernel/kernel_package.gni")
 import("//zircon/kernel/lib/code-patching/code-patching.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
 import("//zircon/kernel/phys/efi/efi_shell_test.gni")
 import("//zircon/kernel/phys/efi/efi_test.gni")
+import("//zircon/kernel/phys/kernel_elf_binary.gni")
 import("//zircon/kernel/phys/qemu.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
 import("phys_zbi_test.gni")
@@ -387,6 +389,50 @@ if (current_toolchain != default_toolchain) {
     contents = [ "echo \"$boot_test_success_string\"" ]
   }
 
+  if (toolchain_environment == "kernel.phys") {
+    kernel_elf_binary("physload-test") {
+      visibility = [ ":*" ]
+      testonly = true
+
+      target_type = "loadable_module"
+      has_patches = false
+
+      sources = [ "physload-test.cc" ]
+      defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
+
+      deps = [
+        "..:allocation",
+        "..:elf-image",
+        "..:main",
+        "..:physload.module",
+        "..:stdio",
+        "..:symbolize",
+        "//zircon/kernel/arch/$zircon_cpu/phys",
+        "//zircon/kernel/lib/boot-options",
+      ]
+    }
+
+    kernel_package("physload-test-data") {
+      visibility = [ ":*" ]
+      testonly = true
+
+      deps = [ ":physload-test" ]
+    }
+  }
+
+  kernel_cmdline("physload-test.cmdline") {
+    visibility = [ ":*" ]
+    testonly = true
+    args = [ "kernel.phys.next=physload-test-data/physload-test" ]
+  }
+
+  zbi_test("zbi-physload-test") {
+    deps = [
+      ":physload-test-data($phys_toolchain)",
+      ":physload-test.cmdline",
+    ]
+  }
+
   group("test") {
     testonly = true
     deps = [
@@ -403,6 +449,7 @@ if (current_toolchain != default_toolchain) {
       ":zbi-decompress-test",
       ":zbi-handoff-entropy-test",
       ":zbi-memory-test",
+      ":zbi-physload-test",
       "code-patching",
       "elf-loading",
     ]

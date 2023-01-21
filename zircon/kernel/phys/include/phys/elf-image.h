@@ -149,7 +149,7 @@ class ElfImage {
 
   // Call the image's entry point as a function type F.
   template <typename F, typename... Args>
-  ktl::invoke_result_t<F*, Args...> Call(Args&&... args) const {
+  decltype(auto) Call(Args&&... args) const {
     static_assert(ktl::is_function_v<F>);
     F* fnptr = reinterpret_cast<F*>(static_cast<uintptr_t>(entry()));
     return (*fnptr)(ktl::forward<Args>(args)...);
@@ -158,7 +158,8 @@ class ElfImage {
   // Call the image's entry point as a [[noreturn]] function type F.
   template <typename F, typename... Args>
   [[noreturn]] void Handoff(Args&&... args) const {
-    Call<void(Args...)>(ktl::forward<Args>(args)...);
+    static_assert(ktl::is_function_v<F>);
+    Call<F>(ktl::forward<Args>(args)...);
     ZX_PANIC("ELF image entry point returned!");
   }
 
