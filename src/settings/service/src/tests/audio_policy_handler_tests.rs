@@ -66,7 +66,6 @@ impl TestEnvironment {
         TestEnvironment::new_with_store(TestEnvironment::create_storage_factory().await, None).await
     }
 
-    // TODO(fxbug.dev/81232): take in options with a builder
     async fn new_with_store(
         storage_factory: Arc<InMemoryStorageFactory>,
         audio_policy_config: Option<AudioPolicyConfig>,
