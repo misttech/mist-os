@@ -37,6 +37,13 @@ template <class Module>
 struct ResolverDefinition {
   using Sym = typename std::decay_t<decltype(std::declval<Module>().symbol_info())>::Sym;
 
+  // TODO(fxbug.dev/120388): preferably, this would just be a constexpr static variable
+  // but clang can't compile that.
+  static constexpr ResolverDefinition UndefinedWeak() {
+    static_assert(ResolverDefinition{}.undefined_weak());
+    return {};
+  }
+
   // This should be called before any other method to check if this Definition is valid.
   constexpr bool undefined_weak() const { return !symbol_; }
 
@@ -70,14 +77,14 @@ constexpr auto MakeSymbolResolver(const SymbolInfo& ref_info, const ModuleList& 
     // FormatError, which isn't preferable, but this is just a temporary error.
     if (tls_type != RelocateTls::kNone) {
       diag.FormatError("TLS not yet supported");
-      return {};
+      return std::nullopt;
     }
 
     elfldltl::SymbolName name{ref_info, ref};
 
     if (name.empty()) [[unlikely]] {
       diag.FormatError("Symbol had invalid st_name");
-      return {};
+      return std::nullopt;
     }
 
     for (const auto& module : modules) {
@@ -86,8 +93,12 @@ constexpr auto MakeSymbolResolver(const SymbolInfo& ref_info, const ModuleList& 
       }
     }
 
+    if (ref.bind() == ElfSymBind::kWeak) {
+      return Definition::UndefinedWeak();
+    }
+
     diag.UndefinedSymbol(name);
-    return {};
+    return std::nullopt;
   };
 }
 

@@ -184,4 +184,23 @@ TYPED_TEST(ElfldltlResolveTests, UndefFirstFoundSecond) {
   EXPECT_EQ(found->symbol().value, 2ul);
 }
 
+TYPED_TEST(ElfldltlResolveTests, UndefinedWeak) {
+  using Elf = typename TestFixture::Elf;
+  using TestModule = typename ElfldltlResolveTests<Elf>::TestModule;
+
+  auto diag = ExpectOkDiagnostics();
+
+  std::array modules{TestModule("first"), TestModule("second")};
+  if (this->HasFatalFailure()) {
+    return;
+  }
+
+  elfldltl::SymbolInfoForSingleLookup<Elf> si{"noexist", elfldltl::ElfSymType::kNoType,
+                                              elfldltl::ElfSymBind::kWeak};
+  auto resolve = elfldltl::MakeSymbolResolver(si, modules, diag);
+  auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
+  ASSERT_TRUE(found);
+  EXPECT_TRUE(found->undefined_weak());
+}
+
 }  // namespace
