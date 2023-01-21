@@ -237,7 +237,7 @@ async fn get_and_check_camera_disable(
 }
 
 // Creates a broker to listen in on media buttons events.
-fn create_broker(executor: &mut TestExecutor, delegate: Delegate) -> Receptor<Payload> {
+fn create_broker(executor: &mut TestExecutor, delegate: Delegate) -> Receptor {
     let message_hub_future = delegate.create(MessengerType::Broker(Some(filter::Builder::single(
         filter::Condition::Custom(Arc::new(move |message| {
             // The first condition indicates that it is a response to a set request.
@@ -258,12 +258,12 @@ fn create_broker(executor: &mut TestExecutor, delegate: Delegate) -> Receptor<Pa
 // Waits for the media buttons receptor to receive an update, so that
 // following code can be sure that the media buttons event was handled
 // before continuing.
-async fn wait_for_media_button_event(media_buttons_receptor: &mut Receptor<Payload>) {
+async fn wait_for_media_button_event(media_buttons_receptor: &mut Receptor) {
     let _ = media_buttons_receptor.next_payload().await.expect("payload should exist");
 }
 
 // Returns true if the given attribution `message`'s payload is an OnButton event.
-fn is_attr_onbutton(message: &Message<Payload>) -> bool {
+fn is_attr_onbutton(message: &Message) -> bool {
     // Find the corresponding message from the message's attribution.
     let attr_msg =
         if let Attribution::Source(MessageType::Reply(message)) = message.get_attribution() {

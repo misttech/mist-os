@@ -41,17 +41,16 @@ impl MessageHub {
 }
 
 pub(crate) mod message {
-    use super::Payload;
     use crate::message::{base, delegate, message_client, messenger, receptor};
 
-    pub(crate) type Delegate = delegate::Delegate<Payload>;
+    pub(crate) type Delegate = delegate::Delegate;
     pub(crate) type Audience = base::Audience;
-    pub(crate) type Messenger = messenger::MessengerClient<Payload>;
+    pub(crate) type Messenger = messenger::MessengerClient;
     pub(crate) type MessageError = base::MessageError;
-    pub(crate) type MessageEvent = base::MessageEvent<Payload>;
-    pub(crate) type MessageClient = message_client::MessageClient<Payload>;
-    pub(crate) type MessengerType = base::MessengerType<Payload>;
-    pub(crate) type Receptor = receptor::Receptor<Payload>;
+    pub(crate) type MessageEvent = base::MessageEvent;
+    pub(crate) type MessageClient = message_client::MessageClient;
+    pub(crate) type MessengerType = base::MessengerType;
+    pub(crate) type Receptor = receptor::Receptor;
     pub(crate) type Signature = base::Signature;
 }
 

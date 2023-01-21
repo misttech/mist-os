@@ -4,7 +4,7 @@
 
 use crate::event;
 use crate::message::action_fuse::ActionFuseBuilder;
-use crate::message::base::{filter, group, Audience, MessageEvent, MessengerType, Payload, Status};
+use crate::message::base::{filter, group, Audience, MessageEvent, MessengerType, Status};
 use crate::message::receptor::Receptor;
 use crate::policy;
 use crate::tests::message_utils::verify_payload;
@@ -26,10 +26,7 @@ pub(crate) mod test_message {
 }
 
 /// Ensures the delivery result matches expected value.
-async fn verify_result<P: Payload + PartialEq + 'static>(
-    expected: Status,
-    receptor: &mut Receptor<P>,
-) {
+async fn verify_result(expected: Status, receptor: &mut Receptor) {
     while let Some(message_event) = receptor.next().await {
         if let MessageEvent::Status(status) = message_event {
             if status == expected {
@@ -51,7 +48,7 @@ const ROLE_1: crate::Role = crate::Role::Event(event::Role::Sink);
 const ROLE_2: crate::Role = crate::Role::Policy(policy::Role::PolicyHandler);
 
 mod test {
-    pub(crate) type MessageHub = crate::message::message_hub::MessageHub<crate::Payload>;
+    pub(crate) type MessageHub = crate::message::message_hub::MessageHub;
 }
 
 // Tests message client creation results in unique ids.
@@ -437,7 +434,7 @@ async fn test_messenger_behavior() {
     }
 }
 
-async fn verify_messenger_behavior(messenger_type: MessengerType<crate::Payload>) {
+async fn verify_messenger_behavior(messenger_type: MessengerType) {
     let delegate = test::MessageHub::create();
 
     // Messenger to receive message.

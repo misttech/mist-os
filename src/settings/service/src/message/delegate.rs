@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use crate::message::base::{
-    CreateMessengerResult, MessengerAction, MessengerActionSender, MessengerType, Payload,
-    Signature,
+    CreateMessengerResult, MessengerAction, MessengerActionSender, MessengerType, Signature,
 };
 #[cfg(test)]
 use crate::message::base::{MessageError, MessengerPresenceResult};
@@ -13,24 +12,21 @@ use crate::message::messenger::Builder;
 /// [Delegate] is the artifact of creating a MessageHub. It can be used
 /// to create new messengers.
 #[derive(Clone)]
-pub struct Delegate<P: Payload + 'static> {
-    messenger_action_tx: MessengerActionSender<P>,
+pub struct Delegate {
+    messenger_action_tx: MessengerActionSender,
 }
 
-impl<P: Payload + 'static> Delegate<P> {
-    pub(super) fn new(action_tx: MessengerActionSender<P>) -> Delegate<P> {
+impl Delegate {
+    pub(super) fn new(action_tx: MessengerActionSender) -> Delegate {
         Delegate { messenger_action_tx: action_tx }
     }
 
     /// Returns a builder for constructing a new messenger.
-    pub(crate) fn messenger_builder(&self, messenger_type: MessengerType<P>) -> Builder<P> {
+    pub(crate) fn messenger_builder(&self, messenger_type: MessengerType) -> Builder {
         Builder::new(self.messenger_action_tx.clone(), messenger_type)
     }
 
-    pub(crate) async fn create(
-        &self,
-        messenger_type: MessengerType<P>,
-    ) -> CreateMessengerResult<P> {
+    pub(crate) async fn create(&self, messenger_type: MessengerType) -> CreateMessengerResult {
         self.messenger_builder(messenger_type).build().await
     }
 

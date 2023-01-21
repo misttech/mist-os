@@ -123,7 +123,7 @@ where
     async fn handle_messages(
         &mut self,
         id: ftrace::Id,
-        mut unordered: FuturesUnordered<StreamFuture<Receptor<service::Payload>>>,
+        mut unordered: FuturesUnordered<StreamFuture<Receptor>>,
     ) {
         let storage_management = StorageManagement {
             device_storage_factory: Arc::clone(&self.device_storage_factory),

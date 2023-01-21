@@ -6,7 +6,7 @@ use crate::message::action_fuse::ActionFuseHandle;
 use crate::message::base::{
     messenger, ActionSender, Audience, CreateMessengerResult, Fingerprint, Message, MessageAction,
     MessageError, MessageType, MessengerAction, MessengerActionSender, MessengerId, MessengerType,
-    Payload, Signature,
+    Signature,
 };
 use crate::message::beacon::Beacon;
 use crate::message::message_builder::MessageBuilder;
@@ -18,22 +18,22 @@ use std::convert::identity;
 /// `Builder` is the default way for creating a new messenger. Beyond the base
 /// messenger type, this helper allows for roles to be associated as well
 /// during construction.
-pub struct Builder<P: Payload + 'static> {
+pub struct Builder {
     /// The sender for sending messenger creation requests to the MessageHub.
-    messenger_action_tx: MessengerActionSender<P>,
+    messenger_action_tx: MessengerActionSender,
     /// The type of messenger to be created. Along with roles, the messenger
     /// type determines what audiences the messenger is included in.
-    messenger_type: MessengerType<P>,
+    messenger_type: MessengerType,
     /// The roles to associate with this messenger.
     roles: HashSet<crate::Role>,
 }
 
-impl<P: Payload + 'static> Builder<P> {
+impl Builder {
     /// Creates a new builder for constructing a messenger of the given
     /// type.
     pub(super) fn new(
-        messenger_action_tx: MessengerActionSender<P>,
-        messenger_type: MessengerType<P>,
+        messenger_action_tx: MessengerActionSender,
+        messenger_type: MessengerType,
     ) -> Self {
         Self { messenger_action_tx, messenger_type, roles: HashSet::new() }
     }
@@ -46,8 +46,8 @@ impl<P: Payload + 'static> Builder<P> {
     }
 
     /// Constructs a messenger based on specifications supplied.
-    pub(crate) async fn build(self) -> CreateMessengerResult<P> {
-        let (tx, rx) = futures::channel::oneshot::channel::<CreateMessengerResult<P>>();
+    pub(crate) async fn build(self) -> CreateMessengerResult {
+        let (tx, rx) = futures::channel::oneshot::channel::<CreateMessengerResult>();
 
         // Panic if send failed since a messenger cannot be created.
         self.messenger_action_tx
@@ -64,19 +64,19 @@ impl<P: Payload + 'static> Builder<P> {
 
 /// MessengerClient is a wrapper around a messenger with a fuse.
 #[derive(Clone, Debug)]
-pub struct MessengerClient<P: Payload + 'static> {
-    messenger: Messenger<P>,
+pub struct MessengerClient {
+    messenger: Messenger,
     _fuse: ActionFuseHandle, // Handle that maintains scoped messenger cleanup
 }
 
-impl<P: Payload + 'static> MessengerClient<P> {
-    pub(super) fn new(messenger: Messenger<P>, fuse: ActionFuseHandle) -> MessengerClient<P> {
+impl MessengerClient {
+    pub(super) fn new(messenger: Messenger, fuse: ActionFuseHandle) -> MessengerClient {
         MessengerClient { messenger, _fuse: fuse }
     }
 
     /// Creates a MessageBuilder for a new message with the specified payload
     /// and audience.
-    pub(crate) fn message(&self, payload: P, audience: Audience) -> MessageBuilder<P> {
+    pub(crate) fn message(&self, payload: crate::Payload, audience: Audience) -> MessageBuilder {
         MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone())
     }
 
@@ -89,13 +89,13 @@ impl<P: Payload + 'static> MessengerClient<P> {
 /// Messengers provide clients the ability to send messages to other registered
 /// clients. They can only be created through a MessageHub.
 #[derive(Clone, Debug)]
-pub struct Messenger<P: Payload + 'static> {
+pub struct Messenger {
     fingerprint: Fingerprint,
-    action_tx: ActionSender<P>,
+    action_tx: ActionSender,
 }
 
-impl<P: Payload + 'static> Messenger<P> {
-    pub(super) fn new(fingerprint: Fingerprint, action_tx: ActionSender<P>) -> Messenger<P> {
+impl Messenger {
+    pub(super) fn new(fingerprint: Fingerprint, action_tx: ActionSender) -> Messenger {
         Messenger { fingerprint, action_tx }
     }
 
@@ -106,14 +106,14 @@ impl<P: Payload + 'static> Messenger<P> {
 
     /// Forwards the message to the next Messenger. Note that this method is
     /// private and only called through the MessageClient.
-    pub(super) fn forward(&self, message: Message<P>, beacon: Option<Beacon<P>>) {
+    pub(super) fn forward(&self, message: Message, beacon: Option<Beacon>) {
         self.transmit(MessageAction::Forward(message), beacon);
     }
 
     /// Tranmits a given action to the message hub. This is a common utility
     /// method to be used for immediate actions (forwarding, observing) and
     /// deferred actions as well (sending, replying).
-    pub(super) fn transmit(&self, action: MessageAction<P>, beacon: Option<Beacon<P>>) {
+    pub(super) fn transmit(&self, action: MessageAction, beacon: Option<Beacon>) {
         // Do not transmit if the message hub has exited.
         if self.action_tx.is_closed() {
             return;

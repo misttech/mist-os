@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::message::action_fuse::{ActionFuseBuilder, ActionFuseHandle};
-use crate::message::base::{Message, MessageClientId, MessageEvent, MessengerId, Payload, Status};
+use crate::message::base::{Message, MessageClientId, MessageEvent, MessengerId, Status};
 use crate::message::message_client::MessageClient;
 use crate::message::messenger::Messenger;
 use crate::message::receptor::Receptor;
@@ -17,14 +17,14 @@ use futures::lock::Mutex;
 use std::sync::Arc;
 
 /// Helper for creating a beacon. The builder allows chaining additional fuses
-pub struct BeaconBuilder<P: Payload + 'static> {
-    messenger: Messenger<P>,
+pub struct BeaconBuilder {
+    messenger: Messenger,
     chained_fuses: Vec<ActionFuseHandle>,
     timeout: Option<Duration>,
 }
 
-impl<P: Payload + 'static> BeaconBuilder<P> {
-    pub(super) fn new(messenger: Messenger<P>) -> Self {
+impl BeaconBuilder {
+    pub(super) fn new(messenger: Messenger) -> Self {
         Self { messenger, chained_fuses: vec![], timeout: None }
     }
 
@@ -38,7 +38,7 @@ impl<P: Payload + 'static> BeaconBuilder<P> {
         self
     }
 
-    pub(super) fn build(self) -> (Beacon<P>, Receptor<P>) {
+    pub(super) fn build(self) -> (Beacon, Receptor) {
         Beacon::create(self.messenger, self.chained_fuses, self.timeout)
     }
 }
@@ -52,30 +52,30 @@ impl<P: Payload + 'static> BeaconBuilder<P> {
 /// and other context sent through the Beacon are in relation to this original
 /// Message (either an origin or reply).
 #[derive(Clone, Debug)]
-pub struct Beacon<P: Payload + 'static> {
+pub struct Beacon {
     /// A reference to the associated Messenger. This is only used when delivering
     /// a new message to a beacon, where a MessageClient (which references both
     /// the recipient's Messenger and the message) must be created.
-    messenger: Messenger<P>,
+    messenger: Messenger,
     /// The sender half of an internal channel established between the Beacon and
     /// Receptor.
-    event_sender: UnboundedSender<MessageEvent<P>>,
+    event_sender: UnboundedSender<MessageEvent>,
     /// Sentinel for secondary ActionFuses
     sentinel: Arc<Mutex<Sentinel>>,
     /// Timeout for firing if a response payload is not delivered in time.
     timeout_abort_client: AbortHandle,
 }
 
-impl<P: Payload + 'static> Beacon<P> {
+impl Beacon {
     /// Creates a Beacon, Receptor tuple. The Messenger provided as an argument
     /// will be associated with any delivered Message for reply purposes.
     fn create(
-        messenger: Messenger<P>,
+        messenger: Messenger,
         fuses: Vec<ActionFuseHandle>,
         timeout: Option<Duration>,
-    ) -> (Beacon<P>, Receptor<P>) {
+    ) -> (Beacon, Receptor) {
         let sentinel = Arc::new(Mutex::new(Sentinel::new()));
-        let (event_tx, event_rx) = futures::channel::mpsc::unbounded::<MessageEvent<P>>();
+        let (event_tx, event_rx) = futures::channel::mpsc::unbounded::<MessageEvent>();
         let (timeout_abort_client, timeout_abort_server) = AbortHandle::new_pair();
         let signature = messenger.get_signature();
         let beacon = Beacon {
@@ -132,7 +132,7 @@ impl<P: Payload + 'static> Beacon<P> {
     /// Delivers a response to the original message that spawned this Beacon.
     pub(super) async fn deliver(
         &self,
-        message: Message<P>,
+        message: Message,
         client_id: MessageClientId,
     ) -> Result<(), Error> {
         self.timeout_abort_client.abort();

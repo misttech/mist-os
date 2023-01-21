@@ -153,7 +153,6 @@ mod tests {
     use crate::event;
     use crate::message::base::{MessageEvent, MessengerType};
     use crate::message::receptor::Receptor;
-    use crate::service::Payload;
     use crate::service_context::ServiceContext;
     use crate::tests::fakes::service_registry::ServiceRegistry;
     use crate::tests::helpers::{
@@ -223,7 +222,7 @@ mod tests {
         // a different messenger below because a broadcast would not send a message
         // to itself. The signature is used to delete the original messenger for this
         // receptor.
-        let handler_receptor: Receptor<Payload> =
+        let handler_receptor: Receptor =
             create_receptor_for_setting_type(&service_message_hub, SettingType::Unknown).await;
 
         let mut event_handler = EventHandler {
@@ -297,7 +296,7 @@ mod tests {
         // a different messenger below because a broadcast would not send a message
         // to itself. The signature is used to delete the original messenger for this
         // receptor.
-        let mut handler_receptor: Receptor<Payload> = service_message_hub
+        let mut handler_receptor: Receptor = service_message_hub
             .create(MessengerType::Addressable(handler_address))
             .await
             .expect("Unable to create handler receptor")

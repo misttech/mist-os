@@ -25,7 +25,7 @@ use crate::job::Job;
 use crate::job::Signature;
 use crate::message::base::Audience;
 use crate::message::receptor::Receptor;
-use crate::service::{message, Address, Payload as ServicePayload};
+use crate::service::{message, Address};
 use crate::trace;
 use async_trait::async_trait;
 use fuchsia_syslog::fx_log_warn;
@@ -151,7 +151,7 @@ impl<
 
     async fn get_next(
         &mut self,
-        receptor: &mut Receptor<ServicePayload>,
+        receptor: &mut Receptor,
     ) -> Result<Result<Payload, anyhow::Error>, WorkError> {
         let receptor = receptor.next_of::<Payload>().fuse();
         let mut cancelation_rx = &mut self.cancelation_rx;

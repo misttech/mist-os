@@ -167,7 +167,6 @@ mod tests {
     use crate::message::base::MessageEvent;
     use crate::message::receptor::Receptor;
     use crate::service;
-    use crate::service::Payload;
     use crate::service_context::ServiceContext;
     use crate::tests::fakes::service_registry::ServiceRegistry;
     use crate::tests::helpers::{
@@ -234,7 +233,7 @@ mod tests {
         let event_receptor = service::build_event_listener(&service_message_hub).await;
 
         // Create receptor representing handler endpoint.
-        let handler_receptor: Receptor<Payload> =
+        let handler_receptor: Receptor =
             create_receptor_for_setting_type(&service_message_hub, target_setting_type).await;
 
         // Make all setting types available.
@@ -320,7 +319,7 @@ mod tests {
             create_messenger_and_publisher_from_hub(&service_message_hub).await;
 
         // Create messenger to represent unavailable setting handler.
-        let mut handler_receptor: Receptor<Payload> =
+        let mut handler_receptor: Receptor =
             create_receptor_for_setting_type(&service_message_hub, SettingType::Unknown).await;
 
         // Declare all settings as unavailable so that no events are sent.
