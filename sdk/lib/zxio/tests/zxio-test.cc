@@ -18,7 +18,7 @@ TEST(OpsTest, Close) {
   zxio_init(&io, &ops);
 
   ASSERT_EQ(&ops, zxio_get_ops(&io));
-  ASSERT_OK(zxio_close_new_transitional(&io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&io, /*should_wait=*/true));
 }
 
 TEST(OpsTest, CloseWillInvalidateTheObject) {
@@ -28,7 +28,7 @@ TEST(OpsTest, CloseWillInvalidateTheObject) {
 
   zxio_t io = {};
   zxio_init(&io, &ops);
-  ASSERT_OK(zxio_close_new_transitional(&io, /*should_wait=*/true));
-  ASSERT_STATUS(zxio_close_new_transitional(&io, /*should_wait=*/true), ZX_ERR_BAD_HANDLE);
+  ASSERT_OK(zxio_close(&io, /*should_wait=*/true));
+  ASSERT_STATUS(zxio_close(&io, /*should_wait=*/true), ZX_ERR_BAD_HANDLE);
   ASSERT_STATUS(zxio_release(&io, nullptr), ZX_ERR_BAD_HANDLE);
 }

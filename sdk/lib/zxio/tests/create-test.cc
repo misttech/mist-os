@@ -43,7 +43,7 @@ TEST(Create, NotSupported) {
   zxio_t* io = &storage.io;
   zx::handle handle;
   ASSERT_OK(zxio_release(io, handle.reset_and_get_address()));
-  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
 
   zx_info_handle_basic_t info = {};
   ASSERT_OK(handle.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
@@ -420,7 +420,7 @@ TEST_F(CreateDirectoryTest, Directory) {
 
   EXPECT_OK(zxio_sync(zxio()));
 
-  ASSERT_OK(zxio_close_new_transitional(zxio(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 TEST_F(CreateDirectoryTest, DirectoryWithType) {
@@ -430,7 +430,7 @@ TEST_F(CreateDirectoryTest, DirectoryWithType) {
 
   EXPECT_OK(zxio_sync(zxio()));
 
-  ASSERT_OK(zxio_close_new_transitional(zxio(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 TEST_F(CreateDirectoryTest, DirectoryWithTypeWrapper) {
@@ -441,7 +441,7 @@ TEST_F(CreateDirectoryTest, DirectoryWithTypeWrapper) {
 
   EXPECT_OK(zxio_sync(zxio()));
 
-  ASSERT_OK(zxio_close_new_transitional(zxio(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 using CreateDirectoryWithOnOpenTest = CreateTestBase<SyncNodeServer>;
@@ -455,7 +455,7 @@ TEST_F(CreateDirectoryWithOnOpenTest, Directory) {
 
   EXPECT_OK(zxio_sync(zxio()));
 
-  ASSERT_OK(zxio_close_new_transitional(zxio(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 class TestFileServerWithDescribe : public zxio_tests::TestReadFileServer {
@@ -514,7 +514,7 @@ TEST_F(CreateFileWithOnOpenTest, File) {
   EXPECT_EQ(sizeof(buffer), actual);
   EXPECT_BYTES_EQ(buffer, zxio_tests::TestReadFileServer::kTestData, sizeof(buffer));
 
-  ASSERT_OK(zxio_close_new_transitional(zxio(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 TEST(CreateWithTypeTest, Pipe) {
@@ -540,7 +540,7 @@ TEST(CreateWithTypeTest, Pipe) {
   EXPECT_EQ(actual, sizeof(buffer));
   EXPECT_EQ(buffer, data);
 
-  ASSERT_OK(zxio_close_new_transitional(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
 }
 
 TEST(CreateWithTypeWrapperTest, Pipe) {
@@ -566,7 +566,7 @@ TEST(CreateWithTypeWrapperTest, Pipe) {
   EXPECT_EQ(actual, sizeof(buffer));
   EXPECT_EQ(buffer, data);
 
-  ASSERT_OK(zxio_close_new_transitional(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
 }
 
 class ServiceServer : public zxio_tests::CloseOnlyNodeServer {
@@ -585,7 +585,7 @@ TEST_F(CreateServiceTest, Service) {
 
   ASSERT_OK(zxio_create(TakeClientChannel().release(), storage()));
 
-  ASSERT_OK(zxio_close_new_transitional(zxio(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 TEST_F(CreateWithOnOpenTest, Service) {
@@ -595,7 +595,7 @@ TEST_F(CreateWithOnOpenTest, Service) {
 
   StartServerThread();
 
-  ASSERT_OK(zxio_close_new_transitional(zxio(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 }
 
 class DeviceServer : public fidl::testing::WireTestBase<fuchsia_hardware_pty::Device> {
@@ -646,7 +646,7 @@ TEST_F(CreateTtyTest, Tty) {
   EXPECT_NE(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
       << "pending is " << std::showbase << std::hex << pending;
 
-  ASSERT_OK(zxio_close_new_transitional(zxio(), /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio(), /*should_wait=*/true));
 
   ASSERT_STATUS(event.wait_one(0u, zx::time::infinite_past(), &pending), ZX_ERR_TIMED_OUT);
   EXPECT_EQ(pending & ZX_EVENTPAIR_PEER_CLOSED, ZX_EVENTPAIR_PEER_CLOSED)
@@ -677,7 +677,7 @@ TEST(CreateVmofileWithTypeTest, File) {
   EXPECT_OK(zxio_seek(zxio, ZXIO_SEEK_ORIGIN_CURRENT, 0, &seek_current_offset));
   EXPECT_EQ(static_cast<size_t>(file_start_offset), seek_current_offset);
 
-  ASSERT_OK(zxio_close_new_transitional(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
 }
 
 TEST(CreateVmoWithTypeWrapperTest, File) {
@@ -704,7 +704,7 @@ TEST(CreateVmoWithTypeWrapperTest, File) {
   EXPECT_OK(zxio_seek(zxio, ZXIO_SEEK_ORIGIN_CURRENT, 0, &seek_current_offset));
   EXPECT_EQ(static_cast<size_t>(file_start_offset), seek_current_offset);
 
-  ASSERT_OK(zxio_close_new_transitional(zxio, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(zxio, /*should_wait=*/true));
 }
 
 }  // namespace

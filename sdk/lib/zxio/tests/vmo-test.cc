@@ -30,7 +30,7 @@ TEST(Vmo, Create) {
   EXPECT_EQ(kSize, attr.content_size);
   ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, zxio_attr_set(io, &attr));
 
-  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
 }
 
 class VmoTest : public zxtest::Test {
@@ -46,7 +46,7 @@ class VmoTest : public zxtest::Test {
     io = &storage.io;
   }
 
-  void TearDown() override { ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true)); }
+  void TearDown() override { ASSERT_OK(zxio_close(io, /*should_wait=*/true)); }
 
  protected:
   zx::vmo backing;
@@ -187,7 +187,7 @@ class HugeVmoTest : public zxtest::Test {
     io = &storage.io;
   }
 
-  void TearDown() override { ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true)); }
+  void TearDown() override { ASSERT_OK(zxio_close(io, /*should_wait=*/true)); }
 
  protected:
   zx::vmo backing;
@@ -242,7 +242,7 @@ TEST_F(VmoCloseTest, UseAfterClose) {
   ASSERT_OK(zxio_read_at(io, 0, buffer, 6, 0, &actual));
   EXPECT_EQ(actual, 6);
 
-  ASSERT_OK(zxio_close_new_transitional(io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(io, /*should_wait=*/true));
   actual = 0;
   ASSERT_STATUS(zxio_read_at(io, 0, buffer, 6, 0, &actual), ZX_ERR_BAD_HANDLE);
   EXPECT_EQ(actual, 0);

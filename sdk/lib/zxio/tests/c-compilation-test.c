@@ -24,5 +24,5 @@ TEST(Zxio, UseFromC) {
   memset(&ops, 0, sizeof(ops));
   ops.close = test_close;
   zxio_init(&object.io, &ops);
-  ASSERT_OK(zxio_close_new_transitional(&object.io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&object.io, /*should_wait=*/true));
 }

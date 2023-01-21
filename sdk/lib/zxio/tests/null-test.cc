@@ -67,7 +67,7 @@ TEST(NullTest, Default) {
   zxio_dirent_t entry = {.name = name_buffer};
   ASSERT_STATUS(zxio_dirent_iterator_next(&iterator, &entry), ZX_ERR_NOT_SUPPORTED);
 
-  ASSERT_OK(zxio_close_new_transitional(&io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&io, /*should_wait=*/true));
 }
 
 TEST(NullTest, Null) {
@@ -132,7 +132,7 @@ TEST(NullTest, Null) {
   zxio_dirent_t entry = {.name = name_buffer};
   ASSERT_STATUS(zxio_dirent_iterator_next(&iterator, &entry), ZX_ERR_NOT_SUPPORTED);
 
-  ASSERT_OK(zxio_close_new_transitional(&io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&io, /*should_wait=*/true));
 }
 
 TEST(NullTest, DefaultRelease) {
@@ -141,7 +141,7 @@ TEST(NullTest, DefaultRelease) {
   zx_handle_t handle = ZX_HANDLE_INVALID;
   ASSERT_STATUS(zxio_release(&io, &handle), ZX_ERR_NOT_SUPPORTED);
   ASSERT_EQ(ZX_HANDLE_INVALID, handle);
-  ASSERT_OK(zxio_close_new_transitional(&io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&io, /*should_wait=*/true));
 }
 
 TEST(NullTest, NullRelease) {
@@ -150,5 +150,5 @@ TEST(NullTest, NullRelease) {
   zx_handle_t handle = ZX_HANDLE_INVALID;
   ASSERT_STATUS(zxio_release(&io, &handle), ZX_ERR_NOT_SUPPORTED);
   ASSERT_EQ(ZX_HANDLE_INVALID, handle);
-  ASSERT_OK(zxio_close_new_transitional(&io, /*should_wait=*/true));
+  ASSERT_OK(zxio_close(&io, /*should_wait=*/true));
 }
