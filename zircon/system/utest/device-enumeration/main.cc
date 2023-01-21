@@ -800,6 +800,7 @@ TEST_F(DeviceEnumerationTest, VisaliaTest) {
 
 TEST_F(DeviceEnumerationTest, PinecrestTest) {
   static const char* kDevicePaths[] = {
+      "sys/platform/00:00:1b/sysmem/sysmem-fidl",
       "sys/platform/14:01:1/as370-gpio",
       "sys/platform/00:00:9/dw-i2c",
       "sys/platform/14:01:2/as370-usb-phy",

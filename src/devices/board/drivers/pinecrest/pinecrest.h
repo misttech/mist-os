@@ -19,6 +19,7 @@ enum {
   BTI_USB,
   BTI_AUDIO_DHUB,
   BTI_SDIO0,
+  BTI_SYSMEM,
   BTI_NNA,
   BTI_EMMC0,
 };
@@ -39,6 +40,7 @@ class Pinecrest : public ddk::Device<Pinecrest> {
   zx_status_t Start();
   int Thread();
 
+  zx_status_t SysmemInit();
   zx_status_t GpioInit();
   zx_status_t I2cInit();
   zx_status_t UsbInit();

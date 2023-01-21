@@ -72,7 +72,16 @@ zx_status_t Pinecrest::Start() {
 }
 
 int Pinecrest::Thread() {
-  auto status = GpioInit();
+  zx_status_t status;
+
+  // Create sysmem early so that calls to `zx_vmo_create_continguous` will work.
+  status = SysmemInit();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "%s: SysmemInit() failed: %s", __func__, zx_status_get_string(status));
+    return thrd_error;
+  }
+
+  status = GpioInit();
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: GpioInit() failed: %s", __func__, zx_status_get_string(status));
     return thrd_error;
