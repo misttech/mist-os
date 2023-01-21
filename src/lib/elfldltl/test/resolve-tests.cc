@@ -203,4 +203,21 @@ TYPED_TEST(ElfldltlResolveTests, UndefinedWeak) {
   EXPECT_TRUE(found->undefined_weak());
 }
 
+TYPED_TEST(ElfldltlResolveTests, Undefined) {
+  using Elf = typename TestFixture::Elf;
+  using TestModule = typename ElfldltlResolveTests<Elf>::TestModule;
+
+  ExpectedSingleError expected("undefined symbol: ", "noexist");
+
+  std::array modules{TestModule("first"), TestModule("second")};
+  if (this->HasFatalFailure()) {
+    return;
+  }
+
+  elfldltl::SymbolInfoForSingleLookup<Elf> si{"noexist"};
+  auto resolve = elfldltl::MakeSymbolResolver(si, modules, expected.diag());
+  auto found = resolve(si.symbol(), elfldltl::RelocateTls::kNone);
+  ASSERT_FALSE(found);
+}
+
 }  // namespace
