@@ -41,6 +41,8 @@ source_set("bus_mapper") {
 }
 
 source_set("magma_system") {
+  # All functions should be declared in magma.h or magma_sysmem.h, so warn about unnecessary functions.
+  cflags = [ "-Wmissing-prototypes" ]
   sources = [ "mock_magma_system.cc" ]
   deps = [
     "$magma_build_root/include:magma",

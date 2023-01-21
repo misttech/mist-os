@@ -3,14 +3,21 @@ IfsVersion:      3.0
 SoName:          libmagma_shared.so
 Symbols:
   - { Name: magma_buffer_clean_cache, Type: Func }
+  - { Name: magma_buffer_collection_get_buffer_handle, Type: Func }
+  - { Name: magma_buffer_collection_get_collection_info, Type: Func }
   - { Name: magma_buffer_collection_import, Type: Func }
   - { Name: magma_buffer_collection_release, Type: Func }
+  - { Name: magma_buffer_collection_release2, Type: Func }
   - { Name: magma_buffer_collection_set_constraints, Type: Func }
+  - { Name: magma_buffer_collection_set_constraints2, Type: Func }
   - { Name: magma_buffer_constraints_add_additional, Type: Func }
   - { Name: magma_buffer_constraints_create, Type: Func }
   - { Name: magma_buffer_constraints_release, Type: Func }
+  - { Name: magma_buffer_constraints_release2, Type: Func }
   - { Name: magma_buffer_constraints_set_colorspaces, Type: Func }
+  - { Name: magma_buffer_constraints_set_colorspaces2, Type: Func }
   - { Name: magma_buffer_constraints_set_format, Type: Func }
+  - { Name: magma_buffer_constraints_set_format2, Type: Func }
   - { Name: magma_buffer_format_description_release, Type: Func }
   - { Name: magma_buffer_get_cache_policy, Type: Func }
   - { Name: magma_buffer_get_handle, Type: Func }
@@ -19,6 +26,15 @@ Symbols:
   - { Name: magma_buffer_get_size, Type: Func }
   - { Name: magma_buffer_set_cache_policy, Type: Func }
   - { Name: magma_buffer_set_name, Type: Func }
+  - { Name: magma_collection_info_get_buffer_count, Type: Func }
+  - { Name: magma_collection_info_get_coherency_domain, Type: Func }
+  - { Name: magma_collection_info_get_color_space, Type: Func }
+  - { Name: magma_collection_info_get_format, Type: Func }
+  - { Name: magma_collection_info_get_format_index, Type: Func }
+  - { Name: magma_collection_info_get_format_modifier, Type: Func }
+  - { Name: magma_collection_info_get_is_secure, Type: Func }
+  - { Name: magma_collection_info_get_plane_info_with_size, Type: Func }
+  - { Name: magma_collection_info_release, Type: Func }
   - { Name: magma_connection_add_performance_counter_buffer_offsets_to_pool, Type: Func }
   - { Name: magma_connection_buffer_range_op, Type: Func }
   - { Name: magma_connection_clear_performance_counters, Type: Func }
@@ -67,7 +83,10 @@ Symbols:
   - { Name: magma_semaphore_reset, Type: Func }
   - { Name: magma_semaphore_signal, Type: Func }
   - { Name: magma_sysmem_allocate_buffer, Type: Func }
+  - { Name: magma_sysmem_connection_allocate_buffer, Type: Func }
+  - { Name: magma_sysmem_connection_create_buffer_constraints, Type: Func }
   - { Name: magma_sysmem_connection_import, Type: Func }
+  - { Name: magma_sysmem_connection_import_buffer_collection, Type: Func }
   - { Name: magma_sysmem_connection_release, Type: Func }
   - { Name: magma_sysmem_get_buffer_handle_from_collection, Type: Func }
   - { Name: magma_sysmem_get_description_from_collection, Type: Func }

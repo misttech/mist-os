@@ -789,8 +789,8 @@ class TestConnection {
               magma_sysmem_connection_import(local_endpoint.release(), &connection));
 
     magma_buffer_collection_t collection;
-    EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_buffer_collection_import(connection, ZX_HANDLE_INVALID, &collection));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_sysmem_connection_import_buffer_collection(
+                                   connection, ZX_HANDLE_INVALID, &collection));
 
     magma_buffer_format_constraints_t buffer_constraints{};
 
@@ -799,16 +799,13 @@ class TestConnection {
     buffer_constraints.secure_permitted = false;
     buffer_constraints.secure_required = false;
     buffer_constraints.cpu_domain_supported = true;
+    buffer_constraints.min_buffer_count_for_camping = 1;
+    buffer_constraints.min_buffer_count_for_dedicated_slack = 1;
+    buffer_constraints.min_buffer_count_for_shared_slack = 1;
+    buffer_constraints.options = MAGMA_BUFFER_FORMAT_CONSTRAINT_OPTIONS_EXTRA_COUNTS;
     magma_sysmem_buffer_constraints_t constraints;
-    EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_buffer_constraints_create(connection, &buffer_constraints, &constraints));
-
-    magma_buffer_format_additional_constraints_t additional{
-        .min_buffer_count_for_camping = 1,
-        .min_buffer_count_for_dedicated_slack = 1,
-        .min_buffer_count_for_shared_slack = 1};
-    EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_buffer_constraints_add_additional(connection, constraints, &additional));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_sysmem_connection_create_buffer_constraints(
+                                   connection, &buffer_constraints, &constraints));
 
     // Create a set of basic 512x512 RGBA image constraints.
     magma_image_format_constraints_t image_constraints{};
@@ -822,65 +819,66 @@ class TestConnection {
     image_constraints.min_bytes_per_row = 0;
 
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_buffer_constraints_set_format(connection, constraints, 0, &image_constraints));
+              magma_buffer_constraints_set_format2(constraints, 0, &image_constraints));
 
     uint32_t color_space_in = MAGMA_COLORSPACE_SRGB;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_constraints_set_colorspaces(connection, constraints, 0,
-                                                                        1, &color_space_in));
-
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_buffer_collection_set_constraints(connection, collection, constraints));
+              magma_buffer_constraints_set_colorspaces2(constraints, 0, 1, &color_space_in));
+
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_collection_set_constraints2(collection, constraints));
 
     // Buffer should be allocated now.
-    magma_buffer_format_description_t description;
+    magma_collection_info_t collection_info;
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_sysmem_get_description_from_collection(connection, collection, &description));
+              magma_buffer_collection_get_collection_info(collection, &collection_info));
 
-    uint32_t expected_buffer_count = additional.min_buffer_count_for_camping +
-                                     additional.min_buffer_count_for_dedicated_slack +
-                                     additional.min_buffer_count_for_shared_slack;
+    uint32_t expected_buffer_count = buffer_constraints.min_buffer_count_for_camping +
+                                     buffer_constraints.min_buffer_count_for_dedicated_slack +
+                                     buffer_constraints.min_buffer_count_for_shared_slack;
     uint32_t buffer_count;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_buffer_count(description, &buffer_count));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_collection_info_get_buffer_count(collection_info, &buffer_count));
     EXPECT_EQ(expected_buffer_count, buffer_count);
     magma_bool_t is_secure;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_buffer_is_secure(description, &is_secure));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_collection_info_get_is_secure(collection_info, &is_secure));
     EXPECT_FALSE(is_secure);
 
     uint32_t format;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_buffer_format(description, &format));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_collection_info_get_format(collection_info, &format));
     EXPECT_EQ(MAGMA_FORMAT_R8G8B8A8, format);
     uint32_t color_space = 0;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_buffer_color_space(description, &color_space));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_collection_info_get_color_space(collection_info, &color_space));
     EXPECT_EQ(MAGMA_COLORSPACE_SRGB, color_space);
 
     magma_bool_t has_format_modifier;
     uint64_t format_modifier;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_get_buffer_format_modifier(description, &has_format_modifier,
-                                                                &format_modifier));
+    EXPECT_EQ(MAGMA_STATUS_OK, magma_collection_info_get_format_modifier(
+                                   collection_info, &has_format_modifier, &format_modifier));
     if (has_format_modifier) {
       EXPECT_EQ(MAGMA_FORMAT_MODIFIER_LINEAR, format_modifier);
     }
 
     magma_image_plane_t planes[4];
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_get_buffer_format_plane_info_with_size(description, 512u, 512u, planes));
+              magma_collection_info_get_plane_info_with_size(collection_info, 512u, 512u, planes));
     EXPECT_EQ(512 * 4u, planes[0].bytes_per_row);
     EXPECT_EQ(0u, planes[0].byte_offset);
     EXPECT_EQ(MAGMA_STATUS_OK,
-              magma_get_buffer_format_plane_info_with_size(description, 512, 512, planes));
+              magma_collection_info_get_plane_info_with_size(collection_info, 512, 512, planes));
     EXPECT_EQ(512 * 4u, planes[0].bytes_per_row);
     EXPECT_EQ(0u, planes[0].byte_offset);
 
-    magma_buffer_format_description_release(description);
+    magma_collection_info_release(collection_info);
 
     magma_handle_t handle;
     uint32_t offset;
-    EXPECT_EQ(MAGMA_STATUS_OK, magma_sysmem_get_buffer_handle_from_collection(
-                                   connection, collection, 0, &handle, &offset));
+    EXPECT_EQ(MAGMA_STATUS_OK,
+              magma_buffer_collection_get_buffer_handle(collection, 0, &handle, &offset));
     EXPECT_EQ(ZX_OK, zx_handle_close(handle));
 
-    magma_buffer_collection_release(connection, collection);
-    magma_buffer_constraints_release(connection, constraints);
+    magma_buffer_collection_release2(collection);
+    magma_buffer_constraints_release2(constraints);
     magma_sysmem_connection_release(connection);
 #endif
   }

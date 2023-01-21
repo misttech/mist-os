@@ -183,18 +183,15 @@ magma_status_t magma_connection_read_notification_channel(magma_connection_t con
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
-magma_status_t magma_read_notification_channel2(magma_connection_t connection, void* buffer,
-                                                uint64_t buffer_size, uint64_t* buffer_size_out,
-                                                magma_bool_t* more_data_out) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
-}
-
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_buffer_collection_import(magma_sysmem_connection_t connection, uint32_t handle,
                                               magma_buffer_collection_t* collection_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
-magma_status_t magma_sysmem_connection_create(magma_sysmem_connection_t* connection_out) {
+magma_status_t magma_sysmem_connection_import_buffer_collection(
+    magma_sysmem_connection_t connection, magma_handle_t handle,
+    magma_buffer_collection_t* collection_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
@@ -202,11 +199,16 @@ magma_status_t magma_sysmem_connection_import(magma_handle_t channel,
                                               magma_sysmem_connection_t* connection_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
+
 void magma_sysmem_connection_release(magma_sysmem_connection_t connection) {}
 
+// TODO(fxbug.dev/120286): Remove
 void magma_buffer_collection_release(magma_sysmem_connection_t connection,
                                      magma_buffer_collection_t collection) {}
 
+void magma_buffer_collection_release2(magma_buffer_collection_t collection) {}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_buffer_constraints_create(
     magma_sysmem_connection_t connection,
     const magma_buffer_format_constraints_t* buffer_constraints,
@@ -214,73 +216,141 @@ magma_status_t magma_buffer_constraints_create(
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_sysmem_connection_create_buffer_constraints(
+    magma_sysmem_connection_t connection,
+    const magma_buffer_format_constraints_t* buffer_constraints,
+    magma_sysmem_buffer_constraints_t* constraints_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_buffer_constraints_set_format(
     magma_sysmem_connection_t connection, magma_sysmem_buffer_constraints_t constraints,
     uint32_t index, const magma_image_format_constraints_t* format_constraints) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_buffer_constraints_set_format2(
+    magma_sysmem_buffer_constraints_t constraints, uint32_t index,
+    const magma_image_format_constraints_t* format_constraints) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_buffer_constraints_set_colorspaces(
     magma_sysmem_connection_t connection, magma_sysmem_buffer_constraints_t constraints,
     uint32_t index, uint32_t color_space_count, const uint32_t* color_spaces) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_buffer_constraints_set_colorspaces2(
+    magma_sysmem_buffer_constraints_t constraints, uint32_t index, uint32_t color_space_count,
+    const uint32_t* color_spaces) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 void magma_buffer_constraints_release(magma_sysmem_connection_t connection,
                                       magma_sysmem_buffer_constraints_t constraints) {}
 
+void magma_buffer_constraints_release2(magma_sysmem_buffer_constraints_t constraints) {}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_buffer_collection_set_constraints(
     magma_sysmem_connection_t connection, magma_buffer_collection_t collection,
     magma_sysmem_buffer_constraints_t constraints) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_buffer_collection_set_constraints2(
+    magma_buffer_collection_t collection, magma_sysmem_buffer_constraints_t constraints) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_get_buffer_coherency_domain(magma_buffer_format_description_t description,
                                                  uint32_t* coherency_domain_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
-magma_status_t magma_get_buffer_format_plane_info(magma_buffer_format_description_t description,
-                                                  magma_image_plane_t* image_planes_out) {
+magma_status_t magma_collection_info_get_coherency_domain(magma_collection_info_t description,
+                                                          uint32_t* coherency_domain_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_get_buffer_format_plane_info_with_size(
     magma_buffer_format_description_t description, uint32_t width, uint32_t height,
     magma_image_plane_t* image_planes_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_collection_info_get_plane_info_with_size(
+    magma_collection_info_t collection_info, uint32_t width, uint32_t height,
+    magma_image_plane_t* image_planes_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 void magma_buffer_format_description_release(magma_buffer_format_description_t description) {}
 
+void magma_collection_info_release(magma_collection_info_t collection_info) {}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_get_buffer_format(magma_buffer_format_description_t description,
                                        uint32_t* format_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_collection_info_get_format(magma_collection_info_t collection_info,
+                                                uint32_t* format_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_get_buffer_format_modifier(magma_buffer_format_description_t description,
                                                 magma_bool_t* has_format_modifier_out,
                                                 uint64_t* format_modifier_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_collection_info_get_format_modifier(magma_collection_info_t collection_info,
+                                                         magma_bool_t* has_format_modifier_out,
+                                                         uint64_t* format_modifier_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_get_buffer_color_space(magma_buffer_format_description_t description,
                                             uint32_t* color_space_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_collection_info_get_color_space(magma_collection_info_t collection_info,
+                                                     uint32_t* color_space_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_buffer_constraints_add_additional(
     magma_sysmem_connection_t connection, magma_sysmem_buffer_constraints_t constraints,
     const magma_buffer_format_additional_constraints_t* additional) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_sysmem_get_description_from_collection(
     magma_sysmem_connection_t connection, magma_buffer_collection_t collection,
     magma_buffer_format_description_t* buffer_format_description_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_buffer_collection_get_collection_info(
+    magma_buffer_collection_t collection, magma_collection_info_t* collection_info_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_sysmem_get_buffer_handle_from_collection(magma_sysmem_connection_t connection,
                                                               magma_buffer_collection_t collection,
                                                               uint32_t index,
@@ -289,6 +359,14 @@ magma_status_t magma_sysmem_get_buffer_handle_from_collection(magma_sysmem_conne
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_buffer_collection_get_buffer_handle(magma_buffer_collection_t collection,
+                                                         uint32_t index,
+                                                         magma_handle_t* buffer_handle_out,
+                                                         uint32_t* vmo_offset_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_get_description_format_index(magma_sysmem_connection_t connection,
                                                   magma_buffer_format_description_t description,
                                                   magma_sysmem_buffer_constraints_t constraints,
@@ -297,8 +375,21 @@ magma_status_t magma_get_description_format_index(magma_sysmem_connection_t conn
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
+magma_status_t magma_collection_info_get_format_index(magma_collection_info_t collection_info,
+                                                      magma_sysmem_buffer_constraints_t constraints,
+                                                      magma_bool_t* format_valid_out,
+                                                      uint32_t format_valid_count) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+// TODO(fxbug.dev/120286): Remove
 magma_status_t magma_get_buffer_count(magma_buffer_format_description_t description,
                                       uint32_t* count_out) {
+  return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+magma_status_t magma_collection_info_get_buffer_count(magma_collection_info_t description,
+                                                      uint32_t* count_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
@@ -373,11 +464,6 @@ magma_status_t magma_connection_read_performance_counter_completion(
     magma_connection_t connection, magma_perf_count_pool_t pool, uint32_t* trigger_id_out,
     uint64_t* buffer_id_out, uint32_t* buffer_offset_out, uint64_t* time_out,
     uint32_t* result_flags_out) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
-}
-
-magma_status_t magma_buffer_set_name(magma_connection_t connection, magma_buffer_t buffer,
-                                     const char* name) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
