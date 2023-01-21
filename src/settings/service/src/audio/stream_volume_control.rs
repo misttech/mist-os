@@ -16,8 +16,7 @@ use fidl_fuchsia_media_audio::VolumeControlProxy;
 use fuchsia_async as fasync;
 use fuchsia_syslog::fx_log_warn;
 use fuchsia_trace as ftrace;
-use futures::channel::mpsc::UnboundedSender;
-use futures::stream::StreamExt;
+use futures::channel::oneshot::Sender;
 use futures::TryStreamExt;
 use std::sync::Arc;
 
@@ -32,27 +31,26 @@ pub(crate) type ExitAction = Arc<dyn Fn() + Send + Sync + 'static>;
 // service for |stored_stream|'s stream type. |proxy| is set to None if it
 // fails to bind to the AudioCore service. |early_exit_action| specifies a
 // closure to be run if the StreamVolumeControl exits prematurely.
-// TODO(fxbug.dev/57705): Replace UnboundedSender with a oneshot channel.
 pub struct StreamVolumeControl {
     pub stored_stream: AudioStream,
     proxy: Option<VolumeControlProxy>,
     audio_service: ExternalServiceProxy<fidl_fuchsia_media::AudioCoreProxy>,
     publisher: Option<Publisher>,
     early_exit_action: Option<ExitAction>,
-    listen_exit_tx: Option<UnboundedSender<()>>,
+    listen_exit_tx: Option<Sender<()>>,
 }
 
 impl Drop for StreamVolumeControl {
     fn drop(&mut self) {
         if let Some(exit_tx) = self.listen_exit_tx.take() {
             // Do not signal exit if receiver is already closed.
-            if exit_tx.is_closed() {
+            if exit_tx.is_canceled() {
                 return;
             }
 
             // Consider panic! is likely to be abort in the drop method, only log info for
             // unbounded_send failure.
-            exit_tx.unbounded_send(()).unwrap_or_else(|_| {
+            exit_tx.send(()).unwrap_or_else(|_| {
                 fx_log_warn!("StreamVolumeControl::drop, exit_tx failed to send exit signal")
             });
         }
@@ -186,7 +184,7 @@ impl StreamVolumeControl {
 
         if let Some(exit_tx) = self.listen_exit_tx.take() {
             // exit_rx needs this signal to end leftover spawn.
-            exit_tx.unbounded_send(()).expect(
+            exit_tx.send(()).expect(
                 "StreamVolumeControl::bind_volume_control, listen_exit_tx failed to send exit \
                 signal",
             );
@@ -194,7 +192,7 @@ impl StreamVolumeControl {
 
         trace!(id, "setup listener");
 
-        let (exit_tx, mut exit_rx) = futures::channel::mpsc::unbounded::<()>();
+        let (exit_tx, mut exit_rx) = futures::channel::oneshot::channel::<()>();
         let publisher_clone = self.publisher.clone();
         let mut volume_events = vol_control_proxy.take_event_stream();
         let early_exit_action = self.early_exit_action.clone();
@@ -203,7 +201,7 @@ impl StreamVolumeControl {
             trace!(id, "bind volume handler");
             loop {
                 futures::select! {
-                    _ = exit_rx.next() => {
+                    _ = exit_rx => {
                         trace!(id, "exit");
                         if let Some(publisher) = publisher_clone {
                             // Send UNKNOWN_INSPECT_STRING for request-related args because it
