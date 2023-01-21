@@ -524,7 +524,7 @@ impl Configurator for DefaultConfigurator {
         let _ = interface.connect().context("Couldn't connect to codec")?;
 
         // Get codec properties.
-        let properties = interface.get_info().await?;
+        let properties = interface.get_properties().await?;
 
         // Reset the codec.
         let _ = interface.reset().await?;
@@ -578,19 +578,29 @@ impl Configurator for DefaultConfigurator {
         {
             return Err(anyhow!("Codec with bad format reported"));
         }
-        tracing::debug!(
-            "Codec {:?} {:?} formats {:?}",
-            properties.manufacturer,
-            properties.product_name,
-            codec_formats
-        );
+        tracing::debug!("Codec properties {:?} formats {:?}", properties, codec_formats);
+        // Use an empty string if no manufacturer reported.
+        let mut manufacturer = "".to_string();
+        if let Some(value) = properties.manufacturer {
+            manufacturer = value;
+        }
+        // Use an empty string if no product reported.
+        let mut product = "".to_string();
+        if let Some(value) = properties.product {
+            product = value;
+        }
+        let mut is_input = false;
+        if let Some(value) = properties.is_input {
+            is_input = value;
+        }
 
         // Update the stream config state for this codec.
         let device = Device {
-            manufacturer: properties.manufacturer,
-            product: properties.product_name,
+            manufacturer: manufacturer,
+            product: product,
             hardwired: plug_detect_capabilities != PlugDetectCapabilities::CanAsyncNotify,
             is_codec: true,
+            is_input: is_input,
         };
         let stream_config_indexes = inner
             .stream_config_available_indexes
@@ -693,11 +703,16 @@ impl Configurator for DefaultConfigurator {
         if let Some(value) = dai_properties.product_name {
             product = value;
         }
+        let mut is_input = false;
+        if let Some(value) = dai_properties.is_input {
+            is_input = value;
+        }
         let device = Device {
             manufacturer: manufacturer,
             product: product,
             hardwired: true, // Set all DAIs to hardwired.
             is_codec: false,
+            is_input: is_input,
         };
         let indexes = inner
             .stream_config_available_indexes
@@ -888,6 +903,7 @@ mod tests {
                 product: "789".to_string(),
                 hardwired: true,
                 is_codec: true,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -898,6 +914,7 @@ mod tests {
                 product: "ghi".to_string(),
                 hardwired: true,
                 is_codec: true,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -908,6 +925,7 @@ mod tests {
                 product: "test".to_string(),
                 hardwired: true,
                 is_codec: false,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -933,6 +951,7 @@ mod tests {
                 product: "e".to_string(),
                 hardwired: true,
                 is_codec: true,
+                is_input: true,
             },
             STREAM_CONFIG_INDEX_MICS,
         );
@@ -942,6 +961,7 @@ mod tests {
                 product: "e".to_string(),
                 hardwired: true,
                 is_codec: true,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_HEADSET_OUT,
         );
@@ -951,6 +971,7 @@ mod tests {
                 product: "e".to_string(),
                 hardwired: true,
                 is_codec: true,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -959,7 +980,7 @@ mod tests {
             assert_eq!(
                 e.to_string(),
                 "Codec processing error: Codec (Device { manufacturer: \"456\", product: \"789\", \
-                 is_codec: true, hardwired: true }) not in config"
+                 is_codec: true, hardwired: true, is_input: false }) not in config"
             );
         }
         if let Err(e) = find_dais(&dai_proxy, 1, configurator).await {
@@ -967,7 +988,7 @@ mod tests {
             assert_eq!(
                 e.to_string(),
                 "DAI processing error: DAI (Device { manufacturer: \"test\", product: \"test\", is\
-                 _codec: false, hardwired: true }) not in config"
+                 _codec: false, hardwired: true, is_input: false }) not in config"
             );
         }
         Ok(())
@@ -984,6 +1005,7 @@ mod tests {
                 product: "test".to_string(),
                 is_codec: false,
                 hardwired: true,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -1025,8 +1047,9 @@ mod tests {
             Device {
                 manufacturer: "456".to_string(),
                 product: "789".to_string(),
-                is_codec: true,
                 hardwired: true,
+                is_codec: true,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -1035,8 +1058,9 @@ mod tests {
             Device {
                 manufacturer: "test".to_string(),
                 product: "test".to_string(),
-                is_codec: false,
                 hardwired: true,
+                is_codec: false,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -1400,8 +1424,11 @@ mod tests {
         /// Stream to handle Signal Processing API protocol.
         signal_stream: Option<SignalProcessingRequestStream>,
 
-        /// Last gain set
+        /// Last gain set.
         gain: Option<f32>,
+
+        /// Is input.
+        is_input: bool,
     }
 
     impl TestCodec {
@@ -1460,6 +1487,17 @@ mod tests {
                         product_name: "testy".to_string(),
                     };
                     responder.send(&mut info)?;
+                }
+                CodecRequest::GetProperties { responder } => {
+                    let info = CodecProperties {
+                        unique_id: Some("".to_string()),
+                        manufacturer: Some("test".to_string()),
+                        product: Some("testy".to_string()),
+                        is_input: Some(self.is_input),
+                        plug_detect_capabilities: Some(PlugDetectCapabilities::Hardwired),
+                        ..CodecProperties::EMPTY
+                    };
+                    responder.send(info)?;
                 }
                 CodecRequest::Stop { responder: _ } => {}
                 CodecRequest::Start { responder: _ } => {}
@@ -1579,6 +1617,7 @@ mod tests {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
             gain: None,
+            is_input: false,
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
         let stream_config_inner = stream_config.inner.clone();
@@ -1631,6 +1670,7 @@ mod tests {
                     product: "testy".to_string(),
                     hardwired: true,
                     is_codec: true,
+                    is_input: false,
                 },
                 STREAM_CONFIG_INDEX_SPEAKERS,
             );
@@ -1647,6 +1687,7 @@ mod tests {
                 codec_stream: codec_stream,
                 signal_stream: Some(signal_stream),
                 gain: None,
+                is_input: false,
             };
             let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
             let codec_proxy = codec_client.into_proxy().expect("Client should be available");
@@ -1667,6 +1708,110 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_default_configurator_find_codecs_check_input_output_codecs() -> Result<()> {
+        let mut config = Config::new()?;
+
+        // 1 output device.
+        config.load_device(
+            Device {
+                manufacturer: "test".to_string(),
+                product: "testy".to_string(),
+                hardwired: true,
+                is_codec: true,
+                is_input: false,
+            },
+            STREAM_CONFIG_INDEX_SPEAKERS,
+        );
+
+        // 2 input devices.
+        config.load_device(
+            Device {
+                manufacturer: "test".to_string(),
+                product: "testy".to_string(),
+                hardwired: true,
+                is_codec: true,
+                is_input: true,
+            },
+            STREAM_CONFIG_INDEX_MICS,
+        );
+        config.load_device(
+            Device {
+                manufacturer: "test".to_string(),
+                product: "testy".to_string(),
+                hardwired: true,
+                is_codec: true,
+                is_input: true,
+            },
+            STREAM_CONFIG_INDEX_MICS,
+        );
+
+        let mut configurator = DefaultConfigurator::new(config)?;
+
+        // Add output device.
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
+            .expect("Error creating endpoint");
+        let (_signal_client, signal_stream) =
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
+                .expect("Error creating endpoint");
+        let codec = TestCodec {
+            codec_stream: codec_stream,
+            signal_stream: Some(signal_stream),
+            gain: None,
+            is_input: false, // Make the device to be of type output.
+        };
+        let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
+        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
+        configurator.process_new_codec(codec_interface).await?;
+
+        // Add input device 1.
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
+            .expect("Error creating endpoint");
+        let (_signal_client, signal_stream) =
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
+                .expect("Error creating endpoint");
+        let codec = TestCodec {
+            codec_stream: codec_stream,
+            signal_stream: Some(signal_stream),
+            gain: None,
+            is_input: true, // Make the device to be of type input.
+        };
+        let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
+        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
+        configurator.process_new_codec(codec_interface).await?;
+
+        // Add input device 2.
+        let (codec_client, codec_stream) = fidl::endpoints::create_request_stream::<CodecMarker>()
+            .expect("Error creating endpoint");
+        let (_signal_client, signal_stream) =
+            fidl::endpoints::create_request_stream::<SignalProcessingMarker>()
+                .expect("Error creating endpoint");
+        let codec = TestCodec {
+            codec_stream: codec_stream,
+            signal_stream: Some(signal_stream),
+            gain: None,
+            is_input: true, // Make the device to be of type input.
+        };
+        let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
+        let codec_proxy = codec_client.into_proxy().expect("Client should be available");
+        let codec_interface = CodecInterface::new_with_proxy(codec_proxy);
+        configurator.process_new_codec(codec_interface).await?;
+
+        // Check states
+        let inner = configurator.inner.lock().await;
+        let codec_speakers_state =
+            inner.stream_config_states.get(&STREAM_CONFIG_INDEX_SPEAKERS).unwrap().lock().await;
+        assert_eq!(codec_speakers_state.codec_states[0].dai_channel, 0);
+        let codec_mics_state =
+            inner.stream_config_states.get(&STREAM_CONFIG_INDEX_MICS).unwrap().lock().await;
+        assert_eq!(codec_mics_state.codec_states[0].dai_channel, 1);
+        assert_eq!(codec_mics_state.codec_states[1].dai_channel, 0);
+
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_default_configurator_find_codec_with_signal_processing() -> Result<()> {
         let mut config = Config::new()?;
         config.load_device(
@@ -1675,6 +1820,7 @@ mod tests {
                 product: "testy".to_string(),
                 hardwired: true,
                 is_codec: true,
+                is_input: false,
             },
             STREAM_CONFIG_INDEX_SPEAKERS,
         );
@@ -1688,6 +1834,7 @@ mod tests {
             codec_stream: codec_stream,
             signal_stream: Some(signal_stream),
             gain: None,
+            is_input: false,
         };
         let _codec_task = fasync::Task::spawn(codec.process_codec_and_signal_requests());
         let codec_proxy = codec_client.into_proxy().expect("Client should be available");

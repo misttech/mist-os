@@ -24,6 +24,9 @@ pub struct Device {
 
     /// Hardwired.
     pub hardwired: bool,
+
+    /// Is input.
+    pub is_input: bool,
 }
 
 #[derive(Default)]
@@ -51,6 +54,7 @@ impl Config {
                     product: "MAX98373".to_string(),
                     hardwired: true,
                     is_codec: true,
+                    is_input: false,
                 },
                 vec![STREAM_CONFIG_INDEX_SPEAKERS, STREAM_CONFIG_INDEX_SPEAKERS],
             ),
@@ -60,8 +64,19 @@ impl Config {
                     product: "DA7219".to_string(),
                     hardwired: false,
                     is_codec: true,
+                    is_input: true,
                 },
-                vec![STREAM_CONFIG_INDEX_HEADSET_OUT, STREAM_CONFIG_INDEX_HEADSET_IN],
+                vec![STREAM_CONFIG_INDEX_HEADSET_IN],
+            ),
+            (
+                Device {
+                    manufacturer: "Dialog".to_string(),
+                    product: "DA7219".to_string(),
+                    hardwired: false,
+                    is_codec: true,
+                    is_input: false,
+                },
+                vec![STREAM_CONFIG_INDEX_HEADSET_OUT],
             ),
             // DAIs:
             (
@@ -70,6 +85,7 @@ impl Config {
                     product: "Builtin Speakers".to_string(),
                     hardwired: true,
                     is_codec: false,
+                    is_input: false,
                 },
                 vec![STREAM_CONFIG_INDEX_SPEAKERS],
             ),
@@ -79,6 +95,7 @@ impl Config {
                     product: "Builtin Microphones".to_string(),
                     hardwired: true,
                     is_codec: false,
+                    is_input: true,
                 },
                 vec![STREAM_CONFIG_INDEX_MICS],
             ),
@@ -88,6 +105,7 @@ impl Config {
                     product: "Builtin Headphone Jack Output".to_string(),
                     hardwired: true,
                     is_codec: false,
+                    is_input: false,
                 },
                 vec![STREAM_CONFIG_INDEX_HEADSET_OUT],
             ),
@@ -97,6 +115,7 @@ impl Config {
                     product: "Builtin Headphone Jack Input".to_string(),
                     hardwired: true,
                     is_codec: false,
+                    is_input: true,
                 },
                 vec![STREAM_CONFIG_INDEX_HEADSET_IN],
             ),

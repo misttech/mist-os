@@ -65,9 +65,9 @@ impl CodecInterface {
         Ok(())
     }
 
-    /// Get information from the codec.
-    pub async fn get_info(&self) -> Result<CodecInfo, Error> {
-        self.get_proxy()?.clone().get_info().err_into().await
+    /// Get properties from the codec.
+    pub async fn get_properties(&self) -> Result<CodecProperties, Error> {
+        self.get_proxy()?.clone().get_properties().err_into().await
     }
 
     /// Get plug detect capabilities from the codec.
