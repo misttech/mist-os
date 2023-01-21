@@ -5,6 +5,7 @@
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/async/cpp/time.h>
 #include <lib/async/dispatcher.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
@@ -22,13 +23,17 @@ namespace {
 using RealLoopFixtureTest = RealLoopFixture;
 
 TEST_F(RealLoopFixtureTest, Timeout) {
-  bool called = false;
+  zx::time posted_at = async::Now(dispatcher());
+  zx::time called_at = zx::time::infinite_past();
+  zx::duration timeout = zx::msec(100);
   async::PostDelayedTask(
-      dispatcher(), [&called] { called = true; }, zx::msec(100));
-  RunLoopWithTimeout(zx::msec(10));
-  EXPECT_FALSE(called);
-  RunLoopWithTimeout(zx::msec(100));
-  EXPECT_TRUE(called);
+      dispatcher(), [&called_at, dispatcher = dispatcher()] { called_at = async::Now(dispatcher); },
+      timeout);
+  // Run until `called_at` is updated.
+  RunLoopWithTimeoutOrUntil([&called_at]() { return called_at > zx::time::infinite_past(); },
+                            zx::sec(1));
+  // The task should have been called only after `timeout` has elapsed.
+  EXPECT_GE(called_at, posted_at + timeout);
 }
 
 TEST_F(RealLoopFixtureTest, NoTimeout) {
