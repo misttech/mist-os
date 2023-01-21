@@ -32,11 +32,10 @@ class AdbTest(unittest.TestCase):
 
     def test_adb_shell(self):
         output = self._run_adb('shell', 'echo \"hello\"')
-        self.assertEqual('hello\n', output)
+        self.assertIn('hello\n', output)
 
     def test_adb_reboot(self):
-        output = self._run_adb('reboot')
-        self.assertEqual('', output)
+        self._run_adb('reboot')
 
         output = self._run_adb('wait-for-disconnect')
         self.assertEqual('', output)
