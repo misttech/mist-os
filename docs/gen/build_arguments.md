@@ -1572,7 +1572,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:33
+From //build/config/BUILD.gn:34
 
 ### dev_bootfs_labels
 
@@ -2561,7 +2561,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:25
+From //build/config/BUILD.gn:26
 
 ### enable_grpc_ares
 
@@ -2913,7 +2913,7 @@ changed.  Set the version of the C++ standard to compile for, 17 or 20.
 
 **Current value (from the default):** `17`
 
-From //build/config/BUILD.gn:30
+From //build/config/BUILD.gn:31
 
 ### experimental_wlan_client_mlme
 
@@ -8496,7 +8496,7 @@ From //build/images/args.gni:110
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/BUILD.gn:132
+From //build/config/fuchsia/BUILD.gn:131
 
 ### zircon_b_partition
 
