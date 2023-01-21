@@ -148,7 +148,23 @@ void SimpleCodecServerInternal<T>::Start(Codec::StartCallback callback,
 
 template <class T>
 void SimpleCodecServerInternal<T>::GetInfo(Codec::GetInfoCallback callback) {
-  callback(static_cast<T*>(this)->GetInfo());
+  auto info = static_cast<T*>(this)->GetInfo();
+  callback({
+      .unique_id = info.unique_id,
+      .manufacturer = info.manufacturer,
+      .product_name = info.product_name,
+  });
+}
+
+template <class T>
+void SimpleCodecServerInternal<T>::GetProperties(Codec::GetPropertiesCallback callback) {
+  Info info = static_cast<T*>(this)->GetInfo();
+  fuchsia::hardware::audio::CodecProperties properties;
+  properties.set_unique_id(info.unique_id);
+  properties.set_product(info.product_name);
+  properties.set_manufacturer(info.manufacturer);
+  properties.set_plug_detect_capabilities(audio_fidl::PlugDetectCapabilities::HARDWIRED);
+  callback(std::move(properties));
 }
 
 template <class T>

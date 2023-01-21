@@ -27,8 +27,13 @@ struct DriverIds {
 // //sdk/fidl/fuchsia.hardware.audio/dai_format.fidl.
 using SampleFormat = ::fuchsia::hardware::audio::DaiSampleFormat;
 using FrameFormat = ::fuchsia::hardware::audio::DaiFrameFormatStandard;
-using Info = ::fuchsia::hardware::audio::CodecInfo;
 using CodecFormatInfo = ::fuchsia::hardware::audio::CodecFormatInfo;
+
+struct Info {
+  std::string unique_id;
+  std::string manufacturer;
+  std::string product_name;
+};
 
 struct DaiFormat final {
   uint32_t number_of_channels{};

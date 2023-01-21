@@ -100,11 +100,47 @@ class Da7219Test : public zxtest::Test {
   fidl::WireSyncClient<fuchsia_hardware_audio::Codec> codec_;
 };
 
-TEST_F(Da7219Test, GetInfo) {
-  auto info = codec_->GetInfo();
-  EXPECT_EQ(info->info.unique_id.size(), 0);
-  EXPECT_EQ(std::string(info->info.manufacturer.data()).compare("Dialog"), 0);
-  EXPECT_EQ(std::string(info->info.product_name.data()).compare("DA7219"), 0);
+TEST_F(Da7219Test, GetPropertiesIsOutput) {
+  auto properties = codec_->GetProperties();
+  fidl::StringView& manufacturer = properties->properties.manufacturer();
+  EXPECT_EQ(std::string(manufacturer.data(), manufacturer.size()).compare("Dialog"), 0);
+  fidl::StringView& product = properties->properties.product();
+  EXPECT_EQ(std::string(product.data(), product.size()).compare("DA7219"), 0);
+  EXPECT_EQ(properties->properties.plug_detect_capabilities(),
+            fuchsia_hardware_audio::wire::PlugDetectCapabilities::kCanAsyncNotify);
+
+  EXPECT_FALSE(properties->properties.is_input());
+}
+
+TEST_F(Da7219Test, GetPropertiesIsInput) {
+  auto input_codec_connector_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio::CodecConnector>();
+  EXPECT_TRUE(input_codec_connector_endpoints.is_ok());
+  auto input_codec_connector =
+      fidl::WireSyncClient(std::move(input_codec_connector_endpoints->client));
+  auto input_device = std::make_unique<Driver>(fake_root_.get(), core_, true);
+  fidl::BindServer(core_->dispatcher(), std::move(input_codec_connector_endpoints->server),
+                   input_device.get());
+
+  auto input_codec_endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::Codec>();
+  EXPECT_TRUE(input_codec_endpoints.is_ok());
+  fidl::WireSyncClient input_codec{std::move(input_codec_endpoints->client)};
+
+  auto connect_ret = input_codec_connector->Connect(std::move(input_codec_endpoints->server));
+  ASSERT_TRUE(connect_ret.ok());
+
+  ASSERT_OK(input_device->DdkAdd(ddk::DeviceAddArgs("DA7219-input")));
+  input_device.release();
+
+  auto properties = input_codec->GetProperties();
+  fidl::StringView& manufacturer = properties->properties.manufacturer();
+  EXPECT_EQ(std::string(manufacturer.data(), manufacturer.size()).compare("Dialog"), 0);
+  fidl::StringView& product = properties->properties.product();
+  EXPECT_EQ(std::string(product.data(), product.size()).compare("DA7219"), 0);
+  EXPECT_EQ(properties->properties.plug_detect_capabilities(),
+            fuchsia_hardware_audio::wire::PlugDetectCapabilities::kCanAsyncNotify);
+
+  EXPECT_TRUE(properties->properties.is_input());
 }
 
 TEST_F(Da7219Test, Reset) {
@@ -249,8 +285,9 @@ TEST_F(Da7219Test, PlugDetectInitiallyUnplugged) {
   thread.join();
 
   // To make sure the IRQ processing is completed in the server, make a 2-way call synchronously.
-  auto info = codec_->GetInfo();
-  EXPECT_EQ(std::string(info->info.product_name.data()).compare("DA7219"), 0);
+  auto properties = codec_->GetProperties();
+  fidl::StringView& product = properties->properties.product();
+  EXPECT_EQ(std::string(product.data(), product.size()).compare("DA7219"), 0);
 }
 
 TEST_F(Da7219Test, PlugDetectInitiallyPlugged) {
@@ -356,8 +393,9 @@ TEST_F(Da7219Test, PlugDetectInitiallyPlugged) {
   thread2.join();
 
   // To make sure the IRQ processing is completed in the server, make a 2-way call synchronously.
-  auto info = codec_->GetInfo();
-  EXPECT_EQ(std::string(info->info.product_name.data()).compare("DA7219"), 0);
+  auto properties = codec_->GetProperties();
+  fidl::StringView& product = properties->properties.product();
+  EXPECT_EQ(std::string(product.data(), product.size()).compare("DA7219"), 0);
 }
 
 TEST_F(Da7219Test, PlugDetectNoMicrophoneWatchBeforeReset) {
@@ -548,7 +586,8 @@ TEST_F(Da7219Test, OutputHeadphonesSignalProcessingGainTopology) {
   ASSERT_EQ(element0.id(), kHeadphoneGainPeId);
   ASSERT_EQ(element0.type(), fuchsia_hardware_audio_signalprocessing::ElementType::kGain);
   ASSERT_EQ(element0.can_disable(), false);
-  ASSERT_STREQ(element0.description().data(), "Headphones gain");
+  fidl::StringView& description = element0.description();
+  EXPECT_EQ(std::string(description.data(), description.size()).compare("Headphones gain"), 0);
 
   // Topology with 1 element id 1.
   auto topologies = signal->GetTopologies();

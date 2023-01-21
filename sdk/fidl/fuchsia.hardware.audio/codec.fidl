@@ -7,6 +7,7 @@ using zx;
 using fuchsia.hardware.audio.signalprocessing;
 
 /// Textual information about the codec.
+@available(deprecated=11)
 type CodecInfo = struct {
     /// Unique identifier for the codec.
     unique_id string:UNIQUE_ID_SIZE;
@@ -16,6 +17,26 @@ type CodecInfo = struct {
 
     /// Product name of the codec.
     product_name string:MAX_UI_STRING_SIZE;
+};
+
+@available(added=HEAD)
+type CodecProperties = table {
+    /// Codec type is input or output.
+    /// If not included, then the codec may be used for both input and output.
+    1: is_input bool;
+
+    /// UI string for the manufacturer name. If not included, the manufacturer is unspecified.
+    2: manufacturer string:MAX_UI_STRING_SIZE;
+
+    /// UI string for the product name. If not included, the product name is unspecified.
+    3: product string:MAX_UI_STRING_SIZE;
+
+    /// Unique identifier for the codec.
+    /// If not included, there is no unique id for the Codec.
+    4: unique_id string:UNIQUE_ID_SIZE;
+
+    /// Plug Detect Capabilities. Required.
+    5: plug_detect_capabilities PlugDetectCapabilities;
 };
 
 /// Gain type of representation.
@@ -105,8 +126,15 @@ protocol Codec {
     Reset() -> ();
 
     /// Retrieves textual information about the codec.
+    @available(deprecated=11)
     GetInfo() -> (struct {
         info CodecInfo;
+    });
+
+    /// Retrieves top level static properties.
+    @available(added=HEAD)
+    GetProperties() -> (struct {
+        properties CodecProperties;
     });
 
     /// Stops the codec operation.
@@ -173,6 +201,7 @@ protocol Codec {
     });
 
     /// Retrieves Plug Detect Capabilities.
+    @available(deprecated=11)
     GetPlugDetectCapabilities() -> (struct {
         plug_detect_capabilities PlugDetectCapabilities;
     });

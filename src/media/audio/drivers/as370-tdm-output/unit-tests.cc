@@ -85,6 +85,7 @@ class FakeCodecDevice : public ddk::CodecProtocol<FakeCodecDevice, ddk::base_pro
   void Stop(StopCompleter::Sync& completer) override { completer.Reply({}); }
   void Start(StartCompleter::Sync& completer) override { completer.Reply({}); }
   void GetInfo(GetInfoCompleter::Sync& completer) override { completer.Reply({}); }
+  void GetProperties(GetPropertiesCompleter::Sync& completer) override { completer.Reply({}); }
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override { completer.Reply({}); }
   void IsBridgeable(IsBridgeableCompleter::Sync& completer) override { completer.Reply({}); }
   void SetBridgedMode(SetBridgedModeRequestView request,

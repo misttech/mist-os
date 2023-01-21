@@ -76,6 +76,7 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
   void Stop(StopCompleter::Sync& completer) override;
   void Start(StartCompleter::Sync& completer) override;
   void GetInfo(GetInfoCompleter::Sync& completer) override;
+  void GetProperties(GetPropertiesCompleter::Sync& completer) override;
   void GetHealthState(GetHealthStateCompleter::Sync& completer) override;
   void IsBridgeable(IsBridgeableCompleter::Sync& completer) override;
   void SetBridgedMode(SetBridgedModeRequestView request,

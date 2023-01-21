@@ -55,6 +55,7 @@ class SimpleCodecServerInternal {
   void Stop(Codec::StopCallback callback, SimpleCodecServerInstance<T>* instance);
   void Start(Codec::StartCallback callback, SimpleCodecServerInstance<T>* instance);
   void GetInfo(Codec::GetInfoCallback callback);
+  void GetProperties(Codec::GetPropertiesCallback callback);
   void GetHealthState(Codec::GetHealthStateCallback callback) { callback({}); }
   void IsBridgeable(Codec::IsBridgeableCallback callback);
   void SetBridgedMode(bool enable_bridged_mode);
@@ -122,6 +123,9 @@ class SimpleCodecServerInstance
   void Stop(StopCallback callback) override { parent_->Stop(std::move(callback), this); }
   void Start(StartCallback callback) override { parent_->Start(std::move(callback), this); }
   void GetInfo(GetInfoCallback callback) override { parent_->GetInfo(std::move(callback)); }
+  void GetProperties(GetPropertiesCallback callback) override {
+    parent_->GetProperties(std::move(callback));
+  }
   void GetHealthState(GetHealthStateCallback callback) override {
     parent_->GetHealthState(std::move(callback));
   }

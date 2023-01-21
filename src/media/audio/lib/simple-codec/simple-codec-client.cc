@@ -174,17 +174,18 @@ zx_status_t SimpleCodecClient::Stop() { return codec_.sync()->Stop().status(); }
 zx_status_t SimpleCodecClient::Start() { return codec_.sync()->Start().status(); }
 
 zx::result<Info> SimpleCodecClient::GetInfo() {
-  const auto result = codec_.sync()->GetInfo();
+  const auto result = codec_.sync()->GetProperties();
   if (!result.ok()) {
     return zx::error(result.status());
   }
 
-  const fuchsia_hardware_audio::wire::CodecInfo& llcpp_info = result.value().info;
+  const fuchsia_hardware_audio::wire::CodecProperties& properties = result.value().properties;
 
   Info info;
-  info.unique_id = std::string(llcpp_info.unique_id.data(), llcpp_info.unique_id.size());
-  info.manufacturer = std::string(llcpp_info.manufacturer.data(), llcpp_info.manufacturer.size());
-  info.product_name = std::string(llcpp_info.product_name.data(), llcpp_info.product_name.size());
+  info.unique_id = std::string(properties.unique_id().data(), properties.unique_id().size());
+  info.manufacturer =
+      std::string(properties.manufacturer().data(), properties.manufacturer().size());
+  info.product_name = std::string(properties.product().data(), properties.product().size());
   return zx::ok(std::move(info));
 }
 

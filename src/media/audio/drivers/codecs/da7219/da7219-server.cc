@@ -330,6 +330,14 @@ void Server::GetInfo(GetInfoCompleter::Sync& completer) {
   completer.Reply(info);
 }
 
+void Server::GetProperties(GetPropertiesCompleter::Sync& completer) {
+  fidl::Arena arena;
+  auto properties = fuchsia_hardware_audio::wire::CodecProperties::Builder(arena);
+  properties.manufacturer("Dialog").product("DA7219").is_input(is_input_).plug_detect_capabilities(
+      fuchsia_hardware_audio::wire::PlugDetectCapabilities::kCanAsyncNotify);
+  completer.Reply(properties.Build());
+}
+
 void Server::Stop(StopCompleter::Sync& completer) { completer.Close(ZX_ERR_NOT_SUPPORTED); }
 
 void Server::Start(StartCompleter::Sync& completer) {
