@@ -77,12 +77,10 @@ pub(super) async fn play_sound<'a>(
     // This fasync thread is needed so that the earcons sounds can play rapidly and not wait
     // for the previous sound to finish to send another request.
     fasync::Task::spawn(async move {
-        match call_async!(sound_player_proxy => play_sound(id, AudioRenderUsage::Background)).await
+        if let Err(e) =
+            call_async!(sound_player_proxy => play_sound(id, AudioRenderUsage::Background)).await
         {
-            Ok(_) => {
-                // TODO(fxbug.dev/50246): Add inspect logging.
-            }
-            Err(e) => fx_log_err!("[earcons] Unable to Play sound from Player: {}", e),
+            fx_log_err!("[earcons] Unable to Play sound from Player: {}", e);
         };
     })
     .detach();
