@@ -6,9 +6,14 @@
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/wire_coding_traits.h>
 #include <lib/fidl/cpp/wire_format_metadata.h>
+#include <lib/stdcompat/version.h>
 #include <zircon/fidl.h>
 
 #include <cstdint>
+#include <utility>
+#if defined(__cpp_lib_ranges) && __cpp_lib_ranges >= 201811L
+#include <ranges>
+#endif
 
 #ifndef LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
 #define LIB_FIDL_CPP_WIRE_INCLUDE_LIB_FIDL_CPP_WIRE_OUTGOING_MESSAGE_H_
@@ -162,8 +167,10 @@ class OutgoingMessage : public ::fidl::Status {
 
     uint8_t* data() { return bytes_.data(); }
     size_t size() const { return bytes_.size(); }
-    auto begin() const { return bytes_.begin(); }
-    auto end() const { return bytes_.end(); }
+    std::vector<uint8_t>::const_iterator begin() const { return bytes_.begin(); }
+    std::vector<uint8_t>::const_iterator end() const { return bytes_.end(); }
+    std::vector<uint8_t>::iterator begin() { return bytes_.begin(); }
+    std::vector<uint8_t>::iterator end() { return bytes_.end(); }
 
    private:
     explicit CopiedBytes(const OutgoingMessage& msg);
@@ -172,6 +179,12 @@ class OutgoingMessage : public ::fidl::Status {
 
     friend class OutgoingMessage;
   };
+
+#if defined(__cpp_lib_ranges) && __cpp_lib_ranges >= 201811L
+  // Require that CopiedBytes& be usable as an input argument to the std::span
+  // range constructor.
+  static_assert(std::ranges::contiguous_range<CopiedBytes&>);
+#endif
 
   // Create a heap-allocated contiguous copy of the bytes in this message.
   CopiedBytes CopyBytes() const { return CopiedBytes(*this); }

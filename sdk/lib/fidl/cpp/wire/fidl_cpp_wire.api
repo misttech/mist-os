@@ -36,7 +36,7 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/message_storage.h": "0069b96d5a8d53ce94cf924d5eee6e63",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/object_view.h": "3bf6edadbc603c6690894216cfa4d3d3",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/optional.h": "dc0074fa8d150918608a42dd5e84c4c0",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/outgoing_message.h": "f5390dfdb53a5d7bedebfb0556ed10e5",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/outgoing_message.h": "ff5c5f889118ad7eed63d4427661ab81",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/server.h": "eda0be537f42de98d21627e7dc452192",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/service_handler.h": "0cfe505086a0c783e319d752cdccfa30",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/soft_migration.h": "d1a13632b96f4f924bd4fd6b1c3866aa",
