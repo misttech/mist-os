@@ -5,7 +5,6 @@
 #ifndef SRC_STORAGE_F2FS_DIR_ENTRY_CACHE_H_
 #define SRC_STORAGE_F2FS_DIR_ENTRY_CACHE_H_
 
-#ifdef __Fuchsia__
 #include <fbl/slab_allocator.h>
 
 namespace f2fs {
@@ -111,7 +110,5 @@ class DirEntryCache {
 };
 
 }  // namespace f2fs
-
-#endif  // __Fuchsia__
 
 #endif  // SRC_STORAGE_F2FS_DIR_ENTRY_CACHE_H_

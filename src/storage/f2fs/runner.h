@@ -27,7 +27,6 @@ class Runner final : public PlatformVfs {
 
   static zx::result<std::unique_ptr<Runner>> CreateRunner(FuchsiaDispatcher dispatcher);
 
-#ifdef __Fuchsia__
   void SetUnmountCallback(fit::closure closure) { on_unmount_ = std::move(closure); }
 
   // Serves the root directory of the filesystem using |root| as the server-end of an IPC
@@ -38,14 +37,11 @@ class Runner final : public PlatformVfs {
   void Shutdown(fs::FuchsiaVfs::ShutdownCallback cb) final;
   zx::result<fs::FilesystemInfo> GetFilesystemInfo() final;
   void OnNoConnections() final;
-#endif  // __Fuchsia__
 
  private:
   explicit Runner(FuchsiaDispatcher dispatcher);
 
-#ifdef __Fuchsia__
   FuchsiaDispatcher dispatcher_;
-#endif  // __Fuchsia__
   fit::closure on_unmount_;
   std::unique_ptr<F2fs> f2fs_;
 };

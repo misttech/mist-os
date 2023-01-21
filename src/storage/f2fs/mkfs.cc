@@ -70,7 +70,6 @@ void MkfsWorker::InitGlobalParameters() {
 }
 
 zx_status_t MkfsWorker::GetDeviceInfo() {
-#ifdef __Fuchsia__
   fuchsia_hardware_block::wire::BlockInfo info;
 
   bc_->GetDevice()->BlockGetInfo(&info);
@@ -89,13 +88,6 @@ zx_status_t MkfsWorker::GetDeviceInfo() {
     std::cerr << "Error: Failed to format f2fs: read only block device" << std::endl;
     return ZX_ERR_INVALID_ARGS;
   }
-
-#else   // __Fuchsia__
-  params_.sector_size = kDefaultSectorSize;
-  params_.sectors_per_blk = kBlockSize / kDefaultSectorSize;
-  params_.total_sectors = bc_->Maxblk() * kDefaultSectorSize / kBlockSize;
-  params_.start_sector = kSuperblockStart;
-#endif  // __Fuchsia__
 
   return ZX_OK;
 }
@@ -880,9 +872,7 @@ zx_status_t ParseOptions(int argc, char **argv, MkfsOptions &options) {
   int opt_index = -1;
   int c = -1;
 
-#ifdef __Fuchsia__
   optreset = 1;
-#endif  // __Fuchsia__
   optind = 1;
 
   while ((c = getopt_long(argc, argv, "l:a:o:s:z:e:", opts, &opt_index)) >= 0) {

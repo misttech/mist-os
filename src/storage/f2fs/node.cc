@@ -874,9 +874,7 @@ zx_status_t NodeManager::NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, 
 
   if (!IncValidNodeCount(&vnode, 1, !ofs)) {
     page->ClearUptodate();
-#ifdef __Fuchsia__
     fs_->GetInspectTree().OnOutOfSpace();
-#endif
     return ZX_ERR_NO_SPACE;
   }
   SetNodeAddr(new_ni, kNewAddr);

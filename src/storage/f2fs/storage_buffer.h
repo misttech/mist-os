@@ -5,10 +5,6 @@
 #ifndef SRC_STORAGE_F2FS_STORAGE_BUFFER_H_
 #define SRC_STORAGE_F2FS_STORAGE_BUFFER_H_
 
-#ifndef __Fuchsia__
-#include <storage/buffer/array_buffer.h>
-#endif  // __Fuchsia__
-
 namespace f2fs {
 
 class VmoBufferKey : public fbl::DoublyLinkedListable<std::unique_ptr<VmoBufferKey>> {

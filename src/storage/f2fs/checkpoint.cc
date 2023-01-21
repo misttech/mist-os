@@ -57,20 +57,16 @@ zx_status_t F2fs::CheckOrphanSpace() {
   max_orphans = (superblock_info.GetBlocksPerSeg() - 5) * kOrphansPerBlock;
   if (superblock_info.GetVnodeSetSize(InoType::kOrphanIno) >= max_orphans) {
     err = ZX_ERR_NO_SPACE;
-#ifdef __Fuchsia__
     inspect_tree_->OnOutOfSpace();
-#endif  // __Fuchsia__
   }
   return err;
 }
 
 void F2fs::AddOrphanInode(VnodeF2fs *vnode) {
   GetSuperblockInfo().AddVnodeToVnodeSet(InoType::kOrphanIno, vnode->GetKey());
-#ifdef __Fuchsia__
   if (vnode->IsDir()) {
     vnode->Notify(".", fuchsia_io::wire::WatchEvent::kDeleted);
   }
-#endif  // __Fuchsia__
   if (vnode->IsDirty()) {
     vnode->ClearDirty();
     // Set the orphan flag of filecache to prevent further dirty Pages.

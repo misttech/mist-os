@@ -28,9 +28,7 @@ void F2fs::PutSuper() {
   ResetPsuedoVnodes();
   GetVCache().Reset();
 
-#ifdef __Fuchsia__
   GetDirEntryCache().Reset();
-#endif  // __Fuchsia__
 
   node_manager_->DestroyNodeManager();
   segment_manager_->DestroySegmentManager();

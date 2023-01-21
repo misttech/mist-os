@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef __Fuchsia__
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
-#endif  // __Fuchsia__
 
 #include "src/storage/f2fs/f2fs.h"
 
@@ -31,7 +29,6 @@ const MountOpt default_option[] = {
     {"active_logs", 6, true},  // It should be the last one.
 };
 
-#ifdef __Fuchsia__
 zx::result<> Mount(const MountOptions& options, std::unique_ptr<f2fs::Bcache> bc,
                    fidl::ServerEnd<fuchsia_io::Directory> root) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -78,8 +75,6 @@ zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,
   ZX_ASSERT(loop.Run() == ZX_ERR_CANCELED);
   return zx::ok();
 }
-
-#endif  // __Fuchsia__
 
 MountOptions::MountOptions() {
   for (uint32_t i = 0; i < kOptMaxNum; ++i) {

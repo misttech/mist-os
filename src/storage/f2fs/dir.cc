@@ -183,17 +183,14 @@ DirEntry *Dir::FindEntryOnDevice(std::string_view name, fbl::RefPtr<Page> *res_p
     SetDirHash(name_hash, level - 1);
   }
 
-#ifdef __Fuchsia__
   if (de != nullptr) {
     fs()->GetDirEntryCache().UpdateDirEntry(Ino(), name, *de, (*res_page)->GetIndex());
   }
-#endif  // __Fuchsia__
 
   return de;
 }
 
 DirEntry *Dir::FindEntry(std::string_view name, fbl::RefPtr<Page> *res_page) {
-#ifdef __Fuchsia__
   if (auto cache_page_index = fs()->GetDirEntryCache().LookupDataPageIndex(Ino(), name);
       !cache_page_index.is_error()) {
     if (TestFlag(InodeInfoFlag::kInlineDentry)) {
@@ -212,7 +209,6 @@ DirEntry *Dir::FindEntry(std::string_view name, fbl::RefPtr<Page> *res_page) {
       return de;
     }
   }
-#endif  // __Fuchsia__
 
   return FindEntryOnDevice(name, res_page);
 }
@@ -225,12 +221,10 @@ DirEntry *Dir::FindEntrySafe(std::string_view name, fbl::RefPtr<Page> *res_page)
 zx::result<DirEntry> Dir::FindEntry(std::string_view name) {
   DirEntry *de = nullptr;
 
-#ifdef __Fuchsia__
   auto element = fs()->GetDirEntryCache().LookupDirEntry(Ino(), name);
   if (!element.is_error()) {
     return zx::ok(*element);
   }
-#endif  // __Fuchsia__
 
   fbl::RefPtr<Page> page;
 
@@ -274,9 +268,7 @@ void Dir::SetLink(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
     // Otherwise, it writes out the data block.
     page_lock.SetDirty();
 
-#ifdef __Fuchsia__
     fs()->GetDirEntryCache().UpdateDirEntry(Ino(), vnode->GetNameView(), *de, page->GetIndex());
-#endif  // __Fuchsia__
 
     timespec cur_time;
     clock_gettime(CLOCK_REALTIME, &cur_time);
@@ -450,9 +442,7 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
             TestAndSetBit(bit_pos + i, dentry_blk->dentry_bitmap);
           }
           dentry_page.SetDirty();
-#ifdef __Fuchsia__
           fs()->GetDirEntryCache().UpdateDirEntry(Ino(), name, *de, dentry_page->GetIndex());
-#endif  // __Fuchsia__
           UpdateParentMetadata(vnode, safemath::checked_cast<uint32_t>(current_depth));
           return ZX_OK;
         }
@@ -494,12 +484,10 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
     }
     page_lock.SetDirty();
 
-#ifdef __Fuchsia__
     std::string_view remove_name(reinterpret_cast<char *>(dentry_blk->filename[bit_pos]),
                                  LeToCpu(dentry->name_len));
 
     fs()->GetDirEntryCache().RemoveDirEntry(Ino(), remove_name);
-#endif  // __Fuchsia__
 
     timespec cur_time;
     clock_gettime(CLOCK_REALTIME, &cur_time);

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifdef __Fuchsia__
 #include "f2fs.h"
 
 namespace f2fs {
@@ -175,5 +174,3 @@ const std::map<EntryKey, ElementRefPtr> &DirEntryCache::GetMap() const {
 }
 
 }  // namespace f2fs
-
-#endif  // __Fuchsia__

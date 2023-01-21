@@ -5,13 +5,11 @@
 #include "src/storage/f2fs/f2fs.h"
 
 #include <fcntl.h>
-#ifdef __Fuchsia__
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/zx/event.h>
-#endif  // __Fuchsia__
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
@@ -24,10 +22,8 @@ F2fs::F2fs(FuchsiaDispatcher dispatcher, std::unique_ptr<f2fs::Bcache> bc,
       bc_(std::move(bc)),
       mount_options_(mount_options),
       raw_sb_(std::move(sb)) {
-#ifdef __Fuchsia__
   inspect_tree_ = std::make_unique<InspectTree>(this);
   zx::event::create(0, &fs_id_);
-#endif  // __Fuchsia__
 }
 
 void F2fs::StartMemoryPressureWatcher() {
@@ -81,8 +77,6 @@ zx::result<std::unique_ptr<Superblock>> F2fs::LoadSuperblock(f2fs::Bcache& bc) {
   return zx::error(status);
 }
 
-#ifdef __Fuchsia__
-
 void F2fs::Sync(SyncCallback closure) {
   SyncFs(true);
   if (closure) {
@@ -109,8 +103,6 @@ zx::result<fs::FilesystemInfo> F2fs::GetFilesystemInfo() {
   return zx::ok(info);
 }
 
-#endif  // __Fuchsia__
-
 void F2fs::DecValidBlockCount(VnodeF2fs* vnode, block_t count) {
   std::lock_guard lock(superblock_info_->GetStatLock());
   ZX_ASSERT(superblock_info_->GetTotalValidBlockCount() >= count);
@@ -123,9 +115,7 @@ zx_status_t F2fs::IncValidBlockCount(VnodeF2fs* vnode, block_t count) {
   std::lock_guard lock(superblock_info_->GetStatLock());
   valid_block_count = superblock_info_->GetTotalValidBlockCount() + count;
   if (valid_block_count > superblock_info_->GetUserBlockCount()) {
-#ifdef __Fuchsia__
     inspect_tree_->OnOutOfSpace();
-#endif  // __Fuchsia__
     return ZX_ERR_NO_SPACE;
   }
   vnode->IncBlocks(count);

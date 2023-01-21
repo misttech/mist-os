@@ -6,7 +6,6 @@
 #define SRC_STORAGE_F2FS_F2FS_H_
 
 // clang-format off
-#ifdef __Fuchsia__
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl-async/cpp/bind.h>
@@ -18,9 +17,6 @@
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
-#else
-#define TRACE_DURATION(...)
-#endif  // __Fuchsia__
 
 #include <fcntl.h>
 
@@ -50,7 +46,6 @@
 #include "src/lib/storage/vfs/cpp/vnode.h"
 #include "src/lib/storage/vfs/cpp/transaction/buffered_operations_builder.h"
 
-#ifdef __Fuchsia__
 #include "src/lib/storage/vfs/cpp/paged_vfs.h"
 #include "src/lib/storage/vfs/cpp/paged_vnode.h"
 #include "src/lib/storage/vfs/cpp/watcher.h"
@@ -63,18 +58,13 @@
 
 #include "src/lib/storage/vfs/cpp/fuchsia_vfs.h"
 #include "src/lib/storage/vfs/cpp/inspect/inspect_tree.h"
-#else  // __Fuchsia__
-#include "src/storage/f2fs/sync_host.h"
-#endif  // __Fuchsia__
 
 #include "src/storage/f2fs/f2fs_types.h"
 #include "src/storage/f2fs/f2fs_lib.h"
 #include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/mount.h"
-#ifdef __Fuchsia__
 #include "src/storage/f2fs/vmo_manager.h"
-#endif  // __Fuchsia__
 #include "src/storage/f2fs/file_cache.h"
 #include "src/storage/f2fs/node_page.h"
 #include "src/storage/f2fs/f2fs_internal.h"
@@ -92,7 +82,6 @@
 #include "src/storage/f2fs/gc.h"
 #include "src/storage/f2fs/mkfs.h"
 #include "src/storage/f2fs/fsck.h"
-#ifdef __Fuchsia__
 #include "src/storage/f2fs/service/admin.h"
 #include "src/storage/f2fs/service/startup.h"
 #include "src/storage/f2fs/service/lifecycle.h"
@@ -100,7 +89,6 @@
 #include "src/storage/f2fs/dir_entry_cache.h"
 #include "src/storage/f2fs/inspect.h"
 #include "src/storage/f2fs/memory_watcher.h"
-#endif  // __Fuchsia__
 // clang-format on
 
 namespace f2fs {
@@ -123,12 +111,10 @@ class F2fs final {
 
   static zx::result<std::unique_ptr<Superblock>> LoadSuperblock(f2fs::Bcache &bc);
 
-#ifdef __Fuchsia__
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
   DirEntryCache &GetDirEntryCache() { return dir_entry_cache_; }
   InspectTree &GetInspectTree() { return *inspect_tree_; }
   void Sync(SyncCallback closure);
-#endif  // __Fuchsia__
 
   VnodeCache &GetVCache() { return vnode_cache_; }
   zx_status_t InsertVnode(VnodeF2fs *vn) { return vnode_cache_.Add(vn); }
@@ -361,13 +347,11 @@ class F2fs final {
   std::unique_ptr<Reader> reader_;
   std::unique_ptr<Writer> writer_;
 
-#ifdef __Fuchsia__
   DirEntryCache dir_entry_cache_;
   zx::event fs_id_;
   std::unique_ptr<InspectTree> inspect_tree_;
   std::atomic<MemoryPressure> current_memory_pressure_level_ = MemoryPressure::kUnknown;
   std::unique_ptr<MemoryPressureWatcher> memory_pressure_watcher_;
-#endif  // __Fuchsia__
 };
 
 f2fs_hash_t DentryHash(std::string_view name);

@@ -36,22 +36,14 @@ using SyncCallback = fs::Vnode::SyncCallback;
 // compiling on host where callers should pass null and it's ignored.
 //
 // Prefer async_dispatcher_t* for Fuchsia-specific functions since it makes the intent more clear.
-#ifdef __Fuchsia__
 using FuchsiaDispatcher = async_dispatcher_t *;
-#else
-using FuchsiaDispatcher = std::nullptr_t;
-#endif  // __Fuchsia__
 
 // A reference to the vfs is needed for some functions. The specific vfs type is different between
 // Fuchsia and Host, so define a PlatformVfs which represents the one for our current platform to
 // avoid ifdefs on every call.
 //
 // Prefer using the appropriate vfs when the function is only used for one or the other.
-#ifdef __Fuchsia__
 using PlatformVfs = fs::PagedVfs;
-#else
-using PlatformVfs = fs::Vfs;
-#endif  // __Fuchsia__
 using PageList = fbl::SizedDoublyLinkedList<fbl::RefPtr<Page>>;
 
 #if BYTE_ORDER == BIG_ENDIAN

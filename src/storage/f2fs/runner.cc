@@ -2,21 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/f2fs/f2fs.h"
-#ifdef __Fuchsia__
 #include "src/lib/storage/vfs/cpp/pseudo_dir.h"
-#endif  // __Fuchsia__
+#include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {
 
 zx::result<std::unique_ptr<Runner>> Runner::CreateRunner(FuchsiaDispatcher dispatcher) {
   std::unique_ptr<Runner> runner(new Runner(dispatcher));
-#ifdef __Fuchsia__
   // Create Pager and PagerPool
   if (auto status = runner->Init(); status.is_error()) {
     return status.take_error();
   }
-#endif  // __Fuchsia__
   return zx::ok(std::move(runner));
 }
 
@@ -41,10 +37,6 @@ zx::result<std::unique_ptr<Runner>> Runner::Create(FuchsiaDispatcher dispatcher,
   return zx::ok(std::move(*runner_or));
 }
 
-#ifndef __Fuchsia__
-Runner::Runner(std::nullptr_t dispatcher) {}
-Runner::~Runner() {}
-#else  // __Fuchsia__
 Runner::Runner(async_dispatcher_t* dispatcher)
     : fs::PagedVfs(dispatcher), dispatcher_(dispatcher) {}
 
@@ -133,7 +125,5 @@ void Runner::OnNoConnections() {
                   zx_status_get_string(status));
   });
 }
-
-#endif  // __Fuchsia__
 
 }  // namespace f2fs
