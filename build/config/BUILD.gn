@@ -34,6 +34,9 @@ declare_args() {
   deny_warnings = true
 }
 
+assert(experimental_cxx_version == 17 || experimental_cxx_version == 20,
+       "`experimental_cxx_version` must be either 17 or 20")
+
 # No frame pointers for host compiles.
 if (!is_fuchsia) {
   enable_frame_pointers = false
@@ -553,6 +556,13 @@ config("default_warnings") {
     "-Wnonportable-system-include-path",
   ]
 
+  # TODO(fxbug.dev/113689): Remove these after we switch to C++20.
+  cflags_cc = [ "-Wc++20-compat" ]
+  if (experimental_cxx_version == 17) {
+    # Only report warning when building as C++17.
+    cflags_cc += [ "-Wno-error=c++20-compat" ]
+  }
+
   if (is_gcc) {
     # GCC is pedantic about which flags apply to which language.
     cflags -= [
@@ -560,7 +570,7 @@ config("default_warnings") {
       "-Wextra-semi",
     ]
     cflags_c = [ "-Wstrict-prototypes" ]
-    cflags_cc = [ "-Wextra-semi" ]
+    cflags_cc += [ "-Wextra-semi" ]
 
     # GCC doesn't support these flags
     cflags -= [
