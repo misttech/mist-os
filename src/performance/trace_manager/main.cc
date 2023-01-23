@@ -37,7 +37,8 @@ int main(int argc, char** argv) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   tracing::TraceManagerApp trace_manager_app{
-      sys::ComponentContext::CreateAndServeOutgoingDirectory(), std::move(config)};
+      sys::ComponentContext::CreateAndServeOutgoingDirectory(), std::move(config),
+      loop.dispatcher()};
   loop.Run();
   return EXIT_SUCCESS;
 }

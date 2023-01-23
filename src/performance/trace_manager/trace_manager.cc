@@ -7,10 +7,13 @@
 #include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/tracing/cpp/fidl.h>
 #include <lib/fidl/cpp/clone.h>
+#include <lib/fpromise/bridge.h>
+#include <lib/fpromise/promise.h>
 #include <lib/zx/time.h>
 
 #include <algorithm>
 #include <iostream>
+#include <unordered_set>
 
 #include "src/performance/trace_manager/app.h"
 
@@ -36,10 +39,27 @@ uint32_t ConstrainBufferSize(uint32_t buffer_size_megabytes) {
                   kMaxBufferSizeMegabytes);
 }
 
+struct KnownCategoryHash {
+  auto operator()(const fuchsia::tracing::KnownCategory& k) const -> size_t {
+    return std::hash<std::string>{}(k.name) ^ std::hash<std::string>{}(k.description);
+  }
+};
+
+struct KnownCategoryEquals {
+  auto operator()(const fuchsia::tracing::KnownCategory& k1,
+                  const fuchsia::tracing::KnownCategory& k2) const -> bool {
+    return k1.name == k2.name && k1.description == k2.description;
+  }
+};
+
+using KnownCategorySet =
+    std::unordered_set<fuchsia::tracing::KnownCategory, KnownCategoryHash, KnownCategoryEquals>;
+using KnownCategoryVector = std::vector<fuchsia::tracing::KnownCategory>;
+
 }  // namespace
 
-TraceManager::TraceManager(TraceManagerApp* app, Config config)
-    : app_(app), config_(std::move(config)) {}
+TraceManager::TraceManager(TraceManagerApp* app, Config config, async_dispatcher_t* dispatcher)
+    : app_(app), config_(std::move(config)), executor_(dispatcher) {}
 
 TraceManager::~TraceManager() = default;
 
@@ -284,11 +304,32 @@ void TraceManager::GetProviders(GetProvidersCallback callback) {
 // fidl
 void TraceManager::GetKnownCategories(GetKnownCategoriesCallback callback) {
   FX_VLOGS(2) << "GetKnownCategories";
-  std::vector<::fuchsia::tracing::KnownCategory> known_categories;
-  for (const auto& it : config_.known_categories()) {
-    known_categories.push_back(fuchsia::tracing::KnownCategory{it.first, it.second});
+  KnownCategorySet known_categories;
+  for (const auto& [name, description] : config_.known_categories()) {
+    known_categories.insert({.name = name, .description = description});
   }
-  callback(std::move(known_categories));
+  std::vector<fpromise::promise<KnownCategoryVector>> promises;
+  for (const auto& provider : providers_) {
+    fpromise::bridge<KnownCategoryVector> bridge;
+    provider.provider->GetKnownCategories(bridge.completer.bind());
+    promises.push_back(bridge.consumer.promise());
+  }
+  auto joined_promise =
+      fpromise::join_promise_vector(std::move(promises))
+          .and_then(
+              [callback = std::move(callback), known_categories = std::move(known_categories)](
+                  std::vector<fpromise::result<KnownCategoryVector>>& results) mutable {
+                for (const auto& result : results) {
+                  if (result.is_ok()) {
+                    const auto& result_known_categories = result.value();
+                    known_categories.insert(result_known_categories.begin(),
+                                            result_known_categories.end());
+                  }
+                }
+                callback({known_categories.begin(), known_categories.end()});
+              });
+
+  executor_.schedule_task(std::move(joined_promise));
 }
 
 void TraceManager::WatchAlert(WatchAlertCallback cb) {

@@ -4,6 +4,7 @@
 
 #include "src/performance/trace_manager/tests/fake_provider.h"
 
+#include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/buffer_internal.h>
 #include <lib/trace-engine/fields.h>
@@ -42,7 +43,7 @@ void FakeProvider::Initialize(provider::ProviderConfig config) {
   // closed and trace-manager will interpret that as us going away.
   buffer_vmo_ = std::move(config.buffer);
   fifo_ = std::move(config.fifo);
-  categories_ = std::move(config.categories);
+  enabled_categories_ = std::move(config.categories);
 
   InitializeBuffer();
   // Write the trace initialization record in case Start is called with
@@ -109,6 +110,11 @@ void FakeProvider::Terminate() {
       AdvanceToState(State::kTerminating);
       break;
   }
+}
+
+// fidl
+void FakeProvider::GetKnownCategories(FakeProvider::GetKnownCategoriesCallback callback) {
+  callback(known_categories_);
 }
 
 void FakeProvider::MarkStarted() {

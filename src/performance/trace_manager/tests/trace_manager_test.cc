@@ -22,7 +22,7 @@ void TraceManagerTest::SetUp() {
   ASSERT_TRUE(config.ReadFrom(kConfigFile));
 
   std::unique_ptr<sys::ComponentContext> context{context_provider_.TakeContext()};
-  app_.reset(new TraceManagerApp(std::move(context), std::move(config)));
+  app_.reset(new TraceManagerApp(std::move(context), std::move(config), dispatcher()));
 }
 
 void TraceManagerTest::TearDown() {

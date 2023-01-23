@@ -18,7 +18,8 @@ namespace tracing {
 
 class TraceManagerApp {
  public:
-  explicit TraceManagerApp(std::unique_ptr<sys::ComponentContext> context, Config config);
+  TraceManagerApp(std::unique_ptr<sys::ComponentContext> context, Config config,
+                  async_dispatcher_t* dispatcher);
   ~TraceManagerApp();
 
   // For testing.

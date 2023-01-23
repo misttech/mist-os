@@ -12,6 +12,8 @@
 #include <lib/trace-provider/provider.h>
 #include <lib/zx/fifo.h>
 
+#include <utility>
+
 #include <gtest/gtest.h>
 #include <trace-reader/reader.h>
 
@@ -57,7 +59,7 @@ class FakeProvider : public provider::Provider {
   void Start(provider::StartOptions options) override;
   void Stop() override;
   void Terminate() override;
-  void GetKnownCategories(GetKnownCategoriesCallback callback) override {}
+  void GetKnownCategories(GetKnownCategoriesCallback callback) override;
 
   // Helpers to provide discrete advancement of provider state.
   // These should only be called when the provider is in the preceding state,
@@ -82,6 +84,10 @@ class FakeProvider : public provider::Provider {
   int terminate_count() const { return terminate_count_; }
 
   void SendAlert(const char* alert_name);
+
+  void SetKnownCategories(std::vector<fuchsia::tracing::KnownCategory> known_categories) {
+    known_categories_ = std::move(known_categories);
+  }
 
  private:
   friend std::ostream& operator<<(std::ostream& out, FakeProvider::State state);
@@ -110,7 +116,8 @@ class FakeProvider : public provider::Provider {
   fuchsia::tracing::BufferingMode buffering_mode_;
   zx::vmo buffer_vmo_;
   zx::fifo fifo_;
-  std::vector<std::string> categories_;
+  std::vector<std::string> enabled_categories_;
+  std::vector<fuchsia::tracing::KnownCategory> known_categories_;
 
   size_t total_buffer_size_ = 0;
   size_t durable_buffer_size_ = 0;

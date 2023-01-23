@@ -8,6 +8,7 @@
 #include <fuchsia/tracing/controller/cpp/fidl.h>
 #include <fuchsia/tracing/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fidl/cpp/interface_ptr_set.h>
 #include <lib/fidl/cpp/interface_request.h>
@@ -31,7 +32,7 @@ class TraceManagerApp;
 
 class TraceManager : public controller::Controller, public provider::Registry {
  public:
-  TraceManager(TraceManagerApp* app, Config config);
+  TraceManager(TraceManagerApp* app, Config config, async_dispatcher_t* dispatcher);
   ~TraceManager() override;
 
   // For testing.
@@ -72,6 +73,7 @@ class TraceManager : public controller::Controller, public provider::Registry {
   std::list<TraceProviderBundle> providers_;
   std::queue<std::string> alerts_;
   std::queue<WatchAlertCallback> watch_alert_callbacks_;
+  async::Executor executor_;
 
   TraceManager(const TraceManager&) = delete;
   TraceManager(TraceManager&&) = delete;
