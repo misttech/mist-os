@@ -201,8 +201,8 @@ where
 {
     fn exit_code(&self) -> i32 {
         match self {
-            Ok(_) => 0,
-            Err(ref err) => err.exit_code(),
+            Ok(code) => code.exit_code(),
+            Err(err) => err.exit_code(),
         }
     }
 }
