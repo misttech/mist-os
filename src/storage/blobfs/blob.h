@@ -134,11 +134,6 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // called multiple times on a given vnode.  This is public only for testing.
   zx_status_t PrepareWrite(uint64_t size_data, bool compress) __TA_EXCLUDES(mutex_);
 
-  // If this is part of a migration and involves writing a new blob to replace an old blob, this can
-  // be called so that the blob is deleted in the transaction that writes the new blob.  The blob
-  // *must* not be currently in use.  It is designed to be used for mount time migrations.
-  void SetOldBlob(Blob& blob) __TA_EXCLUDES(mutex_);
-
   // Sets the target_compression_size in write_info to |size|. Setter made public for testing.
   void SetTargetCompressionSize(uint64_t size) __TA_EXCLUDES(mutex_);
 

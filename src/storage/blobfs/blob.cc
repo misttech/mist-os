@@ -106,9 +106,6 @@ struct Blob::WriteInfo {
   // padding.  See the comment for merkle_tree() above.
   std::unique_ptr<uint8_t[]> merkle_tree_buffer;
 
-  // The old blob that this write is replacing.
-  fbl::RefPtr<Blob> old_blob;
-
   fzl::OwnedVmoMapper buffer;
 
   std::unique_ptr<BlobLayout> blob_layout = nullptr;
@@ -253,11 +250,6 @@ zx_status_t Blob::PrepareWrite(uint64_t size_data, bool compress) {
 
   // Special case for the null blob: We skip the write phase.
   return write_info_->data_size == 0 ? WriteNullBlob() : ZX_OK;
-}
-
-void Blob::SetOldBlob(Blob& blob) {
-  std::lock_guard lock(mutex_);
-  write_info_->old_blob = fbl::RefPtr(&blob);
 }
 
 zx_status_t Blob::SpaceAllocate() {
@@ -618,17 +610,6 @@ zx_status_t Blob::FlushData() {
   BlobTransaction transaction;
   if (zx_status_t status = WriteMetadata(transaction); status != ZX_OK) {
     return status;
-  }
-  if (write_info_->old_blob) {
-    zx_status_t status = blobfs_->FreeInode(write_info_->old_blob->Ino(), transaction);
-    ZX_ASSERT_MSG(status == ZX_OK, "FreeInode failed with error: %s", zx_status_get_string(status));
-    auto& cache = GetCache();
-    status = cache.Evict(write_info_->old_blob);
-    ZX_ASSERT_MSG(status == ZX_OK, "Failed to evict old blob with error: %s",
-                  zx_status_get_string(status));
-    status = cache.Add(fbl::RefPtr(this));
-    ZX_ASSERT_MSG(status == ZX_OK, "Failed to add blob to cache with error: %s",
-                  zx_status_get_string(status));
   }
   transaction.Commit(*blobfs_->GetJournal(), std::move(write_all_data),
                      [self = fbl::RefPtr(this)]() {});
@@ -1303,6 +1284,7 @@ zx_status_t Blob::Purge() {
     if (zx_status_t status = blobfs_->FreeInode(map_index_, transaction); status != ZX_OK)
       return status;
     transaction.Commit(*blobfs_->GetJournal());
+    blobfs_->GetAllocator()->Decommit();
   }
 
   // If the blob is in the error state, it should have already been evicted from

@@ -205,7 +205,7 @@ zx::result<> Allocator::AddNodes() {
 
   auto inode_count = space_manager_->Info().inode_count;
   status = GetNodeBitmap().Grow(inode_count);
-  // This is awkward situation where we could secure storage but potentially ran out of [virtual]
+  // This is an awkward situation where we could secure storage but potentially ran out of [virtual]
   // memory. There is nothing much we can do. The filesystem might fail soon from other alloc
   // failures. It is better to turn the fs-mount into read-only instance or panic to safe-guard
   // against any damage rather than propagating these errors.
@@ -217,6 +217,42 @@ zx::result<> Allocator::AddNodes() {
     FX_LOGS(ERROR) << "Failed to grow bitmap for inodes";
   }
   return zx::make_result(status);
+}
+
+void Allocator::Decommit() {
+  const auto& bitmap = GetNodeBitmap();
+  const size_t blobs_per_page = zx_system_get_page_size() / sizeof(Inode);
+  size_t start = 0, count = 0;
+  size_t decommit_total = 0;
+  for (;;) {
+    if (start + count >= bitmap.Size() || bitmap.IsBusy(start + count)) {
+      if (start + count >= bitmap.Size()) {
+        // Round up at the end.
+        count += blobs_per_page - 1;
+      }
+      count -= count % blobs_per_page;
+      if (count >= blobs_per_page) {
+        const uint64_t size = sizeof(Inode) * count;
+        if (zx_status_t status = node_map_.vmo().op_range(ZX_VMO_OP_DECOMMIT, start * sizeof(Inode),
+                                                          size, nullptr, 0);
+            status != ZX_OK) {
+          FX_PLOGS(WARNING, status) << "Failed to decommit unused node map";
+          return;
+        }
+        decommit_total += size;
+      }
+
+      start += count + blobs_per_page;
+      if (start >= bitmap.Size())
+        break;
+      count = 0;
+    } else {
+      ++count;
+    }
+  }
+  if (decommit_total > 0) {
+    FX_LOGS(INFO) << "Decommitted " << decommit_total << " bytes from the node map";
+  }
 }
 
 }  // namespace blobfs

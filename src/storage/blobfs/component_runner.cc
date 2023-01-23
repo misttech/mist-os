@@ -194,6 +194,10 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BlockDevice> device,
     return blobfs_or.take_error();
   }
   blobfs_ = std::move(blobfs_or.value());
+
+  // Decommit memory we don't need committed.
+  blobfs_->GetAllocator()->Decommit();
+
   SetReadonly(blobfs_->writability() != Writability::Writable);
 
   fbl::RefPtr<fs::Vnode> root;

@@ -78,6 +78,9 @@ class Allocator : public BaseAllocator {
   // Grows node map to |size|. The caller takes responsibility for initializing the new entries.
   [[nodiscard]] zx_status_t GrowNodeMap(size_t size);
 
+  // Decommits unused memory.
+  void Decommit();
+
  protected:
   // blobfs::BaseAllocator interface.
   zx::result<> AddBlocks(uint64_t block_count) final;

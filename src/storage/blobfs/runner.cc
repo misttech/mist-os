@@ -16,7 +16,6 @@
 
 namespace blobfs {
 
-// static.
 zx::result<std::unique_ptr<Runner>> Runner::Create(async::Loop* loop,
                                                    std::unique_ptr<BlockDevice> device,
                                                    const MountOptions& options,
@@ -30,12 +29,15 @@ zx::result<std::unique_ptr<Runner>> Runner::Create(async::Loop* loop,
   // All of our pager threads get the deadline profile for scheduling.
   SetDeadlineProfile(runner->GetPagerThreads());
 
-  auto blobfs_or = Blobfs::Create(loop->dispatcher(), std::move(device), runner.get(), options,
-                                  std::move(vmex_resource));
-  if (blobfs_or.is_error())
-    return blobfs_or.take_error();
+  auto blobfs = Blobfs::Create(loop->dispatcher(), std::move(device), runner.get(), options,
+                               std::move(vmex_resource));
+  if (blobfs.is_error())
+    return blobfs.take_error();
 
-  runner->blobfs_ = std::move(blobfs_or.value());
+  // Decommit memory we don't need committed.
+  blobfs->GetAllocator()->Decommit();
+
+  runner->blobfs_ = *std::move(blobfs);
   runner->SetReadonly(runner->blobfs_->writability() != Writability::Writable);
 
   return zx::ok(std::move(runner));

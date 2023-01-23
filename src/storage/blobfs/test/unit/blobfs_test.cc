@@ -464,5 +464,24 @@ TEST(BlobfsFragmentationTest, FragmentationMetrics) {
   }
 }
 
+TEST_F(BlobfsTest, MemoryUse) {
+  blobfs()->GetAllocator()->Decommit();
+
+  zx_info_vmo_t info[128];
+  size_t actual;
+  ASSERT_EQ(
+      zx::process::self()->get_info(ZX_INFO_PROCESS_VMOS, info, sizeof(info), &actual, nullptr),
+      ZX_OK);
+
+  for (size_t i = 0; i < actual; ++i) {
+    if (!strcmp(info[i].name, "nodemap")) {
+      // It's an empty blobfs, so it should have no committed bytes in the nodemap.
+      ASSERT_EQ(info[i].committed_bytes, 0ul);
+      return;
+    }
+  }
+  ADD_FAILURE() << "Unable to find nodemap VMO";
+}
+
 }  // namespace
 }  // namespace blobfs
