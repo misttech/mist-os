@@ -501,6 +501,55 @@ TEST(VmoTestCase, Resize) {
   EXPECT_OK(status, "handle_close");
 }
 
+TEST(VmoTestCase, GrowMappedVmo) {
+  zx_status_t status;
+  zx::vmo vmo;
+
+  // allocate a VMO with an initial size of 2 pages
+  size_t vmo_size = zx_system_get_page_size() * 2;
+  status = zx::vmo::create(vmo_size, ZX_VMO_RESIZABLE, &vmo);
+  EXPECT_OK(status, "vmo_create");
+
+  size_t mapping_size = zx_system_get_page_size() * 8;
+  uintptr_t mapping_addr;
+
+  // create an 8 page mapping backed by this VMO
+  status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo.get(), 0,
+                       mapping_size, &mapping_addr);
+  EXPECT_OK(status, "vmar_map");
+
+  // grow the vmo to cover part of the mapping and a partial page
+  vmo_size = zx_system_get_page_size() * 6 + zx_system_get_page_size() / 2;
+
+  status = vmo.set_size(vmo_size);
+  EXPECT_OK(status, "vmo_set_size");
+
+  // stores to the mapped area past the initial end of the VMO should be reflected in the object
+  size_t store_offset_within_vmo = zx_system_get_page_size() * 5;
+  *reinterpret_cast<volatile std::byte *>(mapping_addr + store_offset_within_vmo) = std::byte{1};
+
+  std::byte vmo_value;
+  status = vmo.read(&vmo_value, store_offset_within_vmo, 1);
+  EXPECT_OK(status, "vmo_read");
+
+  // stores to memory past the size set on the VMO but within that page should also be reflected in
+  // the object
+  size_t store_offset_past_size = vmo_size + 16;
+  *reinterpret_cast<volatile std::byte *>(mapping_addr + store_offset_past_size) = std::byte{2};
+  status = vmo.read(&vmo_value, store_offset_past_size, 1);
+  EXPECT_OK(status, "vmo_read");
+
+  EXPECT_EQ(vmo_value, std::byte{2});
+
+  // writes to the VMO past the initial end of the VMO should be reflected in the mapped area.
+  size_t load_offset = zx_system_get_page_size() * 5 + 16;
+  std::byte value{3};
+  status = vmo.write(&value, load_offset, 1);
+  EXPECT_OK(status, "vmo_read");
+
+  EXPECT_EQ(value, *reinterpret_cast<volatile std::byte *>(mapping_addr + load_offset));
+}
+
 // Check that non-resizable VMOs cannot get resized.
 TEST(VmoTestCase, NoResize) {
   const size_t len = zx_system_get_page_size() * 4;
