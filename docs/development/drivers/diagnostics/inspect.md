@@ -10,8 +10,7 @@ following pages:
 
 - [Inspect overview][inspect_overview]
 - [Inspect codelab][inspect_codelab]
-
-<!-- TODO(fxbug.dev/60811): link to the selectors doc when it's submitted -->
+- [Inspect selectors][selectors]
 
 ## Introduction
 
@@ -188,7 +187,6 @@ bootfs, then add the following to your `fx set`:
 fx set core.x64 --args='product_bootfs_labels+=["//bundles:diagnostics-eng"]'
 ```
 
-[selectors]: https://docs.google.com/document/d/1gI3FizKlTlth9DL8l7Ja9f7xuY_GKDffa5x1uZesLMY/edit
 [inspect_overview]: /docs/development/diagnostics/inspect/README.md
 [Inspect codelab]: /docs/development/diagnostics/inspect/codelab.md
 [roadmap_drivers_components]: /docs/contribute/roadmap/2020/overview.md#implementing_drivers_as_components
@@ -196,3 +194,4 @@ fx set core.x64 --args='product_bootfs_labels+=["//bundles:diagnostics-eng"]'
 [property_types]: /docs/development/diagnostics/inspect/README.md#property
 [inspect_codelab]: /docs/development/diagnostics/inspect/codelab/README.md
 [driver_host_inspect_test]: /src/devices/bin/driver_host/inspect_test.cc
+[selectors]: /docs/reference/diagnostics/selectors.md
