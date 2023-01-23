@@ -78,6 +78,63 @@ TEST(MmapTest, MprotectSecondPageStringRead) {
   munmap(addr, PAGE_SIZE * 2);
 }
 
+TEST(MMapTest, MapFileThenGrow) {
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string path = tmp == nullptr ? "/tmp/mmap_grow_test" : std::string(tmp) + "/mmap_grow_test";
+  int fd = open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777);
+
+  size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+
+  // Resize the file to be 3 pages long.
+  size_t file_size = page_size * 3;
+  SAFE_SYSCALL(ftruncate(fd, file_size));
+
+  // Create a file-backed mapping that is 8 pages long.
+  size_t mapping_len = page_size * 8;
+  std::byte* mapping_addr = static_cast<std::byte*>(
+      mmap(nullptr, mapping_len, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
+  ASSERT_NE(mapping_addr, MAP_FAILED);
+
+  // Resize the file to be 6.5 pages long.
+  file_size = page_size * 6 + page_size / 2;
+  SAFE_SYSCALL(ftruncate(fd, file_size));
+
+  // Stores to the area past the original mapping should be reflected in the underlying file.
+  off_t store_offset = page_size * 4;
+  *reinterpret_cast<volatile std::byte*>(mapping_addr + store_offset) = std::byte{1};
+
+  SAFE_SYSCALL(msync(mapping_addr + store_offset, page_size, MS_SYNC));
+  std::byte file_value;
+  SAFE_SYSCALL(pread(fd, &file_value, 1, store_offset));
+  EXPECT_EQ(file_value, std::byte{1});
+
+  // Writes to the file past the original mapping should be reflected in the mapping.
+  off_t load_offset = page_size * 5;
+  std::byte stored_value{2};
+  SAFE_SYSCALL(pwrite(fd, &stored_value, 1, load_offset));
+
+  SAFE_SYSCALL(msync(mapping_addr + load_offset, page_size, MS_SYNC));
+  std::byte read_value = *reinterpret_cast<volatile std::byte*>(mapping_addr + load_offset);
+  EXPECT_EQ(read_value, stored_value);
+
+  // Loads and stores to the page corresponding to the end of the file work, even past the end of
+  // the file.
+  store_offset = file_size + 16;
+  *reinterpret_cast<volatile std::byte*>(mapping_addr + store_offset) = std::byte{3};
+  load_offset = store_offset;
+  read_value = *reinterpret_cast<volatile std::byte*>(mapping_addr + load_offset);
+  EXPECT_EQ(read_value, std::byte{3});
+
+  // Note: https://man7.org/linux/man-pages/man2/mmap.2.html#BUGS says that stores to memory past
+  // the end of the file may be visible to other memory mappings of the same file even after the
+  // file is closed and unmapped.
+
+  SAFE_SYSCALL(munmap(mapping_addr, mapping_len));
+
+  close(fd);
+  unlink(path.c_str());
+}
+
 // This variable is accessed from within a signal handler and thus must be declared volatile.
 volatile void* expected_fault_address;
 
