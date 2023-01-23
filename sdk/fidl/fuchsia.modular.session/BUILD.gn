@@ -11,7 +11,7 @@ fidl("fuchsia.modular.session") {
     "vector-bounds-not-specified",
   ]
 
-  sdk_category = "partner"
+  sdk_category = "internal"
 
   sources = [
     "launcher.fidl",
