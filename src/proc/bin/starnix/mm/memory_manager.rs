@@ -66,8 +66,9 @@ struct Mapping {
     filename: Option<NamespaceNode>,
 
     /// A name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
-    /// TODO(tbodt): Investigate whether it's correct to consider this field when merging adjacent
-    /// mappings.
+    /// TODO(tbodt): RangeMap automatically merges adjacent mappings based on this struct's
+    /// PartialEq impl. The auto derive checks this field too, so adjacent mappings with different
+    /// names aren't merged. Investigate whether this is correct.
     name: CString,
 }
 
