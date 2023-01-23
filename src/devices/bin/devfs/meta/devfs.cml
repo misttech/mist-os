@@ -27,11 +27,7 @@
         },
         {
             directory: "dev-class",
-
-            // TODO(https://fxbug.dev/110563): reduce this to r* once
-            // https://chromium-review.googlesource.com/c/chromium/src/+/4120894
-            // is in chromium-release.
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class",
         },
         {
