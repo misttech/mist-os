@@ -18,10 +18,6 @@ BindDriverManager::~BindDriverManager() {}
 
 zx_status_t BindDriverManager::BindDriverToDevice(const MatchedDriver& driver,
                                                   const fbl::RefPtr<Device>& dev) {
-  if (auto info = std::get_if<MatchedCompositeDriverInfo>(&driver); info) {
-    return BindDriverToFragment(*info, dev);
-  }
-
   if (auto info = std::get_if<fdi::MatchedNodeRepresentationInfo>(&driver); info) {
     auto device_ptr = std::shared_ptr<DeviceV1Wrapper>(new DeviceV1Wrapper{
         .device = dev,
@@ -231,25 +227,4 @@ zx::result<MatchedDriverInfo> BindDriverManager::MatchCompositeDevice(
   }
 
   return zx::error(ZX_ERR_NOT_FOUND);
-}
-
-zx_status_t BindDriverManager::BindDriverToFragment(const MatchedCompositeDriverInfo& driver,
-                                                    const fbl::RefPtr<Device>& dev) {
-  // Check if the driver already exists in |driver_index_composite_devices_|. If
-  // it doesn't, create and add a new CompositeDevice.
-  auto name = std::string(driver.driver_info.name());
-  if (driver_index_composite_devices_.count(name) == 0) {
-    driver_index_composite_devices_[name] =
-        CompositeDevice::CreateFromDriverIndex(driver, 0, fbl::Array<std::unique_ptr<Metadata>>());
-  }
-
-  // Bind the matched fragment to the device.
-  auto& composite = driver_index_composite_devices_[name];
-  zx_status_t status = composite->BindFragment(driver.composite.node, dev);
-  if (status != ZX_OK) {
-    LOGF(WARNING, "Failed to BindFragment for '%.*s': %s",
-         static_cast<uint32_t>(dev->name().size()), dev->name().data(),
-         zx_status_get_string(status));
-  }
-  return status;
 }

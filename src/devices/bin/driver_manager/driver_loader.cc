@@ -24,49 +24,6 @@
 
 namespace {
 
-zx::result<fdi::wire::MatchedDriverInfo> GetFidlMatchedDriverInfo(fdi::wire::MatchedDriver driver) {
-  if (driver.is_node_representation()) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
-  if (driver.is_composite_driver()) {
-    if (!driver.composite_driver().has_driver_info()) {
-      return zx::error(ZX_ERR_NOT_FOUND);
-    }
-
-    return zx::ok(driver.composite_driver().driver_info());
-  }
-
-  return zx::ok(driver.driver());
-}
-
-MatchedCompositeDevice CreateMatchedCompositeDevice(
-    fuchsia_driver_index::wire::MatchedCompositeInfo composite_info) {
-  MatchedCompositeDevice composite = {};
-  if (composite_info.has_num_nodes()) {
-    composite.num_nodes = composite_info.num_nodes();
-  }
-
-  if (composite_info.has_node_index()) {
-    composite.node = composite_info.node_index();
-  }
-
-  if (composite_info.has_composite_name()) {
-    composite.name =
-        std::string(composite_info.composite_name().data(), composite_info.composite_name().size());
-  }
-
-  if (composite_info.has_node_names()) {
-    std::vector<std::string> names;
-    for (auto& name : composite_info.node_names()) {
-      names.push_back(std::string(name.data(), name.size()));
-    }
-    composite.node_names = std::move(names);
-  }
-
-  return composite;
-}
-
 bool VerifyMatchedNodeRepresentationInfo(fdi::wire::MatchedNodeRepresentationInfo info) {
   if (!info.has_node_groups() || info.node_groups().empty()) {
     return false;
@@ -296,6 +253,12 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
   const auto& drivers = result->value()->drivers;
 
   for (auto driver : drivers) {
+    // TODO(fxb/119111): Remove the old composite driver matching logic entirely.
+    if (driver.is_composite_driver()) {
+      LOGF(WARNING, "DFv1 only supports matching composite drivers through node groups");
+      continue;
+    }
+
     if (driver.is_node_representation()) {
       if (!VerifyMatchedNodeRepresentationInfo(driver.node_representation())) {
         LOGF(ERROR,
@@ -307,33 +270,30 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
       continue;
     }
 
-    auto fidl_driver_info = GetFidlMatchedDriverInfo(driver);
-    if (fidl_driver_info.is_error()) {
-      LOGF(ERROR, "DriverIndex: MatchedDriversV1 response is missing MatchedDriverInfo");
-      continue;
-    }
+    ZX_ASSERT(driver.is_driver());
 
-    if (!fidl_driver_info->has_is_fallback()) {
+    auto fidl_driver_info = driver.driver();
+    if (!fidl_driver_info.has_is_fallback()) {
       LOGF(ERROR, "DriverIndex: MatchDriversV1 response is missing is_fallback");
       continue;
     }
 
     MatchedDriverInfo matched_driver_info = {};
-    if (fidl_driver_info->has_colocate()) {
-      matched_driver_info.colocate = fidl_driver_info->colocate();
+    if (fidl_driver_info.has_colocate()) {
+      matched_driver_info.colocate = fidl_driver_info.colocate();
     }
 
     // If we have a driver_url we are a DFv1 driver. Otherwise are are DFv2.
-    if (fidl_driver_info->has_driver_url()) {
-      auto loaded_driver = LoadDriverUrl(fidl_driver_info.value());
+    if (fidl_driver_info.has_driver_url()) {
+      auto loaded_driver = LoadDriverUrl(fidl_driver_info);
       if (!loaded_driver) {
         continue;
       }
       matched_driver_info.driver = loaded_driver;
-    } else if (fidl_driver_info->has_url()) {
+    } else if (fidl_driver_info.has_url()) {
       matched_driver_info.driver = Dfv2Driver{
-          .url = std::string(fidl_driver_info->url().get()),
-          .package_type = fidl_driver_info->package_type(),
+          .url = std::string(fidl_driver_info.url().get()),
+          .package_type = fidl_driver_info.package_type(),
       };
     } else {
       LOGF(ERROR, "DriverIndex: MatchDriversV1 response is missing url");
@@ -341,28 +301,18 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
     }
 
     auto driver_url = std::string(matched_driver_info.name());
-    if (!fidl_driver_info->is_fallback() && config.only_return_base_and_fallback_drivers &&
+    if (!fidl_driver_info.is_fallback() && config.only_return_base_and_fallback_drivers &&
         IsFuchsiaBootScheme(driver_url)) {
       continue;
     }
 
-    MatchedDriver matched_driver;
-    if (driver.is_composite_driver()) {
-      matched_driver = MatchedCompositeDriverInfo{
-          .composite = CreateMatchedCompositeDevice(driver.composite_driver()),
-          .driver_info = matched_driver_info,
-      };
-    } else {
-      matched_driver = matched_driver_info;
-    }
-
     if (config.libname.empty() || MatchesLibnameDriverIndex(driver_url, config.libname)) {
-      if (fidl_driver_info->is_fallback()) {
+      if (fidl_driver_info.is_fallback()) {
         if (include_fallback_drivers_ || !config.libname.empty()) {
-          matched_fallback_drivers.push_back(matched_driver);
+          matched_fallback_drivers.push_back(matched_driver_info);
         }
       } else {
-        matched_drivers.push_back(matched_driver);
+        matched_drivers.push_back(matched_driver_info);
       }
     }
   }

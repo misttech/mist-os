@@ -164,7 +164,6 @@ hlcpp_visibility = [
   "//src/devices/tests/banjo-proxy:*",
   "//src/devices/tests/bind-test-v2:*",
   "//src/devices/tests/bindlib-codegen-test:*",
-  "//src/devices/tests/composite-driver-v1:*",
   "//src/devices/tests/device-controller-fidl:*",
   "//src/devices/tests/driver-runtime:*",
   "//src/devices/tests/driver-transport:*",

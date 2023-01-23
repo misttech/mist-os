@@ -29,6 +29,14 @@ struct StrProperty {
   StrPropertyValue value;
 };
 
+// Contains the information to create a CompositeDevice from a node group.
+struct NodeGroupCompositeInfo {
+  MatchedDriverInfo driver;
+  std::string name;
+  uint32_t primary_index;
+  std::vector<std::string> node_names;
+};
+
 // A device composed of other devices.
 class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<CompositeDevice>> {
  public:
@@ -53,9 +61,8 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
                             fuchsia_device_manager::wire::CompositeDeviceDescriptor comp_desc,
                             std::unique_ptr<CompositeDevice>* out);
 
-  static std::unique_ptr<CompositeDevice> CreateFromDriverIndex(
-      MatchedCompositeDriverInfo driver, uint32_t primary_index,
-      fbl::Array<std::unique_ptr<Metadata>> metadata);
+  static std::unique_ptr<CompositeDevice> CreateFromNodeGroup(
+      NodeGroupCompositeInfo driver_info, fbl::Array<std::unique_ptr<Metadata>> metadata);
 
   // Attempt to match and bind any of the unbound fragments against |dev|.
   zx_status_t TryMatchBindFragments(const fbl::RefPtr<Device>& dev);
@@ -124,8 +131,8 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
 
   const fbl::Array<std::unique_ptr<Metadata>> metadata_;
 
-  // Driver index variables. |driver_index_driver_| is set by CreateFromDriverIndex().
-  const bool from_driver_index_;
+  // Set true if CompositeDevice was created from CreateFromNodeGroup().
+  const bool from_node_group_;
 
   // The driver that binds to actual device created by CompositeDevice. Only set by
   // CreateFromDriverIndex(), SetDriver(), or TryAssemble().

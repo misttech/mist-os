@@ -88,22 +88,20 @@ void NodeGroupV1::SetCompositeDevice(fuchsia_driver_index::wire::MatchedNodeGrou
     node_names[i] = std::string(info.node_names()[i].get());
   }
 
-  MatchedCompositeDevice composite_info = {
-      .node = info.node_index(),
-      .num_nodes = info.num_nodes(),
-      .name = std::string(info.composite().composite_name().get()),
-      .node_names = std::move(node_names),
-  };
-
   auto fidl_driver_info = info.composite().driver_info();
   MatchedDriverInfo matched_driver_info = {
       .driver = driver_loader_->LoadDriverUrl(std::string(fidl_driver_info.driver_url().get())),
       .colocate = fidl_driver_info.has_colocate() && fidl_driver_info.colocate(),
   };
 
-  composite_device_ = CompositeDevice::CreateFromDriverIndex(
-      MatchedCompositeDriverInfo{.composite = composite_info, .driver_info = matched_driver_info},
-      info.primary_index(), std::move(metadata_));
+  NodeGroupCompositeInfo composite_info = {
+      .driver = matched_driver_info,
+      .name = std::string(info.composite().composite_name().get()),
+      .primary_index = info.primary_index(),
+      .node_names = std::move(node_names),
+  };
+
+  composite_device_ = CompositeDevice::CreateFromNodeGroup(composite_info, std::move(metadata_));
   metadata_ = fbl::Array<std::unique_ptr<Metadata>>();
 }
 

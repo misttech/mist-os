@@ -91,7 +91,7 @@ CompositeDevice::CompositeDevice(fbl::String name, fbl::Array<const zx_device_pr
                                  uint32_t fragments_count, uint32_t primary_fragment_index,
                                  std::optional<bool> legacy_colocate_flag,
                                  fbl::Array<std::unique_ptr<Metadata>> metadata,
-                                 bool from_driver_index)
+                                 bool from_node_group)
     : name_(std::move(name)),
       properties_(std::move(properties)),
       str_properties_(std::move(str_properties)),
@@ -99,7 +99,7 @@ CompositeDevice::CompositeDevice(fbl::String name, fbl::Array<const zx_device_pr
       primary_fragment_index_(primary_fragment_index),
       legacy_colocate_flag_(legacy_colocate_flag),
       metadata_(std::move(metadata)),
-      from_driver_index_(from_driver_index) {}
+      from_node_group_(from_node_group) {}
 
 CompositeDevice::~CompositeDevice() = default;
 
@@ -165,26 +165,27 @@ zx_status_t CompositeDevice::Create(std::string_view name,
   return ZX_OK;
 }
 
-std::unique_ptr<CompositeDevice> CompositeDevice::CreateFromDriverIndex(
-    MatchedCompositeDriverInfo driver, uint32_t primary_index,
-    fbl::Array<std::unique_ptr<Metadata>> metadata) {
-  fbl::String name(driver.composite.name);
+std::unique_ptr<CompositeDevice> CompositeDevice::CreateFromNodeGroup(
+    NodeGroupCompositeInfo composite_info, fbl::Array<std::unique_ptr<Metadata>> metadata) {
+  uint32_t num_nodes = static_cast<uint32_t>(composite_info.node_names.size());
+
+  fbl::String name(composite_info.name);
   auto dev = std::make_unique<CompositeDevice>(
       std::move(name), fbl::Array<const zx_device_prop_t>(), fbl::Array<const StrProperty>(),
-      driver.composite.num_nodes, primary_index, std::nullopt, std::move(metadata), true);
+      num_nodes, composite_info.primary_index, std::nullopt, std::move(metadata), true);
 
-  for (uint32_t i = 0; i < driver.composite.num_nodes; ++i) {
-    std::string name = driver.composite.node_names[i];
+  for (uint32_t i = 0; i < num_nodes; ++i) {
+    std::string name = composite_info.node_names[i];
     auto fragment = std::make_unique<CompositeDeviceFragment>(dev.get(), std::string(name), i,
                                                               fbl::Array<const zx_bind_inst_t>());
     dev->fragments_.push_back(std::move(fragment));
   }
-  dev->driver_.emplace(driver.driver_info);
+  dev->driver_.emplace(composite_info.driver);
   return dev;
 }
 
 bool CompositeDevice::IsFragmentMatch(const fbl::RefPtr<Device>& dev, size_t* index_out) const {
-  if (from_driver_index_) {
+  if (from_node_group_) {
     return false;
   }
 

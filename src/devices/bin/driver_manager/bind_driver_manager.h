@@ -67,11 +67,6 @@ class BindDriverManager {
   zx::result<> MatchAndBindCompositeDevice(CompositeDevice& composite,
                                            const DriverLoader::MatchDeviceConfig& config);
 
-  // Binds the matched fragment in |driver| to |dev|. If a CompositeDevice for |driver| doesn't
-  // exists in |driver_index_composite_devices_|, this function creates and adds it.
-  zx_status_t BindDriverToFragment(const MatchedCompositeDriverInfo& driver,
-                                   const fbl::RefPtr<Device>& dev);
-
   // Owner. Must outlive BindDriverManager.
   Coordinator* coordinator_;
 

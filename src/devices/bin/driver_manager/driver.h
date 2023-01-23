@@ -45,13 +45,6 @@ struct Dfv2Driver {
   fuchsia_driver_index::DriverPackageType package_type;
 };
 
-struct MatchedCompositeDevice {
-  uint32_t node;
-  uint32_t num_nodes;
-  std::string name;
-  std::vector<std::string> node_names;
-};
-
 struct MatchedDriverInfo {
   std::variant<const Driver*, Dfv2Driver> driver;
   bool colocate = false;
@@ -70,13 +63,8 @@ struct MatchedDriverInfo {
   }
 };
 
-struct MatchedCompositeDriverInfo {
-  MatchedCompositeDevice composite;
-  MatchedDriverInfo driver_info;
-};
-
-using MatchedDriver = std::variant<MatchedDriverInfo, MatchedCompositeDriverInfo,
-                                   fuchsia_driver_index::MatchedNodeRepresentationInfo>;
+using MatchedDriver =
+    std::variant<MatchedDriverInfo, fuchsia_driver_index::MatchedNodeRepresentationInfo>;
 
 #define DRIVER_NAME_LEN_MAX 64
 
