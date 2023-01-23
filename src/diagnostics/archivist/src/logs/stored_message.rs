@@ -15,8 +15,6 @@ use std::{convert::TryInto, sync::Arc};
 
 #[derive(Debug)]
 pub struct StoredMessage {
-    // TODO(miguelfrde): move timestamp and severity to MessageBytes when needed, fetch when
-    // already present in the core structs.
     bytes: MessageBytes,
     stats: Option<Arc<LogStreamStats>>,
 }
