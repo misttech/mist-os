@@ -347,6 +347,7 @@ mlan_register(pmlan_device pmdevice, t_void **ppmlan_adapter)
 	pmadapter->card_type = pmdevice->card_type;
 	pmadapter->card_rev = pmdevice->card_rev;
 	pmadapter->init_para.uap_max_sta = pmdevice->uap_max_sta;
+	pmadapter->init_para.mcs32 = pmdevice->mcs32;
 
 #ifdef SDIO
 	if (IS_SD(pmadapter->card_type)) {
@@ -478,6 +479,7 @@ mlan_register(pmlan_device pmdevice, t_void **ppmlan_adapter)
 	}
 #endif
 	pmadapter->init_para.dfs53cfg = pmdevice->dfs53cfg;
+	pmadapter->init_para.dfs_offload = pmdevice->dfs_offload;
 	pmadapter->priv_num = 0;
 	pmadapter->priv[0] = MNULL;
 
@@ -498,24 +500,40 @@ mlan_register(pmlan_device pmdevice, t_void **ppmlan_adapter)
 	memset(pmadapter, pmadapter->priv[0], 0, sizeof(mlan_private));
 
 	pmadapter->priv[0]->adapter = pmadapter;
-	pmadapter->priv[0]->bss_type = (t_u8)pmdevice->bss_attr[0].bss_type;
-	pmadapter->priv[0]->frame_type = (t_u8)pmdevice->bss_attr[0].frame_type;
-	pmadapter->priv[0]->bss_priority =
-		(t_u8)pmdevice->bss_attr[0].bss_priority;
-	if (pmdevice->bss_attr[0].bss_type == MLAN_BSS_TYPE_STA)
+	if (pmdevice->drv_mode & DRV_MODE_MASK) {
+		/* Save bss_type, frame_type & bss_priority */
+		pmadapter->priv[0]->bss_type = 0xff;
+		pmadapter->priv[0]->frame_type = MLAN_DATA_FRAME_TYPE_ETH_II;
+		pmadapter->priv[0]->bss_priority = 0;
 		pmadapter->priv[0]->bss_role = MLAN_BSS_ROLE_STA;
-	else if (pmdevice->bss_attr[0].bss_type == MLAN_BSS_TYPE_UAP)
-		pmadapter->priv[0]->bss_role = MLAN_BSS_ROLE_UAP;
+
+		/* Save bss_index and bss_num */
+		pmadapter->priv[0]->bss_index = 0;
+		pmadapter->priv[0]->bss_num = 0xff;
+	} else {
+		pmadapter->priv[0]->bss_type =
+			(t_u8)pmdevice->bss_attr[0].bss_type;
+		pmadapter->priv[0]->frame_type =
+			(t_u8)pmdevice->bss_attr[0].frame_type;
+		pmadapter->priv[0]->bss_priority =
+			(t_u8)pmdevice->bss_attr[0].bss_priority;
+		if (pmdevice->bss_attr[0].bss_type == MLAN_BSS_TYPE_STA)
+			pmadapter->priv[0]->bss_role = MLAN_BSS_ROLE_STA;
+		else if (pmdevice->bss_attr[0].bss_type == MLAN_BSS_TYPE_UAP)
+			pmadapter->priv[0]->bss_role = MLAN_BSS_ROLE_UAP;
 #ifdef WIFI_DIRECT_SUPPORT
-	else if (pmdevice->bss_attr[0].bss_type == MLAN_BSS_TYPE_WIFIDIRECT) {
-		pmadapter->priv[0]->bss_role = MLAN_BSS_ROLE_STA;
-		if (pmdevice->bss_attr[0].bss_virtual)
-			pmadapter->priv[0]->bss_virtual = MTRUE;
-	}
+		else if (pmdevice->bss_attr[0].bss_type ==
+			 MLAN_BSS_TYPE_WIFIDIRECT) {
+			pmadapter->priv[0]->bss_role = MLAN_BSS_ROLE_STA;
+			if (pmdevice->bss_attr[0].bss_virtual)
+				pmadapter->priv[0]->bss_virtual = MTRUE;
+		}
 #endif
-	/* Save bss_index and bss_num */
-	pmadapter->priv[0]->bss_index = 0;
-	pmadapter->priv[0]->bss_num = (t_u8)pmdevice->bss_attr[0].bss_num;
+		/* Save bss_index and bss_num */
+		pmadapter->priv[0]->bss_index = 0;
+		pmadapter->priv[0]->bss_num =
+			(t_u8)pmdevice->bss_attr[0].bss_num;
+	}
 
 	/* init function table */
 	for (j = 0; mlan_ops[j]; j++) {

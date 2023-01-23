@@ -7,7 +7,7 @@
  *  to the firmware.
  *
  *
- *  Copyright 2008-2021 NXP
+ *  Copyright 2008-2022 NXP
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
@@ -889,6 +889,7 @@ wlan_cmd_802_11_associate(mlan_private *pmpriv,
 	MrvlIEtypes_RatesParamSet_t *prates_tlv;
 	MrvlIEtypes_AuthType_t *pauth_tlv = MNULL;
 	MrvlIEtypes_RsnParamSet_t *prsn_ie_tlv = MNULL;
+	MrvlIEtypes_SAE_PWE_Mode_t *prsnx_ie_tlv = MNULL;
 	MrvlIEtypes_SecurityCfg_t *psecurity_cfg_ie = MNULL;
 	MrvlIEtypes_ChanListParamSet_t *pchan_tlv;
 	WLAN_802_11_RATES rates;
@@ -916,6 +917,7 @@ wlan_cmd_802_11_associate(mlan_private *pmpriv,
 	pmpriv->pattempted_bss_desc = pbss_desc;
 	/* clear assoc_rsp_size */
 	pmpriv->assoc_rsp_size = 0;
+	pmpriv->assoc_req_size = 0;
 
 	memcpy_ext(pmadapter, passo->peer_sta_addr, pbss_desc->mac_address,
 		   sizeof(pbss_desc->mac_address),
@@ -1045,8 +1047,7 @@ wlan_cmd_802_11_associate(mlan_private *pmpriv,
 		       pchan_tlv->chan_scan_param[0].chan_number);
 
 		pchan_tlv->chan_scan_param[0].bandcfg.chanBand =
-			wlan_band_to_radio_type((t_u8)pbss_desc->bss_band);
-
+			wlan_band_to_radio_type(pbss_desc->bss_band);
 		PRINTM(MINFO, "Assoc: TLV Bandcfg = %x\n",
 		       pchan_tlv->chan_scan_param[0].bandcfg);
 		pos += sizeof(pchan_tlv->header) + sizeof(ChanScanParamSet_t);
@@ -1197,6 +1198,41 @@ wlan_cmd_802_11_associate(mlan_private *pmpriv,
 					wlan_cpu_to_le16(prsn_ie_tlv->header.
 							 len);
 			}
+			if (pbss_desc->prsnx_ie) {
+				prsnx_ie_tlv =
+					(MrvlIEtypes_SAE_PWE_Mode_t *) pos;
+				prsnx_ie_tlv->header.type =
+					(t_u16)(*(pbss_desc->prsnx_ie))
+					.ieee_hdr.element_id;
+				prsnx_ie_tlv->header.type =
+					prsnx_ie_tlv->header.type & 0x00FF;
+				prsnx_ie_tlv->header.type =
+					wlan_cpu_to_le16(prsnx_ie_tlv->header.
+							 type);
+				prsnx_ie_tlv->header.len =
+					(t_u16)(*(pbss_desc->prsnx_ie))
+					.ieee_hdr.len;
+				prsnx_ie_tlv->header.len =
+					prsnx_ie_tlv->header.len & 0x00FF;
+
+				memcpy_ext(pmadapter,
+					   prsnx_ie_tlv->pwe,
+					   &((*(pbss_desc->prsnx_ie))
+					     .data[0]),
+					   prsnx_ie_tlv->header.len,
+					   prsnx_ie_tlv->header.len);
+
+				HEXDUMP("ASSOC_CMD: RSNX IE",
+					(t_u8 *)prsnx_ie_tlv,
+					sizeof(prsnx_ie_tlv->header) +
+					prsnx_ie_tlv->header.len);
+
+				pos += sizeof(prsnx_ie_tlv->header) +
+					prsnx_ie_tlv->header.len;
+				prsnx_ie_tlv->header.len =
+					wlan_cpu_to_le16(prsnx_ie_tlv->header.
+							 len);
+			}
 		}
 	}
 
@@ -1227,12 +1263,11 @@ wlan_cmd_802_11_associate(mlan_private *pmpriv,
 	    wlan_11ac_bandconfig_allowed(pmpriv, pbss_desc->bss_band))
 		wlan_cmd_append_11ac_tlv(pmpriv, pbss_desc, &pos);
 
-	if ((IS_FW_SUPPORT_11AX(pmadapter)) && (!pbss_desc->disable_11n) &&
-	    wlan_11ax_bandconfig_allowed(pmpriv, pbss_desc->bss_band))
+	if ((IS_FW_SUPPORT_11AX(pmadapter)) &&
+	    wlan_11ax_bandconfig_allowed(pmpriv, pbss_desc))
 		wlan_cmd_append_11ax_tlv(pmpriv, pbss_desc, &pos);
 
-	wlan_wmm_process_association_req(pmpriv, &pos, &pbss_desc->wmm_ie,
-					 pbss_desc->pht_cap);
+	wlan_wmm_process_association_req(pmpriv, &pos, &pbss_desc->wmm_ie);
 	if (pmpriv->sec_info.wapi_enabled && pmpriv->wapi_ie_len)
 		wlan_cmd_append_wapi_ie(pmpriv, &pos);
 
@@ -1271,7 +1306,7 @@ wlan_cmd_802_11_associate(mlan_private *pmpriv,
 		pos += sizeof(prev_bssid_tlv->header) + MLAN_MAC_ADDR_LENGTH;
 	}
 
-	if (wlan_11d_create_dnld_countryinfo(pmpriv, (t_u8)pbss_desc->bss_band)) {
+	if (wlan_11d_create_dnld_countryinfo(pmpriv, pbss_desc->bss_band)) {
 		PRINTM(MERROR, "Dnld_countryinfo_11d failed\n");
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
@@ -1504,7 +1539,7 @@ wlan_ret_802_11_associate(mlan_private *pmpriv,
 	pmpriv->curr_bss_params.bss_descriptor.channel =
 		pbss_desc->phy_param_set.ds_param_set.current_chan;
 
-	pmpriv->curr_bss_params.band = (t_u8)pbss_desc->bss_band;
+	pmpriv->curr_bss_params.band = pbss_desc->bss_band;
 
 	/* Store current channel for further reference.
 	 * This would save one extra call to get current
@@ -1513,7 +1548,7 @@ wlan_ret_802_11_associate(mlan_private *pmpriv,
 	pmpriv->adapter->dfsr_channel =
 		pmpriv->curr_bss_params.bss_descriptor.channel;
 
-	/*
+	/*`
 	 * Adjust the timestamps in the scan table to be relative to the newly
 	 * associated AP's TSF
 	 */
@@ -1524,10 +1559,7 @@ wlan_ret_802_11_associate(mlan_private *pmpriv,
 	else
 		pmpriv->curr_bss_params.wmm_enabled = MFALSE;
 
-	if ((pmpriv->wmm_required ||
-	     (pbss_desc->pht_cap &&
-	      (pbss_desc->pht_cap->ieee_hdr.element_id == HT_CAPABILITY))) &&
-	    pmpriv->curr_bss_params.wmm_enabled)
+	if (pmpriv->wmm_required && pmpriv->curr_bss_params.wmm_enabled)
 		pmpriv->wmm_enabled = MTRUE;
 	else
 		pmpriv->wmm_enabled = MFALSE;
@@ -1619,8 +1651,6 @@ wlan_ret_802_11_associate(mlan_private *pmpriv,
 
 	wlan_recv_event(pmpriv, MLAN_EVENT_ID_DRV_CONNECTED, pevent);
 
-	/* Send OBSS scan param to the application if available */
-	wlan_2040_coex_event(pmpriv);
 	wlan_coex_ampdu_rxwinsize(pmpriv->adapter);
 
 	if (!pmpriv->sec_info.wpa_enabled && !pmpriv->sec_info.wpa2_enabled
@@ -2027,6 +2057,7 @@ wlan_cmd_802_11_ad_hoc_join(mlan_private *pmpriv,
 	t_u32 i, rates_size = 0;
 	t_u32 curr_pkt_filter;
 	t_u8 *pos = (t_u8 *)padhoc_join + sizeof(HostCmd_DS_802_11_AD_HOC_JOIN);
+	t_s32 append_size_11h = 0;
 
 	ENTER();
 
@@ -2119,7 +2150,7 @@ wlan_cmd_802_11_ad_hoc_join(mlan_private *pmpriv,
 
 	/* Copy the channel information */
 	pmpriv->curr_bss_params.bss_descriptor.channel = pbss_desc->channel;
-	pmpriv->curr_bss_params.band = (t_u8)pbss_desc->bss_band;
+	pmpriv->curr_bss_params.band = pbss_desc->bss_band;
 
 	if (pmpriv->sec_info.wep_status == Wlan802_11WEPEnabled
 	    || pmpriv->sec_info.wpa_enabled || pmpriv->sec_info.ewpa_enabled)
@@ -2140,7 +2171,7 @@ wlan_cmd_802_11_ad_hoc_join(mlan_private *pmpriv,
 		       pchan_tlv->chan_scan_param[0].chan_number);
 
 		pchan_tlv->chan_scan_param[0].bandcfg.chanBand =
-			wlan_band_to_radio_type((t_u8)pbss_desc->bss_band);
+			wlan_band_to_radio_type(pbss_desc->bss_band);
 
 		PRINTM(MINFO, "ADHOC_J_CMD: TLV Bandcfg = %x\n",
 		       pchan_tlv->chan_scan_param[0].bandcfg);
@@ -2149,7 +2180,7 @@ wlan_cmd_802_11_ad_hoc_join(mlan_private *pmpriv,
 			sizeof(pchan_tlv->header) + sizeof(ChanScanParamSet_t);
 	}
 
-	if (wlan_11d_create_dnld_countryinfo(pmpriv, (t_u8)pbss_desc->bss_band)) {
+	if (wlan_11d_create_dnld_countryinfo(pmpriv, pbss_desc->bss_band)) {
 		PRINTM(MERROR, "Dnld_countryinfo_11d failed\n");
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
@@ -2165,12 +2196,17 @@ wlan_cmd_802_11_ad_hoc_join(mlan_private *pmpriv,
 	 *   adhoc/infra 11h behavior can be properly triggered.
 	 *   pos modified if data is appended
 	 */
-	cmd_append_size +=
+	append_size_11h +=
 		wlan_11h_process_join(pmpriv, &pos,
 				      &padhoc_join->bss_descriptor.cap,
-				      (t_u8)pbss_desc->bss_band,
-				      pbss_desc->channel,
+				      pbss_desc->bss_band, pbss_desc->channel,
 				      &pbss_desc->wlan_11h_bss_info);
+	if (append_size_11h >= 0)
+		cmd_append_size += append_size_11h;
+	else {
+		ret = MLAN_STATUS_FAILURE;
+		goto done;
+	}
 
 	if (pmpriv->sec_info.wpa_enabled) {
 		prsn_ie_tlv = (MrvlIEtypes_RsnParamSet_t *)pos;
@@ -2674,7 +2710,7 @@ wlan_disconnect(mlan_private *pmpriv,
  *  @return         Radio type designator for use in a channel TLV
  */
 t_u8
-wlan_band_to_radio_type(t_u8 band)
+wlan_band_to_radio_type(t_u16 band)
 {
 	t_u8 ret_radio_type;
 

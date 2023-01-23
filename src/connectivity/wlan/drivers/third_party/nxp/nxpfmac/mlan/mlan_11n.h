@@ -6,7 +6,7 @@
  *    implemented in mlan_11n.c.
  *
  *
- *  Copyright 2008-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
@@ -81,7 +81,7 @@ mlan_status wlan_ret_tx_bf_cfg(pmlan_private pmpriv,
 			       HostCmd_DS_COMMAND *resp,
 			       mlan_ioctl_req *pioctl_buf);
 #ifdef STA_SUPPORT
-t_u8 wlan_11n_bandconfig_allowed(mlan_private *pmpriv, t_u8 bss_band);
+t_u8 wlan_11n_bandconfig_allowed(mlan_private *pmpriv, t_u16 bss_band);
 /** Append the 802_11N tlv */
 int wlan_cmd_append_11n_tlv(mlan_private *pmpriv,
 			    BSSDescriptor_t *pbss_desc, t_u8 **ppbuffer);
@@ -290,12 +290,6 @@ static INLINE void
 wlan_update_del_ba_count(mlan_private *priv, raListTbl *ptr)
 {
 	t_s8 rssi;
-#ifdef UAP_802_11N
-#ifdef UAP_SUPPORT
-	if (GET_BSS_ROLE(priv) == MLAN_BSS_ROLE_UAP)
-		return wlan_update_station_del_ba_count(priv, ptr);
-#endif /* UAP_SUPPORT */
-#endif /* UAP_802_11N */
 	if (ptr->is_tdls_link)
 		return wlan_update_station_del_ba_count(priv, ptr);
 	rssi = priv->snr - priv->nf;

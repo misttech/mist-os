@@ -4,7 +4,7 @@
  *  function declarations of 802.11h
  *
  *
- *  Copyright 2008-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
@@ -123,7 +123,7 @@ extern t_s32 wlan_11h_process_start(mlan_private *priv, t_u8 **ppbuffer,
 
 /** Add any 11h TLVs necessary to complete a join command (adhoc or infra) */
 extern t_s32 wlan_11h_process_join(mlan_private *priv, t_u8 **ppbuffer,
-				   IEEEtypes_CapInfo_t *pcap_info, t_u8 band,
+				   IEEEtypes_CapInfo_t *pcap_info, t_u16 band,
 				   t_u32 channel,
 				   wlan_11h_bss_info_t *p11h_bss_info);
 
@@ -160,13 +160,17 @@ extern mlan_status wlan_11h_ioctl_dfs_testing(pmlan_adapter pmadapter,
 					      pmlan_ioctl_req pioctl_req);
 extern mlan_status
 
-wlan_11h_ioctl_get_channel_nop_info(pmlan_adapter pmadapter,
-				    pmlan_ioctl_req pioctl_req);
+wlan_11h_ioctl_channel_nop_info(pmlan_adapter pmadapter,
+				pmlan_ioctl_req pioctl_req);
 
 extern mlan_status
  wlan_11h_ioctl_dfs_chan_report(mlan_private *priv, pmlan_ioctl_req pioctl_req);
 extern mlan_status wlan_11h_ioctl_chan_switch_count(pmlan_adapter pmadapter,
 						    pmlan_ioctl_req pioctl_req);
+
+/** get/set channel dfs state */
+mlan_status wlan_11h_ioctl_chan_dfs_state(pmlan_adapter pmadapter,
+					  pmlan_ioctl_req pioctl_req);
 
 /** get/set dfs w53 cfg */
 mlan_status wlan_11h_ioctl_dfs_w53_cfg(pmlan_adapter pmadapter,

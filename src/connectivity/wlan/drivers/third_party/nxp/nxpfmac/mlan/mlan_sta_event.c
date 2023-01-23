@@ -3,7 +3,7 @@
  *  @brief This file contains MLAN event handling.
  *
  *
- *  Copyright 2008-2021 NXP
+ *  Copyright 2008-2022 NXP
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:
@@ -157,7 +157,8 @@ wlan_parse_tdls_event(pmlan_private priv, pmlan_buffer pevent)
 				}
 			}
 			for (i = 0; i < MAX_NUM_TID; i++) {
-				if (sta_ptr->is_11n_enabled)
+				if (sta_ptr->is_11n_enabled
+				    || sta_ptr->is_11ax_enabled)
 					sta_ptr->ampdu_sta[i] =
 						priv->aggr_prio_tbl[i]
 					.ampdu_user;
@@ -230,7 +231,7 @@ wlan_parse_tdls_event(pmlan_private priv, pmlan_buffer pevent)
 			wlan_restore_tdls_packets(priv,
 						  tdls_event->peer_mac_addr,
 						  TDLS_TEAR_DOWN);
-			if (sta_ptr->is_11n_enabled) {
+			if (sta_ptr->is_11n_enabled || sta_ptr->is_11ax_enabled) {
 				wlan_cleanup_reorder_tbl(priv,
 							 tdls_event->
 							 peer_mac_addr);
@@ -471,8 +472,6 @@ wlan_reset_connect_state(pmlan_private priv, t_u8 drv_disconnect)
 	pmadapter->tx_lock_flag = MFALSE;
 	pmadapter->pps_uapsd_mode = MFALSE;
 	pmadapter->delay_null_pkt = MFALSE;
-	if (priv->bss_type == MLAN_BSS_TYPE_STA)
-		pmadapter->hs_wake_interval = 0;
 
 	if ((wlan_fw_11d_is_enabled(priv)) &&
 	    (priv->state_11d.user_enable_11d == DISABLE_11D)) {
@@ -703,6 +702,7 @@ wlan_ops_sta_process_event(t_void *priv)
 	t_u16 reason_code;
 	pmlan_callbacks pcb = &pmadapter->callbacks;
 	mlan_event *pevent = MNULL;
+	t_u8 addr[MLAN_MAC_ADDR_LENGTH];
 	chan_band_info *pchan_band_info = MNULL;
 	t_u8 radar_chan;
 	t_u16 enable = 0;
@@ -832,8 +832,8 @@ wlan_ops_sta_process_event(t_void *priv)
 								  |
 								  MRVDRV_TxPD_POWER_MGMT_LAST_PACKET)
 					    == MLAN_STATUS_SUCCESS) {
-						LEAVE();
-						return MLAN_STATUS_SUCCESS;
+						ret = MLAN_STATUS_SUCCESS;
+						goto done;
 					}
 				}
 			}
@@ -867,6 +867,14 @@ wlan_ops_sta_process_event(t_void *priv)
 		wlan_clean_txrx(pmpriv);
 		wlan_recv_event(pmpriv, MLAN_EVENT_ID_FW_ADHOC_LINK_LOST,
 				MNULL);
+		break;
+	case EVENT_ASSOC_REQ_IE:
+		pmpriv->assoc_req_size = pmbuf->data_len - sizeof(eventcause);
+		evt_buf = (pmbuf->pbuf + pmbuf->data_offset +
+			   sizeof(eventcause));
+		memcpy_ext(pmpriv->adapter, pmpriv->assoc_req_buf, evt_buf,
+			   pmbuf->data_len - sizeof(eventcause),
+			   MRVDRV_ASSOC_RSP_BUF_SIZE);
 		break;
 
 	case EVENT_FW_DEBUG_INFO:
@@ -902,6 +910,8 @@ wlan_ops_sta_process_event(t_void *priv)
 		}
 		pmadapter->scan_block = MFALSE;
 		wlan_recv_event(pmpriv, MLAN_EVENT_ID_FW_PORT_RELEASE, MNULL);
+		/* Send OBSS scan param to the application */
+		wlan_2040_coex_event(pmpriv);
 		break;
 
 	case EVENT_STOP_TX:
@@ -1332,12 +1342,51 @@ wlan_ops_sta_process_event(t_void *priv)
 		wlan_free_ssu_pcie_buf(pmadapter);
 		break;
 #endif
+	case EVENT_CSI:
+		PRINTM(MEVENT, "EVENT: EVENT_CSI on STA\n");
+		wlan_process_csi_event(pmpriv);
+		break;
 	case EVENT_MEF_HOST_WAKEUP:
 		PRINTM(MEVENT, "EVENT: EVENT_MEF_HOST_WAKEUP len=%d\n",
 		       pmbuf->data_len);
 		break;
 	case EVENT_MANAGEMENT_FRAME_WAKEUP:
 		PRINTM(MEVENT, "EVENT: EVENT_MANAGEMENT_FRAME_WAKEUP HOST\n");
+		break;
+	case EVENT_ROAM_OFFLOAD:
+		memcpy_ext(pmadapter, addr,
+			   pmpriv->curr_bss_params.bss_descriptor.mac_address,
+			   MLAN_MAC_ADDR_LENGTH, MLAN_MAC_ADDR_LENGTH);
+		memcpy_ext(pmadapter,
+			   pmpriv->curr_bss_params.bss_descriptor.mac_address,
+			   (t_u8 *)(pmadapter->event_body + 2),
+			   MLAN_MAC_ADDR_LENGTH, MLAN_MAC_ADDR_LENGTH);
+		/** replace ralist's mac address with new mac address */
+		if (0 ==
+		    wlan_ralist_update(pmpriv, addr,
+				       pmpriv->curr_bss_params.bss_descriptor.
+				       mac_address))
+			wlan_ralist_add(pmpriv,
+					pmpriv->curr_bss_params.bss_descriptor.
+					mac_address);
+		wlan_11n_cleanup_reorder_tbl(pmpriv);
+		wlan_11n_deleteall_txbastream_tbl(pmpriv);
+		/*Update the BSS for inform kernel, otherwise kernel will give
+		 * warning for not find BSS*/
+		memcpy_ext(pmadapter, (t_u8 *)&pmadapter->pscan_table[0],
+			   (t_u8 *)&pmpriv->curr_bss_params.bss_descriptor,
+			   sizeof(BSSDescriptor_t), sizeof(BSSDescriptor_t));
+		if (!pmadapter->num_in_scan_table)
+			pmadapter->num_in_scan_table = 1;
+		PRINTM(MEVENT, "EVENT: ROAM OFFLOAD IN FW SUCCESS\n");
+		pevent->bss_index = pmpriv->bss_index;
+		pevent->event_id = MLAN_EVENT_ID_FW_ROAM_OFFLOAD_RESULT;
+		/** Drop event id length and 2 bytes reverved length*/
+		pevent->event_len = pmbuf->data_len - sizeof(eventcause) - 2;
+		memcpy_ext(pmadapter, (t_u8 *)pevent->event_buf,
+			   pmadapter->event_body + 2, pevent->event_len,
+			   pevent->event_len);
+		wlan_recv_event(pmpriv, pevent->event_id, pevent);
 		break;
 	case EVENT_CLOUD_KEEP_ALIVE_RETRY_FAIL:
 		break;

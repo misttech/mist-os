@@ -4,7 +4,7 @@
  *  It also defines the data structures used for APIs between MLAN and MOAL.
  *
  *
- *  Copyright 2008-2020 NXP
+ *  Copyright 2008-2021 NXP
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions are met:

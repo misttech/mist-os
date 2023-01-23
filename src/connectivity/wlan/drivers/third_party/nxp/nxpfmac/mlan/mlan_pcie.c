@@ -130,7 +130,7 @@ static const struct _mlan_card_info mlan_card_info_pcie8997 = {
 };
 #endif
 
-#ifdef PCIE9097
+#if defined(PCIE9097) || defined(PCIENW62X)
 static const struct _mlan_pcie_card_reg mlan_reg_pcie9097_b0 = {
 	.reg_txbd_rdptr = PCIE9098_TXBD_RDPTR,
 	.reg_txbd_wrptr = PCIE9098_TXBD_WRPTR,
@@ -164,7 +164,7 @@ static const struct _mlan_pcie_card_reg mlan_reg_pcie9097_b0 = {
 };
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 static const struct _mlan_pcie_card_reg mlan_reg_pcie9098 = {
 	.reg_txbd_rdptr = PCIE9098_TXBD_RDPTR,
 	.reg_txbd_wrptr = PCIE9098_TXBD_WRPTR,
@@ -216,7 +216,7 @@ static const struct _mlan_card_info mlan_card_info_pcie9098 = {
 static mlan_status wlan_pcie_delete_evtbd_ring(pmlan_adapter pmadapter);
 static mlan_status wlan_pcie_delete_rxbd_ring(pmlan_adapter pmadapter);
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 /**
  *  @brief This function init the adma setting
  *
@@ -555,7 +555,7 @@ wlan_pcie_init_adma_ring_size(mlan_adapter *pmadapter)
 
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 /**
  *  @brief This function set the host interrupt select mask
  *
@@ -603,7 +603,7 @@ wlan_pcie_set_host_int_select_mask(mlan_adapter *pmadapter, t_u8 enable)
 }
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 /**
  *  @brief This function handles command response completion
  *
@@ -779,8 +779,9 @@ wlan_disable_pcie_host_int(mlan_adapter *pmadapter)
 		LEAVE();
 		return ret;
 	}
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if ((pmadapter->card_type == CARD_TYPE_PCIE9098) ||
+	    (pmadapter->card_type == CARD_TYPE_PCIENW62X) ||
 	    (pmadapter->card_type == CARD_TYPE_PCIE9097)) {
 		ret = wlan_pcie_set_host_int_select_mask(pmadapter, MFALSE);
 		if (ret) {
@@ -858,8 +859,9 @@ wlan_enable_pcie_host_int(mlan_adapter *pmadapter)
 		LEAVE();
 		return ret;
 	}
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if ((pmadapter->card_type == CARD_TYPE_PCIE9098) ||
+	    (pmadapter->card_type == CARD_TYPE_PCIENW62X) ||
 	    (pmadapter->card_type == CARD_TYPE_PCIE9097)) {
 		ret = wlan_pcie_set_host_int_select_mask(pmadapter, MTRUE);
 		if (ret) {
@@ -889,7 +891,7 @@ wlan_pcie_create_txbd_ring(mlan_adapter *pmadapter)
 #if defined(PCIE8997) || defined(PCIE8897)
 	pmlan_pcie_data_buf ptx_bd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	padma_dual_desc_buf padma_bd_buf;
 #endif
 
@@ -911,7 +913,7 @@ wlan_pcie_create_txbd_ring(mlan_adapter *pmadapter)
 			pmadapter->pcard_pcie->txrx_bd_size;
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma)
 		pmadapter->pcard_pcie->txbd_ring_size =
 			sizeof(adma_dual_desc_buf) *
@@ -944,7 +946,7 @@ wlan_pcie_create_txbd_ring(mlan_adapter *pmadapter)
 
 	for (i = 0; i < pmadapter->pcard_pcie->txrx_bd_size; i++) {
 		pmadapter->pcard_pcie->tx_buf_list[i] = MNULL;
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf =
 				(adma_dual_desc_buf
@@ -998,7 +1000,7 @@ wlan_pcie_delete_txbd_ring(mlan_adapter *pmadapter)
 #if defined(PCIE8997) || defined(PCIE8897)
 	mlan_pcie_data_buf *ptx_bd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 #endif
 
@@ -1031,7 +1033,7 @@ wlan_pcie_delete_txbd_ring(mlan_adapter *pmadapter)
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf = (adma_dual_desc_buf *)
 				pmadapter->pcard_pcie->txbd_ring[i];
@@ -1089,7 +1091,7 @@ wlan_pcie_create_rxbd_ring(mlan_adapter *pmadapter)
 #if defined(PCIE8997) || defined(PCIE8897)
 	mlan_pcie_data_buf *prxbd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 #endif
 
@@ -1113,7 +1115,7 @@ wlan_pcie_create_rxbd_ring(mlan_adapter *pmadapter)
 	}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	/*
 	 * driver maintaines the write pointer and firmware maintaines the read
 	 * pointer. The read pointer starts at 0 (zero) while the write pointer
@@ -1203,7 +1205,7 @@ wlan_pcie_create_rxbd_ring(mlan_adapter *pmadapter)
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf =
 				(adma_dual_desc_buf
@@ -1242,7 +1244,7 @@ wlan_pcie_delete_rxbd_ring(mlan_adapter *pmadapter)
 #if defined(PCIE8997) || defined(PCIE8897)
 	mlan_pcie_data_buf *prxbd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 #endif
 
@@ -1273,7 +1275,7 @@ wlan_pcie_delete_rxbd_ring(mlan_adapter *pmadapter)
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf = (adma_dual_desc_buf *)
 				pmadapter->pcard_pcie->rxbd_ring[i];
@@ -1330,7 +1332,7 @@ wlan_pcie_create_evtbd_ring(mlan_adapter *pmadapter)
 	pmlan_pcie_evt_buf pevtbd_buf;
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 #endif
 
@@ -1349,7 +1351,7 @@ wlan_pcie_create_evtbd_ring(mlan_adapter *pmadapter)
 	}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		pmadapter->pcard_pcie->evtbd_wrptr = MLAN_MAX_EVT_BD;
 		pmadapter->pcard_pcie->evtbd_ring_size =
@@ -1421,7 +1423,7 @@ wlan_pcie_create_evtbd_ring(mlan_adapter *pmadapter)
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf =
 				(adma_dual_desc_buf
@@ -1460,7 +1462,7 @@ wlan_pcie_delete_evtbd_ring(mlan_adapter *pmadapter)
 #if defined(PCIE8997) || defined(PCIE8897)
 	mlan_pcie_evt_buf *pevtbd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 #endif
 
@@ -1489,7 +1491,7 @@ wlan_pcie_delete_evtbd_ring(mlan_adapter *pmadapter)
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf = (adma_dual_desc_buf *)
 				pmadapter->pcard_pcie->evtbd_ring[i];
@@ -1696,7 +1698,7 @@ wlan_check_tx_pending_buffer(mlan_adapter *pmadapter, t_u32 rdptr)
 			return MFALSE;
 	}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		if ((pmadapter->pcard_pcie->txbd_rdptr &
 		     ADMA_RW_PTR_WRAP_MASK) != (rdptr & ADMA_RW_PTR_WRAP_MASK))
@@ -1731,7 +1733,7 @@ wlan_pcie_send_data_complete(mlan_adapter *pmadapter)
 		pmadapter->pcard_pcie->reg->txrx_rw_ptr_rollover_ind;
 	mlan_pcie_data_buf *ptx_bd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 	t_u32 wrptr;
 #endif
@@ -1755,7 +1757,7 @@ wlan_pcie_send_data_complete(mlan_adapter *pmadapter)
 		rdptr = rdptr >> TXBD_RW_PTR_START;
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		wrptr = rdptr & 0xffff;
 		rdptr = rdptr >> ADMA_RPTR_START;
@@ -1818,7 +1820,7 @@ wlan_pcie_send_data_complete(mlan_adapter *pmadapter)
 					 txrx_rw_ptr_rollover_ind);
 		}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf =
 				(adma_dual_desc_buf *) pmadapter->pcard_pcie->
@@ -1858,7 +1860,7 @@ done:
 	 ((wrptr & rollover_ind) == (rdptr & rollover_ind)))
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 #define ADMA_TXBD_IS_FULL(wrptr, rdptr, mask, rollover_ind)                                        \
 	(((wrptr & mask) == (rdptr & mask)) &&         \
 	 ((wrptr & rollover_ind) !=                                \
@@ -1884,7 +1886,7 @@ wlan_check_txbd_not_full(mlan_adapter *pmadapter)
 			return MFALSE;
 	}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		txrx_rw_ptr_mask = pmadapter->pcard_pcie->txrx_bd_size - 1;
 		txrx_rw_ptr_rollover_ind = pmadapter->pcard_pcie->txrx_bd_size;
@@ -1922,7 +1924,7 @@ wlan_pcie_send_data(mlan_adapter *pmadapter, t_u8 type,
 		pmadapter->pcard_pcie->reg->txrx_rw_ptr_rollover_ind;
 	mlan_pcie_data_buf *ptx_bd_buf = MNULL;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf = MNULL;
 #endif
 	const t_u32 num_tx_buffs = pmadapter->pcard_pcie->txrx_bd_size;
@@ -2003,7 +2005,7 @@ wlan_pcie_send_data(mlan_adapter *pmadapter, t_u8 type,
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			wr_ptr_start = ADMA_WPTR_START;
 			padma_bd_buf =
@@ -2095,7 +2097,7 @@ done_unmap:
 		ptx_bd_buf->offset = 0;
 	}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma && padma_bd_buf) {
 		padma_bd_buf->paddr = 0;
 		padma_bd_buf->len = 0;
@@ -2136,7 +2138,7 @@ wlan_check_rx_pending_buffer(mlan_adapter *pmadapter, t_u32 rdptr)
 	}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		if ((pmadapter->pcard_pcie->rxbd_rdptr &
 		     ADMA_RW_PTR_WRAP_MASK) != (rdptr & ADMA_RW_PTR_WRAP_MASK))
@@ -2183,7 +2185,7 @@ wlan_is_rx_pending_full(mlan_adapter *pmadapter, t_u32 rdptr)
 	}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		PRINTM(MDATA, "local wrptr: 0x%x -> reg rdptr: 0x%x\n",
 		       (pmadapter->pcard_pcie->
@@ -2224,7 +2226,7 @@ wlan_pcie_process_recv_data(mlan_adapter *pmadapter)
 		pmadapter->pcard_pcie->reg->txrx_rw_ptr_rollover_ind;
 	mlan_pcie_data_buf *prxbd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 #endif
 	t_u32 in_ts_sec, in_ts_usec;
@@ -2237,7 +2239,7 @@ wlan_pcie_process_recv_data(mlan_adapter *pmadapter)
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
 	}
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma)
 		rdptr = rdptr >> ADMA_RPTR_START;
 #endif
@@ -2400,7 +2402,7 @@ wlan_pcie_process_recv_data(mlan_adapter *pmadapter)
 			txbd_val = txbd_val << TXBD_RW_PTR_START;
 		}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf =
 				(adma_dual_desc_buf *) pmadapter->pcard_pcie->
@@ -2443,7 +2445,7 @@ wlan_pcie_process_recv_data(mlan_adapter *pmadapter)
 			ret = MLAN_STATUS_FAILURE;
 			goto done;
 		}
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma)
 			rdptr = rdptr >> ADMA_RPTR_START;
 #endif
@@ -2591,7 +2593,7 @@ wlan_pcie_send_cmd(mlan_adapter *pmadapter, mlan_buffer *pmbuf)
 		}
 	}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		/* To send a command, the driver will:
 		   1. driver prepare the cmdrep buffer for adma
@@ -2760,7 +2762,7 @@ wlan_pcie_process_cmd_resp(mlan_adapter *pmadapter)
 			}
 		}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			/* Clear the cmd-rsp buffer address in adma registers.
 			   This will prevent firmware from writing to the same
@@ -2830,7 +2832,7 @@ wlan_check_evt_buffer(mlan_adapter *pmadapter, t_u32 rdptr)
 			return MFALSE;
 	}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		if ((pmadapter->pcard_pcie->evtbd_rdptr &
 		     ADMA_RW_PTR_WRAP_MASK) != (rdptr & ADMA_RW_PTR_WRAP_MASK))
@@ -2859,7 +2861,7 @@ wlan_pcie_process_event_ready(mlan_adapter *pmadapter)
 #if defined(PCIE8997) || defined(PCIE8897)
 	mlan_pcie_evt_buf *pevtbd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 #endif
 	ENTER();
@@ -2885,7 +2887,7 @@ wlan_pcie_process_event_ready(mlan_adapter *pmadapter)
 		LEAVE();
 		return MLAN_STATUS_FAILURE;
 	}
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma)
 		rdptr = rdptr >> ADMA_RPTR_START;
 #endif
@@ -2917,7 +2919,7 @@ wlan_pcie_process_event_ready(mlan_adapter *pmadapter)
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf =
 				(adma_dual_desc_buf *) pmadapter->pcard_pcie->
@@ -2966,7 +2968,7 @@ wlan_pcie_process_event_ready(mlan_adapter *pmadapter)
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma)
 			pmadapter->pcard_pcie->evtbd_rdptr &=
 				ADMA_RW_PTR_WRAP_MASK;
@@ -3011,7 +3013,7 @@ wlan_pcie_event_complete(mlan_adapter *pmadapter,
 #if defined(PCIE8997) || defined(PCIE8897)
 	mlan_pcie_evt_buf *pevtbd_buf;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	adma_dual_desc_buf *padma_bd_buf;
 #endif
 
@@ -3035,7 +3037,7 @@ wlan_pcie_event_complete(mlan_adapter *pmadapter,
 		ret = MLAN_STATUS_FAILURE;
 		goto done;
 	}
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma)
 		rdptr = rdptr >> ADMA_RPTR_START;
 #endif
@@ -3066,7 +3068,7 @@ wlan_pcie_event_complete(mlan_adapter *pmadapter,
 		}
 #endif
 
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->use_adma) {
 			padma_bd_buf =
 				(adma_dual_desc_buf *) pmadapter->pcard_pcie->
@@ -3103,7 +3105,7 @@ wlan_pcie_event_complete(mlan_adapter *pmadapter,
 		}
 	}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma)
 		pmadapter->pcard_pcie->evtbd_wrptr &= ADMA_RW_PTR_WRAP_MASK;
 #endif
@@ -3339,6 +3341,10 @@ wlan_pcie_prog_fw_w_helper(mlan_adapter *pmadapter, mlan_fw_image *fw)
 	if (IS_PCIE9097(pmadapter->card_type))
 		check_fw_status = MTRUE;
 #endif
+#if defined(PCIENW62X)
+	if (IS_PCIENW62X(pmadapter->card_type))
+		check_fw_status = MTRUE;
+#endif
 
 	/* Perform firmware data transfer */
 	do {
@@ -3545,18 +3551,21 @@ wlan_get_pcie_device(pmlan_adapter pmadapter)
 		pmadapter->pcard_pcie->txrx_bd_size = MAX_TXRX_BD;
 		break;
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	case CARD_TYPE_PCIE9097:
 	case CARD_TYPE_PCIE9098:
+	case CARD_TYPE_PCIENW62X:
 		pmadapter->pcard_pcie->reg = &mlan_reg_pcie9098;
 		pmadapter->pcard_info = &mlan_card_info_pcie9098;
 		pmadapter->pcard_pcie->txrx_bd_size = ADMA_DEF_TXRX_BD;
 		pmadapter->pcard_pcie->txrx_num_desc = TXRX_DEF_NUM_DESC;
-#ifdef PCIE9097
-		if (card_type == CARD_TYPE_PCIE9097 &&
-		    pmadapter->card_rev == CHIP_9097_REV_B0)
+#if defined(PCIE9097) || defined(PCIENW62X)
+		if ((card_type == CARD_TYPE_PCIE9097 &&
+		     pmadapter->card_rev == CHIP_9097_REV_B0) ||
+		    (card_type == CARD_TYPE_PCIENW62X))
 			pmadapter->pcard_pcie->reg = &mlan_reg_pcie9097_b0;
 #endif
+
 		break;
 #endif
 	default:
@@ -3734,7 +3743,7 @@ wlan_process_msix_int(mlan_adapter *pmadapter)
 		if (ret)
 			goto done;
 	}
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->host_intr_cmd_dnld &&
 	    (pcie_ireg & pmadapter->pcard_pcie->reg->host_intr_cmd_dnld)) {
 		if (pmadapter->cmd_sent)
@@ -3858,7 +3867,7 @@ wlan_process_pcie_int_status(mlan_adapter *pmadapter)
 			if (ret)
 				goto done;
 		}
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 		if (pmadapter->pcard_pcie->reg->host_intr_cmd_dnld &&
 		    (pcie_ireg &
 		     pmadapter->pcard_pcie->reg->host_intr_cmd_dnld)) {
@@ -4021,7 +4030,7 @@ wlan_pcie_check_fw_status(mlan_adapter *pmadapter, t_u32 pollnum)
 			ret = MLAN_STATUS_SUCCESS;
 			break;
 		} else {
-			wlan_mdelay(pmadapter, 100);
+			wlan_mdelay(pmadapter, 10);
 			ret = MLAN_STATUS_FAILURE;
 		}
 	}
@@ -4158,7 +4167,7 @@ wlan_pcie_host_to_card(pmlan_private pmpriv, t_u8 type,
 		ret = wlan_pcie_send_data(pmadapter, type, pmbuf, tx_param);
 	else if (type == MLAN_TYPE_CMD)
 		ret = wlan_pcie_send_cmd(pmadapter, pmbuf);
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	else if (type == MLAN_TYPE_VDLL)
 		ret = wlan_pcie_send_vdll(pmadapter, pmbuf);
 #endif
@@ -4289,8 +4298,9 @@ wlan_alloc_pcie_ring_buf(pmlan_adapter pmadapter)
 	mlan_status ret = MLAN_STATUS_SUCCESS;
 
 	ENTER();
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if ((pmadapter->card_type == CARD_TYPE_PCIE9098) ||
+	    (pmadapter->card_type == CARD_TYPE_PCIENW62X) ||
 	    (pmadapter->card_type == CARD_TYPE_PCIE9097)) {
 		wlan_pcie_init_adma_ring_size(pmadapter);
 	}
@@ -4347,6 +4357,7 @@ wlan_free_pcie_ring_buf(pmlan_adapter pmadapter)
 	pmadapter->pcard_pcie->cmdrsp_buf = MNULL;
 #ifdef RPTR_MEM_COP
 	if ((pmadapter->card_type == CARD_TYPE_PCIE9098) ||
+	    (pmadapter->card_type == CARD_TYPE_PCIENW62X)
 	    (pmadapter->card_type == CARD_TYPE_PCIE9097))
 		wlan_pcie_free_rdptrs(pmadapter);
 #endif
@@ -4434,7 +4445,7 @@ wlan_set_pcie_buf_config(mlan_private *pmpriv)
 		}
 	}
 #endif
-#if defined(PCIE9098) || defined(PCIE9097)
+#if defined(PCIE9098) || defined(PCIE9097) || defined(PCIENW62X)
 	if (pmadapter->pcard_pcie->reg->use_adma) {
 		/** config ADMA for Tx Data */
 		wlan_init_adma(pmadapter, ADMA_TX_DATA,

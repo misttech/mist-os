@@ -105,6 +105,16 @@ static const struct _mlan_card_info mlan_card_info_usb9097 = {
 };
 #endif
 
+#ifdef USBNW62X
+static const struct _mlan_card_info mlan_card_info_usbNW62X = {
+	.max_tx_buf_size = MLAN_TX_DATA_BUF_SIZE_4K,
+	.v16_fw_api = 1,
+	.v17_fw_api = 1,
+	.supp_ps_handshake = 1,
+	.default_11n_tx_bf_cap = DEFAULT_11N_TX_BF_CAP_2X2,
+};
+#endif
+
 /********************************************************
 			Global Variables
 ********************************************************/
@@ -257,6 +267,11 @@ wlan_usb_prog_fw_w_helper(pmlan_adapter pmadapter, pmlan_fw_image pmfw)
 	if (IS_USB9097(pmadapter->card_type))
 		check_fw_status = MTRUE;
 #endif
+#if defined(USBNW62X)
+	if (IS_USBNW62X(pmadapter->card_type))
+		check_fw_status = MTRUE;
+#endif
+
 	do {
 		/* Send pseudo data to check winner status first */
 		if (check_winner) {
@@ -785,6 +800,11 @@ wlan_get_usb_device(pmlan_adapter pmadapter)
 		pmadapter->pcard_info = &mlan_card_info_usb9097;
 		break;
 #endif
+#ifdef USBNW62X
+	case CARD_TYPE_USBNW62X:
+		pmadapter->pcard_info = &mlan_card_info_usbNW62X;
+		break;
+#endif
 	default:
 		PRINTM(MERROR, "can't get right USB card type \n");
 		ret = MLAN_STATUS_FAILURE;
@@ -1191,7 +1211,7 @@ wlan_usb_host_to_card(pmlan_private pmpriv, t_u8 type,
 		return MLAN_STATUS_FAILURE;
 	}
 	if (type == MLAN_TYPE_CMD
-#if (defined(USB9098) || defined(USB9097))
+#if (defined(USB9098) || defined(USB9097) || defined(USBNW62X))
 	    || type == MLAN_TYPE_VDLL
 #endif
 		) {
