@@ -315,6 +315,10 @@ netstack3_tests = [
     label = rawsocket_label
     expects = true
   },
+  {
+    label = fuchsia_label
+    expects = true
+  },
 ]
 
 foreach(test, netstack3_tests) {

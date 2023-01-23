@@ -17,7 +17,17 @@
                 // client end will be available when instantiating a UDP socket,
                 // which isn't true unless Fast UDP is turned on.
                 "SocketTest/Datagram*",
+                // TODO(https://fxbug.dev/47321): Implement POSIX ICMP echo API.
+                "SocketTest/SynchronousDatagramIcmp*",
             ],
         },
+        {
+            type: "expect_failure",
+            matchers: [
+                "SocketTest.CloseClonedSocketAfterTcpRst",
+                "SocketTest.PassFD",
+                "SocketTest.ZXSocketSignalNotPermitted",
+            ]
+        }
     ],
 }
