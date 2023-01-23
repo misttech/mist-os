@@ -2,7 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::subtool::FfxTool;
+use crate::subtool::ToolCommand;
+use crate::FhoEnvironment;
+use argh::FromArgs;
 use async_trait::async_trait;
+use ffx_command::{FfxCommandLine, Result};
+use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_writer::Writer;
 use fidl_fuchsia_developer_ffx::{DaemonProxy, FastbootProxy, TargetProxy, VersionInfo};
@@ -10,9 +16,18 @@ use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::future::Future;
 use std::pin::Pin;
 
-#[derive(Default)]
-pub struct FakeInjectorBuilder {
-    inner: FakeInjector,
+pub struct ToolEnv {
+    injector: FakeInjector,
+    ffx_cmd_line: FfxCommandLine,
+}
+
+impl Default for ToolEnv {
+    fn default() -> Self {
+        Self {
+            injector: Default::default(),
+            ffx_cmd_line: FfxCommandLine::new(None, &["please", "set", "me"]).unwrap(),
+        }
+    }
 }
 
 macro_rules! factory_func {
@@ -22,19 +37,19 @@ macro_rules! factory_func {
             F: Fn() -> Fut + 'static,
             Fut: Future<Output = anyhow::Result<$output>> + 'static,
         {
-            self.inner.$func = Box::new(move || Box::pin(closure()));
+            self.injector.$func = Box::new(move || Box::pin(closure()));
             self
         }
     };
 }
 
-impl FakeInjectorBuilder {
+impl ToolEnv {
     pub fn new() -> Self {
         Self::default()
     }
 
     factory_func!(daemon_factory_closure, DaemonProxy);
-    factory_func!(try_daemon_factory_closure, Option<DaemonProxy>);
+    factory_func!(try_daemon_closure, Option<DaemonProxy>);
     factory_func!(remote_factory_closure, RemoteControlProxy);
     factory_func!(fastboot_factory_closure, FastbootProxy);
     factory_func!(target_factory_closure, TargetProxy);
@@ -46,19 +61,48 @@ impl FakeInjectorBuilder {
         F: Fn() -> Fut + 'static,
         Fut: Future<Output = bool> + 'static,
     {
-        self.inner.is_experiment_closure = Box::new(move |_| Box::pin(closure()));
+        self.injector.is_experiment_closure = Box::new(move |_| Box::pin(closure()));
         self
     }
 
-    pub fn build(self) -> FakeInjector {
-        self.inner
+    pub fn set_ffx_cmd(mut self, cmd: FfxCommandLine) -> Self {
+        self.ffx_cmd_line = cmd;
+        self
+    }
+
+    pub fn take_injector(self) -> FakeInjector {
+        self.injector
+    }
+
+    pub async fn build_tool<'a, T: FfxTool>(
+        &'a self,
+        context: &'a EnvironmentContext,
+    ) -> Result<T::Main<'a>> {
+        let tool_cmd = ToolCommand::<T>::from_args(
+            &Vec::from_iter(self.ffx_cmd_line.cmd_iter()),
+            &Vec::from_iter(self.ffx_cmd_line.subcmd_iter()),
+        )
+        .unwrap();
+        let crate::subtool::FhoHandler::Standalone(cmd) = tool_cmd.subcommand else {
+            panic!("Not testing metadata generation");
+        };
+        self.build_tool_from_cmd::<T>(cmd, context).await
+    }
+
+    pub async fn build_tool_from_cmd<'a, T: FfxTool>(
+        &'a self,
+        cmd: T::Command,
+        context: &'a EnvironmentContext,
+    ) -> Result<T::Main<'a>> {
+        let env = FhoEnvironment { injector: &self.injector, context, ffx: &self.ffx_cmd_line };
+        T::from_env(env, cmd).await
     }
 }
 
 pub struct FakeInjector {
     daemon_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<DaemonProxy>>>>>,
-    try_daemon_factory_closure:
+    try_daemon_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<Option<DaemonProxy>>>>>>,
     remote_factory_closure:
         Box<dyn Fn() -> Pin<Box<dyn Future<Output = anyhow::Result<RemoteControlProxy>>>>>,
@@ -75,7 +119,7 @@ impl Default for FakeInjector {
     fn default() -> Self {
         Self {
             daemon_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
-            try_daemon_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
+            try_daemon_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             remote_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             fastboot_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
             target_factory_closure: Box::new(|| Box::pin(async { unimplemented!() })),
@@ -93,7 +137,7 @@ impl Injector for FakeInjector {
     }
 
     async fn try_daemon(&self) -> anyhow::Result<Option<DaemonProxy>> {
-        (self.try_daemon_factory_closure)().await
+        (self.try_daemon_closure)().await
     }
 
     async fn remote_factory(&self) -> anyhow::Result<RemoteControlProxy> {
@@ -124,12 +168,11 @@ impl Injector for FakeInjector {
 #[cfg(test)]
 mod internal {
     use super::*;
-    use crate::subtool::ToolCommand;
-    use crate::{self as fho, CheckEnv, FfxMain, FfxTool, FhoEnvironment, Result, TryFromEnv};
+    use crate::{self as fho, CheckEnv, FfxMain, FhoEnvironment, Result, TryFromEnv};
     use argh::FromArgs;
-    use ffx_command::FfxCommandLine;
     use std::cell::RefCell;
 
+    #[derive(Debug)]
     pub struct NewTypeString(String);
 
     #[async_trait(?Send)]
@@ -165,7 +208,7 @@ mod internal {
         }
     }
 
-    #[derive(fho_macro::FfxTool)]
+    #[derive(fho_macro::FfxTool, Debug)]
     #[ffx(forces_stdout_logs)]
     #[check(SimpleCheck(true))]
     pub struct FakeTool {
@@ -183,21 +226,6 @@ mod internal {
             writer.line("junk-line").unwrap();
             Ok(())
         }
-    }
-
-    pub(crate) fn setup_fho_items<T: FfxTool>() -> (FfxCommandLine, FakeInjector, ToolCommand<T>) {
-        let injector = FakeInjectorBuilder::new()
-            .writer_closure(|| async { Ok(ffx_writer::Writer::new(None)) })
-            .build();
-        // Runs the command line tool as if under ffx (first version of fho invocation).
-        let ffx_cmd_line = FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap();
-
-        let tool_cmd = ToolCommand::<T>::from_args(
-            &Vec::from_iter(ffx_cmd_line.cmd_iter()),
-            &Vec::from_iter(ffx_cmd_line.subcmd_iter()),
-        )
-        .unwrap();
-        (ffx_cmd_line, injector, tool_cmd)
     }
 }
 #[cfg(test)]

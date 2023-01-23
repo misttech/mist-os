@@ -22,6 +22,8 @@ use std::{fs::File, path::PathBuf, rc::Rc, sync::Arc};
 
 use crate::FhoToolMetadata;
 
+/// The main trait for defining an ffx tool. This is not intended to be implemented directly
+/// by the user, but instead derived via `#[derive(FfxTool)]`.
 #[async_trait(?Send)]
 pub trait FfxTool: Sized {
     type Command: FromArgs + SubCommand;
@@ -234,16 +236,6 @@ where
 }
 
 #[async_trait(?Send)]
-impl<T> TryFromEnv for Option<T>
-where
-    T: TryFromEnv,
-{
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
-        Ok(T::try_from_env(env).await.ok())
-    }
-}
-
-#[async_trait(?Send)]
 impl<T> TryFromEnv for Result<T>
 where
     T: TryFromEnv,
@@ -428,6 +420,22 @@ impl TryFromEnv for ffx_fidl::DaemonProxy {
 }
 
 #[async_trait(?Send)]
+impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
+    /// Attempts to connect to the ffx daemon, returning Ok(None) if no instance of the daemon is
+    /// started. If you would like to use the normal flow of attempting to connect to the daemon,
+    /// and starting a new instance of the daemon if none is currently present, you should use the
+    /// impl for `ffx_fidl::DaemonProxy`, which returns a `Result<ffx_fidl::DaemonProxy>`.
+    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+        let res = env
+            .injector
+            .try_daemon()
+            .await
+            .user_message("Failed internally while checking for daemon.")?;
+        Ok(res)
+    }
+}
+
+#[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::TargetProxy {
     async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
         env.injector.target_factory().await.user_message("Failed to create target proxy")
@@ -456,27 +464,18 @@ mod tests {
     use crate::testing::*;
     use crate::FhoDetails;
     use crate::Only;
+    use crate::SimpleWriter;
     use async_trait::async_trait;
-    use ffx_writer::Writer;
     use fho_macro::FfxTool;
 
     // The main testing part will happen in the `main()` function of the tool.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_fake_tool() {
-        let context = ffx_config::EnvironmentContext::default();
-        let (ffx, injector, tool_cmd) = setup_fho_items::<FakeTool>();
-        let fho_env = FhoEnvironment { ffx: &ffx, context: &context, injector: &injector };
-        let writer = Writer::try_from_env(&fho_env).await.expect("creating writer");
-
-        assert_eq!(
-            SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
-            0,
-            "tool pre-check should not have been called yet"
-        );
-        let fake_tool = match tool_cmd.subcommand {
-            FhoHandler::Standalone(t) => FakeTool::from_env(fho_env, t).await.unwrap(),
-            FhoHandler::Metadata(_) => panic!("Not testing metadata generation"),
-        };
+        let config_env = ffx_config::test_init().await.unwrap();
+        let tool_env = fho::testing::ToolEnv::new()
+            .set_ffx_cmd(FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap());
+        let writer = SimpleWriter::new_test(None);
+        let fake_tool = tool_env.build_tool::<FakeTool>(&config_env.context).await.unwrap();
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
             1,
@@ -501,21 +500,13 @@ mod tests {
             }
         }
 
-        let context = ffx_config::EnvironmentContext::default();
-        let (ffx, injector, tool_cmd) = setup_fho_items::<FakeToolWillFail>();
-        let fho_env = FhoEnvironment { ffx: &ffx, context: &context, injector: &injector };
-
-        assert_eq!(
-            SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
-            0,
-            "tool pre-check should not have been called yet"
-        );
-        match tool_cmd.subcommand {
-            FhoHandler::Standalone(t) => FakeToolWillFail::from_env(fho_env, t)
-                .await
-                .expect_err("Should not have been able to create tool with a negative pre-check"),
-            FhoHandler::Metadata(_) => panic!("Not testing metadata generation"),
-        };
+        let config_env = ffx_config::test_init().await.unwrap();
+        let tool_env = fho::testing::ToolEnv::new()
+            .set_ffx_cmd(FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap());
+        tool_env
+            .build_tool::<FakeToolWillFail>(&config_env.context)
+            .await
+            .expect_err("Should not have been able to create tool with a negative pre-check");
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
             1,

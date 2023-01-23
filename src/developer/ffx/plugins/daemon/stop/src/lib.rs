@@ -2,33 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {anyhow::Result, ffx_daemon_stop_args::StopCommand, fidl_fuchsia_developer_ffx as ffx};
+// TODO(fxbug.dev/120283): Remove. This is force-included as part of ffx_plugin.
+use anyhow as _;
+use async_trait::async_trait;
+use ffx_daemon_stop_args::StopCommand;
+use fho::{FfxContext, FfxMain, FfxTool, Result, SimpleWriter};
+use fidl_fuchsia_developer_ffx as ffx;
 
-// If you're looking at this command as an example, don't follow this pattern. A better
-// one would be the echo command.
-pub async fn ffx_plugin_impl(injector: &dyn ffx_core::Injector, cmd: StopCommand) -> Result<()> {
-    stop_impl(injector.try_daemon().await?, cmd, &mut std::io::stdout()).await
-}
-
-pub fn ffx_plugin_writer_output() -> String {
-    "Not supported".to_owned()
-}
-
-pub fn ffx_plugin_is_machine_supported() -> bool {
-    false
-}
-
-async fn stop_impl<W: std::io::Write>(
-    daemon_proxy: Option<ffx::DaemonProxy>,
+#[derive(FfxTool)]
+pub struct StopTool {
+    #[command]
     _cmd: StopCommand,
-    writer: &mut W,
-) -> Result<()> {
-    if let Some(daemon) = daemon_proxy {
-        daemon.quit().await?;
+    daemon_proxy: Option<ffx::DaemonProxy>,
+}
+
+fho::embedded_plugin!(StopTool);
+
+#[async_trait(?Send)]
+impl FfxMain for StopTool {
+    type Writer = SimpleWriter;
+    async fn main(self, writer: &SimpleWriter) -> Result<()> {
+        if let Some(d) = self.daemon_proxy {
+            d.quit().await.bug()?;
+        }
+        // It might be worth considering informing the user that no daemon was running here.
+        writer.line("Stopped daemon.").bug()?;
+        Ok(())
     }
-    // It might be worth considering informing the user that no daemon was running here.
-    writeln!(writer, "Stopped daemon.")?;
-    Ok(())
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -36,7 +36,8 @@ async fn stop_impl<W: std::io::Write>(
 
 #[cfg(test)]
 mod test {
-    use {super::*, futures_lite::StreamExt};
+    use super::*;
+    use futures_lite::StreamExt;
 
     fn setup_fake_daemon_server() -> ffx::DaemonProxy {
         let (proxy, mut stream) =
@@ -59,11 +60,17 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn run_stop_test() {
-        let proxy = setup_fake_daemon_server();
-        let mut writer = Vec::new();
-        let result = stop_impl(Some(proxy), StopCommand {}, &mut writer).await;
+        let config_env = ffx_config::test_init().await.unwrap();
+        let tool_env = fho::testing::ToolEnv::new()
+            .try_daemon_closure(|| async { Ok(Some(setup_fake_daemon_server())) });
+        let writer = SimpleWriter::new_test(None);
+        let tool = tool_env
+            .build_tool_from_cmd::<StopTool>(StopCommand {}, &config_env.context)
+            .await
+            .unwrap();
+        let result = tool.main(&writer).await;
         assert!(result.is_ok());
-        let output = String::from_utf8(writer).unwrap();
+        let output = writer.test_output().unwrap();
         assert_eq!(output, "Stopped daemon.\n");
     }
 }

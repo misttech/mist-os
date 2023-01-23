@@ -45,14 +45,24 @@ macro_rules! embedded_plugin {
 
 #[cfg(test)]
 mod tests {
-    use crate::subtool::FhoHandler;
+    use crate::subtool::{FhoHandler, ToolCommand};
     use crate::testing::*;
+    use argh::FromArgs;
+    use ffx_command::FfxCommandLine;
 
     // The main testing part will happen in the `main()` function of the tool.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_run_fake_tool_with_legacy_shim() {
-        let _test_env = ffx_config::test_init().await.expect("Initializing test environment");
-        let (_ffx, injector, tool_cmd) = setup_fho_items::<FakeTool>();
+        let _config_env = ffx_config::test_init().await.expect("Initializing test environment");
+        let injector = ToolEnv::new()
+            .writer_closure(|| async { Ok(ffx_writer::Writer::new(None)) })
+            .take_injector();
+        let ffx_cmd_line = FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap();
+        let tool_cmd = ToolCommand::<FakeTool>::from_args(
+            &Vec::from_iter(ffx_cmd_line.cmd_iter()),
+            &Vec::from_iter(ffx_cmd_line.subcmd_iter()),
+        )
+        .unwrap();
 
         embedded_plugin!(FakeTool);
 

@@ -96,6 +96,7 @@ impl fho::FfxTool for SuiteAdapterTool {
     fn forces_stdout_log() -> bool {
         false
     }
+
     async fn from_env(env: fho::FhoEnvironment<'_>, cmd: Self::Command) -> fho::Result<Self::Main<'_>> {
         let injector = env.injector;
         Ok(SuiteAdapter { cmd, injector })
