@@ -23,6 +23,20 @@ void LogTopologicalPath(const fbl::RefPtr<Device> dev) {
     LOGF(WARNING, "Unable to retrieve topological path for device %s: %s", dev->name().data(),
          zx_status_get_string(result.status_value()));
   }
+
+  if (dev->name() != "backlight") {
+    return;
+  }
+
+  if (!dev->parent()) {
+    LOGF(WARNING, "Flake debug(fxb/118905): backlight missing parent");
+    return;
+  }
+
+  LOGF(INFO, "Flake debug(fxb/118905): Logging backlight's parent's children:");
+  for (const auto& child : dev->children()) {
+    LOGF(INFO, "   child: %s", child->name().c_str());
+  }
 }
 
 }  // namespace

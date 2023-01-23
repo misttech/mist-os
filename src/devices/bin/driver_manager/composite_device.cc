@@ -257,6 +257,9 @@ zx_status_t CompositeDevice::BindFragment(size_t index, const fbl::RefPtr<Device
     return ZX_OK;
   }
 
+  // TODO(fxb/118905): Remove debug logs once the flake is resolved.
+  LOGF(INFO, "Flake debug(fxb/118905): Binding fragment %zu in composite device %p to device %s",
+       index, name_.data(), dev->name().c_str());
   zx_status_t status = fragment->Bind(dev);
   if (status != ZX_OK) {
     return status;
