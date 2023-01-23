@@ -6,12 +6,12 @@ use crate::{
     error::Error,
     events::{
         router::EventConsumer,
-        types::{DiagnosticsReadyPayload, Event, EventPayload},
+        types::{DiagnosticsReadyPayload, Event, EventPayload, Moniker},
     },
     identity::ComponentIdentity,
     inspect::container::{InspectArtifactsContainer, UnpopulatedInspectDataContainer},
     pipeline::Pipeline,
-    trie, ImmutableString,
+    trie,
 };
 use async_lock::RwLock;
 use async_trait::async_trait;
@@ -58,7 +58,7 @@ impl InspectRepository {
     pub async fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<&HashMap<ImmutableString, Arc<HierarchyMatcher>>>,
+        moniker_to_static_matcher_map: Option<&HashMap<Moniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         self.inner
             .read()
@@ -195,7 +195,7 @@ impl InspectRepositoryInner {
     fn fetch_inspect_data(
         &self,
         component_selectors: &Option<Vec<Selector>>,
-        moniker_to_static_matcher_map: Option<&HashMap<ImmutableString, Arc<HierarchyMatcher>>>,
+        moniker_to_static_matcher_map: Option<&HashMap<Moniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         self.diagnostics_directories
             .iter()
@@ -207,7 +207,7 @@ impl InspectRepositoryInner {
 
                 let optional_hierarchy_matcher = match moniker_to_static_matcher_map {
                     Some(map) => {
-                        match map.get(identity.relative_moniker.join("/").as_str()) {
+                        match map.get(&identity.relative_moniker) {
                             Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
                             // Return early if there were static selectors, and none were for this
                             // moniker.
@@ -385,7 +385,7 @@ mod tests {
                 .await
                 .static_selectors_matchers()
                 .unwrap()
-                .get(&"a/b/foo.cmx".to_string().into_boxed_str())
+                .get(&Moniker::from(vec!["a", "b", "foo.cmx"]))
                 .is_some())
         }
 
@@ -400,7 +400,7 @@ mod tests {
             .await
             .static_selectors_matchers()
             .unwrap()
-            .get(&"a/b/foo.cmx".to_string().into_boxed_str())
+            .get(&Moniker::from(vec!["a", "b", "foo.cmx"]))
             .is_none())
     }
 

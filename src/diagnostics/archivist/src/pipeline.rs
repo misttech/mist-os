@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 use {
     crate::{
-        configs, constants, diagnostics::AccessorStats, error::Error,
-        moniker_rewriter::MonikerRewriter, ImmutableString,
+        configs, constants, diagnostics::AccessorStats, error::Error, events::types::Moniker,
+        moniker_rewriter::MonikerRewriter,
     },
     async_lock::RwLock,
     diagnostics_hierarchy::HierarchyMatcher,
@@ -187,7 +187,7 @@ pub struct PipelineMutableState {
     static_selectors: Option<Vec<Selector>>,
 
     /// A hierarchy matcher for any selector present in the static selectors.
-    moniker_to_static_matcher_map: HashMap<ImmutableString, Arc<HierarchyMatcher>>,
+    moniker_to_static_matcher_map: HashMap<Moniker, Arc<HierarchyMatcher>>,
 }
 
 impl Deref for Pipeline {
@@ -199,11 +199,11 @@ impl Deref for Pipeline {
 }
 
 impl PipelineMutableState {
-    pub fn remove(&mut self, relative_moniker: &[String]) {
-        self.moniker_to_static_matcher_map.remove(relative_moniker.join("/").as_str());
+    pub fn remove(&mut self, relative_moniker: &Moniker) {
+        self.moniker_to_static_matcher_map.remove(relative_moniker);
     }
 
-    pub fn add_inspect_artifacts(&mut self, relative_moniker: &[String]) -> Result<(), Error> {
+    pub fn add_inspect_artifacts(&mut self, relative_moniker: &Moniker) -> Result<(), Error> {
         // Update the pipeline wrapper to be aware of the new inspect source if there
         // are are static selectors for the pipeline, and some of them are applicable to
         // the inspect source's relative moniker. Otherwise, ignore.
@@ -216,19 +216,15 @@ impl PipelineMutableState {
                 [] => {}
                 populated_vec => {
                     let hierarchy_matcher = (populated_vec).try_into()?;
-                    self.moniker_to_static_matcher_map.insert(
-                        relative_moniker.join("/").into_boxed_str(),
-                        Arc::new(hierarchy_matcher),
-                    );
+                    self.moniker_to_static_matcher_map
+                        .insert(relative_moniker.clone(), Arc::new(hierarchy_matcher));
                 }
             }
         }
         Ok(())
     }
 
-    pub fn static_selectors_matchers(
-        &self,
-    ) -> Option<&HashMap<ImmutableString, Arc<HierarchyMatcher>>> {
+    pub fn static_selectors_matchers(&self) -> Option<&HashMap<Moniker, Arc<HierarchyMatcher>>> {
         if self.static_selectors.is_some() {
             return Some(&self.moniker_to_static_matcher_map);
         }
