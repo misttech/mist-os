@@ -5,6 +5,13 @@ template("emboss_cc_library") {
   assert(defined(invoker.source), "Need source arg for emboss_cc_library")
   source = get_path_info(invoker.source, "file")
 
+  imports = []
+  if (defined(invoker.imports)) {
+    foreach(import, invoker.imports) {
+      imports += [ get_path_info(import, "file") ]
+    }
+  }
+
   # The --output-path arg to the embossc script only specifies the
   # prefix of the path at which the generated header is placed. To this
   # prefix, the script appends the entire path of the input Emboss source,
@@ -33,61 +40,65 @@ template("emboss_cc_library") {
   action(target_name + "_header") {
     script = "//third_party/github.com/google/emboss/embossc_runner.py"
     args = [
-      rebase_path("//third_party/github.com/google/emboss/src/embossc", root_build_dir),
+      rebase_path("//third_party/github.com/google/emboss/src/embossc",
+                  root_build_dir),
       "--generate",
       "cc",
+      "--import-dir",
+      rebase_path(".", root_build_dir),
       "--output-path",
       rebase_path(output_path, root_build_dir),
       rebase_path(source, root_build_dir),
     ]
     inputs = [
-      source,
-      "//third_party/github.com/google/emboss/src/embossc",
-      "//third_party/github.com/google/emboss/src/compiler/back_end/__init__.py",
-      "//third_party/github.com/google/emboss/src/compiler/back_end/cpp/__init__.py",
-      "//third_party/github.com/google/emboss/src/compiler/back_end/cpp/emboss_codegen_cpp.py",
-      "//third_party/github.com/google/emboss/src/compiler/back_end/cpp/generated_code_templates",
-      "//third_party/github.com/google/emboss/src/compiler/back_end/cpp/header_generator.py",
-      "//third_party/github.com/google/emboss/src/compiler/back_end/util/__init__.py",
-      "//third_party/github.com/google/emboss/src/compiler/back_end/util/code_template.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/__init__.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/attribute_checker.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/attributes.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/constraints.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/dependency_checker.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/emboss_front_end.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/error_examples",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/expression_bounds.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/glue.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/lr1.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/module_ir.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/parser.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/prelude.emb",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/reserved_words",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/symbol_resolver.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/synthetics.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/tokenizer.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/type_check.py",
-      "//third_party/github.com/google/emboss/src/compiler/front_end/write_inference.py",
-      "//third_party/github.com/google/emboss/src/compiler/util/error.py",
-      "//third_party/github.com/google/emboss/src/compiler/util/expression_parser.py",
-      "//third_party/github.com/google/emboss/src/compiler/util/ir_pb2.py",
-      "//third_party/github.com/google/emboss/src/compiler/util/ir_util.py",
-      "//third_party/github.com/google/emboss/src/compiler/util/name_conversion.py",
-      "//third_party/github.com/google/emboss/src/compiler/util/parser_types.py",
-      "//third_party/github.com/google/emboss/src/compiler/util/simple_memoizer.py",
-      "//third_party/github.com/google/emboss/src/compiler/util/traverse_ir.py",
-    ]
+               source,
+               "//third_party/github.com/google/emboss/src/embossc",
+               "//third_party/github.com/google/emboss/src/compiler/back_end/__init__.py",
+               "//third_party/github.com/google/emboss/src/compiler/back_end/cpp/__init__.py",
+               "//third_party/github.com/google/emboss/src/compiler/back_end/cpp/emboss_codegen_cpp.py",
+               "//third_party/github.com/google/emboss/src/compiler/back_end/cpp/generated_code_templates",
+               "//third_party/github.com/google/emboss/src/compiler/back_end/cpp/header_generator.py",
+               "//third_party/github.com/google/emboss/src/compiler/back_end/util/__init__.py",
+               "//third_party/github.com/google/emboss/src/compiler/back_end/util/code_template.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/__init__.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/attribute_checker.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/attributes.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/constraints.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/dependency_checker.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/emboss_front_end.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/error_examples",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/expression_bounds.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/glue.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/lr1.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/module_ir.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/parser.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/prelude.emb",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/reserved_words",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/symbol_resolver.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/synthetics.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/tokenizer.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/type_check.py",
+               "//third_party/github.com/google/emboss/src/compiler/front_end/write_inference.py",
+               "//third_party/github.com/google/emboss/src/compiler/util/error.py",
+               "//third_party/github.com/google/emboss/src/compiler/util/expression_parser.py",
+               "//third_party/github.com/google/emboss/src/compiler/util/ir_pb2.py",
+               "//third_party/github.com/google/emboss/src/compiler/util/ir_util.py",
+               "//third_party/github.com/google/emboss/src/compiler/util/name_conversion.py",
+               "//third_party/github.com/google/emboss/src/compiler/util/parser_types.py",
+               "//third_party/github.com/google/emboss/src/compiler/util/simple_memoizer.py",
+               "//third_party/github.com/google/emboss/src/compiler/util/traverse_ir.py",
+             ] + imports
     outputs = [ compiled_header_path ]
   }
 
-  config("emboss_config") {
+  config(target_name + "_emboss_config") {
     include_dirs = [ "//third_party/github.com/google/emboss/src" ]
   }
 
   source_set(target_name) {
+    forward_variables_from(invoker, [ "deps" ])
     sources = [ compiled_header_path ]
     public_deps = [ ":" + target_name + "_header" ]
-    public_configs = [ ":emboss_config" ]
+    public_configs = [ ":" + target_name + "_emboss_config" ]
   }
 }
