@@ -493,8 +493,7 @@ impl SessionInner {
                     // We're currently negotiating the multiplexer role. We should send a DM, and
                     // attempt to restart the multiplexer after a random interval. See RFCOMM 5.2.1
                     self.send_dm_response(dlci).await
-                    // TODO(fxbug.dev/61852): When we support the INT role, we should attempt to
-                    // restart the multiplexer.
+                    // TODO(fxbug.dev/61852): We can improve this by restarting the multiplexer.
                 }
                 _role => {
                     // Remote device incorrectly trying to start up the multiplexer when it has
@@ -548,10 +547,11 @@ impl SessionInner {
                         }
                         MuxCommandParams::ModemStatus(_)
                         | MuxCommandParams::RemoteLineStatus(_) => Ok(()),
-                        _ => {
-                            // TODO(fxbug.dev/59585): We currently don't send any other mux commands,
-                            // add other handlers here when implemented.
-                            Err(Error::NotImplemented)
+                        params => {
+                            // We don't send any other mux commands so any such responses are
+                            // unexpected and unhandled.
+                            warn!("Received unexpected {params:?} response. Ignoring");
+                            Err(Error::Other(format_err!("Unexpected response").into()))
                         }
                     }
                 }
@@ -656,8 +656,6 @@ impl SessionInner {
     /// Handles an UnnumberedAcknowledgement response over the provided `dlci`.
     /// Returns a flag indicating session termination.
     async fn handle_ua_response(&mut self, dlci: DLCI) -> bool {
-        // TODO(fxbug.dev/63104): Handle UA responses for Disconnect frames sent via
-        // an individual SessionChannel.
         match self.outstanding_frames.remove_frame(&dlci).map(|frame| frame.data) {
             Some(FrameData::SetAsynchronousBalancedMode) if dlci.is_mux_control() => {
                 // If we are not negotiating anymore, mux startup was either canceled
@@ -687,6 +685,9 @@ impl SessionInner {
                 info!("Received UA response to Disconnect of RFCOMM Session. Shutting down...");
                 return true;
             }
+            // It's possible that we have received a UA response to an individual SessionChannel's
+            // Disconnect request. In this case, there is no further action needed as the individual
+            // channel has been closed. This is handled gracefully and logged.
             Some(_) | None => warn!("Received unexpected UA response over DLCI: {:?}", dlci),
         }
         false
@@ -696,8 +697,6 @@ impl SessionInner {
     /// Returns a flag indicating session termination.
     async fn handle_dm_response(&mut self, dlci: DLCI) -> bool {
         // See GSM 7.10 Section 5.5.3 for the usage of the DM response.
-        // TODO(fxbug.dev/63104): Handle DM responses for Disconnect frames sent via
-        // an individual SessionChannel.
         match self.outstanding_frames.remove_frame(&dlci).map(|frame| frame.data) {
             Some(FrameData::SetAsynchronousBalancedMode) if dlci.is_mux_control() => {
                 // Peer rejected our request to start the Session multiplexer - reset and
@@ -729,6 +728,9 @@ impl SessionInner {
                 if self.outstanding_frames.remove_mux_command(&pn_identifier).is_some() {
                     self.cancel_parameter_negotiation(dlci);
                 }
+                // Otherwise, it's possible that we have received a DM response to an individual
+                // SessionChannel's Disconnect request. There is no action needed as the channel
+                // is closed.
             }
         }
         false

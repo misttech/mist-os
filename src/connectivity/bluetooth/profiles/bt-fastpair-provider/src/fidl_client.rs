@@ -49,8 +49,6 @@ impl FastPairConnectionManager {
 
     pub fn notify_pairing_complete(&self, id: PeerId) {
         if let Some(watcher) = &self.watcher {
-            // TODO(aniramakri): This is an async request which expects an empty response.
-            // Should we care?
             if let Err(e) = watcher.on_pairing_complete(&mut id.into()).check() {
                 warn!("Couldn't notify upstream client of pairing complete: {:?}", e);
             }

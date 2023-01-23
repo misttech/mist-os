@@ -279,7 +279,7 @@ impl Provider {
                 }
             }
             KeyBasedPairingAction::ProviderInitiatesPairing { .. } => {
-                // TODO(fxbug.dev/96222): Use `sys.Access/Pair` to pair to peer.
+                // TODO(fxbug.dev/120378): Use `sys.Access/Pair` to pair to peer.
             }
             KeyBasedPairingAction::RetroactiveWrite { seeker_address: _ } => {
                 // TODO(fxbug.dev/115567): This can be improved by using a timeout after an
