@@ -303,13 +303,24 @@ foreach(test, netstack2_fastudp_tests) {
   all_test_component_names += [ _component_name ]
 }
 
-netstack3_tests = [ if_nameindex_label ]
+netstack3_tests = [
+  {
+    label = if_nameindex_label
+  },
+  {
+    label = packetsocket_label
+    expects = true
+  },
+]
 
 foreach(test, netstack3_tests) {
-  _component_name = "netstack3_${test}_test"
-  posix_socket_test_component(test) {
+  _component_name = "netstack3_${test.label}_test"
+  posix_socket_test_component(test.label) {
     component_name = _component_name
-    manifest = "meta/netstack3/${test}.cml"
+    if (defined(test.expects) && test.expects) {
+      expects_path = "expects/netstack3/${test.label}.json5"
+    }
+    manifest = "meta/netstack3/${test.label}.cml"
   }
   all_test_component_names += [ _component_name ]
 }
