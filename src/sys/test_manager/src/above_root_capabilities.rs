@@ -127,22 +127,20 @@ impl AboveRootCapabilitiesForTest {
                 }) if collection_data.contains_key(name.as_str())
                     && target_name != "fuchsia.logger.LogSink" =>
                 {
-                    collection_data
-                        .get_mut(name.as_str())
-                        .unwrap()
-                        .capabilities
-                        .push(Capability::protocol_by_name(target_name).into());
+                    collection_data.get_mut(name.as_str()).unwrap().capabilities.push(
+                        Capability::protocol_by_name(target_name)
+                            .availability_same_as_target()
+                            .into(),
+                    );
                 }
                 fdecl::Offer::Directory(fdecl::OfferDirectory {
                     target: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name })),
                     target_name: Some(target_name),
                     ..
                 }) if collection_data.contains_key(name.as_str()) => {
-                    collection_data
-                        .get_mut(name.as_str())
-                        .unwrap()
-                        .capabilities
-                        .push(Capability::directory(target_name).into());
+                    collection_data.get_mut(name.as_str()).unwrap().capabilities.push(
+                        Capability::directory(target_name).availability_same_as_target().into(),
+                    );
                 }
                 fdecl::Offer::Storage(fdecl::OfferStorage {
                     target: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name })),
@@ -150,11 +148,12 @@ impl AboveRootCapabilitiesForTest {
                     ..
                 }) if collection_data.contains_key(name.as_str()) => {
                     let use_path = format!("/{}", target_name);
-                    collection_data
-                        .get_mut(name.as_str())
-                        .unwrap()
-                        .capabilities
-                        .push(Capability::storage(target_name).path(use_path).into());
+                    collection_data.get_mut(name.as_str()).unwrap().capabilities.push(
+                        Capability::storage(target_name)
+                            .path(use_path)
+                            .availability_same_as_target()
+                            .into(),
+                    );
                 }
                 fdecl::Offer::EventStream(fdecl::OfferEventStream {
                     target: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name })),
