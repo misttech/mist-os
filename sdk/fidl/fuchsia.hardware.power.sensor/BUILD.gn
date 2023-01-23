@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.power.sensor") {
-  sdk_category = "partner"
+  sdk_category = "internal"
   sources = [ "sensor.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }
