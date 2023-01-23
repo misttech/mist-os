@@ -36,9 +36,9 @@ namespace component {
 //
 // # Thread safety
 //
-// This class is thread-unsafe. Instances must be managed and used from an async
-// dispatcher with mutual exclusion guarantee. See
-// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#mutual-exclusion-guarantee
+// This class is thread-unsafe. Instances must be managed and used from a
+// [synchronized async dispatcher][synchronized-dispatcher]. See
+// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 //
 // # Maintainer's Note
 //

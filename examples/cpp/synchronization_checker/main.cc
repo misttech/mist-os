@@ -23,9 +23,8 @@ TEST(Async, SynchronizationCheckerExample) {
   //
   // ## Thread safety
   //
-  // Instances must be used from an async dispatcher with mutual exclusion
-  // guarantee. See
-  // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#mutual-exclusion-guarantee
+  // Instances must be used from a synchronized async dispatcher. See
+  // https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
   class ChannelReader {
    public:
     ChannelReader(async_dispatcher_t* dispatcher, zx::channel channel)
@@ -44,7 +43,7 @@ TEST(Async, SynchronizationCheckerExample) {
     // data into a member variable.
     void AsyncRead() {
       // This guard checks that the |AsyncRead| method is called from a task
-      // running on a dispatcher with mutual exclusion guarantee.
+      // running on a synchronized dispatcher.
       std::lock_guard guard(checker_);
 
       data_.clear();

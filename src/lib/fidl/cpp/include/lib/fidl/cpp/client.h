@@ -27,9 +27,10 @@ namespace fidl {
 // comments.
 //
 
-// |Client| is a client for sending and receiving FIDL wire and natural
-// messages, that is bound to a single fixed thread. See |SharedClient| for a
-// client that may be moved or cloned to a different thread.
+// |Client| is a client for sending and receiving FIDL wire messages, that
+// must be managed and used from a [synchronized async dispatcher][synchronized-dispatcher].
+// See |SharedClient| for a client that may be moved or cloned to different
+// dispatchers or arbitrary threads.
 //
 // Generated FIDL APIs are accessed by 'dereferencing' the client value:
 //
@@ -85,15 +86,14 @@ namespace fidl {
 // |Client| provides an easier to use API in exchange of a more restrictive
 // threading model:
 //
-// - There must only ever be one thread executing asynchronous operations for
-//   the provided |async_dispatcher_t|, termed "the dispatcher thread".
-// - The client must be bound on the dispatcher thread.
-// - The client must be destroyed on the dispatcher thread.
-// - FIDL method calls must be made from the dispatcher thread.
-// - Responses are always delivered on the dispatcher thread, as are events.
+// - The provided |async_dispatcher_t| must be a [synchronized dispatcher][synchronized-dispatcher].
+// - The client must be bound on a task running on that dispatcher.
+// - The client must be destroyed on a task running on that dispatcher.
+// - FIDL method calls must be made from tasks running on that dispatcher.
+// - Responses are always delivered from dispatcher tasks, as are events.
 //
 // The above rules are checked in debug builds at run-time. In short, the client
-// is local to a thread.
+// is local to its associated dispatcher.
 //
 // Note that FIDL method calls must be synchronized with operations that consume
 // or mutate the |Client| itself:
@@ -112,6 +112,9 @@ namespace fidl {
 //
 // See |SharedClient| for a client that supports binding and destroying on
 // arbitrary threads, at the expense of requiring two-phase shutdown.
+//
+// [synchronized-dispatcher]:
+// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 template <typename Protocol>
 class Client {
  private:

@@ -1612,6 +1612,14 @@
   related_guides: [""]
   area: ["Software Assembly", "Developer"]
 
+- term: "Synchronized dispatcher"
+  short_description: "An async dispatcher where posted tasks are run in order, and each
+  task will observe the side-effects from previous tasks."
+  full_description: ""
+  see_also: ["<a href=\"/docs/development/languages/c-cpp/thread-safe-async.md\">Thread safe asynchronous code</a>"]
+  related_guides: [""]
+  area: ["System"]
+
 - term: "Thread"
   short_description: "A <a href=\"/docs/glossary#kernel-object\">kernel object</a> that
   represents a time-shared CPU execution context. Each thread is contained in

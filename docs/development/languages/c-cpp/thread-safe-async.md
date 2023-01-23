@@ -45,7 +45,7 @@ synchronization if desired. Such types may have comments like the following:
 class SomeUnsafeType { /* ... */ };
 ```
 
-## Achieving thread safety in asynchronous code
+## Thread safety in asynchronous code
 
 Achieving thread safety gets more subtle in asynchronous code due to the
 presence of callbacks. Consider the following snippet:
@@ -53,7 +53,7 @@ presence of callbacks. Consider the following snippet:
 ```c++
 // |CsvParser| asynchronously reads from a file, and parses the contents as
 // comma separated values.
-class CsvParser{
+class CsvParser {
  public:
   void Load() {
     reader_.AsyncRead([this] (std::string data) {
@@ -84,70 +84,99 @@ counted.
 If we ensure that there is always a defined ordering between the destruction of
 `CsvParser` and the invocation of the callback, then the race condition is
 avoided. On Fuchsia, the callback is typically scheduled on an
-`async_dispatcher_t` object. A common pattern is to use a single threaded
-dispatcher:
+`async_dispatcher_t` object (termed *dispatcher* in short). A common pattern is
+to use a single threaded dispatcher:
 
 - Use an `async::Loop` as the dispatcher implementation.
 - Only run one thread to service the loop.
-- Only destroy upcall targets on that thread. For example, destroy the
-  `CsvParser` within a task posted to that dispatcher.
+- Only destroy upcall targets on that thread, and cancel future upcalls at the
+  same time. For example, destroy the `CsvParser` within a task posted to that
+  dispatcher.
 
 Since the same thread invokes asynchronous callbacks and destroys the instance,
 there must be a defined ordering between those operations.
 
-This scenario is common across Fuchsia C++ because FIDL server components are
-strongly encouraged to be concurrent and asynchronous. See
-[C++ FIDL threading guide][cpp-threading-guide] for a concrete discussion of
-this scenario when using FIDL bindings.
+The general case of the above pattern is to ensure *synchronized access*: every
+access (including construction and destruction) of an object will observe the
+side-effects of previous accesses. In other literature about threading, you may
+see the term *synchronized access* always associated with locking, for example
+taking a mutex lock before accessing an object. In Fuchsia C++, locks alone
+would not be sufficient as discussed above, and we use properties of the async
+dispatcher to achieve synchronized access, such that user code does not have to
+take locks. The next section will go into detail.
 
-### Sequences
+## Synchronized dispatchers {#synchronized-dispatcher}
 
-More generally, if a dispatcher promises that tasks posted on that dispatcher
-always run with a defined ordering, it is safe to destroy upcall targets on a
-dispatcher task, and synchronization with upcalls is guaranteed. Such
-dispatchers are said to support *sequences*: sequential execution domains which
-runs a series of tasks with strict mutual exclusion, but where the underlying
-execution may hop from one thread to another.
+A *synchronized dispatcher* is one where posted tasks are run in order, and each
+task will observe the side-effects from previous tasks.
 
-Synchronized driver dispatchers ([`fdf::Dispatcher`][fdf-dispatcher] created
-with the `FDF_DISPATCHER_OPTION_SYNCHRONIZED` option) are an example of sequence
-supporting dispatchers.
+Because objects dealing with asynchronous logic are accessed from dispatchers,
+one cannot also access the object from arbitrary threads, as the dispatcher
+might be concurrently accessing the same object, resulting in data races. In
+fact, one must always access the object from a single dispatcher associated with
+that object. The dispatcher must also ensure ordering between operations. We
+call such dispatchers *synchronized dispatchers*. There are two ways for a
+dispatcher to qualify as *synchronized*:
 
-When using dispatchers supporting sequences, a common pattern for ensuring
-thread safety is to use the object from a single sequence.
+### Support sequences
 
-### Enforce with runtime checks {#mutual-exclusion-guarantee}
+A dispatcher may promise that tasks posted on that dispatcher always run with a
+strict ordering. Such dispatchers are said to support *sequences*: sequential
+execution domains which runs a series of tasks where one task will observe all
+side-effects from previous tasks, but where the underlying execution may hop
+from one thread to another.
 
-We provide libraries for enforcing the above common patterns at runtime. In
-particular, thread-unsafe types may check that an instance is always used from
-an asynchronous dispatcher that ensures ordering between operations. Here "used
-from" covers construction, destruction, and calling instance methods. We call
-this *mutual exclusion guarantee*. Specifically:
+Synchronized driver dispatchers (e.g.
+[`fdf::SynchronizedDispatcher`][fdf-dispatcher]) are an example of dispatchers
+that support sequences. See [driver threading model][driver-threading-model]. On
+the other hand, `async::Loop` does not support sequences, as the user may call
+`Loop::StartThread` many times to introduce multiple threads that race to
+execute tasks in that loop.
 
-- If the `async_dispatcher_t` supports [*sequences*](#sequences), then code
-  running on tasks posted to that dispatcher are ordered with one another.
-- If the `async_dispatcher_t` does not support sequences, then code running on
-  tasks posted to that dispatcher are ordered if that dispatcher is only
-  serviced by a single thread, for example, a single-threaded `async::Loop`.
+### Stay single threaded
 
-In short, either the dispatcher supports sequences in which case the object must
-be used on that sequence, or the code runs on a single dispatcher thread and the
-object must be used on that thread.
+If the dispatcher does not support sequences, then code running on
+tasks posted to that dispatcher are ordered if that dispatcher is only serviced
+by a single thread, for example, a single-threaded `async::Loop`.
 
-The async library offers a BasicLockable type,
-[`async::synchronization_checker`](/zircon/system/ulib/async/include/lib/async/cpp/sequence_checker.h).
-You may call `.lock()` or lock the checker using a `std::lock_guard` whenever a
-function requires mutual exclusion. Doing so checks that the function is called
-from a dispatcher with such a guarantee, without actually taking any locks. Here
-is a full example:
+In summary, either the dispatcher supports sequences in which case the object
+must be used on that sequence, or the code runs on a single dispatcher thread
+and the object must be used on that thread. *Use* covers construction,
+destruction, and calling instance methods.
+
+Synchronized dispatchers are a unit of [concurrency][concurrency]: tasks posted
+to the same synchronized dispatcher are never run concurrently alongside one
+another. Tasks posted to different synchronized dispatchers may potentially run
+concurrently alongside one another.
+
+### Check for synchronized dispatchers {#check-synchronized}
+
+The `async` library offers a `BasicLockable` type,
+[`async::synchronization_checker`][synchronization-checker]. You may call
+`.lock()` or lock the checker using a `std::lock_guard` whenever a function
+requires *synchronized access*. Doing so checks that the function is called from
+a dispatcher with such a guarantee, without actually taking any locks. If the
+check fails, the program will panic. It is recommended that thread-unsafe types
+check for synchronization at runtime by carrying a checker. Here is a full
+example:
 
 ```cpp
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/cpp/synchronization_checker/main.cc" region_tag="synchronization_checker" adjust_indentation="auto" exclude_regexp="^TEST|^}" %}
 ```
 
-`fidl::Client` is another example of types that check for mutual exclusion
-guarantee at runtime: destroying a `fidl::Client` on a non-dispatcher thread
-will lead to a panic.
+`fidl::Client` is another example of types that check for synchronized access at
+runtime: destroying a `fidl::Client` on a non-dispatcher thread will lead to a
+panic. There are other C++ classes in the Fuchsia code base that do the same.
+They will usually highlight this with a comment such as the following:
+
+```c++
+// This class is thread-unsafe. Instances must be used and managed from a
+// synchronized dispatcher.
+class SomeAsyncType { /* ... */ };
+```
+
+See [C++ FIDL threading guide][cpp-threading-guide] for a concrete discussion of
+this scenario when using FIDL bindings.
 
 ### Discard callbacks during destruction
 
@@ -162,7 +191,7 @@ those have yet to be called. These kind of APIs are said to guarantee *at most
 once delivery*. `async::Wait` and `async::Task` are examples of such objects.
 This style works well when the callback references a single receiver that owns
 the wait/task, i.e. the callback is an upcall. These APIs are typically also
-thread-unsafe and requires the aforementioned mutual exclusion guarantee.
+thread-unsafe and requires the aforementioned *synchronized access*.
 
 Other objects will always call the the registered callback exactly once, even
 during destruction. Those calls would typically provide an error or status
@@ -177,36 +206,31 @@ discarding the upcall if the object making the upcalls is already destroyed.
 destroying a `ClosureQueue` will discard unexecuted callbacks scheduled on that
 queue.
 
-### Use an object with different mutual exclusion requirements
+### Use an object belonging to a different synchronized dispatcher
 
-To maintain the mutual exclusion guarantees, one may manage and use a group of
-objects on the same sequence (if supported) or single threaded dispatcher. Those
-objects can synchronously call into one another without breaking the mutual
-exclusion runtime checks. A special case of this is an application that runs
-everything on a single `async::Loop` with a single thread, typically called the
-main thread.
+To maintain synchronized access, one may manage and use a group of objects on
+the same synchronized dispatcher. Those objects can synchronously call into one
+another without breaking the synchronization checks. A special case of this is
+an application that runs everything on a single `async::Loop` with a single
+thread, typically called the "main thread".
 
-More complex applications may have multiple sequences or multiple single
-threaded dispatchers. When individual objects must be used from their
-corresponding sequence or single threaded dispatcher, a question arises: how
-does one object call another object if they are associated with different
-dispatchers?
+More complex applications may have multiple synchronized dispatchers. When
+individual objects must be used from their corresponding synchronized
+dispatcher, a question arises: how does one object call another object if they
+are associated with different dispatchers?
 
 A time-tested approach is to have the objects send messages between one another,
 as opposed to synchronously calling their instance methods. Concretely, this
 could mean that if object `A` needs to do something to object `B`, `A` would
-post an asynchronous task to `B`'s dispatcher using `async::PostTask`. The task
-(usually a lambda function) may then synchronously use `B` because it is already
-running under `B`'s mutual exclusion guarantee.
+post an asynchronous task to `B`'s dispatcher. The task (usually a lambda
+function) may then synchronously use `B` because it is already running under
+`B`'s dispatcher and will be synchronized with other tasks that use `B`.
 
 When tasks are posted to a different dispatcher, it's harder to safely discard
 them when the receiver object goes out of scope. Here are some approaches:
 
-- One may shutdown the dispatcher before destroying the object, if that
-  dispatcher serves exactly that object. For example, `B` may own an
-  `async::Loop` as the last member field. When `B` destructs, the `async::Loop`
-  would be destroyed, which silently discards any unexecuted tasks posted to
-  `B`.
+<!-- TODO(fxbug.dev/119641): Document other async_patterns helpers when they
+     land. -->
 - One may reference count the objects, and pass a weak pointer to the posted
   task. The posted task should do nothing if the pointer is expired.
 
@@ -226,6 +250,8 @@ tasks in Chrome][chrome].
 [async-loop]: /zircon/system/ulib/async-loop/include/lib/async-loop/loop.h
 [async-loop-cpp]: /zircon/system/ulib/async-loop/include/lib/async-loop/cpp/loop.h
 [async-wait]: /zircon/system/ulib/async/include/lib/async/cpp/wait.h
+[concurrency]: https://slikts.github.io/concurrency-glossary/?id=concurrent-order-independent-vs-sequential
+[driver-threading-model]: /docs/concepts/drivers/driver-dispatcher-and-threads.md#threading-model
 [fdf-dispatcher]: /sdk/lib/driver/runtime/include/lib/fdf/cpp/dispatcher.h
 [thread-safety]: https://en.wikipedia.org/wiki/Thread_safety
 [data-race]: http://eel.is/c++draft/intro.races#21
@@ -235,3 +261,4 @@ tasks in Chrome][chrome].
 [chrome]: https://chromium.googlesource.com/chromium/src/+/master/docs/threading_and_tasks.md
 [java]: https://openjdk.org/jeps/425
 [golang]: https://go.dev/blog/codelab-share
+[synchronization-checker]: /zircon/system/ulib/async/include/lib/async/cpp/sequence_checker.h

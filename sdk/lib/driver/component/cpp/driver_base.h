@@ -66,7 +66,7 @@ using DriverStartArgs = fuchsia_driver_framework::DriverStartArgs;
 // This class is thread-unsafe. Instances must be managed and used from tasks
 // running on the |driver_dispatcher|, and the dispatcher must be synchronized.
 // See
-// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#mutual-exclusion-guarantee
+// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 class DriverBase {
  public:
   DriverBase(std::string_view name, DriverStartArgs start_args,

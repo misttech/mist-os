@@ -102,19 +102,20 @@ Similarly, the threading behavior of `fidl::SharedClient` extends to
 
 ### Client
 
-`fidl::Client` supports [solution #1 (scheduling)](#solution_1_scheduling)
-by enforcing that it is used on the same dispatcher thread that reads and
+`fidl::Client` supports [solution #1 (scheduling)](#solution_1_scheduling) by
+enforcing that it is used from a
+[synchronized dispatcher][glossary.synchronized-dispatcher] that reads and
 handles messages from the channel:
 
-- You may make FIDL method calls only from the dispatcher thread.
+- You may make FIDL method calls only from tasks running on that dispatcher.
 - The client object itself cannot be moved to another object which is then
-  destroyed on another thread.
+  destroyed from tasks running on other dispatchers.
 
 This ensures that the containing user object is not destroyed while a FIDL
 message or error event is being dispatched. It is suitable for single-threaded
 and object oriented usage styles.
 
-`fidl::Client` can only be used with a single-threaded async dispatcher.
+`fidl::Client` can only be used with a synchronized async dispatcher.
 One particular usage of `async::Loop` is creating a single worker thread via
 `loop.StartThread()`, and joining that and shutting down the loop via
 `loop.Shutdown()` from a different thread. Here, two threads are technically
@@ -222,15 +223,16 @@ reply a cancellation error when handling `FooMethod`, or introduce retry logic.
 `fidl::SharedClient` supports [solution #2 (reference
 counting)](#solution_2_ref_counting) and [solution #3 (two-phase
 shutdown)](#solution_3_two_phase_shutdown). You may make FIDL calls on a
-`SharedClient` from arbitrary threads. Unlike `Client` where destroying a client
-immediately guarantees that there are no more **to-user** calls, destroying a
-`SharedClient` merely initiates asynchronous bindings teardown. The user may
-observe the completion of the teardown asynchronously. In turn, this allows
-moving or cloning a `SharedClient` to a different thread than the dispatcher
-thread, and destroying/calling teardown on a client while there are parallel
-**to-user** calls (e.g. a response callback). Those two actions will race (the
-response callback might be canceled if the client is destroyed early enough),
-but `SharedClient` will never make any more to-user calls once it notifies its
+`SharedClient` from arbitrary threads, and use the shared client from any kind
+of async dispatcher. Unlike `Client` where destroying a client immediately
+guarantees that there are no more **to-user** calls, destroying a `SharedClient`
+merely initiates asynchronous bindings teardown. The user may observe the
+completion of the teardown asynchronously. In turn, this allows moving or
+cloning a `SharedClient` to a different thread than the dispatcher thread, and
+destroying/calling teardown on a client while there are parallel **to-user**
+calls (e.g. a response callback). Those two actions will race (the response
+callback might be canceled if the client is destroyed early enough), but
+`SharedClient` will never make any more to-user calls once it notifies its
 teardown completion.
 
 There are two ways to observe teardown completion:
@@ -295,14 +297,14 @@ type to use:
 
 - If your app is single-threaded, use `Client`.
 
-- If your app is multi-threaded but consists of multiple single-threaded
-  dispatchers, and you can guarantee that each client is only bound, destroyed,
-  and called from their respective single dispatcher thread: still able to use
-  `Client`.
+- If your app is multi-threaded but consists of multiple
+  [synchronized dispatchers][glossary.synchronized-dispatcher], and you can
+  guarantee that each client is only bound, destroyed, and called from their
+  respective dispatcher tasks: still able to use `Client`.
 
 - If your app is multi-threaded and the FIDL clients are not guaranteed to be
-  used from on their respective dispatcher threads: use `SharedClient` and
-  take on the two-phase shutdown complexity.
+  used from on their respective dispatchers: use `SharedClient` and take on the
+  two-phase shutdown complexity.
 
 ## Server-side threading
 
@@ -334,20 +336,21 @@ operations or parallel **to-user** calls (e.g. method handlers). Consequently,
 the trade-off is that we need to practice some care in maintaining the lifetime
 of the server implementation object. There are two cases:
 
-* [Initiating teardown from the single dispatcher
-  thread](#initiating_teardown_from_the_single_dispatcher_thread)
+* [Initiating teardown from the synchronized
+  dispatcher](#initiating_teardown_from_the_synchronized_dispatcher)
 * [Initiating teardown from an arbitrary
   thread](#initiating_teardown_from_an_arbitrary_thread)
 
-### Initiating teardown from the single dispatcher thread
+### Initiating teardown from the synchronized dispatcher
 
 When the async dispatcher (`async_dispatcher_t*`) passed to `fidl::BindServer`
-only has one thread backing it, and teardown is initiated from that thread (e.g.
-from within a server method handler or a task running on this dispatcher), then
-the binding will not make any calls on the server object after `Unbind`/`Close`
-returns. It is safe to destroy the server object at this point.
+is a [synchronized dispatcher][glossary.synchronized-dispatcher], and teardown
+is initiated from tasks running on that dispatcher (e.g. from within a server
+method handler), then the binding will not make any calls on the server object
+after `Unbind`/`Close` returns. It is safe to destroy the server object at this
+point.
 
-If the unbound handler is specified, the binding _will_ make one final
+If the unbound handler is specified, the binding *will* make one final
 **to-user** call that is the unbound handler soon after, usually at the next
 iteration of the event loop. The unbound handler has the following signature:
 
@@ -371,7 +374,7 @@ If the server object was destroyed earlier on, the callback must not access the
 ### Initiating teardown from an arbitrary thread
 
 If the application cannot guarantee that the teardown is always initiated from
-the single dispatcher thread, then there could be ongoing **to-user** calls
+the synchronized dispatcher, then there could be ongoing **to-user** calls
 during teardown. To prevent use-after-free, we may implement a similar two-phase
 shutdown pattern as found on the client side.
 
@@ -435,3 +438,4 @@ dispatcher threads, which may take locks in user code).
 [server-header]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/lib/fidl/cpp/wire/include/lib/fidl/cpp/wire/channel.h
 [client]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/fidl/cpp/include/lib/fidl/cpp/client.h?q=Client&ss=fuchsia%2Ffuchsia
 [shared-client]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/fidl/cpp/include/lib/fidl/cpp/client.h?q=SharedClient&sq=&ss=fuchsia%2Ffuchsia
+[glossary.synchronized-dispatcher]: /docs/glossary/README.md#synchronized-dispatcher

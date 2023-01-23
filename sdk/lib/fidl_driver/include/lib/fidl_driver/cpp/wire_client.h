@@ -57,15 +57,14 @@ class WireSyncBufferNeededVeneer {
 // |WireClient| provides an easier to use API in exchange of a more restrictive
 // threading model:
 //
-// - There must only ever be one thread executing asynchronous operations for
-//   the provided |fdf_dispatcher_t|, termed "the dispatcher thread".
-// - The client must be bound on the dispatcher thread.
-// - The client must be destroyed on the dispatcher thread.
-// - FIDL method calls must be made from the dispatcher thread.
-// - Responses are always delivered on the dispatcher thread, as are events.
+// - The provided |fdf_dispatcher_t| must be a [synchronized dispatcher][synchronized-dispatcher].
+// - The client must be bound on a task running on that dispatcher.
+// - The client must be destroyed on a task running on that dispatcher.
+// - FIDL method calls must be made from tasks running on that dispatcher.
+// - Responses are always delivered from dispatcher tasks, as are events.
 //
 // The above rules are checked in debug builds at run-time. In short, the client
-// is local to a thread.
+// is local to its associated dispatcher.
 //
 // Note that FIDL method calls must be synchronized with operations that consume
 // or mutate the |WireClient| itself:
@@ -75,12 +74,12 @@ class WireSyncBufferNeededVeneer {
 // - Destroying the |WireClient|.
 //
 // See
-// https://fuchsia.dev/fuchsia-src/development/languages/fidl/guides/llcpp-threading
+// https://fuchsia.dev/fuchsia-src/development/languages/fidl/tutorials/cpp/topics/threading
 // for thread safety notes on |fidl::WireClient|, which also largely apply to
 // |fdf::WireClient|.
 //
-// TODO(fxbug.dev/90958): support hopping threads in the driver async dispatcher
-// as long as the dispatcher is SYNCHRONIZED.
+// [synchronized-dispatcher]:
+// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 template <typename Protocol>
 class WireClient {
  public:

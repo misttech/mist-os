@@ -722,7 +722,7 @@ internal::SyncEndpointVeneer<internal::WireEventSender, FidlProtocol> WireSendEv
 //    // Handle errors..
 //  }
 //
-//  // Define impls of the FIDL protocol.
+//  // Define implementations of the FIDL protocol.
 //  class ImplA : public fidl::Server<fuchsia_lib::MyProtocol> { ... };
 //  class ImplB : public fidl::Server<fuchsia_lib::MyProtocol> { ... };
 //
@@ -734,20 +734,20 @@ internal::SyncEndpointVeneer<internal::WireEventSender, FidlProtocol> WireSendEv
 //  fidl::ServerBindingGroup<fuchsia_lib::MyProtocol> group;
 //
 //  // Add two bindings of each impl to the group.
-//  fidl::CreateEndpoints<fuchsia_lib::MyProtocol>() endpoints1;
+//  fidl::Endpoints<fuchsia_lib::MyProtocol>() endpoints1 = ...;
 //  group.AddBinding(loop, endpoints1->server, &a, OnClosed);
-//  fidl::CreateEndpoints<fuchsia_lib::MyProtocol>() endpoints2;
+//  fidl::Endpoints<fuchsia_lib::MyProtocol>() endpoints2 = ...;
 //  group.AddBinding(loop, endpoints2->server, &a, OnClosed);
-//  fidl::CreateEndpoints<fuchsia_lib::MyProtocol>() endpoints3;
+//  fidl::Endpoints<fuchsia_lib::MyProtocol>() endpoints3 = ...;
 //  group.AddBinding(loop, endpoints3->server, &b, OnClosed);
-//  fidl::CreateEndpoints<fuchsia_lib::MyProtocol>() endpoints4;
+//  fidl::Endpoints<fuchsia_lib::MyProtocol>() endpoints4 = ...;
 //  group.AddBinding(loop, endpoints4->server, &b, OnClosed);
 //
 // # Thread safety
 //
-// This class is thread-unsafe. Instances must be managed and used from an async
-// dispatcher with mutual exclusion guarantee. See
-// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#mutual-exclusion-guarantee
+// This class is thread-unsafe. Instances must be managed and used from a
+// synchronized async dispatcher. See
+// https://fuchsia.dev/fuchsia-src/development/languages/c-cpp/thread-safe-async#synchronized-dispatcher
 template <typename FidlProtocol>
 class ServerBindingGroup final {
  private:

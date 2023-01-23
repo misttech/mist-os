@@ -49,7 +49,7 @@ OutgoingDirectory::Inner::Inner(async_dispatcher_t* dispatcher, svc_dir_t* root)
       root_(root),
       unbind_protocol_callbacks_() {
   // TODO(fxbug.dev/113997): Post a task onto the dispatcher to verify that the
-  // dispatcher has mutual exclusion guarantees.
+  // dispatcher is synchronized.
 }
 
 OutgoingDirectory::OutgoingDirectory(OutgoingDirectory&& other) noexcept = default;
