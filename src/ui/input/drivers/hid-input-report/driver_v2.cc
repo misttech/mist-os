@@ -139,4 +139,4 @@ bool driver_log_severity_enabled_internal(const zx_driver_t* drv, fx_log_severit
   return true;
 }
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<InputReportDriver>);
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<InputReportDriver>);

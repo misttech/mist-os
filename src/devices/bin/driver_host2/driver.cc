@@ -95,28 +95,29 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo) {
     LOGF(ERROR, "Failed to start driver '%s', could not load library: %s", url.data(), dlerror());
     return zx::error(ZX_ERR_INTERNAL);
   }
-  auto record = static_cast<const DriverRecord*>(dlsym(library, "__fuchsia_driver_record__"));
-  if (record == nullptr) {
-    LOGF(ERROR, "Failed to start driver '%s', driver record not found", url.data());
+  auto lifecycle =
+      static_cast<const DriverLifecycle*>(dlsym(library, "__fuchsia_driver_lifecycle__"));
+  if (lifecycle == nullptr) {
+    LOGF(ERROR, "Failed to start driver '%s', driver lifecycle not found", url.data());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
-  if (record->version < 1 || record->version > 2) {
-    LOGF(ERROR, "Failed to start driver '%s', unknown driver record version: %lu", url.data(),
-         record->version);
+  if (lifecycle->version < 1 || lifecycle->version > 2) {
+    LOGF(ERROR, "Failed to start driver '%s', unknown driver lifecycle version: %lu", url.data(),
+         lifecycle->version);
     return zx::error(ZX_ERR_WRONG_TYPE);
   }
-  return zx::ok(fbl::MakeRefCounted<Driver>(std::move(url), library, record));
+  return zx::ok(fbl::MakeRefCounted<Driver>(std::move(url), library, lifecycle));
 }
 
-Driver::Driver(std::string url, void* library, const DriverRecord* record)
-    : url_(std::move(url)), library_(library), record_(record) {}
+Driver::Driver(std::string url, void* library, const DriverLifecycle* lifecycle)
+    : url_(std::move(url)), library_(library), lifecycle_(lifecycle) {}
 
 Driver::~Driver() {
   fbl::AutoLock al(&lock_);
   if (opaque_.has_value()) {
     void* opaque = *opaque_;
     al.release();
-    zx_status_t status = record_->v1.stop(opaque);
+    zx_status_t status = lifecycle_->v1.stop(opaque);
     if (status != ZX_OK) {
       LOGF(ERROR, "Failed to stop driver '%s': %s", url_.data(), zx_status_get_string(status));
     }
@@ -133,7 +134,7 @@ void Driver::set_binding(fidl::ServerBindingRef<fdh::Driver> binding) {
 
 void Driver::Stop(StopCompleter::Sync& completer) {
   // Prepare stop was added in version 2.
-  if (record_->version >= 2) {
+  if (lifecycle_->version >= 2) {
     // We synchronize this task with start by posting it against the dispatcher used in Start.
     async_dispatcher_t* dispatcher;
     {
@@ -162,7 +163,7 @@ void Driver::Stop(StopCompleter::Sync& completer) {
         }
         delete context;
       };
-      record_->v2.prepare_stop(context.release());
+      lifecycle_->v2.prepare_stop(context.release());
     });
     // It shouldn't be possible for this to fail as the dispatcher shouldn't be shutdown by anyone
     // other than the driver host.
@@ -199,12 +200,12 @@ zx::result<> Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
     return zx::error(converted_message.status());
   }
 
-  // After calling |record_->start|, we assume it has taken ownership of
+  // After calling |lifecycle_->start|, we assume it has taken ownership of
   // the handles from |start_args|, and can therefore relinquish ownership.
   fidl_incoming_msg_t c_msg = std::move(converted_message.message()).ReleaseToEncodedCMessage();
   void* opaque = nullptr;
   zx_status_t status =
-      record_->v1.start({&c_msg, wire_format_metadata}, initial_dispatcher, &opaque);
+      lifecycle_->v1.start({&c_msg, wire_format_metadata}, initial_dispatcher, &opaque);
   if (status != ZX_OK) {
     return zx::error(status);
   }

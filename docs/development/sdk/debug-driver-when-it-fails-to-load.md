@@ -242,21 +242,21 @@ on these two approaches, see [Write bind rules for a driver][write-bind-rules].)
 
 ## Appendices
 
-### Error: driver record not found {:#error-driver-record-not-found}
+### Error: driver lifecycle not found {:#error-driver-lifecycle-not-found}
 
 After registering a component as a driver in your Fuchsia system, you may see an error message
 similar to the following in the device logs ([`ffx log`][ffx-log]):
 
 ```none {:.devsite-disable-click-to-copy}
-Failed to start driver; driver record not found url=<DRIVER_URL>
+Failed to start driver; driver lifecycle not found url=<DRIVER_URL>
 ```
 
-If you run into this error, make sure that the `FUCHSIA_DRIVER_RECORD_CPP_V2()` macro is added
+If you run into this error, make sure that the `FUCHSIA_DRIVER_LIFECYCLE_CPP_V2()` macro is added
 at the end of your driver component’s source code, for example:
 
 ```none {:.devsite-disable-click-to-copy}
 // Register driver hooks with the framework
-FUCHSIA_DRIVER_RECORD_CPP_V2(fdf::Record<qemu_edu::QemuEduDriver>);
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V2(fdf::Lifecycle<qemu_edu::QemuEduDriver>);
 ```
 
 For more information on this macro, see [Implement driver hooks][implement-driver-hooks] in

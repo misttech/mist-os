@@ -12,7 +12,7 @@
 #include <lib/driver/component/cpp/namespace.h>
 #include <lib/driver/component/cpp/outgoing_directory.h>
 #include <lib/driver/component/cpp/start_args.h>
-#include <lib/driver/record/record.h>
+#include <lib/driver/symbols/symbols.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 namespace fdf {
@@ -195,7 +195,7 @@ class BasicFactory {
   }
 };
 
-// |Record| implements static |Start| and |Stop| methods which will be used by the framework.
+// |Lifecycle| implements static |Start| and |Stop| methods which will be used by the framework.
 //
 // By default, it will utilize |BasicFactory| to construct your primary driver class, |Driver|,
 // and invoke it's |Start| and |Stop| methods.
@@ -207,12 +207,12 @@ class BasicFactory {
 //     DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
 // ```
 //
-// This illustrates how to use a |Record| with the default |BasicFactory|:
+// This illustrates how to use a |Lifecycle| with the default |BasicFactory|:
 // ```
-// FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<MyDriver>);
+// FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<MyDriver>);
 // ```
 //
-// This illustrates how to use a |Record| with a custom factory:
+// This illustrates how to use a |Lifecycle| with a custom factory:
 // ```
 // class CustomFactory {
 //  public:
@@ -220,13 +220,13 @@ class BasicFactory {
 //       DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
 //   ...construct and start driver...
 // };
-// // We must define the record before passing into the macro, otherwise the macro expansion
+// // We must define the lifecycle before passing into the macro, otherwise the macro expansion
 // // will think the comma is to pass a second macro argument.
-// using record = fdf::Record<MyDriver, CustomFactory>;
-// FUCHSIA_DRIVER_RECORD_CPP_V3(record);
+// using lifecycle = fdf::Lifecycle<MyDriver, CustomFactory>;
+// FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(lifecycle);
 // ```
 template <typename Driver, typename Factory = BasicFactory<Driver>>
-class Record {
+class Lifecycle {
   static_assert(std::is_base_of_v<DriverBase, Driver>, "Driver has to inherit from DriverBase");
 
   DECLARE_HAS_MEMBER_FN(has_create_driver, CreateDriver);
@@ -279,12 +279,12 @@ class Record {
   }
 };
 
-#define FUCHSIA_DRIVER_RECORD_CPP_V2(record) \
-  FUCHSIA_DRIVER_RECORD_V1(.start = record::Start, .stop = record::Stop)
+#define FUCHSIA_DRIVER_LIFECYCLE_CPP_V2(lifecycle) \
+  FUCHSIA_DRIVER_LIFECYCLE_V1(.start = lifecycle::Start, .stop = lifecycle::Stop)
 
-#define FUCHSIA_DRIVER_RECORD_CPP_V3(record)                                            \
-  FUCHSIA_DRIVER_RECORD_V2(.start = record::Start, .prepare_stop = record::PrepareStop, \
-                           .stop = record::Stop)
+#define FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(lifecycle)                                               \
+  FUCHSIA_DRIVER_LIFECYCLE_V2(.start = lifecycle::Start, .prepare_stop = lifecycle::PrepareStop, \
+                              .stop = lifecycle::Stop)
 
 }  // namespace fdf
 

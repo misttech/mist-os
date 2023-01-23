@@ -145,4 +145,4 @@ class DemoNumber : public fdf::DriverBase {
 
 }  // namespace demo_number
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<demo_number::DemoNumber>);
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<demo_number::DemoNumber>);

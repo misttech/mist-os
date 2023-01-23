@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_RECORD_RECORD_H_
-#define LIB_DRIVER_RECORD_RECORD_H_
+#ifndef LIB_DRIVER_SYMBOLS_SYMBOLS_H_
+#define LIB_DRIVER_SYMBOLS_SYMBOLS_H_
 
 #include <lib/fdf/dispatcher.h>
 #include <zircon/fidl.h>
@@ -12,7 +12,7 @@ struct EncodedDriverStartArgs {
   // |msg| is an encoded `fuchsia.driver.framework/DriverStartArgs` table. The
   // ownership of handles in |msg| are transferred to the driver. The driver may
   // mutate the bytes referenced by |msg|, but those are only alive until the
-  // |DriverRecordV1::start| method returns.
+  // |DriverLifecycleV1::start| method returns.
   fidl_incoming_msg_t* msg;
 
   // |wire_format_metadata| describes the the revision of the FIDL wire format
@@ -31,8 +31,8 @@ struct PrepareStopContext {
   PrepareStopCompleteCallback* complete;
 };
 
-struct DriverRecord {
-  // This is the version of `DriverRecord` and all structures used by it.
+struct DriverLifecycle {
+  // This is the version of `DriverLifecycle` and all structures used by it.
   uint64_t version;
 
   struct v1 {
@@ -60,14 +60,14 @@ struct DriverRecord {
   } v2;
 };
 
-#define FUCHSIA_DRIVER_RECORD_V1(start, stop)                        \
-  extern "C" const DriverRecord __fuchsia_driver_record__ __EXPORT { \
-    .version = 1, .v1 = {start, stop}, .v2 = {nullptr},              \
+#define FUCHSIA_DRIVER_LIFECYCLE_V1(start, stop)                           \
+  extern "C" const DriverLifecycle __fuchsia_driver_lifecycle__ __EXPORT { \
+    .version = 1, .v1 = {start, stop}, .v2 = {nullptr},                    \
   }
 
-#define FUCHSIA_DRIVER_RECORD_V2(start, prepare_stop, stop)          \
-  extern "C" const DriverRecord __fuchsia_driver_record__ __EXPORT { \
-    .version = 2, .v1 = {start, stop}, .v2 = {prepare_stop},         \
+#define FUCHSIA_DRIVER_LIFECYCLE_V2(start, prepare_stop, stop)             \
+  extern "C" const DriverLifecycle __fuchsia_driver_lifecycle__ __EXPORT { \
+    .version = 2, .v1 = {start, stop}, .v2 = {prepare_stop},               \
   }
 
-#endif  // LIB_DRIVER_RECORD_RECORD_H_
+#endif  // LIB_DRIVER_SYMBOLS_SYMBOLS_H_

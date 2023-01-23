@@ -6,7 +6,7 @@
 
 using fdf::DriverBase;
 using fdf::DriverStartArgs;
-using fdf::Record;
+using fdf::Lifecycle;
 
 // ----------------------------------Default BasicFactory------------------------------------------
 class MyDriver : public DriverBase {
@@ -24,7 +24,7 @@ class MyDriver : public DriverBase {
 
 // If we don't need a custom factory (default is the BasicFactory in driver_base.h) we can just
 // put in this macro and stop.
-// FUCHSIA_DRIVER_RECORD_CPP_V3(Record<MyDriver>);
+// FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(Lifecycle<MyDriver>);
 
 // ------------------------------------------------------------------------------------------------
 
@@ -48,7 +48,7 @@ class AnotherDriver : public DriverBase {
   }
 };
 
-// Here is our custom factory, we can pass it into our Record down below.
+// Here is our custom factory, we can pass it into our Lifecycle down below.
 class CustomFactory {
  public:
   static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
@@ -67,8 +67,8 @@ class CustomFactory {
   }
 };
 
-// We must define the record before passing into the macro, otherwise the macro expansion
+// We must define the lifecycle before passing into the macro, otherwise the macro expansion
 // will think the comma is to pass a second macro argument.
-using record = Record<AnotherDriver, CustomFactory>;
-FUCHSIA_DRIVER_RECORD_CPP_V3(record);
+using lifecycle = Lifecycle<AnotherDriver, CustomFactory>;
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(lifecycle);
 // ------------------------------------------------------------------------------------------------

@@ -202,4 +202,4 @@ class ParentZirconTransportDriver : public fdf::DriverBase {
 
 }  // namespace zircon_transport
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<zircon_transport::ParentZirconTransportDriver>);
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<zircon_transport::ParentZirconTransportDriver>);

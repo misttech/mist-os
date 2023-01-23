@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_HOST2_DRIVER_H_
 
 #include <fidl/fuchsia.driver.host/cpp/fidl.h>
-#include <lib/driver/record/record.h>
+#include <lib/driver/symbols/symbols.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <fbl/auto_lock.h>
@@ -23,7 +23,7 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
  public:
   static zx::result<fbl::RefPtr<Driver>> Load(std::string url, zx::vmo vmo);
 
-  Driver(std::string url, void* library, const DriverRecord* record);
+  Driver(std::string url, void* library, const DriverLifecycle* lifecycle);
   ~Driver() override;
 
   const std::string& url() const { return url_; }
@@ -43,7 +43,7 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
  private:
   std::string url_;
   void* library_;
-  const DriverRecord* record_;
+  const DriverLifecycle* lifecycle_;
 
   fbl::Mutex lock_;
   std::optional<void*> opaque_ __TA_GUARDED(lock_);

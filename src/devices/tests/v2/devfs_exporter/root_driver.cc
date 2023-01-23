@@ -72,4 +72,4 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Device> {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<RootDriver>);
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<RootDriver>);

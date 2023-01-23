@@ -757,5 +757,5 @@ zx_status_t Driver::ServeDiagnosticsDir() {
 
 }  // namespace compat
 
-using record = fdf::Record<compat::Driver, compat::DriverFactory>;
-FUCHSIA_DRIVER_RECORD_CPP_V3(record);
+using record = fdf::Lifecycle<compat::Driver, compat::DriverFactory>;
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(record);

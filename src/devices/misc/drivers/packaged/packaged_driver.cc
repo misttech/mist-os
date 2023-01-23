@@ -33,4 +33,4 @@ class PackagedDriver : public fdf::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<PackagedDriver>);
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<PackagedDriver>);

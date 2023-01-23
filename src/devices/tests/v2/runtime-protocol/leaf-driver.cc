@@ -131,4 +131,4 @@ class LeafDriver : public fdf::DriverBase {
 
 }  // namespace
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<LeafDriver>);
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<LeafDriver>);

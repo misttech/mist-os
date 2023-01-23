@@ -40,13 +40,13 @@ sdk://pkg/async-cpp
 sdk://pkg/async-default
 sdk://pkg/component_incoming_cpp
 sdk://pkg/component_outgoing_cpp
-sdk://pkg/driver-record
 sdk://pkg/driver_compat
 sdk://pkg/driver_component_cpp
 sdk://pkg/driver_devfs_cpp
 sdk://pkg/driver_runtime
 sdk://pkg/driver_runtime_cpp
 sdk://pkg/driver_runtime_shared_lib
+sdk://pkg/driver_symbols
 sdk://pkg/fdio
 sdk://pkg/fidl
 sdk://pkg/fidl_base

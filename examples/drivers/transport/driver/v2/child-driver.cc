@@ -162,4 +162,4 @@ class ChildDriverTransportDriver : public fdf::DriverBase {
 
 }  // namespace driver_transport
 
-FUCHSIA_DRIVER_RECORD_CPP_V3(fdf::Record<driver_transport::ChildDriverTransportDriver>);
+FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<driver_transport::ChildDriverTransportDriver>);

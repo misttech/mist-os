@@ -1,7 +1,7 @@
 {
   global:
     /* DFv2 Symbols */
-    __fuchsia_driver_record__;
+    __fuchsia_driver_lifecycle__;
     /* Compat driver Symbols */
     device_add_from_driver;
     device_init_reply;

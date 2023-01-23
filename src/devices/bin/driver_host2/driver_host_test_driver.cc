@@ -6,7 +6,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/component/cpp/start_args.h>
-#include <lib/driver/record/record.h>
+#include <lib/driver/symbols/symbols.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/epitaph.h>
 
@@ -90,4 +90,4 @@ zx_status_t test_driver_stop(void* driver) {
   return ZX_OK;
 }
 
-FUCHSIA_DRIVER_RECORD_V1(.start = test_driver_start, .stop = test_driver_stop);
+FUCHSIA_DRIVER_LIFECYCLE_V1(.start = test_driver_start, .stop = test_driver_stop);
