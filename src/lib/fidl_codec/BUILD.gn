@@ -92,6 +92,7 @@ executable("fidl_codec_test_bin") {
     ":json_for_test",
     ":list_for_test",
     ":value_proto",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/testing/fidl:test",
     "//sdk/testing/fidl:test_support",
     "//src/lib/fxl/test:gtest_main",
