@@ -407,6 +407,7 @@ TEST(ConvertTest, ToFidlBssConfig) {
   bss_config_t in = {
       .bss_type = kFakeBanjoBssType,
       .remote = kPopulaterBool,
+      .beacon_period = kRandomPopulaterUint16,
   };
   for (size_t i = 0; i < wlan_ieee80211::kMacAddrLen; i++) {
     in.bssid[i] = kFakeMacAddr[i];
@@ -422,6 +423,7 @@ TEST(ConvertTest, ToFidlBssConfig) {
   }
   EXPECT_EQ(kFakeFidlBssType, out.bss_type);
   EXPECT_EQ(kPopulaterBool, out.remote);
+  EXPECT_EQ(kRandomPopulaterUint16, out.beacon_period);
 
   // Assign an invalid value to cbw, and the conversion will fail.
   in.bss_type = kRandomPopulaterUint32;

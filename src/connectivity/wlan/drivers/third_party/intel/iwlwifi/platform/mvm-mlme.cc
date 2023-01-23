@@ -403,9 +403,9 @@ zx_status_t mac_configure_bss(struct iwl_mvm_vif* mvmvif,
                               const fuchsia_wlan_internal::wire::BssConfig* config) {
   zx_status_t ret = ZX_OK;
 
-  IWL_INFO(mvmvif, "mac_configure_bss(bssid=" FMT_SSID ", type=%d, remote=%d)\n",
+  IWL_INFO(mvmvif, "mac_configure_bss(bssid=" FMT_SSID ", type=%d, remote=%d, beacon_period=%u)\n",
            FMT_SSID_BYTES(config->bssid.data(), sizeof(config->bssid)), config->bss_type,
-           config->remote);
+           config->remote, config->beacon_period);
 
   if (config->bss_type != fuchsia_wlan_internal::BssType::kInfrastructure) {
     IWL_ERR(mvmvif, "invalid bss_type requested: %d\n", config->bss_type);
@@ -417,6 +417,9 @@ zx_status_t mac_configure_bss(struct iwl_mvm_vif* mvmvif,
     auto lock = std::lock_guard(mvmvif->mvm->mutex);
     memcpy(mvmvif->bss_conf.bssid, config->bssid.data(), ETH_ALEN);
     memcpy(mvmvif->bssid, config->bssid.data(), ETH_ALEN);
+
+    // beacon_period is checked by driver later on
+    mvmvif->bss_conf.beacon_int = config->beacon_period;
 
     // Simulates the behavior of iwl_mvm_bss_info_changed_station().
     ret = iwl_mvm_mac_ctxt_changed(mvmvif, false, mvmvif->bssid);

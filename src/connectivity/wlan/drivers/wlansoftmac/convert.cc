@@ -416,6 +416,7 @@ zx_status_t ConvertBssConfig(const bss_config_t& in, fuchsia_wlan_internal::wire
       return ZX_ERR_INVALID_ARGS;
   }
 
+  out->beacon_period = in.beacon_period;
   return ZX_OK;
 }
 

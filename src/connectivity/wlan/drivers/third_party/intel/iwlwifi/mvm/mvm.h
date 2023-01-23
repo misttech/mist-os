@@ -76,6 +76,9 @@
 #define MSEC_TO_TU(_msec) (_msec * 1000 / 1024)
 #define TU_TO_ZX_DURATION(tu) (ZX_USEC(tu * 1024))
 
+/* Minimum beacon period supported by the firmware */
+#define IWL_MIN_BEACON_PERIOD_TU 16
+
 /* For GO, this value represents the number of TUs before CSA "beacon
  * 0" TBTT when the CSA time-event needs to be scheduled to start.  It
  * must be big enough to ensure that we switch in time.

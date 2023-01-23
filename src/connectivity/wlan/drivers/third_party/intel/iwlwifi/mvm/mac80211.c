@@ -2977,7 +2977,8 @@ zx_status_t iwl_mvm_mac_sta_state(struct iwl_mvm_vif* mvmvif, struct iwl_mvm_sta
      * attempts to connect to this AP, and eventually wpa_s will
      * blocklist the AP...
      */
-    if (mvmvif->mac_role == WLAN_MAC_ROLE_CLIENT && mvmvif->bss_conf.beacon_int < 16) {
+    if (mvmvif->mac_role == WLAN_MAC_ROLE_CLIENT &&
+        mvmvif->bss_conf.beacon_int < IWL_MIN_BEACON_PERIOD_TU) {
       IWL_ERR(mvm, "AP %pM beacon interval is %d, refusing due to firmware bug!\n", mvm_sta->addr,
               mvmvif->bss_conf.beacon_int);
       ret = ZX_ERR_INVALID_ARGS;

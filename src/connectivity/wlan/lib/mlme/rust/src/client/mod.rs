@@ -372,6 +372,7 @@ impl ClientMlme {
             bssid: bss.bssid.0,
             bss_type: banjo_internal::BssType::INFRASTRUCTURE,
             remote: true,
+            beacon_period: bss.beacon_period,
         };
 
         // Configure driver to pass frames from this BSS to MLME. Otherwise they will be dropped.

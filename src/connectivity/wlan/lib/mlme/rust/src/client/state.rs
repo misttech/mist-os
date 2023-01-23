@@ -1421,6 +1421,7 @@ mod tests {
                     bssid: [1, 2, 3, 4, 5, 6],
                     bss_type: banjo_internal::BssType::PERSONAL,
                     remote: true,
+                    beacon_period: 100,
                 })
                 .expect("error configuring bss");
             self.make_ctx_with_device(device)

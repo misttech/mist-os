@@ -46,6 +46,8 @@ constexpr size_t kListenInterval = 100;
 constexpr uint8_t kInvalidBandIdFillByte = 0xa5;
 constexpr wlan_band_t kInvalidBandId = 0xa5;
 constexpr zx_handle_t kDummyMlmeChannel = 73939133;  // An arbitrary value not ZX_HANDLE_INVALID
+constexpr size_t kDefaultBeaconPeriod = 100;
+constexpr size_t kNonDefaultBeaconPeriod = 123;
 
 class WlanSoftmacDeviceTest : public SingleApTest,
                               public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
@@ -724,6 +726,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
           },
       .bss_type = fuchsia_wlan_internal::wire::BssType::kInfrastructure,
       .remote = true,
+      .beacon_period = kDefaultBeaconPeriod,
   };
 
   // Assoc context without HT related data.
@@ -889,6 +892,8 @@ TEST_F(MacInterfaceTest, DuplicateSetChannel) {
 TEST_F(MacInterfaceTest, TestConfigureBss) {
   ASSERT_OK(SetChannel(&kChannel));
 
+  ASSERT_EQ(mvmvif_->bss_conf.beacon_int, kDefaultBeaconPeriod);
+
   ExpectSendCmd(expected_cmd_id_list({
       MockCommand(WIDE_ID(LONG_GROUP, MAC_CONTEXT_CMD)),
       MockCommand(WIDE_ID(LONG_GROUP, TIME_EVENT_CMD)),
@@ -897,10 +902,15 @@ TEST_F(MacInterfaceTest, TestConfigureBss) {
       MockCommand(WIDE_ID(LONG_GROUP, ADD_STA)),
   }));
 
-  ASSERT_OK(ConfigureBss(&kBssConfig));
+  // Change the beacon period so we can see change in mvmvif_->bss_conf
+  auto cfg = kBssConfig;
+  cfg.beacon_period = kNonDefaultBeaconPeriod;
+
+  ASSERT_OK(ConfigureBss(&cfg));
   // Ensure the BSSID was copied into mvmvif
   ASSERT_EQ(memcmp(mvmvif_->bss_conf.bssid, kBssConfig.bssid.data(), ETH_ALEN), 0);
   ASSERT_EQ(memcmp(mvmvif_->bssid, kBssConfig.bssid.data(), ETH_ALEN), 0);
+  ASSERT_EQ(mvmvif_->bss_conf.beacon_int, kNonDefaultBeaconPeriod);
 }
 
 // Test duplicate BSS config.
@@ -939,6 +949,20 @@ TEST_F(MacInterfaceTest, UnsupportedBssType) {
           },
       .bss_type = fuchsia_wlan_internal::wire::BssType::kIndependent,
       .remote = true,
+      .beacon_period = kDefaultBeaconPeriod,
+  };
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, ConfigureBss(&kUnsupportedBssConfig));
+}
+
+TEST_F(MacInterfaceTest, UnsupportedBeaconPeriod) {
+  static constexpr fuchsia_wlan_internal::wire::BssConfig kUnsupportedBssConfig = {
+      .bssid =
+          {
+              .data_ = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
+          },
+      .bss_type = fuchsia_wlan_internal::wire::BssType::kIndependent,
+      .remote = true,
+      .beacon_period = IWL_MIN_BEACON_PERIOD_TU - 1,
   };
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, ConfigureBss(&kUnsupportedBssConfig));
 }
@@ -974,11 +998,6 @@ TEST_F(MacInterfaceTest, TestAuxSta) {
 //
 TEST_F(MacInterfaceTest, TestExceptionHandling) {
   ASSERT_OK(SetChannel(&kChannel));
-
-  // Test the beacon interval checking.
-  mvmvif_->bss_conf.beacon_int = 0;
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConfigureBss(&kBssConfig));
-  mvmvif_->bss_conf.beacon_int = 16;  // which just passes the check.
 
   // Test the phy_ctxt checking.
   auto backup_phy_ctxt = mvmvif_->phy_ctxt;

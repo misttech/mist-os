@@ -1413,6 +1413,7 @@ mod tests {
             bssid: [1, 2, 3, 4, 5, 6],
             bss_type: banjo_internal::BssType::PERSONAL,
             remote: true,
+            beacon_period: 100,
         })
         .expect("error configuring bss");
         assert!(fake_device.bss_cfg.is_some());
@@ -1528,6 +1529,7 @@ mod tests {
             bssid: [1, 2, 3, 4, 5, 6],
             bss_type: banjo_internal::BssType::PERSONAL,
             remote: true,
+            beacon_period: 100,
         })
         .expect("error configuring bss");
         let assoc_ctx = ddk_converter::build_ddk_assoc_ctx(

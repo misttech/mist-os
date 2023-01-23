@@ -23,6 +23,7 @@ type BssConfig = struct {
     bssid ieee80211.MacAddr;
     bss_type BssType;
     remote bool;
+    beacon_period uint16; // in TU
 };
 
 // IEEE Std 802.11-2016, 9.4.1.4
