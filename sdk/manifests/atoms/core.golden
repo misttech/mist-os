@@ -5,6 +5,7 @@
 //sdk/fidl/fuchsia.accessibility.virtualkeyboard:fuchsia.accessibility.virtualkeyboard_sdk
 //sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects_sdk
 //sdk/fidl/fuchsia.auth.oldtokens:fuchsia.auth.oldtokens_sdk
+//sdk/fidl/fuchsia.auth:fuchsia.auth_sdk
 //sdk/fidl/fuchsia.bluetooth.a2dp:fuchsia.bluetooth.a2dp_sdk
 //sdk/fidl/fuchsia.bluetooth.fastpair:fuchsia.bluetooth.fastpair_sdk
 //sdk/fidl/fuchsia.bluetooth.gatt2:fuchsia.bluetooth.gatt2_sdk

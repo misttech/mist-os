@@ -14,6 +14,7 @@ sdk://fidl/fuchsia.accessibility.gesture
 sdk://fidl/fuchsia.accessibility.semantics
 sdk://fidl/fuchsia.accessibility.virtualkeyboard
 sdk://fidl/fuchsia.audio.effects
+sdk://fidl/fuchsia.auth
 sdk://fidl/fuchsia.auth.oldtokens
 sdk://fidl/fuchsia.bluetooth
 sdk://fidl/fuchsia.bluetooth.a2dp
