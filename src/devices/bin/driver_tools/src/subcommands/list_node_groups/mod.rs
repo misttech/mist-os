@@ -5,7 +5,9 @@
 pub mod args;
 
 use {
-    crate::common::{node_property_key_to_string, node_property_value_to_string},
+    crate::common::{
+        node_property_key_to_string, node_property_value_to_string, write_node_properties,
+    },
     anyhow::{Context, Result},
     args::ListNodeGroupsCommand,
     fidl_fuchsia_driver_development as fdd, fuchsia_driver_dev,
@@ -78,21 +80,7 @@ pub async fn list_node_groups(
                     )?;
                 }
 
-                let props_len = node.properties.len();
-                writeln!(writer, "  {0} {1}", props_len, "Properties")?;
-
-                for (j, property) in node.properties.into_iter().enumerate() {
-                    let key = node_property_key_to_string(&property.key.unwrap());
-                    let value = node_property_value_to_string(&property.value.unwrap());
-                    writeln!(
-                        writer,
-                        "  [{0:>2}/{1:>2}] : Key {2:30} Value {3}",
-                        j + 1,
-                        props_len,
-                        key,
-                        value,
-                    )?;
-                }
+                write_node_properties(&node.properties, writer)?;
             }
         }
 

@@ -5,10 +5,10 @@
 use {
     super::subcommands::{
         debug_bind::args::DebugBindCommand, device::args::DeviceCommand, dump::args::DumpCommand,
-        list::args::ListCommand, list_devices::args::ListDevicesCommand,
-        list_hosts::args::ListHostsCommand, list_node_groups::args::ListNodeGroupsCommand,
-        register::args::RegisterCommand, restart::args::RestartCommand,
-        test_node::args::TestNodeCommand,
+        list::args::ListCommand, list_composites::args::ListCompositesCommand,
+        list_devices::args::ListDevicesCommand, list_hosts::args::ListHostsCommand,
+        list_node_groups::args::ListNodeGroupsCommand, register::args::RegisterCommand,
+        restart::args::RestartCommand, test_node::args::TestNodeCommand,
     },
     argh::FromArgs,
 };
@@ -43,6 +43,7 @@ pub enum DriverSubCommand {
     Device(DeviceCommand),
     Dump(DumpCommand),
     List(ListCommand),
+    ListComposites(ListCompositesCommand),
     ListDevices(ListDevicesCommand),
     ListHosts(ListHostsCommand),
     ListNodeGroups(ListNodeGroupsCommand),
@@ -61,6 +62,7 @@ pub enum DriverSubCommand {
     Dump(DumpCommand),
     I2c(I2cCommand),
     List(ListCommand),
+    ListComposites(ListCompositesCommand),
     ListDevices(ListDevicesCommand),
     ListHosts(ListHostsCommand),
     ListNodeGroups(ListNodeGroupsCommand),

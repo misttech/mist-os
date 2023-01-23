@@ -75,6 +75,20 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
                 .await
                 .context("List subcommand failed")?;
         }
+        DriverSubCommand::ListComposites(subcmd) => {
+            let mut writer = io::stdout();
+            let driver_development_proxy = driver_connector
+                .get_driver_development_proxy(false)
+                .await
+                .context("Failed to get driver development proxy")?;
+            subcommands::list_composites::list_composites(
+                subcmd,
+                &mut writer,
+                driver_development_proxy,
+            )
+            .await
+            .context("List composites subcommand failed")?;
+        }
         DriverSubCommand::ListDevices(subcmd) => {
             let driver_development_proxy = driver_connector
                 .get_driver_development_proxy(subcmd.select)

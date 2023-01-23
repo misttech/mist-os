@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_FRAGMENT_H_
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_FRAGMENT_H_
 
+#include <fidl/fuchsia.driver.development/cpp/wire.h>
 #include <lib/ddk/binding.h>
 
 #include <fbl/array.h>
@@ -66,6 +67,9 @@ class CompositeDeviceFragment
   // This may create a Banjo or FIDL proxy depending on the device bound to this
   // fragment.
   zx_status_t CreateProxy(const fbl::RefPtr<DriverHost> driver_host);
+
+  fuchsia_driver_development::wire::Dfv1CompositeFragmentInfo GetCompositeFragmentInfo(
+      fidl::AnyArena& arena) const;
 
   std::string_view name() const { return name_; }
   uint32_t index() const { return index_; }

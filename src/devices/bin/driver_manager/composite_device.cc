@@ -4,6 +4,8 @@
 
 #include "composite_device.h"
 
+#include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <zircon/status.h>
 
 #include "src/devices/bin/driver_manager/binding.h"
@@ -11,7 +13,12 @@
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/lib/log/log.h"
 
+namespace fdd = fuchsia_driver_development;
 namespace fdm = fuchsia_device_manager;
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace {
 
@@ -34,6 +41,45 @@ fbl::Array<StrProperty> ConvertStringProperties(
   }
 
   return str_properties;
+}
+
+fidl::VectorView<fdf::wire::NodeProperty> ConvertToNodeProperties(
+    fidl::AnyArena& arena, const fbl::Array<const zx_device_prop_t>& props,
+    const fbl::Array<const StrProperty>& str_props) {
+  size_t size = props.size() + str_props.size();
+  size_t index = 0;
+
+  fidl::VectorView<fdf::wire::NodeProperty> fidl_props(arena, size);
+  for (size_t i = 0; i < props.size(); i++) {
+    fidl_props[index++] = fdf::MakeProperty(arena, props[i].id, props[i].value);
+  }
+
+  for (size_t i = 0; i < str_props.size(); i++) {
+    switch (str_props[i].value.index()) {
+      case StrPropValueType::Integer: {
+        fidl_props[index++] = fdf::MakeProperty(
+            arena, str_props[i].key, std::get<StrPropValueType::Integer>(str_props[i].value));
+        break;
+      }
+      case StrPropValueType::String: {
+        fidl_props[index++] = fdf::MakeProperty(
+            arena, str_props[i].key, std::get<StrPropValueType::String>(str_props[i].value));
+        break;
+      }
+      case StrPropValueType::Bool: {
+        fidl_props[index++] = fdf::MakeProperty(
+            arena, str_props[i].key, std::get<StrPropValueType::Bool>(str_props[i].value));
+        break;
+      }
+      case StrPropValueType::Enum: {
+        fidl_props[index++] = fdf::MakeProperty(
+            arena, str_props[i].key, std::get<StrPropValueType::Enum>(str_props[i].value));
+        break;
+      }
+    }
+  }
+
+  return fidl_props;
 }
 
 }  // namespace
@@ -301,8 +347,8 @@ zx_status_t CompositeDevice::TryAssemble() {
 
   zx::result driver_host = GetDriverHost();
 
-  fidl::Arena allocator;
-  fidl::VectorView<fdm::wire::Fragment> fragments(allocator, fragments_.size_slow());
+  fidl::Arena arena;
+  fidl::VectorView<fdm::wire::Fragment> fragments(arena, fragments_.size_slow());
 
   // Create all of the proxies for the fragment devices, in the same process
   for (auto& fragment : fragments_) {
@@ -337,7 +383,7 @@ zx_status_t CompositeDevice::TryAssemble() {
 
   // Create the composite device in the driver_host
   fdm::wire::CompositeDevice composite{fragments, fidl::StringView::FromExternal(name())};
-  auto type = fdm::wire::DeviceType::WithComposite(allocator, composite);
+  auto type = fdm::wire::DeviceType::WithComposite(arena, composite);
 
   driver_host->controller()
       ->CreateDevice(std::move(coordinator_endpoints->client),
@@ -404,6 +450,36 @@ void CompositeDevice::Remove() {
     device_ = nullptr;
   }
   driver_host_ = nullptr;
+}
+
+fdd::wire::Dfv1CompositeInfo CompositeDevice::GetCompositeInfo(fidl::AnyArena& arena) const {
+  auto composite_info =
+      fdd::wire::Dfv1CompositeInfo::Builder(arena)
+          .name(fidl::StringView(arena, name_.c_str()))
+          .primary_index(primary_fragment_index_)
+          .properties(ConvertToNodeProperties(arena, properties_, str_properties_));
+
+  if (driver_.has_value()) {
+    composite_info.driver(driver_->name());
+  }
+
+  if (device_) {
+    auto topological_path = device_->GetTopologicalPath();
+    if (topological_path.is_ok()) {
+      composite_info.topological_path(fidl::StringView(arena, *topological_path));
+    } else {
+      LOGF(WARNING, "Unable to retrieve topological path for device %s", device_->name().c_str());
+    }
+  }
+
+  fidl::VectorView<fdd::wire::Dfv1CompositeFragmentInfo> fragments(arena, fragments_count_);
+  uint32_t index = 0;
+  for (auto& fragment : fragments_) {
+    fragments[index] = fragment.GetCompositeFragmentInfo(arena);
+    index++;
+  }
+  composite_info.fragments(fragments);
+  return composite_info.Build();
 }
 
 CompositeDeviceFragment* CompositeDevice::GetPrimaryFragment() {

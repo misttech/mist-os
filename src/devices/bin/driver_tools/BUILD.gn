@@ -97,6 +97,8 @@ rustc_library("lib") {
     "src/subcommands/i2c/subcommands/write/mod.rs",
     "src/subcommands/list/args.rs",
     "src/subcommands/list/mod.rs",
+    "src/subcommands/list_composites/args.rs",
+    "src/subcommands/list_composites/mod.rs",
     "src/subcommands/list_devices/args.rs",
     "src/subcommands/list_devices/mod.rs",
     "src/subcommands/list_hosts/args.rs",
@@ -140,7 +142,11 @@ rustc_library("lib") {
       "src/subcommands/runtool/mod.rs",
     ]
   }
-  inputs = [ "//third_party/pciids/pci.ids.zst" ]
+  inputs = [
+    "//third_party/pciids/pci.ids.zst",
+    "tests/golden/list_composites_verbose",
+    "tests/golden/list_composites_verbose_empty_fields",
+  ]
 }
 
 fuchsia_unittest_package("driver_tools_tests") {

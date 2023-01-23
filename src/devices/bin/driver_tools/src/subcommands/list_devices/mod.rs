@@ -207,8 +207,8 @@ pub async fn list_devices(
     if !driver_development_proxy.is_dfv2().await? {
         println!(
             "\n\n\
-            WARNING: Unbound composites are no longer added to the topology in DFv1. \
-            See fxbug.dev/118660 for more information."
+            PSA: Unbound composites are no longer added to the topology in DFv1. \
+            Use ffx driver list-composites to see information on the composites."
         );
     }
 

@@ -912,6 +912,17 @@ void Coordinator::GetDeviceInfo(GetDeviceInfoRequestView request,
                    });
 }
 
+void Coordinator::GetCompositeInfo(GetCompositeInfoRequestView request,
+                                   GetCompositeInfoCompleter::Sync& completer) {
+  auto iterator = std::make_unique<CompositeInfoIterator>(device_manager_->composite_devices());
+  fidl::BindServer(dispatcher(), std::move(request->iterator), std::move(iterator),
+                   [](auto* server, fidl::UnbindInfo info, auto channel) {
+                     if (!info.is_peer_closed()) {
+                       LOGF(WARNING, "Closed CompositeInfoIterator: %s", info.lossy_description());
+                     }
+                   });
+}
+
 void Coordinator::BindAllUnboundNodes(BindAllUnboundNodesCompleter::Sync& completer) {
   LOGF(WARNING, "BindAllUnboundNodes is only supported in DFv2.");
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);

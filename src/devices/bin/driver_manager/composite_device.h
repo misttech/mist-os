@@ -6,6 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_DEVICE_H_
 
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
+#include <fidl/fuchsia.driver.development/cpp/wire.h>
 
 #include <fbl/array.h>
 #include <fbl/intrusive_double_list.h>
@@ -81,6 +82,8 @@ class CompositeDevice : public fbl::DoublyLinkedListable<std::unique_ptr<Composi
   // Forget about the composite device that was constructed.  If TryAssemble()
   // is invoked after this, it will reassemble the device.
   void Remove();
+
+  fuchsia_driver_development::wire::Dfv1CompositeInfo GetCompositeInfo(fidl::AnyArena& arena) const;
 
   CompositeDeviceFragment* GetPrimaryFragment();
   const CompositeDeviceFragment* GetPrimaryFragment() const;

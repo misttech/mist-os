@@ -232,6 +232,8 @@ class Coordinator : public CompositeManagerBridge,
                      GetNodeGroupsCompleter::Sync& completer) override;
   void GetDeviceInfo(GetDeviceInfoRequestView request,
                      GetDeviceInfoCompleter::Sync& completer) override;
+  void GetCompositeInfo(GetCompositeInfoRequestView request,
+                        GetCompositeInfoCompleter::Sync& completer) override;
   void BindAllUnboundNodes(BindAllUnboundNodesCompleter::Sync& completer) override;
   void IsDfv2(IsDfv2Completer::Sync& completer) override;
   void AddTestNode(AddTestNodeRequestView request, AddTestNodeCompleter::Sync& completer) override;

@@ -192,6 +192,12 @@ void DriverDevelopmentService::GetDeviceInfo(GetDeviceInfoRequestView request,
       });
 }
 
+void DriverDevelopmentService::GetCompositeInfo(GetCompositeInfoRequestView request,
+                                                GetCompositeInfoCompleter::Sync& completer) {
+  // TODO(fxb/119947): Implement support for DFv2.
+  LOGF(WARNING, "GetCompositeInfo() is currently not supported in DFv2. See fxb/119947.");
+}
+
 void DriverDevelopmentService::GetDriverInfo(GetDriverInfoRequestView request,
                                              GetDriverInfoCompleter::Sync& completer) {
   auto driver_index_client = component::Connect<fdd::DriverIndex>();

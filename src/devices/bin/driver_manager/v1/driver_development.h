@@ -19,24 +19,26 @@ class DeviceInfoIterator : public fidl::WireServer<fuchsia_driver_development::D
                               std::vector<fuchsia_driver_development::wire::DeviceInfo> list)
       : arena_(std::move(arena)), list_(std::move(list)) {}
 
-  void GetNext(GetNextCompleter::Sync& completer) override {
-    if (offset_ >= list_.size()) {
-      completer.Reply(fidl::VectorView<fuchsia_driver_development::wire::DeviceInfo>{});
-      return;
-    }
-
-    constexpr size_t kMaxEntries = 100;
-    auto result = cpp20::span(&list_[offset_], std::min(kMaxEntries, list_.size() - offset_));
-    offset_ += result.size();
-
-    completer.Reply(fidl::VectorView<fuchsia_driver_development::wire::DeviceInfo>::FromExternal(
-        result.data(), result.size()));
-  }
+  void GetNext(GetNextCompleter::Sync& completer) override;
 
  private:
   size_t offset_ = 0;
   std::unique_ptr<fidl::Arena<512>> arena_;
   std::vector<fuchsia_driver_development::wire::DeviceInfo> list_;
+};
+
+class CompositeInfoIterator
+    : public fidl::WireServer<fuchsia_driver_development::CompositeInfoIterator> {
+ public:
+  explicit CompositeInfoIterator(
+      const fbl::DoublyLinkedList<std::unique_ptr<CompositeDevice>>& composites);
+
+  void GetNext(GetNextCompleter::Sync& completer) override;
+
+ private:
+  size_t offset_ = 0;
+  fidl::Arena<512> arena_;
+  std::vector<fuchsia_driver_development::wire::Dfv1CompositeInfo> list_;
 };
 
 zx::result<std::vector<fuchsia_driver_development::wire::DeviceInfo>> GetDeviceInfo(

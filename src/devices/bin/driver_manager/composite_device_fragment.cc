@@ -4,11 +4,15 @@
 
 #include "src/devices/bin/driver_manager/composite_device_fragment.h"
 
+#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <zircon/status.h>
 
 #include "src/devices/bin/driver_manager/binding.h"
 #include "src/devices/bin/driver_manager/coordinator.h"
 #include "src/devices/lib/log/log.h"
+
+namespace fdd = fuchsia_driver_development;
+namespace fdm = fuchsia_device_manager;
 
 CompositeDeviceFragment::CompositeDeviceFragment(CompositeDevice* composite, std::string name,
                                                  uint32_t index,
@@ -16,6 +20,32 @@ CompositeDeviceFragment::CompositeDeviceFragment(CompositeDevice* composite, std
     : composite_(composite), name_(name), index_(index), bind_rules_(std::move(bind_rules)) {}
 
 CompositeDeviceFragment::~CompositeDeviceFragment() = default;
+
+fdd::wire::Dfv1CompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentInfo(
+    fidl::AnyArena& arena) const {
+  auto fragment_info = fdd::wire::Dfv1CompositeFragmentInfo::Builder(arena).name(
+      fidl::StringView(arena, name_.c_str()));
+
+  if (bound_device_) {
+    auto topological_path = bound_device_->GetTopologicalPath();
+    if (topological_path.is_ok()) {
+      fragment_info.device(fidl::StringView(arena, topological_path->c_str()));
+    } else {
+      LOGF(WARNING, "Unable to retrieve topological path for %s", bound_device_->name().c_str());
+    }
+  }
+
+  fidl::VectorView<fdm::wire::BindInstruction> bind_rules(arena, bind_rules_.size());
+  for (size_t i = 0; i < bind_rules_.size(); i++) {
+    bind_rules[i] = fdm::wire::BindInstruction{
+        .op = bind_rules_[i].op,
+        .arg = bind_rules_[i].arg,
+        .debug = bind_rules_[i].debug,
+    };
+  }
+  fragment_info.bind_rules(bind_rules);
+  return fragment_info.Build();
+}
 
 bool CompositeDeviceFragment::TryMatch(const fbl::RefPtr<Device>& dev) const {
   internal::BindProgramContext ctx;

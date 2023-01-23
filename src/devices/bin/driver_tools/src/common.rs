@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    bind::compiler::symbol_table::get_deprecated_key_identifier,
-    fidl_fuchsia_driver_framework as fdf,
+    anyhow::Result, bind::compiler::symbol_table::get_deprecated_key_identifier,
+    fidl_fuchsia_driver_framework as fdf, std::io::Write,
 };
 
 pub fn node_property_key_to_string(key: &fdf::NodePropertyKey) -> String {
@@ -36,6 +36,29 @@ pub fn node_property_value_to_string(value: &fdf::NodePropertyValue) -> String {
         }
         _ => "Unknown value".to_string(),
     }
+}
+
+pub fn write_node_properties(
+    properties: &Vec<fdf::NodeProperty>,
+    writer: &mut impl Write,
+) -> Result<()> {
+    let props_len = properties.len();
+    writeln!(writer, "  {0} {1}", props_len, "Properties")?;
+
+    for (index, property) in properties.into_iter().enumerate() {
+        let key = node_property_key_to_string(&property.key.clone().unwrap());
+        let value = node_property_value_to_string(&property.value.clone().unwrap());
+        writeln!(
+            writer,
+            "  [{0:>2}/{1:>2}] : Key {2:30} Value {3}",
+            index + 1,
+            props_len,
+            key,
+            value,
+        )?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
