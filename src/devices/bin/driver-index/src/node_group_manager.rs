@@ -509,8 +509,85 @@ mod tests {
     use bind::parser::bind_library::ValueType;
     use fuchsia_async as fasync;
 
+    const TEST_DEVICE_NAME: &str = "test_device";
+    const TEST_PRIMARY_NAME: &str = "primary_node";
+    const TEST_ADDITIONAL_A_NAME: &str = "node_a";
+    const TEST_ADDITIONAL_B_NAME: &str = "node_b";
+    const TEST_OPTIONAL_NAME: &str = "optional_node";
+
+    fn make_accept(key: fdf::NodePropertyKey, value: fdf::NodePropertyValue) -> fdf::BindRule {
+        fdf::BindRule { key: key, condition: fdf::Condition::Accept, values: vec![value] }
+    }
+
+    fn make_accept_list(
+        key: fdf::NodePropertyKey,
+        values: Vec<fdf::NodePropertyValue>,
+    ) -> fdf::BindRule {
+        fdf::BindRule { key: key, condition: fdf::Condition::Accept, values: values }
+    }
+
+    fn make_reject(key: fdf::NodePropertyKey, value: fdf::NodePropertyValue) -> fdf::BindRule {
+        fdf::BindRule { key: key, condition: fdf::Condition::Reject, values: vec![value] }
+    }
+
+    fn make_reject_list(
+        key: fdf::NodePropertyKey,
+        values: Vec<fdf::NodePropertyValue>,
+    ) -> fdf::BindRule {
+        fdf::BindRule { key: key, condition: fdf::Condition::Reject, values: values }
+    }
+
+    fn make_property(
+        key: fdf::NodePropertyKey,
+        value: fdf::NodePropertyValue,
+    ) -> fdf::NodeProperty {
+        fdf::NodeProperty { key: Some(key), value: Some(value), ..fdf::NodeProperty::EMPTY }
+    }
+
+    // TODO(fxb/120270): Update tests so that they use the test data functions more often.
+    fn create_test_node_rep_1() -> fdf::NodeRepresentation {
+        let bind_rules = vec![
+            make_accept(fdf::NodePropertyKey::IntValue(1), fdf::NodePropertyValue::IntValue(200)),
+            make_accept(fdf::NodePropertyKey::IntValue(3), fdf::NodePropertyValue::BoolValue(true)),
+            make_accept(
+                fdf::NodePropertyKey::StringValue("killdeer".to_string()),
+                fdf::NodePropertyValue::StringValue("plover".to_string()),
+            ),
+        ];
+
+        let properties = vec![make_property(
+            fdf::NodePropertyKey::IntValue(2),
+            fdf::NodePropertyValue::BoolValue(false),
+        )];
+
+        fdf::NodeRepresentation { bind_rules: bind_rules, properties: properties }
+    }
+
+    fn create_test_node_rep_2() -> fdf::NodeRepresentation {
+        let bind_rules = vec![
+            make_reject(
+                fdf::NodePropertyKey::StringValue("killdeer".to_string()),
+                fdf::NodePropertyValue::StringValue("plover".to_string()),
+            ),
+            make_accept(
+                fdf::NodePropertyKey::StringValue("flycatcher".to_string()),
+                fdf::NodePropertyValue::EnumValue("flycatcher.phoebe".to_string()),
+            ),
+            make_reject(
+                fdf::NodePropertyKey::StringValue("yellowlegs".to_string()),
+                fdf::NodePropertyValue::BoolValue(true),
+            ),
+        ];
+
+        let properties = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
+
+        fdf::NodeRepresentation { bind_rules: bind_rules, properties: properties }
+    }
+
     fn create_driver_with_rules<'a>(
-        device_name: &str,
         primary_node: (&str, Vec<SymbolicInstructionInfo<'a>>),
         additionals: Vec<(&str, Vec<SymbolicInstructionInfo<'a>>)>,
         optionals: Vec<(&str, Vec<SymbolicInstructionInfo<'a>>)>,
@@ -526,7 +603,7 @@ mod tests {
                 .push(CompositeNode { name: optional.0.to_string(), instructions: optional.1 });
         }
         let bind_rules = CompositeBindRules {
-            device_name: device_name.to_string(),
+            device_name: TEST_DEVICE_NAME.to_string(),
             symbol_table: HashMap::new(),
             primary_node: CompositeNode {
                 name: primary_node.0.to_string(),
@@ -556,58 +633,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_property_match_node() {
-        let bind_rules_1 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(3),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-        ];
-
-        let properties_1 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(2)),
-            value: Some(fdf::NodePropertyValue::BoolValue(false)),
-            ..fdf::NodeProperty::EMPTY
-        }];
-
-        let bind_rules_2 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("flycatcher".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::EnumValue("flycatcher.phoebe".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("yellowlegs".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
-        ];
-
-        let properties_2 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
-
-        let nodes = Some(vec![
-            fdf::NodeRepresentation { bind_rules: bind_rules_1, properties: properties_1 },
-            fdf::NodeRepresentation { bind_rules: bind_rules_2, properties: properties_2 },
-        ]);
+        let nodes = Some(vec![create_test_node_rep_1(), create_test_node_rep_2()]);
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -693,23 +719,17 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_property_match_bool_edgecase() {
         let bind_rules = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(3),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::BoolValue(false)],
-            },
+            make_accept(fdf::NodePropertyKey::IntValue(1), fdf::NodePropertyValue::IntValue(200)),
+            make_accept(
+                fdf::NodePropertyKey::IntValue(3),
+                fdf::NodePropertyValue::BoolValue(false),
+            ),
         ];
 
-        let properties = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -749,23 +769,20 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_deprecated_keys_match() {
         let bind_rules = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("fuchsia.BIND_PROTOCOL".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(0x0201), // "fuchsia.BIND_USB_PID"
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            },
+            make_accept(
+                fdf::NodePropertyKey::StringValue("fuchsia.BIND_PROTOCOL".to_string()),
+                fdf::NodePropertyValue::IntValue(200),
+            ),
+            make_accept(
+                fdf::NodePropertyKey::IntValue(0x0201), // "fuchsia.BIND_USB_PID"
+                fdf::NodePropertyValue::IntValue(10),
+            ),
         ];
 
-        let properties = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(0x01)),
-            value: Some(fdf::NodePropertyValue::IntValue(50)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties = vec![make_property(
+            fdf::NodePropertyKey::IntValue(0x01),
+            fdf::NodePropertyValue::IntValue(50),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -811,83 +828,35 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_multiple_group_match() {
-        let bind_rules_1 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(3),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-        ];
-
-        let properties_1 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(2)),
-            value: Some(fdf::NodePropertyValue::BoolValue(false)),
-            ..fdf::NodeProperty::EMPTY
-        }];
-
-        let bind_rules_2 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("flycatcher".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::EnumValue("flycatcher.phoebe".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("yellowlegs".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
-        ];
-
         let bind_rules_2_rearranged = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("flycatcher".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::EnumValue("flycatcher.phoebe".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("yellowlegs".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
+            make_accept(
+                fdf::NodePropertyKey::StringValue("flycatcher".to_string()),
+                fdf::NodePropertyValue::EnumValue("flycatcher.phoebe".to_string()),
+            ),
+            make_reject(
+                fdf::NodePropertyKey::StringValue("killdeer".to_string()),
+                fdf::NodePropertyValue::StringValue("plover".to_string()),
+            ),
+            make_reject(
+                fdf::NodePropertyKey::StringValue("yellowlegs".to_string()),
+                fdf::NodePropertyValue::BoolValue(true),
+            ),
         ];
 
-        let properties_2 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_2 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
-        let bind_rules_3 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::StringValue("cormorant".to_string()),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::BoolValue(true)],
-        }];
+        let bind_rules_3 = vec![make_accept(
+            fdf::NodePropertyKey::StringValue("cormorant".to_string()),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
-        let properties_3 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::StringValue("anhinga".to_string())),
-            value: Some(fdf::NodePropertyValue::BoolValue(false)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_3 = vec![make_property(
+            fdf::NodePropertyKey::StringValue("anhinga".to_string()),
+            fdf::NodePropertyValue::BoolValue(false),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -895,16 +864,7 @@ mod tests {
             node_group_manager.add_node_group(
                 fdf::NodeGroup {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_1,
-                            properties: properties_1,
-                        },
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_2,
-                            properties: properties_2.clone(),
-                        },
-                    ]),
+                    nodes: Some(vec![create_test_node_rep_1(), create_test_node_rep_2(),]),
                     ..fdf::NodeGroup::EMPTY
                 },
                 vec![]
@@ -974,87 +934,45 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_multiple_group_nodes_match() {
         let bind_rules_1 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
+            make_accept(fdf::NodePropertyKey::IntValue(1), fdf::NodePropertyValue::IntValue(200)),
+            make_accept(
+                fdf::NodePropertyKey::StringValue("killdeer".to_string()),
+                fdf::NodePropertyValue::StringValue("plover".to_string()),
+            ),
         ];
 
-        let properties_1 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(2)),
-            value: Some(fdf::NodePropertyValue::BoolValue(false)),
-            ..fdf::NodeProperty::EMPTY
-        }];
-
-        let bind_rules_2 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("flycatcher".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::EnumValue("flycatcher.phoebe".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("yellowlegs".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
-        ];
-
-        let properties_2 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_1 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(2),
+            fdf::NodePropertyValue::BoolValue(false),
+        )];
 
         let bind_rules_1_rearranged = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
+            make_accept(
+                fdf::NodePropertyKey::StringValue("killdeer".to_string()),
+                fdf::NodePropertyValue::StringValue("plover".to_string()),
+            ),
+            make_accept(fdf::NodePropertyKey::IntValue(1), fdf::NodePropertyValue::IntValue(200)),
         ];
 
-        let bind_rules_3 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::StringValue("cormorant".to_string()),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::BoolValue(true)],
-        }];
+        let bind_rules_3 = vec![make_accept(
+            fdf::NodePropertyKey::StringValue("cormorant".to_string()),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
-        let properties_3 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(false)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_3 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(false),
+        )];
 
-        let bind_rules_4 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![
-                fdf::NodePropertyValue::IntValue(10),
-                fdf::NodePropertyValue::IntValue(200),
-            ],
-        }];
+        let bind_rules_4 = vec![make_accept_list(
+            fdf::NodePropertyKey::IntValue(1),
+            vec![fdf::NodePropertyValue::IntValue(10), fdf::NodePropertyValue::IntValue(200)],
+        )];
 
-        let properties_4 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(2)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_4 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(2),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1067,10 +985,7 @@ mod tests {
                             bind_rules: bind_rules_1,
                             properties: properties_1.clone(),
                         },
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_2,
-                            properties: properties_2,
-                        },
+                        create_test_node_rep_2(),
                     ]),
                     ..fdf::NodeGroup::EMPTY
                 },
@@ -1157,48 +1072,21 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_property_mismatch() {
-        let bind_rules_1 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(1),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(3),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-        ];
-
-        let properties_1 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(2)),
-            value: Some(fdf::NodePropertyValue::BoolValue(false)),
-            ..fdf::NodeProperty::EMPTY
-        }];
-
         let bind_rules_2 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("killdeer".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::StringValue("plover".to_string())],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("yellowlegs".to_string()),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::BoolValue(false)],
-            },
+            make_accept(
+                fdf::NodePropertyKey::StringValue("killdeer".to_string()),
+                fdf::NodePropertyValue::StringValue("plover".to_string()),
+            ),
+            make_reject(
+                fdf::NodePropertyKey::StringValue("yellowlegs".to_string()),
+                fdf::NodePropertyValue::BoolValue(false),
+            ),
         ];
 
-        let properties_2 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_2 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1207,10 +1095,7 @@ mod tests {
                 fdf::NodeGroup {
                     name: Some("test_group".to_string()),
                     nodes: Some(vec![
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_1,
-                            properties: properties_1,
-                        },
+                        create_test_node_rep_1(),
                         fdf::NodeRepresentation {
                             bind_rules: bind_rules_2,
                             properties: properties_2,
@@ -1241,51 +1126,39 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_property_match_list() {
         let bind_rules_1 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(10),
-                condition: fdf::Condition::Reject,
-                values: vec![
-                    fdf::NodePropertyValue::IntValue(200),
-                    fdf::NodePropertyValue::IntValue(150),
-                ],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("plover".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![
+            make_reject_list(
+                fdf::NodePropertyKey::IntValue(10),
+                vec![fdf::NodePropertyValue::IntValue(200), fdf::NodePropertyValue::IntValue(150)],
+            ),
+            make_accept_list(
+                fdf::NodePropertyKey::StringValue("plover".to_string()),
+                vec![
                     fdf::NodePropertyValue::StringValue("killdeer".to_string()),
                     fdf::NodePropertyValue::StringValue("lapwing".to_string()),
                 ],
-            },
+            ),
         ];
 
-        let properties_1 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(1)),
-            value: Some(fdf::NodePropertyValue::IntValue(100)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_1 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(100),
+        )];
 
         let bind_rules_2 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(11),
-                condition: fdf::Condition::Reject,
-                values: vec![
-                    fdf::NodePropertyValue::IntValue(20),
-                    fdf::NodePropertyValue::IntValue(10),
-                ],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("dunlin".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
+            make_reject_list(
+                fdf::NodePropertyKey::IntValue(11),
+                vec![fdf::NodePropertyValue::IntValue(20), fdf::NodePropertyValue::IntValue(10)],
+            ),
+            make_accept(
+                fdf::NodePropertyKey::StringValue("dunlin".to_string()),
+                fdf::NodePropertyValue::BoolValue(true),
+            ),
         ];
 
-        let properties_2 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_2 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1355,51 +1228,36 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_property_mismatch_list() {
         let bind_rules_1 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(10),
-                condition: fdf::Condition::Reject,
-                values: vec![
-                    fdf::NodePropertyValue::IntValue(200),
-                    fdf::NodePropertyValue::IntValue(150),
-                ],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("plover".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![
+            make_reject_list(
+                fdf::NodePropertyKey::IntValue(10),
+                vec![fdf::NodePropertyValue::IntValue(200), fdf::NodePropertyValue::IntValue(150)],
+            ),
+            make_accept_list(
+                fdf::NodePropertyKey::StringValue("plover".to_string()),
+                vec![
                     fdf::NodePropertyValue::StringValue("killdeer".to_string()),
                     fdf::NodePropertyValue::StringValue("lapwing".to_string()),
                 ],
-            },
+            ),
         ];
 
-        let properties_1 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(1)),
-            value: Some(fdf::NodePropertyValue::IntValue(100)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_1 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(100),
+        )];
 
         let bind_rules_2 = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(11),
-                condition: fdf::Condition::Reject,
-                values: vec![
-                    fdf::NodePropertyValue::IntValue(20),
-                    fdf::NodePropertyValue::IntValue(10),
-                ],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(2),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::BoolValue(true)],
-            },
+            make_reject_list(
+                fdf::NodePropertyKey::IntValue(11),
+                vec![fdf::NodePropertyValue::IntValue(20), fdf::NodePropertyValue::IntValue(10)],
+            ),
+            make_accept(fdf::NodePropertyKey::IntValue(2), fdf::NodePropertyValue::BoolValue(true)),
         ];
 
-        let properties_2 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_2 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1442,20 +1300,15 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_property_multiple_value_types() {
-        let bind_rules = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(10),
-            condition: fdf::Condition::Reject,
-            values: vec![
-                fdf::NodePropertyValue::IntValue(200),
-                fdf::NodePropertyValue::BoolValue(false),
-            ],
-        }];
+        let bind_rules = vec![make_reject_list(
+            fdf::NodePropertyKey::IntValue(10),
+            vec![fdf::NodePropertyValue::IntValue(200), fdf::NodePropertyValue::BoolValue(false)],
+        )];
 
-        let properties = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(1)),
-            value: Some(fdf::NodePropertyValue::IntValue(100)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties = vec![make_property(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(100),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1480,23 +1333,17 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_property_duplicate_key() {
         let bind_rules = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(10),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(10),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            },
+            make_reject_list(
+                fdf::NodePropertyKey::IntValue(10),
+                vec![fdf::NodePropertyValue::IntValue(200), fdf::NodePropertyValue::IntValue(150)],
+            ),
+            make_accept(fdf::NodePropertyKey::IntValue(10), fdf::NodePropertyValue::IntValue(10)),
         ];
 
-        let properties = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1521,29 +1368,22 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_missing_bind_rules() {
         let bind_rules = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(10),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(10),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            },
+            make_reject_list(
+                fdf::NodePropertyKey::IntValue(10),
+                vec![fdf::NodePropertyValue::IntValue(200), fdf::NodePropertyValue::IntValue(150)],
+            ),
+            make_accept(fdf::NodePropertyKey::IntValue(10), fdf::NodePropertyValue::IntValue(10)),
         ];
 
-        let properties_1 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_1 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
-        let properties_2 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(10)),
-            value: Some(fdf::NodePropertyValue::BoolValue(false)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_2 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(10),
+            fdf::NodePropertyValue::BoolValue(false),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1571,29 +1411,22 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_missing_node_group_fields() {
         let bind_rules = vec![
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(10),
-                condition: fdf::Condition::Reject,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            },
-            fdf::BindRule {
-                key: fdf::NodePropertyKey::IntValue(10),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(10)],
-            },
+            make_reject_list(
+                fdf::NodePropertyKey::IntValue(10),
+                vec![fdf::NodePropertyValue::IntValue(200), fdf::NodePropertyValue::IntValue(150)],
+            ),
+            make_accept(fdf::NodePropertyKey::IntValue(10), fdf::NodePropertyValue::IntValue(10)),
         ];
 
-        let properties_1 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(3)),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_1 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(3),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
-        let properties_2 = vec![fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(1)),
-            value: Some(fdf::NodePropertyValue::BoolValue(false)),
-            ..fdf::NodeProperty::EMPTY
-        }];
+        let properties_2 = vec![make_property(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::BoolValue(false),
+        )];
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1634,23 +1467,20 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_match() {
-        let primary_bind_rules = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(200)],
-        }];
+        let primary_bind_rules = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(200),
+        )];
 
-        let additional_bind_rules_1 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(10)],
-        }];
+        let additional_bind_rules_1 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(10),
+        )];
 
-        let additional_bind_rules_2 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(10),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::BoolValue(true)],
-        }];
+        let additional_bind_rules_2 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(10),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let primary_key_1 = "whimbrel";
         let primary_val_1 = "sanderling";
@@ -1661,18 +1491,12 @@ mod tests {
         let additional_b_key_1 = "curlew";
         let additional_b_val_1 = 500;
 
-        let device_name = "mimid";
-        let primary_name = "catbird";
-        let additional_a_name = "mockingbird";
-        let additional_b_name = "lapwing";
-
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
+                fdf::NodePropertyValue::StringValue(primary_val_1.to_string()),
+            )],
         };
 
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -1685,11 +1509,10 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::IntValue(additional_a_key_1),
+                fdf::NodePropertyValue::IntValue(additional_a_val_1),
+            )],
         };
 
         let additional_node_a_inst = vec![
@@ -1711,11 +1534,10 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
+                fdf::NodePropertyValue::IntValue(additional_b_val_1),
+            )],
         };
 
         let additional_node_b_inst = vec![SymbolicInstructionInfo {
@@ -1727,11 +1549,10 @@ mod tests {
         }];
 
         let composite_driver = create_driver_with_rules(
-            device_name,
-            (primary_name, primary_node_inst),
+            (TEST_PRIMARY_NAME, primary_node_inst),
             vec![
-                (additional_a_name, additional_node_a_inst),
-                (additional_b_name, additional_node_b_inst),
+                (TEST_ADDITIONAL_A_NAME, additional_node_a_inst),
+                (TEST_ADDITIONAL_B_NAME, additional_node_b_inst),
             ],
             vec![],
         );
@@ -1748,15 +1569,15 @@ mod tests {
                 fdi::MatchedCompositeInfo {
                     node_index: None,
                     num_nodes: None,
-                    composite_name: Some(device_name.to_string()),
+                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
                     node_names: None,
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                     ..fdi::MatchedCompositeInfo::EMPTY
                 },
                 vec![
-                    primary_name.to_string(),
-                    additional_b_name.to_string(),
-                    additional_a_name.to_string()
+                    TEST_PRIMARY_NAME.to_string(),
+                    TEST_ADDITIONAL_B_NAME.to_string(),
+                    TEST_ADDITIONAL_A_NAME.to_string()
                 ]
             )),
             node_group_manager.add_node_group(
@@ -1779,9 +1600,9 @@ mod tests {
             driver: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
             primary_index: Some(0),
             node_names: Some(vec![
-                primary_name.to_string(),
-                additional_b_name.to_string(),
-                additional_a_name.to_string(),
+                TEST_PRIMARY_NAME.to_string(),
+                TEST_ADDITIONAL_B_NAME.to_string(),
+                TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             nodes,
             ..fdd::NodeGroupInfo::EMPTY
@@ -1799,14 +1620,14 @@ mod tests {
             num_nodes: Some(3),
             primary_index: Some(0),
             node_names: Some(vec![
-                primary_name.to_string(),
-                additional_b_name.to_string(),
-                additional_a_name.to_string(),
+                TEST_PRIMARY_NAME.to_string(),
+                TEST_ADDITIONAL_B_NAME.to_string(),
+                TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
                 node_index: None,
                 num_nodes: None,
-                composite_name: Some(device_name.to_string()),
+                composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
@@ -1824,23 +1645,20 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_with_rearranged_primary_node() {
-        let primary_bind_rules = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(200)],
-        }];
+        let primary_bind_rules = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(200),
+        )];
 
-        let additional_bind_rules_1 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(10)],
-        }];
+        let additional_bind_rules_1 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(10),
+        )];
 
-        let additional_bind_rules_2 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(10),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::BoolValue(true)],
-        }];
+        let additional_bind_rules_2 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(10),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let primary_key_1 = "whimbrel";
         let primary_val_1 = "sanderling";
@@ -1851,18 +1669,12 @@ mod tests {
         let additional_b_key_1 = "curlew";
         let additional_b_val_1 = 500;
 
-        let device_name = "mimid";
-        let primary_name = "primary_node";
-        let additional_a_name = "additional_1";
-        let additional_b_name = "additional_2";
-
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
+                fdf::NodePropertyValue::StringValue(primary_val_1.to_string()),
+            )],
         };
 
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -1875,11 +1687,10 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::IntValue(additional_a_key_1),
+                fdf::NodePropertyValue::IntValue(additional_a_val_1),
+            )],
         };
 
         let additional_node_a_inst = vec![
@@ -1901,11 +1712,10 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
+                fdf::NodePropertyValue::IntValue(additional_b_val_1),
+            )],
         };
 
         let additional_node_b_inst = vec![SymbolicInstructionInfo {
@@ -1917,11 +1727,10 @@ mod tests {
         }];
 
         let composite_driver = create_driver_with_rules(
-            device_name,
-            (primary_name, primary_node_inst),
+            (TEST_PRIMARY_NAME, primary_node_inst),
             vec![
-                (additional_a_name, additional_node_a_inst),
-                (additional_b_name, additional_node_b_inst),
+                (TEST_ADDITIONAL_A_NAME, additional_node_a_inst),
+                (TEST_ADDITIONAL_B_NAME, additional_node_b_inst),
             ],
             vec![],
         );
@@ -1938,15 +1747,15 @@ mod tests {
                 fdi::MatchedCompositeInfo {
                     node_index: None,
                     num_nodes: None,
-                    composite_name: Some(device_name.to_string()),
+                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
                     node_names: None,
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                     ..fdi::MatchedCompositeInfo::EMPTY
                 },
                 vec![
-                    additional_b_name.to_string(),
-                    additional_a_name.to_string(),
-                    primary_name.to_string(),
+                    TEST_ADDITIONAL_B_NAME.to_string(),
+                    TEST_ADDITIONAL_A_NAME.to_string(),
+                    TEST_PRIMARY_NAME.to_string(),
                 ]
             )),
             node_group_manager.add_node_group(
@@ -1969,9 +1778,9 @@ mod tests {
             driver: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
             primary_index: Some(2),
             node_names: Some(vec![
-                additional_b_name.to_string(),
-                additional_a_name.to_string(),
-                primary_name.to_string(),
+                TEST_ADDITIONAL_B_NAME.to_string(),
+                TEST_ADDITIONAL_A_NAME.to_string(),
+                TEST_PRIMARY_NAME.to_string(),
             ]),
             nodes,
             ..fdd::NodeGroupInfo::EMPTY
@@ -1989,14 +1798,14 @@ mod tests {
             num_nodes: Some(3),
             primary_index: Some(2),
             node_names: Some(vec![
-                additional_b_name.to_string(),
-                additional_a_name.to_string(),
-                primary_name.to_string(),
+                TEST_ADDITIONAL_B_NAME.to_string(),
+                TEST_ADDITIONAL_A_NAME.to_string(),
+                TEST_PRIMARY_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
                 node_index: None,
                 num_nodes: None,
-                composite_name: Some(device_name.to_string()),
+                composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
@@ -2014,23 +1823,20 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_with_optional_match_without_optional() {
-        let primary_bind_rules = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(200)],
-        }];
+        let primary_bind_rules = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(200),
+        )];
 
-        let additional_bind_rules_1 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(10)],
-        }];
+        let additional_bind_rules_1 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(10),
+        )];
 
-        let additional_bind_rules_2 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(10),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::BoolValue(true)],
-        }];
+        let additional_bind_rules_2 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(10),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
         let primary_key_1 = "whimbrel";
         let primary_val_1 = "sanderling";
@@ -2044,19 +1850,12 @@ mod tests {
         let optional_a_key_1 = 200;
         let optional_a_val_1: u32 = 10;
 
-        let device_name = "mimid";
-        let primary_name = "catbird";
-        let additional_a_name = "mockingbird";
-        let additional_b_name = "lapwing";
-        let optional_a_name = "trembler";
-
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
+                fdf::NodePropertyValue::StringValue(primary_val_1.to_string()),
+            )],
         };
 
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -2069,11 +1868,10 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::IntValue(additional_a_key_1),
+                fdf::NodePropertyValue::IntValue(additional_a_val_1),
+            )],
         };
 
         let additional_node_a_inst = vec![
@@ -2095,11 +1893,10 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
+                fdf::NodePropertyValue::IntValue(additional_b_val_1),
+            )],
         };
 
         let additional_node_b_inst = vec![SymbolicInstructionInfo {
@@ -2128,13 +1925,12 @@ mod tests {
         ];
 
         let composite_driver = create_driver_with_rules(
-            device_name,
-            (primary_name, primary_node_inst),
+            (TEST_PRIMARY_NAME, primary_node_inst),
             vec![
-                (additional_a_name, additional_node_a_inst),
-                (additional_b_name, additional_node_b_inst),
+                (TEST_ADDITIONAL_A_NAME, additional_node_a_inst),
+                (TEST_ADDITIONAL_B_NAME, additional_node_b_inst),
             ],
-            vec![(optional_a_name, optional_node_a_inst)],
+            vec![(TEST_OPTIONAL_NAME, optional_node_a_inst)],
         );
 
         let mut node_group_manager = NodeGroupManager::new();
@@ -2143,15 +1939,15 @@ mod tests {
                 fdi::MatchedCompositeInfo {
                     node_index: None,
                     num_nodes: None,
-                    composite_name: Some(device_name.to_string()),
+                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
                     node_names: None,
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                     ..fdi::MatchedCompositeInfo::EMPTY
                 },
                 vec![
-                    primary_name.to_string(),
-                    additional_b_name.to_string(),
-                    additional_a_name.to_string()
+                    TEST_PRIMARY_NAME.to_string(),
+                    TEST_ADDITIONAL_B_NAME.to_string(),
+                    TEST_ADDITIONAL_A_NAME.to_string()
                 ]
             )),
             node_group_manager.add_node_group(
@@ -2178,14 +1974,14 @@ mod tests {
             num_nodes: Some(3),
             primary_index: Some(0),
             node_names: Some(vec![
-                primary_name.to_string(),
-                additional_b_name.to_string(),
-                additional_a_name.to_string(),
+                TEST_PRIMARY_NAME.to_string(),
+                TEST_ADDITIONAL_B_NAME.to_string(),
+                TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
                 node_index: None,
                 num_nodes: None,
-                composite_name: Some(device_name.to_string()),
+                composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
@@ -2203,29 +1999,25 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_with_optional_match_with_optional() {
-        let primary_bind_rules = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(200)],
-        }];
+        let primary_bind_rules = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(200),
+        )];
 
-        let additional_bind_rules_1 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(10)],
-        }];
+        let additional_bind_rules_1 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(10),
+        )];
 
-        let additional_bind_rules_2 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(10),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::BoolValue(true)],
-        }];
+        let additional_bind_rules_2 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(10),
+            fdf::NodePropertyValue::BoolValue(true),
+        )];
 
-        let optional_bind_rules_1 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1000),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(1000)],
-        }];
+        let optional_bind_rules_1 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1000),
+            fdf::NodePropertyValue::IntValue(1000),
+        )];
 
         let primary_key_1 = "whimbrel";
         let primary_val_1 = "sanderling";
@@ -2239,19 +2031,12 @@ mod tests {
         let optional_a_key_1 = 200;
         let optional_a_val_1 = 10;
 
-        let device_name = "mimid";
-        let primary_name = "catbird";
-        let additional_a_name = "mockingbird";
-        let additional_b_name = "lapwing";
-        let optional_a_name = "trembler";
-
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
+                fdf::NodePropertyValue::StringValue(primary_val_1.to_string()),
+            )],
         };
 
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -2290,11 +2075,10 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
+                fdf::NodePropertyValue::IntValue(additional_b_val_1),
+            )],
         };
 
         let additional_node_b_inst = vec![SymbolicInstructionInfo {
@@ -2307,11 +2091,10 @@ mod tests {
 
         let optional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: optional_bind_rules_1,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(optional_a_key_1)),
-                value: Some(fdf::NodePropertyValue::IntValue(optional_a_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::IntValue(optional_a_key_1),
+                fdf::NodePropertyValue::IntValue(optional_a_val_1),
+            )],
         };
 
         let optional_node_a_inst = vec![
@@ -2332,13 +2115,12 @@ mod tests {
         ];
 
         let composite_driver = create_driver_with_rules(
-            device_name,
-            (primary_name, primary_node_inst),
+            (TEST_PRIMARY_NAME, primary_node_inst),
             vec![
-                (additional_a_name, additional_node_a_inst),
-                (additional_b_name, additional_node_b_inst),
+                (TEST_ADDITIONAL_A_NAME, additional_node_a_inst),
+                (TEST_ADDITIONAL_B_NAME, additional_node_b_inst),
             ],
-            vec![(optional_a_name, optional_node_a_inst)],
+            vec![(TEST_OPTIONAL_NAME, optional_node_a_inst)],
         );
 
         let mut node_group_manager = NodeGroupManager::new();
@@ -2347,16 +2129,16 @@ mod tests {
                 fdi::MatchedCompositeInfo {
                     node_index: None,
                     num_nodes: None,
-                    composite_name: Some(device_name.to_string()),
+                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
                     node_names: None,
                     driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                     ..fdi::MatchedCompositeInfo::EMPTY
                 },
                 vec![
-                    primary_name.to_string(),
-                    additional_b_name.to_string(),
-                    optional_a_name.to_string(),
-                    additional_a_name.to_string()
+                    TEST_PRIMARY_NAME.to_string(),
+                    TEST_ADDITIONAL_B_NAME.to_string(),
+                    TEST_OPTIONAL_NAME.to_string(),
+                    TEST_ADDITIONAL_A_NAME.to_string()
                 ]
             )),
             node_group_manager.add_node_group(
@@ -2384,15 +2166,15 @@ mod tests {
             num_nodes: Some(4),
             primary_index: Some(0),
             node_names: Some(vec![
-                primary_name.to_string(),
-                additional_b_name.to_string(),
-                optional_a_name.to_string(),
-                additional_a_name.to_string(),
+                TEST_PRIMARY_NAME.to_string(),
+                TEST_ADDITIONAL_B_NAME.to_string(),
+                TEST_OPTIONAL_NAME.to_string(),
+                TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
                 node_index: None,
                 num_nodes: None,
-                composite_name: Some(device_name.to_string()),
+                composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
@@ -2417,15 +2199,15 @@ mod tests {
             num_nodes: Some(4),
             primary_index: Some(0),
             node_names: Some(vec![
-                primary_name.to_string(),
-                additional_b_name.to_string(),
-                optional_a_name.to_string(),
-                additional_a_name.to_string(),
+                TEST_PRIMARY_NAME.to_string(),
+                TEST_ADDITIONAL_B_NAME.to_string(),
+                TEST_OPTIONAL_NAME.to_string(),
+                TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
             composite: Some(fdi::MatchedCompositeInfo {
                 node_index: None,
                 num_nodes: None,
-                composite_name: Some(device_name.to_string()),
+                composite_name: Some(TEST_DEVICE_NAME.to_string()),
                 node_names: None,
                 driver_info: Some(composite_driver.clone().create_matched_driver_info()),
                 ..fdi::MatchedCompositeInfo::EMPTY
@@ -2443,23 +2225,20 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_composite_mismatch() {
-        let primary_bind_rules = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(200)],
-        }];
+        let primary_bind_rules = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(200),
+        )];
 
-        let additional_bind_rules_1 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(1),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::IntValue(10)],
-        }];
+        let additional_bind_rules_1 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(1),
+            fdf::NodePropertyValue::IntValue(10),
+        )];
 
-        let additional_bind_rules_2 = vec![fdf::BindRule {
-            key: fdf::NodePropertyKey::IntValue(10),
-            condition: fdf::Condition::Accept,
-            values: vec![fdf::NodePropertyValue::BoolValue(false)],
-        }];
+        let additional_bind_rules_2 = vec![make_accept(
+            fdf::NodePropertyKey::IntValue(10),
+            fdf::NodePropertyValue::BoolValue(false),
+        )];
 
         let primary_key_1 = "whimbrel";
         let primary_val_1 = "sanderling";
@@ -2469,11 +2248,6 @@ mod tests {
 
         let additional_b_key_1 = "curlew";
         let additional_b_val_1 = 500;
-
-        let device_name = "mimid";
-        let primary_name = "catbird";
-        let additional_a_name = "mockingbird";
-        let additional_b_name = "lapwing";
 
         let primary_node_inst = vec![SymbolicInstructionInfo {
             location: None,
@@ -2485,11 +2259,10 @@ mod tests {
 
         let primary_node_representation = fdf::NodeRepresentation {
             bind_rules: primary_bind_rules,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(primary_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue(primary_val_1.to_string())),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
+                fdf::NodePropertyValue::StringValue(primary_val_1.to_string()),
+            )],
         };
 
         let additional_node_a_inst = vec![
@@ -2512,11 +2285,10 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string())),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_b_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
+                fdf::NodePropertyValue::IntValue(additional_b_val_1),
+            )],
         };
 
         let additional_node_b_inst = vec![SymbolicInstructionInfo {
@@ -2529,19 +2301,17 @@ mod tests {
 
         let additional_node_representation_b = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_2,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::IntValue(additional_a_key_1),
+                fdf::NodePropertyValue::IntValue(additional_a_val_1),
+            )],
         };
 
         let composite_driver = create_driver_with_rules(
-            device_name,
-            (primary_name, primary_node_inst),
+            (TEST_PRIMARY_NAME, primary_node_inst),
             vec![
-                (additional_a_name, additional_node_a_inst),
-                (additional_b_name, additional_node_b_inst),
+                (TEST_ADDITIONAL_A_NAME, additional_node_a_inst),
+                (TEST_ADDITIONAL_B_NAME, additional_node_b_inst),
             ],
             vec![],
         );
@@ -2569,16 +2339,14 @@ mod tests {
         let mut node_group_manager = NodeGroupManager::new();
 
         let node = fdf::NodeRepresentation {
-            bind_rules: vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("wrybill".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            }],
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("dotteral".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("wrybill".to_string())),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            bind_rules: vec![make_accept(
+                fdf::NodePropertyKey::StringValue("wrybill".to_string()),
+                fdf::NodePropertyValue::IntValue(200),
+            )],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue("dotteral".to_string()),
+                fdf::NodePropertyValue::StringValue("wrybill".to_string()),
+            )],
         };
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
@@ -2609,16 +2377,14 @@ mod tests {
     async fn test_invalid_name() {
         let mut node_group_manager = NodeGroupManager::new();
         let node = fdf::NodeRepresentation {
-            bind_rules: vec![fdf::BindRule {
-                key: fdf::NodePropertyKey::StringValue("wrybill".to_string()),
-                condition: fdf::Condition::Accept,
-                values: vec![fdf::NodePropertyValue::IntValue(200)],
-            }],
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("dotteral".to_string())),
-                value: Some(fdf::NodePropertyValue::IntValue(100)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            bind_rules: vec![make_accept(
+                fdf::NodePropertyKey::StringValue("wrybill".to_string()),
+                fdf::NodePropertyValue::IntValue(200),
+            )],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::StringValue("dotteral".to_string()),
+                fdf::NodePropertyValue::IntValue(100),
+            )],
         };
         assert_eq!(
             Err(Status::INVALID_ARGS.into_raw()),
