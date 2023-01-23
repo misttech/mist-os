@@ -16,7 +16,6 @@ sdk_source_set("cpp") {
     "internal.h",
     "protocol.cc",
     "protocol.h",
-    "service.cc",
     "service.h",
   ]
 

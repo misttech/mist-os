@@ -11,7 +11,7 @@ void Context::ConnectAndCreate(fdf::DriverContext* driver_context, async_dispatc
   auto context = std::make_unique<Context>();
 
   // Connect to our parent.
-  auto result = component::ConnectAt<fuchsia_driver_compat::Service::Device>(
+  auto result = component::ConnectAtMember<fuchsia_driver_compat::Service::Device>(
       driver_context->incoming()->svc_dir());
   if (result.is_error()) {
     return callback(result.take_error());

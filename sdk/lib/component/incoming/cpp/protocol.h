@@ -23,69 +23,94 @@ namespace component {
 //
 // # Errors
 //
-//   * `ZX_ERR_INVALID_ARGS`: `path` is invalid.
+//   * `ZX_ERR_BAD_PATH`: `path` is too long.
 //   * `ZX_ERR_NOT_FOUND`: `path` was not found in the incoming namespace.
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenServiceRoot(
     std::string_view path = component::kServiceDirectory);
 
 // Connects to the FIDL Protocol in the component's incoming namespace.
 //
+// `server_end` is the channel used for the server connection.
+//
 // `path` must be absolute, containing a leading "/". Default to "/svc/{name}"
 // where `{name}` is the fully qualified name of the FIDL Protocol.
 //
 // # Errors
 //
-//   * `ZX_ERR_INVALID_ARGS`: `name` is invalid.
-//   * `ZX_ERR_NOT_FOUND`: No entry was found under the given `name` inside "/svc".
-template <typename Protocol>
-zx::result<fidl::ClientEnd<Protocol>> Connect(
-    std::string_view name = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
-  auto channel = internal::ConnectRaw(name);
-  if (channel.is_error()) {
-    return channel.take_error();
-  }
-  return zx::ok(fidl::ClientEnd<Protocol>(std::move(channel.value())));
-}
-
-// Same as above but allows specifying a custom server end for the request.
-// This is useful if you'd like to forward requests to another server in
-// the namespace.
+//   * `ZX_ERR_BAD_PATH`: `path` is too long.
+//   * `ZX_ERR_NOT_FOUND`: No entry was found using the provided `path`.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<> Connect(fidl::ServerEnd<Protocol> server_end,
                      std::string_view path = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
   return internal::ConnectRaw(server_end.TakeChannel(), path);
 }
 
-// Connects to the FIDL Protocol relative to the provided `svc_dir` directory.
+// Connects to the FIDL Protocol in the component's incoming namespace and
+// returns a client end.
 //
-// `name` must be an entry in the `svc_dir` directory. Defaults to the fully
-// qualified name fo the FIDL Protocol.
+// `path` must be absolute, containing a leading "/". Default to "/svc/{name}"
+// where `{name}` is the fully qualified name of the FIDL Protocol.
 //
 // # Errors
 //
-//   * `ZX_ERR_INVALID_ARGS`: `svc_dir` is an invalid handle.
-//   * `ZX_ERR_NOT_FOUND`: No entry was found under the given `name` inside `svc_dir`.
+//   * `ZX_ERR_BAD_PATH`: `path` is too long.
+//   * `ZX_ERR_NOT_FOUND`: No entry was found using the provided `path`.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
-zx::result<fidl::ClientEnd<Protocol>> ConnectAt(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
-    std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
-  auto channel = internal::ConnectAtRaw(svc_dir, name);
-  if (channel.is_error()) {
-    return channel.take_error();
+zx::result<fidl::ClientEnd<Protocol>> Connect(
+    std::string_view path = fidl::DiscoverableProtocolDefaultPath<Protocol>) {
+  auto endpoints = fidl::CreateEndpoints<Protocol>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
   }
-  return zx::ok(fidl::ClientEnd<Protocol>(std::move(channel.value())));
+
+  if (auto result = Connect<Protocol>(std::move(endpoints->server), path); result.is_error()) {
+    return result.take_error();
+  }
+
+  return zx::ok(std::move(endpoints->client));
 }
 
-// Same as above but allows specifying a customer server end for the request.
+// Connects to the FIDL Protocol in the directory `svc_dir`.
+//
+// `server_end` is the channel used for the server connection.
+//
+// `name` must be a valid entry in `svc_dir`.
+//
+// # Errors
+//
+//   * `ZX_ERR_BAD_PATH`: `name` is too long.
+//   * `ZX_ERR_NOT_FOUND`: No entry was found using the provided `name`.
 template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
 zx::result<> ConnectAt(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
                        fidl::ServerEnd<Protocol> server_end,
                        std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
-  if (zx::result<> status = internal::ConnectAtRaw(svc_dir, server_end.TakeChannel(), name);
-      status.is_error()) {
-    return status.take_error();
+  return internal::ConnectAtRaw(svc_dir, server_end.TakeChannel(), name);
+}
+
+// Connects to the FIDL Protocol in the directory `svc_dir`. Returns a client
+// end to the protocol connection.
+//
+// `name` must be a valid entry in `svc_dir`.
+//
+// # Errors
+//
+//   * `ZX_ERR_BAD_PATH`: `name` is too long.
+//   * `ZX_ERR_NOT_FOUND`: No entry was found using the provided `name`.
+template <typename Protocol, typename = std::enable_if_t<fidl::IsProtocolV<Protocol>>>
+zx::result<fidl::ClientEnd<Protocol>> ConnectAt(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
+    std::string_view name = fidl::DiscoverableProtocolName<Protocol>) {
+  auto endpoints = fidl::CreateEndpoints<Protocol>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
   }
-  return zx::ok();
+
+  if (auto result = ConnectAt<Protocol>(svc_dir, std::move(endpoints->server), name);
+      result.is_error()) {
+    return result.take_error();
+  }
+
+  return zx::ok(std::move(endpoints->client));
 }
 
 }  // namespace component

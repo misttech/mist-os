@@ -207,9 +207,10 @@ TEST_F(ClientTest, FilePathTooLong) {
   // Use a service name that is too long.
   zx::channel local, remote;
   ASSERT_OK(zx::channel::create(0, &local, &remote));
-  ASSERT_STATUS(component::OpenNamedServiceAt(svc_, illegal_path, "default", std::move(remote))
-                    .status_value(),
-                ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(
+      component::internal::OpenNamedServiceAtRaw(svc_, illegal_path, "default", std::move(remote))
+          .status_value(),
+      ZX_ERR_INVALID_ARGS);
 }
 
 //

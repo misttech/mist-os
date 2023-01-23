@@ -316,9 +316,9 @@ TEST_F(OutgoingDirectoryTest, AddServiceServesAllMembers) {
   // the directory housing the service members will be closed.
   zx::channel client, server;
   ASSERT_OK(zx::channel::create(0, &client, &server));
-  zx::result result = component::OpenNamedServiceAt(GetSvcClientEnd(GetRootClientEnd()),
-                                                    fuchsia_examples::EchoService::Name,
-                                                    component::kDefaultInstance, std::move(server));
+  zx::result result = component::internal::OpenNamedServiceAtRaw(
+      GetSvcClientEnd(GetRootClientEnd()), fuchsia_examples::EchoService::Name,
+      component::kDefaultInstance, std::move(server));
   ASSERT_OK(result.status_value());
   RunLoopUntilIdle();
   {

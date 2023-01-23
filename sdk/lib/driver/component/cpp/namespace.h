@@ -169,7 +169,7 @@ class Namespace {
         "ServiceMember type must be the Protocol inside of a Service, eg: fuchsia_hardware_pci::Service::Device.");
     if constexpr (std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::ChannelTransport>) {
-      return component::ConnectAt<ServiceMember>(svc_dir(), instance);
+      return component::ConnectAtMember<ServiceMember>(svc_dir(), instance);
     } else if constexpr (std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                         fidl::internal::DriverTransport>) {
       return internal::DriverTransportConnect<ServiceMember>(svc_dir(), instance);
