@@ -37,23 +37,18 @@ fn write_exit_code<W: Write>(res: &Result<ExitStatus>, out: &mut W) {
     write!(out, "{}\n", exit_code).ok();
 }
 
-/// If given an error result, prints a user-meaningful interpretation of it
-/// to the given output handle
-pub async fn report_user_error(err: &Error) -> anyhow::Result<()> {
-    // Report BUG errors as crash events
-    if let Error::Unexpected(err) = err {
-        // TODO(66918): make configurable, and evaluate chosen time value.
-        if let Err(e) = analytics::add_crash_event(&format!("{}", err), None)
-            .on_timeout(Duration::from_secs(2), || {
-                tracing::error!("analytics timed out reporting crash event");
-                Ok(())
-            })
-            .await
-        {
-            tracing::error!("analytics failed to submit crash event: {}", e);
-        }
+/// Tries to report the given unexpected error to analytics if appropriate
+pub async fn report_bug(err: &impl std::fmt::Display) {
+    // TODO(66918): make configurable, and evaluate chosen time value.
+    if let Err(e) = analytics::add_crash_event(&format!("{}", err), None)
+        .on_timeout(Duration::from_secs(2), || {
+            tracing::error!("analytics timed out reporting crash event");
+            Ok(())
+        })
+        .await
+    {
+        tracing::error!("analytics failed to submit crash event: {}", e);
     }
-    Ok(())
 }
 
 pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
@@ -109,22 +104,19 @@ pub async fn exit(res: Result<ExitStatus>) -> ! {
         Err(Error::Help { output, .. }) => {
             writeln!(&mut std::io::stdout(), "{output}").unwrap();
         }
-        Err(Error::Config(err)) => {
+        Err(err @ Error::Config(_)) | Err(err @ Error::User(_)) => {
             let mut out = std::io::stderr();
             // abort hard on a failure to print the user error somehow
             writeln!(&mut out, "{err}").unwrap();
-            // note: we don't try to report this error or print a log hint
-            // because we don't expect to have enough information to do either
-            // of those things here.
         }
-        Err(err) => {
+        Err(err @ Error::Unexpected(_)) => {
             let mut out = std::io::stderr();
-            // abort hard on a failure to print the user error somehow
+            // abort hard on a failure to print the unexpected error somehow
             writeln!(&mut out, "{err}").unwrap();
-            report_user_error(&err).await.unwrap();
+            report_bug(&err).await;
             ffx_config::print_log_hint(&mut out).await;
         }
-        _ => (),
+        Ok(_) => (),
     }
     std::process::exit(exit_code);
 }
