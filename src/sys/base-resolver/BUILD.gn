@@ -101,7 +101,7 @@ fuchsia_structured_config_rust_lib("base-resolver-config") {
 fuchsia_structured_config_values("values-from-gn") {
   cm_label = ":base-resolver-manifest"
   values = {
-    only_base_packages = false
+    only_base_packages = true
   }
 }
 
