@@ -93,10 +93,7 @@ zx_status_t Mount(std::unique_ptr<BlockDevice> device, const MountOptions& optio
                   fidl::ServerEnd<fuchsia_io::Directory> root, zx::resource vmex_resource);
 
 struct ComponentOptions {
-  int32_t pager_threads;
-
-  ComponentOptions(const ComponentOptions&) = default;
-  ComponentOptions& operator=(const ComponentOptions&) = default;
+  int32_t pager_threads{};
 };
 
 // Start blobfs as a component. Begin serving requests on the provided |root|. Initially it starts
