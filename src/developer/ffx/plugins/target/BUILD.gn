@@ -23,6 +23,7 @@ ffx_plugin("ffx_target") {
     "reboot:ffx_reboot",
     "remove:ffx_target_remove",
     "repository:ffx_target_repository",
+    "screenshot:ffx_target_screenshot",
     "set-preferred-ssh-address:ffx_target_set_preferred_ssh_address",
     "show:ffx_target_show",
     "snapshot:ffx_snapshot",
