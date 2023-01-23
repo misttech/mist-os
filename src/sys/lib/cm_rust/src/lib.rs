@@ -10,6 +10,7 @@ use {
     },
     cm_types, fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
+    flyweights::FlyStr,
     from_enum::FromEnum,
     lazy_static::lazy_static,
     std::collections::hash_map::Entry,
@@ -1607,35 +1608,35 @@ impl SourceName for UseDecl {
 /// of hierarchy.
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct CapabilityName(String);
+pub struct CapabilityName(FlyStr);
 
 impl CapabilityName {
     pub fn str(&self) -> &str {
-        &self.0
+        &*self.0
     }
 }
 
 impl From<CapabilityName> for String {
     fn from(name: CapabilityName) -> String {
-        name.0
+        name.0.into()
     }
 }
 
 impl From<&str> for CapabilityName {
     fn from(name: &str) -> CapabilityName {
-        CapabilityName(name.to_string())
+        CapabilityName(FlyStr::new(name))
     }
 }
 
 impl From<String> for CapabilityName {
     fn from(name: String) -> CapabilityName {
-        CapabilityName(name)
+        CapabilityName(name.into())
     }
 }
 
 impl From<&String> for CapabilityName {
     fn from(name: &String) -> CapabilityName {
-        CapabilityName(name.clone())
+        CapabilityName(name.into())
     }
 }
 
