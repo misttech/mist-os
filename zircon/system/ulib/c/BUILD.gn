@@ -61,6 +61,7 @@ config("llvm-libc-export.config") {
   defines = [
     "LLVM_LIBC_PUBLIC_PACKAGING=1",
     "LLVM_LIBC_FUNCTION_ATTR=[[gnu::visibility(\"default\")]]",
+    "LIBC_INLINE=inline",
   ]
 }
 
