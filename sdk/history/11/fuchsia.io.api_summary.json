@@ -1318,7 +1318,7 @@
         "kind": "const",
         "name": "fuchsia.io/MODE_TYPE_BLOCK_DEVICE",
         "type": "uint32",
-        "value": "24576"
+        "value": "8192"
     },
     {
         "kind": "const",

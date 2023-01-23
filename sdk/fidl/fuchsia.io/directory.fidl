@@ -104,8 +104,8 @@ const MODE_PROTECTION_MASK uint32 = 0x00FFF;
 /// `MODE_TYPE_MASK`, and check exact equality against a mode type.
 const MODE_TYPE_MASK uint32 = 0xFF000;
 
+const MODE_TYPE_BLOCK_DEVICE uint32 = 0x02000;
 const MODE_TYPE_DIRECTORY uint32 = 0x04000;
-const MODE_TYPE_BLOCK_DEVICE uint32 = 0x06000;
 const MODE_TYPE_FILE uint32 = 0x08000;
 const MODE_TYPE_SERVICE uint32 = 0x10000;
 
