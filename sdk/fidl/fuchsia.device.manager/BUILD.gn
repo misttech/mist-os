@@ -18,6 +18,5 @@ fidl("fuchsia.device.manager") {
     "//sdk/fidl/fuchsia.io",
     "//zircon/vdso/zx",
   ]
-  enable_c = true
   enable_hlcpp = true
 }
