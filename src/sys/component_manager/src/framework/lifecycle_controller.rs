@@ -162,17 +162,9 @@ impl LifecycleController {
             .add_dynamic_child(collection.name.clone(), &child_decl, child_args)
             .await
             .map(|_| ())
-            .map_err(|e| match e {
-                ModelError::InstanceAlreadyExists { .. } => {
-                    fsys::CreateError::InstanceAlreadyExists
-                }
-                ModelError::CollectionNotFound { .. } => fsys::CreateError::CollectionNotFound,
-                error => {
-                    let child_name = child_decl.name;
-                    let collection_name = collection.name;
-                    warn!(%parent_moniker, %child_name, %collection_name, %error, "failed to create dynamic child");
-                    fsys::CreateError::Internal
-                }
+            .map_err(|error| {
+                warn!(%parent_moniker, %error, "failed to add dynamic child");
+                error.into()
             })
     }
 

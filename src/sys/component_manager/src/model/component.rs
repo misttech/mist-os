@@ -10,7 +10,10 @@ use {
         },
         context::ModelContext,
         environment::Environment,
-        error::{ModelError, OpenExposedDirError, RebootError, StructuredConfigError},
+        error::{
+            AddChildError, AddDynamicChildError, DynamicOfferError, ModelError,
+            OpenExposedDirError, RebootError, StructuredConfigError,
+        },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
         namespace::{populate_and_get_logsink_decl, IncomingNamespace},
@@ -678,38 +681,41 @@ impl ComponentInstance {
         collection_name: String,
         child_decl: &ChildDecl,
         child_args: fcomponent::CreateChildArgs,
-    ) -> Result<fdecl::Durability, ModelError> {
+    ) -> Result<fdecl::Durability, AddDynamicChildError> {
         match child_decl.startup {
             fdecl::StartupMode::Lazy => {}
             fdecl::StartupMode::Eager => {
-                return Err(ModelError::unsupported("Eager startup"));
+                return Err(AddDynamicChildError::EagerStartupUnsupported);
             }
         }
-        let mut state = self.lock_resolved_state().await?;
+        let mut state = self
+            .lock_resolved_state()
+            .await
+            .map_err(|err| AddDynamicChildError::ResolveFailed { err })?;
         let collection_decl = state
             .decl()
             .find_collection(&collection_name)
-            .ok_or_else(|| ModelError::collection_not_found(collection_name.clone()))?
+            .ok_or_else(|| AddDynamicChildError::CollectionNotFound {
+                name: collection_name.clone(),
+            })?
             .clone();
 
         if let Some(handles) = &child_args.numbered_handles {
             if !handles.is_empty() && collection_decl.durability != fdecl::Durability::SingleRun {
-                return Err(ModelError::unsupported(
-                    "Numbered handles to child in a collection that is not SingleRun",
-                ));
+                return Err(AddDynamicChildError::NumberedHandleNotInSingleRunCollection);
             }
         }
 
         if !collection_decl.allow_long_names && child_decl.name.len() > cm_types::MAX_NAME_LENGTH {
-            return Err(ModelError::name_too_long(cm_types::MAX_NAME_LENGTH));
+            return Err(AddDynamicChildError::NameTooLong { max_len: cm_types::MAX_NAME_LENGTH });
         }
 
         if child_args.dynamic_offers.as_ref().map(|v| v.first()).flatten().is_some()
             && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
         {
-            return Err(ModelError::dynamic_offers_not_allowed(&collection_name));
+            return Err(AddDynamicChildError::DynamicOffersNotAllowed { collection_name });
         }
-        let durability_nf = state
+        let discover_fut = state
             .add_child(
                 self,
                 child_decl,
@@ -718,7 +724,9 @@ impl ComponentInstance {
                 child_args.dynamic_offers,
             )
             .await?;
-        durability_nf.await?;
+        discover_fut
+            .await
+            .map_err(|err| AddDynamicChildError::DiscoverFailed { err: Box::new(err) })?;
         Ok(collection_decl.durability)
     }
 
@@ -1584,7 +1592,7 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         numbered_handles: Option<Vec<fidl_fuchsia_process::HandleInfo>>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
-    ) -> Result<BoxFuture<'static, Result<(), ModelError>>, ModelError> {
+    ) -> Result<BoxFuture<'static, Result<(), ModelError>>, AddChildError> {
         let child = self.add_child_internal(
             component,
             child,
@@ -1608,7 +1616,7 @@ impl ResolvedInstanceState {
         component: &Arc<ComponentInstance>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), AddChildError> {
         self.add_child_internal(component, child, collection, None, None).map(|_| ())
     }
 
@@ -1619,7 +1627,7 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         numbered_handles: Option<Vec<fidl_fuchsia_process::HandleInfo>>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
-    ) -> Result<Arc<ComponentInstance>, ModelError> {
+    ) -> Result<Arc<ComponentInstance>, AddChildError> {
         assert!(
             (numbered_handles.is_none() && dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
@@ -1628,10 +1636,10 @@ impl ResolvedInstanceState {
             self.validate_and_convert_dynamic_offers(dynamic_offers, child, collection)?;
         let child_moniker = ChildMoniker::try_new(&child.name, collection.map(|c| &c.name))?;
         if self.get_child(&child_moniker).is_some() {
-            return Err(ModelError::instance_already_exists(
-                component.abs_moniker().clone(),
-                child_moniker,
-            ));
+            return Err(AddChildError::InstanceAlreadyExists {
+                moniker: component.abs_moniker().clone(),
+                child: child_moniker,
+            });
         }
         // TODO(fxb/108376): next_dynamic_instance_id should be per-collection.
         let instance_id = match collection {
@@ -1666,7 +1674,7 @@ impl ResolvedInstanceState {
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
-    ) -> Result<Vec<cm_rust::OfferDecl>, ModelError> {
+    ) -> Result<Vec<cm_rust::OfferDecl>, DynamicOfferError> {
         let mut dynamic_offers = dynamic_offers.unwrap_or_default();
         if dynamic_offers.is_empty() {
             return Ok(vec![]);
@@ -1681,18 +1689,18 @@ impl ResolvedInstanceState {
                 | fdecl::Offer::Resolver(fdecl::OfferResolver { target, .. })
                 | fdecl::Offer::EventStream(fdecl::OfferEventStream { target, .. }) => {
                     if target.is_some() {
-                        return Err(ModelError::dynamic_offer_invalid(
-                            cm_fidl_validator::error::ErrorList {
+                        return Err(DynamicOfferError::OfferInvalid {
+                            err: cm_fidl_validator::error::ErrorList {
                                 errs: vec![cm_fidl_validator::error::Error::extraneous_field(
                                     "OfferDecl",
                                     "target",
                                 )],
                             },
-                        ));
+                        });
                     }
                 }
                 _ => {
-                    return Err(ModelError::unsupported("unknown offer type in dynamic offers"));
+                    return Err(DynamicOfferError::UnknownOfferType);
                 }
             }
             *offer_target_mut(offer).expect("validation should have found unknown enum type") =
@@ -1707,15 +1715,14 @@ impl ResolvedInstanceState {
         cm_fidl_validator::validate_dynamic_offers(
             &all_dynamic_offers,
             &self.decl.clone().native_into_fidl(),
-        )
-        .map_err(ModelError::dynamic_offer_invalid)?;
+        )?;
         // Manifest validation is not informed of the contents of collections, and is thus unable
         // to confirm the source exists if it's in a collection. Let's check that here.
         let dynamic_offers: Vec<cm_rust::OfferDecl> =
             dynamic_offers.into_iter().map(FidlIntoNative::fidl_into_native).collect();
         for offer in &dynamic_offers {
             if !self.offer_source_exists(offer.source()) {
-                return Err(ModelError::dynamic_offer_source_not_found(offer.clone()));
+                return Err(DynamicOfferError::SourceNotFound { offer: offer.clone() });
             }
         }
         Ok(dynamic_offers)
@@ -1727,7 +1734,13 @@ impl ResolvedInstanceState {
         decl: &ComponentDecl,
     ) -> Result<(), ModelError> {
         for child in decl.children.iter() {
-            self.add_child(component, child, None, None, None).await?;
+            self.add_child(component, child, None, None, None).await.map_err(|err| {
+                ModelError::AddStaticChild {
+                    parent_moniker: component.abs_moniker.clone(),
+                    child_name: child.name.clone(),
+                    err,
+                }
+            })?;
         }
         Ok(())
     }

@@ -87,6 +87,14 @@ type CreateError = flexible enum {
     BAD_CHILD_DECL = 5;
     // The parent instance does not have a collection with the given name.
     COLLECTION_NOT_FOUND = 6;
+    // A given dynamic offer is invalid.
+    BAD_DYNAMIC_OFFER = 7;
+    // The specified collection does not allow dynamic offers.
+    DYNAMIC_OFFERS_FORBIDDEN = 8;
+    // The specified collection does not allow eager startup.
+    EAGER_STARTUP_FORBIDDEN = 9;
+    // The specified collection does not allow numbered handles.
+    NUMBERED_HANDLES_FORBIDDEN = 10;
 };
 
 /// Mutates the component instance state in a realm.

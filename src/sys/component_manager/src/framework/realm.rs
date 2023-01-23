@@ -195,20 +195,7 @@ impl RealmCapabilityHost {
                     "Failed to create child \"{}\" in collection \"{}\" of component \"{}\": {}",
                     child_decl.name, collection.name, component.abs_moniker, e
                 );
-                match e {
-                    ModelError::InstanceAlreadyExists { .. } => {
-                        Err(fcomponent::Error::InstanceAlreadyExists)
-                    }
-                    ModelError::CollectionNotFound { .. } => {
-                        Err(fcomponent::Error::CollectionNotFound)
-                    }
-                    ModelError::DynamicOffersNotAllowed { .. }
-                    | ModelError::DynamicOfferInvalid { .. }
-                    | ModelError::DynamicOfferSourceNotFound { .. }
-                    | ModelError::NameTooLong { .. } => Err(fcomponent::Error::InvalidArguments),
-                    ModelError::Unsupported { .. } => Err(fcomponent::Error::Unsupported),
-                    _ => Err(fcomponent::Error::Internal),
-                }
+                Err(e.into())
             }
         }
     }

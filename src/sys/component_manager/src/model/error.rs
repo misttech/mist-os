@@ -16,7 +16,7 @@ use {
     },
     anyhow::Error,
     clonable_error::ClonableError,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
     std::path::PathBuf,
     thiserror::Error,
@@ -25,25 +25,19 @@ use {
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]
 pub enum ModelError {
-    #[error("component instance {} in realm {} already exists", child, moniker)]
-    InstanceAlreadyExists { moniker: AbsoluteMoniker, child: ChildMoniker },
+    #[error("could not add static child \"{child_name}\" to parent {parent_moniker}: {err}")]
+    AddStaticChild {
+        parent_moniker: AbsoluteMoniker,
+        child_name: String,
+        #[source]
+        err: AddChildError,
+    },
     #[error("component instance with moniker {} has shut down", moniker)]
     InstanceShutDown { moniker: AbsoluteMoniker },
     #[error("component instance with moniker {} is being destroyed", moniker)]
     InstanceDestroyed { moniker: AbsoluteMoniker },
     #[error("component collection not found with name {}", name)]
     CollectionNotFound { name: String },
-    #[error("collection {} does not allow dynamic offers", collection_name)]
-    DynamicOffersNotAllowed { collection_name: String },
-    #[error("dynamic offer not valid: {}", err)]
-    DynamicOfferInvalid {
-        #[source]
-        err: cm_fidl_validator::error::ErrorList,
-    },
-    #[error("source for dynamic offer not found: {:?}", offer)]
-    DynamicOfferSourceNotFound { offer: cm_rust::OfferDecl },
-    #[error("name length is longer than the allowed max {}", max_len)]
-    NameTooLong { max_len: usize },
     #[error(
         "component address could not be computed for component '{}' at url '{}': {:#?}",
         moniker,
@@ -176,10 +170,6 @@ pub enum ModelError {
 }
 
 impl ModelError {
-    pub fn instance_already_exists(moniker: AbsoluteMoniker, child: ChildMoniker) -> ModelError {
-        ModelError::InstanceAlreadyExists { moniker, child }
-    }
-
     pub fn instance_shut_down(moniker: AbsoluteMoniker) -> ModelError {
         ModelError::InstanceShutDown { moniker }
     }
@@ -190,26 +180,6 @@ impl ModelError {
 
     pub fn instance_not_found(moniker: AbsoluteMoniker) -> ModelError {
         ModelError::from(ComponentInstanceError::instance_not_found(moniker))
-    }
-
-    pub fn collection_not_found(name: impl Into<String>) -> ModelError {
-        ModelError::CollectionNotFound { name: name.into() }
-    }
-
-    pub fn dynamic_offers_not_allowed(collection_name: impl Into<String>) -> ModelError {
-        ModelError::DynamicOffersNotAllowed { collection_name: collection_name.into() }
-    }
-
-    pub fn dynamic_offer_invalid(err: cm_fidl_validator::error::ErrorList) -> ModelError {
-        ModelError::DynamicOfferInvalid { err }
-    }
-
-    pub fn dynamic_offer_source_not_found(offer: cm_rust::OfferDecl) -> ModelError {
-        ModelError::DynamicOfferSourceNotFound { offer }
-    }
-
-    pub fn name_too_long(max_len: usize) -> ModelError {
-        ModelError::NameTooLong { max_len }
     }
 
     pub fn unsupported(feature: impl Into<String>) -> ModelError {
@@ -294,4 +264,126 @@ pub enum RebootError {
 pub enum OpenExposedDirError {
     #[error("instance was destroyed")]
     InstanceDestroyed,
+}
+
+#[derive(Debug, Error, Clone)]
+pub enum AddDynamicChildError {
+    #[error("dynamic children cannot have eager startup")]
+    EagerStartupUnsupported,
+    #[error("component collection not found with name {}", name)]
+    CollectionNotFound { name: String },
+    #[error(
+        "numbered handles can only be provided when adding components to a single-run collection"
+    )]
+    NumberedHandleNotInSingleRunCollection,
+    #[error("name length is longer than the allowed max {}", max_len)]
+    NameTooLong { max_len: usize },
+    #[error("collection {} does not allow dynamic offers", collection_name)]
+    DynamicOffersNotAllowed { collection_name: String },
+    #[error("failed to add child to parent: {}", err)]
+    AddChildError {
+        #[from]
+        err: AddChildError,
+    },
+    #[error("failed to discover child: {}", err)]
+    DiscoverFailed {
+        // TODO(https://fxbug.dev/116855): This is temporary, until we untangle ModelError
+        err: Box<ModelError>,
+    },
+    #[error("failed to resolve parent: {}", err)]
+    ResolveFailed { err: ComponentInstanceError },
+}
+
+// This is implemented for fuchsia.component.Realm protocol
+impl Into<fcomponent::Error> for AddDynamicChildError {
+    fn into(self) -> fcomponent::Error {
+        match self {
+            AddDynamicChildError::CollectionNotFound { .. } => {
+                fcomponent::Error::CollectionNotFound
+            }
+            AddDynamicChildError::NumberedHandleNotInSingleRunCollection => {
+                fcomponent::Error::Unsupported
+            }
+            AddDynamicChildError::EagerStartupUnsupported => fcomponent::Error::Unsupported,
+            AddDynamicChildError::AddChildError {
+                err: AddChildError::InstanceAlreadyExists { .. },
+            } => fcomponent::Error::InstanceAlreadyExists,
+
+            // Invalid Arguments
+            AddDynamicChildError::DynamicOffersNotAllowed { .. } => {
+                fcomponent::Error::InvalidArguments
+            }
+            AddDynamicChildError::NameTooLong { .. } => fcomponent::Error::InvalidArguments,
+            AddDynamicChildError::AddChildError {
+                err: AddChildError::DynamicOfferError { .. },
+            } => fcomponent::Error::InvalidArguments,
+            AddDynamicChildError::AddChildError {
+                err: AddChildError::ChildMonikerInvalid { .. },
+            } => fcomponent::Error::InvalidArguments,
+            AddDynamicChildError::DiscoverFailed { .. } => fcomponent::Error::Internal,
+            AddDynamicChildError::ResolveFailed { .. } => fcomponent::Error::Internal,
+        }
+    }
+}
+
+// This is implemented for fuchsia.sys2.LifecycleController protocol
+impl Into<fsys::CreateError> for AddDynamicChildError {
+    fn into(self) -> fsys::CreateError {
+        match self {
+            AddDynamicChildError::CollectionNotFound { .. } => {
+                fsys::CreateError::CollectionNotFound
+            }
+            AddDynamicChildError::DiscoverFailed { .. } => fsys::CreateError::Internal,
+            AddDynamicChildError::ResolveFailed { .. } => fsys::CreateError::Internal,
+            AddDynamicChildError::EagerStartupUnsupported => {
+                fsys::CreateError::EagerStartupForbidden
+            }
+            AddDynamicChildError::AddChildError {
+                err: AddChildError::InstanceAlreadyExists { .. },
+            } => fsys::CreateError::InstanceAlreadyExists,
+
+            AddDynamicChildError::DynamicOffersNotAllowed { .. } => {
+                fsys::CreateError::DynamicOffersForbidden
+            }
+            AddDynamicChildError::NameTooLong { .. } => fsys::CreateError::BadChildDecl,
+            AddDynamicChildError::AddChildError {
+                err: AddChildError::DynamicOfferError { .. },
+            } => fsys::CreateError::BadDynamicOffer,
+            AddDynamicChildError::AddChildError {
+                err: AddChildError::ChildMonikerInvalid { .. },
+            } => fsys::CreateError::BadMoniker,
+            AddDynamicChildError::NumberedHandleNotInSingleRunCollection => {
+                fsys::CreateError::NumberedHandlesForbidden
+            }
+        }
+    }
+}
+
+#[derive(Debug, Error, Clone)]
+pub enum AddChildError {
+    #[error("component instance {} in realm {} already exists", child, moniker)]
+    InstanceAlreadyExists { moniker: AbsoluteMoniker, child: ChildMoniker },
+    #[error("dynamic offer error: {}", err)]
+    DynamicOfferError {
+        #[from]
+        err: DynamicOfferError,
+    },
+    #[error("child moniker not valid: {}", err)]
+    ChildMonikerInvalid {
+        #[from]
+        err: MonikerError,
+    },
+}
+
+#[derive(Debug, Error, Clone)]
+pub enum DynamicOfferError {
+    #[error("dynamic offer not valid: {}", err)]
+    OfferInvalid {
+        #[from]
+        err: cm_fidl_validator::error::ErrorList,
+    },
+    #[error("source for dynamic offer not found: {:?}", offer)]
+    SourceNotFound { offer: cm_rust::OfferDecl },
+    #[error("unknown offer type in dynamic offers")]
+    UnknownOfferType,
 }
