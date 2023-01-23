@@ -78,7 +78,7 @@ impl<I> Multiplexer<I> {
                     // incoming has more for us right now
                     Poll::Ready(Some(IncomingStream::Next { identity, stream })) => {
                         if self.selectors_allow(&identity) {
-                            self.current.push(SubStream::new(identity.clone(), stream));
+                            self.current.push(SubStream::new(Arc::clone(&identity), stream));
                         }
                     }
 

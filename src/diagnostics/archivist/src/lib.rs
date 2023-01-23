@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #![warn(clippy::all)]
+#![warn(clippy::clone_on_ref_ptr)]
 
 mod accessor;
 pub mod archivist;

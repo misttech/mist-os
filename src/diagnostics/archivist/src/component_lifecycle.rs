@@ -66,7 +66,7 @@ impl TestControllerServer {
 
     /// Serves the test Controller used for controlled shutdown of the archivist in v1 tests.
     pub fn spawn(&mut self, mut stream: ControllerRequestStream) {
-        let stop_sender = self.stop_sender.clone();
+        let stop_sender = Arc::clone(&self.stop_sender);
         self.server_task_sender
             .unbounded_send(fasync::Task::spawn(async move {
                 match stream.next().await {

@@ -39,8 +39,8 @@ impl LogServer {
 
     /// Spawn a task to handle requests from components reading the shared log.
     pub fn spawn(&self, stream: flogger::LogRequestStream) {
-        let logs_repo = self.logs_repo.clone();
-        let sender = self.task_sender.clone();
+        let logs_repo = Arc::clone(&self.logs_repo);
+        let sender = Arc::clone(&self.task_sender);
         let Ok(task_guard) = self.task_sender.lock() else { return };
         if let Err(e) = task_guard.unbounded_send(fasync::Task::spawn(async move {
             if let Err(e) = Self::handle_requests(logs_repo, stream, sender).await {

@@ -35,7 +35,7 @@ impl InspectArtifactsContainer {
     pub fn new(proxy: fio::DirectoryProxy) -> (Self, oneshot::Receiver<()>) {
         let (snd, rcv) = oneshot::channel();
         let component_diagnostics_proxy = Arc::new(proxy);
-        let proxy_for_fut = component_diagnostics_proxy.clone();
+        let proxy_for_fut = Arc::clone(&component_diagnostics_proxy);
         let _on_closed_task = fasync::Task::spawn(async move {
             if !proxy_for_fut.is_closed() {
                 let _ = proxy_for_fut.on_closed().await;
@@ -248,7 +248,7 @@ impl State {
                         )
                         .await;
                         let result = PopulatedInspectDataContainer {
-                            identity: self.unpopulated.identity.clone(),
+                            identity: Arc::clone(&self.unpopulated.identity),
                             snapshot,
                             inspect_matcher: self.unpopulated.inspect_matcher.clone(),
                         };
@@ -306,12 +306,12 @@ impl UnpopulatedInspectDataContainer {
         };
 
         futures::stream::unfold(state, |state| {
-            let unpopulated_for_timeout = state.unpopulated.clone();
+            let unpopulated_for_timeout = Arc::clone(&state.unpopulated);
             let timeout = state.batch_timeout;
             let elapsed_time = state.elapsed_time;
-            let global_stats = state.global_stats.clone();
+            let global_stats = Arc::clone(&state.global_stats);
             let start_time = zx::Time::get_monotonic();
-            let trace_guard = state.trace_guard.clone();
+            let trace_guard = Arc::clone(&state.trace_guard);
             let trace_id = state.trace_id;
 
             let fut = state.iterate(start_time);
@@ -323,7 +323,7 @@ impl UnpopulatedInspectDataContainer {
                             "{}", &*TIMEOUT_MESSAGE);
                         global_stats.add_timeout();
                         let result = PopulatedInspectDataContainer {
-                            identity: unpopulated_for_timeout.identity.clone(),
+                            identity: Arc::clone(&unpopulated_for_timeout.identity),
                             inspect_matcher: unpopulated_for_timeout.inspect_matcher.clone(),
                             snapshot: SnapshotData::failed(
                                 schema::InspectError { message: TIMEOUT_MESSAGE.to_string() },

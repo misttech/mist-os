@@ -83,7 +83,7 @@ impl TestHarness {
     async fn make(hold_sinks: bool) -> Self {
         let inspector = Inspector::default();
         let log_manager = LogsRepository::new(1_000_000, inspector.root()).await;
-        let log_server = LogServer::new(log_manager.clone());
+        let log_server = LogServer::new(Arc::clone(&log_manager));
 
         let (log_proxy, log_stream) =
             fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
@@ -100,7 +100,7 @@ impl TestHarness {
     }
 
     pub fn create_default_reader(&self, identity: ComponentIdentity) -> Arc<dyn LogReader> {
-        Arc::new(DefaultLogReader::new(self.log_manager.clone(), Arc::new(identity)))
+        Arc::new(DefaultLogReader::new(Arc::clone(&self.log_manager), Arc::new(identity)))
     }
 
     pub fn create_event_stream_reader(
@@ -108,7 +108,11 @@ impl TestHarness {
         target_moniker: impl Into<String>,
         target_url: impl Into<String>,
     ) -> Arc<dyn LogReader> {
-        Arc::new(EventStreamLogReader::new(self.log_manager.clone(), target_moniker, target_url))
+        Arc::new(EventStreamLogReader::new(
+            Arc::clone(&self.log_manager),
+            target_moniker,
+            target_url,
+        ))
     }
 
     /// Check to make sure all `TestStream`s have been dropped. This ensures that we repeatedly test
@@ -172,7 +176,8 @@ impl TestHarness {
         &mut self,
         identity: Arc<ComponentIdentity>,
     ) -> TestStream<LogPacketWriter> {
-        self.make_stream(Arc::new(DefaultLogReader::new(self.log_manager.clone(), identity))).await
+        self.make_stream(Arc::new(DefaultLogReader::new(Arc::clone(&self.log_manager), identity)))
+            .await
     }
 
     /// Create a [`TestStream`] which should be dropped before calling `filter_test` or
@@ -190,7 +195,8 @@ impl TestHarness {
         &mut self,
         identity: Arc<ComponentIdentity>,
     ) -> TestStream<StructuredMessageWriter> {
-        self.make_stream(Arc::new(DefaultLogReader::new(self.log_manager.clone(), identity))).await
+        self.make_stream(Arc::new(DefaultLogReader::new(Arc::clone(&self.log_manager), identity)))
+            .await
     }
 
     async fn make_stream<E, P>(&mut self, log_reader: Arc<dyn LogReader>) -> TestStream<E>
@@ -284,7 +290,7 @@ impl LogReader for DefaultLogReader {
     async fn handle_request(&self, log_sender: mpsc::UnboundedSender<Task<()>>) -> LogSinkProxy {
         let (log_sink_proxy, log_sink_stream) =
             fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
-        let container = self.log_manager.get_log_container(self.identity.clone()).await;
+        let container = self.log_manager.get_log_container(Arc::clone(&self.identity)).await;
         container.handle_log_sink(log_sink_stream, log_sender).await;
         log_sink_proxy
     }
@@ -314,7 +320,7 @@ impl EventStreamLogReader {
     ) {
         while let Ok(res) = stream.get_next().await {
             for event in res {
-                Self::handle_event(event, sender.clone(), log_manager.clone()).await
+                Self::handle_event(event, sender.clone(), Arc::clone(&log_manager)).await
             }
         }
     }
@@ -352,7 +358,7 @@ impl LogReader for EventStreamLogReader {
         let task = Task::spawn(Self::handle_event_stream(
             event_stream_proxy,
             log_sender.clone(),
-            self.log_manager.clone(),
+            Arc::clone(&self.log_manager),
         ));
         let event_stream_server = Task::spawn(async move {
             let _tx_clone = tx;
@@ -403,7 +409,7 @@ pub async fn debuglog_test(
 ) -> Inspector {
     let inspector = Inspector::default();
     let lm = LogsRepository::new(1_000_000, inspector.root()).await;
-    let log_server = LogServer::new(lm.clone());
+    let log_server = LogServer::new(Arc::clone(&lm));
     let (log_proxy, log_stream) = fidl::endpoints::create_proxy_and_stream::<LogMarker>().unwrap();
     log_server.spawn(log_stream);
     lm.drain_debuglog(debug_log).await;

@@ -143,7 +143,7 @@ impl LogsArtifactsContainer {
         mode: StreamMode,
         parent_trace_id: ftrace::Id,
     ) -> PinStream<Arc<LogsData>> {
-        let identity = self.identity.clone();
+        let identity = Arc::clone(&self.identity);
         let earliest_timestamp = self.buffer.peek_front().map(|f| f.timestamp()).unwrap_or(0);
         Box::pin(
             self.buffer
@@ -213,7 +213,7 @@ impl LogsArtifactsContainer {
             guard.num_active_channels += 1;
             guard.is_initializing = false;
         }
-        let task = Task::spawn(self.clone().actually_handle_log_sink(stream, sender.clone()));
+        let task = Task::spawn(Arc::clone(self).actually_handle_log_sink(stream, sender.clone()));
         sender.unbounded_send(task).expect("channel is live for whole program");
     }
 
@@ -278,10 +278,10 @@ impl LogsArtifactsContainer {
                     } else {
                         // Wait for broadcast event asynchronously
                         self.wait_for_interest_change_async(
-                            previous_interest_sent.clone(),
+                            Arc::clone(&previous_interest_sent),
                             &mut interest_listener,
                             responder,
-                            hanging_get_sender.clone(),
+                            Arc::clone(&hanging_get_sender),
                         )
                         .await;
                     }
@@ -316,11 +316,11 @@ impl LogsArtifactsContainer {
         let mut state = self.state.lock().await;
         let id = self.fetch_add_hanging_get_id();
         {
-            state.hanging_gets.insert(id, sender.clone());
+            state.hanging_gets.insert(id, Arc::clone(&sender));
         }
-        let unlocked_state = self.state.clone();
-        let prev_interest_clone = previous_interest_sent.clone();
-        let get_clone = self.hanging_get_test_state.clone();
+        let unlocked_state = Arc::clone(&self.state);
+        let prev_interest_clone = Arc::clone(&previous_interest_sent);
+        let get_clone = Arc::clone(&self.hanging_get_test_state);
         *interest_listener = Some(Task::spawn(async move {
             // Block started
             if cfg!(test) {
@@ -383,7 +383,7 @@ impl LogsArtifactsContainer {
         self.budget.allocate(message.size()).await;
         self.stats.ingest_message(&message);
         if !message.has_stats() {
-            message.with_stats(self.stats.clone());
+            message.with_stats(Arc::clone(&self.stats));
         }
         self.buffer.push_back(message);
     }

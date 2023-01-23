@@ -194,7 +194,7 @@ impl GlobalConnectionStats {
         let node = self
             .batch_iterator_connections
             .create_child(self.next_connection_id.fetch_add(1, Ordering::Relaxed).to_string());
-        BatchIteratorConnectionStats::new(node, self.clone())
+        BatchIteratorConnectionStats::new(node, Arc::clone(self))
     }
 
     pub fn add_timeout(&self) {

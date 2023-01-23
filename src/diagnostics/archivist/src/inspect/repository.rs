@@ -74,7 +74,7 @@ impl InspectRepository {
         let mut guard = self.inner.write().await;
 
         if let Some(on_closed_fut) =
-            guard.insert_inspect_artifact_container(identity.clone(), directory_proxy).await?
+            guard.insert_inspect_artifact_container(Arc::clone(&identity), directory_proxy).await?
         {
             let this_weak = Arc::downgrade(self);
             guard
@@ -106,14 +106,14 @@ impl InspectRepository {
     }
 
     async fn handle_diagnostics_ready(
-        self: Arc<Self>,
+        self: &Arc<Self>,
         component: Arc<ComponentIdentity>,
         directory: Option<fio::DirectoryProxy>,
     ) {
         debug!(identity = %component, "Diagnostics directory is ready.");
         if let Some(directory) = directory {
             // Update the central repository to reference the new diagnostics source.
-            self.add_inspect_artifacts(component.clone(), directory).await.unwrap_or_else(|err| {
+            self.add_inspect_artifacts(Arc::clone(&component), directory).await.unwrap_or_else(|err| {
                 warn!(identity = %component, ?err, "Failed to add inspect artifacts to repository");
             });
 
@@ -208,7 +208,7 @@ impl InspectRepositoryInner {
                 let optional_hierarchy_matcher = match moniker_to_static_matcher_map {
                     Some(map) => {
                         match map.get(identity.relative_moniker.join("/").as_str()) {
-                            Some(inspect_matcher) => Some(inspect_matcher.clone()),
+                            Some(inspect_matcher) => Some(Arc::clone(inspect_matcher)),
                             // Return early if there were static selectors, and none were for this
                             // moniker.
                             None => return None,
@@ -237,7 +237,7 @@ impl InspectRepositoryInner {
                 fuchsia_fs::directory::clone_no_describe(container.diagnostics_directory(), None)
                     .ok()
                     .map(|directory| UnpopulatedInspectDataContainer {
-                        identity: identity.clone(),
+                        identity: Arc::clone(identity),
                         component_diagnostics_proxy: directory,
                         inspect_matcher: optional_hierarchy_matcher,
                     })
@@ -276,12 +276,11 @@ mod tests {
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
 
-        inspect_repo
-            .clone()
+        Arc::clone(&inspect_repo)
             .handle(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: identity.clone(),
+                    component: Arc::clone(&identity),
                     directory: Some(proxy),
                 }),
             })
@@ -290,12 +289,11 @@ mod tests {
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
 
-        inspect_repo
-            .clone()
+        Arc::clone(&inspect_repo)
             .handle(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: identity.clone(),
+                    component: Arc::clone(&identity),
                     directory: Some(proxy),
                 }),
             })
@@ -315,12 +313,11 @@ mod tests {
         let (proxy, _) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
 
-        data_repo
-            .clone()
+        Arc::clone(&data_repo)
             .handle(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: identity.clone(),
+                    component: Arc::clone(&identity),
                     directory: Some(proxy),
                 }),
             })
@@ -343,12 +340,11 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         {
-            data_repo
-                .clone()
+            Arc::clone(&data_repo)
                 .handle(Event {
                     timestamp: zx::Time::get_monotonic(),
                     payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                        component: identity.clone(),
+                        component: Arc::clone(&identity),
                         directory: Some(proxy),
                     }),
                 })
@@ -374,12 +370,11 @@ mod tests {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
         {
-            data_repo
-                .clone()
+            Arc::clone(&data_repo)
                 .handle(Event {
                     timestamp: zx::Time::get_monotonic(),
                     payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                        component: identity.clone(),
+                        component: Arc::clone(&identity),
                         directory: Some(proxy),
                     }),
                 })
@@ -420,12 +415,11 @@ mod tests {
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker: moniker.into() };
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
 
-        data_repo
-            .clone()
+        Arc::clone(&data_repo)
             .handle(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: identity,
+                    component: Arc::clone(&identity),
                     directory: Some(
                         fuchsia_fs::directory::open_in_namespace(
                             "/tmp",
@@ -446,12 +440,11 @@ mod tests {
         let identity2 =
             Arc::new(ComponentIdentity::from_identifier_and_url(component_id2, TEST_URL));
 
-        data_repo
-            .clone()
+        Arc::clone(&data_repo)
             .handle(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: identity2,
+                    component: Arc::clone(&identity2),
                     directory: Some(
                         fuchsia_fs::directory::open_in_namespace(
                             "/tmp",

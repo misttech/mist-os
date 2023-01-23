@@ -94,12 +94,12 @@ impl Archivist {
 
         // Initialize our FIDL servers. This doesn't start serving yet.
         let accessor_server = Arc::new(ArchiveAccessorServer::new(
-            inspect_repo.clone(),
-            logs_repo.clone(),
+            Arc::clone(&inspect_repo),
+            Arc::clone(&logs_repo),
             config.maximum_concurrent_snapshots_per_reader,
         ));
-        let log_server = Arc::new(LogServer::new(logs_repo.clone()));
-        let log_settings_server = Arc::new(LogSettingsServer::new(logs_repo.clone()));
+        let log_server = Arc::new(LogServer::new(Arc::clone(&logs_repo)));
+        let log_settings_server = Arc::new(LogSettingsServer::new(Arc::clone(&logs_repo)));
 
         // Initialize the respective v1 and v2 protocols in charge of telling the archivist to
         // shutdown gracefully while draining existing log sinks and ensuring existing readers get
@@ -314,9 +314,9 @@ impl Archivist {
             drain_events_fut.await;
         });
 
-        let accessor_server = self.accessor_server.clone();
-        let log_server = self.log_server.clone();
-        let logs_repo = self.logs_repository.clone();
+        let accessor_server = Arc::clone(&self.accessor_server);
+        let log_server = Arc::clone(&self.log_server);
+        let logs_repo = Arc::clone(&self.logs_repository);
         let all_msg = async {
             logs_repo.wait_for_termination().await;
             debug!("Flushing to listeners.");
@@ -330,7 +330,7 @@ impl Archivist {
         let log_server = self.log_server;
         let accessor_server = self.accessor_server;
         let incoming_external_event_producers = self.incoming_external_event_producers;
-        let logs_repo = self.logs_repository.clone();
+        let logs_repo = Arc::clone(&self.logs_repository);
         let stop_fut = match self.stop_recv {
             Some(stop_recv) => async move {
                 stop_recv.into_future().await.ok();
@@ -365,10 +365,10 @@ impl Archivist {
 
         // Serve fuchsia.diagnostics.ArchiveAccessors backed by a pipeline.
         for pipeline in &self.pipelines {
-            let accessor_server = self.accessor_server.clone();
-            let accessor_pipeline = pipeline.clone();
+            let accessor_server = Arc::clone(&self.accessor_server);
+            let accessor_pipeline = Arc::clone(pipeline);
             svc_dir.add_fidl_service_at(pipeline.protocol_name(), move |stream| {
-                accessor_server.spawn_server(accessor_pipeline.clone(), stream);
+                accessor_server.spawn_server(Arc::clone(&accessor_pipeline), stream);
             });
         }
 
@@ -388,14 +388,14 @@ impl Archivist {
         }
 
         // Server fuchsia.logger.Log
-        let log_server = self.log_server.clone();
+        let log_server = Arc::clone(&self.log_server);
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.logger.Log connection");
             log_server.spawn(stream);
         });
 
         // Server fuchsia.diagnostics.LogSettings
-        let log_settings_server = self.log_settings_server.clone();
+        let log_settings_server = Arc::clone(&self.log_settings_server);
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.diagnostics.LogSettings connection");
             log_settings_server.spawn(stream);

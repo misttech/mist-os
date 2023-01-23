@@ -91,7 +91,7 @@ where
                 // If we got data, then return the data we read.
                 Poll::Ready(Ok(_len)) => {
                     let buf = std::mem::take(&mut this.buffer);
-                    return Poll::Ready(Some(Ok(E::wrap_bytes(buf, this.stats.clone()))));
+                    return Poll::Ready(Some(Ok(E::wrap_bytes(buf, Arc::clone(&this.stats)))));
                 }
             }
         }

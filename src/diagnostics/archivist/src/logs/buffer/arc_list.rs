@@ -60,7 +60,7 @@ impl<T> ArcList<T> {
 
 impl<T> Clone for ArcList<T> {
     fn clone(&self) -> Self {
-        Self { inner: self.inner.clone() }
+        Self { inner: Arc::clone(&self.inner) }
     }
 }
 
@@ -71,7 +71,7 @@ struct ArcListItem<T> {
 
 impl<T> Clone for ArcListItem<T> {
     fn clone(&self) -> Self {
-        Self { id: self.id, value: self.value.clone() }
+        Self { id: self.id, value: Arc::clone(&self.value) }
     }
 }
 

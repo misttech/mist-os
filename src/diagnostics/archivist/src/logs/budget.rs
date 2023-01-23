@@ -65,11 +65,11 @@ impl BudgetState {
             // find the container with the oldest log message
             self.containers.sort_unstable_by_key(|c| c.oldest_timestamp().unwrap_or(std::i64::MAX));
 
-            let container_with_oldest = self
-                .containers
-                .get(0)
-                .expect("containers are added to budget before they can call allocate")
-                .clone();
+            let container_with_oldest = Arc::clone(
+                self.containers
+                    .get(0)
+                    .expect("containers are added to budget before they can call allocate"),
+            );
             let oldest_message = container_with_oldest
                 .pop()
                 .expect("if we need to free space, we have messages to remove");
@@ -90,11 +90,13 @@ impl BudgetState {
                 debug!(
                     identity = %container.identity,
                     "Removing now that we've popped the last message.");
-                self.remover.unbounded_send(container.identity.clone()).unwrap_or_else(|err| {
-                    warn!(
+                self.remover.unbounded_send(Arc::clone(&container.identity)).unwrap_or_else(
+                    |err| {
+                        warn!(
                             %err,
                             identity = %container.identity, "Failed to send identity for removal");
-                });
+                    },
+                );
             } else {
                 i += 1;
             }
@@ -180,8 +182,8 @@ mod tests {
             )
             .await,
         );
-        manager.add_container(container_a.clone()).await;
-        manager.add_container(container_b.clone()).await;
+        manager.add_container(Arc::clone(&container_a)).await;
+        manager.add_container(Arc::clone(&container_b)).await;
         assert_eq!(manager.state.lock().await.containers.len(), 2);
 
         // Add a few test messages

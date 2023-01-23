@@ -63,7 +63,7 @@ impl LogsRepository {
             component_removal_task: Mutex::new(None),
         });
         *this.component_removal_task.lock().await = Some(fasync::Task::spawn(
-            Self::process_removal_of_components(remover_rcv, this.clone()),
+            Self::process_removal_of_components(remover_rcv, Arc::clone(&this)),
         ));
         this
     }
@@ -126,7 +126,7 @@ impl LogsRepository {
             .filter_map(|(_, c)| c)
             .map(|c| {
                 let cursor = c.cursor(mode, parent_trace_id);
-                (c.identity.clone(), cursor)
+                (Arc::clone(&c.identity), cursor)
             })
             .for_each(|(n, c)| {
                 mpx_handle.send(n, c);
@@ -291,12 +291,12 @@ impl LogsRepositoryState {
                     )
                     .await,
                 );
-                self.logs_budget.add_container(container.clone()).await;
-                self.logs_data_store.set(trie_key, container.clone());
+                self.logs_budget.add_container(Arc::clone(&container)).await;
+                self.logs_data_store.set(trie_key, Arc::clone(&container));
                 self.logs_multiplexers.send(&container).await;
                 container
             }
-            Some(existing) => existing.clone(),
+            Some(existing) => Arc::clone(existing),
         }
     }
 
@@ -352,7 +352,7 @@ impl MultiplexerBroker {
     fn new() -> Self {
         let (cleanup_sender, mut receiver) = mpsc::unbounded();
         let live_iterators = Arc::new(Mutex::new(HashMap::new()));
-        let live_iterators_clone = live_iterators.clone();
+        let live_iterators_clone = Arc::clone(&live_iterators);
         Self {
             live_iterators,
             cleanup_sender,
@@ -388,7 +388,7 @@ impl MultiplexerBroker {
     pub async fn send(&mut self, container: &Arc<LogsArtifactsContainer>) {
         self.live_iterators.lock().await.retain(|_, (mode, recipient)| {
             recipient.send(
-                container.identity.clone(),
+                Arc::clone(&container.identity),
                 container.cursor(*mode, recipient.parent_trace_id()),
             )
         });

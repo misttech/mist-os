@@ -213,7 +213,7 @@ impl ArchiveAccessorServer {
                         performance_config,
                         selectors,
                         output_rewriter,
-                        stats.clone(),
+                        Arc::clone(&stats),
                         trace_id,
                     ),
                     requests,
@@ -259,9 +259,9 @@ impl ArchiveAccessorServer {
     pub fn spawn_server(&self, pipeline: Arc<Pipeline>, mut stream: ArchiveAccessorRequestStream) {
         // Self isn't guaranteed to live into the exception handling of the async block. We need to clone self
         // to have a version that can be referenced in the exception handling.
-        let batch_iterator_task_sender = self.server_task_sender.clone();
-        let log_repo = self.logs_repository.clone();
-        let inspect_repo = self.inspect_repository.clone();
+        let batch_iterator_task_sender = Arc::clone(&self.server_task_sender);
+        let log_repo = Arc::clone(&self.logs_repository);
+        let inspect_repo = Arc::clone(&self.inspect_repository);
         let maximum_concurrent_snapshots_per_reader = self.maximum_concurrent_snapshots_per_reader;
         let Ok(guard) = self.server_task_sender.lock() else { return };
         guard
@@ -283,13 +283,13 @@ impl ArchiveAccessorServer {
                     };
 
                     stats.global_stats.stream_diagnostics_requests.add(1);
-                    let pipeline = pipeline.clone();
+                    let pipeline = Arc::clone(&pipeline);
 
                     // Store the batch iterator task so that we can ensure that the client finishes
                     // draining items through it when a Controller#Stop call happens. For example,
                     // this allows tests to fetch all isolated logs before finishing.
-                    let inspect_repo_for_task = inspect_repo.clone();
-                    let log_repo_for_task = log_repo.clone();
+                    let inspect_repo_for_task = Arc::clone(&inspect_repo);
+                    let log_repo_for_task = Arc::clone(&log_repo);
                     let Ok(guard) = batch_iterator_task_sender.lock() else { continue };
                     guard
                         .unbounded_send(Task::spawn(async move {
@@ -370,17 +370,17 @@ impl BatchIterator {
         Items: Stream<Item = Data<D>> + Send + 'static,
         D: DiagnosticsData + 'static,
     {
-        let result_stats_for_fut = stats.clone();
+        let result_stats_for_fut = Arc::clone(&stats);
 
         let budget_tracker_shared = Arc::new(Mutex::new(HashMap::new()));
 
         let truncation_counter = SchemaTruncationCounter::new();
-        let stream_owned_counter_for_fut = truncation_counter.clone();
+        let stream_owned_counter_for_fut = Arc::clone(&truncation_counter);
 
         let data = data.then(move |d| {
-            let stream_owned_counter = stream_owned_counter_for_fut.clone();
-            let result_stats = result_stats_for_fut.clone();
-            let budget_tracker = budget_tracker_shared.clone();
+            let stream_owned_counter = Arc::clone(&stream_owned_counter_for_fut);
+            let result_stats = Arc::clone(&result_stats_for_fut);
+            let budget_tracker = Arc::clone(&budget_tracker_shared);
             async move {
                 let trace_id = ftrace::Id::random();
                 let _trace_guard = ftrace::async_enter!(
@@ -438,7 +438,7 @@ impl BatchIterator {
         });
 
         Self::new_inner(
-            new_batcher(data, stats.clone(), mode),
+            new_batcher(data, Arc::clone(&stats), mode),
             requests,
             stats,
             Some(truncation_counter),
@@ -457,10 +457,13 @@ impl BatchIterator {
         D: Serialize + Send + 'static,
         S: Stream<Item = D> + Send + Unpin + 'static,
     {
-        let data =
-            JsonPacketSerializer::new(stats.clone(), FORMATTED_CONTENT_CHUNK_SIZE_TARGET, data);
+        let data = JsonPacketSerializer::new(
+            Arc::clone(&stats),
+            FORMATTED_CONTENT_CHUNK_SIZE_TARGET,
+            data,
+        );
         Self::new_inner(
-            new_batcher(data, stats.clone(), mode),
+            new_batcher(data, Arc::clone(&stats), mode),
             requests,
             stats,
             None,

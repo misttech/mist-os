@@ -107,7 +107,7 @@ impl ReaderServer {
 
         futures::stream::iter(unpopulated_diagnostics_sources.into_iter())
             .map(move |unpopulated| {
-                let global_stats = stats.global_stats().clone();
+                let global_stats = Arc::clone(stats.global_stats());
                 unpopulated.populate(batch_timeout, global_stats, parent_trace_id)
             })
             .flatten()
@@ -116,7 +116,7 @@ impl ReaderServer {
             .buffer_unordered(maximum_concurrent_snapshots_per_reader as usize)
             // filter each component's inspect
             .filter_map(move |populated| {
-                let server_clone = server.clone();
+                let server_clone = Arc::clone(&server);
                 async move { server_clone.filter_snapshot(populated, parent_trace_id) }
             })
     }
@@ -335,7 +335,7 @@ impl ReaderServer {
             client_selectors.as_ref()?;
         }
 
-        let identity = pumped_inspect_data.identity.clone();
+        let identity = Arc::clone(&pumped_inspect_data.identity);
 
         let hierarchy_data = ReaderServer::filter_single_components_snapshot(
             pumped_inspect_data.snapshot,
@@ -729,12 +729,11 @@ mod tests {
                 for (cid, proxy) in id_and_directory_proxy {
                     let identity =
                         Arc::new(ComponentIdentity::from_identifier_and_url(cid, TEST_URL));
-                    inspect_repo
-                        .clone()
+                    Arc::clone(&inspect_repo)
                         .handle(Event {
                             timestamp: zx::Time::get_monotonic(),
                             payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                                component: identity,
+                                component: Arc::clone(&identity),
                                 directory: Some(proxy),
                             }),
                         })
@@ -750,8 +749,8 @@ mod tests {
                     Arc::new(test_accessor_stats.new_inspect_batch_iterator());
 
                 let _result_json = read_snapshot_verify_batch_count_and_batch_size(
-                    inspect_repo.clone(),
-                    pipeline.clone(),
+                    Arc::clone(&inspect_repo),
+                    Arc::clone(&pipeline),
                     expected_batch_results,
                     test_batch_iterator_stats1,
                 )
@@ -880,12 +879,11 @@ mod tests {
         let inspector_arc = Arc::new(inspector);
 
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
-        inspect_repo
-            .clone()
+        Arc::clone(&inspect_repo)
             .handle(Event {
                 timestamp: zx::Time::get_monotonic(),
                 payload: EventPayload::DiagnosticsReady(DiagnosticsReadyPayload {
-                    component: identity.clone(),
+                    component: Arc::clone(&identity),
                     directory: Some(out_dir_proxy),
                 }),
             })
@@ -898,9 +896,9 @@ mod tests {
 
         {
             let result_json = read_snapshot(
-                inspect_repo.clone(),
-                pipeline.clone(),
-                inspector_arc.clone(),
+                Arc::clone(&inspect_repo),
+                Arc::clone(&pipeline),
+                Arc::clone(&inspector_arc),
                 test_batch_iterator_stats1,
             )
             .await;
@@ -933,7 +931,7 @@ mod tests {
 
             // stream_diagnostics_requests is 0 since its tracked via archive_accessor server,
             // which isn't running in this unit test.
-            assert_data_tree!(inspector_arc.clone(), root: {
+            assert_data_tree!(Arc::clone(&inspector_arc), root: {
                 test_archive_accessor_node: {
                     connections_closed: 0u64,
                     connections_opened: 0u64,
@@ -994,9 +992,9 @@ mod tests {
         inspect_repo.terminate_inspect(identity.as_ref()).await;
         {
             let result_json = read_snapshot(
-                inspect_repo.clone(),
-                pipeline.clone(),
-                inspector_arc.clone(),
+                Arc::clone(&inspect_repo),
+                Arc::clone(&pipeline),
+                Arc::clone(&inspector_arc),
                 test_batch_iterator_stats2,
             )
             .await;
@@ -1004,7 +1002,7 @@ mod tests {
             let result_array = result_json.as_array().expect("unit test json should be array.");
             assert_eq!(result_array.len(), 0, "Expect no schemas to be returned.");
 
-            assert_data_tree!(inspector_arc.clone(), root: {
+            assert_data_tree!(Arc::clone(&inspector_arc), root: {
                 test_archive_accessor_node: {
                     connections_closed: 0u64,
                     connections_opened: 0u64,
@@ -1082,7 +1080,7 @@ mod tests {
             None,
             // No output rewriter
             None,
-            stats.clone(),
+            Arc::clone(&stats),
             trace_id,
         ));
         let (consumer, batch_iterator_requests) =

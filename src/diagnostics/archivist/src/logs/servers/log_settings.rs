@@ -36,7 +36,7 @@ impl LogSettingsServer {
 
     /// Spawn a task to handle requests from components reading the shared log.
     pub fn spawn(&self, stream: fdiagnostics::LogSettingsRequestStream) {
-        let logs_repo = self.logs_repo.clone();
+        let logs_repo = Arc::clone(&self.logs_repo);
         if let Err(e) = self.task_sender.unbounded_send(fasync::Task::spawn(async move {
             if let Err(e) = Self::handle_requests(logs_repo, stream).await {
                 warn!("error handling Log requests: {}", e);

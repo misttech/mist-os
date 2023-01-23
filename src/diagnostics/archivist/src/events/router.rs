@@ -89,7 +89,10 @@ impl EventRouter {
     {
         let subscriber_weak = Arc::downgrade(config.consumer);
         for event_type in config.events {
-            self.consumers.entry(event_type).or_default().push(subscriber_weak.clone());
+            self.consumers
+                .entry(event_type)
+                .or_default()
+                .push(Weak::clone(&subscriber_weak) as Weak<dyn EventConsumer + Send + Sync>);
         }
     }
 

@@ -124,7 +124,7 @@ pub struct DiagnosticsReadyPayload {
 
 impl Clone for DiagnosticsReadyPayload {
     fn clone(&self) -> Self {
-        Self { component: self.component.clone(), directory: None }
+        Self { component: Arc::clone(&self.component), directory: None }
     }
 }
 
@@ -138,7 +138,7 @@ pub struct LogSinkRequestedPayload {
 
 impl Clone for LogSinkRequestedPayload {
     fn clone(&self) -> Self {
-        Self { component: self.component.clone(), request_stream: None }
+        Self { component: Arc::clone(&self.component), request_stream: None }
     }
 }
 
