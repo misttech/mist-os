@@ -167,6 +167,12 @@ pub enum ModelError {
     },
     #[error("timed out after {:?}", duration)]
     Timeout { duration: zx::Duration },
+    #[error("error with discover action for {moniker}: {err}")]
+    DiscoverError {
+        moniker: AbsoluteMoniker,
+        #[source]
+        err: DiscoverError,
+    },
 }
 
 impl ModelError {
@@ -287,8 +293,8 @@ pub enum AddDynamicChildError {
     },
     #[error("failed to discover child: {}", err)]
     DiscoverFailed {
-        // TODO(https://fxbug.dev/116855): This is temporary, until we untangle ModelError
-        err: Box<ModelError>,
+        #[from]
+        err: DiscoverError,
     },
     #[error("failed to resolve parent: {}", err)]
     ResolveFailed { err: ComponentInstanceError },
@@ -386,4 +392,10 @@ pub enum DynamicOfferError {
     SourceNotFound { offer: cm_rust::OfferDecl },
     #[error("unknown offer type in dynamic offers")]
     UnknownOfferType,
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum DiscoverError {
+    #[error("instance {moniker} was destroyed")]
+    InstanceDestroyed { moniker: AbsoluteMoniker },
 }

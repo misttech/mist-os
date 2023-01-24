@@ -48,7 +48,9 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Mod
         }
     }
     // Ensure `Resolved` is dispatched after `Discovered`.
-    ActionSet::register(component.clone(), DiscoverAction::new()).await?;
+    ActionSet::register(component.clone(), DiscoverAction::new())
+        .await
+        .map_err(|err| ModelError::DiscoverError { moniker: component.abs_moniker.clone(), err })?;
     let result = async move {
         let first_resolve = {
             let state = component.lock_state().await;

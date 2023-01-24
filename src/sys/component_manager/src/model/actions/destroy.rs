@@ -49,7 +49,9 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ModelError
 
     // Require the component to be discovered before deleting it so a Destroyed event is
     // always preceded by a Discovered.
-    ActionSet::register(component.clone(), DiscoverAction::new()).await?;
+    ActionSet::register(component.clone(), DiscoverAction::new())
+        .await
+        .map_err(|err| ModelError::DiscoverError { moniker: component.abs_moniker.clone(), err })?;
 
     // For destruction to behave correctly, the component has to be shut down first.
     // NOTE: This will recursively shut down the whole subtree. If this component has children,
@@ -128,6 +130,7 @@ pub mod tests {
                 ActionNotifier, ShutdownAction,
             },
             component::{Component, StartReason},
+            error::DiscoverError,
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::{
@@ -443,7 +446,7 @@ pub mod tests {
             ActionKey::Discover,
             // The mocked action must return a result, even though the result is not used
             // by the Destroy action.
-            Ok(()) as Result<(), ModelError>,
+            Ok(()) as Result<(), DiscoverError>,
         )
         .await;
     }

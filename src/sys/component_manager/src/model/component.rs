@@ -11,7 +11,7 @@ use {
         context::ModelContext,
         environment::Environment,
         error::{
-            AddChildError, AddDynamicChildError, DynamicOfferError, ModelError,
+            AddChildError, AddDynamicChildError, DiscoverError, DynamicOfferError, ModelError,
             OpenExposedDirError, RebootError, StructuredConfigError,
         },
         exposed_dir::ExposedDir,
@@ -724,9 +724,7 @@ impl ComponentInstance {
                 child_args.dynamic_offers,
             )
             .await?;
-        discover_fut
-            .await
-            .map_err(|err| AddDynamicChildError::DiscoverFailed { err: Box::new(err) })?;
+        discover_fut.await?;
         Ok(collection_decl.durability)
     }
 
@@ -1592,7 +1590,7 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         numbered_handles: Option<Vec<fidl_fuchsia_process::HandleInfo>>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
-    ) -> Result<BoxFuture<'static, Result<(), ModelError>>, AddChildError> {
+    ) -> Result<BoxFuture<'static, Result<(), DiscoverError>>, AddChildError> {
         let child = self.add_child_internal(
             component,
             child,
