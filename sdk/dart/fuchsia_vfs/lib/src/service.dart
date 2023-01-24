@@ -57,7 +57,7 @@ class Service<T> extends Vnode {
       return ZX.ERR_NOT_DIR;
     }
 
-    // We don't support OpenFlags.rightDescribe, as service request is not going
+    // We don't support OpenFlags.describe, as service request is not going
     // to be of type fidl.InterfaceRequest<Node> most of the time, but we do send
     // OnOpen event incase of bad flags and if OpenFlags.rightDescribe is passed
     // so that underlying services don't need to handle these flags.
