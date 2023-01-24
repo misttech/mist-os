@@ -288,13 +288,23 @@ impl StateInfo {
     }
 
     pub fn system_has_internet(&self) -> bool {
+        self.system_has_state(&State::Internet)
+    }
+
+    // A system is considered to have gateway reachability if it has State::Gateway
+    // or State::Internet.
+    pub fn system_has_gateway(&self) -> bool {
+        self.system_has_state(&State::Gateway) || self.system_has_state(&State::Internet)
+    }
+
+    fn system_has_state(&self, want_state: &State) -> bool {
         let v4_state = self.get_system_ipv4();
         let v6_state = self.get_system_ipv6();
 
         return [v4_state, v6_state]
             .iter()
             .filter_map(|state| state.as_ref())
-            .any(|state| state.state.state == State::Internet);
+            .any(|state| &state.state.state == want_state);
     }
 
     /// Report the duration of the current state for each interface and each protocol.
@@ -676,6 +686,7 @@ mod tests {
         fidl_fuchsia_net as fnet, fuchsia_async as fasync,
         net_declare::{fidl_ip, fidl_subnet, std_ip},
         std::task::Poll,
+        test_case::test_case,
     };
 
     const ETHERNET_INTERFACE_NAME: &str = "eth1";
@@ -1339,45 +1350,47 @@ mod tests {
         assert_eq!(state, want_state);
     }
 
-    #[test]
-    fn test_system_has_internet() {
-        let if1_local_event = StateEvent::construct(State::Local);
-        let if1_local = IpVersions::<StateEvent>::construct(if1_local_event);
-        let if2_internet_event = StateEvent::construct(State::Internet);
-        let if2_internet = IpVersions::<StateEvent>::construct(if2_internet_event);
+    #[test_case(None, None, false, false;
+        "no interfaces available")]
+    #[test_case(Some(&State::Local), Some(&State::Local), false, false;
+        "no interfaces with gateway or internet state")]
+    #[test_case(Some(&State::Local), Some(&State::Gateway), false, true;
+        "only one interface with gateway state or above")]
+    #[test_case(Some(&State::Local), Some(&State::Internet), true, true;
+        "only one interface with internet state")]
+    #[test_case(Some(&State::Internet), Some(&State::Internet), true, true;
+        "all interfaces with internet")]
+    #[test_case(Some(&State::Internet), None, true, true;
+        "only one interface available, has internet state")]
+    fn test_system_has_state(
+        ipv4_state: Option<&State>,
+        ipv6_state: Option<&State>,
+        expect_internet: bool,
+        expect_gateway: bool,
+    ) {
+        let if1 = ipv4_state
+            .map(|state| IpVersions::<StateEvent>::construct(StateEvent::construct(*state)));
+        let if2 = ipv6_state
+            .map(|state| IpVersions::<StateEvent>::construct(StateEvent::construct(*state)));
 
-        let no_interfaces = StateInfo {
-            per_interface: HashMap::new(),
-            system: IpVersions { ipv4: None, ipv6: None },
-        };
-        assert_eq!(no_interfaces.system_has_internet(), false);
+        let mut system_interfaces: HashMap<u64, IpVersions<StateEvent>> = HashMap::new();
 
-        let no_interfaces_with_ipv6 = StateInfo {
-            per_interface: std::iter::once((ID2, if2_internet.clone())).collect::<HashMap<_, _>>(),
-            system: IpVersions { ipv4: Some(ID2), ipv6: None },
-        };
-        assert_eq!(no_interfaces_with_ipv6.system_has_internet(), true);
+        let system_interface_ipv4 = if1.map(|interface| {
+            let _ = system_interfaces.insert(ID1, interface);
+            ID1
+        });
 
-        let no_interfaces_with_internet = StateInfo {
-            per_interface: std::iter::once((ID1, if1_local.clone())).collect::<HashMap<_, _>>(),
-            system: IpVersions { ipv4: Some(ID1), ipv6: Some(ID1) },
-        };
-        assert_eq!(no_interfaces_with_internet.system_has_internet(), false);
+        let system_interface_ipv6 = if2.map(|interface| {
+            let _ = system_interfaces.insert(ID2, interface);
+            ID2
+        });
 
-        let one_interface_with_internet = StateInfo {
-            per_interface: [(ID1, if1_local.clone()), (ID2, if2_internet.clone())]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-            system: IpVersions { ipv4: Some(ID2), ipv6: Some(ID1) },
+        let state = StateInfo {
+            per_interface: system_interfaces,
+            system: IpVersions { ipv4: system_interface_ipv4, ipv6: system_interface_ipv6 },
         };
-        assert_eq!(one_interface_with_internet.system_has_internet(), true);
 
-        let all_interfaces_with_internet = StateInfo {
-            per_interface: [(ID1, if1_local.clone()), (ID2, if2_internet.clone())]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-            system: IpVersions { ipv4: Some(ID2), ipv6: Some(ID2) },
-        };
-        assert_eq!(all_interfaces_with_internet.system_has_internet(), true);
+        assert_eq!(state.system_has_internet(), expect_internet);
+        assert_eq!(state.system_has_gateway(), expect_gateway);
     }
 }

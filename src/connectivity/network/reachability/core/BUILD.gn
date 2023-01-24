@@ -42,6 +42,7 @@ rustc_library("lib") {
     "//src/connectivity/lib/net-declare",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [
