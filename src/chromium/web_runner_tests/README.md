@@ -9,6 +9,12 @@ $ fx set <product>.<arch> --with //src/chromium/web_runner_tests:tests
 $ fx build
 ```
 
+If `<product>` does not include WebEngine by default, you will need to add it:
+```shell
+$ fx set <product>.<arch> --with //src/chromium/web_runner_tests:tests --with //src/chromium:web_engine
+$ fx build
+```
+
 ## Run the test
 
 Remember to kill a running Scenic before starting the test. In particular, the pixel tests must be

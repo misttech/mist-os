@@ -39,6 +39,11 @@ group("workstation") {
 
     # FIDL example tests
     "//examples/fidl:tests",
+
+    # Web-related system integration tests require WebEngine, which must be
+    # provided by the Product. See fxbug.dev/119212. Workstation does not
+    # currently include WebEngine, so provide it to the buildbot.
+    "//src/chromium:web_engine",
   ]
 
   # Remove when all builder bots that use the workstation_eng product explicitly
@@ -58,6 +63,11 @@ group("eng_paused") {
   deps = [
     "//src/testing/system-validation:tests",
     "//src/testing/system-validation:tests_with_host_script",
+
+    # Web-related system integration tests require WebEngine, which must be
+    # provided by the Product. See fxbug.dev/119212. Workstation does not
+    # currently include WebEngine, so provide it to the buildbot.
+    "//src/chromium:web_engine",
   ]
 }
 

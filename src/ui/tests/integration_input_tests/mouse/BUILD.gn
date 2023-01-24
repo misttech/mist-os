@@ -10,8 +10,13 @@ group("tests") {
   testonly = true
   deps = [
     ":mouse-input-test",
-    "//src/chromium:web_engine",
     "//src/cobalt/bin/testing/mock_cobalt",
+
+    # TODO(fxbug.dev/119212): These should be provided by the Product
+    # configurations on which these tests run rather than as deps.
+    # TODO(fxbug.dev/119212): Should these be deps of the individual test
+    # targets above?
+    "//src/chromium:uses_web_engine",
     "//src/flutter",
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
@@ -67,7 +72,10 @@ fuchsia_test_package("mouse-input-test") {
   deps = [
     "mouse-input-chromium:mouse-input-chromium-component",
     "mouse-input-flutter:realm",
-    "//src/chromium:web_engine",
+
+    # TODO(fxbug.dev/119212): These should be provided by the Product
+    # configurations on which these tests run rather than as deps.
+    "//src/chromium:uses_web_engine",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/connectivity/network/netstack:component",
     "//src/developer/build_info/testing:fake-build-info-component",

@@ -30,6 +30,13 @@ template("generate_chromium_targets") {
     ]
   }
 
+  # Used by integration tests to indicate they need WebEngine in the Products on
+  # which they run. It has no effect.
+  # TODO(fxbug.dev/119212): Remove once a better solution is available.
+  group("uses_web_engine") {
+    testonly = true
+  }
+
   # TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
   if (use_chromium_canary) {
     package_flavor_selections += [
