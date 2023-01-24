@@ -127,6 +127,9 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
       FX_LOGS(WARNING) << "web_context_: " << zx_status_get_string(status);
     });
     web_context_->CreateFrame(web_frame_.NewRequest());
+    fuchsia::web::ContentAreaSettings settings;
+    settings.set_autoplay_policy(fuchsia::web::AutoplayPolicy::ALLOW);
+    web_frame_->SetContentAreaSettings(std::move(settings));
     web_frame_.set_error_handler([](zx_status_t status) {
       FX_LOGS(WARNING) << "web_frame_: " << zx_status_get_string(status);
     });

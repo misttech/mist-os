@@ -64,6 +64,14 @@ async fn handle(request: hyper::Request<hyper::Body>) -> hyper::Response<hyper::
                 .body(body)
                 .unwrap()
         }
+        "/mp3" => {
+            let body = stream_file("/pkg/data/100Hz_tone.mp3");
+            hyper::Response::builder()
+                .status(hyper::StatusCode::OK)
+                .header("Content-Type", "audio/mpeg")
+                .body(body)
+                .unwrap()
+        }
         _ => hyper::Response::builder()
             .status(hyper::StatusCode::NOT_FOUND)
             .body(hyper::Body::from(format!("Request URI not supported: {:?}", request.uri())))

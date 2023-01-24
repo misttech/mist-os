@@ -25,6 +25,7 @@ executable("bin") {
 resource("javascripts") {
   sources = [
     "data/dynamic_elements.js",
+    "data/simple_audio.js",
     "data/simple_png.js",
     "data/simple_video.js",
   ]
@@ -54,6 +55,13 @@ fuchsia_structured_config_values("simple_video_config") {
   }
 }
 
+fuchsia_structured_config_values("simple_audio_config") {
+  cm_label = ":web_view_manifest"
+  values = {
+    javascript_file = "/pkg/data/javascripts/simple_audio.js"
+  }
+}
+
 fuchsia_structured_config_values("dynamic_element_config") {
   cm_label = ":web_view_manifest"
   values = {
@@ -74,6 +82,14 @@ fuchsia_component("simple_video_web_view_component") {
   deps = [
     ":bin",
     ":simple_video_config",
+  ]
+}
+
+fuchsia_component("simple_audio_web_view_component") {
+  cm_label = ":web_view_manifest"
+  deps = [
+    ":bin",
+    ":simple_audio_config",
   ]
 }
 

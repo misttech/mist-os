@@ -24,7 +24,7 @@ System validation sets up the test with following capability routing relationshi
 1. Build `workstation_eng_paused` product with system validation test targets.
 
 ```
-fx set workstation_eng_paused.qemu-x64 --release --with-base //src/chromium:web_engine --with //src/testing/system-validation:tests
+fx set workstation_eng_paused.qemu-x64 --release --with //src/testing/system-validation:tests
 fx build
 ```
 
@@ -41,4 +41,5 @@ fx serve
 $ fx test fuchsia-pkg://fuchsia.com/dynamic_elements_web_system_validation#meta/web_view_system_validation.cm --ffx-output-directory /path/to/output/dir
 $ fx test fuchsia-pkg://fuchsia.com/simple_png_web_system_validation#meta/web_view_system_validation.cm --ffx-output-directory /path/to/output/dir
 $ fx test fuchsia-pkg://fuchsia.com/simple_video_web_system_validation#meta/web_view_system_validation.cm --ffx-output-directory /path/to/output/dir
+$ fx test fuchsia-pkg://fuchsia.com/simple_audio_web_system_validation#meta/web_view_system_validation.cm --ffx-output-directory /path/to/output/dir
 ```

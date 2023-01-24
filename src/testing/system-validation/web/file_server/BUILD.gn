@@ -46,6 +46,10 @@ resource_group("server_data") {
       source = "data/fuchsia_logo.png"
       dest = "data/fuchsia_logo.png"
     },
+    {
+      source = "data/100Hz_tone.mp3"
+      dest = "data/100Hz_tone.mp3"
+    },
   ]
 }
 
