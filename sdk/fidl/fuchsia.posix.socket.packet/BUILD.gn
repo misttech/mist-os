@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.posix.socket.packet") {
-  sdk_category = "internal"
+  sdk_category = "partner_internal"
 
   sources = [ "socket.fidl" ]
 

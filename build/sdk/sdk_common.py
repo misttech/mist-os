@@ -88,6 +88,7 @@ CATEGORIES = [
     'experimental',
     'internal',
     'cts',
+    'partner_internal',
     'partner',
     'public',
 ]

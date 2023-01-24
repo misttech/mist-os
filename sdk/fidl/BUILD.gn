@@ -211,8 +211,17 @@ sdk_molecule("fidl_testing") {
 # category. This is to create the "sdk_partner_internal_libs" group below,
 # this group is used to ensure that we run the FIDL API compatibility tests on
 # these libraries.
-# TODO(fxb/119264): Add elements to this list.
-_sdk_partner_internal_fidl_libraries = []
+_sdk_partner_internal_fidl_libraries = [
+  "fuchsia.debugdata",
+  "fuchsia.fs",
+  "fuchsia.hardware.pty",
+  "fuchsia.net.name",
+  "fuchsia.posix.socket.packet",
+  "fuchsia.posix.socket.raw",
+  "fuchsia.posix.socket",
+  "fuchsia.posix",
+  "fuchsia.vulkan.loader",
+]
 
 group("sdk_partner_internal_libs") {
   public_deps = []
