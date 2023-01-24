@@ -129,20 +129,17 @@ impl Service {
             Ok(Arc::try_unwrap(inner).unwrap().into_channel())
         };
 
-        let flags = match new_connection_validate_flags(flags, mode) {
-            Ok(updated) => updated,
+        match new_connection_validate_flags(flags, mode) {
+            Ok(_updated) => {
+                if let Ok(channel) = describe(channel, Ok(())) {
+                    (self.open)(scope, channel)
+                }
+            }
             Err(status) => {
                 if let Ok(channel) = describe(channel, Err(status)) {
-                    let _ = channel.close_with_epitaph(status);
+                    let _: Result<(), _> = channel.close_with_epitaph(status);
                 }
-                return;
             }
-        };
-
-        debug_assert!(flags.contains(fio::OpenFlags::RIGHT_READABLE));
-
-        if let Ok(channel) = describe(channel, Ok(())) {
-            (self.open)(scope, channel);
         }
     }
 }
