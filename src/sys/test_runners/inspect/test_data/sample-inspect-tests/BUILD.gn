@@ -17,9 +17,5 @@ fuchsia_test_package("sample-inspect-tests-pkg") {
 
 group("sample-inspect-tests") {
   testonly = true
-  deps = []
-
-  # TODO(fxbug.dev/77403) - reenable tests on coverage builders.
-  # TODO(fxbug.dev/77856) - disabled due to flakiness. Re-enable.
-  # deps += [ ":sample-inspect-tests-pkg" ]
+  deps = [ ":sample-inspect-tests-pkg" ]
 }

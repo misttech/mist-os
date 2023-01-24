@@ -162,11 +162,9 @@ async fn launch_and_test_sample_test() {
             "bootstrap/archivist",
             Some(hierarchy! {
                 root: {
-                    event_stats: {
-                        recent_events: {
-                            "0": {
-                                event: "START",
-                            }
+                    events: {
+                        event_counts: {
+                            log_sink_requested: 2i64,
                         }
                     }
                 }
@@ -187,11 +185,17 @@ async fn launch_and_test_sample_test() {
         ),
         Data::for_inspect(
             "bootstrap/archivist",
-            Some(hierarchy! { root: {
-                event_stats: {
-                    components_seen_running: 2i64,
+            Some(hierarchy! {
+                root: {
+                    events: {
+                        recent_events: {
+                            "0": {
+                                event: "log_sink_requested",
+                            }
+                        }
+                    }
                 }
-            }}),
+            }),
             0,
             "no-url",
             "fake-file-name",
@@ -209,9 +213,9 @@ async fn launch_and_test_sample_test() {
     assert_eq!(
         vec![
             vec!["bootstrap/archivist:root"],
-            vec!["bootstrap/archivist:root/event_stats/recent_events/*:event"],
-            vec!["bootstrap/archivist:root/event_stats:components_seen_running"],
-            vec!["bootstrap/archivist:root/event_stats:components_seen_running"],
+            vec!["bootstrap/archivist:root/events/event_counts:log_sink_requested"],
+            vec!["bootstrap/archivist:root/events/recent_events/*:event"],
+            vec!["bootstrap/archivist:root/events/recent_events/*:event"],
         ],
         selectors_requested
             .into_iter()
@@ -223,8 +227,8 @@ async fn launch_and_test_sample_test() {
     expected_events.extend(
         vec![
             "bootstrap/archivist:root",
-            "bootstrap/archivist:root/event_stats/recent_events/*:event WHERE [a] Count(Filter(Fn([b], b == 'START'), a)) > 0",
-            "bootstrap/archivist:root/event_stats:components_seen_running WHERE [a] a > 1"
+            "bootstrap/archivist:root/events/recent_events/*:event WHERE [a] Count(Filter(Fn([b], b == 'log_sink_requested'), a)) > 0",
+            "bootstrap/archivist:root/events/event_counts:log_sink_requested WHERE [a] a > 1",
         ]
             .into_iter()
             .map(|case_name| vec![
