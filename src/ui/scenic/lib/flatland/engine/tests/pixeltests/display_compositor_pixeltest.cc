@@ -354,7 +354,8 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
 
     size_t cap_idx = 0;
     // Ignore first line. It <sometimes> contains junk (hardware bug).
-    bool success = true;
+    // Track the number of differences between the display output and the input buffer.
+    uint32_t num_different = 0;
     for (size_t h = 1; h < height; h++) {
       for (; cap_idx < capture_width_bytes && buf_idx < buffer_width_bytes;) {
         // skip the alpha channel
@@ -376,14 +377,12 @@ class DisplayCompositorPixelTest : public DisplayCompositorTestBase {
           cap_idx++;
           continue;
         }
-        success = false;
-        break;
+        num_different++;
       }
-      if (!success) {
-        break;
-      }
+
     }
-    return success;
+    EXPECT_EQ(num_different, 0U) << "Capture Compare number of values different: " << num_different;
+    return num_different == 0U;
   }
 #endif  // FAKE_DISPLAY
 };
