@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.unknown/cpp/wire.h>
 #include <lib/component/incoming/cpp/constants.h>
 #include <lib/component/incoming/cpp/internal.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 

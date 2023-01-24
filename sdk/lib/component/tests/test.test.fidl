@@ -6,6 +6,7 @@ library fidl.service.test;
 using fuchsia.io;
 using fuchsia.unknown;
 
+@discoverable
 protocol Echo {
     compose fuchsia.unknown.Cloneable;
 

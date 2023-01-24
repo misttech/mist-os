@@ -9,8 +9,8 @@ import("//build/test.gni")
 group("tests") {
   testonly = true
   deps = [
+    ":component_cpp_incoming_tests",
     ":component_cpp_outgoing_directory_tests",
-    ":component_cpp_service_client_tests",
     ":component_cpp_service_server_tests",
   ]
 }
@@ -36,23 +36,94 @@ fidl("fidl.service.test") {
   enable_hlcpp = true
 }
 
-test("service_client_test") {
-  sources = [ "client_test.cc" ]
+test("incoming_test_bin") {
+  sources = [ "incoming_test.cc" ]
   deps = [
+    ":fidl.service.test_cpp",
     ":fidl.service.test_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fdio",
-    "//src/lib/storage/vfs/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
-fuchsia_unittest_package("component_cpp_service_client_tests") {
-  deps = [ ":service_client_test" ]
+fuchsia_unittest_component("incoming_test") {
+  deps = [ ":incoming_test_bin" ]
+}
+
+executable("incoming_integration_test_bin") {
+  testonly = true
+
+  sources = [ "incoming_integration_test.cc" ]
+
+  deps = [
+    ":fidl.service.test_hlcpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/sys/component/cpp/testing:cpp",
+    "//sdk/lib/sys/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+  ]
+}
+
+fuchsia_component("incoming_integration_test") {
+  testonly = true
+  deps = [ ":incoming_integration_test_bin" ]
+  manifest = "meta/incoming_integration_test.cml"
+}
+
+executable("echo_service_client_bin") {
+  testonly = true
+
+  sources = [ "echo_service_client.cc" ]
+
+  deps = [
+    ":fidl.service.test_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
+fuchsia_component("echo_service_client") {
+  testonly = true
+  deps = [ ":echo_service_client_bin" ]
+  manifest = "meta/echo_service_client.cml"
+}
+
+executable("echo_client_bin") {
+  testonly = true
+
+  sources = [ "echo_client.cc" ]
+
+  deps = [
+    ":fidl.service.test_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
+fuchsia_component("echo_client") {
+  testonly = true
+  deps = [ ":echo_client_bin" ]
+  manifest = "meta/echo_client.cml"
+}
+
+fuchsia_test_package("component_cpp_incoming_tests") {
+  test_components = [
+    ":incoming_test",
+    ":incoming_integration_test",
+  ]
+
+  deps = [
+    ":echo_client",
+    ":echo_service_client",
+  ]
 }
 
 executable("echo_service_server_bin") {
@@ -144,7 +215,6 @@ test("service_server_test") {
     "//src/lib/storage/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zxtest",
   ]
