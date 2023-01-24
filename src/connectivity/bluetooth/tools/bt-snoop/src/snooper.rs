@@ -123,15 +123,13 @@ pub(crate) struct Snooper {
 impl Snooper {
     /// Create a new snooper from a device path. This opens a new snoop channel, returning an error
     /// if the devices doesn't exist or the channel cannot be created.
-    #[allow(dead_code)] // used in future
     pub fn new(device_path: PathBuf) -> Result<Snooper, Error> {
-        let hci_device = OpenOptions::new().read(true).write(true).open(&device_path)?;
+        let hci_device = OpenOptions::new().read(true).open(&device_path)?;
         let channel = open_snoop_channel(&hci_device)?;
         Snooper::from_channel(channel, device_path)
     }
 
     /// Take a channel and wrap it in a `Snooper`.
-    #[allow(dead_code)] // used in tests
     pub fn from_channel(chan: Channel, device_path: PathBuf) -> Result<Snooper, Error> {
         let chan = fasync::Channel::from_channel(chan)?;
 
