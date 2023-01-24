@@ -7,6 +7,8 @@ use fidl_fuchsia_component::BinderMarker;
 use fidl_fuchsia_metrics_test::MetricEventLoggerQuerierMarker;
 use fidl_fuchsia_mockrebootcontroller::MockRebootControllerMarker;
 use fidl_fuchsia_samplertestcontroller::SamplerTestControllerMarker;
+use fuchsia_async as fasync;
+use fuchsia_zircon as zx;
 
 mod mocks;
 mod test_topology;
@@ -182,20 +184,26 @@ async fn sampler_inspect_test() {
         .connect_to_named_protocol_at_exposed_dir::<BinderMarker>("fuchsia.component.SamplerBinder")
         .unwrap();
 
-    // Observe verification shows up in inspect.
-    let mut data = ArchiveReader::new()
-        .add_selector(format!(
-            "realm_builder\\:{}/wrapper/sampler:root",
-            instance.root.child_name()
-        ))
-        .snapshot::<Inspect>()
-        .await
-        .expect("got inspect data");
+    let hierarchy = loop {
+        // Observe verification shows up in inspect.
+        let mut data = ArchiveReader::new()
+            .add_selector(format!(
+                "realm_builder\\:{}/wrapper/sampler:root",
+                instance.root.child_name()
+            ))
+            .snapshot::<Inspect>()
+            .await
+            .expect("got inspect data");
 
-    let hierarchy = data.pop().expect("one result").payload.expect("payload is not none");
-    // TODO(fxbug.dev/42067): Introduce better fencing so we can
-    // guarantee we fetch the hierarchy after the metrics were sampled
-    // AND fully processed.
+        let hierarchy = data.pop().expect("one result").payload.expect("payload is not none");
+        if hierarchy.get_child("sampler_executor_stats").is_none()
+            || hierarchy.get_child("metrics_sent").is_none()
+        {
+            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100))).await;
+            continue;
+        }
+        break hierarchy;
+    };
     assert_data_tree!(
         hierarchy,
         root: {
