@@ -72,10 +72,6 @@ legacy_base_package_labels += [
 # TODO(fxbug.dev/9892): Support a package server on bots so this can be added to
 # universe like the tests.
 legacy_cache_package_labels += [
-  # Used for Chromium tests for example:
-  #    //src/chromium/web_runner_tests:tests
-  "//src/testing/fidl/intl_property_manager",
-
   # General end to end dependencies.
   "//src/tests/end_to_end/bundles:end_to_end_deps",
   "//src/tests/end_to_end/bundles:terminal_end_to_end_deps",
@@ -83,10 +79,10 @@ legacy_cache_package_labels += [
   # CFv2 test framework.
   "//src/sys/run_test_suite",
 
-  # Fake build info service.
-  # This is needed by Chromium tests, which run on this image, until fakes are
-  # provided with the SDK. See crbug.com/1326674.
+  # Used by Chromium tests, such as //src/chromium:tests.
+  # In Chromium infra, these tests run on this image, so they must be in cache.
   # TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
+  "//src/testing/fidl/intl_property_manager",
   "//src/developer/build_info/testing:fake-build-info",
 
   # Archivist for manual embedding in tests. Note that this archivist won't attribute logs by
