@@ -183,6 +183,12 @@ sdk_molecule("fidl") {
   foreach(target, sdk_fidl_targets) {
     deps += [ "${target}_sdk($fidl_toolchain)" ]
   }
+
+  non_sdk_deps = [
+    # Ensure that the API compatibility tests run on the APIs libraries in the
+    # "partner_internal" SDK category.
+    "//sdk/fidl:sdk_partner_internal_libs",
+  ]
 }
 
 # Fuchsia IDL (FIDL) files defining testing API for the SDK.
@@ -197,5 +203,29 @@ sdk_molecule("fidl_testing") {
   deps = []
   foreach(target, sdk_fidl_testing_targets) {
     deps += [ "${target}_sdk($fidl_toolchain)" ]
+  }
+}
+
+# Contains all the API libraries that are in the "partner_internal" SDK
+# category. This is to create the "sdk_partner_internal_libs" group below,
+# this group is used to ensure that we run the FIDL API compatibility tests on
+# these libraries.
+# TODO(fxb/119264): Add elements to this list.
+_sdk_partner_internal_fidl_libraries = []
+
+group("sdk_partner_internal_libs") {
+  public_deps = []
+  foreach(fidl_library, _sdk_partner_internal_fidl_libraries) {
+    public_deps += [
+      "//sdk/fidl/${fidl_library}:${fidl_library}_sdk($fidl_toolchain)",
+      "//sdk/fidl/${fidl_library}($fidl_toolchain)",
+    ]
+  }
+}
+
+group("sdk_partner_internal_libs_allowlist") {
+  visibility = []
+  foreach(fidl_library, _sdk_partner_internal_fidl_libraries) {
+    visibility += [ "//sdk/fidl/${fidl_library}($fidl_toolchain)" ]
   }
 }

@@ -61,9 +61,13 @@ template("fidl_library") {
       defined(invoker.sdk_category) && invoker.sdk_category != "excluded"
   is_sdk_included_publishable =
       is_sdk_included && invoker.sdk_category != "internal" &&
-      invoker.sdk_category != "experimental"
+      invoker.sdk_category != "experimental" &&
+      invoker.sdk_category != "partner_internal"
   is_sdk_included_publishable_nontest =
       is_sdk_included_publishable && invoker.sdk_category != "cts"
+  requires_compatibility_tests = is_sdk_included_publishable ||
+                                 (defined(invoker.sdk_category) &&
+                                  invoker.sdk_category == "partner_internal")
 
   # Additional dependencies to add when this target is published in an SDK.
   sdk_atom_deps = []
@@ -76,7 +80,7 @@ template("fidl_library") {
   if (!is_sdk_included) {
     not_needed([ "sdk_atom_deps" ])
   }
-  if (!is_sdk_included_publishable) {
+  if (!requires_compatibility_tests) {
     not_needed([ "goldens_dir" ])
   }
   if (!is_sdk_included_publishable_nontest) {
@@ -219,7 +223,7 @@ template("fidl_library") {
 
   # Enforce compatibility checks for all published SDK FIDLs in the Fuchsia
   # namespace.
-  if (is_sdk_included_publishable) {
+  if (requires_compatibility_tests) {
     # The current level might be a supported level. Don't double count it.
     current_level = platform_version.in_development_api_level
     policy_for_current_level = "no_breaking_changes"
@@ -338,7 +342,18 @@ template("fidl_library") {
       ":$lint_target_name",
     ]
 
-    deps = [ ":$verification_target_name" ]
+    deps = [
+      ":$plasa_fragment_target_name",
+      ":$verification_target_name",
+    ]
+
+    # Ensures that all libraries that are in the "partner_internal" category are
+    # in the "sdk_partner_internal_libs_allowlist" target. This is used to
+    # ensure that the API compatibility tests actually run on these libraries.
+    if (defined(invoker.sdk_category) &&
+        invoker.sdk_category == "partner_internal") {
+      deps += [ "//sdk/fidl:sdk_partner_internal_libs_allowlist" ]
+    }
   }
 
   if (is_sdk_included) {

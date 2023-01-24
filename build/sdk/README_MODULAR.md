@@ -69,6 +69,8 @@ restrictive to least restrictive:
 guarantees.
 - `internal`: The element is available within the Fuchsia tree only.
 - `cts`: The element may be used in the Fuchsia Compatibility Test Suite.
+- `partner_internal`: The element may be used by by prebuilts redistributed to
+some select partners.
 - `partner`: The element may be used by select partners.
 - `public`: The element may be used by anyone.
 
