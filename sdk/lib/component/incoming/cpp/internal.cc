@@ -107,11 +107,9 @@ zx::result<> OpenNamedServiceAtRaw(fidl::UnownedClientEnd<fuchsia_io::Directory>
 
 zx::result<> DirectoryOpenFunc(zx::unowned_channel dir, fidl::StringView path,
                                fidl::internal::AnyTransport remote) {
-  fidl::UnownedClientEnd<fuchsia_io::Directory> dir_end(dir);
-  fidl::ServerEnd<fuchsia_io::Node> node_end(remote.release<fidl::internal::ChannelTransport>());
-  fidl::Status result = fidl::WireCall<fuchsia_io::Directory>(dir_end)->Open(
-      fuchsia_io::wire::OpenFlags::kRightReadable, 0755u, path, std::move(node_end));
-  return zx::make_result(result.status());
+  return zx::make_result(
+      fdio_service_connect_at(dir->get(), std::string(path.get()).c_str(),
+                              remote.release<fidl::internal::ChannelTransport>().release()));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetGlobalServiceDirectory() {
