@@ -12,6 +12,13 @@ import("//src/chromium/generate_pkg_and_config.gni")
 #                        is appended to the innermost folder of the base paths
 #                        passed into the generate_package_flavors_and_config template.
 
+declare_args() {
+  # Whether to use the most recent (canary) version of the CastRunner prebuilt.
+  # Otherwise, the qualified "release" version is used.
+  # Set [`use_chromium_canary`](#use_chromium_canary) to the same value.
+  use_cast_runner_canary = false
+}
+
 template("generate_cast_targets") {
   assert(defined(invoker.archive_path_suffix))
 
@@ -48,18 +55,23 @@ template("generate_cast_targets") {
     ]
   }
 
-  generate_package_flavors_and_config("cast_runner") {
+  generate_fuchsia_web_package_flavors("cast_runner") {
     prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
     custom_package_path = "${build_output_gen_base_path}/fuchsia_web/runners/${target_name}/${target_name}.far"
     selections = package_flavor_selections
 
-    # Config data arguments.
-    for_pkg = "appmgr"
-    sources = [ "//src/cast/config/cast_scheme_map.config" ]
-    outputs = [ "scheme_map/cast.config" ]
+    # TODO(crbug.com/1385930): Change this to "chromium.org".
+    # Also override or templatize `./config/cast_scheme_map.config`.
+    repository = "fuchsia.com"
 
     # The chromium_cast_runner_tests need to depend on the config.
     # TODO(crbug.com/1065707): Remove once the deps has been removed.
     visibility = [ "//src/chromium:*" ]
+  }
+
+  generate_config("cast_runner") {
+    for_pkg = "appmgr"
+    sources = [ "//src/cast/config/cast_scheme_map.config" ]
+    outputs = [ "scheme_map/cast.config" ]
   }
 }

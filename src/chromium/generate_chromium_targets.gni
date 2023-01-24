@@ -9,140 +9,36 @@ import("//src/chromium/generate_pkg_and_config.gni")
 import("//src/lib/icu/tzdata/icu_tzdata_config_data.gni")
 import("//src/sys/core/build/core_shard.gni")
 
-# Helper template that generates prebuilt Chromium packages.
+prebuilt_archive_root_path = "//prebuilt/third_party"
+build_output_gen_base_path = "/gen"
+
+# Generates targets for Chrome browser prebuilts.
 #
-# Parameters:
-#   archive_path_suffix: For a given package target, the archive_path_suffix
-#                        is appended to the innermost folder of the base paths
-#                        passed into the generate_package_flavors_and_config template.
-
-template("generate_chromium_targets") {
-  assert(defined(invoker.archive_path_suffix))
+# Parameters
+#
+#   repository (optional; string; default: "chromium.org")
+#     The repository host name part of the package URL.
+#     See https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository
+#     for more details.
+#
+#   available_flavors (optional)
+#     Must be set if and only if `default_flavor` is set.
+#     See `flavors` in the `prebuilt_package_with_flavors()` documentation.
+#
+#   default_flavor (optional; string)
+#     The name of the default flavor in available_flavors to use if not overridden.
+#     Must be set if and only if `flavors` is set.
+#     See `default` in the `prebuilt_package_with_flavors()` documentation.
+template("generate_chrome_browser_targets") {
   not_needed([ "target_name" ])
-
-  prebuilt_archive_root_path = "//prebuilt/third_party"
-  build_output_gen_base_path = "/gen"
-
-  group("web_engine") {
-    deps = [
-      ":tzdata_for_web_engine",
-      ":web_engine_pkg",
-    ]
-  }
-
-  # Used by integration tests to indicate they need WebEngine in the Products on
-  # which they run. It has no effect.
-  # TODO(fxbug.dev/119212): Remove once a better solution is available.
-  group("uses_web_engine") {
-    testonly = true
-  }
-
-  # TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
-  if (use_chromium_canary) {
-    package_flavor_selections += [
-      {
-        name = "web_engine_pkg"
-        flavor = "canary"
-      },
-      {
-        name = "web_engine_shell_pkg"
-        flavor = "canary"
-      },
-      {
-        name = "web_runner_pkg"
-        flavor = "canary"
-      },
-      {
-        name = "chrome_browser_pkg"
-        flavor = "canary"
-      },
-    ]
-  } else {
-    # TODO(fxbug.dev/115624): Remove once other Chrome builds are available.
-    package_flavor_selections += [
-      {
-        name = "chrome_browser_pkg"
-        flavor = "canary"
-      },
-    ]
-  }
-
-  # Setting chromium_build_dir in args.gn allows using chromium packages built
-  # directly in Chromium source.
-  if (chromium_build_dir != "") {
-    package_flavor_selections += [
-      {
-        name = "web_engine_pkg"
-        flavor = "custom"
-      },
-      {
-        name = "web_engine_shell_pkg"
-        flavor = "custom"
-      },
-      {
-        name = "web_runner_pkg"
-        flavor = "custom"
-      },
-      {
-        name = "chrome_browser_pkg"
-        flavor = "custom"
-      },
-    ]
-  }
-
-  generate_package_flavors("web_engine") {
-    prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
-
-    custom_package_path = "${build_output_gen_base_path}/fuchsia_web/webengine/${target_name}/${target_name}.far"
-    selections = package_flavor_selections
-  }
-
-  core_shard("web_context_provider_core_shard") {
-    shard_file = "config/web_context_provider.core_shard.cml"
-  }
-
-  icu_tzdata_config_data("tzdata_for_web_engine") {
-    for_pkg = "web_engine"
-  }
-
-  group("web_engine_shell") {
-    deps = [ ":web_engine_shell_pkg" ]
-    testonly = true
-  }
-
-  generate_package_flavors("web_engine_shell") {
-    prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
-    custom_package_path = "${build_output_gen_base_path}/fuchsia_web/shell/${target_name}/${target_name}.far"
-    selections = package_flavor_selections
-
-    testonly = true
-  }
-
-  group("web_runner") {
-    deps = [
-      ":web_runner_config",
-      ":web_runner_pkg",
-    ]
-  }
-
-  generate_package_flavors_and_config("web_runner") {
-    prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
-
-    custom_package_path = "${build_output_gen_base_path}/fuchsia_web/runners/${target_name}/${target_name}.far"
-    selections = package_flavor_selections
-
-    # Config data arguments.
-    for_pkg = "appmgr"
-    sources = [ "//src/chromium/config/http_scheme_map.config" ]
-    outputs = [ "scheme_map/http.config" ]
-  }
+  visibility = [ ":*" ]
 
   # This target is provided for use by the Workstation product, which cannot be
   # conditioned on `target_cpu` because that is not set in the product config.
   # TODO(crbug.com/1320078): If arm64 builds become available, remove this
   # target and the `target_cpu` condition below it.
   group("chrome_browser_if_available") {
-    visibility = [
+    visibility += [
       "//:legacy_cache_packages",  # Used by workstation_base.gni.
     ]
 
@@ -152,48 +48,261 @@ template("generate_chromium_targets") {
   }
 
   if (target_cpu == "x64") {
+    # TODO(fxbug.dev/70573): Remove this once flavors are selected at a higher
+    # level than the chromium BUILD.gn and thus before this file is imported.
+    package_flavor_selections += invoker.package_flavor_selections
+
+    # The flavor override must use the slightly different name "chrome_pkg".
     group("chrome_browser") {
+      visibility += [ "*" ]
       deps = [
-        ":chrome_browser_pkg",
-        ":tzdata_for_chrome_browser",
+        ":chrome_pkg",
+        ":tzdata_for_chrome",
       ]
     }
 
-    icu_tzdata_config_data("tzdata_for_chrome_browser") {
+    icu_tzdata_config_data("tzdata_for_chrome") {
       for_pkg = "chrome"
     }
 
-    generate_package_flavors("chrome_browser") {
-      prebuilt_archive_base_path = "${prebuilt_archive_root_path}/chrome"
-      package_name = "chrome"
-      repository = "chromium.org"
+    # Always use the custom build when the GN arg is specified.
+    if (chromium_build_dir != "") {
+      print("Using Chrome browser prebuilts from ", chromium_build_dir)
+      package_flavor_selections += [
+        {
+          name = "chrome_pkg"
+          flavor = "custom"
+        },
+      ]
+    }
+
+    generate_package_flavors("chrome") {
       custom_package_path =
           "${build_output_gen_base_path}/chrome/app/chrome/chrome.far"
       selections = package_flavor_selections
+
+      assert(
+          defined(invoker.available_flavors) ==
+              defined(invoker.default_flavor) &&
+              defined(invoker.available_flavors) == defined(invoker.repository),
+          "Either all or none of `available_flavors`, `default_flavor`, and `repository` must be defined.")
+      if (defined(invoker.available_flavors)) {
+        not_needed([ "target_name" ])
+        repository = invoker.repository
+        default_flavor = invoker.default_flavor
+        available_flavors = invoker.available_flavors
+      } else {
+        prebuilt_archive_base_path = "${prebuilt_archive_root_path}/chrome"
+        repository = "chromium.org"
+
+        # Only the Canary flavor is available in fuchsia.git.
+        default_flavor = "canary"
+        available_flavors = [
+          {
+            name = "canary"
+            archive = "${prebuilt_archive_base_path}_latest/arch/$target_cpu/${target_name}.far"
+            production_safe = true
+          },
+        ]
+      }
     }
-  }
-
-  # TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
-  # Consider alternatives to use of `flavor_suffix` in this file.
-  if (use_chromium_canary) {
-    flavor_suffix = "_latest"
   } else {
-    flavor_suffix = ""
+    not_needed([ "invoker" ])
+    not_needed([ "repository" ])
+    not_needed([ "available_flavors" ])
+    not_needed([ "default_flavor" ])
+  }
+}
+
+# Generates targets for WebEngine prebuilts.
+#
+# Parameters
+#
+#   archive_path_suffix (required)
+#     Appended to the innermost folder of the base paths passed into the
+#     `generate_package_flavors()` template.
+#
+#   repository (required; string; default: "fuchsia.com")
+#     The repository host name part of the package URL.
+#     See https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository
+#     for more details.
+#     TODO(crbug.com/1385930): Change this to "chromium.org".
+template("generate_fuchsia_web_targets") {
+  assert(defined(invoker.archive_path_suffix))
+  assert(defined(invoker.repository))
+  not_needed([ "target_name" ])
+  visibility = [ ":*" ]
+
+  # TODO(fxbug.dev/70573): Remove this once flavors are selected at a higher
+  # level than the chromium BUILD.gn and thus before this file is imported.
+  package_flavor_selections += invoker.package_flavor_selections
+
+  repository = invoker.repository
+
+  # Always use the custom build when the GN arg is specified.
+  if (chromium_build_dir != "") {
+    print("Using fuchsia.web prebuilts from ", chromium_build_dir)
+    package_flavor_selections += [
+      {
+        name = "web_engine_pkg"
+        flavor = "custom"
+      },
+    ]
   }
 
-  if (is_host) {
+  group("web_engine") {
+    # TODO(fxbug.dev/119075): Consider limiting visibility to prevent tests from
+    # depending on it rather than `:uses_web_engine`. Maybe limit it to
+    # `//products/*` and `//vendor/*`, though that is imperfect if tests get
+    # added to `//vendor/*`.
+    visibility += [ "*" ]
+    deps = [
+      ":tzdata_for_web_engine",
+      ":web_engine_pkg",
+    ]
+  }
+
+  # Used by integration tests to indicate they need WebEngine in the Products on
+  # which they run. It has no effect.
+  # TODO(fxbug.dev/119212): Remove once a better solution is available..
+  group("uses_web_engine") {
+    visibility += [ "*" ]
+    testonly = true
+  }
+
+  generate_fuchsia_web_package_flavors("web_engine") {
+    prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
+
+    custom_package_path = "${build_output_gen_base_path}/fuchsia_web/webengine/${target_name}/${target_name}.far"
+    selections = package_flavor_selections
+  }
+
+  # TODO(crbug.com/1385930): Templatize the shard file to allow specification of
+  # the `repo-hostname` and replace all other instances of similar build rules.
+  core_shard("web_context_provider_core_shard") {
+    shard_file = "config/web_context_provider.core_shard.cml"
+  }
+
+  icu_tzdata_config_data("tzdata_for_web_engine") {
+    for_pkg = "web_engine"
+  }
+}
+
+# Generates targets for prebuilts used for testing WebEngine.
+#
+# Parameters
+#
+#   archive_path_suffix (required)
+#     Appended to the innermost folder of the base paths passed into the
+#     `generate_package_flavors()` template.
+#
+#   repository (required; string; default: "fuchsia.com")
+#     The repository host name part of the package URL.
+#     See https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository
+#     for more details.
+#     TODO(crbug.com/1385930): Change this to "chromium.org".
+template("generate_fuchsia_web_test_targets") {
+  assert(defined(invoker.archive_path_suffix))
+  assert(defined(invoker.repository))
+  not_needed([ "target_name" ])
+  visibility = [ ":*" ]
+
+  # TODO(fxbug.dev/70573): Remove this once flavors are selected at a higher
+  # level than the chromium BUILD.gn and thus before this file is imported.
+  package_flavor_selections += invoker.package_flavor_selections
+
+  repository = invoker.repository
+
+  # Always use the custom build when the GN arg is specified.
+  if (chromium_build_dir != "") {
+    print("Using fuchsia.web test prebuilts from ", chromium_build_dir)
+    package_flavor_selections += [
+      {
+        name = "web_engine_shell_pkg"
+        flavor = "custom"
+      },
+      {
+        name = "web_runner_pkg"
+        flavor = "custom"
+      },
+    ]
+  }
+
+  group("web_engine_shell") {
+    visibility += [ "*" ]
+    deps = [ ":web_engine_shell_pkg" ]
+    testonly = true
+  }
+
+  generate_fuchsia_web_package_flavors("web_engine_shell") {
+    prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
+    custom_package_path = "${build_output_gen_base_path}/fuchsia_web/shell/${target_name}/${target_name}.far"
+    selections = package_flavor_selections
+
+    testonly = true
+  }
+
+  group("web_runner") {
+    visibility += [ "*" ]
+    deps = [
+      ":web_runner_config",
+      ":web_runner_pkg",
+    ]
+  }
+
+  generate_fuchsia_web_package_flavors("web_runner") {
+    prebuilt_archive_base_path = "${prebuilt_archive_root_path}/${target_name}${invoker.archive_path_suffix}"
+
+    custom_package_path = "${build_output_gen_base_path}/fuchsia_web/runners/${target_name}/${target_name}.far"
+    selections = package_flavor_selections
+  }
+
+  generate_config("web_runner") {
+    for_pkg = "appmgr"
+    sources = [ "//src/chromium/config/http_scheme_map.config" ]
+    outputs = [ "scheme_map/http.config" ]
+  }
+}
+
+if (is_host) {
+  # Generates targets for ChromeDriver prebuilt.
+  #
+  # Parameters
+  #
+  #   archive_path_suffix (required)
+  #     Appended to the innermost folder of the base paths passed into the
+  #     `generate_package_flavors()` template.
+  template("generate_host_targets") {
+    assert(defined(invoker.archive_path_suffix))
+    not_needed([ "target_name" ])
+    visibility = [ ":*" ]
+
     copy("chromedriver") {
+      visibility += [ "*" ]
       outputs = [ "${host_tools_dir}/chromedriver" ]
-      sources = [ "${prebuilt_archive_root_path}/chromedriver${invoker.archive_path_suffix}${flavor_suffix}/linux-x64/chromedriver" ]
+      sources = [ "${prebuilt_archive_root_path}/chromedriver${invoker.archive_path_suffix}/linux-x64/chromedriver" ]
     }
-  } else {
+  }
+} else {
+  # Generates targets for Chromium test prebuilts and manifests.
+  #
+  # Parameters
+  #
+  #   archive_path_suffix (required)
+  #     Appended to the innermost folder of the base paths passed into the
+  #     `generate_package_flavors()` template.
+  template("generate_test_targets") {
+    assert(defined(invoker.archive_path_suffix))
+    not_needed([ "target_name" ])
+    visibility = [ ":*" ]
+
     # Prebuilt FAR tests
     test_env = [
       atlas_env,
       nuc_env,
     ]
 
-    archive_dir = "${prebuilt_archive_root_path}/web_engine_tests${invoker.archive_path_suffix}${flavor_suffix}/arch/${target_cpu}"
+    archive_dir = "${prebuilt_archive_root_path}/web_engine_tests${invoker.archive_path_suffix}/arch/${target_cpu}"
 
     # The specific tests binaries are specified by the "tests" target in
     # https://source.chromium.org/chromium/chromium/src/+/main:fuchsia/cipd/BUILD.gn.
@@ -260,7 +369,7 @@ template("generate_chromium_targets") {
       # TODO(fxbug.dev/108563): Remove //bundles/buildbot/dfv2:core when
       # //bundles/buildbot/dfv2:core does not directly depend on
       # //src/chromium:tests
-      visibility = [
+      visibility += [
         "//bundles/buildbot/dfv2/core",
         "//src:*",
       ]

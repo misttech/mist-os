@@ -6,71 +6,115 @@ import("//build/config.gni")
 import("//build/packages/prebuilt_package_with_flavors.gni")
 import("//src/chromium/build_args.gni")
 
-# Generates a prebuilt_package_with_flavors target which allows choosing which flavor to use for
-# Chromium packages.
+# Generates a `prebuilt_package_with_flavors` target, which allows choosing a
+# specific flavor of the target to use in the build.
+#
+# Parameters
+#
+#   available_flavors (required)
+#    Must be set if and only if `default_flavor` is set.
+#    A `"custom"` flavor corresponding to `custom_package_path` is appended.
+#    See `flavors` in the `prebuilt_package_with_flavors()` documentation.
+#
+#   default_flavor (required; string)
+#     The name of the default flavor in available_flavors to use if not overridden.
+#     Must be set if and only if `flavors` is set.
+#     See `default` in the `prebuilt_package_with_flavors()` documentation.
+#
+#   custom_package_path (required)
+#     [path]: The path to the package inside a custom chromium build output directory.
+#
+#   repository (required; string)
+#     The repository host name part of the package URL.
+#     See https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository
+#     for more details.
+#
+#   selections (optional; list)
+#     Flavor choice. This allows flavor to be changed based on other build args. See
+#     //build/packages/prebuilt_package_with_flavors.gni
+#
+#   deps (optional)
+#   testonly (optional)
+#   visibility (optional)
+#     Usual GN meanings.
+#
+template("generate_package_flavors") {
+  assert(defined(invoker.available_flavors),
+         "The available flavors must be specified")
+  assert(defined(invoker.default_flavor),
+         "The default flavor must be specified")
+  assert(defined(invoker.custom_package_path),
+         "A custom package path must be specified")
+  assert(defined(invoker.repository), "The Repository must be specified")
+  assert(!defined(invoker.package_name),
+         "Custom package names are not supported")
+
+  _base_target_name = target_name
+  prebuilt_package_with_flavors("${target_name}_pkg") {
+    forward_variables_from(invoker,
+                           [
+                             "deps",
+                             "repository",
+                             "selections",
+                             "testonly",
+                             "visibility",
+                           ])
+    if (!defined(visibility)) {
+      visibility = []
+    }
+    visibility += [ ":${invoker.target_name}" ]
+
+    # Override the default behavior, which would include "_pkg".
+    package_name = _base_target_name
+
+    default = invoker.default_flavor
+    flavors = invoker.available_flavors
+    flavors += [
+      {
+        name = "custom"
+        archive = "${invoker.chromium_build_dir}${invoker.custom_package_path}"
+      },
+    ]
+  }
+}
+
+# Generates a prebuilt_package_with_flavors target for packages related to the
+# fuchsia.web` FIDL Protocol.
 #
 # Parameters
 #
 #   prebuilt_archive_base_path (required)
 #     [path]: Base path for the prebuilt archive.
 #
-#   custom_package_path (required)
-#     [path]: The path to the package inside a custom chromium build output directory.
-#
-#   package_name (optional)
-#     Name of the prebuilt package, defaults to template's target name
-#
-#   selections (optional)
-#     [list] Flavor choice. This allows flavor to be changed based on other build args. See
-#     //build/packages/prebuilt_package_with_flavors.gni
-#
-#  deps (optional)
-#  testonly (optional)
-#  visibility (optional)
-#    Usual GN meanings.
-#
-template("generate_package_flavors") {
+#   See the `generate_package_flavors` template for documentation of other
+#   parameters.
+template("generate_fuchsia_web_package_flavors") {
   assert(defined(invoker.prebuilt_archive_base_path),
          "A prebuilt archive base path must be specified")
-  assert(defined(invoker.custom_package_path),
-         "A custom package path must be specified")
 
-  prebuilt_package_with_flavors("${target_name}_pkg") {
+  generate_package_flavors("${target_name}") {
     forward_variables_from(invoker,
                            [
+                             "custom_package_path",
                              "deps",
-                             "package_name",
                              "repository",
                              "selections",
                              "testonly",
                              "visibility",
                            ])
 
-    if (defined(invoker.package_name)) {
-      package_name = invoker.package_name
-    } else {
-      package_name = invoker.target_name
-    }
+    default_flavor = "release"
 
-    if (!defined(visibility)) {
-      visibility = []
-    }
-    visibility += [ ":${invoker.target_name}" ]
-    default = "release"
-    flavors = [
+    available_flavors = [
       {
         name = "release"
-        archive = "${invoker.prebuilt_archive_base_path}/arch/$target_cpu/${package_name}.far"
+        archive = "${invoker.prebuilt_archive_base_path}/arch/$target_cpu/${target_name}.far"
         production_safe = true
       },
       {
         name = "canary"
-        archive = "${invoker.prebuilt_archive_base_path}_latest/arch/$target_cpu/${package_name}.far"
+        archive = "${invoker.prebuilt_archive_base_path}_latest/arch/$target_cpu/${target_name}.far"
         production_safe = true
-      },
-      {
-        name = "custom"
-        archive = "${chromium_build_dir}${invoker.custom_package_path}"
       },
     ]
   }
@@ -78,7 +122,6 @@ template("generate_package_flavors") {
 
 # Generates a config for Chromium packages. See //build/config.gni for
 # documentation of the parameters below.
-
 template("generate_config") {
   config_data("${target_name}_config") {
     forward_variables_from(invoker,
@@ -93,33 +136,5 @@ template("generate_config") {
       visibility = []
     }
     visibility += [ ":${invoker.target_name}" ]
-  }
-}
-
-# Helper template that generates a prebuilt_package_with_flavors target and
-# a config_data target for a given Chromium package. List of parameters is
-# the combined parameters in the generate_config and generate_flavors templates.
-
-template("generate_package_flavors_and_config") {
-  generate_package_flavors(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "custom_package_path",
-                             "prebuilt_archive_base_path",
-                             "repository",
-                             "selections",
-                             "testonly",
-                             "visibility",
-                           ])
-  }
-  generate_config(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "for_pkg",
-                             "outputs",
-                             "sources",
-                             "testonly",
-                             "visibility",
-                           ])
   }
 }

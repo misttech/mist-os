@@ -4,14 +4,76 @@
 
 import("generate_chromium_targets.gni")
 
+visibility = [ ":*" ]
+
 # This target is provided per
 # https://fuchsia.dev/fuchsia-src/development/source_code/layout?hl=en#canonical_targets
 # for use by //src:src* targets. Dependencies on Chromium-supplied packages
 # should reference specific package(s).
 group("chromium") {
-  visibility = [ "//src:*" ]
+  visibility += [ "//src:*" ]
 }
 
-generate_chromium_targets("chromium") {
-  archive_path_suffix = ""
+generate_chrome_browser_targets("chromium") {
+}
+
+# The other targets are more complex to configure for historical reasons.
+
+archive_path_suffix = ""
+
+# TODO(crbug.com/1385930): Change this to "chromium.org".
+# Also override or templatize `./config/http_scheme_map.config` and
+# `./config/web_context_provider.core_shard.cml.
+repository = "fuchsia.com"
+
+declare_args() {
+  # Whether to use the most recent (canary) version of prebuilt Chromium
+  # components. Otherwise, the qualified "release" version is used.
+  # For scenarios where CastRunner is used,
+  # [`use_cast_runner_canary`](#use_cast_runner_canary) must be set to the same
+  # value.
+  use_chromium_canary = false
+}
+
+# TODO(fxbug.dev/70573): Replace with solution that does not rely on GN args.
+# Consider abstracting the `_pkg` aspect of the target name.
+if (use_chromium_canary) {
+  package_flavor_selections += [
+    {
+      name = "web_engine_pkg"
+      flavor = "canary"
+    },
+    {
+      name = "web_engine_shell_pkg"
+      flavor = "canary"
+    },
+    {
+      name = "web_runner_pkg"
+      flavor = "canary"
+    },
+  ]
+}
+
+generate_fuchsia_web_targets("chromium") {
+}
+
+generate_fuchsia_web_test_targets("chromium") {
+}
+
+# TODO(fxbug.dev/70573, fxbug.dev/119526): Replace with a solution that
+# does not rely on GN args.
+if (use_chromium_canary) {
+  _flavor_suffix = "_latest"
+} else {
+  _flavor_suffix = ""
+}
+
+if (is_host) {
+  generate_host_targets("chromium") {
+    archive_path_suffix = "${archive_path_suffix}${_flavor_suffix}"
+  }
+} else {
+  generate_test_targets("chromium") {
+    archive_path_suffix = "${archive_path_suffix}${_flavor_suffix}"
+  }
 }

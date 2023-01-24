@@ -9,16 +9,4 @@ declare_args() {
   # All of those targets must exist in the output directory.
   # If unset, the prebuilt packages from CIPD will be used.
   chromium_build_dir = ""
-
-  # Whether to use the most recent (canary) version of prebuilt Chromium
-  # components. Otherwise, the qualified "release" version is used.
-  # For scenarios where CastRunner is used,
-  # [`use_cast_runner_canary`](#use_cast_runner_canary) must be set to the same
-  # value.
-  use_chromium_canary = false
-
-  # Whether to use the most recent (canary) version of the CastRunner prebuilt.
-  # Otherwise, the qualified "release" version is used.
-  # Set [`use_chromium_canary`](#use_chromium_canary) to the same value.
-  use_cast_runner_canary = false
 }
