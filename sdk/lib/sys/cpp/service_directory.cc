@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <lib/fdio/directory.h>
+#include <lib/fdio/namespace.h>
+#include <lib/fit/defer.h>
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/channel.h>
 
@@ -10,12 +12,18 @@ namespace sys {
 namespace {
 
 zx::channel OpenServiceRoot() {
-  zx::channel request, service_root;
-  if (zx::channel::create(0, &request, &service_root) != ZX_OK)
-    return zx::channel();
-  if (fdio_service_connect("/svc", request.release()) != ZX_OK)
-    return zx::channel();
-  return service_root;
+  fdio_flat_namespace_t* out;
+  if (zx_status_t status = fdio_ns_export_root(&out); status != ZX_OK) {
+    return {};
+  }
+  auto deferred = fit::defer([out]() { fdio_ns_free_flat_ns(out); });
+  const fdio_flat_namespace_t& ns = *out;
+  for (size_t i = 0; i < ns.count; ++i) {
+    if (std::string_view{ns.path[i]} == "/svc") {
+      return zx::channel{std::exchange(ns.handle[i], ZX_HANDLE_INVALID)};
+    }
+  }
+  return {};
 }
 
 }  // namespace
