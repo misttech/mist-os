@@ -18,10 +18,10 @@ namespace dfv2 {
 fbl::Array<const zx_device_prop_t> NodeToProps(Node* node) {
   std::vector<zx_device_prop_t> props;
   for (auto& prop : node->properties()) {
-    if (prop.key().is_int_value() && prop.value().is_int_value()) {
+    if (prop.key.is_int_value() && prop.value.is_int_value()) {
       zx_device_prop_t device_prop;
-      device_prop.id = static_cast<uint16_t>(prop.key().int_value());
-      device_prop.value = prop.value().int_value();
+      device_prop.id = static_cast<uint16_t>(prop.key.int_value());
+      device_prop.value = prop.value.int_value();
       props.push_back(device_prop);
     }
   }

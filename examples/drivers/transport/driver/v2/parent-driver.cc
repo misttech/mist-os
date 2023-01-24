@@ -7,6 +7,7 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
 #include <bind/fuchsia/examples/gizmo/cpp/bind.h>
@@ -103,12 +104,8 @@ class ParentDriverTransportDriver : public fdf::DriverBase {
     offers.push_back(fuchsia_component_decl::wire::Offer::WithService(arena, service_offer));
 
     auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-    properties[0] = fuchsia_driver_framework::wire::NodeProperty::Builder(arena)
-                        .key(fuchsia_driver_framework::wire::NodePropertyKey::WithStringValue(
-                            arena, bind_fuchsia_examples_gizmo::DEVICE))
-                        .value(fuchsia_driver_framework::wire::NodePropertyValue::WithEnumValue(
-                            arena, bind_fuchsia_examples_gizmo::DEVICE_DRIVERTRANSPORT))
-                        .Build();
+    properties[0] = fdf::MakeProperty(arena, bind_fuchsia_examples_gizmo::DEVICE,
+                                      bind_fuchsia_examples_gizmo::DEVICE_DRIVERTRANSPORT);
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, node_name)

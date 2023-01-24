@@ -106,19 +106,15 @@ std::optional<fdf::wire::NodePropertyValue> GetProperty(fdf::wire::NodeAddArgs& 
   std::optional<fdf::wire::NodePropertyValue> ret;
 
   for (auto& prop : args.properties()) {
-    if (!prop.has_key() || !prop.has_value()) {
-      continue;
-    }
-    if (prop.key().Which() != key.Which() || prop.key().has_invalid_tag()) {
+    if (prop.key.Which() != key.Which() || prop.key.has_invalid_tag()) {
       continue;
     }
 
-    if (key.is_int_value() && prop.key().int_value() != key.int_value()) {
+    if (key.is_int_value() && prop.key.int_value() != key.int_value()) {
       continue;
     }
     if (key.is_string_value()) {
-      std::string_view prop_view{prop.key().string_value().data(),
-                                 prop.key().string_value().size()};
+      std::string_view prop_view{prop.key.string_value().data(), prop.key.string_value().size()};
       std::string_view key_view{key.string_value().data(), key.string_value().size()};
       if (prop_view != key_view) {
         continue;
@@ -127,7 +123,7 @@ std::optional<fdf::wire::NodePropertyValue> GetProperty(fdf::wire::NodeAddArgs& 
 
     // We found a match. Keep iterating though, because the last property in the list of
     // properties takes precedence.
-    ret = prop.value();
+    ret = prop.value;
   }
   return ret;
 }
@@ -289,8 +285,8 @@ TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
   node.SetAddChildHook([&ran](TestNode::AddChildRequestView& rv) {
     ran = true;
     auto& prop = rv->args.properties()[0];
-    ASSERT_EQ(prop.key().int_value(), (uint32_t)BIND_PROTOCOL);
-    ASSERT_EQ(prop.value().int_value(), ZX_PROTOCOL_I2C);
+    ASSERT_EQ(prop.key.int_value(), (uint32_t)BIND_PROTOCOL);
+    ASSERT_EQ(prop.value.int_value(), ZX_PROTOCOL_I2C);
   });
 
   // Add a child device.
@@ -326,28 +322,25 @@ TEST_F(DeviceTest, AddChildWithStringProps) {
   node.SetAddChildHook([&ran](TestNode::AddChildRequestView& rv) {
     ran = true;
     auto& prop = rv->args.properties()[0];
-    ASSERT_EQ(strncmp(prop.key().string_value().data(), "hello", prop.key().string_value().size()),
-              0);
-    ASSERT_EQ(prop.value().int_value(), 1u);
+    ASSERT_EQ(strncmp(prop.key.string_value().data(), "hello", prop.key.string_value().size()), 0);
+    ASSERT_EQ(prop.value.int_value(), 1u);
 
     prop = rv->args.properties()[1];
-    ASSERT_EQ(
-        strncmp(prop.key().string_value().data(), "another", prop.key().string_value().size()), 0);
-    ASSERT_EQ(prop.value().bool_value(), true);
+    ASSERT_EQ(strncmp(prop.key.string_value().data(), "another", prop.key.string_value().size()),
+              0);
+    ASSERT_EQ(prop.value.bool_value(), true);
 
     prop = rv->args.properties()[2];
-    ASSERT_EQ(strncmp(prop.key().string_value().data(), "key", prop.key().string_value().size()),
+    ASSERT_EQ(strncmp(prop.key.string_value().data(), "key", prop.key.string_value().size()), 0);
+    ASSERT_EQ(strncmp(prop.value.string_value().data(), "value", prop.value.string_value().size()),
               0);
-    ASSERT_EQ(
-        strncmp(prop.value().string_value().data(), "value", prop.value().string_value().size()),
-        0);
 
     prop = rv->args.properties()[3];
-    ASSERT_EQ(
-        strncmp(prop.key().string_value().data(), "enum_key", prop.key().string_value().size()), 0);
-    ASSERT_EQ(strncmp(prop.value().string_value().data(), "enum_value",
-                      prop.value().string_value().size()),
+    ASSERT_EQ(strncmp(prop.key.string_value().data(), "enum_key", prop.key.string_value().size()),
               0);
+    ASSERT_EQ(
+        strncmp(prop.value.string_value().data(), "enum_value", prop.value.string_value().size()),
+        0);
   });
 
   // Add a child device.
@@ -998,27 +991,27 @@ TEST_F(DeviceTest, CreateNodeProperties) {
 
   ASSERT_EQ(7ul, properties.size());
 
-  EXPECT_EQ(11u, properties[0].key().int_value());
-  EXPECT_EQ(2u, properties[0].value().int_value());
+  EXPECT_EQ(11u, properties[0].key.int_value());
+  EXPECT_EQ(2u, properties[0].value.int_value());
 
-  EXPECT_EQ("test", properties[1].key().string_value().get());
-  EXPECT_EQ(5u, properties[1].value().int_value());
+  EXPECT_EQ("test", properties[1].key.string_value().get());
+  EXPECT_EQ(5u, properties[1].value.int_value());
 
-  EXPECT_EQ("fuchsia.hardware.i2c.Device", properties[2].key().string_value().get());
+  EXPECT_EQ("fuchsia.hardware.i2c.Device", properties[2].key.string_value().get());
   EXPECT_EQ("fuchsia.hardware.i2c.Device.ZirconTransport",
-            properties[2].value().string_value().get());
+            properties[2].value.string_value().get());
 
-  EXPECT_EQ("fuchsia.hardware.i2c.Service", properties[3].key().string_value().get());
+  EXPECT_EQ("fuchsia.hardware.i2c.Service", properties[3].key.string_value().get());
   EXPECT_EQ("fuchsia.hardware.i2c.Service.ZirconTransport",
-            properties[3].value().string_value().get());
+            properties[3].value.string_value().get());
 
-  EXPECT_EQ(static_cast<uint32_t>(BIND_FIDL_PROTOCOL), properties[4].key().int_value());
-  EXPECT_EQ(3u, properties[4].value().int_value());
+  EXPECT_EQ(static_cast<uint32_t>(BIND_FIDL_PROTOCOL), properties[4].key.int_value());
+  EXPECT_EQ(3u, properties[4].value.int_value());
 
-  EXPECT_EQ("fuchsia.hardware.gpio.Service", properties[5].key().string_value().get());
+  EXPECT_EQ("fuchsia.hardware.gpio.Service", properties[5].key.string_value().get());
   EXPECT_EQ("fuchsia.hardware.gpio.Service.DriverTransport",
-            properties[5].value().string_value().get());
+            properties[5].value.string_value().get());
 
-  EXPECT_EQ(static_cast<uint32_t>(BIND_PROTOCOL), properties[6].key().int_value());
-  EXPECT_EQ(10u, properties[6].value().int_value());
+  EXPECT_EQ(static_cast<uint32_t>(BIND_PROTOCOL), properties[6].key.int_value());
+  EXPECT_EQ(10u, properties[6].value.int_value());
 }

@@ -471,10 +471,10 @@ TEST(MiscTestCase, AddNodeGroup) {
   };
 
   auto properties = fidl::VectorView<fdf::wire::NodeProperty>(allocator, 1);
-  properties[0] = fdf::wire::NodeProperty::Builder(allocator)
-                      .key(fdf::wire::NodePropertyKey::WithIntValue(10))
-                      .value(fdf::wire::NodePropertyValue::WithIntValue(500))
-                      .Build();
+  properties[0] = fdf::wire::NodeProperty{
+      .key = fdf::wire::NodePropertyKey::WithIntValue(10),
+      .value = fdf::wire::NodePropertyValue::WithIntValue(500),
+  };
 
   fidl::VectorView<fdf::wire::NodeRepresentation> nodes(allocator, 1);
   nodes[0] = fdf::wire::NodeRepresentation{

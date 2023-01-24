@@ -46,8 +46,8 @@ pub fn write_node_properties(
     writeln!(writer, "  {0} {1}", props_len, "Properties")?;
 
     for (index, property) in properties.into_iter().enumerate() {
-        let key = node_property_key_to_string(&property.key.clone().unwrap());
-        let value = node_property_value_to_string(&property.value.clone().unwrap());
+        let key = node_property_key_to_string(&property.key);
+        let value = node_property_value_to_string(&property.value);
         writeln!(
             writer,
             "  [{0:>2}/{1:>2}] : Key {2:30} Value {3}",

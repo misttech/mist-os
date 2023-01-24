@@ -49,12 +49,12 @@ type NodePropertyValue = flexible union {
 
 /// Definition of a property for a node. A property is commonly used to match a
 /// node to a driver for driver binding.
-type NodeProperty = table {
+type NodeProperty = struct {
     /// Key for the property.
-    1: key NodePropertyKey;
+    key NodePropertyKey;
 
     /// Value for the property.
-    2: value NodePropertyValue;
+    value NodePropertyValue;
 };
 
 /// Arguments for adding a node.

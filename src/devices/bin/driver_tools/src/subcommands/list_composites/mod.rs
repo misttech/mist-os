@@ -129,14 +129,12 @@ mod tests {
     fn gen_composite_property_data() -> Vec<fdf::NodeProperty> {
         vec![
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("avocet".to_string())),
-                value: Some(fdf::NodePropertyValue::IntValue(10)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("avocet".to_string()),
+                value: fdf::NodePropertyValue::IntValue(10),
             },
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("stilt".to_string())),
-                value: Some(fdf::NodePropertyValue::BoolValue(false)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("stilt".to_string()),
+                value: fdf::NodePropertyValue::BoolValue(false),
             },
         ]
     }

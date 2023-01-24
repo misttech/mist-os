@@ -985,15 +985,14 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
 TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
   FakeDriverIndex driver_index(
       dispatcher(), [](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
-        if (args.has_properties() && args.properties()[0].key().is_int_value() &&
-            args.properties()[0].key().int_value() == 0x1985 &&
-            args.properties()[0].value().is_int_value() &&
-            args.properties()[0].value().int_value() == 0x2301
+        if (args.has_properties() && args.properties()[0].key.is_int_value() &&
+            args.properties()[0].key.int_value() == 0x1985 &&
+            args.properties()[0].value.is_int_value() &&
+            args.properties()[0].value.int_value() == 0x2301
 
-            && args.properties()[1].key().is_string_value() &&
-            args.properties()[1].key().string_value().get() == "fuchsia.driver.framework.dfv2" &&
-            args.properties()[1].value().is_bool_value() &&
-            args.properties()[1].value().bool_value()
+            && args.properties()[1].key.is_string_value() &&
+            args.properties()[1].key.string_value().get() == "fuchsia.driver.framework.dfv2" &&
+            args.properties()[1].value.is_bool_value() && args.properties()[1].value.bool_value()
 
         ) {
           return zx::ok(FakeDriverIndex::MatchResult{
@@ -1035,10 +1034,10 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
         EXPECT_EQ(ZX_OK, root_node.Bind(std::move(*start_args.mutable_node()), dispatcher()));
         fdf::NodeAddArgs args;
         args.set_name("second");
-        args.mutable_properties()->emplace_back(
-            std::move(fdf::NodeProperty()
-                          .set_key(fdf::NodePropertyKey::WithIntValue(0x1985))
-                          .set_value(fdf::NodePropertyValue::WithIntValue(0x2301))));
+        args.mutable_properties()->emplace_back(fdf::NodeProperty{
+            .key = fdf::NodePropertyKey::WithIntValue(0x1985),
+            .value = fdf::NodePropertyValue::WithIntValue(0x2301),
+        });
         root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
                             [](auto result) { EXPECT_FALSE(result.is_err()); });
         BindDriver(std::move(request), std::move(root_node));
@@ -1133,9 +1132,8 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
     fdf::NodeAddArgs args;
     args.set_name("second");
     args.mutable_properties()->emplace_back(
-        std::move(fdf::NodeProperty()
-                      .set_key(fdf::NodePropertyKey::WithStringValue("driver.prop-one"))
-                      .set_value(fdf::NodePropertyValue::WithStringValue("value"))));
+        fdf::NodeProperty{.key = fdf::NodePropertyKey::WithStringValue("driver.prop-one"),
+                          .value = fdf::NodePropertyValue::WithStringValue("value")});
     fdf::NodeControllerPtr node_controller;
     root_node->AddChild(std::move(args), node_controller.NewRequest(dispatcher()), {},
                         [](auto result) { EXPECT_FALSE(result.is_err()); });

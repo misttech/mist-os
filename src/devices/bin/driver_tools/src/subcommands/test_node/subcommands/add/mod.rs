@@ -16,9 +16,8 @@ fn string_to_property(prop: &str) -> Result<fdf::NodeProperty> {
     }
 
     Ok(fdf::NodeProperty {
-        key: Some(fdf::NodePropertyKey::StringValue(split[0].to_string())),
-        value: Some(fdf::NodePropertyValue::StringValue(split[1].to_string())),
-        ..fdf::NodeProperty::EMPTY
+        key: fdf::NodePropertyKey::StringValue(split[0].to_string()),
+        value: fdf::NodePropertyValue::StringValue(split[1].to_string()),
     })
 }
 

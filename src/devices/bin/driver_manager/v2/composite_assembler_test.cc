@@ -121,11 +121,11 @@ TEST_F(CompositeAssemblerTest, CreateSingleParentComposite) {
   ASSERT_EQ(1ul, child->parents().size());
 
   ASSERT_EQ(2ul, child->properties().size());
-  ASSERT_EQ(kPropId, child->properties()[0].key().int_value());
-  ASSERT_EQ(kPropValue, child->properties()[0].value().int_value());
+  ASSERT_EQ(kPropId, child->properties()[0].key.int_value());
+  ASSERT_EQ(kPropValue, child->properties()[0].value.int_value());
 
-  ASSERT_EQ(static_cast<uint32_t>(BIND_COMPOSITE), child->properties()[1].key().int_value());
-  ASSERT_EQ(1ul, child->properties()[1].value().int_value());
+  ASSERT_EQ(static_cast<uint32_t>(BIND_COMPOSITE), child->properties()[1].key.int_value());
+  ASSERT_EQ(1ul, child->properties()[1].value.int_value());
 
   // Check that our node no longer matches now that the composite has been created.
   ASSERT_FALSE(manager.BindNode(node));
@@ -170,11 +170,11 @@ TEST_F(CompositeAssemblerTest, CreateTwoParentComposite) {
   ASSERT_EQ(2ul, child->parents().size());
 
   ASSERT_EQ(2ul, child->properties().size());
-  ASSERT_EQ(kPropId, child->properties()[0].key().int_value());
-  ASSERT_EQ(kPropValue, child->properties()[0].value().int_value());
+  ASSERT_EQ(kPropId, child->properties()[0].key.int_value());
+  ASSERT_EQ(kPropValue, child->properties()[0].value.int_value());
 
-  ASSERT_EQ(static_cast<uint32_t>(BIND_COMPOSITE), child->properties()[1].key().int_value());
-  ASSERT_EQ(1ul, child->properties()[1].value().int_value());
+  ASSERT_EQ(static_cast<uint32_t>(BIND_COMPOSITE), child->properties()[1].key.int_value());
+  ASSERT_EQ(1ul, child->properties()[1].value.int_value());
 
   // Check that our node no longer matches now that the composite has been created.
   ASSERT_FALSE(manager.BindNode(node));
@@ -225,8 +225,8 @@ TEST_F(CompositeAssemblerTest, NodeRemovesCorrectly) {
   ASSERT_EQ(kCompositeName, child->name());
   ASSERT_EQ(2ul, child->parents().size());
 
-  ASSERT_EQ(kPropId, child->properties()[0].key().int_value());
-  ASSERT_EQ(kPropValue, child->properties()[0].value().int_value());
+  ASSERT_EQ(kPropId, child->properties()[0].key.int_value());
+  ASSERT_EQ(kPropValue, child->properties()[0].value.int_value());
 
   // Check that our node no longer matches now that the composite has been created.
   ASSERT_FALSE(manager.BindNode(node));
@@ -265,8 +265,8 @@ TEST_F(CompositeAssemblerTest, TwoSingleParentComposite) {
   auto child = node->children().front();
   ASSERT_EQ(kCompositeName, child->name());
   ASSERT_EQ(1ul, child->parents().size());
-  ASSERT_EQ(kPropId, child->properties()[0].key().int_value());
-  ASSERT_EQ(kPropValue, child->properties()[0].value().int_value());
+  ASSERT_EQ(kPropId, child->properties()[0].key.int_value());
+  ASSERT_EQ(kPropValue, child->properties()[0].value.int_value());
 
   // Match to the second composite device.
   child = node->children().back();
@@ -308,8 +308,8 @@ TEST_F(CompositeAssemblerTest, AddCompositeAfterNode) {
   auto child = node->children().front();
   ASSERT_EQ(kCompositeName, child->name());
   ASSERT_EQ(1ul, child->parents().size());
-  ASSERT_EQ(kPropId, child->properties()[0].key().int_value());
-  ASSERT_EQ(kPropValue, child->properties()[0].value().int_value());
+  ASSERT_EQ(kPropId, child->properties()[0].key.int_value());
+  ASSERT_EQ(kPropValue, child->properties()[0].value.int_value());
 
   // Add a new composite device. The Manager should check already bound nodes,
   // so it should create a new composite device immediately,
@@ -353,8 +353,8 @@ TEST_F(CompositeAssemblerTest, Rebind) {
   auto child = node->children().front();
   ASSERT_EQ(kCompositeName, child->name());
   ASSERT_EQ(1ul, child->parents().size());
-  ASSERT_EQ(kPropId, child->properties()[0].key().int_value());
-  ASSERT_EQ(kPropValue, child->properties()[0].value().int_value());
+  ASSERT_EQ(kPropId, child->properties()[0].key.int_value());
+  ASSERT_EQ(kPropValue, child->properties()[0].value.int_value());
 
   // Try and rebind. This shouldn't change anything
   manager.RebindNodes();

@@ -597,35 +597,30 @@ void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodeProperty
                                     fuchsia_driver_framework::wire::NodePropertyValue value) {
   bool found = false;
   for (auto& prop : properties_) {
-    if (!prop.has_key()) {
-      continue;
-    }
-
-    if (prop.key().Which() != key.Which()) {
+    if (prop.key.Which() != key.Which()) {
       continue;
     }
 
     if (key.is_string_value()) {
-      std::string_view prop_key_view(prop.key().string_value().data(),
-                                     prop.key().string_value().size());
+      std::string_view prop_key_view(prop.key.string_value().data(),
+                                     prop.key.string_value().size());
       std::string_view key_view(key.string_value().data(), key.string_value().size());
       if (key_view == prop_key_view) {
         found = true;
       }
     } else if (key.is_int_value()) {
-      if (key.int_value() == prop.key().int_value()) {
+      if (key.int_value() == prop.key.int_value()) {
         found = true;
       }
     }
 
     if (found) {
-      prop.value() = value;
+      prop.value = value;
       break;
     }
   }
   if (!found) {
-    properties_.emplace_back(
-        fdf::wire::NodeProperty::Builder(arena_).key(key).value(value).Build());
+    properties_.emplace_back(fdf::wire::NodeProperty{.key = key, .value = value});
   }
 }
 

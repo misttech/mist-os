@@ -27,8 +27,8 @@ const std::string kFakeDriverUrl = "#driver/mock-device.so";
 zx::result<FakeDriverIndex::MatchResult> MatchFakeDriver(
     fuchsia_driver_index::wire::MatchDriverArgs args) {
   for (auto& prop : args.properties()) {
-    if (prop.key().is_int_value() && prop.key().int_value() == BIND_PROTOCOL &&
-        prop.value().is_int_value() && prop.value().int_value() == ZX_PROTOCOL_TEST) {
+    if (prop.key.is_int_value() && prop.key.int_value() == BIND_PROTOCOL &&
+        prop.value.is_int_value() && prop.value.int_value() == ZX_PROTOCOL_TEST) {
       return zx::ok(FakeDriverIndex::MatchResult{
           .url = kFakeDriverUrl,
           .colocate = true,

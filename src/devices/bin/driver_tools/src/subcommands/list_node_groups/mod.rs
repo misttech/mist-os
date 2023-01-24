@@ -188,13 +188,12 @@ mod tests {
                                         )],
                                     }],
                                     properties: vec![fdf::NodeProperty {
-                                        key: Some(fdf::NodePropertyKey::StringValue(
+                                        key: fdf::NodePropertyKey::StringValue(
                                             "prop_key".to_string(),
-                                        )),
-                                        value: Some(fdf::NodePropertyValue::StringValue(
+                                        ),
+                                        value: fdf::NodePropertyValue::StringValue(
                                             "prop_val".to_string(),
-                                        )),
-                                        ..fdf::NodeProperty::EMPTY
+                                        ),
                                     }],
                                 }]),
                                 ..fdd::NodeGroupInfo::EMPTY
@@ -224,13 +223,12 @@ mod tests {
                                             ],
                                         }],
                                         properties: vec![fdf::NodeProperty {
-                                            key: Some(fdf::NodePropertyKey::StringValue(
+                                            key: fdf::NodePropertyKey::StringValue(
                                                 "prop_key_0".to_string(),
-                                            )),
-                                            value: Some(fdf::NodePropertyValue::StringValue(
+                                            ),
+                                            value: fdf::NodePropertyValue::StringValue(
                                                 "prop_val_0".to_string(),
-                                            )),
-                                            ..fdf::NodeProperty::EMPTY
+                                            ),
                                         }],
                                     },
                                     fdf::NodeRepresentation {
@@ -254,29 +252,24 @@ mod tests {
                                         ],
                                         properties: vec![
                                             fdf::NodeProperty {
-                                                key: Some(fdf::NodePropertyKey::StringValue(
+                                                key: fdf::NodePropertyKey::StringValue(
                                                     "prop_key_1".to_string(),
-                                                )),
-                                                value: Some(fdf::NodePropertyValue::EnumValue(
+                                                ),
+                                                value: fdf::NodePropertyValue::EnumValue(
                                                     "prop_key_1.prop_val".to_string(),
-                                                )),
-                                                ..fdf::NodeProperty::EMPTY
+                                                ),
                                             },
                                             fdf::NodeProperty {
-                                                key: Some(fdf::NodePropertyKey::StringValue(
+                                                key: fdf::NodePropertyKey::StringValue(
                                                     "prop_key_2".to_string(),
-                                                )),
-                                                value: Some(fdf::NodePropertyValue::IntValue(0x1)),
-                                                ..fdf::NodeProperty::EMPTY
+                                                ),
+                                                value: fdf::NodePropertyValue::IntValue(0x1),
                                             },
                                             fdf::NodeProperty {
-                                                key: Some(fdf::NodePropertyKey::StringValue(
+                                                key: fdf::NodePropertyKey::StringValue(
                                                     "prop_key_3".to_string(),
-                                                )),
-                                                value: Some(fdf::NodePropertyValue::BoolValue(
-                                                    true,
-                                                )),
-                                                ..fdf::NodeProperty::EMPTY
+                                                ),
+                                                value: fdf::NodePropertyValue::BoolValue(true),
                                             },
                                         ],
                                     },

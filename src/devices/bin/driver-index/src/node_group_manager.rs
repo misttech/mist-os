@@ -541,7 +541,7 @@ mod tests {
         key: fdf::NodePropertyKey,
         value: fdf::NodePropertyValue,
     ) -> fdf::NodeProperty {
-        fdf::NodeProperty { key: Some(key), value: Some(value), ..fdf::NodeProperty::EMPTY }
+        fdf::NodeProperty { key: key, value: value }
     }
 
     // TODO(fxb/120270): Update tests so that they use the test data functions more often.
@@ -2049,11 +2049,10 @@ mod tests {
 
         let additional_node_representation_a = fdf::NodeRepresentation {
             bind_rules: additional_bind_rules_1,
-            properties: vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(additional_a_key_1)),
-                value: Some(fdf::NodePropertyValue::IntValue(additional_a_val_1)),
-                ..fdf::NodeProperty::EMPTY
-            }],
+            properties: vec![make_property(
+                fdf::NodePropertyKey::IntValue(additional_a_key_1),
+                fdf::NodePropertyValue::IntValue(additional_a_val_1),
+            )],
         };
 
         let additional_node_a_inst = vec![

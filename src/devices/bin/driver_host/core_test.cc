@@ -403,10 +403,10 @@ TEST_F(CoreTest, AddNodeGroup) {
 
         auto node_1_props_result = node_result_1.properties;
         EXPECT_EQ(2, node_1_props_result.count());
-        ASSERT_EQ(100, node_1_props_result.at(0).key().int_value());
-        ASSERT_FALSE(node_1_props_result.at(0).value().bool_value());
-        ASSERT_STREQ("kinglet", node_1_props_result.at(1).key().string_value());
-        ASSERT_EQ(20, node_1_props_result.at(1).value().int_value());
+        ASSERT_EQ(100, node_1_props_result.at(0).key.int_value());
+        ASSERT_FALSE(node_1_props_result.at(0).value.bool_value());
+        ASSERT_STREQ("kinglet", node_1_props_result.at(1).key.string_value());
+        ASSERT_EQ(20, node_1_props_result.at(1).value.int_value());
 
         // Check the second node.
         auto node_result_2 = node_group.nodes.at(1);
@@ -427,8 +427,8 @@ TEST_F(CoreTest, AddNodeGroup) {
 
         auto node_2_prop_result = node_result_2.properties;
         EXPECT_EQ(1, node_2_prop_result.count());
-        ASSERT_EQ(100, node_2_prop_result.at(0).key().int_value());
-        ASSERT_TRUE(node_2_prop_result.at(0).value().bool_value());
+        ASSERT_EQ(100, node_2_prop_result.at(0).key.int_value());
+        ASSERT_TRUE(node_2_prop_result.at(0).value.bool_value());
       };
 
   coordinator_.set_node_group_callback(std::move(test_callback));

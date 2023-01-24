@@ -56,38 +56,33 @@ zx_status_t PlatformInterruptFragment::Add(const char* name, PlatformDevice* pde
 
   if (irq.properties().has_value()) {
     for (auto& prop : irq.properties().value()) {
-      if (!prop.key().has_value() || !prop.value().has_value()) {
-        zxlogf(ERROR, "Interrupt property has no key/value");
-        return ZX_ERR_INVALID_ARGS;
-      }
-      switch (prop.key()->Which()) {
+      switch (prop.key().Which()) {
         case fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue:
-          if (prop.value()->Which() !=
-              fuchsia_driver_framework::NodePropertyValue::Tag::kIntValue) {
+          if (prop.value().Which() != fuchsia_driver_framework::NodePropertyValue::Tag::kIntValue) {
             return ZX_ERR_NOT_SUPPORTED;
           }
           props.emplace_back(zx_device_prop_t{
-              .id = static_cast<uint16_t>(prop.key()->int_value().value()),
-              .value = prop.value()->int_value().value(),
+              .id = static_cast<uint16_t>(prop.key().int_value().value()),
+              .value = prop.value().int_value().value(),
           });
           break;
 
         case fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue: {
           auto& str_prop = str_props.emplace_back(zx_device_str_prop_t{
-              .key = prop.key()->string_value()->data(),
+              .key = prop.key().string_value()->data(),
           });
-          switch (prop.value()->Which()) {
+          switch (prop.value().Which()) {
             case fuchsia_driver_framework::NodePropertyValue::Tag::kStringValue:
-              str_prop.property_value = str_prop_str_val(prop.value()->string_value()->data());
+              str_prop.property_value = str_prop_str_val(prop.value().string_value()->data());
               break;
             case fuchsia_driver_framework::NodePropertyValue::Tag::kIntValue:
-              str_prop.property_value = str_prop_int_val(prop.value()->int_value().value());
+              str_prop.property_value = str_prop_int_val(prop.value().int_value().value());
               break;
             case fuchsia_driver_framework::NodePropertyValue::Tag::kEnumValue:
-              str_prop.property_value = str_prop_enum_val(prop.value()->enum_value()->data());
+              str_prop.property_value = str_prop_enum_val(prop.value().enum_value()->data());
               break;
             case fuchsia_driver_framework::NodePropertyValue::Tag::kBoolValue:
-              str_prop.property_value = str_prop_bool_val(prop.value()->bool_value().value());
+              str_prop.property_value = str_prop_bool_val(prop.value().bool_value().value());
               break;
             default:
               zxlogf(ERROR, "Invalid property value.");

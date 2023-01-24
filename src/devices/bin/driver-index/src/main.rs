@@ -948,9 +948,8 @@ mod tests {
         let test_task = async move {
             // Check the value from the 'test-bind' binary. This should match my-driver.cm
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(1)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(1),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -977,9 +976,8 @@ mod tests {
 
             // Check the value from the 'test-bind2' binary. This should match my-driver2.cm
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1005,9 +1003,8 @@ mod tests {
 
             // Check an unknown value. This should return the NOT_FOUND error.
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(3)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(3),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1069,9 +1066,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("my-key".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("test-value".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("my-key".to_string()),
+                value: fdf::NodePropertyValue::StringValue("test-value".to_string()),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1144,9 +1140,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("my-key".to_string())),
-                value: Some(fdf::NodePropertyValue::EnumValue("test-value".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("my-key".to_string()),
+                value: fdf::NodePropertyValue::EnumValue("test-value".to_string()),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1231,9 +1226,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1330,9 +1324,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1408,9 +1401,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1515,9 +1507,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1607,9 +1598,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1720,9 +1710,8 @@ mod tests {
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1950,9 +1939,8 @@ mod tests {
 
         execute_driver_index_test(index, stream, async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -1988,9 +1976,8 @@ mod tests {
 
         execute_driver_index_test(index, stream, async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2031,9 +2018,8 @@ mod tests {
 
         execute_driver_index_test(index, stream, async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2069,9 +2055,8 @@ mod tests {
 
         execute_driver_index_test(index, stream, async move {
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2110,9 +2095,8 @@ mod tests {
         let test_task = async move {
             // Check the value from the 'test-bind' binary. This should match my-driver.cm
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(1)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(1),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2134,9 +2118,8 @@ mod tests {
 
             // Check the value from the 'test-bind2' binary. This should match my-driver2.cm
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(2)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(2),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2158,9 +2141,8 @@ mod tests {
 
             // Check an unknown value. This should return the NOT_FOUND error.
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(3)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(3),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2249,9 +2231,8 @@ mod tests {
         let test_task = async move {
             // Match primary node.
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2282,14 +2263,12 @@ mod tests {
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![
                     fdf::NodeProperty {
-                        key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                        value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                        ..fdf::NodeProperty::EMPTY
+                        key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                        value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
                     },
                     fdf::NodeProperty {
-                        key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
-                        value: Some(fdf::NodePropertyValue::IntValue(1)),
-                        ..fdf::NodeProperty::EMPTY
+                        key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
+                        value: fdf::NodePropertyValue::IntValue(1),
                     },
                 ]),
                 ..fdi::MatchDriverArgs::EMPTY
@@ -2406,9 +2385,8 @@ mod tests {
         let test_task = async move {
             // Match primary node.
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2439,14 +2417,12 @@ mod tests {
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![
                     fdf::NodeProperty {
-                        key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                        value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                        ..fdf::NodeProperty::EMPTY
+                        key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                        value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
                     },
                     fdf::NodeProperty {
-                        key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
-                        value: Some(fdf::NodePropertyValue::IntValue(1)),
-                        ..fdf::NodeProperty::EMPTY
+                        key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
+                        value: fdf::NodePropertyValue::IntValue(1),
                     },
                 ]),
                 ..fdi::MatchDriverArgs::EMPTY
@@ -2474,9 +2450,8 @@ mod tests {
 
             // The optional node should not match.
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("trembler".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                value: fdf::NodePropertyValue::StringValue("trembler".to_string()),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),
@@ -2524,9 +2499,8 @@ mod tests {
             ];
 
             let properties = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             assert_eq!(
@@ -2546,14 +2520,12 @@ mod tests {
 
             let device_properties_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::IntValue(1)),
-                    value: Some(fdf::NodePropertyValue::IntValue(200)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::IntValue(1),
+                    value: fdf::NodePropertyValue::IntValue(200),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("lapwing".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("plover".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
                 },
             ];
             let match_args = fdi::MatchDriverArgs {
@@ -2577,14 +2549,12 @@ mod tests {
 
             let device_properties_mismatch = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::IntValue(1)),
-                    value: Some(fdf::NodePropertyValue::IntValue(200)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::IntValue(1),
+                    value: fdf::NodePropertyValue::IntValue(200),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("lapwing".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("dotterel".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("dotterel".to_string()),
                 },
             ];
             let mismatch_args = fdi::MatchDriverArgs {
@@ -2655,9 +2625,8 @@ mod tests {
             ];
 
             let properties = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             assert_eq!(
@@ -2677,14 +2646,12 @@ mod tests {
 
             let device_properties_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::IntValue(1)),
-                    value: Some(fdf::NodePropertyValue::IntValue(200)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::IntValue(1),
+                    value: fdf::NodePropertyValue::IntValue(200),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("lapwing".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("plover".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
                 },
             ];
             let match_args = fdi::MatchDriverArgs {
@@ -2722,14 +2689,12 @@ mod tests {
 
             let device_properties_mismatch = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::IntValue(1)),
-                    value: Some(fdf::NodePropertyValue::IntValue(200)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::IntValue(1),
+                    value: fdf::NodePropertyValue::IntValue(200),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("lapwing".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("dotterel".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("dotterel".to_string()),
                 },
             ];
             let mismatch_args = fdi::MatchDriverArgs {
@@ -2848,9 +2813,8 @@ mod tests {
             ];
 
             let node_1_props_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             let node_2_bind_rules = vec![fdf::BindRule {
@@ -2861,14 +2825,12 @@ mod tests {
 
             let node_2_props_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
-                    value: Some(fdf::NodePropertyValue::IntValue(1)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
+                    value: fdf::NodePropertyValue::IntValue(1),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
                 },
             ];
 
@@ -2893,9 +2855,8 @@ mod tests {
             assert_eq!(url.to_string(), result.0.driver_info.unwrap().url.unwrap());
 
             let node_1_props_nonmatch = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
             }];
 
             assert_eq!(
@@ -2920,9 +2881,8 @@ mod tests {
             );
 
             let node_2_props_nonmatch = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(1)),
-                value: Some(fdf::NodePropertyValue::IntValue(10)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(1),
+                value: fdf::NodePropertyValue::IntValue(10),
             }];
 
             assert_eq!(
@@ -3054,9 +3014,8 @@ mod tests {
             ];
 
             let node_1_props_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             let node_2_bind_rules = vec![fdf::BindRule {
@@ -3067,14 +3026,12 @@ mod tests {
 
             let node_2_props_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
-                    value: Some(fdf::NodePropertyValue::IntValue(1)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
+                    value: fdf::NodePropertyValue::IntValue(1),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
                 },
             ];
 
@@ -3099,9 +3056,8 @@ mod tests {
             assert_eq!(url.to_string(), result.0.driver_info.unwrap().url.unwrap());
 
             let node_1_props_nonmatch = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
             }];
 
             assert_eq!(
@@ -3126,9 +3082,8 @@ mod tests {
             );
 
             let node_2_props_nonmatch = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(1)),
-                value: Some(fdf::NodePropertyValue::IntValue(10)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(1),
+                value: fdf::NodePropertyValue::IntValue(10),
             }];
 
             assert_eq!(
@@ -3260,9 +3215,8 @@ mod tests {
             ];
 
             let node_1_props_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             let optional_1_bind_rules = vec![fdf::BindRule {
@@ -3272,9 +3226,8 @@ mod tests {
             }];
 
             let optional_1_props_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("trembler".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                value: fdf::NodePropertyValue::StringValue("trembler".to_string()),
             }];
 
             let node_2_bind_rules = vec![fdf::BindRule {
@@ -3285,14 +3238,12 @@ mod tests {
 
             let node_2_props_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
-                    value: Some(fdf::NodePropertyValue::IntValue(1)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
+                    value: fdf::NodePropertyValue::IntValue(1),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
                 },
             ];
 
@@ -3407,9 +3358,8 @@ mod tests {
             ];
 
             let node_1_props_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             let node_2_bind_rules = vec![fdf::BindRule {
@@ -3420,14 +3370,12 @@ mod tests {
 
             let node_2_props_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
-                    value: Some(fdf::NodePropertyValue::IntValue(1)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
+                    value: fdf::NodePropertyValue::IntValue(1),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
                 },
             ];
 
@@ -3455,14 +3403,12 @@ mod tests {
 
             let device_properties_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::IntValue(1)),
-                    value: Some(fdf::NodePropertyValue::IntValue(200)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::IntValue(1),
+                    value: fdf::NodePropertyValue::IntValue(200),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("lapwing".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("plover".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
                 },
             ];
             let match_args = fdi::MatchDriverArgs {
@@ -3609,9 +3555,8 @@ mod tests {
             ];
 
             let node_1_props_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             let node_2_bind_rules = vec![fdf::BindRule {
@@ -3622,14 +3567,12 @@ mod tests {
 
             let node_2_props_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
-                    value: Some(fdf::NodePropertyValue::IntValue(1)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
+                    value: fdf::NodePropertyValue::IntValue(1),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
                 },
             ];
 
@@ -3657,14 +3600,12 @@ mod tests {
 
             let device_properties_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::IntValue(1)),
-                    value: Some(fdf::NodePropertyValue::IntValue(200)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::IntValue(1),
+                    value: fdf::NodePropertyValue::IntValue(200),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("lapwing".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("plover".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("lapwing".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("plover".to_string()),
                 },
             ];
             let match_args = fdi::MatchDriverArgs {
@@ -3811,9 +3752,8 @@ mod tests {
             ];
 
             let node_1_props_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             let node_2_bind_rules = vec![fdf::BindRule {
@@ -3824,14 +3764,12 @@ mod tests {
 
             let node_2_props_match = vec![
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("catbird".to_string())),
-                    value: Some(fdf::NodePropertyValue::IntValue(1)),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("catbird".to_string()),
+                    value: fdf::NodePropertyValue::IntValue(1),
                 },
                 fdf::NodeProperty {
-                    key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                    value: Some(fdf::NodePropertyValue::StringValue("catbird".to_string())),
-                    ..fdf::NodeProperty::EMPTY
+                    key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                    value: fdf::NodePropertyValue::StringValue("catbird".to_string()),
                 },
             ];
 
@@ -3842,9 +3780,8 @@ mod tests {
             }];
 
             let optional_1_props_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("thrasher".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("trembler".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("thrasher".to_string()),
+                value: fdf::NodePropertyValue::StringValue("trembler".to_string()),
             }];
 
             // When we add the node group it should get not found since there's no drivers.
@@ -3874,9 +3811,8 @@ mod tests {
             );
 
             let device_properties_match = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(2)),
-                value: Some(fdf::NodePropertyValue::IntValue(10)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(2),
+                value: fdf::NodePropertyValue::IntValue(10),
             }];
             let match_args = fdi::MatchDriverArgs {
                 properties: Some(device_properties_match),
@@ -3991,13 +3927,8 @@ mod tests {
                         nodes: Some(vec![fdf::NodeRepresentation {
                             bind_rules: bind_rules,
                             properties: vec![fdf::NodeProperty {
-                                key: Some(fdf::NodePropertyKey::StringValue(
-                                    "trembler".to_string()
-                                )),
-                                value: Some(fdf::NodePropertyValue::StringValue(
-                                    "thrasher".to_string()
-                                )),
-                                ..fdf::NodeProperty::EMPTY
+                                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
                             }]
                         }]),
                         ..fdf::NodeGroup::EMPTY
@@ -4013,9 +3944,8 @@ mod tests {
             }];
 
             let node_transform = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             let result = proxy
@@ -4091,9 +4021,8 @@ mod tests {
             ];
 
             let node_transform = vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("trembler".to_string())),
-                value: Some(fdf::NodePropertyValue::StringValue("thrasher".to_string())),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
+                value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
             }];
 
             let result = proxy
@@ -4155,9 +4084,8 @@ mod tests {
 
             // These properties match the bind rules for the "test-bind-componenet.cm".
             let property = fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(1)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(1),
             };
             let args = fdi::MatchDriverArgs {
                 properties: Some(vec![property]),

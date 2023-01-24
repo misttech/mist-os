@@ -694,13 +694,7 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
     std::vector<device_bind_prop_t> properties;
     properties.reserve(node.properties().size());
     for (const auto& property : node.properties()) {
-      if (!property.key() || !property.value()) {
-        zxlogf(ERROR, "Node representation properties must contain a key and value");
-        completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-        return;
-      }
-
-      auto property_value = ConvertFidlPropertyValue(property.value().value());
+      auto property_value = ConvertFidlPropertyValue(property.value());
       if (property_value.is_error()) {
         zxlogf(ERROR, "Invalid property value");
         completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
@@ -708,7 +702,7 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
       }
 
       properties.push_back(device_bind_prop_t{
-          .key = ConvertFidlPropertyKey(property.key().value()),
+          .key = ConvertFidlPropertyKey(property.key()),
           .value = property_value.value(),
       });
     }

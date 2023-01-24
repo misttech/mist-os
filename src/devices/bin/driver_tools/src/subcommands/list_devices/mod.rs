@@ -112,16 +112,8 @@ impl DevicePrinter for DFv2Node {
                     "[{:>2}/ {:>2}] : Key {:30} Value {}",
                     i + 1,
                     node_property_list.len(),
-                    node_property
-                        .key
-                        .as_ref()
-                        .map(|key| node_property_key_to_string(key))
-                        .unwrap_or("None".to_owned()),
-                    node_property
-                        .value
-                        .as_ref()
-                        .map(|value| node_property_value_to_string(value))
-                        .unwrap_or("None".to_owned()),
+                    node_property_key_to_string(&node_property.key),
+                    node_property_value_to_string(&node_property.value),
                 );
             }
         } else {

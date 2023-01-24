@@ -23,16 +23,12 @@ const FAKE_DRIVER_URL: &str = "fuchsia-boot:///#meta/driver-test-realm-fake-driv
 fn get_no_protocol_dfv2_property_list() -> Option<[fdf::NodeProperty; 2]> {
     Some([
         fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-            value: Some(fdf::NodePropertyValue::IntValue(28)), // ZX_PROTOCOL_MISC
-            ..fdf::NodeProperty::EMPTY
+            key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+            value: fdf::NodePropertyValue::IntValue(28), // ZX_PROTOCOL_MISC
         },
         fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::StringValue(String::from(
-                "fuchsia.driver.framework.dfv2",
-            ))),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
+            key: fdf::NodePropertyKey::StringValue(String::from("fuchsia.driver.framework.dfv2")),
+            value: fdf::NodePropertyValue::BoolValue(true),
         },
     ])
 }
@@ -40,16 +36,12 @@ fn get_no_protocol_dfv2_property_list() -> Option<[fdf::NodeProperty; 2]> {
 fn get_test_parent_dfv2_property_list() -> Option<[fdf::NodeProperty; 2]> {
     Some([
         fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-            value: Some(fdf::NodePropertyValue::IntValue(bind_fuchsia_test::BIND_PROTOCOL_PARENT)),
-            ..fdf::NodeProperty::EMPTY
+            key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+            value: fdf::NodePropertyValue::IntValue(bind_fuchsia_test::BIND_PROTOCOL_PARENT),
         },
         fdf::NodeProperty {
-            key: Some(fdf::NodePropertyKey::StringValue(String::from(
-                "fuchsia.driver.framework.dfv2",
-            ))),
-            value: Some(fdf::NodePropertyValue::BoolValue(true)),
-            ..fdf::NodeProperty::EMPTY
+            key: fdf::NodePropertyKey::StringValue(String::from("fuchsia.driver.framework.dfv2")),
+            value: fdf::NodePropertyValue::BoolValue(true),
         },
     ])
 }
@@ -643,11 +635,8 @@ async fn test_add_test_node_dfv2() -> Result<()> {
         .add_test_node(fdd::TestNodeAddArgs {
             name: Some("test_sample".to_string()),
             properties: Some(vec![fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL)),
-                value: Some(fdf::NodePropertyValue::IntValue(
-                    bind_fuchsia_test::BIND_PROTOCOL_PARENT,
-                )),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(bind::ddk_bind_constants::BIND_PROTOCOL),
+                value: fdf::NodePropertyValue::IntValue(bind_fuchsia_test::BIND_PROTOCOL_PARENT),
             }]),
             ..fdd::TestNodeAddArgs::EMPTY
         })

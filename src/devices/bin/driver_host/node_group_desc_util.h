@@ -87,17 +87,17 @@ zx::result<fuchsia_driver_framework::wire::BindRule> ConvertBindRuleToFidl(
 
 zx::result<fuchsia_driver_framework::wire::NodeProperty> ConvertBindPropToFidl(
     fidl::AnyArena& allocator, const device_bind_prop_t& bind_prop) {
-  auto node_property = fuchsia_driver_framework::wire::NodeProperty::Builder(allocator);
+  auto node_property = fuchsia_driver_framework::wire::NodeProperty{};
 
   switch (bind_prop.key.key_type) {
     case DEVICE_BIND_PROPERTY_KEY_INT: {
-      node_property.key(fuchsia_driver_framework::wire::NodePropertyKey::WithIntValue(
-          bind_prop.key.data.int_key));
+      node_property.key =
+          fuchsia_driver_framework::wire::NodePropertyKey::WithIntValue(bind_prop.key.data.int_key);
       break;
     }
     case DEVICE_BIND_PROPERTY_KEY_STRING: {
-      node_property.key(fuchsia_driver_framework::wire::NodePropertyKey::WithStringValue(
-          allocator, allocator, bind_prop.key.data.str_key));
+      node_property.key = fuchsia_driver_framework::wire::NodePropertyKey::WithStringValue(
+          allocator, allocator, bind_prop.key.data.str_key);
       break;
     }
     default: {
@@ -107,24 +107,24 @@ zx::result<fuchsia_driver_framework::wire::NodeProperty> ConvertBindPropToFidl(
 
   switch (bind_prop.value.data_type) {
     case ZX_DEVICE_PROPERTY_VALUE_INT: {
-      node_property.value(fuchsia_driver_framework::wire::NodePropertyValue::WithIntValue(
-          bind_prop.value.data.int_value));
+      node_property.value = fuchsia_driver_framework::wire::NodePropertyValue::WithIntValue(
+          bind_prop.value.data.int_value);
       break;
     }
     case ZX_DEVICE_PROPERTY_VALUE_STRING: {
-      node_property.value(fuchsia_driver_framework::wire::NodePropertyValue::WithStringValue(
-          allocator, allocator, bind_prop.value.data.str_value));
+      node_property.value = fuchsia_driver_framework::wire::NodePropertyValue::WithStringValue(
+          allocator, allocator, bind_prop.value.data.str_value);
       break;
     }
     case ZX_DEVICE_PROPERTY_VALUE_BOOL: {
-      node_property.value(fuchsia_driver_framework::wire::NodePropertyValue::WithBoolValue(
-          bind_prop.value.data.bool_value));
+      node_property.value = fuchsia_driver_framework::wire::NodePropertyValue::WithBoolValue(
+          bind_prop.value.data.bool_value);
       break;
     }
     case ZX_DEVICE_PROPERTY_VALUE_ENUM: {
-      node_property.value(fuchsia_driver_framework::wire::NodePropertyValue::WithEnumValue(
+      node_property.value = fuchsia_driver_framework::wire::NodePropertyValue::WithEnumValue(
           fidl::ObjectView<fidl::StringView>(allocator, allocator,
-                                             bind_prop.value.data.enum_value)));
+                                             bind_prop.value.data.enum_value));
       break;
     }
     default: {
@@ -132,7 +132,7 @@ zx::result<fuchsia_driver_framework::wire::NodeProperty> ConvertBindPropToFidl(
     }
   }
 
-  return zx::ok(node_property.Build());
+  return zx::ok(node_property);
 }
 
 zx::result<fuchsia_driver_framework::wire::NodeRepresentation> ConvertNodeRepresentation(

@@ -87,15 +87,10 @@ zx::result<fdd::wire::DeviceInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
   if (!properties.empty()) {
     fidl::VectorView<fdf::wire::NodeProperty> node_properties(allocator, properties.size());
     for (size_t i = 0; i < properties.size(); ++i) {
-      const auto& src = properties[i];
-      auto dst = fdf::wire::NodeProperty::Builder(allocator);
-      if (src.has_key()) {
-        dst.key(src.key());
-      }
-      if (src.has_value()) {
-        dst.value(src.value());
-      }
-      node_properties[i] = dst.Build();
+      node_properties[i] = fdf::wire::NodeProperty{
+          .key = properties[i].key,
+          .value = properties[i].value,
+      };
     }
     device_info.node_property_list(node_properties);
   }

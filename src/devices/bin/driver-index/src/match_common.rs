@@ -20,16 +20,12 @@ pub fn node_to_device_property(
     let mut device_properties = DeviceProperties::new();
 
     for property in node_properties {
-        if property.key.is_none() || property.value.is_none() {
-            return Err(Status::INVALID_ARGS.into_raw());
-        }
-
-        let key = match property.key.as_ref().unwrap() {
+        let key = match &property.key {
             fdf::NodePropertyKey::IntValue(i) => PropertyKey::NumberKey(i.clone().into()),
             fdf::NodePropertyKey::StringValue(s) => PropertyKey::StringKey(s.clone()),
         };
 
-        let value = match property.value.as_ref().unwrap() {
+        let value = match &property.value {
             fdf::NodePropertyValue::IntValue(i) => Symbol::NumberValue(i.clone().into()),
             fdf::NodePropertyValue::StringValue(s) => Symbol::StringValue(s.clone()),
             fdf::NodePropertyValue::EnumValue(s) => Symbol::EnumValue(s.clone()),
@@ -95,14 +91,12 @@ mod tests {
     async fn test_duplicate_properties() {
         let node_properties = vec![
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(10)),
-                value: Some(fdf::NodePropertyValue::IntValue(200)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(10),
+                value: fdf::NodePropertyValue::IntValue(200),
             },
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(10)),
-                value: Some(fdf::NodePropertyValue::IntValue(200)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(10),
+                value: fdf::NodePropertyValue::IntValue(200),
             },
         ];
 
@@ -117,14 +111,12 @@ mod tests {
     async fn test_property_collision() {
         let node_properties = vec![
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(10)),
-                value: Some(fdf::NodePropertyValue::IntValue(200)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(10),
+                value: fdf::NodePropertyValue::IntValue(200),
             },
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(10)),
-                value: Some(fdf::NodePropertyValue::IntValue(10)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(10),
+                value: fdf::NodePropertyValue::IntValue(10),
             },
         ];
 
@@ -137,14 +129,12 @@ mod tests {
     async fn test_multiple_bind_protocol() {
         let node_properties = vec![
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into())),
-                value: Some(fdf::NodePropertyValue::IntValue(200)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into()),
+                value: fdf::NodePropertyValue::IntValue(200),
             },
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into())),
-                value: Some(fdf::NodePropertyValue::IntValue(10)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into()),
+                value: fdf::NodePropertyValue::IntValue(10),
             },
         ];
 
@@ -159,14 +149,12 @@ mod tests {
     async fn test_multiple_bind_protocol_w_deprecated_str_key() {
         let node_properties = vec![
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into())),
-                value: Some(fdf::NodePropertyValue::IntValue(28)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::IntValue(BIND_PROTOCOL.into()),
+                value: fdf::NodePropertyValue::IntValue(28),
             },
             fdf::NodeProperty {
-                key: Some(fdf::NodePropertyKey::StringValue("fuchsia.BIND_PROTOCOL".to_string())),
-                value: Some(fdf::NodePropertyValue::IntValue(10)),
-                ..fdf::NodeProperty::EMPTY
+                key: fdf::NodePropertyKey::StringValue("fuchsia.BIND_PROTOCOL".to_string()),
+                value: fdf::NodePropertyValue::IntValue(10),
             },
         ];
 
