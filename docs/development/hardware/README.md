@@ -37,7 +37,6 @@ Fuchsia's support for CPUs:
   - [Install Fuchsia from a USB flash drive][prepare-usb]
 - Set up experimental hardware:
   - [Install Fuchsia on Acer Switch Alpha 12][install-fuchsia-on-acer12]
-  - [Install Fuchsia on Toulouse][install-fuchsia-on-toulouse]
 
 <!-- Reference links -->
 
@@ -47,4 +46,3 @@ Fuchsia's support for CPUs:
 [install-fuchsia-on-vim3]: /docs/development/hardware/khadas-vim3.md
 [prepare-usb]: /docs/development/hardware/usb_setup.md
 [install-fuchsia-on-acer12]: /docs/development/hardware/acer12.md
-[install-fuchsia-on-toulouse]: /docs/development/hardware/toulouse.md

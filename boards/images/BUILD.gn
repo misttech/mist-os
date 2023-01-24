@@ -170,11 +170,6 @@ generated_images_config("imx8mmevk") {
   deps = [ "//zircon/kernel/target/arm64/boot-shim:imx8mmevk" ]
 }
 
-generated_images_config("toulouse") {
-  forward_variables_from(_default_zbi, "*")
-  forward_variables_from(_default_fvm, "*")
-}
-
 group("images") {
   public_deps = [
     ":arm64",
@@ -185,7 +180,6 @@ group("images") {
     ":default",
     ":imx8mmevk",
     ":qemu-x64",
-    ":toulouse",
     ":vim3",
     ":x64",
   ]

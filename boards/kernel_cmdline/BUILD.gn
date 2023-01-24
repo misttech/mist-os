@@ -66,18 +66,6 @@ group("pmm-checker-from-board") {
   }
 }
 
-kernel_cmdline("toulouse") {
-  args = [
-    # Fuchsia does not have a deterministic ordering for bringing up PCI devices, so the
-    # /dev/class/ethernet/xxx paths have no well-defined mapping to the ports on the front of the
-    # device.
-    # In order for netbooting and loglistener to work, we need to let netsvc know which path corresponds
-    # to the left-most ethernet port.
-    "kernel.serial=legacy",
-    "netsvc.interface=/dev/sys/platform/pci/00:1f.6-fidl/e1000/ethernet",
-  ]
-}
-
 # This collects settings not specific to any particular machine that are
 # recommended to minimize unintended effects on timing data.  Note that this
 # does not (as yet) include settings that may reduce overall performance, which

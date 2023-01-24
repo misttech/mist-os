@@ -63,10 +63,6 @@ generated_partitions_config("qemu-x64") {
   hw_revision = "qemu-x64"
 }
 
-generated_partitions_config("toulouse") {
-  hw_revision = ""
-}
-
 generated_partitions_config("as370") {
   hw_revision = "av370"
   zbi_a = "boot"
@@ -119,7 +115,6 @@ group("partitions") {
     ":chromebook-x64",
     ":clover",
     ":qemu-x64",
-    ":toulouse",
     ":vim3",
     ":x64",
   ]

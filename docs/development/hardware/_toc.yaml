@@ -26,5 +26,3 @@ toc:
   section:
   - title: "Install Fuchsia on Acer Switch Alpha 12"
     path: /docs/development/hardware/acer12.md
-  - title: "Install Fuchsia on Toulouse"
-    path: /docs/development/hardware/toulouse.md
