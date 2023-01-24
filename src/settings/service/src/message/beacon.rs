@@ -19,17 +19,17 @@ use std::sync::Arc;
 /// Helper for creating a beacon. The builder allows chaining additional fuses
 pub struct BeaconBuilder {
     messenger: Messenger,
-    chained_fuses: Vec<ActionFuseHandle>,
+    chained_fuses: Option<ActionFuseHandle>,
     timeout: Option<Duration>,
 }
 
 impl BeaconBuilder {
     pub(super) fn new(messenger: Messenger) -> Self {
-        Self { messenger, chained_fuses: vec![], timeout: None }
+        Self { messenger, chained_fuses: None, timeout: None }
     }
 
     pub(super) fn add_fuse(mut self, fuse: ActionFuseHandle) -> Self {
-        self.chained_fuses.push(fuse);
+        self.chained_fuses = Some(fuse);
         self
     }
 
@@ -71,7 +71,7 @@ impl Beacon {
     /// will be associated with any delivered Message for reply purposes.
     fn create(
         messenger: Messenger,
-        fuses: Vec<ActionFuseHandle>,
+        fuses: Option<ActionFuseHandle>,
         timeout: Option<Duration>,
     ) -> (Beacon, Receptor) {
         let sentinel = Arc::new(Mutex::new(Sentinel::new()));
@@ -98,8 +98,8 @@ impl Beacon {
                     })
                     .detach();
                 }))
-                .chain_fuses(fuses)
                 .build(),
+            fuses,
         );
 
         if let Some(duration) = timeout {

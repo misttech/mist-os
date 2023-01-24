@@ -27,6 +27,7 @@ pub struct Receptor {
     event_rx: EventReceiver,
     // Fuse to be triggered when all receptors go out of scope.
     _fuse: ActionFuseHandle,
+    _chained_fuse: Option<ActionFuseHandle>,
 }
 
 impl Stream for Receptor {
@@ -42,8 +43,9 @@ impl Receptor {
         signature: Signature,
         event_rx: EventReceiver,
         fuse: ActionFuseHandle,
+        chained_fuse: Option<ActionFuseHandle>,
     ) -> Self {
-        Self { signature, event_rx, _fuse: fuse }
+        Self { signature, event_rx, _fuse: fuse, _chained_fuse: chained_fuse }
     }
 
     /// Returns the signature associated the top level messenger associated with

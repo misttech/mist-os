@@ -551,35 +551,6 @@ async fn test_action_fuse() {
     assert!(rx.next().await.is_some());
 }
 
-// Exercises chained action fuse behavior
-#[fuchsia::test(allow_stalls = false)]
-async fn test_chained_action_fuse() {
-    // Channel to send the message from the fuse.
-    let (tx, mut rx) = futures::channel::mpsc::unbounded::<()>();
-    let (tx2, mut rx2) = futures::channel::mpsc::unbounded::<()>();
-
-    {
-        let _ = ActionFuseBuilder::new()
-            .add_action(Box::new(move || {
-                tx.unbounded_send(()).unwrap();
-            }))
-            .chain_fuse(
-                ActionFuseBuilder::new()
-                    .add_action(Box::new(move || {
-                        tx2.unbounded_send(()).unwrap();
-                    }))
-                    .build(),
-            )
-            .build();
-    }
-
-    // Root should fire first
-    assert!(rx.next().await.is_some());
-
-    // Then chain reaction
-    assert!(rx2.next().await.is_some());
-}
-
 // Verifies that the proper signal is fired when a receptor disappears.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_bind_to_recipient() {
