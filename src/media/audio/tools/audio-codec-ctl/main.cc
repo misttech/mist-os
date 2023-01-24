@@ -6,7 +6,6 @@
 #include <errno.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio/cpp/natural_ostream.h>
-#include <getopt.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/directory.h>
@@ -19,6 +18,7 @@
 #include <unistd.h>
 #include <zircon/status.h>
 
+#include <deque>
 #include <filesystem>
 #include <sstream>
 
@@ -43,7 +43,12 @@ Usage:
   audio-codec-ctl [-d|--device <device>] start
   audio-codec-ctl [-d|--device <device>] stop
   audio-codec-ctl [-d|--device <device>] p[lug_state]
-  audio-codec-ctl --help
+  audio-codec-ctl [-d|--device <device>] e[lements]
+  audio-codec-ctl [-d|--device <device>] t[opologies]
+  audio-codec-ctl [-d|--device <device>] w[atch] <id>
+  audio-codec-ctl [-d|--device <device>] set <id> [enable|disable] [gain <gain>] [latency <nsecs>]
+    [vendor <hex> <hex> ...]
+  audio-codec-ctl [-h|--help]
 )""";
 
 constexpr char kUsageDetails[] = R"""(
@@ -87,6 +92,17 @@ Commands:
   start                             : Start/Re-start the codec operation.
   stop                              : Stops the codec operation.
   p[lug_state]                      : Get the plug detect state.
+  e[lements]                        : Returns a vector of supported processing elements.
+  t[opologies]                      : Returns a vector of supported topologies.
+  w[atch] <id>                      : Get a processing element state.
+  set <id> [enable|disable] [gain <gain>] [latency <nsecs>] [vendor <hex> <hex> ...] : Controls a
+    processing element.
+    <id>: Processing element id.
+    enable: Process element enabled state.
+    disable: Process element disabled state.
+    <gain>: Current gain in GainType format reported in the supported processing elements vector.
+    <nsecs>: Latency added to the pipeline in nanoseconds.
+    <hex>: Vendor specific raw byte to feed to the processing element in hex format.
 
 Examples:
 
@@ -117,13 +133,14 @@ Examples:
 
   Sets a codec's bridged mode:
   $ audio-codec-ctl m true
-  Executing on device: /dev/class/codec/706
   Setting bridged mode to: true
+  Executing on device: /dev/class/codec/706
 
   Sets the DAI format to be used in the codec interface:
   $ audio-codec-ctl d 2 1 s i 48000 16 32
   Setting DAI format:
   fuchsia_hardware_audio::DaiFormat{ number_of_channels = 2, channels_to_use_bitmask = 1, sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned, frame_format = fuchsia_hardware_audio::DaiFrameFormat::frame_format_standard(fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S), frame_rate = 48000, bits_per_slot = 16, bits_per_sample = 32, }
+  Executing on device: /dev/class/codec/706
 
   Start/Re-start the codec operation:
   $ audio-codec-ctl start
@@ -139,6 +156,27 @@ Examples:
   $ audio-codec-ctl p
   Executing on device: /dev/class/codec/706
   fuchsia_hardware_audio::PlugState{ plugged = true, plug_state_time = 1167863520, }
+
+  Returns a vector of supported processing elements:
+  $ audio-codec-ctl e
+  Executing on device: /dev/class/codec/706
+  [ fuchsia_hardware_audio_signalprocessing::Element{ id = 1, type = fuchsia_hardware_audio_signalprocessing::ElementType::kGain, type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::gain(fuchsia_hardware_audio_signalprocessing::Gain{ type = fuchsia_hardware_audio_signalprocessing::GainType::kDecibels, min_gain = -63.5, max_gain = 0, min_gain_step = 0.5, }), }, fuchsia_hardware_audio_signalprocessing::Element{ id = 2, type = fuchsia_hardware_audio_signalprocessing::ElementType::kMute, }, ]
+
+  Returns a vector of supported topologies.
+  $ audio-codec-ctl t
+  Executing on device: /dev/class/codec/706
+  [ fuchsia_hardware_audio_signalprocessing::Topology{ id = 1, processing_elements_edge_pairs = [ fuchsia_hardware_audio_signalprocessing::EdgePair{ processing_element_id_from = 1, processing_element_id_to = 2, }, fuchsia_hardware_audio_signalprocessing::EdgePair{ processing_element_id_from = 2, processing_element_id_to = 3, }, ], }, ]
+
+  Get a processing element state.
+  $ audio-codec-ctl w 1
+  Executing on device: /dev/class/codec/706
+  fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 0, }), enabled = true, }
+
+  Controls a processing element.
+  $ audio-codec-ctl set 1 enable gain 1.23 vendor 0x12 0x98
+  Setting element state:
+  fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest{ processing_element_id = 1, state = fuchsia_hardware_audio_signalprocessing::ElementState{ type_specific = fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::gain(fuchsia_hardware_audio_signalprocessing::GainElementState{ gain = 1.23, }), enabled = true, vendor_specific_data = [ 18, 152, ], }, }
+  Executing on device: /dev/class/codec/706
 
   Specify device:
   $ audio-codec-ctl -d 706 p
@@ -197,37 +235,52 @@ fidl::SyncClient<fuchsia_hardware_audio::Codec> GetCodecClient(std::string path)
   return fidl::SyncClient<fuchsia_hardware_audio::Codec>(std::move(local));
 }
 
+fidl::SyncClient<fuchsia_hardware_audio_signalprocessing::SignalProcessing> GetSignalClient(
+    std::string path) {
+  auto endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
+  ZX_ASSERT(endpoints.is_ok());
+  auto [local, remote] = *std::move(endpoints);
+  auto connect_ret = GetCodecClient(path)->SignalProcessingConnect(std::move(remote));
+  ZX_ASSERT(connect_ret.is_ok());
+  return fidl::SyncClient<fuchsia_hardware_audio_signalprocessing::SignalProcessing>(
+      std::move(local));
+}
+
 int main(int argc, char** argv) {
-  static const struct option opts[] = {
-      {"device", required_argument, nullptr, 'd'},
-      {"help", no_argument, nullptr, 'h'},
-  };
-
   std::string path = {};
-  for (int opt; (opt = getopt_long(argc, argv, "d:h", opts, nullptr)) != -1;) {
-    switch (opt) {
-      case 'd': {
-        // Allows using only the devfs node number, for instance "123" instead of
-        // "/dev/class/codec/123".
-        path = std::string(optarg);
-        int id = -1;
-        if (sscanf(path.c_str(), "%u", &id) == 1) {
-          path = std::string(kCodecClassDir) + "/" + path;
-        }
-      } break;
 
-      case 'h':
-        ShowUsage(true);
-        return 0;
+  std::deque<std::string> args(argv + 1, argv + argc);
+  if (args.size() == 0) {  // Must have a parameter.
+    ShowUsage(false);
+    return 0;
+  }
+  if (!args.front().compare(0, 2, "-d") || !args.front().compare(0, 3, "--d")) {
+    args.pop_front();
+    if (args.size() == 0) {  // Must have a <device> if -d or --d
+      ShowUsage(false);
+      return 0;
     }
+    // Allows using only the devfs node number, for instance "123" instead of
+    // "/dev/class/codec/123".
+    path = args.front();
+    args.pop_front();
+    int id = -1;
+    if (sscanf(path.c_str(), "%u", &id) == 1) {
+      path = std::string(kCodecClassDir) + "/" + path;
+    }
+  } else if (!args.front().compare(0, 2, "-h") || !args.front().compare(0, 3, "--h")) {
+    ShowUsage(true);
+    return 0;
   }
 
-  if (optind >= argc) {
+  if (args.size() == 0) {  // Must have a command.
     ShowUsage(false);
     return 0;
   }
 
-  std::string cmd(argv[optind++]);
+  std::string_view cmd(args.front());
+  args.pop_front();
   switch (cmd[0]) {
     case 'f': {
       auto result = GetCodecClient(path)->GetDaiFormats();
@@ -275,14 +328,14 @@ int main(int argc, char** argv) {
 
     case 'm': {
       bool mode = false;
-      if (optind >= argc) {
+      if (args.size() == 0) {  // Must have a mode.
         ShowUsage(false);
         return -1;
       }
-      std::string mode2(argv[optind++]);
-      if (mode2[0] == 't') {
+      if (args.front()[0] == 't') {
         mode = true;
       }
+      args.pop_front();
       auto result = GetCodecClient(path)->SetBridgedMode(mode);
       std::cout << "Setting bridged mode to: " << (mode ? "true" : "false") << std::endl;
       if (!result.is_ok()) {
@@ -294,18 +347,34 @@ int main(int argc, char** argv) {
     }
 
     case 'd': {
-      if (argc - optind <= 6) {
+      if (args.size() == 0) {
         ShowUsage(false);
         return -1;
       }
       uint32_t number_of_channels = 0;
-      sscanf(argv[optind++], "%u", &number_of_channels);
+      if (sscanf(args.front().c_str(), "%u", &number_of_channels) != 1) {
+        ShowUsage(false);
+        return -1;
+      }
+      args.pop_front();
 
+      if (args.size() == 0) {
+        ShowUsage(false);
+        return -1;
+      }
       uint64_t channels_to_use_bitmask = 0;
-      sscanf(argv[optind++], "%lx", &channels_to_use_bitmask);
+      if (sscanf(args.front().c_str(), "%lx", &channels_to_use_bitmask) != 1) {
+        ShowUsage(false);
+        return -1;
+      }
+      args.pop_front();
 
+      if (args.size() == 0) {
+        ShowUsage(false);
+        return -1;
+      }
       fuchsia_hardware_audio::DaiSampleFormat sample_format = {};
-      switch (argv[optind++][0]) {
+      switch (args.front()[0]) {
         case 'p':
           sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPdm;
           break;
@@ -320,9 +389,14 @@ int main(int argc, char** argv) {
           sample_format = fuchsia_hardware_audio::DaiSampleFormat::kPcmFloat;
           break;
       }
+      args.pop_front();
 
+      if (args.size() == 0) {
+        ShowUsage(false);
+        return -1;
+      }
       auto frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard({});
-      switch (argv[optind++][0]) {
+      switch (args.front()[0]) {
         case 'n':
           frame_format = fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
               fuchsia_hardware_audio::DaiFrameFormatStandard::kNone);
@@ -353,23 +427,48 @@ int main(int argc, char** argv) {
               fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm3);
           break;
       }
+      args.pop_front();
 
+      if (args.size() == 0) {
+        ShowUsage(false);
+        return -1;
+      }
       uint32_t frame_rate = 0;
-      sscanf(argv[optind++], "%u", &frame_rate);
+      if (sscanf(args.front().c_str(), "%u", &frame_rate) != 1) {
+        ShowUsage(false);
+        return -1;
+      }
+      args.pop_front();
 
+      if (args.size() == 0) {
+        ShowUsage(false);
+        return -1;
+      }
       uint32_t bits_per_slot = 0;
-      sscanf(argv[optind++], "%u", &bits_per_slot);
+      if (sscanf(args.front().c_str(), "%u", &bits_per_slot) != 1) {
+        ShowUsage(false);
+        return -1;
+      }
+      args.pop_front();
 
+      if (args.size() == 0) {
+        ShowUsage(false);
+        return -1;
+      }
       uint32_t bits_per_sample = 0;
-      sscanf(argv[optind++], "%u", &bits_per_sample);
+      if (sscanf(args.front().c_str(), "%u", &bits_per_sample) != 1) {
+        ShowUsage(false);
+        return -1;
+      }
+      args.pop_front();
 
       fuchsia_hardware_audio::DaiFormat format(number_of_channels, channels_to_use_bitmask,
                                                std::move(sample_format), std::move(frame_format),
                                                frame_rate, static_cast<uint8_t>(bits_per_slot),
                                                static_cast<uint8_t>(bits_per_sample));
-      auto result = GetCodecClient(path)->SetDaiFormat(std::move(format));
       std::cout << "Setting DAI format:" << std::endl;
       std::cout << FidlString(format) << std::endl;
+      auto result = GetCodecClient(path)->SetDaiFormat(std::move(format));
       if (!result.is_ok()) {
         std::cerr << "set DAI format failed: " << result.error_value().FormatDescription()
                   << std::endl;
@@ -406,6 +505,100 @@ int main(int argc, char** argv) {
         }
         std::cout << "Stop done" << std::endl;
         return 0;
+      } else if (cmd == "set") {
+        if (args.size() == 0) {  // Must have an id.
+          ShowUsage(false);
+          return -1;
+        }
+        uint64_t id = 0;
+        if (sscanf(args.front().c_str(), "%lu", &id) != 1) {
+          ShowUsage(false);
+          return -1;
+        }
+        args.pop_front();
+
+        fuchsia_hardware_audio_signalprocessing::ElementState state;
+
+        if (args.size() > 0) {
+          if (args.front() == "enable") {
+            args.pop_front();
+            state.enabled(true);
+          } else if (args.front() == "disable") {
+            args.pop_front();
+            state.enabled(false);
+          }
+        }
+
+        if (args.size() > 0) {
+          if (args.front() == "gain") {
+            args.pop_front();
+            if (args.size() > 0) {
+              fuchsia_hardware_audio_signalprocessing::GainElementState gain_state;
+              float gain = std::stof(args.front());
+              args.pop_front();
+              gain_state.gain(gain);
+              state.type_specific(
+                  fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithGain(
+                      std::move(gain_state)));
+            } else {
+              std::cerr << "set processing element state failed: no gain specified" << std::endl;
+              return -1;
+            }
+          }
+        }
+
+        if (args.size() > 0) {
+          if (args.front() == "latency") {
+            args.pop_front();
+            if (args.size() > 0) {
+              uint64_t latency = 0;
+              if (sscanf(args.front().c_str(), "%lu", &latency) != 1) {
+                ShowUsage(false);
+                return -1;
+              }
+              args.pop_front();
+              state.latency(
+                  fuchsia_hardware_audio_signalprocessing::Latency::WithLatencyTime(latency));
+            } else {
+              std::cerr << "set processing element state failed: no latency specified" << std::endl;
+              return -1;
+            }
+          }
+        }
+
+        if (args.size() > 0) {
+          if (args.front() == "vendor") {
+            args.pop_front();
+            std::vector<uint8_t> bytes;
+            while (args.size() > 0) {
+              uint32_t hex = 0;
+              if (sscanf(args.front().c_str(), "%x", &hex) != 1) {
+                ShowUsage(false);
+                return -1;
+              }
+              args.pop_front();
+              bytes.push_back(static_cast<uint8_t>(hex));
+            }
+            state.vendor_specific_data(std::move(bytes));
+          }
+        }
+
+        if (args.size() > 0) {  // Error if we have unparsed parameters.
+          ShowUsage(false);
+          return -1;
+        }
+
+        fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest request(
+            id, std::move(state));
+        std::cout << "Setting element state:" << std::endl;
+        std::cout << FidlString(request) << std::endl;
+        auto result = GetSignalClient(path)->SetElementState(std::move(request));
+        if (result.is_error()) {
+          std::cerr << "set processing element state failed: "
+                    << result.error_value().FormatDescription() << std::endl;
+          return -1;
+        }
+        return 0;
       }
       break;
 
@@ -417,6 +610,50 @@ int main(int argc, char** argv) {
         return -1;
       }
       std::cout << FidlString(result->plug_state()) << std::endl;
+      return 0;
+    }
+
+    case 'e': {
+      auto result = GetSignalClient(path)->GetElements();
+      if (result.is_error()) {
+        std::cerr << "get signal processing elements failed: "
+                  << result.error_value().FormatDescription() << std::endl;
+        return -1;
+      }
+      std::cout << FidlString(result->processing_elements()) << std::endl;
+      return 0;
+    }
+
+    case 't': {
+      auto result = GetSignalClient(path)->GetTopologies();
+      if (result.is_error()) {
+        std::cerr << "get signal processing topologies failed: "
+                  << result.error_value().FormatDescription() << std::endl;
+        return -1;
+      }
+      std::cout << FidlString(result->topologies()) << std::endl;
+      return 0;
+    }
+
+    case 'w': {
+      if (args.size() == 0) {  // Must have an id.
+
+        ShowUsage(false);
+        return -1;
+      }
+      uint64_t id = 0;
+      if (sscanf(args.front().c_str(), "%lu", &id) != 1) {
+        ShowUsage(false);
+        return -1;
+      }
+      args.pop_front();
+      auto result = GetSignalClient(path)->WatchElementState(id);
+      if (result.is_error()) {
+        std::cerr << "watch processing element state failed: "
+                  << result.error_value().FormatDescription() << std::endl;
+        return -1;
+      }
+      std::cout << FidlString(result->state()) << std::endl;
       return 0;
     }
 
