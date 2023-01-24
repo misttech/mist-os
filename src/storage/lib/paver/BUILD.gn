@@ -184,11 +184,13 @@ source_set("luis") {
   ]
 }
 
+source_set("pinecrest-abr") {
+  sources = [ "pinecrest_abr_avbab_conversion.c" ]
+  deps = [ "//src/firmware/lib/abr" ]
+}
+
 source_set("pinecrest") {
-  sources = [
-    "pinecrest.cc",
-    "pinecrest_abr_avbab_conversion.c",
-  ]
+  sources = [ "pinecrest.cc" ]
   deps = [
     ":gpt",
     ":paver-core",
@@ -197,6 +199,7 @@ source_set("pinecrest") {
     "//src/lib/uuid",
     "//src/storage/gpt",
   ]
+  public_deps = [ ":pinecrest-abr" ]
 }
 
 source_set("vim3") {
