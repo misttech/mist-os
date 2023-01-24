@@ -75,13 +75,6 @@ class LocalComponentRunner extends fcrunner.ComponentRunner {
       throw Exception('no such local component: $localComponentName');
     }
 
-    vfs.PseudoDir().open(
-      fio.OpenFlags.rightReadable,
-      fio.modeTypeDirectory,
-      '.',
-      fidl.InterfaceRequest<fio.Node>(runtimeDirServerEnd.passChannel()!),
-    );
-
     await localComponent.run(
       controller,
       namespace,

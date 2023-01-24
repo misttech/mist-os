@@ -16,10 +16,7 @@ use {
     runner::get_value as get_dictionary_value,
     std::{collections::HashMap, sync::Arc},
     tracing::*,
-    vfs::{
-        directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
-        file::vmo::asynchronous::read_only_static, path::Path as VfsPath, pseudo_directory,
-    },
+    vfs::execution_scope::ExecutionScope,
 };
 
 struct DirectoryProtocolImpl(fio::DirectoryProxy);
@@ -303,7 +300,7 @@ impl LocalComponentRunner {
                     let outgoing_dir = start_info
                         .outgoing_dir
                         .ok_or(format_err!("outgoing_dir is missing from start_info"))?;
-                    let runtime_dir_server_end = start_info
+                    let _runtime_dir_server_end: ServerEnd<fio::DirectoryMarker> = start_info
                         .runtime_dir
                         .ok_or(format_err!("runtime_dir is missing from start_info"))?;
 
@@ -315,18 +312,6 @@ impl LocalComponentRunner {
                         .clone();
                     let (component_handles, stop_notifier) =
                         LocalComponentHandles::new(namespace, outgoing_dir)?;
-
-                    let runtime_dir = pseudo_directory!(
-                        "local_component_name" =>
-                            read_only_static(local_component_name.clone().into_bytes()),
-                    );
-                    runtime_dir.open(
-                        self.execution_scope.clone(),
-                        fio::OpenFlags::RIGHT_READABLE,
-                        fio::MODE_TYPE_DIRECTORY,
-                        VfsPath::dot(),
-                        runtime_dir_server_end.into_channel().into(),
-                    );
 
                     let mut controller_request_stream = controller.into_stream()?;
                     self.execution_scope.spawn(async move {
@@ -394,7 +379,6 @@ mod tests {
         super::*,
         assert_matches::assert_matches,
         fidl::endpoints::{create_proxy, Proxy as _},
-        fuchsia_fs::directory::{readdir, DirEntry, DirentKind},
         fuchsia_zircon::AsHandleRef,
         futures::{channel::oneshot, future::pending, lock::Mutex},
     };
@@ -445,7 +429,7 @@ mod tests {
     struct RunnerAndHandles {
         _runner_task: fasync::Task<()>,
         _component_runner_proxy: fcrunner::ComponentRunnerProxy,
-        runtime_dir_proxy: fio::DirectoryProxy,
+        _runtime_dir_proxy: fio::DirectoryProxy,
         outgoing_dir_proxy: fio::DirectoryProxy,
         controller_proxy: fcrunner::ComponentControllerProxy,
     }
@@ -484,7 +468,7 @@ mod tests {
         RunnerAndHandles {
             _runner_task: runner_task,
             _component_runner_proxy: component_runner_proxy,
-            runtime_dir_proxy,
+            _runtime_dir_proxy: runtime_dir_proxy,
             outgoing_dir_proxy,
             controller_proxy,
         }
@@ -514,41 +498,6 @@ mod tests {
         let _runner_and_handles = build_and_start(runner_builder, component_name).await;
 
         let () = receiver.await.expect("failed to receive");
-    }
-
-    #[fuchsia::test]
-    async fn the_runner_services_the_runtime_dir() {
-        let runner_builder = LocalComponentRunnerBuilder::new();
-
-        let component_name = "test".to_string();
-
-        runner_builder
-            .register_local_component(component_name.clone(), move |_handles| pending().boxed())
-            .await
-            .unwrap();
-
-        let runner_and_handles = build_and_start(runner_builder, component_name.clone()).await;
-
-        let dir_entries =
-            readdir(&runner_and_handles.runtime_dir_proxy).await.expect("failed to readdir");
-        let local_component_name_filename = "local_component_name".to_string();
-        assert_eq!(
-            vec![DirEntry { name: local_component_name_filename.clone(), kind: DirentKind::File }],
-            dir_entries
-        );
-        let local_component_name_file = fuchsia_fs::directory::open_file(
-            &runner_and_handles.runtime_dir_proxy,
-            &local_component_name_filename,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("failed to open file");
-        assert_eq!(
-            component_name,
-            fuchsia_fs::file::read_to_string(&local_component_name_file)
-                .await
-                .expect("failed to read file"),
-        );
     }
 
     #[fuchsia::test]
