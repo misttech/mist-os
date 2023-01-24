@@ -218,6 +218,13 @@ void SimpleCodecServerInternal<T>::SetElementState(
   // but we must update all appropriate instances callbacks with the potentially new state.
   switch (processing_element_id) {
     case kGainPeId:
+
+      if (!state.has_type_specific() || !state.type_specific().is_gain() ||
+          !state.type_specific().gain().has_gain()) {
+        callback(
+            signal_fidl::SignalProcessing_SetElementState_Result::WithErr(ZX_ERR_INVALID_ARGS));
+        return;
+      }
       gain_state_.gain = state.type_specific().gain().gain();
 
       {

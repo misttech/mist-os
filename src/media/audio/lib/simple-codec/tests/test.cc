@@ -378,6 +378,75 @@ TEST_F(SimpleCodecTest, PlugStateHardwired) {
   }
 }
 
+TEST_F(SimpleCodecTest, GainWithClientViaSignalProcessingApi) {
+  auto fake_parent = MockDevice::FakeRootParent();
+
+  ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<TestCodec>(fake_parent.get()));
+  auto* child_dev = fake_parent->GetLatestChild();
+  ASSERT_NOT_NULL(child_dev);
+  auto codec = child_dev->GetDeviceContext<TestCodec>();
+  auto codec_proto = codec->GetProto();
+  ddk::CodecProtocolClient codec_proto2(&codec_proto);
+
+  zx::channel channel_remote, channel_local;
+  ASSERT_OK(zx::channel::create(0, &channel_local, &channel_remote));
+  ddk::CodecProtocolClient proto_client;
+  ASSERT_OK(codec_proto2.Connect(std::move(channel_remote)));
+  audio_fidl::CodecSyncPtr codec_client;
+  codec_client.Bind(std::move(channel_local));
+
+  fidl::InterfaceHandle<signal_fidl::SignalProcessing> signal_processing_handle;
+  fidl::InterfaceRequest<signal_fidl::SignalProcessing> signal_processing_request =
+      signal_processing_handle.NewRequest();
+  ASSERT_OK(codec_client->SignalProcessingConnect(std::move(signal_processing_request)));
+  fidl::SynchronousInterfacePtr signal_processing_client = signal_processing_handle.BindSync();
+
+  // We should get 3 PEs with gain, mute and AGC support.
+  signal_fidl::Reader_GetElements_Result result_elements;
+  ASSERT_OK(signal_processing_client->GetElements(&result_elements));
+  ASSERT_FALSE(result_elements.is_err());
+  ASSERT_EQ(result_elements.response().processing_elements.size(), 3);
+  ASSERT_EQ(result_elements.response().processing_elements[0].type(),
+            signal_fidl::ElementType::GAIN);
+  ASSERT_EQ(result_elements.response().processing_elements[1].type(),
+            signal_fidl::ElementType::MUTE);
+  ASSERT_EQ(result_elements.response().processing_elements[2].type(),
+            signal_fidl::ElementType::AUTOMATIC_GAIN_CONTROL);
+
+  // Control with test gain.
+  signal_fidl::SignalProcessing_SetElementState_Result result_gain;
+  signal_fidl::ElementState state_gain;
+  constexpr float kTestGain = 12.3f;
+  signal_fidl::GainElementState gain_state;
+  gain_state.set_gain(kTestGain);
+  state_gain.set_type_specific(
+      signal_fidl::TypeSpecificElementState::WithGain(std::move(gain_state)));
+  ASSERT_OK(signal_processing_client->SetElementState(
+      result_elements.response().processing_elements[0].id(), std::move(state_gain), &result_gain));
+  ASSERT_FALSE(result_gain.is_err());
+
+  // Do a synchronous FIDL call to flush messages on the channel and force the server to update the
+  // gain state.
+  ASSERT_OK(signal_processing_client->GetElements(&result_elements));
+
+  ASSERT_EQ(codec->GetGainState().gain, kTestGain);
+
+  // Control with no gain returns an error.
+  signal_fidl::SignalProcessing_SetElementState_Result result_no_gain;
+  signal_fidl::ElementState state_no_gain;
+  ASSERT_OK(signal_processing_client->SetElementState(
+      result_elements.response().processing_elements[0].id(), std::move(state_no_gain),
+      &result_no_gain));
+  ASSERT_TRUE(result_no_gain.is_err());
+  ASSERT_EQ(result_no_gain.err(), ZX_ERR_INVALID_ARGS);
+
+  // Do a synchronous FIDL call to flush messages on the channel and force the server to make
+  // any possible updates to the gain state.
+  ASSERT_OK(signal_processing_client->GetElements(&result_elements));
+
+  ASSERT_EQ(codec->GetGainState().gain, kTestGain);  // Keeps old gain.
+}
+
 TEST_F(SimpleCodecTest, AglStateServerWithClientViaSignalProcessingApi) {
   auto fake_parent = MockDevice::FakeRootParent();
 
