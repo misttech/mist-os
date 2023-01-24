@@ -2580,7 +2580,7 @@ TODO(fxbug.dev/104963): Have this variable default to false when we're ready
 to field bug reports, and remove it after the Tiger Lake driver gets enough
 soak time with Kaby Lake display engines.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/graphics/display/drivers/args.gni:11
 
@@ -7975,7 +7975,7 @@ Set [`use_chromium_canary`](#use_chromium_canary) to the same value.
 
 **Current value (from the default):** `false`
 
-From //src/chromium/build_args.gni:23
+From //src/cast/generate_cast_targets.gni:19
 
 ### use_ccache
 
@@ -7995,7 +7995,7 @@ value.
 
 **Current value (from the default):** `false`
 
-From //src/chromium/build_args.gni:18
+From //src/chromium/BUILD.gn:35
 
 ### use_direct_for_carnelian_examples
 
