@@ -134,7 +134,6 @@ Symbols:
   - { Name: __stpcpy, Type: Func }
   - { Name: __stpncpy, Type: Func }
   - { Name: __strchrnul, Type: Func }
-  - { Name: __strdup, Type: Func }
   - { Name: __strftime_fmt_1, Type: Func }
   - { Name: __sysv_signal, Type: Func, Weak: true }
   - { Name: __tan, Type: Func }
@@ -155,7 +154,6 @@ Symbols:
   - { Name: __wait, Type: Func }
   - { Name: __wcsftime_l, Type: Func }
   - { Name: __xpg_basename, Type: Func, Weak: true }
-  - { Name: __xpg_strerror_r, Type: Func, Weak: true }
   - { Name: __zx_panic, Type: Func }
   - { Name: _dl_debug_addr, Type: Object }
   - { Name: _environ, Type: Object, Weak: true }
@@ -1213,7 +1211,7 @@ Symbols:
   - { Name: strcoll, Type: Func }
   - { Name: strcpy, Type: Func }
   - { Name: strcspn, Type: Func }
-  - { Name: strdup, Type: Func, Weak: true }
+  - { Name: strdup, Type: Func }
   - { Name: strerror, Type: Func }
   - { Name: strerror_r, Type: Func }
   - { Name: strfmon, Type: Func }
