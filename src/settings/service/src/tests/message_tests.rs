@@ -625,7 +625,7 @@ async fn test_reply_propagation() {
         &mut broker,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED.clone()).send().ack();
+                client.propagate(MODIFIED.clone()).ack();
             })
         })),
     )
@@ -668,7 +668,7 @@ async fn test_propagation() {
         &mut broker_1,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED.clone()).send().ack();
+                client.propagate(MODIFIED.clone()).ack();
             })
         })),
     )
@@ -681,7 +681,7 @@ async fn test_propagation() {
         &mut broker_2,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED_2.clone()).send().ack();
+                client.propagate(MODIFIED_2.clone()).ack();
             })
         })),
     )

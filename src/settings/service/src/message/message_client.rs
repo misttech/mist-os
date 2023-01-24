@@ -97,9 +97,10 @@ impl MessageClient {
     }
 
     /// Propagates a derived message on the path of the original message.
-    pub(crate) fn propagate(&self, payload: crate::Payload) -> MessageBuilder {
+    pub(crate) fn propagate(&self, payload: crate::Payload) -> Receptor {
         MessageBuilder::derive(payload, self.message.clone(), self.messenger.clone())
             .auto_forwarder(self.forwarder.clone())
+            .send()
     }
 
     /// Report back to the clients that the message has been acknowledged.

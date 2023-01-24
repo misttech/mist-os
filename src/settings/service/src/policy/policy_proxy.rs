@@ -183,7 +183,7 @@ impl PolicyProxy {
         match handler_result {
             Some(RequestTransform::Request(modified_request)) => {
                 // Ignore the receptor result.
-                let _ = message_client.propagate(Payload::Request(modified_request).into()).send();
+                let _ = message_client.propagate(Payload::Request(modified_request).into());
             }
             Some(RequestTransform::Result(result)) => {
                 // Handler provided a result to return directly to the client, respond to the
@@ -215,7 +215,7 @@ impl PolicyProxy {
         if let Some(ResponseTransform::Response(response)) = handler_result {
             // Handler provided a modified setting event to forward to the requestor in place
             // of the original. Ignore the receptor result.
-            let _ = client.propagate(Payload::Response(response).into()).send();
+            let _ = client.propagate(Payload::Response(response).into());
         }
     }
 }
