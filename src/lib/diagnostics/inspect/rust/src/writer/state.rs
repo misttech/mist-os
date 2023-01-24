@@ -1675,10 +1675,10 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
             let array = state.create_string_array("array", 2, 0).unwrap();
 
-            let abc = StringReference::from("abc");
-            let def = StringReference::from("def");
-            let cba = StringReference::from("cba");
-            let fed = StringReference::from("fed");
+            let abc = StringReference::new("abc");
+            let def = StringReference::new("def");
+            let cba = StringReference::new("cba");
+            let fed = StringReference::new("fed");
 
             state.set_array_string_slot(array.index(), 0, &abc).unwrap();
             state.set_array_string_slot(array.index(), 1, &def).unwrap();

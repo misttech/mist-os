@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use flyweights::FlyStr;
 use std::{
     borrow::Cow,
     sync::atomic::{AtomicUsize, Ordering},
@@ -11,42 +10,23 @@ use std::{
 /// This is the generator for StringReference ID's.
 static NEXT_STRING_REFERENCE_ID: AtomicUsize = AtomicUsize::new(0);
 
-enum StrLike<'a> {
-    Cowed(Cow<'a, str>),
-    FlyWeight(FlyStr),
-}
-
 /// StringReference is a type that can be constructed and passed into
 /// the Inspect API as a name of a Node. If this is done, only one
 /// reference counted instance of the string will be allocated per
 /// Inspector. They can be safely used with LazyNodes.
 pub struct StringReference<'a> {
     // The canonical data referred to by this instance.
-    data: StrLike<'a>,
+    data: Cow<'a, str>,
 
     // The identifier used by state to locate this reference.
     reference_id: usize,
 }
 
 impl<'a> StringReference<'a> {
-    /// Access a read-only reference to the data in a StringReference.
-    pub fn data(&self) -> &str {
-        match self.data {
-            StrLike::Cowed(ref cowed) => cowed,
-            StrLike::FlyWeight(ref cached) => cached.as_str(),
-        }
-    }
-
-    /// Get the ID of this StringReference for State. Note that this is not
-    /// necessarily equivalent to the block index of the StringReference in the VMO.
-    pub(crate) fn id(&self) -> usize {
-        self.reference_id
-    }
-
     /// Construct a StringReference with non-owned data.
-    fn new_borrowed(data: &'a str) -> Self {
+    pub fn new(data: &'a str) -> Self {
         Self {
-            data: StrLike::Cowed(Cow::Borrowed(data)),
+            data: Cow::Borrowed(data),
             reference_id: NEXT_STRING_REFERENCE_ID.fetch_add(1, Ordering::SeqCst),
         }
     }
@@ -55,35 +35,38 @@ impl<'a> StringReference<'a> {
     /// an owning StringReference with the public API, use from(String).
     fn new_owned(data: String) -> Self {
         Self {
-            data: StrLike::Cowed(Cow::Owned(data)),
+            data: Cow::Owned(data),
             reference_id: NEXT_STRING_REFERENCE_ID.fetch_add(1, Ordering::SeqCst),
         }
     }
 
-    /// Construct a StringReference backed by a `FlyStr`
-    fn new_flystr(data: FlyStr) -> Self {
-        Self {
-            data: StrLike::FlyWeight(data),
-            reference_id: NEXT_STRING_REFERENCE_ID.fetch_add(1, Ordering::SeqCst),
-        }
+    /// Access a read-only reference to the data in a StringReference.
+    pub(crate) fn data(&self) -> &str {
+        &self.data
+    }
+
+    /// Get the ID of this StringReference for State. Note that this is not
+    /// necessarily equivalent to the block index of the StringReference in the VMO.
+    pub(crate) fn id(&self) -> usize {
+        self.reference_id
     }
 }
 
 impl<'a> From<&'a StringReference<'a>> for StringReference<'a> {
     fn from(sf: &'a StringReference<'a>) -> Self {
-        Self { data: StrLike::Cowed(Cow::Borrowed(sf.data())), reference_id: sf.reference_id }
+        Self { data: Cow::Borrowed(sf.data()), reference_id: sf.reference_id }
     }
 }
 
 impl<'a> From<&'a str> for StringReference<'a> {
     fn from(data: &'a str) -> Self {
-        StringReference::new_borrowed(data)
+        StringReference::new(data)
     }
 }
 
 impl<'a> From<&'a String> for StringReference<'a> {
     fn from(data: &'a String) -> Self {
-        StringReference::new_borrowed(data)
+        StringReference::new(data)
     }
 }
 
@@ -100,12 +83,6 @@ impl<'a> From<Cow<'a, str>> for StringReference<'a> {
     }
 }
 
-impl<'a> From<FlyStr> for StringReference<'a> {
-    fn from(data: FlyStr) -> StringReference<'a> {
-        StringReference::new_flystr(data)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,8 +94,8 @@ mod tests {
     fn string_references_as_names() {
         lazy_static! {
             static ref FOO: StringReference<'static> = "foo".into();
-            static ref BAR: StringReference<'static> = String::from("bar").into();
-            static ref BAZ: StringReference<'static> = FlyStr::new("baz").into();
+            static ref BAR: StringReference<'static> = "bar".into();
+            static ref BAZ: StringReference<'static> = "baz".into();
         };
 
         let inspector = Inspector::default();

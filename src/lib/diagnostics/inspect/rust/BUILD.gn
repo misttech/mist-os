@@ -14,7 +14,6 @@ rustc_library("fuchsia-inspect") {
   deps = [
     "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/inspect/format/rust",
-    "//src/lib/flyweights",
     "//src/lib/fuchsia-async",
     "//src/lib/injectable-time",
     "//third_party/rust_crates:anyhow",
