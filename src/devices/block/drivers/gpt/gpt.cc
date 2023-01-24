@@ -191,9 +191,11 @@ zx_status_t PartitionDevice::Add(uint32_t partition_number, bool ignore_device) 
 
   // Previously validated in Bind().
   ZX_ASSERT(GetPartitionName(gpt_entry_, partition_name_, sizeof(partition_name_)).is_ok());
+  uint8_to_guid_string(partition_type_guid_, gpt_entry_.type);
 
   const zx_device_str_prop_t str_props[]{
       {bind_fuchsia_gpt::PARTITIONNAME.c_str(), str_prop_str_val(partition_name_)},
+      {bind_fuchsia_gpt::PARTITIONTYPEGUID.c_str(), str_prop_str_val(partition_type_guid_)},
       {bind_fuchsia_block::IGNOREDEVICE.c_str(), str_prop_bool_val(ignore_device)},
   };
 

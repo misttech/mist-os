@@ -224,15 +224,19 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
     EXPECT_STREQ(name, "Linux filesystem");
 
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
-    ASSERT_EQ(props.size(), 2);
+    ASSERT_EQ(props.size(), 3);
 
     EXPECT_STREQ(props[0].key, "fuchsia.gpt.PartitionName");
     ASSERT_EQ(props[0].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
     EXPECT_STREQ(props[0].property_value.data.str_val, "Linux filesystem");
 
-    EXPECT_STREQ(props[1].key, "fuchsia.block.IgnoreDevice");
-    ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
-    EXPECT_FALSE(props[1].property_value.data.bool_val);
+    EXPECT_STREQ(props[1].key, "fuchsia.gpt.PartitionTypeGuid");
+    ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
+    EXPECT_STREQ(props[1].property_value.data.str_val, "0FC63DAF-8483-4772-8E79-3D69D8477DE4");
+
+    EXPECT_STREQ(props[2].key, "fuchsia.block.IgnoreDevice");
+    ASSERT_EQ(props[2].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
+    EXPECT_FALSE(props[2].property_value.data.bool_val);
   }
 
   iter++;
@@ -243,15 +247,19 @@ TEST_F(GptDeviceTest, ValidatePartitionBindProps) {
     EXPECT_EQ(name, kPartition1Name);
 
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
-    ASSERT_EQ(props.size(), 2);
+    ASSERT_EQ(props.size(), 3);
 
     EXPECT_STREQ(props[0].key, "fuchsia.gpt.PartitionName");
     ASSERT_EQ(props[0].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
     EXPECT_STREQ(props[0].property_value.data.str_val, kPartition1Name);
 
-    EXPECT_STREQ(props[1].key, "fuchsia.block.IgnoreDevice");
-    ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
-    EXPECT_FALSE(props[1].property_value.data.bool_val);
+    EXPECT_STREQ(props[1].key, "fuchsia.gpt.PartitionTypeGuid");
+    ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_STRING);
+    EXPECT_STREQ(props[1].property_value.data.str_val, "0FC63DAF-8483-4772-8E79-3D69D8477DE4");
+
+    EXPECT_STREQ(props[2].key, "fuchsia.block.IgnoreDevice");
+    ASSERT_EQ(props[2].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
+    EXPECT_FALSE(props[2].property_value.data.bool_val);
   }
 }
 
@@ -280,22 +288,22 @@ TEST_F(GptDeviceTest, ValidatePartitionBindPropIgnoreDevice) {
 
   {
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
-    ASSERT_EQ(props.size(), 2);
+    ASSERT_EQ(props.size(), 3);
 
-    EXPECT_STREQ(props[1].key, "fuchsia.block.IgnoreDevice");
-    ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
-    EXPECT_TRUE(props[1].property_value.data.bool_val);
+    EXPECT_STREQ(props[2].key, "fuchsia.block.IgnoreDevice");
+    ASSERT_EQ(props[2].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
+    EXPECT_TRUE(props[2].property_value.data.bool_val);
   }
 
   iter++;
 
   {
     cpp20::span<const zx_device_str_prop_t> props = (*iter)->GetStringProperties();
-    ASSERT_EQ(props.size(), 2);
+    ASSERT_EQ(props.size(), 3);
 
-    EXPECT_STREQ(props[1].key, "fuchsia.block.IgnoreDevice");
-    ASSERT_EQ(props[1].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
-    EXPECT_FALSE(props[1].property_value.data.bool_val);
+    EXPECT_STREQ(props[2].key, "fuchsia.block.IgnoreDevice");
+    ASSERT_EQ(props[2].property_value.data_type, ZX_DEVICE_PROPERTY_VALUE_BOOL);
+    EXPECT_FALSE(props[2].property_value.data.bool_val);
   }
 }
 

@@ -59,6 +59,7 @@ class PartitionDevice : public DeviceType,
   gpt_entry_t gpt_entry_{};
   block_info_t info_{};
   char partition_name_[kMaxUtf8NameLen]{};
+  char partition_type_guid_[GPT_GUID_STRLEN]{};
 };
 
 // Device bind() interface.
