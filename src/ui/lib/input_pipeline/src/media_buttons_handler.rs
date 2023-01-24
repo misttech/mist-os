@@ -134,13 +134,23 @@ impl MediaButtonsHandler {
                         // Add the listener to the registry.
                         let mut inner = self.inner.lock().await;
                         inner.listeners.insert(proxy.as_channel().raw_handle(), proxy.clone());
+                        let proxy_clone = proxy.clone();
 
                         // Send the listener the last media button event.
                         if let Some(event) = &inner.last_event {
-                            proxy
-                                .on_event(event.clone())
-                                .await
-                                .context("Failed to send media buttons event to listener")?;
+                            let event_to_send = event.clone();
+                            let fut = async move {
+                                match proxy_clone.on_event(event_to_send).await {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        fx_log_info!(
+                                            "Failed to send media buttons event to listener {:?}",
+                                            e
+                                        )
+                                    }
+                                }
+                            };
+                            inner.send_event_task_tracker.track(fasync::Task::local(fut));
                         }
                     }
                     let _ = responder.send();
