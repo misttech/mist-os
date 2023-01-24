@@ -339,8 +339,11 @@ void BufferCollection::V2::CheckAllBuffersAllocated(
     return;
   }
   fuchsia_sysmem2::BufferCollectionCheckAllBuffersAllocatedResponse response;
-  response.status() = result;
-  completer.Reply(std::move(response));
+  if (result == ZX_OK) {
+    completer.Reply(fit::ok(response));
+  } else {
+    completer.Reply(fit::error(result));
+  }
 }
 
 void BufferCollection::V1::GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) {
@@ -806,10 +809,13 @@ void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {
     }
     TRACE_ASYNC_END("gfx", "BufferCollection::WaitForBuffersAllocated async", async_id, "this",
                     this, "logical_buffer_collection", &logical_buffer_collection());
-    fuchsia_sysmem2::BufferCollectionWaitForAllBuffersAllocatedResponse response;
-    response.status() = ZX_OK;
-    response.buffer_collection_info() = std::move(v2);
-    txn.Reply(std::move(response));
+    if (logical_allocation_result_->status != ZX_OK) {
+      txn.Reply(fit::error(logical_allocation_result_->status));
+    } else {
+      fuchsia_sysmem2::BufferCollectionWaitForAllBuffersAllocatedResponse response;
+      response.buffer_collection_info() = std::move(v2);
+      txn.Reply(fit::ok(std::move(response)));
+    }
     fidl::Status reply_status = txn.result_of_reply();
     if (!reply_status.ok()) {
       FailAsync(FROM_HERE, reply_status.status(),

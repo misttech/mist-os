@@ -7,7 +7,14 @@ import("//build/test.gni")
 import("//build/testing/bootfs_test.gni")
 
 test("sysmem") {
-  sources = [ "sysmem_tests.cc" ]
+  sources = [
+    "common.cc",
+    "main.cc",
+    "secure_vmo_read_tester.cc",
+    "sysmem_tests.cc",
+    "sysmem_tests_v2.cc",
+    "test_observer.cc",
+  ]
   deps = [
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
@@ -20,6 +27,7 @@ test("sysmem") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
+    "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]

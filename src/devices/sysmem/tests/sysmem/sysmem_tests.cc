@@ -20,6 +20,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>
+#include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/event.h>
@@ -52,57 +53,26 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
-// To dump a corpus file for sysmem_fuzz.cc test, enable SYSMEM_FUZZ_CORPUS. Files can be found
-// under /data/cache/r/sys/fuchsia.com:sysmem-test:0#meta:sysmem.cmx/ on the device.
-#define SYSMEM_FUZZ_CORPUS 0
-
-const char* kSysmemClassPath = "/dev/class/sysmem";
+#include "common.h"
+#include "secure_vmo_read_tester.h"
+#include "test_observer.h"
 
 namespace {
 
-using Token = fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken>;
-using Collection = fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>;
-using Group = fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionTokenGroup>;
-using SharedToken = std::shared_ptr<Token>;
-using SharedCollection = std::shared_ptr<Collection>;
-using SharedGroup = std::shared_ptr<Group>;
+namespace v1 = fuchsia_sysmem;
 
-// This test observer is used to get the name of the current test to send to sysmem to identify the
-// client.
-std::string current_test_name;
-class TestObserver : public zxtest::LifecycleObserver {
- public:
-  void OnTestStart(const zxtest::TestCase& test_case, const zxtest::TestInfo& test_info) final {
-    current_test_name = std::string(test_case.name()) + "." + std::string(test_info.name());
-    if (current_test_name.size() > 64) {
-      current_test_name = current_test_name.substr(0, 64);
-    }
-  }
-};
-
-TestObserver test_observer;
+using TokenV1 = fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken>;
+using CollectionV1 = fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>;
+using GroupV1 = fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionTokenGroup>;
+using SharedTokenV1 = std::shared_ptr<TokenV1>;
+using SharedCollectionV1 = std::shared_ptr<CollectionV1>;
+using SharedGroupV1 = std::shared_ptr<GroupV1>;
 
 zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_service_v1();
-zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_service_v2();
 zx_status_t verify_connectivity_v1(fidl::WireSyncClient<fuchsia_sysmem::Allocator>& allocator);
-zx_status_t verify_connectivity_v2(fidl::SyncClient<fuchsia_sysmem2::Allocator>& allocator);
-
-#define IF_FAILURES_RETURN()           \
-  do {                                 \
-    if (CURRENT_TEST_HAS_FAILURES()) { \
-      return;                          \
-    }                                  \
-  } while (0)
-
-#define IF_FAILURES_RETURN_FALSE()     \
-  do {                                 \
-    if (CURRENT_TEST_HAS_FAILURES()) { \
-      return false;                    \
-    }                                  \
-  } while (0)
 
 zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_driver_v1() {
-  fbl::unique_fd sysmem_dir(open(kSysmemClassPath, O_RDONLY));
+  fbl::unique_fd sysmem_dir(open(SYSMEM_CLASS_PATH, O_RDONLY));
 
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>> client_end;
   zx_status_t status = fdio_watch_directory(
@@ -152,59 +122,6 @@ zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_dr
   return zx::ok(std::move(allocator));
 }
 
-zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_driver_v2() {
-  fbl::unique_fd sysmem_dir(open(kSysmemClassPath, O_RDONLY));
-
-  zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>> client_end;
-  zx_status_t status = fdio_watch_directory(
-      sysmem_dir.get(),
-      [](int dirfd, int event, const char* fn, void* cookie) {
-        if (std::string_view{fn} == ".") {
-          return ZX_OK;
-        }
-        if (event != WATCH_EVENT_ADD_FILE) {
-          return ZX_OK;
-        }
-        fdio_cpp::UnownedFdioCaller caller(dirfd);
-        *reinterpret_cast<zx::result<fidl::ClientEnd<fuchsia_sysmem2::DriverConnector>>*>(cookie) =
-            component::ConnectAt<fuchsia_sysmem2::DriverConnector>(caller.directory(), fn);
-        return ZX_ERR_STOP;
-      },
-      ZX_TIME_INFINITE, &client_end);
-  EXPECT_STATUS(status, ZX_ERR_STOP);
-  if (status != ZX_ERR_STOP) {
-    if (status == ZX_OK) {
-      status = ZX_ERR_BAD_STATE;
-    }
-    return zx::error(status);
-  }
-  EXPECT_OK(client_end);
-  if (!client_end.is_ok()) {
-    return zx::error(client_end.status_value());
-  }
-  fidl::WireSyncClient connector{std::move(client_end.value())};
-
-  auto allocator_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
-  EXPECT_OK(allocator_endpoints);
-  if (!allocator_endpoints.is_ok()) {
-    return zx::error(allocator_endpoints.status_value());
-  }
-
-  auto connect_result = connector->ConnectV2(std::move(allocator_endpoints->server));
-  EXPECT_OK(connect_result);
-  if (!connect_result.ok()) {
-    return zx::error(connect_result.status());
-  }
-
-  fidl::SyncClient allocator{std::move(allocator_endpoints->client)};
-  fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
-  request.name() = current_test_name;
-  request.id() = 0u;
-  auto result = allocator->SetDebugClientInfo(std::move(request));
-  EXPECT_TRUE(result.is_ok());
-  return zx::ok(std::move(allocator));
-}
-
 zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_service_v1() {
   auto client_end = component::Connect<fuchsia_sysmem::Allocator>();
   EXPECT_OK(client_end);
@@ -216,35 +133,6 @@ zx::result<fidl::WireSyncClient<fuchsia_sysmem::Allocator>> connect_to_sysmem_se
       allocator->SetDebugClientInfo(fidl::StringView::FromExternal(current_test_name), 0u);
   EXPECT_OK(result.status());
   return zx::ok(std::move(allocator));
-}
-
-zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_service_v2() {
-  auto client_end = component::Connect<fuchsia_sysmem2::Allocator>();
-  EXPECT_OK(client_end);
-  if (!client_end.is_ok()) {
-    return zx::error(client_end.status_value());
-  }
-  fidl::SyncClient allocator{std::move(client_end.value())};
-  fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest request;
-  request.name() = current_test_name;
-  request.id() = 0u;
-  auto result = allocator->SetDebugClientInfo(std::move(request));
-  EXPECT_TRUE(result.is_ok());
-  return zx::ok(std::move(allocator));
-}
-
-zx_koid_t get_koid(zx_handle_t handle) {
-  zx_info_handle_basic_t info;
-  EXPECT_OK(
-      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
-  return info.koid;
-}
-
-zx_koid_t get_related_koid(zx_handle_t handle) {
-  zx_info_handle_basic_t info;
-  EXPECT_OK(
-      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
-  return info.related_koid;
 }
 
 zx_status_t verify_connectivity_v1(fidl::WireSyncClient<fuchsia_sysmem::Allocator>& allocator) {
@@ -270,35 +158,10 @@ zx_status_t verify_connectivity_v1(fidl::WireSyncClient<fuchsia_sysmem::Allocato
   return ZX_OK;
 }
 
-zx_status_t verify_connectivity_v2(fidl::SyncClient<fuchsia_sysmem2::Allocator>& allocator) {
-  zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
-  EXPECT_TRUE(collection_endpoints.is_ok());
-  if (!collection_endpoints.is_ok()) {
-    return collection_endpoints.status_value();
-  }
-  auto [collection_client_end, collection_server_end] = std::move(*collection_endpoints);
-
-  fuchsia_sysmem2::AllocatorAllocateNonSharedCollectionRequest request;
-  request.collection_request().emplace(std::move(collection_server_end));
-  auto result = allocator->AllocateNonSharedCollection(std::move(request));
-  EXPECT_TRUE(result.is_ok());
-  if (result.is_error()) {
-    return result.error_value().status();
-  }
-
-  fidl::SyncClient collection(std::move(collection_client_end));
-  auto sync_result = collection->Sync();
-  EXPECT_TRUE(sync_result.is_ok());
-  if (sync_result.is_error()) {
-    return sync_result.error_value().status();
-  }
-  return ZX_OK;
-}
-
-static void SetDefaultCollectionName(
+static void SetDefaultCollectionNameV1(
     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection, fbl::String suffix = "") {
   constexpr uint32_t kPriority = 1000000;
-  fbl::String name = "sysmem-test";
+  fbl::String name = "sysmem-test-v1";
   if (!suffix.empty()) {
     name = fbl::String::Concat({name, "-", suffix});
   }
@@ -306,7 +169,7 @@ static void SetDefaultCollectionName(
 }
 
 zx::result<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
-make_single_participant_collection() {
+make_single_participant_collection_v1() {
   // We could use AllocateNonSharedCollection() to implement this function, but we're already
   // using AllocateNonSharedCollection() during verify_connectivity_v1(), so instead just set up the
   // more general (and more real) way here.
@@ -347,12 +210,12 @@ make_single_participant_collection() {
 
   fidl::WireSyncClient collection{std::move(collection_client_end)};
 
-  SetDefaultCollectionName(collection);
+  SetDefaultCollectionNameV1(collection);
 
   return zx::ok(std::move(collection));
 }
 
-fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_initial_token() {
+fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_initial_token_v1() {
   zx::result allocator = connect_to_sysmem_service_v1();
   EXPECT_OK(allocator.status_value());
   zx::result token_endpoints_0 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -364,10 +227,10 @@ fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_initial_token
   return token;
 }
 
-std::vector<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>> create_clients(
+std::vector<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>> create_clients_v1(
     uint32_t client_count) {
   std::vector<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>> result;
-  auto next_token = create_initial_token();
+  auto next_token = create_initial_token_v1();
   auto allocator = connect_to_sysmem_service_v1();
   for (uint32_t i = 0; i < client_count; ++i) {
     auto cur_token = std::move(next_token);
@@ -387,7 +250,7 @@ std::vector<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>> create_clien
             ->BindSharedCollection(cur_token.TakeClientEnd(), std::move(collection_server_endpoint))
             .status());
     fidl::WireSyncClient collection_client{std::move(collection_client_endpoint)};
-    SetDefaultCollectionName(collection_client, fbl::StringPrintf("%u", i));
+    SetDefaultCollectionNameV1(collection_client, fbl::StringPrintf("%u", i));
     if (i < client_count - 1) {
       // Ensure next_token is usable.
       EXPECT_OK(collection_client->Sync().status());
@@ -397,7 +260,7 @@ std::vector<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>> create_clien
   return result;
 }
 
-fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_token_under_token(
+fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_token_under_token_v1(
     fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken>& token_a) {
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   EXPECT_OK(token_endpoints.status_value());
@@ -408,7 +271,7 @@ fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_token_under_t
   return token_b;
 }
 
-fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionTokenGroup> create_group_under_token(
+fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionTokenGroup> create_group_under_token_v1(
     fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken>& token) {
   zx::result group_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionTokenGroup>();
   EXPECT_OK(group_endpoints.status_value());
@@ -419,7 +282,7 @@ fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionTokenGroup> create_group_un
   return group;
 }
 
-fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_token_under_group(
+fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_token_under_group_v1(
     fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionTokenGroup>& group,
     uint32_t rights_attenuation_mask = ZX_RIGHT_SAME_RIGHTS) {
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -438,7 +301,7 @@ fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> create_token_under_g
   return token;
 }
 
-void check_token_alive(fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken>& token) {
+void check_token_alive_v1(fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken>& token) {
   constexpr uint32_t kIterations = 1;
   for (uint32_t i = 0; i < kIterations; ++i) {
     zx::nanosleep(zx::deadline_after(zx::usec(500)));
@@ -446,7 +309,7 @@ void check_token_alive(fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToke
   }
 }
 
-void check_group_alive(fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionTokenGroup>& group) {
+void check_group_alive_v1(fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionTokenGroup>& group) {
   constexpr uint32_t kIterations = 1;
   for (uint32_t i = 0; i < kIterations; ++i) {
     zx::nanosleep(zx::deadline_after(zx::usec(500)));
@@ -454,7 +317,7 @@ void check_group_alive(fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToke
   }
 }
 
-fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> convert_token_to_collection(
+fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> convert_token_to_collection_v1(
     fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> token) {
   auto allocator = connect_to_sysmem_service_v1();
   zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
@@ -465,8 +328,8 @@ fidl::WireSyncClient<fuchsia_sysmem::BufferCollection> convert_token_to_collecti
   return fidl::WireSyncClient(std::move(collection_client));
 }
 
-void set_picky_constraints(fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection,
-                           uint32_t exact_buffer_size) {
+void set_picky_constraints_v1(fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection,
+                              uint32_t exact_buffer_size) {
   EXPECT_EQ(exact_buffer_size % zx_system_get_page_size(), 0);
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
@@ -490,9 +353,9 @@ void set_picky_constraints(fidl::WireSyncClient<fuchsia_sysmem::BufferCollection
   EXPECT_OK(collection->SetConstraints(true, std::move(constraints)).status());
 }
 
-void set_min_camping_constraints(fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection,
-                                 uint32_t min_buffer_count_for_camping,
-                                 uint32_t max_buffer_count = 0) {
+void set_min_camping_constraints_v1(
+    fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection,
+    uint32_t min_buffer_count_for_camping, uint32_t max_buffer_count = 0) {
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
       fuchsia_sysmem::wire::kCpuUsageReadOften | fuchsia_sysmem::wire::kCpuUsageWriteOften;
@@ -518,215 +381,6 @@ void set_min_camping_constraints(fidl::WireSyncClient<fuchsia_sysmem::BufferColl
   EXPECT_OK(collection->SetConstraints(true, std::move(constraints)).status());
 }
 
-const std::string& GetBoardName() {
-  static std::string s_board_name;
-  if (s_board_name.empty()) {
-    zx::result client_end = component::Connect<fuchsia_sysinfo::SysInfo>();
-    EXPECT_OK(client_end.status_value());
-
-    fidl::WireSyncClient sysinfo{std::move(client_end.value())};
-    auto result = sysinfo->GetBoardName();
-    EXPECT_OK(result.status());
-    EXPECT_OK(result.value().status);
-
-    s_board_name = result.value().name.get();
-    printf("\nFound board %s\n", s_board_name.c_str());
-  }
-  return s_board_name;
-}
-
-bool is_board_astro() { return GetBoardName() == "astro"; }
-
-bool is_board_sherlock() { return GetBoardName() == "sherlock"; }
-
-bool is_board_luis() { return GetBoardName() == "luis"; }
-
-bool is_board_nelson() { return GetBoardName() == "nelson"; }
-
-bool is_board_with_amlogic_secure() {
-  if (is_board_astro()) {
-    return true;
-  }
-  if (is_board_sherlock()) {
-    return true;
-  }
-  if (is_board_luis()) {
-    return true;
-  }
-  if (is_board_nelson()) {
-    return true;
-  }
-  return false;
-}
-
-bool is_board_with_amlogic_secure_vdec() { return is_board_with_amlogic_secure(); }
-
-void nanosleep_duration(zx::duration duration) {
-  EXPECT_OK(zx::nanosleep(zx::deadline_after(duration)));
-}
-
-// Faulting on write to a mapping to the VMO can't be checked currently
-// because maybe it goes into CPU cache without faulting because 34580?
-class SecureVmoReadTester {
- public:
-  explicit SecureVmoReadTester(zx::vmo secure_vmo);
-  explicit SecureVmoReadTester(zx::unowned_vmo unowned_secure_vmo);
-  ~SecureVmoReadTester();
-  bool IsReadFromSecureAThing();
-  // When we're trying to read from an actual secure VMO, expect_read_success is false.
-  // When we're trying tor read from an aux VMO, expect_read_success is true.
-  void AttemptReadFromSecure(bool expect_read_success = false);
-
- private:
-  void Init();
-
-  zx::vmo secure_vmo_to_delete_;
-  zx::unowned_vmo unowned_secure_vmo_;
-  zx::vmar child_vmar_;
-  // volatile only so reads in the code actually read despite the value being
-  // discarded.
-  volatile uint8_t* map_addr_ = {};
-  // This is set to true just before the attempt to read.
-  std::atomic<bool> is_read_from_secure_attempted_ = false;
-  std::atomic<bool> is_read_from_secure_a_thing_ = false;
-  std::thread let_die_thread_;
-  std::atomic<bool> is_let_die_started_ = false;
-
-  std::uint64_t kSeed = 0;
-  std::mt19937_64 prng_{kSeed};
-  std::uniform_int_distribution<uint32_t> distribution_{0, std::numeric_limits<uint32_t>::max()};
-};
-
-SecureVmoReadTester::SecureVmoReadTester(zx::vmo secure_vmo_to_delete)
-    : secure_vmo_to_delete_(std::move(secure_vmo_to_delete)),
-      unowned_secure_vmo_(secure_vmo_to_delete_) {
-  Init();
-}
-
-SecureVmoReadTester::SecureVmoReadTester(zx::unowned_vmo unowned_secure_vmo)
-    : unowned_secure_vmo_(std::move(unowned_secure_vmo)) {
-  Init();
-}
-
-void SecureVmoReadTester::Init() {
-  // We need a child VMAR so we can clean up robustly without relying on a fault
-  // to occur at location where a VMO was recently mapped but which
-  // theoretically something else could be mapped unless we're specific with a
-  // VMAR that isn't letting something else get mapped there yet.
-  zx_vaddr_t child_vaddr;
-  EXPECT_OK(zx::vmar::root_self()->allocate(
-      ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0,
-      zx_system_get_page_size(), &child_vmar_, &child_vaddr));
-
-  uint64_t vmo_size;
-  EXPECT_OK(unowned_secure_vmo_->get_size(&vmo_size));
-  EXPECT_EQ(vmo_size % zx_system_get_page_size(), 0);
-  uint64_t vmo_offset =
-      (distribution_(prng_) % (vmo_size / zx_system_get_page_size())) * zx_system_get_page_size();
-
-  uintptr_t map_addr_raw;
-  EXPECT_OK(child_vmar_.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC | ZX_VM_MAP_RANGE,
-                            0, *unowned_secure_vmo_, vmo_offset, zx_system_get_page_size(),
-                            &map_addr_raw));
-  map_addr_ = reinterpret_cast<uint8_t*>(map_addr_raw);
-  EXPECT_EQ(reinterpret_cast<uint8_t*>(child_vaddr), map_addr_);
-
-  // No data should be in CPU cache for a secure VMO; no fault should happen here.
-  EXPECT_OK(unowned_secure_vmo_->op_range(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, vmo_offset,
-                                          zx_system_get_page_size(), nullptr, 0));
-
-  // But currently the read doesn't visibly fault while the vaddr is mapped to
-  // a secure page.  Instead the read gets stuck and doesn't complete (perhaps
-  // internally faulting from kernel's point of view).  While that's not ideal,
-  // we can check that the thread doing the reading doesn't get anything from
-  // the read while mapped to a secure page, and then let the thread fault
-  // normally by unmapping the secure VMO.
-  let_die_thread_ = std::thread([this] {
-    is_let_die_started_ = true;
-    // Ensure is_read_from_secure_attempted_ becomes true before we start
-    // waiting.  This just increases the likelihood that we wait long enough
-    // for the read itself to potentially execute (expected to fault instead).
-    while (!is_read_from_secure_attempted_) {
-      nanosleep_duration(zx::msec(10));
-    }
-    // Wait 10ms for the read attempt to succeed; the read attempt should not
-    // succeed.  The read attempt may fail immediately or may get stuck.  It's
-    // possible we might very occasionally not wait long enough for the read
-    // to have actually started - if that occurs the test will "pass" without
-    // having actually attempted the read.
-    nanosleep_duration(zx::msec(10));
-    // Let thread running fn die if it hasn't already (if it got stuck, let it
-    // no longer be stuck).
-    //
-    // By removing ZX_VM_PERM_READ, if the read is stuck, the read will cause a
-    // process-visible fault instead.  We don't zx_vmar_unmap() here because the
-    // syscall docs aren't completely clear on whether zx_vmar_unmap() might
-    // make the vaddr page available for other uses.
-    EXPECT_OK(
-        child_vmar_.protect(0, reinterpret_cast<uintptr_t>(map_addr_), zx_system_get_page_size()));
-  });
-
-  while (!is_let_die_started_) {
-    nanosleep_duration(zx::msec(10));
-  }
-}
-
-SecureVmoReadTester::~SecureVmoReadTester() {
-  if (let_die_thread_.joinable()) {
-    let_die_thread_.join();
-  }
-
-  child_vmar_.destroy();
-}
-
-bool SecureVmoReadTester::IsReadFromSecureAThing() {
-  EXPECT_TRUE(is_let_die_started_);
-  EXPECT_TRUE(is_read_from_secure_attempted_);
-  return is_read_from_secure_a_thing_;
-}
-
-void SecureVmoReadTester::AttemptReadFromSecure(bool expect_read_success) {
-  EXPECT_TRUE(is_let_die_started_);
-  EXPECT_TRUE(!is_read_from_secure_attempted_);
-  is_read_from_secure_attempted_ = true;
-  // This attempt to read from a vaddr that's mapped to a secure paddr won't succeed.  For now the
-  // read gets stuck while mapped to secure memory, and then faults when we've unmapped the VMO.
-  // This address is in a child VMAR so we know nothing else will be getting mapped to the vaddr.
-  //
-  // The loop is mainly for the benefit of debugging/fixing the test should the very first write,
-  // flush, read not force and fence a fault.
-  for (uint32_t i = 0; i < zx_system_get_page_size(); ++i) {
-    map_addr_[i] = 0xF0;
-    EXPECT_OK(zx_cache_flush((const void*)&map_addr_[i], 1,
-                             ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
-    uint8_t value = map_addr_[i];
-    // Despite the flush above often causing the fault to be sync, sometimes the fault doesn't
-    // happen but we read zero.  For now, only complain if we read back something other than zero.
-    if (value != 0) {
-      is_read_from_secure_a_thing_ = true;
-    }
-    constexpr bool kDumpPageContents = false;
-    if (!expect_read_success && kDumpPageContents) {
-      if (i % 64 == 0) {
-        printf("%08x: ", i);
-      }
-      printf("%02x ", value);
-      if ((i + 1) % 64 == 0) {
-        printf("\n");
-      }
-    }
-  }
-  if (!expect_read_success) {
-    printf("\n");
-    // If we made it through the whole page without faulting, yet only read zero, consider that
-    // success in the sense that we weren't able to read anything in secure memory.  Cause the thead
-    // to "die" here on purpose so the test can pass.  This is not the typical case, but can happen
-    // at least on sherlock.  Typically we fault during the write, flush, read of byte 0 above.
-    ZX_PANIC("didn't fault, but also didn't read non-zero, so pretend to fault");
-  }
-}
-
-// Some helpers to test equality of buffer collection infos and related types.
 template <typename T, size_t S>
 bool ArrayEqual(const ::fidl::Array<T, S>& a, const ::fidl::Array<T, S>& b);
 
@@ -784,6 +438,7 @@ bool Equal(const fuchsia_sysmem::wire::ColorSpace& a, const fuchsia_sysmem::wire
   return a.type == b.type;
 }
 
+// Some helpers to test equality of buffer collection infos and related types.
 template <typename T, size_t S>
 bool ArrayEqual(const ::fidl::Array<T, S>& a, const ::fidl::Array<T, S>& b) {
   for (size_t i = 0; i < S; i++) {
@@ -794,7 +449,7 @@ bool ArrayEqual(const ::fidl::Array<T, S>& a, const ::fidl::Array<T, S>& b) {
   return true;
 }
 
-bool AttachTokenSucceeds(
+bool AttachTokenSucceedsV1(
     bool attach_before_also, bool fail_attached_early,
     fit::function<void(fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify)>
         modify_constraints_initiator,
@@ -1226,25 +881,13 @@ TEST(Sysmem, DriverConnectionV1) {
   ASSERT_OK(verify_connectivity_v1(allocator.value()));
 }
 
-TEST(Sysmem, DriverConnectionV2) {
-  auto allocator = connect_to_sysmem_driver_v2();
-  ASSERT_TRUE(allocator.is_ok());
-  ASSERT_OK(verify_connectivity_v2(allocator.value()));
-}
-
 TEST(Sysmem, ServiceConnectionV1) {
   auto allocator = connect_to_sysmem_service_v1();
   ASSERT_OK(allocator);
   ASSERT_OK(verify_connectivity_v1(allocator.value()));
 }
 
-TEST(Sysmem, ServiceConnectionV2) {
-  auto allocator = connect_to_sysmem_service_v2();
-  ASSERT_OK(allocator);
-  ASSERT_OK(verify_connectivity_v2(allocator.value()));
-}
-
-TEST(Sysmem, VerifyBufferCollectionToken) {
+TEST(Sysmem, VerifyBufferCollectionTokenV1) {
   auto allocator = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator);
 
@@ -1285,8 +928,8 @@ TEST(Sysmem, VerifyBufferCollectionToken) {
   ASSERT_FALSE(validate_result_not_known->is_known);
 }
 
-TEST(Sysmem, TokenOneParticipantNoImageConstraints) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, TokenOneParticipantNoImageConstraintsV1) {
+  auto collection = make_single_participant_collection_v1();
   ASSERT_OK(collection);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
@@ -1336,8 +979,8 @@ TEST(Sysmem, TokenOneParticipantNoImageConstraints) {
   }
 }
 
-TEST(Sysmem, TokenOneParticipantColorspaceRanking) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, TokenOneParticipantColorspaceRankingV1) {
+  auto collection = make_single_participant_collection_v1();
   ASSERT_OK(collection);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
@@ -1381,8 +1024,8 @@ TEST(Sysmem, TokenOneParticipantColorspaceRanking) {
             fuchsia_sysmem::wire::ColorSpaceType::kRec709);
 }
 
-TEST(Sysmem, AttachLifetimeTracking) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, AttachLifetimeTrackingV1) {
+  auto collection = make_single_participant_collection_v1();
   ASSERT_OK(collection);
 
   ASSERT_OK(collection->Sync());
@@ -1550,8 +1193,8 @@ TEST(Sysmem, AttachLifetimeTracking) {
   }
 }
 
-TEST(Sysmem, TokenOneParticipantWithImageConstraints) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, TokenOneParticipantWithImageConstraintsV1) {
+  auto collection = make_single_participant_collection_v1();
   ASSERT_OK(collection);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
@@ -1649,8 +1292,8 @@ TEST(Sysmem, TokenOneParticipantWithImageConstraints) {
   }
 }
 
-TEST(Sysmem, MinBufferCount) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, MinBufferCountV1) {
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
@@ -1680,12 +1323,12 @@ TEST(Sysmem, MinBufferCount) {
   ASSERT_EQ(allocation_result.value().buffer_collection_info.buffer_count, 5);
 }
 
-TEST(Sysmem, BufferName) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, BufferNameV1) {
+  auto collection = make_single_participant_collection_v1();
 
   const char kSysmemName[] = "abcdefghijkl\0mnopqrstuvwxyz";
   const char kLowPrioName[] = "low_pri";
-  // Override default set in make_single_participant_collection)
+  // Override default set in make_single_participant_collection_v1)
   ASSERT_OK(collection->SetName(2000000, kSysmemName).status());
   ASSERT_OK(collection->SetName(0, kLowPrioName).status());
 
@@ -1723,7 +1366,7 @@ TEST(Sysmem, BufferName) {
   EXPECT_EQ(0u, vmo_name[ZX_MAX_NAME_LEN - 1]);
 }
 
-TEST(Sysmem, NoToken) {
+TEST(Sysmem, NoTokenV1) {
   auto allocator = connect_to_sysmem_driver_v1();
   zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   ASSERT_OK(collection_endpoints);
@@ -1732,7 +1375,7 @@ TEST(Sysmem, NoToken) {
 
   ASSERT_OK(allocator->AllocateNonSharedCollection(std::move(collection_server_end)));
 
-  SetDefaultCollectionName(collection);
+  SetDefaultCollectionNameV1(collection);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
@@ -1783,7 +1426,7 @@ TEST(Sysmem, NoToken) {
   }
 }
 
-TEST(Sysmem, NoSync) {
+TEST(Sysmem, NoSyncV1) {
   auto allocator_1 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_1);
 
@@ -1853,7 +1496,7 @@ TEST(Sysmem, NoSync) {
   ASSERT_OK(token_1->Sync());
 }
 
-TEST(Sysmem, MultipleParticipants) {
+TEST(Sysmem, MultipleParticipantsV1) {
   auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -1892,7 +1535,7 @@ TEST(Sysmem, MultipleParticipants) {
   ASSERT_OK(
       allocator->BindSharedCollection(token_1.TakeClientEnd(), std::move(collection_server_1)));
 
-  SetDefaultCollectionName(collection_1);
+  SetDefaultCollectionNameV1(collection_1);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_1;
   constraints_1.usage.cpu =
@@ -2139,7 +1782,7 @@ TEST(Sysmem, MultipleParticipants) {
 }
 
 // This test is mainly to have something in the fuzzer corpus using format modifiers.
-TEST(Sysmem, ComplicatedFormatModifiers) {
+TEST(Sysmem, ComplicatedFormatModifiersV1) {
   auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -2164,7 +1807,7 @@ TEST(Sysmem, ComplicatedFormatModifiers) {
   ASSERT_OK(
       allocator->BindSharedCollection(token_1.TakeClientEnd(), std::move(collection_server_1)));
 
-  SetDefaultCollectionName(collection_1);
+  SetDefaultCollectionNameV1(collection_1);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_1;
   constraints_1.usage.cpu =
@@ -2242,7 +1885,7 @@ TEST(Sysmem, ComplicatedFormatModifiers) {
   ASSERT_OK(allocate_result_1->status);
 }
 
-TEST(Sysmem, MultipleParticipantsColorspaceRanking) {
+TEST(Sysmem, MultipleParticipantsColorspaceRankingV1) {
   auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -2267,7 +1910,7 @@ TEST(Sysmem, MultipleParticipantsColorspaceRanking) {
   ASSERT_OK(
       allocator->BindSharedCollection(token_1.TakeClientEnd(), std::move(collection_server_1)));
 
-  SetDefaultCollectionName(collection_1);
+  SetDefaultCollectionNameV1(collection_1);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_1;
   constraints_1.usage.cpu =
@@ -2349,7 +1992,8 @@ TEST(Sysmem, MultipleParticipantsColorspaceRanking) {
 //  * One client with NV12 ImageFormatConstraints with rec709.
 //  * Scrambled ordering of which constraints get processed first, but deterministically check each
 //    client going first in the first couple iterations.
-TEST(Sysmem, MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_CompatibleColorspaces) {
+TEST(Sysmem,
+     MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_CompatibleColorspacesV1) {
   // Multiple iterations to try to repro fxbug.dev/60895, in case it comes back.  This should be
   // at least 2 to check both orderings with two clients.
   std::atomic<uint32_t> clean_failure_seen_count = 0;
@@ -2365,7 +2009,7 @@ TEST(Sysmem, MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_Compa
     }
     const uint32_t kNumClients = 2;
     std::vector<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>> clients =
-        create_clients(kNumClients);
+        create_clients_v1(kNumClients);
 
     auto build_constraints =
         [](bool include_rec601) -> fuchsia_sysmem::wire::BufferCollectionConstraints {
@@ -2457,7 +2101,7 @@ TEST(Sysmem, MultipleParticipants_TwoImageFormatConstraintsSamePixelFormat_Compa
          clean_failure_seen_count.load());
 }
 
-TEST(Sysmem, DuplicateSync) {
+TEST(Sysmem, DuplicateSyncV1) {
   auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -2483,7 +2127,7 @@ TEST(Sysmem, DuplicateSync) {
   ASSERT_OK(
       allocator->BindSharedCollection(token_1.TakeClientEnd(), std::move(collection_server_1)));
 
-  SetDefaultCollectionName(collection_1);
+  SetDefaultCollectionNameV1(collection_1);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_1;
   constraints_1.usage.cpu =
@@ -2570,7 +2214,7 @@ TEST(Sysmem, DuplicateSync) {
   ASSERT_EQ(info.rights & ZX_RIGHT_WRITE, 0);
 }
 
-TEST(Sysmem, CloseWithOutstandingWait) {
+TEST(Sysmem, CloseWithOutstandingWaitV1) {
   auto allocator_1 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_1);
 
@@ -2643,7 +2287,7 @@ TEST(Sysmem, CloseWithOutstandingWait) {
   ASSERT_OK(verify_connectivity_v1(*allocator_1));
 }
 
-TEST(Sysmem, ConstraintsRetainedBeyondCleanClose) {
+TEST(Sysmem, ConstraintsRetainedBeyondCleanCloseV1) {
   auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -2674,7 +2318,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondCleanClose) {
   ASSERT_OK(
       allocator->BindSharedCollection(token_1.TakeClientEnd(), std::move(collection_server_1)));
 
-  SetDefaultCollectionName(collection_1);
+  SetDefaultCollectionNameV1(collection_1);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_1;
   constraints_1.usage.cpu =
@@ -2736,7 +2380,7 @@ TEST(Sysmem, ConstraintsRetainedBeyondCleanClose) {
   ASSERT_OK(
       allocator_2->BindSharedCollection(std::move(token_client_2), std::move(collection_server_2)));
 
-  SetDefaultCollectionName(collection_2);
+  SetDefaultCollectionNameV1(collection_2);
 
   // Not all constraints have been input (client 2 hasn't SetConstraints()
   // yet), so the buffers haven't been allocated yet.
@@ -2760,8 +2404,8 @@ TEST(Sysmem, ConstraintsRetainedBeyondCleanClose) {
   ASSERT_EQ(allocate_result_2->buffer_collection_info.buffer_count, 4);
 }
 
-TEST(Sysmem, HeapConstraints) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, HeapConstraintsV1) {
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanUsageTransferDst;
@@ -2796,8 +2440,8 @@ TEST(Sysmem, HeapConstraints) {
             true);
 }
 
-TEST(Sysmem, CpuUsageAndInaccessibleDomainFails) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, CpuUsageAndInaccessibleDomainFailsV1) {
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
@@ -2823,7 +2467,7 @@ TEST(Sysmem, CpuUsageAndInaccessibleDomainFails) {
   ASSERT_NE(allocate_result.status(), ZX_OK);
 }
 
-TEST(Sysmem, SystemRamHeapSupportsAllDomains) {
+TEST(Sysmem, SystemRamHeapSupportsAllDomainsV1) {
   fuchsia_sysmem::wire::CoherencyDomain domains[] = {
       fuchsia_sysmem::wire::CoherencyDomain::kCpu,
       fuchsia_sysmem::wire::CoherencyDomain::kRam,
@@ -2831,7 +2475,7 @@ TEST(Sysmem, SystemRamHeapSupportsAllDomains) {
   };
 
   for (const fuchsia_sysmem::wire::CoherencyDomain domain : domains) {
-    auto collection = make_single_participant_collection();
+    auto collection = make_single_participant_collection_v1();
 
     fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
     constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanImageUsageTransferDst;
@@ -2860,8 +2504,8 @@ TEST(Sysmem, SystemRamHeapSupportsAllDomains) {
   }
 }
 
-TEST(Sysmem, RequiredSize) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, RequiredSizeV1) {
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
@@ -2909,7 +2553,7 @@ TEST(Sysmem, RequiredSize) {
   EXPECT_LE(1024 * 512 * 3 / 2, vmo_size);
 }
 
-TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraints) {
+TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraintsV1) {
   auto allocator_1 = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator_1);
 
@@ -2935,7 +2579,7 @@ TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraints) {
   ASSERT_OK(
       allocator_1->BindSharedCollection(token_1.TakeClientEnd(), std::move(collection_server_1)));
 
-  SetDefaultCollectionName(collection_1);
+  SetDefaultCollectionNameV1(collection_1);
 
   // First client has CPU usage constraints but no buffer memory constraints.
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_1;
@@ -2985,8 +2629,8 @@ TEST(Sysmem, CpuUsageAndNoBufferMemoryConstraints) {
             fuchsia_sysmem::wire::CoherencyDomain::kCpu);
 }
 
-TEST(Sysmem, ContiguousSystemRamIsCached) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, ContiguousSystemRamIsCachedV1) {
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanUsageTransferDst;
@@ -3037,7 +2681,7 @@ TEST(Sysmem, ContiguousSystemRamIsCached) {
   ASSERT_EQ(vmo_info.cache_policy, ZX_CACHE_POLICY_CACHED);
 }
 
-TEST(Sysmem, ContiguousSystemRamIsRecycled) {
+TEST(Sysmem, ContiguousSystemRamIsRecycledV1) {
   // This needs to be larger than RAM, to know that this test is really checking if the allocations
   // are being recycled, regardless of what allocation strategy sysmem might be using.
   //
@@ -3067,7 +2711,7 @@ TEST(Sysmem, ContiguousSystemRamIsRecycled) {
       break;
     }
 
-    auto collection = make_single_participant_collection();
+    auto collection = make_single_participant_collection_v1();
 
     fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
     constraints.usage.vulkan = fuchsia_sysmem::wire::kVulkanUsageTransferDst;
@@ -3121,8 +2765,8 @@ TEST(Sysmem, ContiguousSystemRamIsRecycled) {
   }
 }
 
-TEST(Sysmem, OnlyNoneUsageFails) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, OnlyNoneUsageFailsV1) {
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.none = fuchsia_sysmem::wire::kNoneUsage;
@@ -3158,8 +2802,8 @@ TEST(Sysmem, OnlyNoneUsageFails) {
               allocate_result.value().status == ZX_ERR_NOT_SUPPORTED);
 }
 
-TEST(Sysmem, NoneUsageAndOtherUsageFromSingleParticipantFails) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, NoneUsageAndOtherUsageFromSingleParticipantFailsV1) {
+  auto collection = make_single_participant_collection_v1();
 
   const char* kClientName = "TestClient";
   ASSERT_OK(
@@ -3201,7 +2845,7 @@ TEST(Sysmem, NoneUsageAndOtherUsageFromSingleParticipantFails) {
               allocate_result.value().status == ZX_ERR_NOT_SUPPORTED);
 }
 
-TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceeds) {
+TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceedsV1) {
   auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -3232,7 +2876,7 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceeds) {
   ASSERT_OK(
       allocator->BindSharedCollection(token_1.TakeClientEnd(), std::move(collection_server_1)));
 
-  SetDefaultCollectionName(collection_1);
+  SetDefaultCollectionNameV1(collection_1);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_1;
   constraints_1.usage.none = fuchsia_sysmem::wire::kNoneUsage;
@@ -3300,14 +2944,14 @@ TEST(Sysmem, NoneUsageWithSeparateOtherUsageSucceeds) {
   ASSERT_OK(allocate_result_1->status);
 }
 
-TEST(Sysmem, PixelFormatBgr24) {
+TEST(Sysmem, PixelFormatBgr24V1) {
   constexpr uint32_t kWidth = 600;
   constexpr uint32_t kHeight = 1;
   constexpr uint32_t kStride = kWidth * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888);
   constexpr uint32_t divisor = 32;
   constexpr uint32_t kStrideAlign = (kStride + divisor - 1) & ~(divisor - 1);
 
-  auto collection = make_single_participant_collection();
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
@@ -3393,7 +3037,7 @@ TEST(Sysmem, PixelFormatBgr24) {
 }
 
 // Test that closing a token handle that's had Close() called on it doesn't crash sysmem.
-TEST(Sysmem, CloseToken) {
+TEST(Sysmem, CloseTokenV1) {
   auto allocator = connect_to_sysmem_driver_v1();
 
   auto token_endpoints_1 = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
@@ -3420,7 +3064,7 @@ TEST(Sysmem, CloseToken) {
   EXPECT_OK(token_2->Sync());
 }
 
-TEST(Sysmem, HeapAmlogicSecure) {
+TEST(Sysmem, HeapAmlogicSecureV1) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
@@ -3428,7 +3072,7 @@ TEST(Sysmem, HeapAmlogicSecure) {
   for (uint32_t i = 0; i < 64; ++i) {
     bool need_aux = (i % 4 == 0);
     bool allow_aux = (i % 2 == 0);
-    auto collection = make_single_participant_collection();
+    auto collection = make_single_participant_collection_v1();
 
     if (need_aux) {
       fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers aux_constraints;
@@ -3532,7 +3176,7 @@ TEST(Sysmem, HeapAmlogicSecure) {
   }
 }
 
-TEST(Sysmem, HeapAmlogicSecureMiniStress) {
+TEST(Sysmem, HeapAmlogicSecureMiniStressV1) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
@@ -3579,7 +3223,7 @@ TEST(Sysmem, HeapAmlogicSecureMiniStress) {
     uint32_t size = fbl::round_up(size_distribution(prng), zx_system_get_page_size());
     total_size += size;
 
-    auto collection = make_single_participant_collection();
+    auto collection = make_single_participant_collection_v1();
     fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
     constraints.usage.video = fuchsia_sysmem::wire::kVideoUsageHwDecoder;
     constexpr uint32_t kBufferCount = 1;
@@ -3681,7 +3325,7 @@ TEST(Sysmem, HeapAmlogicSecureMiniStress) {
   for (uint32_t i = 0; i < 64; ++i) {
     bool need_aux = (i % 4 == 0);
     bool allow_aux = (i % 2 == 0);
-    auto collection = make_single_participant_collection();
+    auto collection = make_single_participant_collection_v1();
 
     if (need_aux) {
       fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers aux_constraints;
@@ -3785,7 +3429,7 @@ TEST(Sysmem, HeapAmlogicSecureMiniStress) {
   }
 }
 
-TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessible) {
+TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessibleV1) {
   if (!is_board_with_amlogic_secure()) {
     return;
   }
@@ -3797,7 +3441,7 @@ TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessible) {
   };
 
   for (const fuchsia_sysmem::wire::CoherencyDomain domain : domains) {
-    auto collection = make_single_participant_collection();
+    auto collection = make_single_participant_collection_v1();
 
     fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
     constraints.usage.video = fuchsia_sysmem::wire::kVideoUsageHwDecoder;
@@ -3847,13 +3491,13 @@ TEST(Sysmem, HeapAmlogicSecureOnlySupportsInaccessible) {
   }
 }
 
-TEST(Sysmem, HeapAmlogicSecureVdec) {
+TEST(Sysmem, HeapAmlogicSecureVdecV1) {
   if (!is_board_with_amlogic_secure_vdec()) {
     return;
   }
 
   for (uint32_t i = 0; i < 64; ++i) {
-    auto collection = make_single_participant_collection();
+    auto collection = make_single_participant_collection_v1();
 
     fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
     constraints.usage.video = fuchsia_sysmem::wire::kVideoUsageDecryptorOutput |
@@ -3914,8 +3558,8 @@ TEST(Sysmem, HeapAmlogicSecureVdec) {
   }
 }
 
-TEST(Sysmem, CpuUsageAndInaccessibleDomainSupportedSucceeds) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, CpuUsageAndInaccessibleDomainSupportedSucceedsV1) {
+  auto collection = make_single_participant_collection_v1();
 
   constexpr uint32_t kBufferCount = 3;
   constexpr uint32_t kBufferSize = 64 * 1024;
@@ -3966,7 +3610,7 @@ TEST(Sysmem, CpuUsageAndInaccessibleDomainSupportedSucceeds) {
   }
 }
 
-TEST(Sysmem, AllocatedBufferZeroInRam) {
+TEST(Sysmem, AllocatedBufferZeroInRamV1) {
   constexpr uint32_t kBufferCount = 1;
   // Since we're reading from buffer start to buffer end, let's not allocate too large a buffer,
   // since perhaps that'd hide problems if the cache flush is missing in sysmem.
@@ -3978,7 +3622,7 @@ TEST(Sysmem, AllocatedBufferZeroInRam) {
   auto tmp_buffer = std::make_unique<uint8_t[]>(kBufferSize);
   ASSERT_TRUE(tmp_buffer);
   for (uint32_t iter = 0; iter < kIterationCount; ++iter) {
-    auto collection = make_single_participant_collection();
+    auto collection = make_single_participant_collection_v1();
 
     fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
     constraints.usage.cpu =
@@ -4041,8 +3685,8 @@ TEST(Sysmem, AllocatedBufferZeroInRam) {
 }
 
 // Test that most image format constraints don't need to be specified.
-TEST(Sysmem, DefaultAttributes) {
-  auto collection = make_single_participant_collection();
+TEST(Sysmem, DefaultAttributesV1) {
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
@@ -4079,7 +3723,7 @@ TEST(Sysmem, DefaultAttributes) {
 }
 
 // Check that the server validates how many image format constraints there are.
-TEST(Sysmem, TooManyFormats) {
+TEST(Sysmem, TooManyFormatsV1) {
   auto allocator = connect_to_sysmem_driver_v1();
   ASSERT_OK(allocator);
 
@@ -4129,7 +3773,7 @@ TEST(Sysmem, TooManyFormats) {
 }
 
 // Check that the server checks for min_buffer_count too large.
-TEST(Sysmem, TooManyBuffers) {
+TEST(Sysmem, TooManyBuffersV1) {
   auto allocator = connect_to_sysmem_driver_v1();
 
   zx::result collection_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
@@ -4139,7 +3783,7 @@ TEST(Sysmem, TooManyBuffers) {
 
   ASSERT_OK(allocator->AllocateNonSharedCollection(std::move(collection_server_end)));
 
-  SetDefaultCollectionName(collection);
+  SetDefaultCollectionNameV1(collection);
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.has_buffer_memory_constraints = true;
@@ -4156,10 +3800,10 @@ TEST(Sysmem, TooManyBuffers) {
   verify_connectivity_v1(*allocator);
 }
 
-bool BasicAllocationSucceeds(
+bool BasicAllocationSucceedsV1(
     fit::function<void(fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify)>
         modify_constraints) {
-  auto collection = make_single_participant_collection();
+  auto collection = make_single_participant_collection_v1();
 
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
   constraints.usage.cpu =
@@ -4252,14 +3896,14 @@ bool BasicAllocationSucceeds(
   return *std::max_element(bytes.begin(), bytes.end()) == 0u;
 }
 
-TEST(Sysmem, BasicAllocationSucceeds) {
-  EXPECT_TRUE(BasicAllocationSucceeds(
+TEST(Sysmem, BasicAllocationSucceedsV1) {
+  EXPECT_TRUE(BasicAllocationSucceedsV1(
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify_nop) {}));
 }
 
-TEST(Sysmem, ZeroMinSizeBytesFails) {
+TEST(Sysmem, ZeroMinSizeBytesFailsV1) {
   EXPECT_FALSE(
-      BasicAllocationSucceeds([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
+      BasicAllocationSucceedsV1([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         // Disable image_format_constraints so that the client is not specifying any min size via
         // implied by image_format_constraints.
         to_modify.image_format_constraints_count = 0;
@@ -4268,52 +3912,52 @@ TEST(Sysmem, ZeroMinSizeBytesFails) {
       }));
 }
 
-TEST(Sysmem, ZeroMaxBufferCount_SucceedsOnlyForNow) {
+TEST(Sysmem, ZeroMaxBufferCount_SucceedsOnlyForNowV1) {
   // With sysmem2 this will be expected to fail.  With sysmem(1), this succeeds because 0 is
   // interpreted as replace with default.
   EXPECT_TRUE(
-      BasicAllocationSucceeds([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
+      BasicAllocationSucceedsV1([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         to_modify.max_buffer_count = 0;
       }));
 }
 
-TEST(Sysmem, ZeroRequiredMinCodedWidth_SucceedsOnlyForNow) {
+TEST(Sysmem, ZeroRequiredMinCodedWidth_SucceedsOnlyForNowV1) {
   // With sysmem2 this will be expected to fail.  With sysmem(1), this succeeds because 0 is
   // interpreted as replace with default.
   EXPECT_TRUE(
-      BasicAllocationSucceeds([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
+      BasicAllocationSucceedsV1([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         to_modify.image_format_constraints[0].required_min_coded_width = 0;
       }));
 }
 
-TEST(Sysmem, ZeroRequiredMinCodedHeight_SucceedsOnlyForNow) {
+TEST(Sysmem, ZeroRequiredMinCodedHeight_SucceedsOnlyForNowV1) {
   // With sysmem2 this will be expected to fail.  With sysmem(1), this succeeds because 0 is
   // interpreted as replace with default.
   EXPECT_TRUE(
-      BasicAllocationSucceeds([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
+      BasicAllocationSucceedsV1([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         to_modify.image_format_constraints[0].required_min_coded_height = 0;
       }));
 }
 
-TEST(Sysmem, ZeroRequiredMinBytesPerRow_SucceedsOnlyForNow) {
+TEST(Sysmem, ZeroRequiredMinBytesPerRow_SucceedsOnlyForNowV1) {
   // With sysmem2 this will be expected to fail.  With sysmem(1), this succeeds because 0 is
   // interpreted as replace with default.
   EXPECT_TRUE(
-      BasicAllocationSucceeds([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
+      BasicAllocationSucceedsV1([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         to_modify.image_format_constraints[0].required_min_bytes_per_row = 0;
       }));
 }
 
-TEST(Sysmem, DuplicateConstraintsFails) {
+TEST(Sysmem, DuplicateConstraintsFailsV1) {
   EXPECT_FALSE(
-      BasicAllocationSucceeds([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
+      BasicAllocationSucceedsV1([](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         to_modify.image_format_constraints_count = 2;
         to_modify.image_format_constraints[1] = to_modify.image_format_constraints[0];
       }));
 }
 
-TEST(Sysmem, AttachToken_BeforeAllocate_Success) {
-  EXPECT_TRUE(AttachTokenSucceeds(
+TEST(Sysmem, AttachToken_BeforeAllocate_SuccessV1) {
+  EXPECT_TRUE(AttachTokenSucceedsV1(
       true, false, [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
@@ -4321,26 +3965,26 @@ TEST(Sysmem, AttachToken_BeforeAllocate_Success) {
   IF_FAILURES_RETURN();
 }
 
-TEST(Sysmem, AttachToken_AfterAllocate_Success) {
-  EXPECT_TRUE(AttachTokenSucceeds(
+TEST(Sysmem, AttachToken_AfterAllocate_SuccessV1) {
+  EXPECT_TRUE(AttachTokenSucceedsV1(
       false, false, [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionInfo2& to_verify) {}));
 }
 
-TEST(Sysmem, AttachToken_BeforeAllocate_AttachedFailedEarly_Failure) {
+TEST(Sysmem, AttachToken_BeforeAllocate_AttachedFailedEarly_FailureV1) {
   // Despite the attached token failing early, this still verifies that the non-attached tokens
   // are still ok and the LogicalBufferCollection is still ok.
-  EXPECT_FALSE(AttachTokenSucceeds(
+  EXPECT_FALSE(AttachTokenSucceedsV1(
       true, true, [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionInfo2& to_verify) {}));
 }
 
-TEST(Sysmem, AttachToken_BeforeAllocate_Failure_BufferSizes) {
-  EXPECT_FALSE(AttachTokenSucceeds(
+TEST(Sysmem, AttachToken_BeforeAllocate_Failure_BufferSizesV1) {
+  EXPECT_FALSE(AttachTokenSucceedsV1(
       true, false, [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
@@ -4349,8 +3993,8 @@ TEST(Sysmem, AttachToken_BeforeAllocate_Failure_BufferSizes) {
       [](fuchsia_sysmem::wire::BufferCollectionInfo2& to_verify) {}));
 }
 
-TEST(Sysmem, AttachToken_AfterAllocate_Failure_BufferSizes) {
-  EXPECT_FALSE(AttachTokenSucceeds(
+TEST(Sysmem, AttachToken_AfterAllocate_Failure_BufferSizesV1) {
+  EXPECT_FALSE(AttachTokenSucceedsV1(
       false, false, [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
@@ -4359,10 +4003,10 @@ TEST(Sysmem, AttachToken_AfterAllocate_Failure_BufferSizes) {
       [](fuchsia_sysmem::wire::BufferCollectionInfo2& to_verify) {}));
 }
 
-TEST(Sysmem, AttachToken_BeforeAllocate_Success_BufferCounts) {
+TEST(Sysmem, AttachToken_BeforeAllocate_Success_BufferCountsV1) {
   const uint32_t kAttachTokenBufferCount = 2;
   uint32_t buffers_needed = 0;
-  EXPECT_TRUE(AttachTokenSucceeds(
+  EXPECT_TRUE(AttachTokenSucceedsV1(
       true, false,
       [&buffers_needed](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         // 3
@@ -4383,10 +4027,10 @@ TEST(Sysmem, AttachToken_BeforeAllocate_Success_BufferCounts) {
       ));
 }
 
-TEST(Sysmem, AttachToken_AfterAllocate_Success_BufferCounts) {
+TEST(Sysmem, AttachToken_AfterAllocate_Success_BufferCountsV1) {
   const uint32_t kAttachTokenBufferCount = 2;
   uint32_t buffers_needed = 0;
-  EXPECT_TRUE(AttachTokenSucceeds(
+  EXPECT_TRUE(AttachTokenSucceedsV1(
       false, false,
       [&buffers_needed](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         // 3
@@ -4407,8 +4051,8 @@ TEST(Sysmem, AttachToken_AfterAllocate_Success_BufferCounts) {
       ));
 }
 
-TEST(Sysmem, AttachToken_BeforeAllocate_Failure_BufferCounts) {
-  EXPECT_FALSE(AttachTokenSucceeds(
+TEST(Sysmem, AttachToken_BeforeAllocate_Failure_BufferCountsV1) {
+  EXPECT_FALSE(AttachTokenSucceedsV1(
       true, false, [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
@@ -4421,8 +4065,8 @@ TEST(Sysmem, AttachToken_BeforeAllocate_Failure_BufferCounts) {
       6));
 }
 
-TEST(Sysmem, AttachToken_AfterAllocate_Failure_BufferCounts) {
-  EXPECT_FALSE(AttachTokenSucceeds(
+TEST(Sysmem, AttachToken_AfterAllocate_Failure_BufferCountsV1) {
+  EXPECT_FALSE(AttachTokenSucceedsV1(
       false, false, [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {},
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
@@ -4434,10 +4078,10 @@ TEST(Sysmem, AttachToken_AfterAllocate_Failure_BufferCounts) {
       6));
 }
 
-TEST(Sysmem, AttachToken_SelectsSameDomainAsInitialAllocation) {
+TEST(Sysmem, AttachToken_SelectsSameDomainAsInitialAllocationV1) {
   // The first part is mostly to verify that we have a way of influencing an initial allocation
   // to pick RAM coherency domain, for the benefit of the second AttachTokenSucceeds() call below.
-  EXPECT_TRUE(AttachTokenSucceeds(
+  EXPECT_TRUE(AttachTokenSucceedsV1(
       false, false,
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         to_modify.buffer_memory_constraints.cpu_domain_supported = true;
@@ -4467,7 +4111,7 @@ TEST(Sysmem, AttachToken_SelectsSameDomainAsInitialAllocation) {
   // Now verify that if the initial allocation is CPU coherency domain, an attached token that would
   // normally prefer RAM domain can succeed but will get CPU because the initial allocation already
   // picked CPU.
-  EXPECT_TRUE(AttachTokenSucceeds(
+  EXPECT_TRUE(AttachTokenSucceedsV1(
       false, false,
       [](fuchsia_sysmem::wire::BufferCollectionConstraints& to_modify) {
         to_modify.buffer_memory_constraints.cpu_domain_supported = true;
@@ -4498,7 +4142,7 @@ TEST(Sysmem, AttachToken_SelectsSameDomainAsInitialAllocation) {
       6));
 }
 
-TEST(Sysmem, SetDispensable) {
+TEST(Sysmem, SetDispensableV1) {
   enum class Variant { kDispensableFailureBeforeAllocation, kDispensableFailureAfterAllocation };
   constexpr Variant variants[] = {Variant::kDispensableFailureBeforeAllocation,
                                   Variant::kDispensableFailureAfterAllocation};
@@ -4571,7 +4215,6 @@ TEST(Sysmem, SetDispensable) {
     ASSERT_OK(collection_endpoints_2);
     auto [collection_client_2, collection_server_2] = std::move(*collection_endpoints_2);
     fidl::WireSyncClient collection_2{std::move(collection_client_2)};
-    ;
 
     // Just because we can, perform this sync as late as possible, just before
     // the BindSharedCollection() via allocator2_client_2.  Without this Sync(),
@@ -4631,10 +4274,10 @@ TEST(Sysmem, SetDispensable) {
   }
 }
 
-TEST(Sysmem, IsAlternateFor_False) {
-  auto root_token = create_initial_token();
-  auto token_a = create_token_under_token(root_token);
-  auto token_b = create_token_under_token(root_token);
+TEST(Sysmem, IsAlternateFor_FalseV1) {
+  auto root_token = create_initial_token_v1();
+  auto token_a = create_token_under_token_v1(root_token);
+  auto token_b = create_token_under_token_v1(root_token);
   auto maybe_response = token_b->GetNodeRef();
   ASSERT_TRUE(maybe_response.ok());
   auto token_b_node_ref = std::move(maybe_response->node_ref);
@@ -4643,11 +4286,11 @@ TEST(Sysmem, IsAlternateFor_False) {
   EXPECT_FALSE(result->value()->is_alternate);
 }
 
-TEST(Sysmem, IsAlternateFor_True) {
-  auto root_token = create_initial_token();
-  auto group = create_group_under_token(root_token);
-  auto token_a = create_token_under_group(group);
-  auto token_b = create_token_under_group(group);
+TEST(Sysmem, IsAlternateFor_TrueV1) {
+  auto root_token = create_initial_token_v1();
+  auto group = create_group_under_token_v1(root_token);
+  auto token_a = create_token_under_group_v1(group);
+  auto token_b = create_token_under_group_v1(group);
   auto maybe_response = token_b->GetNodeRef();
   ASSERT_TRUE(maybe_response.ok());
   auto token_b_node_ref = std::move(maybe_response->node_ref);
@@ -4656,7 +4299,7 @@ TEST(Sysmem, IsAlternateFor_True) {
   EXPECT_TRUE(result->value()->is_alternate);
 }
 
-TEST(Sysmem, IsAlternateFor_MiniStress) {
+TEST(Sysmem, IsAlternateFor_MiniStressV1) {
   std::random_device random_device;
   std::uint_fast64_t seed{random_device()};
   std::mt19937_64 prng{seed};
@@ -4665,30 +4308,30 @@ TEST(Sysmem, IsAlternateFor_MiniStress) {
 
   // We use shared_ptr<> in this test to make it easier to share code between
   // cases below.
-  std::vector<std::shared_ptr<Token>> tokens;
-  std::vector<std::shared_ptr<Group>> groups;
+  std::vector<std::shared_ptr<TokenV1>> tokens;
+  std::vector<std::shared_ptr<GroupV1>> groups;
 
-  auto create_extra_group = [&](std::shared_ptr<Token> token) {
-    auto group = std::make_shared<Group>(create_group_under_token(*token));
+  auto create_extra_group = [&](std::shared_ptr<TokenV1> token) {
+    auto group = std::make_shared<GroupV1>(create_group_under_token_v1(*token));
     groups.emplace_back(group);
 
-    auto child_0 = std::make_shared<Token>(create_token_under_group(*group));
+    auto child_0 = std::make_shared<TokenV1>(create_token_under_group_v1(*group));
     tokens.emplace_back(child_0);
 
-    auto child_1 = std::make_shared<Token>(create_token_under_group(*group));
+    auto child_1 = std::make_shared<TokenV1>(create_token_under_group_v1(*group));
     tokens.emplace_back(token);
     token = child_1;
 
     return token;
   };
 
-  auto create_child_chain = [&](std::shared_ptr<Token> token, uint32_t additional_tokens) {
+  auto create_child_chain = [&](std::shared_ptr<TokenV1> token, uint32_t additional_tokens) {
     for (uint32_t i = 0; i < additional_tokens; ++i) {
       if (i == additional_tokens / 2 && uint32_distribution(prng) % 2 == 0) {
         token = create_extra_group(token);
       } else {
-        auto child_token = std::make_shared<Token>(create_token_under_token(*token));
-        check_token_alive(*child_token);
+        auto child_token = std::make_shared<TokenV1>(create_token_under_token_v1(*token));
+        check_token_alive_v1(*child_token);
         tokens.emplace_back(token);
         token = child_token;
       }
@@ -4704,19 +4347,19 @@ TEST(Sysmem, IsAlternateFor_MiniStress) {
 
     tokens.clear();
     groups.clear();
-    auto root_token = std::make_shared<Token>(create_initial_token());
+    auto root_token = std::make_shared<TokenV1>(create_initial_token_v1());
     tokens.emplace_back(root_token);
     auto branch_token = create_child_chain(root_token, uint32_distribution(prng) % 5);
-    std::shared_ptr<Token> child_a;
-    std::shared_ptr<Token> child_b;
+    std::shared_ptr<TokenV1> child_a;
+    std::shared_ptr<TokenV1> child_b;
     bool is_alternate_for = !!(uint32_distribution(prng) % 2);
     if (is_alternate_for) {
-      auto group = std::make_shared<Group>(create_group_under_token(*branch_token));
+      auto group = std::make_shared<GroupV1>(create_group_under_token_v1(*branch_token));
       groups.emplace_back(group);
-      check_group_alive(*group);
+      check_group_alive_v1(*group);
       // Both can remain direct children of group, or can become indirect children of group.
-      child_a = std::make_shared<Token>(create_token_under_group(*group));
-      child_b = std::make_shared<Token>(create_token_under_group(*group));
+      child_a = std::make_shared<TokenV1>(create_token_under_group_v1(*group));
+      child_b = std::make_shared<TokenV1>(create_token_under_group_v1(*group));
     } else {
       // Both can remain branch_token, either can be parent of the other, or both can be children
       // (direct or indirect) of branch_token.
@@ -4734,23 +4377,23 @@ TEST(Sysmem, IsAlternateFor_MiniStress) {
   }
 }
 
-TEST(Sysmem, GroupPrefersFirstChild) {
+TEST(Sysmem, GroupPrefersFirstChildV1) {
   const uint32_t kFirstChildSize = zx_system_get_page_size() * 16;
   const uint32_t kSecondChildSize = zx_system_get_page_size() * 32;
 
-  auto root_token = create_initial_token();
-  auto group = create_group_under_token(root_token);
-  auto child_0_token = create_token_under_group(group);
-  auto child_1_token = create_token_under_group(group);
+  auto root_token = create_initial_token_v1();
+  auto group = create_group_under_token_v1(root_token);
+  auto child_0_token = create_token_under_group_v1(group);
+  auto child_1_token = create_token_under_group_v1(group);
 
-  auto root = convert_token_to_collection(std::move(root_token));
-  auto child_0 = convert_token_to_collection(std::move(child_0_token));
-  auto child_1 = convert_token_to_collection(std::move(child_1_token));
+  auto root = convert_token_to_collection_v1(std::move(root_token));
+  auto child_0 = convert_token_to_collection_v1(std::move(child_0_token));
+  auto child_1 = convert_token_to_collection_v1(std::move(child_1_token));
   auto set_result =
       root->SetConstraints(false, ::fuchsia_sysmem::wire::BufferCollectionConstraints{});
   ASSERT_TRUE(set_result.ok());
-  set_picky_constraints(child_0, kFirstChildSize);
-  set_picky_constraints(child_1, kSecondChildSize);
+  set_picky_constraints_v1(child_0, kFirstChildSize);
+  set_picky_constraints_v1(child_1, kSecondChildSize);
 
   auto all_children_present_result = group->AllChildrenPresent();
   ASSERT_TRUE(all_children_present_result.ok());
@@ -4777,13 +4420,13 @@ TEST(Sysmem, Group_CloseBeforeChildrenSetConstraints) {
   const uint32_t kFirstChildSize = zx_system_get_page_size() * 16;
   const uint32_t kSecondChildSize = zx_system_get_page_size() * 32;
 
-  auto root_token = create_initial_token();
+  auto root_token = create_initial_token_v1();
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> child_0_token;
   fidl::WireSyncClient<fuchsia_sysmem::BufferCollectionToken> child_1_token;
   {
-    auto group = create_group_under_token(root_token);
-    child_0_token = create_token_under_group(group);
-    child_1_token = create_token_under_group(group);
+    auto group = create_group_under_token_v1(root_token);
+    child_0_token = create_token_under_group_v1(group);
+    child_1_token = create_token_under_group_v1(group);
 
     auto all_children_present_result = group->AllChildrenPresent();
     ASSERT_TRUE(all_children_present_result.ok());
@@ -4792,14 +4435,14 @@ TEST(Sysmem, Group_CloseBeforeChildrenSetConstraints) {
     ASSERT_TRUE(group_close_result.ok());
   }
 
-  auto root = convert_token_to_collection(std::move(root_token));
-  auto child_0 = convert_token_to_collection(std::move(child_0_token));
-  auto child_1 = convert_token_to_collection(std::move(child_1_token));
+  auto root = convert_token_to_collection_v1(std::move(root_token));
+  auto child_0 = convert_token_to_collection_v1(std::move(child_0_token));
+  auto child_1 = convert_token_to_collection_v1(std::move(child_1_token));
   auto set_result =
       root->SetConstraints(false, ::fuchsia_sysmem::wire::BufferCollectionConstraints{});
   ASSERT_TRUE(set_result.ok());
-  set_picky_constraints(child_0, kFirstChildSize);
-  set_picky_constraints(child_1, kSecondChildSize);
+  set_picky_constraints_v1(child_0, kFirstChildSize);
+  set_picky_constraints_v1(child_1, kSecondChildSize);
 
   auto wait_result1 = root->WaitForBuffersAllocated();
   ASSERT_TRUE(wait_result1.ok() && wait_result1->status == ZX_OK);
@@ -4819,7 +4462,7 @@ TEST(Sysmem, Group_CloseBeforeChildrenSetConstraints) {
               wait_result3->status == ZX_ERR_NOT_SUPPORTED);
 }
 
-TEST(Sysmem, GroupPriority) {
+TEST(Sysmem, GroupPriorityV1) {
   constexpr uint32_t kIterations = 50;
   for (uint32_t i = 0; i < kIterations; ++i) {
     if ((i + 1) % 100 == 0) {
@@ -4845,7 +4488,7 @@ TEST(Sysmem, GroupPriority) {
     constexpr uint32_t kNonGroupCount = 12;
     constexpr uint32_t kPickCount = 2;
 
-    using Item = std::variant<std::monostate, SharedToken, SharedCollection, SharedGroup>;
+    using Item = std::variant<std::monostate, SharedTokenV1, SharedCollectionV1, SharedGroupV1>;
     struct Node;
     using SharedNode = std::shared_ptr<Node>;
     struct Node {
@@ -4903,19 +4546,19 @@ TEST(Sysmem, GroupPriority) {
     auto add_random_nodes = [&]() {
       for (uint32_t i = 0; i < kNonGroupCount; ++i) {
         auto parent_node = all_nodes[uint32_distribution(prng) % all_nodes.size()];
-        auto node = create_node(parent_node.get(), std::make_shared<Token>(create_token_under_token(
-                                                       *std::get<SharedToken>(parent_node->item))));
+        auto node =
+            create_node(parent_node.get(), std::make_shared<TokenV1>(create_token_under_token_v1(
+                                               *std::get<SharedTokenV1>(parent_node->item))));
       }
       for (uint32_t i = 0; i < kGroupCount; ++i) {
         auto parent_node = pre_groups_non_group_nodes[uint32_distribution(prng) %
                                                       pre_groups_non_group_nodes.size()];
         auto group =
-            create_node(parent_node.get(), std::make_shared<Group>(create_group_under_token(
-                                               *std::get<SharedToken>(parent_node->item))));
+            create_node(parent_node.get(), std::make_shared<GroupV1>(create_group_under_token_v1(
+                                               *std::get<SharedTokenV1>(parent_node->item))));
         // a group must have at least one child so go ahead and add that child when we add the group
-        create_node(
-            group.get(),
-            std::make_shared<Token>(create_token_under_group(*std::get<SharedGroup>(group->item))));
+        create_node(group.get(), std::make_shared<TokenV1>(create_token_under_group_v1(
+                                     *std::get<SharedGroupV1>(group->item))));
       }
     };
 
@@ -4926,9 +4569,9 @@ TEST(Sysmem, GroupPriority) {
         group_node->is_camper = false;
         un_picked_group_nodes.erase(un_picked_group_nodes.begin() + which);
         picked_group_nodes.emplace_back(group_node);
-        auto group = std::get<SharedGroup>(group_node->item);
+        auto group = std::get<SharedGroupV1>(group_node->item);
         auto token = create_node(group_node.get(),
-                                 std::make_shared<Token>(create_token_under_group(*group)));
+                                 std::make_shared<TokenV1>(create_token_under_group_v1(*group)));
         token->is_camper = false;
       }
     };
@@ -4963,18 +4606,18 @@ TEST(Sysmem, GroupPriority) {
     auto finalize_nodes = [&] {
       for (auto& node : all_nodes) {
         if (node->is_group()) {
-          auto group = std::get<SharedGroup>(node->item);
+          auto group = std::get<SharedGroupV1>(node->item);
           EXPECT_OK((*group)->AllChildrenPresent().status());
         } else {
-          auto token = std::get<SharedToken>(node->item);
+          auto token = std::get<SharedTokenV1>(node->item);
           auto collection =
-              std::make_shared<Collection>(convert_token_to_collection(std::move(*token)));
-          node->item.emplace<SharedCollection>(collection);
+              std::make_shared<CollectionV1>(convert_token_to_collection_v1(std::move(*token)));
+          node->item.emplace<SharedCollectionV1>(collection);
           if (node.get() == root_node.get()) {
-            set_min_camping_constraints(*collection, node->is_camper ? 1 : 0,
-                                        constraints_count - 1);
+            set_min_camping_constraints_v1(*collection, node->is_camper ? 1 : 0,
+                                           constraints_count - 1);
           } else {
-            set_min_camping_constraints(*collection, node->is_camper ? 1 : 0);
+            set_min_camping_constraints_v1(*collection, node->is_camper ? 1 : 0);
           }
         }
       }
@@ -4985,9 +4628,9 @@ TEST(Sysmem, GroupPriority) {
         if (node->is_group()) {
           continue;
         }
-        auto collection = std::get<SharedCollection>(node->item);
+        auto collection = std::get<SharedCollectionV1>(node->item);
         auto wait_result = (*collection)->WaitForBuffersAllocated();
-        if (!wait_result.ok() || wait_result->status != ZX_OK) {
+        if (!wait_result.ok()) {
           auto* group = node->parent;
           ASSERT_FALSE(group->is_camper);
           // Only the picked group enumerated last among the picked groups (in DFS pre-order) gives
@@ -4999,7 +4642,7 @@ TEST(Sysmem, GroupPriority) {
       }
     };
 
-    root_node = create_node(nullptr, std::make_shared<Token>(create_initial_token()));
+    root_node = create_node(nullptr, std::make_shared<TokenV1>(create_initial_token_v1()));
     add_random_nodes();
     pick_groups();
     set_picked_group_dfs_preorder_ordinals();
@@ -5008,7 +4651,7 @@ TEST(Sysmem, GroupPriority) {
   }
 }
 
-TEST(Sysmem, Group_MiniStress) {
+TEST(Sysmem, Group_MiniStressV1) {
   // In addition to some degree of stress, this tests whether sysmem can find the group child
   // selections that work, given various arrangements of tokens, groups, and constraints
   // compatibility / incompatibility.
@@ -5027,7 +4670,7 @@ TEST(Sysmem, Group_MiniStress) {
     // child.
     const uint32_t kRandomChildrenCount = 6;
 
-    using Item = std::variant<SharedToken, SharedCollection, SharedGroup>;
+    using Item = std::variant<SharedTokenV1, SharedCollectionV1, SharedGroupV1>;
 
     std::random_device random_device;
     std::uint_fast64_t seed{random_device()};
@@ -5066,18 +4709,21 @@ TEST(Sysmem, Group_MiniStress) {
         auto parent_node = all_nodes[uint32_distribution(prng) % all_nodes.size()];
         SharedNode node;
         if (parent_node->is_group()) {
-          node = create_node(parent_node.get(), std::make_shared<Token>(create_token_under_group(
-                                                    *std::get<SharedGroup>(parent_node->item))));
+          node =
+              create_node(parent_node.get(), std::make_shared<TokenV1>(create_token_under_group_v1(
+                                                 *std::get<SharedGroupV1>(parent_node->item))));
         } else if (uint32_distribution(prng) % 2 == 0) {
-          node = create_node(parent_node.get(), std::make_shared<Token>(create_token_under_token(
-                                                    *std::get<SharedToken>(parent_node->item))));
+          node =
+              create_node(parent_node.get(), std::make_shared<TokenV1>(create_token_under_token_v1(
+                                                 *std::get<SharedTokenV1>(parent_node->item))));
         } else {
-          node = create_node(parent_node.get(), std::make_shared<Group>(create_group_under_token(
-                                                    *std::get<SharedToken>(parent_node->item))));
+          node =
+              create_node(parent_node.get(), std::make_shared<GroupV1>(create_group_under_token_v1(
+                                                 *std::get<SharedTokenV1>(parent_node->item))));
           // a group must have at least one child so go ahead and add that child when we add the
           // group
-          create_node(node.get(), std::make_shared<Token>(create_token_under_group(
-                                      *std::get<SharedGroup>(node->item))));
+          create_node(node.get(), std::make_shared<TokenV1>(create_token_under_group_v1(
+                                      *std::get<SharedGroupV1>(node->item))));
         }
       }
     };
@@ -5132,15 +4778,15 @@ TEST(Sysmem, Group_MiniStress) {
             std::this_thread::yield();
           }
           if (node->is_group()) {
-            auto group = std::get<SharedGroup>(node->item);
+            auto group = std::get<SharedGroupV1>(node->item);
             EXPECT_OK((*group)->AllChildrenPresent().status());
           } else {
-            auto token = std::get<SharedToken>(node->item);
+            auto token = std::get<SharedTokenV1>(node->item);
             auto collection =
-                std::make_shared<Collection>(convert_token_to_collection(std::move(*token)));
-            node->item.emplace<SharedCollection>(collection);
+                std::make_shared<CollectionV1>(convert_token_to_collection_v1(std::move(*token)));
+            node->item.emplace<SharedCollectionV1>(collection);
             uint32_t size = node->is_compatible ? kCompatibleSize : kIncompatibleSize;
-            set_picky_constraints(*collection, size);
+            set_picky_constraints_v1(*collection, size);
           }
         }));
       }
@@ -5158,7 +4804,7 @@ TEST(Sysmem, Group_MiniStress) {
         if (node->is_group()) {
           continue;
         }
-        auto collection = std::get<SharedCollection>(node->item);
+        auto collection = std::get<SharedCollectionV1>(node->item);
         auto wait_result = (*collection)->WaitForBuffersAllocated();
         if (!node->is_compatible) {
           if (wait_result.ok()) {
@@ -5175,7 +4821,7 @@ TEST(Sysmem, Group_MiniStress) {
       }
     };
 
-    auto root_node = create_node(nullptr, std::make_shared<Token>(create_initial_token()));
+    auto root_node = create_node(nullptr, std::make_shared<TokenV1>(create_initial_token_v1()));
     add_random_nodes();
     select_group_children();
     find_visible_nodes_and_mark_compatible();
@@ -5184,14 +4830,14 @@ TEST(Sysmem, Group_MiniStress) {
   }
 }
 
-TEST(Sysmem, SkipUnreachableChildSelections) {
+TEST(Sysmem, SkipUnreachableChildSelectionsV1) {
   const uint32_t kCompatibleSize = zx_system_get_page_size();
   const uint32_t kIncompatibleSize = 2 * zx_system_get_page_size();
-  std::vector<std::shared_ptr<Token>> incompatible_tokens;
-  std::vector<std::shared_ptr<Token>> compatible_tokens;
-  std::vector<std::shared_ptr<Group>> groups;
-  std::vector<std::shared_ptr<Collection>> collections;
-  auto root_token = std::make_shared<Token>(create_initial_token());
+  std::vector<std::shared_ptr<TokenV1>> incompatible_tokens;
+  std::vector<std::shared_ptr<TokenV1>> compatible_tokens;
+  std::vector<std::shared_ptr<GroupV1>> groups;
+  std::vector<std::shared_ptr<CollectionV1>> collections;
+  auto root_token = std::make_shared<TokenV1>(create_initial_token_v1());
   compatible_tokens.emplace_back(root_token);
   auto cur_token = root_token;
   // Essentially counting to 2^63 would take too long and cause the test to time out.  The fact
@@ -5208,24 +4854,26 @@ TEST(Sysmem, SkipUnreachableChildSelections) {
   // combinations) sysmem would be forced to give up after trying several group child combinations
   // instead of ever finding the highest priority combination that can succeed aggregation.
   for (uint32_t i = 0; i < 63; ++i) {
-    auto group = std::make_shared<Group>(create_group_under_token(*cur_token));
+    auto group = std::make_shared<GroupV1>(create_group_under_token_v1(*cur_token));
     groups.emplace_back(group);
     // We create the next_token first, because we want to prefer the deeper sub-tree.
-    auto next_token = std::make_shared<Token>(create_token_under_group(*group));
+    auto next_token = std::make_shared<TokenV1>(create_token_under_group_v1(*group));
     incompatible_tokens.emplace_back(next_token);
-    auto shorter_child = std::make_shared<Token>(create_token_under_group(*group));
+    auto shorter_child = std::make_shared<TokenV1>(create_token_under_group_v1(*group));
     compatible_tokens.emplace_back(shorter_child);
     cur_token = next_token;
   }
   for (auto& token : compatible_tokens) {
-    auto collection = std::make_shared<Collection>(convert_token_to_collection(std::move(*token)));
+    auto collection =
+        std::make_shared<CollectionV1>(convert_token_to_collection_v1(std::move(*token)));
     collections.emplace_back(collection);
-    set_picky_constraints(*collection, kCompatibleSize);
+    set_picky_constraints_v1(*collection, kCompatibleSize);
   }
   for (auto& token : incompatible_tokens) {
-    auto collection = std::make_shared<Collection>(convert_token_to_collection(std::move(*token)));
+    auto collection =
+        std::make_shared<CollectionV1>(convert_token_to_collection_v1(std::move(*token)));
     collections.emplace_back(collection);
-    set_picky_constraints(*collection, kIncompatibleSize);
+    set_picky_constraints_v1(*collection, kIncompatibleSize);
   }
   for (auto& group : groups) {
     auto result = (*group)->AllChildrenPresent();
@@ -5233,7 +4881,7 @@ TEST(Sysmem, SkipUnreachableChildSelections) {
   }
   // Only two collections will succeed - the root and the right child of the group direclty under
   // the root.
-  std::vector<std::shared_ptr<Collection>> success_collections;
+  std::vector<std::shared_ptr<CollectionV1>> success_collections;
   auto root_collection = collections[0];
   auto right_child_under_root_collection = collections[1];
   success_collections.emplace_back(root_collection);
@@ -5259,35 +4907,37 @@ TEST(Sysmem, SkipUnreachableChildSelections) {
   }
 }
 
-TEST(Sysmem, GroupChildSelectionCombinationCountLimit) {
+TEST(Sysmem, GroupChildSelectionCombinationCountLimitV1) {
   const uint32_t kCompatibleSize = zx_system_get_page_size();
   const uint32_t kIncompatibleSize = 2 * zx_system_get_page_size();
-  std::vector<std::shared_ptr<Token>> incompatible_tokens;
-  std::vector<std::shared_ptr<Token>> compatible_tokens;
-  std::vector<std::shared_ptr<Group>> groups;
-  std::vector<std::shared_ptr<Collection>> collections;
-  auto root_token = std::make_shared<Token>(create_initial_token());
+  std::vector<std::shared_ptr<TokenV1>> incompatible_tokens;
+  std::vector<std::shared_ptr<TokenV1>> compatible_tokens;
+  std::vector<std::shared_ptr<GroupV1>> groups;
+  std::vector<std::shared_ptr<CollectionV1>> collections;
+  auto root_token = std::make_shared<TokenV1>(create_initial_token_v1());
   incompatible_tokens.emplace_back(root_token);
   // Essentially counting to 2^64 would take too long and cause the test to time out.  The fact
   // that the test doesn't time out (and instead the logical allocation fails) shows that sysmem
   // isn't trying all the group child selections, by design.
   for (uint32_t i = 0; i < 64; ++i) {
-    auto group = std::make_shared<Group>(create_group_under_token(*root_token));
+    auto group = std::make_shared<GroupV1>(create_group_under_token_v1(*root_token));
     groups.emplace_back(group);
-    auto child_token_0 = std::make_shared<Token>(create_token_under_group(*group));
+    auto child_token_0 = std::make_shared<TokenV1>(create_token_under_group_v1(*group));
     compatible_tokens.emplace_back(child_token_0);
-    auto child_token_1 = std::make_shared<Token>(create_token_under_group(*group));
+    auto child_token_1 = std::make_shared<TokenV1>(create_token_under_group_v1(*group));
     compatible_tokens.emplace_back(child_token_1);
   }
   for (auto& token : compatible_tokens) {
-    auto collection = std::make_shared<Collection>(convert_token_to_collection(std::move(*token)));
+    auto collection =
+        std::make_shared<CollectionV1>(convert_token_to_collection_v1(std::move(*token)));
     collections.emplace_back(collection);
-    set_picky_constraints(*collection, kCompatibleSize);
+    set_picky_constraints_v1(*collection, kCompatibleSize);
   }
   for (auto& token : incompatible_tokens) {
-    auto collection = std::make_shared<Collection>(convert_token_to_collection(std::move(*token)));
+    auto collection =
+        std::make_shared<CollectionV1>(convert_token_to_collection_v1(std::move(*token)));
     collections.emplace_back(collection);
-    set_picky_constraints(*collection, kIncompatibleSize);
+    set_picky_constraints_v1(*collection, kIncompatibleSize);
   }
   for (auto& group : groups) {
     auto result = (*group)->AllChildrenPresent();
@@ -5304,13 +4954,13 @@ TEST(Sysmem, GroupChildSelectionCombinationCountLimit) {
   }
 }
 
-TEST(Sysmem, GroupCreateChildrenSync) {
+TEST(Sysmem, GroupCreateChildrenSyncV1) {
   for (uint32_t is_oddball_writable = 0; is_oddball_writable < 2; ++is_oddball_writable) {
     const uint32_t kCompatibleSize = zx_system_get_page_size();
     const uint32_t kIncompatibleSize = 2 * zx_system_get_page_size();
-    auto root_token = create_initial_token();
-    auto group = create_group_under_token(root_token);
-    check_group_alive(group);
+    auto root_token = create_initial_token_v1();
+    auto group = create_group_under_token_v1(root_token);
+    check_group_alive_v1(group);
     constexpr uint32_t kTokenCount = 16;
     zx_rights_t rights_attenuation_masks[kTokenCount];
     for (auto& rights : rights_attenuation_masks) {
@@ -5335,12 +4985,12 @@ TEST(Sysmem, GroupCreateChildrenSync) {
     std::vector<fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>> collections;
     collections.reserve(tokens.size());
     for (auto& token : tokens) {
-      collections.emplace_back(convert_token_to_collection(std::move(token)));
+      collections.emplace_back(convert_token_to_collection_v1(std::move(token)));
     }
     uint32_t index = 0;
     for (auto& collection : collections) {
       uint32_t size = is_compatible(index) ? kCompatibleSize : kIncompatibleSize;
-      set_picky_constraints(collection, size);
+      set_picky_constraints_v1(collection, size);
       ++index;
     }
     auto group_done_result = group->AllChildrenPresent();
@@ -5380,26 +5030,26 @@ TEST(Sysmem, GroupCreateChildrenSync) {
   }
 }
 
-TEST(Sysmem, SetVerboseLogging) {
+TEST(Sysmem, SetVerboseLoggingV1) {
   // Verbose logging shouldn't have any observable effect via the sysmem protocols, so this test
   // mainly just checks that having verbose logging enabled for a failed allocation doesn't crash
   // sysmem.  In addition, the log output during this test can be manually checked to make sure it's
   // significantly more verbose as intended.
 
-  auto root_token = create_initial_token();
+  auto root_token = create_initial_token_v1();
   auto set_verbose_result = root_token->SetVerboseLogging();
   ASSERT_TRUE(set_verbose_result.ok());
-  auto child_token = create_token_under_token(root_token);
-  auto child2_token = create_token_under_token(child_token);
-  check_token_alive(child_token);
-  check_token_alive(child2_token);
+  auto child_token = create_token_under_token_v1(root_token);
+  auto child2_token = create_token_under_token_v1(child_token);
+  check_token_alive_v1(child_token);
+  check_token_alive_v1(child2_token);
   const uint32_t kCompatibleSize = zx_system_get_page_size();
   const uint32_t kIncompatibleSize = 2 * zx_system_get_page_size();
-  auto root = convert_token_to_collection(std::move(root_token));
-  auto child = convert_token_to_collection(std::move(child_token));
-  auto child2 = convert_token_to_collection(std::move(child2_token));
-  set_picky_constraints(root, kCompatibleSize);
-  set_picky_constraints(child, kIncompatibleSize);
+  auto root = convert_token_to_collection_v1(std::move(root_token));
+  auto child = convert_token_to_collection_v1(std::move(child_token));
+  auto child2 = convert_token_to_collection_v1(std::move(child2_token));
+  set_picky_constraints_v1(root, kCompatibleSize);
+  set_picky_constraints_v1(child, kIncompatibleSize);
   auto set_result =
       child2->SetConstraints(false, fuchsia_sysmem::wire::BufferCollectionConstraints{});
   ASSERT_TRUE(set_result.ok());
@@ -5414,17 +5064,17 @@ TEST(Sysmem, SetVerboseLogging) {
               child2_result.ok() && child2_result->status == ZX_ERR_NOT_SUPPORTED);
 
   // Make sure sysmem is still alive.
-  auto check_token = create_initial_token();
+  auto check_token = create_initial_token_v1();
   auto sync_result = check_token->Sync();
   ASSERT_TRUE(sync_result.ok());
 }
 
-TEST(Sysmem, PixelFormatDoNotCare_Success) {
-  auto token1 = create_initial_token();
-  auto token2 = create_token_under_token(token1);
+TEST(Sysmem, PixelFormatDoNotCare_SuccessV1) {
+  auto token1 = create_initial_token_v1();
+  auto token2 = create_token_under_token_v1(token1);
 
-  auto collection1 = convert_token_to_collection(std::move(token1));
-  auto collection2 = convert_token_to_collection(std::move(token2));
+  auto collection1 = convert_token_to_collection_v1(std::move(token1));
+  auto collection2 = convert_token_to_collection_v1(std::move(token2));
 
   fuchsia_sysmem::BufferCollectionConstraints c2;
   c2.usage().cpu() = fuchsia_sysmem::kCpuUsageWriteOften;
@@ -5484,16 +5134,16 @@ TEST(Sysmem, PixelFormatDoNotCare_Success) {
       info1.buffer_collection_info().settings().image_format_constraints().pixel_format().type());
 }
 
-TEST(Sysmem, PixelFormatDoNotCare_MultiplePixelFormatsFails) {
+TEST(Sysmem, PixelFormatDoNotCare_MultiplePixelFormatsFailsV1) {
   // pass 0 - verify success when single pixel format
   // pass 1 - verify failure when multiple pixel formats
   // pass 1 - verify failure when multiple pixel formats (kInvalid variant)
   for (uint32_t pass = 0; pass < 3; ++pass) {
-    auto token1 = create_initial_token();
-    auto token2 = create_token_under_token(token1);
+    auto token1 = create_initial_token_v1();
+    auto token2 = create_token_under_token_v1(token1);
 
-    auto collection1 = convert_token_to_collection(std::move(token1));
-    auto collection2 = convert_token_to_collection(std::move(token2));
+    auto collection1 = convert_token_to_collection_v1(std::move(token1));
+    auto collection2 = convert_token_to_collection_v1(std::move(token2));
 
     fuchsia_sysmem::BufferCollectionConstraints c2;
     c2.usage().cpu() = fuchsia_sysmem::kCpuUsageWriteOften;
@@ -5553,15 +5203,15 @@ TEST(Sysmem, PixelFormatDoNotCare_MultiplePixelFormatsFails) {
   }
 }
 
-TEST(Sysmem, PixelFormatDoNotCare_UnconstrainedFails) {
+TEST(Sysmem, PixelFormatDoNotCare_UnconstrainedFailsV1) {
   // pass 0 - verify success when not all participants are unconstrained pixel format
   // pass 1 - verify fialure when all participants are unconstrained pixel format
   for (uint32_t pass = 0; pass < 2; ++pass) {
-    auto token1 = create_initial_token();
-    auto token2 = create_token_under_token(token1);
+    auto token1 = create_initial_token_v1();
+    auto token2 = create_token_under_token_v1(token1);
 
-    auto collection1 = convert_token_to_collection(std::move(token1));
-    auto collection2 = convert_token_to_collection(std::move(token2));
+    auto collection1 = convert_token_to_collection_v1(std::move(token1));
+    auto collection2 = convert_token_to_collection_v1(std::move(token2));
 
     fuchsia_sysmem::BufferCollectionConstraints c2;
     c2.usage().cpu() = fuchsia_sysmem::kCpuUsageWriteOften;
@@ -5615,12 +5265,12 @@ TEST(Sysmem, PixelFormatDoNotCare_UnconstrainedFails) {
   }
 }
 
-TEST(Sysmem, ColorSpaceDoNotCare_Success) {
-  auto token1 = create_initial_token();
-  auto token2 = create_token_under_token(token1);
+TEST(Sysmem, ColorSpaceDoNotCare_SuccessV1) {
+  auto token1 = create_initial_token_v1();
+  auto token2 = create_token_under_token_v1(token1);
 
-  auto collection1 = convert_token_to_collection(std::move(token1));
-  auto collection2 = convert_token_to_collection(std::move(token2));
+  auto collection1 = convert_token_to_collection_v1(std::move(token1));
+  auto collection2 = convert_token_to_collection_v1(std::move(token2));
 
   fuchsia_sysmem::BufferCollectionConstraints c2;
   c2.usage().cpu() = fuchsia_sysmem::kCpuUsageWriteOften;
@@ -5675,7 +5325,7 @@ TEST(Sysmem, ColorSpaceDoNotCare_Success) {
       info1.buffer_collection_info().settings().image_format_constraints().color_space()[0].type());
 }
 
-TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFails) {
+TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFailsV1) {
   // In pass 0, c1 sets kDoNotCare (via ForceUnsetColorSpaceConstraint) and correctly sets a single
   // kInvalid color space - in this pass we expect success.
   //
@@ -5684,11 +5334,11 @@ TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFails) {
   //
   // Pass 2 is a variant of pass 1 that sets the 2nd color space to kInvalid instead.
   for (uint32_t pass = 0; pass < 3; ++pass) {
-    auto token1 = create_initial_token();
-    auto token2 = create_token_under_token(token1);
+    auto token1 = create_initial_token_v1();
+    auto token2 = create_token_under_token_v1(token1);
 
-    auto collection1 = convert_token_to_collection(std::move(token1));
-    auto collection2 = convert_token_to_collection(std::move(token2));
+    auto collection1 = convert_token_to_collection_v1(std::move(token1));
+    auto collection2 = convert_token_to_collection_v1(std::move(token2));
 
     fuchsia_sysmem::BufferCollectionConstraints c2;
     c2.usage().cpu() = fuchsia_sysmem::kCpuUsageWriteOften;
@@ -5756,7 +5406,7 @@ TEST(Sysmem, PixelFormatDoNotCare_OneColorSpaceElseFails) {
   }
 }
 
-TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormat) {
+TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormatV1) {
   // In pass 0, we verify that with a participant (2) that does constrain the color space, success.
   //
   // In pass 1, we verify that essentially "removing" the constraining participant (2) is enough to
@@ -5770,16 +5420,16 @@ TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormat) {
     // All the "decltype(1)" stuff is defined in both passes but only actually used in pass 0, not
     // pass 1.
 
-    auto token1 = create_initial_token();
+    auto token1 = create_initial_token_v1();
     decltype(token1) token2;
     if (pass == 0) {
-      token2 = create_token_under_token(token1);
+      token2 = create_token_under_token_v1(token1);
     }
 
-    auto collection1 = convert_token_to_collection(std::move(token1));
+    auto collection1 = convert_token_to_collection_v1(std::move(token1));
     decltype(collection1) collection2;
     if (pass == 0) {
-      collection2 = convert_token_to_collection(std::move(token2));
+      collection2 = convert_token_to_collection_v1(std::move(token2));
     }
 
     fuchsia_sysmem::BufferCollectionConstraints c1;
@@ -5795,7 +5445,8 @@ TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormat) {
     // clone / copy
     auto c2 = c1;
     c1.image_format_constraints()[0].color_spaces_count() = 1;
-    c1.image_format_constraints()[0].color_space()[0] = fuchsia_sysmem::ColorSpaceType::kDoNotCare;
+    c1.image_format_constraints()[0].color_space()[0].type() =
+        fuchsia_sysmem::ColorSpaceType::kDoNotCare;
     if (pass == 0) {
       // c2 will constrain the pixel format (by setting a valid one here and not sending
       // ForceUnsetColorSpaceConstraint() below).
@@ -5838,11 +5489,4 @@ TEST(Sysmem, ColorSpaceDoNotCare_UnconstrainedColorSpaceRemovesPixelFormat) {
       ASSERT_TRUE(!wait_result1.ok() || wait_result1->status != ZX_OK);
     }
   }
-}
-
-int main(int argc, char** argv) {
-  setlinebuf(stdout);
-  zxtest::Runner::GetInstance()->AddObserver(&test_observer);
-
-  return RUN_ALL_TESTS(argc, argv);
 }

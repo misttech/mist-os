@@ -539,8 +539,7 @@ protocol BufferCollection {
     ///   * All `BufferCollection`(s) of the logical buffer collection must have
     ///     had `SetConstraints` sent to them.
     ///
-    /// Returns:
-    ///   * `ZX_OK` if successful.
+    /// Failure codes:
     ///   * `ZX_ERR_NO_MEMORY` if the request is valid but cannot be fulfilled
     ///      due to resource exhaustion.
     ///   * `ZX_ERR_ACCESS_DENIED` if the caller is not permitted to obtain the
@@ -551,16 +550,21 @@ protocol BufferCollection {
     ///
     /// `buffer_collection_info` has the VMO handles and other related info.
     WaitForAllBuffersAllocated() -> (resource table {
-        1: status zx.status;
-        2: buffer_collection_info BufferCollectionInfo;
-    });
+        1: buffer_collection_info BufferCollectionInfo;
+    }) error zx.status;
 
-    /// This returns the same result code as `WaitForAllBuffersAllocated` if the
-    /// logical buffer collection has been allocated or failed, or
-    /// `ZX_ERR_UNAVAILABLE` if `WaitForAllBuffersAllocated` would block.
+    /// If the buffer collection has been allocated, returns an empty table
+    /// (empty for now).
+    ///
+    /// If the buffer collection failed allocation, returns the same failure
+    /// zx.status as WaitForAllBuffersAllocated would return.
+    ///
+    /// If the buffer collection hasn't attempted allocation yet, returns
+    /// `ZX_ERR_UNAVAILABLE`.  This means that WaitForAllBuffersAllocated
+    /// would block (not respond quickly).
     CheckAllBuffersAllocated() -> (table {
-        1: status zx.status;
-    });
+            // nothing here yet
+            }) error zx.status;
 
     /// Create a new token, for trying to add a new participant to an existing
     /// logical buffer collection, if the existing collection's buffer counts,
