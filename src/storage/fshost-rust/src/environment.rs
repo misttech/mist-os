@@ -489,14 +489,17 @@ impl FilesystemLauncher {
             _ => (),
         }
 
-        fs.format().await?;
+        fs.format().await.context("formatting data partition")?;
         let mut serving_fs = if let DiskFormat::Fxfs = format {
-            let mut serving_fs = fs.serve_multi_volume().await?;
+            let mut serving_fs =
+                fs.serve_multi_volume().await.context("serving multi volume data partition")?;
             let (crypt_service, volume_name, _) =
-                fxfs::init_data_volume(&mut serving_fs, &self.config).await?;
+                fxfs::init_data_volume(&mut serving_fs, &self.config)
+                    .await
+                    .context("initializing data volume encryption")?;
             Filesystem::ServingMultiVolume(crypt_service, serving_fs, volume_name)
         } else {
-            Filesystem::Serving(fs.serve().await?)
+            Filesystem::Serving(fs.serve().await.context("serving single volume data partition")?)
         };
 
         if let Some(data) = copied_data {

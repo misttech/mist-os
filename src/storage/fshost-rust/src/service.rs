@@ -269,42 +269,49 @@ async fn write_data_file(
 
     let mut device = BlockDevice::new(partition_path).await.context("failed to make new device")?;
     let mut filesystem = match format {
-        DiskFormat::Fxfs => {
-            launcher.serve_data(&mut device, Fxfs::dynamic_child(), inside_zxcrypt, None).await?
-        }
-        DiskFormat::F2fs => {
-            launcher.serve_data(&mut device, F2fs::dynamic_child(), inside_zxcrypt, None).await?
-        }
-        DiskFormat::Minfs => {
-            launcher.serve_data(&mut device, Minfs::dynamic_child(), inside_zxcrypt, None).await?
-        }
+        DiskFormat::Fxfs => launcher
+            .serve_data(&mut device, Fxfs::dynamic_child(), inside_zxcrypt, None)
+            .await
+            .context("serving fxfs")?,
+        DiskFormat::F2fs => launcher
+            .serve_data(&mut device, F2fs::dynamic_child(), inside_zxcrypt, None)
+            .await
+            .context("serving f2fs")?,
+        DiskFormat::Minfs => launcher
+            .serve_data(&mut device, Minfs::dynamic_child(), inside_zxcrypt, None)
+            .await
+            .context("serving minfs")?,
         _ => unreachable!(),
     };
 
     let data_root = filesystem.root().context("Failed to get data root")?;
-    let (directory_path, relative_file_path) =
-        filename.rsplit_once("/").ok_or(anyhow!("There is no backslash in the file path"))?;
-    let directory_proxy = create_directory_recursive(
-        &data_root,
-        directory_path,
-        OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-    )
-    .await
-    .context("Failed to create directory")?;
+    let (directory_proxy, file_path) = match filename.rsplit_once("/") {
+        Some((directory_path, relative_file_path)) => {
+            let directory_proxy = create_directory_recursive(
+                &data_root,
+                directory_path,
+                OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            )
+            .await
+            .context("Failed to create directory")?;
+            (directory_proxy, relative_file_path)
+        }
+        None => (data_root, filename),
+    };
 
     let file_proxy = open_file(
         &directory_proxy,
-        relative_file_path,
+        file_path,
         OpenFlags::CREATE | OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
     )
     .await
     .context("Failed to open file")?;
 
     let mut data = vec![0; content_size];
-    payload.read(&mut data, 0)?;
-    write(&file_proxy, &data).await?;
+    payload.read(&mut data, 0).context("reading payload vmo")?;
+    write(&file_proxy, &data).await.context("writing file contents")?;
 
-    filesystem.shutdown().await?;
+    filesystem.shutdown().await.context("shutting down data filesystem")?;
     return Ok(());
 }
 
