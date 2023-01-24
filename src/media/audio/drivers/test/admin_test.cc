@@ -18,6 +18,12 @@
 namespace media::audio::drivers::test {
 
 void AdminTest::TearDown() {
+  DropRingBuffer();
+
+  TestBase::TearDown();
+}
+
+void AdminTest::DropRingBuffer() {
   ring_buffer_.Unbind();
 
   // When disconnecting a RingBuffer, there's no signal to wait on before proceeding (potentially
@@ -31,8 +37,6 @@ void AdminTest::TearDown() {
   // TODO(fxbug.dev/113683): investigate why we fail without this delay, fix the drivers/test as
   // necessary, and eliminate this workaround.
   zx::nanosleep(zx::deadline_after(zx::msec(100)));
-
-  TestBase::TearDown();
 }
 
 // For the channelization and sample_format that we've set, determine the size of each frame.
@@ -58,6 +62,8 @@ void AdminTest::RequestRingBufferChannel() {
   }
 
   AddErrorHandler(ring_buffer_, "RingBuffer");
+
+  CalculateFrameSize();
 }
 
 // Request that driver set format to the lowest bit-rate/channelization of the ranges reported.
@@ -68,7 +74,6 @@ void AdminTest::RequestMinFormat() {
   // TODO(fxbug.dev/83792): Once driver issues are fixed, change this back to min_format()
   pcm_format_ = max_format();
   RequestRingBufferChannel();
-  CalculateFrameSize();
 }
 
 // Request that driver set the highest bit-rate/channelization of the ranges reported.
@@ -78,7 +83,6 @@ void AdminTest::RequestMaxFormat() {
 
   pcm_format_ = max_format();
   RequestRingBufferChannel();
-  CalculateFrameSize();
 }
 
 // Ring-buffer channel requests
@@ -492,6 +496,50 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoExternalDelayMatchesRingBufferProps, {
   ExpectExternalDelayMatchesRingBufferProperties();
 });
 
+// Create RingBuffer, fully exercise it, drop it, recreate it, then validate GetDelayInfo.
+DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(WatchDelayAndExpectUpdate());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
+  ASSERT_NO_FAILURE_OR_SKIP(WatchDelayAndExpectNoUpdate());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestStop());
+  ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
+
+  // Dropped first ring buffer, creating second one, reverifying WatchDelayInfo.
+  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
+  ASSERT_NO_FAILURE_OR_SKIP(WatchDelayAndExpectUpdate());
+
+  WatchDelayAndExpectNoUpdate();
+  WaitForError();
+});
+
+// Create RingBuffer, fully exercise it, drop it, recreate it, then validate SetActiveChannels.
+DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
+  ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
+  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannels((1 << pcm_format().number_of_channels) - 1));
+  ASSERT_NO_FAILURE_OR_SKIP(RequestStop());
+  ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
+
+  // Dropped first ring buffer, creating second one, reverifying SetActiveChannels.
+  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
+  ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
+  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannels((1 << pcm_format().number_of_channels) - 1));
+
+  RequestStop();
+  WaitForError();
+});
+
 // Register separate test case instances for each enumerated device
 //
 // See googletest/docs/advanced.md for details
@@ -530,6 +578,9 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
 
     REGISTER_ADMIN_TEST(GetDelayInfoInternalDelayMatchesFifoDepth, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoExternalDelayMatchesRingBufferProps, device_entry);
+
+    REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
+    REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);
   }
 }
 

@@ -358,6 +358,7 @@ impl SoftPcmOutput {
                 let current = (pcm.frame_rate, pcm.into(), pcm.number_of_channels.into());
                 self.inspect.record_current_format(&current);
                 self.current_format = Some(current);
+                self.delay_info_replied = false;
             }
             StreamConfigRequest::WatchGainState { responder } => {
                 if self.gain_state_replied == true {

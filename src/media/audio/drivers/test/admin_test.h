@@ -23,6 +23,7 @@ class AdminTest : public TestBase {
 
  protected:
   void TearDown() override;
+  void DropRingBuffer();
 
   void RequestMinFormat();
   void RequestMaxFormat();
