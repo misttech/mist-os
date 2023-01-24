@@ -140,17 +140,16 @@ zx::result<> Watchdog::Untrack(OperationTrackerId id) {
 }
 
 void Watchdog::Run() {
-  // TODO(fxbug.dev/58179)
-  // Inspect debug printer only accepts a FILE stream for output, but we don't
-  // want to hold the lock while actually flushing out to log. This buffer is
-  // used as a temporary destination to queue lines and thread information so it
-  // can be sent to the log after releasing the lock.
-  std::unique_ptr<char[]> log_buffer = std::make_unique<char[]>(options_.log_buffer_size);
-  // FILE stream on top of log_buffer that is used to get stack traces.
-  std::unique_ptr<FILE, decltype(&fclose)> out_stream(
-      fmemopen(log_buffer.get(), options_.log_buffer_size, "r+"), &fclose);
-
   while (true) {
+    // TODO(fxbug.dev/58179)
+    // Inspect debug printer only accepts a FILE stream for output, but we don't
+    // want to hold the lock while actually flushing out to log. This buffer is
+    // used as a temporary destination to queue lines and thread information so it
+    // can be sent to the log after releasing the lock.
+    std::unique_ptr<char[]> log_buffer;
+    // FILE stream on top of log_buffer that is used to get stack traces.
+    std::unique_ptr<FILE, decltype(&fclose)> out_stream(nullptr, nullptr);
+
     // Right now we periodically wakeup and scan all the trackers for timeout.
     // This is OK as long as few operations are in flight. The code needs to
     // sort and scan only entries that have timed out. Also, sleep can be for a
@@ -158,7 +157,6 @@ void Watchdog::Run() {
     auto should_terminate =
         sync_completion_wait(&completion_, zx_duration_from_nsec(options_.sleep.count())) == ZX_OK;
 
-    bool log = false;
     {
       std::lock_guard<std::mutex> lock(lock_);
       if (should_terminate) {
@@ -169,7 +167,6 @@ void Watchdog::Run() {
       }
       auto now = std::chrono::steady_clock::now();
       std::map<OperationTrackerId, OperationTracker*>::iterator iter;
-      rewind(out_stream.get());
       for (iter = healthy_operations_.begin(); iter != healthy_operations_.end();) {
         auto tracker = iter->second;
         std::chrono::nanoseconds time_elapsed = now - tracker->StartTime();
@@ -181,14 +178,19 @@ void Watchdog::Run() {
         }
         iter = healthy_operations_.erase(iter);
         timed_out_operations_.insert({tracker->GetId(), tracker});
+
+        if (!out_stream) {
+          log_buffer = std::make_unique<char[]>(options_.log_buffer_size);
+          out_stream = {fmemopen(log_buffer.get(), options_.log_buffer_size, "r+"), &fclose};
+        }
+
         fprintf(out_stream.get(), "Operation:%s id:%lu exceeded timeout(%lluns < %lluns)\n",
                 tracker->Name().data(), tracker->GetId(), tracker->Timeout().count(),
                 time_elapsed.count());
-        log = true;
         tracker->OnTimeOut(out_stream.get());
       }
     }
-    if (log) {
+    if (out_stream) {
       inspector_print_debug_info_for_all_threads(out_stream.get(), zx_process_self());
       fflush(out_stream.get());
       DumpLog(options_.log_tag.c_str(), log_buffer.get());
