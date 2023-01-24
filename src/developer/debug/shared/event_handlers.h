@@ -16,14 +16,6 @@
 
 namespace debug {
 
-enum class WatchType : uint32_t;
-
-// This signal on the task_event_ indicates there is work to do.
-constexpr uint32_t kTaskSignal = ZX_USER_SIGNAL_0;
-
-// 0 is an invalid ID for watchers, so is safe to use here.
-constexpr uint64_t kTaskSignalKey = 0;
-
 // Function called when a SignalHandler gets a signal it's waiting for.
 using SignalHandlerFunc = void (*)(async_dispatcher_t*, async_wait_t*, zx_status_t,
                                    const zx_packet_signal_t*);

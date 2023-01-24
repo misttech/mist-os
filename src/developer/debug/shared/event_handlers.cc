@@ -90,10 +90,6 @@ void SignalHandler::Handler(async_dispatcher_t*, async_wait_t* wait, zx_status_t
     case WatchType::kSocket:
       loop->OnSocketSignal(watch_info_id, *watch_info, signal->observed);
       break;
-    case WatchType::kTask:
-      FX_DCHECK(watch_info_id == kTaskSignalKey);
-      loop->CheckAndProcessPendingTasks();
-      break;
     case WatchType::kProcessExceptions:
       loop->OnProcessTerminated(*watch_info, signal->observed);
       break;

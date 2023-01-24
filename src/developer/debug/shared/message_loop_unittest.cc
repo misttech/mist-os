@@ -90,6 +90,36 @@ TEST(MessageLoop, TimerQuit) {
   loop.Cleanup();
 }
 
+TEST(MessageLoop, TimerQuitFromLoop) {
+  const uint64_t kNano = 1000000000;
+
+  PlatformMessageLoop loop;
+  std::string error_message;
+  ASSERT_TRUE(loop.Init(&error_message)) << error_message;
+
+  struct timespec start;
+  ASSERT_FALSE(clock_gettime(CLOCK_MONOTONIC, &start));
+
+  loop.PostTask(FROM_HERE,
+                [&loop]() { loop.PostTimer(FROM_HERE, 50, [&loop]() { loop.QuitNow(); }); });
+  loop.Run();
+
+  struct timespec end;
+  ASSERT_FALSE(clock_gettime(CLOCK_MONOTONIC, &end));
+  ASSERT_GE(end.tv_sec, start.tv_sec);
+
+  uint64_t nsec = (end.tv_sec - start.tv_sec) * kNano;
+  nsec += end.tv_nsec;
+  nsec -= start.tv_nsec;
+
+  EXPECT_GE(nsec, 50u);
+
+  // If we test an upper bound for nsec this test could potentially be flaky.
+  // We don't actually make any guarantees about the upper bound anyway.
+
+  loop.Cleanup();
+}
+
 // Tests a promise that suspends itself and then continues.
 TEST(MessageLoop, SuspendPromise) {
   PlatformMessageLoop loop;

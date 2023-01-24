@@ -28,27 +28,6 @@ MessageLoopFuchsia::~MessageLoopFuchsia() {
   FX_DCHECK(Current() != this);  // Cleanup should have been called.
 }
 
-bool MessageLoopFuchsia::Init(std::string* error_message) {
-  FX_DCHECK(error_message);  // Error message out param not optional.
-  if (!MessageLoop::Init(error_message))
-    return false;
-
-  zx::event::create(0, &task_event_);
-
-  WatchInfo info;
-  info.type = WatchType::kTask;
-  zx_status_t status = AddSignalHandler(kTaskSignalKey, task_event_.get(), kTaskSignal, &info);
-
-  if (status != ZX_OK) {
-    *error_message = "Could not initialize message loop: ";
-    error_message->append(debug::ZxStatusToString(status));
-    return false;
-  }
-
-  watches_[kTaskSignalKey] = std::move(info);
-  return true;
-}
-
 void MessageLoopFuchsia::Cleanup() {
   DEBUG_LOG(MessageLoop) << "Cleaning up the message loop.";
 
@@ -257,20 +236,6 @@ zx_status_t MessageLoopFuchsia::WatchJobExceptions(WatchJobConfig config,
   return ZX_OK;
 }
 
-bool MessageLoopFuchsia::CheckAndProcessPendingTasks() {
-  std::lock_guard<std::mutex> guard(mutex_);
-
-  // We clear the event, otherwise it will trigger again and again
-  task_event_.signal(kTaskSignal, 0);
-
-  // Do a C++ task.
-  if (ProcessPendingTask()) {
-    SetHasTasks();  // Enqueue another task signal.
-    return true;
-  }
-  return false;
-}
-
 void MessageLoopFuchsia::HandleChannelException(const ChannelExceptionHandler& handler,
                                                 zx::exception exception,
                                                 zx_exception_info_t exception_info) {
@@ -292,7 +257,6 @@ void MessageLoopFuchsia::HandleChannelException(const ChannelExceptionHandler& h
 
   // We should only receive exceptions here.
   switch (watch_info->type) {
-    case WatchType::kTask:
     case WatchType::kFdio:
     case WatchType::kSocket:
       FX_NOTREACHED() << "Should only receive exceptions.";
@@ -314,44 +278,29 @@ uint64_t MessageLoopFuchsia::GetMonotonicNowNS() const {
   return ret.get();
 }
 
-// Previously, the approach was to first look for C++ tasks and when handled look for WatchHandle
-// work and finally wait for an event. This worked because handle events didn't post C++ tasks.
-//
-// But some tests do post tasks on handle events. Because C++ tasks are signaled by explicitly
-// signaling an zx::event, without manually checking, the C++ tasks will never be checked and we
-// would get blocked until a watch handled is triggered.
-//
-// In order to handle the events properly, we need to check for C++ tasks before and *after*
-// handling watch handle events. This way we always process C++ tasks before handle events and will
-// get signaled if one of them posted a new task.
+// To keep similar interfaces and behaviors between MessageLoopPoll and MessageLoopFuchsia,
+// we handle tasks and timers ourselves instead of posting them as async_task_t to async::Loop.
 void MessageLoopFuchsia::RunImpl() {
   // Init should have been called.
   FX_DCHECK(Current() == this);
   zx_status_t status;
 
-  zx::time time;
-  uint64_t delay = DelayNS();
-  if (delay == MessageLoop::kMaxDelay) {
-    time = zx::time::infinite();
-  } else {
-    time = zx::deadline_after(zx::nsec(delay));
-  }
-
   while (!should_quit()) {
-    status = loop_.ResetQuit();
-    FX_DCHECK(status != ZX_ERR_BAD_STATE);
+    zx::time time;
+    uint64_t delay = DelayNS();
+    if (delay == MessageLoop::kMaxDelay) {
+      time = zx::time::infinite();
+    } else {
+      time = zx::deadline_after(zx::nsec(delay));
+    }
     status = loop_.Run(time);
     FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED || status == ZX_ERR_TIMED_OUT)
         << "Expected ZX_OK || ZX_ERR_CANCELED || ZX_ERR_TIMED_OUT, got "
         << ZxStatusToString(status);
 
-    if (status != ZX_ERR_TIMED_OUT) {
-      return;
-    }
-
     std::lock_guard<std::mutex> guard(mutex_);
-    if (ProcessPendingTask())
-      SetHasTasks();
+    if (!ProcessPendingTask())
+      loop_.ResetQuit();
   }
 }
 
@@ -391,7 +340,6 @@ void MessageLoopFuchsia::StopWatching(int id) {
     case WatchType::kFdio:
       fdio_unsafe_release(info.fdio);
       __FALLTHROUGH;
-    case WatchType::kTask:
     case WatchType::kSocket:
       RemoveSignalHandler(&info);
       break;
@@ -399,7 +347,10 @@ void MessageLoopFuchsia::StopWatching(int id) {
   watches_.erase(found);
 }
 
-void MessageLoopFuchsia::SetHasTasks() { task_event_.signal(0, kTaskSignal); }
+void MessageLoopFuchsia::SetHasTasks() {
+  // Since async::Loop is cancellable, we just need to quit it to wake up the loop.
+  loop_.Quit();
+}
 
 void MessageLoopFuchsia::OnFdioSignal(int watch_id, const WatchInfo& info, zx_signals_t observed) {
   uint32_t events = 0;
@@ -518,8 +469,6 @@ const char* WatchTypeToString(WatchType type) {
       return "Job";
     case WatchType::kProcessExceptions:
       return "Process";
-    case WatchType::kTask:
-      return "Task";
     case WatchType::kSocket:
       return "Socket";
   }

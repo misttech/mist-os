@@ -25,7 +25,7 @@ class SignalHandler;
 class SocketWatcher;
 class ZirconExceptionWatcher;
 
-enum class WatchType : uint32_t { kTask, kFdio, kProcessExceptions, kJobExceptions, kSocket };
+enum class WatchType : uint32_t { kFdio, kProcessExceptions, kJobExceptions, kSocket };
 const char* WatchTypeToString(WatchType);
 
 // MessageLoop is a virtual class to enable tests to intercept watch messages.
@@ -46,7 +46,6 @@ class MessageLoopFuchsia : public MessageLoop {
   MessageLoopFuchsia();
   ~MessageLoopFuchsia();
 
-  bool Init(std::string* error_message) override;
   void Cleanup() override;
 
   // Returns the current message loop or null if there isn't one.
@@ -100,12 +99,7 @@ class MessageLoopFuchsia : public MessageLoop {
   uint64_t GetMonotonicNowNS() const override;
   void RunImpl() override;
   void StopWatching(int id) override;
-  // Triggers an event signaling that there is a pending event.
   void SetHasTasks() override;
-
-  // Check for any pending C++ tasks and process them.
-  // Returns true if there was an event pending to be processed.
-  bool CheckAndProcessPendingTasks();
 
   // Handlers exceptions channel.
   void HandleChannelException(const ChannelExceptionHandler&, zx::exception exception,
@@ -130,7 +124,6 @@ class MessageLoopFuchsia : public MessageLoop {
   int next_watch_id_ = 1;
 
   async::Loop loop_;
-  zx::event task_event_;
 
   SignalHandlerMap signal_handlers_;
   // See SignalHandler constructor.
