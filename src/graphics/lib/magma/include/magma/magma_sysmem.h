@@ -30,11 +30,6 @@ typedef uint64_t magma_sysmem_buffer_constraints_t;
 // layout of the image. This corresponds most closely to a fuchsia.sysmem.BufferCollectionInfo_2.
 typedef uint64_t magma_collection_info_t;
 
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-// Old name for a `magma_collection_info_t`.
-typedef magma_collection_info_t magma_buffer_format_description_t;
-#endif
-
 typedef struct magma_image_plane {
   uint32_t bytes_per_row;
   uint32_t byte_offset;
@@ -113,12 +108,6 @@ MAGMA_EXPORT void magma_sysmem_connection_release(magma_sysmem_connection_t conn
 /// \param size The size of the buffer in bytes.
 /// \param buffer_handle_out The returned buffer handle
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_sysmem_allocate_buffer(magma_sysmem_connection_t connection,
-                                                         uint32_t flags, uint64_t size,
-                                                         magma_handle_t* buffer_handle_out);
-#endif
-
 MAGMA_EXPORT magma_status_t
 magma_sysmem_connection_allocate_buffer(magma_sysmem_connection_t connection, uint32_t flags,
                                         uint64_t size, magma_handle_t* buffer_handle_out);
@@ -127,11 +116,6 @@ magma_sysmem_connection_allocate_buffer(magma_sysmem_connection_t connection, ui
 /// \brief Release a magma_collection_info_t object.
 /// \param description The object to release
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT void magma_buffer_format_description_release(
-    magma_buffer_format_description_t description);
-#endif
-
 MAGMA_EXPORT void magma_collection_info_release(magma_collection_info_t collection_info);
 
 ///
@@ -143,12 +127,6 @@ MAGMA_EXPORT void magma_collection_info_release(magma_collection_info_t collecti
 /// \param image_planes_out An array with MAGMA_MAX_IMAGE_PLANES elements that will receive
 ///        information on all planes.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_get_buffer_format_plane_info_with_size(
-    magma_buffer_format_description_t description, uint32_t width, uint32_t height,
-    magma_image_plane_t* image_planes_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_collection_info_get_plane_info_with_size(
     magma_collection_info_t collection_info, uint32_t width, uint32_t height,
     magma_image_plane_t* image_planes_out);
@@ -159,11 +137,6 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_plane_info_with_size(
 /// \param format_out Receives a `MAGMA_FORMAT_*` value describing the image. May receive
 ///        MAGMA_FORMAT_INVALID if the buffer isn't an image.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_get_buffer_format(magma_buffer_format_description_t description,
-                                                    uint32_t* format_out);
-#endif
-
 MAGMA_EXPORT magma_status_t
 magma_collection_info_get_format(magma_collection_info_t collection_info, uint32_t* format_out);
 
@@ -173,12 +146,6 @@ magma_collection_info_get_format(magma_collection_info_t collection_info, uint32
 /// \param has_format_modifier_out Receives whether the description has a format modifier.
 /// \param format_modifier_out Receives the sysmem format modifier value.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_get_buffer_format_modifier(
-    magma_buffer_format_description_t description, magma_bool_t* has_format_modifier_out,
-    uint64_t* format_modifier_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_collection_info_get_format_modifier(
     magma_collection_info_t collection_info, magma_bool_t* has_format_modifier_out,
     uint64_t* format_modifier_out);
@@ -188,11 +155,6 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_format_modifier(
 /// \param description The description to retrieve information about.
 /// \param color_space_out Receives the color space
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_get_buffer_color_space(
-    magma_buffer_format_description_t description, uint32_t* color_space_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_collection_info_get_color_space(
     magma_collection_info_t collection_info, uint32_t* color_space_out);
 
@@ -201,11 +163,6 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_color_space(
 /// \param description The description to retrieve information about.
 /// \param coherency_domain_out receives a `MAGMA_COHERENCY_DOMAIN_*` value.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_get_buffer_coherency_domain(
-    magma_buffer_format_description_t description, uint32_t* coherency_domain_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_collection_info_get_coherency_domain(
     magma_collection_info_t collection_info, uint32_t* coherency_domain_out);
 
@@ -215,11 +172,6 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_coherency_domain(
 /// \param count_out receives the buffer count. This corresponds to
 ///        `fuchsia.sysmem.BufferCollectionInfo_2.buffer_count`.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_get_buffer_count(magma_buffer_format_description_t description,
-                                                   uint32_t* count_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_collection_info_get_buffer_count(
     magma_collection_info_t collection_info, uint32_t* count_out);
 
@@ -229,11 +181,6 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_buffer_count(
 /// \param description The description to retrieve information about.
 /// \param is_secure_out Receives the value.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_get_buffer_is_secure(
-    magma_buffer_format_description_t description, magma_bool_t* is_secure_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_collection_info_get_is_secure(
     magma_collection_info_t collection_info, magma_bool_t* is_secure_out);
 
@@ -244,27 +191,14 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_is_secure(
 ///        ZX_HANDLE_INVALID (0), then a new buffer collection is created.
 /// \param collection_out Receives the collection
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t
-magma_buffer_collection_import(magma_sysmem_connection_t connection, magma_handle_t handle,
-                               magma_buffer_collection_t* collection_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_sysmem_connection_import_buffer_collection(
     magma_sysmem_connection_t connection, magma_handle_t handle,
     magma_buffer_collection_t* collection_out);
 
 ///
 /// \brief Release a magma buffer collection.
-/// \param connection The connection to release using. Must match the one passed when creating the
-///        collection.
 /// \param collection The Collection to release.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT void magma_buffer_collection_release(magma_sysmem_connection_t connection,
-                                                  magma_buffer_collection_t collection);
-#endif
-
 MAGMA_EXPORT void magma_buffer_collection_release2(magma_buffer_collection_t collection);
 
 ///
@@ -275,30 +209,10 @@ MAGMA_EXPORT void magma_buffer_collection_release2(magma_buffer_collection_t col
 /// \param buffer_constraints A struct describing overall constraints of every image format.
 /// \param constraints_out receives the allocated buffer constraints.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t
-magma_buffer_constraints_create(magma_sysmem_connection_t connection,
-                                const magma_buffer_format_constraints_t* buffer_constraints,
-                                magma_sysmem_buffer_constraints_t* constraints_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_sysmem_connection_create_buffer_constraints(
     magma_sysmem_connection_t connection,
     const magma_buffer_format_constraints_t* buffer_constraints,
     magma_sysmem_buffer_constraints_t* constraints_out);
-
-///
-/// \brief Add additional constraints onto an existing set of constraints. May not be called after
-///        `magma_buffer_collection_set_constraints` using these constraints.
-/// \param connection The connection for the constraints.
-/// \param constraints Constraints to modify.
-/// \param additional Additional constraints to set.
-///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_buffer_constraints_add_additional(
-    magma_sysmem_connection_t connection, magma_sysmem_buffer_constraints_t constraints,
-    const magma_buffer_format_additional_constraints_t* additional);
-#endif
 
 ///
 /// \brief Set information about a format slot on the constraints. The sysmem driver will choose one
@@ -309,12 +223,6 @@ MAGMA_EXPORT magma_status_t magma_buffer_constraints_add_additional(
 /// \param index The format slot index to set. A format slot index may only be set once.
 /// \param format_constraints constraints on the image format.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_buffer_constraints_set_format(
-    magma_sysmem_connection_t connection, magma_sysmem_buffer_constraints_t constraints,
-    uint32_t index, const magma_image_format_constraints_t* format_constraints);
-#endif
-
 MAGMA_EXPORT magma_status_t
 magma_buffer_constraints_set_format2(magma_sysmem_buffer_constraints_t constraints, uint32_t index,
                                      const magma_image_format_constraints_t* format_constraints);
@@ -323,70 +231,43 @@ magma_buffer_constraints_set_format2(magma_sysmem_buffer_constraints_t constrain
 /// \brief Sets the list of allowable color spaces for an image format slot.
 ///        May not be called after `magma_buffer_collection_set_constraints` using these
 ///        constraints.
-/// \param connection The connection for the constraints.
 /// \param constraints Constraints to modify.
 /// \param index the format slot index to set colorspace constraints on.
 ///        `magma_buffer_constraints_set_format` must have been set on this index.
 /// \param color_space_count Number of elements in the color_spaces array.
 /// \param color_spaces array of color spaces. Must be elements of `fuchsia.sysmem.ColorSpaceType`
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_buffer_constraints_set_colorspaces(
-    magma_sysmem_connection_t connection, magma_sysmem_buffer_constraints_t constraints,
-    uint32_t index, uint32_t color_space_count, const uint32_t* color_spaces);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_buffer_constraints_set_colorspaces2(
     magma_sysmem_buffer_constraints_t constraints, uint32_t index, uint32_t color_space_count,
     const uint32_t* color_spaces);
 
 ///
 /// \brief Release a `magma_sysmem_buffer_constraints_t`.
-/// \param connection The connection for the constraints.
 /// \param constraints The constraints to release.
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT void magma_buffer_constraints_release(magma_sysmem_connection_t connection,
-                                                   magma_sysmem_buffer_constraints_t constraints);
-#endif
-
 MAGMA_EXPORT void magma_buffer_constraints_release2(magma_sysmem_buffer_constraints_t constraints);
 
 ///
 /// \brief Set format constraints for a buffer collection. This call may trigger sysmem to allocate
 ///        the collection if all constraints are set.
-/// \param connection The connection for the constraints and collection
 /// \param collection The collection to use
 /// \param constraints Constraints to use
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_buffer_collection_set_constraints(
-    magma_sysmem_connection_t connection, magma_buffer_collection_t collection,
-    magma_sysmem_buffer_constraints_t constraints);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_buffer_collection_set_constraints2(
     magma_buffer_collection_t collection, magma_sysmem_buffer_constraints_t constraints);
 
 ///
 /// \brief Creates a buffer format description to describe a collection of allocated buffers. This
 ///        call will wait until the initial buffers in the collection are allocated.
-/// \param connection The connection for the collection
-/// \param buffer_format_description_out receives the buffer format description.  On success must
+/// \param collection The collection
+/// \param collection_info_out receives the buffer format description.  On success must
 ///        later be released using magma_buffer_format_description_release.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_sysmem_get_description_from_collection(
-    magma_sysmem_connection_t connection, magma_buffer_collection_t collection,
-    magma_buffer_format_description_t* buffer_format_description_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_buffer_collection_get_collection_info(
     magma_buffer_collection_t collection, magma_collection_info_t* collection_info_out);
 
 ///
 /// \brief Retrieves a handle to a VMO to retrieve from a buffer collection. This call will wait
 ///        until the initial buffers in the collection are allocated.
-/// \param connection The connection for the collection
 /// \param collection A collection to retrieve the handle from
 /// \param index the index of the handle to retrieve. Must be < the value of
 ///        `magma_get_buffer_count`
@@ -394,19 +275,12 @@ MAGMA_EXPORT magma_status_t magma_buffer_collection_get_collection_info(
 ///        `magma_import`. On success, the caller takes ownership.
 /// \param vmo_offset Receives the byte offset into the VMO where the buffer starts.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_sysmem_get_buffer_handle_from_collection(
-    magma_sysmem_connection_t connection, magma_buffer_collection_t collection, uint32_t index,
-    magma_handle_t* buffer_handle_out, uint32_t* vmo_offset_out);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_buffer_collection_get_buffer_handle(
     magma_buffer_collection_t collection, uint32_t index, magma_handle_t* buffer_handle_out,
     uint32_t* vmo_offset_out);
 
 ///
 /// \brief Determines which constraint format slot indices match the buffer description.
-/// \param connection The connection for the description
 /// \param description The description to retrieve information about.
 /// \param constraints The constraints originally used to allocate the collection that `description`
 ///        was retrieved from.
@@ -417,13 +291,6 @@ MAGMA_EXPORT magma_status_t magma_buffer_collection_get_buffer_handle(
 /// \param format_valid_count The number of entires in `format_valid_out`. Must be > the maximum
 ///        format slot index used when creating the constraints.
 ///
-#ifndef MAGMA_DISABLE_DEPRECATED_SYSMEM
-MAGMA_EXPORT magma_status_t magma_get_description_format_index(
-    magma_sysmem_connection_t connection, magma_buffer_format_description_t description,
-    magma_sysmem_buffer_constraints_t constraints, magma_bool_t* format_valid_out,
-    uint32_t format_valid_count);
-#endif
-
 MAGMA_EXPORT magma_status_t magma_collection_info_get_format_index(
     magma_collection_info_t collection_info, magma_sysmem_buffer_constraints_t constraints,
     magma_bool_t* format_valid_out, uint32_t format_valid_count);
