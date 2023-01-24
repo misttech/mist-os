@@ -556,11 +556,13 @@ config("default_warnings") {
     "-Wnonportable-system-include-path",
   ]
 
-  # TODO(fxbug.dev/113689): Remove these after we switch to C++20.
-  cflags_cc = [ "-Wc++20-compat" ]
-  if (experimental_cxx_version == 17) {
-    # Only report warning when building as C++17.
-    cflags_cc += [ "-Wno-error=c++20-compat" ]
+  cflags_cc = []
+  if (experimental_cxx_version == 20) {
+    # TODO(fxbug.dev/113689): Remove these after we switch to C++20.
+    cflags_cc += [
+      "-Wc++20-compat",
+      "-Wno-error=c++20-compat",
+    ]
   }
 
   if (is_gcc) {
