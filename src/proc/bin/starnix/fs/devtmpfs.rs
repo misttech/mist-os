@@ -26,6 +26,7 @@ fn init_devtmpfs(current_task: &CurrentTask) -> FileSystemHandle {
             .unwrap();
     };
 
+    mkchr(b"kmsg", DeviceType::KMSG);
     mkchr(b"null", DeviceType::NULL);
     mkchr(b"zero", DeviceType::ZERO);
     mkchr(b"full", DeviceType::FULL);

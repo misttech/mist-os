@@ -24,6 +24,7 @@ impl DeviceType {
     pub const FULL: DeviceType = DeviceType::new(1, 7);
     pub const RANDOM: DeviceType = DeviceType::new(1, 8);
     pub const URANDOM: DeviceType = DeviceType::new(1, 9);
+    pub const KMSG: DeviceType = DeviceType::new(1, 11);
     pub const TTY: DeviceType = DeviceType::new(5, 0);
     pub const PTMX: DeviceType = DeviceType::new(5, 2);
     pub const FB0: DeviceType = DeviceType::new(29, 0);
