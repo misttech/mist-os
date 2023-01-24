@@ -5,7 +5,7 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.cobalt") {
-  sdk_category = "partner"
+  sdk_category = "internal"
   api = "fuchsia.cobalt.api"
   fuzzers = [
     {
