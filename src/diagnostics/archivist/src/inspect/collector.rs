@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::ImmutableString,
     fidl::endpoints::{DiscoverableProtocolMarker, Proxy},
     fidl_fuchsia_inspect::{TreeMarker, TreeProxy},
     fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy},
-    fidl_fuchsia_io as fio, fuchsia_fs, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio,
+    flyweights::FlyStr,
+    fuchsia_fs, fuchsia_zircon as zx,
     futures::stream::StreamExt,
     pin_utils::pin_mut,
     std::collections::HashMap,
@@ -19,7 +20,7 @@ use anyhow::Context as _;
 
 /// Mapping from a diagnostics filename to the underlying encoding of that
 /// diagnostics data.
-pub type DataMap = HashMap<ImmutableString, InspectData>;
+pub type DataMap = HashMap<FlyStr, InspectData>;
 
 /// Data associated with a component.
 /// This data is stored by data collectors and passed by the collectors to processors.
@@ -76,12 +77,12 @@ pub async fn populate_data_map(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
         // We are only currently interested in inspect VMO files (root.inspect) and
         // inspect services.
         if let Ok(Some(proxy)) = maybe_load_service::<TreeMarker>(inspect_proxy, &entry) {
-            data_map.insert(entry.name.into_boxed_str(), InspectData::Tree(proxy));
+            data_map.insert(FlyStr::new(entry.name), InspectData::Tree(proxy));
             continue;
         }
 
         if let Ok(Some(proxy)) = maybe_load_service::<InspectMarker>(inspect_proxy, &entry) {
-            data_map.insert(entry.name.into_boxed_str(), InspectData::DeprecatedFidl(proxy));
+            data_map.insert(FlyStr::new(entry.name), InspectData::DeprecatedFidl(proxy));
             continue;
         }
 
@@ -136,7 +137,7 @@ pub async fn populate_data_map(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
                 }
             }
         };
-        data_map.insert(entry.name.into_boxed_str(), data);
+        data_map.insert(FlyStr::new(entry.name), data);
     }
 
     data_map
@@ -216,7 +217,7 @@ mod tests {
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
-                    let extra = extra_data.get(path);
+                    let extra = extra_data.get(&FlyStr::new(path));
                     assert!(extra.is_some());
 
                     match extra.unwrap() {
@@ -283,7 +284,7 @@ mod tests {
                     collect(&format!("{path}/diagnostics")).await.expect("collector missing data");
                 assert_eq!(1, extra_data.len());
 
-                let extra = extra_data.get(TreeMarker::PROTOCOL_NAME);
+                let extra = extra_data.get(&FlyStr::new(TreeMarker::PROTOCOL_NAME));
                 assert!(extra.is_some());
 
                 match extra.unwrap() {

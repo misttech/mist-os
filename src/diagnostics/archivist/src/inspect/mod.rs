@@ -8,11 +8,11 @@ use {
         diagnostics::BatchIteratorConnectionStats,
         inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer},
         moniker_rewriter::OutputRewriter,
-        ImmutableString,
     },
     diagnostics_data::{self as schema, Data, Inspect},
     diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher},
     fidl_fuchsia_diagnostics::{self, Selector},
+    flyweights::FlyStr,
     fuchsia_inspect::reader::PartialNodeHierarchy,
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::prelude::*,
@@ -33,7 +33,7 @@ use container::PopulatedInspectDataContainer;
 /// populate a diagnostics schema for that node hierarchy.
 pub struct NodeHierarchyData {
     // Name of the file that created this snapshot.
-    filename: ImmutableString,
+    filename: FlyStr,
     // Timestamp at which this snapshot resolved or failed.
     timestamp: zx::Time,
     // Errors encountered when processing this snapshot.
@@ -432,7 +432,7 @@ mod tests {
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
-                    let extra = extra_data.get(path);
+                    let extra = extra_data.get(&FlyStr::new(path));
                     assert!(extra.is_some());
 
                     match extra.unwrap() {
@@ -500,7 +500,7 @@ mod tests {
                     .expect("collector missing data");
                 assert_eq!(1, extra_data.len());
 
-                let extra = extra_data.get(TreeMarker::PROTOCOL_NAME);
+                let extra = extra_data.get(&FlyStr::new(TreeMarker::PROTOCOL_NAME));
                 assert!(extra.is_some());
 
                 match extra.unwrap() {

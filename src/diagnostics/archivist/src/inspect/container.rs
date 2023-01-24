@@ -7,12 +7,12 @@ use crate::{
     diagnostics::GlobalConnectionStats,
     identity::ComponentIdentity,
     inspect::collector::{self as collector, InspectData},
-    ImmutableString,
 };
 use diagnostics_data as schema;
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_io as fio;
+use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
 use fuchsia_trace as ftrace;
@@ -51,7 +51,7 @@ impl InspectArtifactsContainer {
 }
 
 lazy_static! {
-    static ref NO_FILE_SUCCEEDED: &'static str = "NO_FILE_SUCCEEDED";
+    static ref NO_FILE_SUCCEEDED: FlyStr = FlyStr::new("NO_FILE_SUCCEEDED");
     static ref TIMEOUT_MESSAGE: &'static str =
         "Exceeded per-component time limit for fetching diagnostics data";
 }
@@ -68,7 +68,7 @@ pub enum ReadSnapshot {
 #[derive(Debug)]
 pub struct SnapshotData {
     /// Name of the file that created this snapshot.
-    pub filename: ImmutableString,
+    pub filename: FlyStr,
     /// Timestamp at which this snapshot resolved or failed.
     pub timestamp: zx::Time,
     /// Errors encountered when processing this snapshot.
@@ -80,7 +80,7 @@ pub struct SnapshotData {
 
 impl SnapshotData {
     async fn new(
-        filename: ImmutableString,
+        filename: FlyStr,
         data: InspectData,
         lazy_child_timeout: zx::Duration,
         identity: &ComponentIdentity,
@@ -141,7 +141,7 @@ impl SnapshotData {
     }
 
     // Constructs packet that timestamps and packages inspect snapshot for exfiltration.
-    fn successful(snapshot: ReadSnapshot, filename: ImmutableString) -> SnapshotData {
+    fn successful(snapshot: ReadSnapshot, filename: FlyStr) -> SnapshotData {
         SnapshotData {
             filename,
             timestamp: fasync::Time::now().into_zx(),
@@ -151,7 +151,7 @@ impl SnapshotData {
     }
 
     // Constructs packet that timestamps and packages inspect snapshot failure for exfiltration.
-    fn failed(error: schema::InspectError, filename: ImmutableString) -> SnapshotData {
+    fn failed(error: schema::InspectError, filename: FlyStr) -> SnapshotData {
         SnapshotData {
             filename,
             timestamp: fasync::Time::now().into_zx(),
@@ -179,7 +179,7 @@ pub struct PopulatedInspectDataContainer {
 
 enum Status {
     Begin,
-    Pending(VecDeque<(ImmutableString, InspectData)>),
+    Pending(VecDeque<(FlyStr, InspectData)>),
 }
 
 struct State {
@@ -193,11 +193,7 @@ struct State {
 }
 
 impl State {
-    fn into_pending(
-        self,
-        pending: VecDeque<(ImmutableString, InspectData)>,
-        start_time: zx::Time,
-    ) -> Self {
+    fn into_pending(self, pending: VecDeque<(FlyStr, InspectData)>, start_time: zx::Time) -> Self {
         Self {
             unpopulated: self.unpopulated,
             status: Status::Pending(pending),
@@ -327,7 +323,7 @@ impl UnpopulatedInspectDataContainer {
                             inspect_matcher: unpopulated_for_timeout.inspect_matcher.clone(),
                             snapshot: SnapshotData::failed(
                                 schema::InspectError { message: TIMEOUT_MESSAGE.to_string() },
-                                NO_FILE_SUCCEEDED.to_string().into_boxed_str(),
+                                NO_FILE_SUCCEEDED.clone(),
                             ),
                         };
                         Some((
@@ -386,7 +382,7 @@ mod test {
             ftrace::Id::random(),
         );
         let res = stream.next().await.unwrap();
-        assert_eq!(res.snapshot.filename.as_ref(), *NO_FILE_SUCCEEDED);
+        assert_eq!(res.snapshot.filename, *NO_FILE_SUCCEEDED);
         assert_eq!(
             res.snapshot.errors,
             vec![schema::InspectError { message: TIMEOUT_MESSAGE.to_string() }]
