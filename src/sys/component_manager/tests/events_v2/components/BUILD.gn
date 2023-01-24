@@ -133,6 +133,7 @@ rustc_binary("directory_ready_root_v2_bin") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//src/sys/lib/component-events",

@@ -7,9 +7,7 @@ use {
         events::{DirectoryReady, Event, EventStream},
         matcher::EventMatcher,
     },
-    fidl::endpoints::{
-        create_endpoints, create_proxy, ClientEnd, DiscoverableProtocolMarker, ServerEnd,
-    },
+    fidl::endpoints::{create_endpoints, ClientEnd, DiscoverableProtocolMarker as _},
     fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_fs,
     futures::StreamExt,
     maplit::hashmap,
@@ -24,18 +22,13 @@ async fn list_entries(directory: &fio::DirectoryProxy) -> Vec<String> {
 
 async fn call_trigger(directory: &fio::DirectoryProxy, paths: &Vec<String>) {
     for path in paths {
-        let (trigger, server_end) = create_proxy::<ftest::TriggerMarker>().unwrap();
-        directory
-            .open(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_SERVICE,
-                path,
-                ServerEnd::new(server_end.into_channel()),
-            )
-            .expect("open dir");
+        let trigger = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+            ftest::TriggerMarker,
+        >(directory, path)
+        .expect("open dir");
         // We're only interested in this function successfully returning, we don't care about the
         // contents of the string returned.
-        let _ = trigger.run().await.expect("call trigger");
+        let _: String = trigger.run().await.expect("call trigger");
     }
 }
 
