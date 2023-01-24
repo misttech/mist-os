@@ -9,7 +9,10 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.sysmem.Allocator" ],
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
         },
     ],
     use: [
@@ -32,7 +35,10 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.sysmem.Allocator",
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
             from: "self",
         },
     ],

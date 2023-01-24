@@ -197,7 +197,10 @@
             source_availability: "unknown",
         },
         {
-            protocol: "fuchsia.sysmem.Allocator",
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
             from: "#sysmem_connector",
             to: "#test_manager",
             source_availability: "unknown",

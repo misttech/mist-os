@@ -6,6 +6,7 @@
 #define SRC_DEVICES_SYSMEM_BIN_SYSMEM_CONNECTOR_APP_H_
 
 #include <fuchsia/sysmem/cpp/fidl.h>
+#include <fuchsia/sysmem2/cpp/fidl.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sysmem-connector/sysmem-connector.h>
 

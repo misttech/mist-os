@@ -584,6 +584,7 @@
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
             ],
             from: "#svchost",
             to: [
@@ -1213,6 +1214,7 @@
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.tracing.kernel.Reader",
             ],

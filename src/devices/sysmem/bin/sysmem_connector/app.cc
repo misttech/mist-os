@@ -60,8 +60,17 @@ App::App(async_dispatcher_t* dispatcher)
         // channel, but in this case we forward the service request to the
         // sysmem driver.  We do the forwarding via code we share with a similar
         // Zircon service.
-        sysmem_connector_queue_connection_request(sysmem_connector_,
-                                                  request.TakeChannel().release());
+        sysmem_connector_queue_connection_request_v1(sysmem_connector_,
+                                                     request.TakeChannel().release());
+      });
+  component_context_->outgoing()->AddPublicService<fuchsia::sysmem2::Allocator>(
+      [this](fidl::InterfaceRequest<fuchsia::sysmem2::Allocator> request) {
+        // Normally a service would directly serve the server end of the
+        // channel, but in this case we forward the service request to the
+        // sysmem driver.  We do the forwarding via code we share with a similar
+        // Zircon service.
+        sysmem_connector_queue_connection_request_v2(sysmem_connector_,
+                                                     request.TakeChannel().release());
       });
 }
 

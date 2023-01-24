@@ -44,8 +44,10 @@ __EXPORT zx_status_t sysmem_connector_init(const char* sysmem_directory_path,
 // may sit in the queue for that duration - there isn't a timeout, because that
 // would probably do more harm than good, since sysmem is always supposed to be
 // running.
-__EXPORT void sysmem_connector_queue_connection_request(sysmem_connector_t* connector,
-                                                        zx_handle_t allocator_request);
+__EXPORT void sysmem_connector_queue_connection_request_v1(sysmem_connector_t* connector,
+                                                           zx_handle_t allocator_request);
+__EXPORT void sysmem_connector_queue_connection_request_v2(sysmem_connector_t* connector,
+                                                           zx_handle_t allocator_request);
 
 // Sysmem needs access to Cobalt.  We provide a service directory to sysmem which has only Cobalt
 // in it.

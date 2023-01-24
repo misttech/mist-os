@@ -58,6 +58,7 @@ executable("svchost") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp_wire",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/lib/storage/vfs/cpp",

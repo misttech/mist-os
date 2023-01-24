@@ -4,8 +4,8 @@
 
 #include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -13,6 +13,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/watcher.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/fit/function.h>
 #include <lib/sysmem-connector/sysmem-connector.h>
 #include <lib/zx/channel.h>
@@ -51,6 +52,7 @@ class SysmemConnector : public sysmem_connector {
   zx_status_t Start();
 
   using QueueItem = std::variant<fidl::ServerEnd<fuchsia_sysmem::Allocator>,
+                                 fidl::ServerEnd<fuchsia_sysmem2::Allocator>,
                                  fidl::ClientEnd<fuchsia_io::Directory>>;
 
   void Queue(QueueItem&& queue_item);
@@ -284,18 +286,24 @@ void SysmemConnector::ProcessQueue() {
     ZX_DEBUG_ASSERT(driver_connector_client_);
 
     const auto [name, status] = std::visit(
-        overloaded{[this](fidl::ServerEnd<fuchsia_sysmem::Allocator> allocator_request) {
-                     return std::make_pair("Connect", fidl::WireCall(driver_connector_client_)
-                                                          ->ConnectV1(std::move(allocator_request))
-                                                          .status());
-                   },
-                   [this](fidl::ClientEnd<fuchsia_io::Directory> service_directory) {
-                     return std::make_pair(
-                         "SetAuxServiceDirectory",
-                         fidl::WireCall(driver_connector_client_)
-                             ->SetAuxServiceDirectory(std::move(service_directory))
-                             .status());
-                   }},
+        overloaded{
+            [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> allocator_request) {
+              return std::make_pair("ConnectV1", fidl::WireCall(driver_connector_client_)
+                                                     ->ConnectV1(std::move(allocator_request))
+                                                     .status());
+            },
+            [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> allocator_request) {
+              fprintf(stderr, "ConnectV2");
+              return std::make_pair("ConnectV2", fidl::WireCall(driver_connector_client_)
+                                                     ->ConnectV2(std::move(allocator_request))
+                                                     .status());
+            },
+            [this](fidl::ClientEnd<fuchsia_io::Directory> service_directory) {
+              return std::make_pair("SetAuxServiceDirectory",
+                                    fidl::WireCall(driver_connector_client_)
+                                        ->SetAuxServiceDirectory(std::move(service_directory))
+                                        .status());
+            }},
         std::move(queue_item));
     printf("sysmem-connector: fuchsia.sysmem/DriverConnect.%s: %s\n", name,
            zx_status_get_string(status));
@@ -334,13 +342,22 @@ zx_status_t sysmem_connector_init(const char* sysmem_directory_path,
   return ZX_OK;
 }
 
-void sysmem_connector_queue_connection_request(sysmem_connector_t* connector_param,
-                                               zx_handle_t allocator_request_param) {
+void sysmem_connector_queue_connection_request_v1(sysmem_connector_t* connector_param,
+                                                  zx_handle_t allocator_request_param) {
   zx::channel allocator_request(allocator_request_param);
   ZX_DEBUG_ASSERT(connector_param);
   ZX_DEBUG_ASSERT(allocator_request);
   SysmemConnector* connector = static_cast<SysmemConnector*>(connector_param);
   connector->Queue(fidl::ServerEnd<fuchsia_sysmem::Allocator>{std::move(allocator_request)});
+}
+
+void sysmem_connector_queue_connection_request_v2(sysmem_connector_t* connector_param,
+                                                  zx_handle_t allocator_request_param) {
+  zx::channel allocator_request(allocator_request_param);
+  ZX_DEBUG_ASSERT(connector_param);
+  ZX_DEBUG_ASSERT(allocator_request);
+  SysmemConnector* connector = static_cast<SysmemConnector*>(connector_param);
+  connector->Queue(fidl::ServerEnd<fuchsia_sysmem2::Allocator>{std::move(allocator_request)});
 }
 
 void sysmem_connector_queue_service_directory(sysmem_connector_t* connector_param,

@@ -121,6 +121,7 @@
                 "fuchsia.sys2.RealmQuery.root",
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
                 "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.tracing.kernel.Controller",
                 "fuchsia.vboot.FirmwareParam",
