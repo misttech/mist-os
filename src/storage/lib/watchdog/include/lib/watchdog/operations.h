@@ -5,7 +5,7 @@
 #ifndef SRC_STORAGE_LIB_WATCHDOG_INCLUDE_LIB_WATCHDOG_OPERATIONS_H_
 #define SRC_STORAGE_LIB_WATCHDOG_INCLUDE_LIB_WATCHDOG_OPERATIONS_H_
 
-#include <lib/syslog/logger.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/watchdog/watchdog.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>

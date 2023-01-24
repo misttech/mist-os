@@ -47,7 +47,6 @@ syslog_visibility_allowlist = [
   "//src/diagnostics/archivist:*",
   "//src/lib/metrics_buffer:*",
   "//src/lib/syslog/rust:*",
-  "//src/storage/lib/watchdog:*",
   "//src/virtualization/bin/vmm/device:*",
   "//src/virtualization/bin/vmm/device/virtio_magma:*",
 ]

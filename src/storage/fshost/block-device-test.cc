@@ -10,8 +10,6 @@
 #include <lib/fdio/namespace.h>
 #include <lib/fpromise/single_threaded_executor.h>
 #include <lib/inspect/cpp/reader.h>
-#include <lib/syslog/global.h>
-#include <lib/syslog/logger.h>
 #include <zircon/assert.h>
 #include <zircon/hw/gpt.h>
 

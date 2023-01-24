@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/sync/completion.h>
-#include <lib/syslog/global.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/watchdog/operations.h>
 #include <lib/watchdog/watchdog.h>
 #include <lib/zx/process.h>
@@ -36,7 +36,7 @@ void DumpLog(const char* log_tag, const char* str) {
   std::istringstream stream(str);
   std::string line;
   while (std::getline(stream, line)) {
-    FX_LOGF(INFO, log_tag, "%s", line.c_str());
+    FX_SLOG(INFO, line.c_str(), KV("tag", log_tag));
   }
 }
 
@@ -132,10 +132,10 @@ zx::result<> Watchdog::Untrack(OperationTrackerId id) {
   }
   auto now = std::chrono::steady_clock::now();
   auto time_elapsed = now - tracker->StartTime();
-  FX_LOGF(INFO, options_.log_tag.c_str(),
-          "Timeout(%lluns) exceeded operation:%s id:%lu completed(%lluns).",
-          tracker->Timeout().count(), tracker->Name().data(), tracker->GetId(),
-          time_elapsed.count());
+  FX_LOGST(INFO, options_.log_tag.c_str())
+      << "Timeout " << tracker->Timeout().count()
+      << " exceeded operation:" << tracker->Name().data() << " id: " << tracker->GetId()
+      << " completed(" << time_elapsed.count() << "ns).";
   return zx::ok();
 }
 
