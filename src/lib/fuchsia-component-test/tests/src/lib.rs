@@ -7,7 +7,6 @@ use {
     assert_matches::assert_matches,
     cm_rust::{self, FidlIntoNative},
     cm_types,
-    fidl::endpoints::ServerEnd,
     fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker},
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component::EventStreamMarker,
@@ -1392,15 +1391,10 @@ async fn event_streams_test() -> Result<(), Error> {
             move |handles| {
                 let tx = tx.clone();
                 async move {
-                    let (proxy, event_stream_server) =
-                        fidl::endpoints::create_proxy::<EventStreamMarker>().unwrap();
                     let events_dir = handles.clone_from_namespace("events").unwrap();
-                    events_dir.open(
-                        fio::OpenFlags::RIGHT_READABLE,
-                        fio::MODE_TYPE_SERVICE,
-                        "event_stream",
-                        ServerEnd::new(event_stream_server.into_channel()),
-                    )?;
+                    let proxy = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                        EventStreamMarker,
+                    >(&events_dir, "event_stream")?;
                     proxy.get_next().await.unwrap();
                     tx.unbounded_send(())?;
                     Ok(())
