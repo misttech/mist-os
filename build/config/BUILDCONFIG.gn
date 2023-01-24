@@ -1259,6 +1259,30 @@ _asan_fuzzer_toolchain_args = {
           ])
 }
 
+# This is the basic hwasan variant. Other configs can use this for mixing
+# other variants (like hwasan-ubsan).
+_hwasan_variant = {
+  configs = [ "//build/config/sanitizers:hwasan" ]
+  tags = [
+    "hwasan",
+    "instrumentation-runtime",
+    "instrumented",
+    "kernel-excluded",
+    "replaces-allocator",
+    "uses-shadow",
+
+    # TODO(fxbug.dev/104397): This is here because starnix binaries using
+    # this variant attempt to use libclang_rt.hwasan.so for linux-arm64, but
+    # we don't ship that yet in the toolchain. Once we do, we should be able
+    # to remove this.
+    "fuchsia-only",
+
+    # TODO(fxbug.dev/120208): Note the lsan tag is omitted here because
+    # hwasan+lsan is not yet supported. Once that work is complete, we can
+    # add it here.
+  ]
+}
+
 # Disable identical code folding in fuzzer toolchain variants, since accurate
 # stack traces are most useful under fuzzing than reduced binary sizes.
 _fuzzer_remove_common_configs = [ "//build/config:icf" ]
@@ -1389,17 +1413,13 @@ declare_args() {
         "kernel-excluded",
       ]
     },
+
+    _hwasan_variant,
     {
-      configs = [ "//build/config/sanitizers:hwasan" ]
-      tags = [
-        "hwasan",
-        "instrumentation-runtime",
-        "instrumented",
-        "kernel-excluded",
-        "replaces-allocator",
-        "uses-shadow",
-        "fuchsia-only",
-      ]
+      # This is the hwasan-ubsan variant.
+      forward_variables_from(_hwasan_variant, "*")
+      configs += [ "//build/config/sanitizers:ubsan" ]
+      tags += [ "ubsan" ]
     },
 
     {
@@ -1784,11 +1804,13 @@ is_asan = select_variant + [
             "asan",
             "asan-ubsan",
             "hwasan",
+            "hwasan-ubsan",
           ] -
           [
             "asan",
             "asan-ubsan",
             "hwasan",
+            "hwasan-ubsan",
           ] != select_variant
 
 # Do this only once, in the default toolchain context.    Then

@@ -168,10 +168,18 @@ mod tests {
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
         let mut pkg_lib = fuchsia_fs::directory::open_in_namespace("/pkg/lib", rights)?;
         let entries = list_directory(&pkg_lib).await;
-        if let Some(name) =
-            ["asan-ubsan", "asan", "hwasan", "coverage", "coverage-rust", "coverage-cts", "profile"]
-                .iter()
-                .find(|&&name| entries.iter().any(|f| f == name))
+        if let Some(name) = [
+            "asan",
+            "asan-ubsan",
+            "coverage",
+            "coverage-cts",
+            "coverage-rust",
+            "hwasan",
+            "hwasan-ubsan",
+            "profile",
+        ]
+        .iter()
+        .find(|&&name| entries.iter().any(|f| f == name))
         {
             pkg_lib = fuchsia_fs::directory::open_directory_no_describe(&pkg_lib, name, rights)?;
         }

@@ -9,12 +9,16 @@ _toolchain_runtime_deps_cflags = []
 if (toolchain_variant.tags + [ "asan" ] - [ "asan" ] !=
     toolchain_variant.tags) {
   _toolchain_runtime_deps_cflags += [ "-fsanitize=address" ]
-} else if (toolchain_variant.tags + [ "ubsan" ] - [ "ubsan" ] !=
-           toolchain_variant.tags) {
-  _toolchain_runtime_deps_cflags += [ "-fsanitize=undefined" ]
 } else if (toolchain_variant.tags + [ "hwasan" ] - [ "hwasan" ] !=
            toolchain_variant.tags) {
   _toolchain_runtime_deps_cflags += [ "-fsanitize=hwaddress" ]
+} else if (toolchain_variant.tags + [ "ubsan" ] - [ "ubsan" ] !=
+           toolchain_variant.tags) {
+  # Note this should come last to ensure that if neither
+  # -fsanitize=address/hwaddress is selected, then
+  # libclang_rt.ubsan_standalone will be used as opposed to
+  # libclang_rt.asan/hwasan.
+  _toolchain_runtime_deps_cflags += [ "-fsanitize=undefined" ]
 }
 
 toolchain_runtime_deps("static-libc++-deps") {
