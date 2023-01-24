@@ -220,6 +220,7 @@ mod tests {
                             vendor_id: 123,
                             product_id: 987,
                             version: 555,
+                            polling_rate: 1000,
                         }),
                         mouse: Some(fir::MouseDescriptor {
                             input: Some(fir::MouseInputDescriptor {

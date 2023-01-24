@@ -212,6 +212,7 @@ pub(crate) mod testing {
                 vendor_id: VendorId::Google.into_primitive(),
                 product_id: VendorGoogleProductId::AmsLightSensor.into_primitive(),
                 version: 0,
+                polling_rate: 1000,
             }),
             mouse: None,
             sensor: Some(SensorDescriptor {

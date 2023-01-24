@@ -36,6 +36,7 @@ impl input_device::InputDeviceBinding for FakeInputDeviceBinding {
                 vendor_id: 42,
                 product_id: 43,
                 version: 44,
+                polling_rate: 1000,
             },
             // Random fake identifier.
             device_id: 442,

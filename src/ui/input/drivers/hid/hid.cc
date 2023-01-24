@@ -333,6 +333,7 @@ void HidDevice::HidDeviceGetHidDeviceInfo(hid_device_info_t* out_info) {
   out_info->vendor_id = info_.vendor_id;
   out_info->product_id = info_.product_id;
   out_info->version = info_.version;
+  out_info->polling_rate = info_.polling_rate;
 }
 
 zx_status_t HidDevice::HidDeviceGetDescriptor(uint8_t* out_descriptor_data, size_t descriptor_count,

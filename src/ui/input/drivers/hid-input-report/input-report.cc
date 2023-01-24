@@ -176,6 +176,7 @@ void InputReport::GetDescriptor(GetDescriptorCompleter::Sync& completer) {
   fidl_info.vendor_id = info.vendor_id;
   fidl_info.product_id = info.product_id;
   fidl_info.version = info.version;
+  fidl_info.polling_rate = info.polling_rate;
   descriptor.set_device_info(descriptor_allocator, std::move(fidl_info));
 
   if (sensor_count_) {

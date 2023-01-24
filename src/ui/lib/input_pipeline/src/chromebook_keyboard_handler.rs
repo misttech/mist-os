@@ -404,6 +404,7 @@ mod tests {
                     vendor_id: VENDOR_ID,
                     product_id: PRODUCT_ID,
                     version: 42,
+                    polling_rate: 1000,
                 },
                 device_id: 43,
             });
@@ -414,6 +415,7 @@ mod tests {
                     vendor_id: VENDOR_ID + 10,
                     product_id: PRODUCT_ID,
                     version: 42,
+                    polling_rate: 1000,
                 },
                 device_id: 43,
             });

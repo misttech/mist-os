@@ -19,7 +19,7 @@ use {
 
 // Use this to place required DeviceInfo into DeviceDescriptor.
 fn new_fake_device_info() -> DeviceInfo {
-    DeviceInfo { product_id: 42, vendor_id: 43, version: u32::MAX }
+    DeviceInfo { product_id: 42, vendor_id: 43, version: u32::MAX, polling_rate: 1000 }
 }
 
 /// Implements the `synthesizer::InputDeviceRegistry` trait, and the client side

@@ -40,6 +40,9 @@ type HidInfo = struct {
     vendor_id uint32;
     product_id uint32;
     version uint32;
+
+    /// polling rate if applicable in usec
+    polling_rate zx.duration;
 };
 
 @transport("Banjo")

@@ -247,6 +247,7 @@ impl Default for KeyboardDeviceDescriptor {
                 vendor_id: 0,
                 product_id: 0,
                 version: 0,
+                polling_rate: 0,
             },
             device_id: 0,
         }

@@ -239,6 +239,7 @@ fn empty_keyboard_device_descriptor() -> input_device::InputDeviceDescriptor {
                 vendor_id: 0,
                 product_id: 0,
                 version: 0,
+                polling_rate: 0,
             },
             device_id: 0,
         },

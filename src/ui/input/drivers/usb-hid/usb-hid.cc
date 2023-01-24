@@ -18,6 +18,7 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <cmath>
 #include <thread>
 
 #include <fbl/auto_lock.h>
@@ -92,6 +93,8 @@ zx_status_t UsbHidbus::HidbusQuery(uint32_t options, hid_info_t* info) {
   info->vendor_id = info_.vendor_id;
   info->product_id = info_.product_id;
   info->version = info_.version;
+
+  info->polling_rate = info_.polling_rate;
   return ZX_OK;
 }
 
@@ -300,6 +303,30 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid) {
   }
   hid_desc_ = hid_desc;
   endptin_address_ = endptin->b_endpoint_address;
+  // Calculation according to 9.6.6 of USB2.0 Spec for interrupt endpoints
+  switch (auto speed = usb_.GetSpeed()) {
+    case USB_SPEED_LOW:
+    case USB_SPEED_FULL:
+      if (endptin->b_interval > 255 || endptin->b_interval < 1) {
+        zxlogf(ERROR, "bInterval for LOW/FULL Speed EPs must be between 1 and 255. bInterval = %u",
+               endptin->b_interval);
+        return ZX_ERR_OUT_OF_RANGE;
+      }
+      info_.polling_rate = zx::msec(endptin->b_interval).to_usecs();
+      break;
+    case USB_SPEED_HIGH:
+      if (endptin->b_interval > 16 || endptin->b_interval < 1) {
+        zxlogf(ERROR, "bInterval for HIGH Speed EPs must be between 1 and 16. bInterval = %u",
+               endptin->b_interval);
+        return ZX_ERR_OUT_OF_RANGE;
+      }
+      info_.polling_rate =
+          static_cast<uint64_t>(pow(2, endptin->b_interval - 1)) * zx::usec(125).to_usecs();
+      break;
+    default:
+      zxlogf(ERROR, "Unrecognized USB Speed %u", speed);
+      return ZX_ERR_NOT_SUPPORTED;
+  }
 
   if (endptout) {
     endptout_address_ = endptout->b_endpoint_address;

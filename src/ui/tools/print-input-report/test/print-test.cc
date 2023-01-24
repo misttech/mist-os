@@ -659,4 +659,35 @@ TEST_F(PrintInputReport, PrintFeatureReport) {
   printer.AssertSawAllStrings();
 }
 
+TEST_F(PrintInputReport, PrintDeviceInfo) {
+  auto descriptor = std::make_unique<fuchsia::input::report::DeviceDescriptor>();
+  auto device_info = descriptor->mutable_device_info();
+
+  device_info->vendor_id = 0x1234;
+  device_info->product_id = 0x4321;
+  device_info->version = 0x1111;
+  device_info->polling_rate = 1000;
+
+  fake_device_->SetDescriptor(std::move(descriptor));
+
+  FakePrinter printer;
+  printer.SetExpectedStrings(std::vector<std::string>{
+      "Descriptor from file: test\n",
+      "Device Info:\n",
+      "  Vendor ID:\n",
+      "    0x1234\n",
+      "  Product ID:\n",
+      "    0x4321\n",
+      "  Version:\n",
+      "    0x1111\n",
+      "  Polling Rate:\n",
+      "    1000 usec\n",
+  });
+
+  print_input_report::PrintInputDescriptor(std::string("test"), &printer, std::move(*client_));
+
+  loop_->RunUntilIdle();
+  printer.AssertSawAllStrings();
+}
+
 }  // namespace test

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library fuchsia.input.report;
 
+using zx;
+
 /// DeviceInfo provides more information about the device and lets a client
 /// distinguish between devices (e.g between two touchscreens that come from
 /// different vendors). If the device is a HID device, then the id information
@@ -13,6 +15,10 @@ type DeviceInfo = struct {
     vendor_id uint32;
     product_id uint32;
     version uint32;
+
+    /// polling rate if applicable in usec
+    @available(added=HEAD)
+    polling_rate zx.duration;
 };
 
 /// `DeviceDescriptor` describes a physical input device. Some physical devices may
