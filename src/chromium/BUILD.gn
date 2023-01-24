@@ -69,8 +69,10 @@ if (use_chromium_canary) {
 }
 
 if (is_host) {
-  generate_host_targets("chromium") {
-    archive_path_suffix = "${archive_path_suffix}${_flavor_suffix}"
+  if (is_linux && host_cpu == "x64") {
+    generate_host_targets("chromium") {
+      archive_path_suffix = "${archive_path_suffix}${_flavor_suffix}"
+    }
   }
 } else {
   generate_test_targets("chromium") {

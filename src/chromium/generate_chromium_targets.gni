@@ -100,7 +100,7 @@ template("generate_chrome_browser_targets") {
         available_flavors = [
           {
             name = "canary"
-            archive = "${prebuilt_archive_base_path}_latest/arch/$target_cpu/${target_name}.far"
+            archive = "${prebuilt_archive_base_path}_latest/arch/${target_cpu}/${target_name}.far"
             production_safe = true
           },
         ]
@@ -265,22 +265,24 @@ template("generate_fuchsia_web_test_targets") {
 }
 
 if (is_host) {
-  # Generates targets for ChromeDriver prebuilt.
-  #
-  # Parameters
-  #
-  #   archive_path_suffix (required)
-  #     Appended to the innermost folder of the base paths passed into the
-  #     `generate_package_flavors()` template.
-  template("generate_host_targets") {
-    assert(defined(invoker.archive_path_suffix))
-    not_needed([ "target_name" ])
-    visibility = [ ":*" ]
+  if (host_os == "linux" && host_cpu == "x64") {
+    # Generates targets for ChromeDriver prebuilt.
+    #
+    # Parameters
+    #
+    #   archive_path_suffix (required)
+    #     Appended to the innermost folder of the base paths passed into the
+    #     `generate_package_flavors()` template.
+    template("generate_host_targets") {
+      assert(defined(invoker.archive_path_suffix))
+      not_needed([ "target_name" ])
+      visibility = [ ":*" ]
 
-    copy("chromedriver") {
-      visibility += [ "*" ]
-      outputs = [ "${host_tools_dir}/chromedriver" ]
-      sources = [ "${prebuilt_archive_root_path}/chromedriver${invoker.archive_path_suffix}/linux-x64/chromedriver" ]
+      copy("chromedriver") {
+        visibility += [ "*" ]
+        outputs = [ "${host_tools_dir}/chromedriver" ]
+        sources = [ "${prebuilt_archive_root_path}/chromedriver${invoker.archive_path_suffix}/${host_os}-${host_cpu}/chromedriver" ]
+      }
     }
   }
 } else {
