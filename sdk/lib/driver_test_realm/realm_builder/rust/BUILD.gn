@@ -11,8 +11,9 @@ rustc_library("rust") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/lib/driver_test_realm:realm_builder_version",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-fs",
+    "//src/lib/zircon/rust:fuchsia-zircon-status",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]

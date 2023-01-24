@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Result},
+    anyhow::{Context as _, Result},
     fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
 };
@@ -75,17 +75,21 @@ pub trait DriverTestRealmInstance {
 impl DriverTestRealmInstance for RealmInstance {
     async fn driver_test_realm_start(&self, args: fdt::RealmArgs) -> Result<()> {
         let config = self.root.connect_to_protocol_at_exposed_dir::<fdt::RealmMarker>()?;
-        config
+        let () = config
             .start(args)
-            .await?
-            .map_err(|e| anyhow!("DriverTestRealm Start failed with: {}", e))?;
+            .await
+            .context("DriverTestRealm Start failed")?
+            .map_err(fuchsia_zircon_status::Status::from_raw)
+            .context("DriverTestRealm Start failed")?;
         Ok(())
     }
 
     fn driver_test_realm_connect_to_dev(&self) -> Result<fio::DirectoryProxy> {
-        let (dev, dev_server) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>()?;
-        self.root
-            .connect_request_to_named_protocol_at_exposed_dir("dev", dev_server.into_channel())?;
-        Ok(fio::DirectoryProxy::new(fidl::handle::AsyncChannel::from_channel(dev.into_channel())?))
+        fuchsia_fs::directory::open_directory_no_describe(
+            self.root.get_exposed_dir(),
+            "dev",
+            fio::OpenFlags::RIGHT_READABLE,
+        )
+        .map_err(Into::into)
     }
 }
