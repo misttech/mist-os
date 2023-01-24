@@ -236,6 +236,7 @@ template("scrutiny_verifiers2") {
     forward_variables_from(invoker,
                            [
                              "deps",
+                             "metadata",
                              "testonly",
                              "visibility",
                            ])

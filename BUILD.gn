@@ -1254,6 +1254,7 @@ build_api_module("product_size_checker_output") {
 build_api_module("product_bundles") {
   testonly = true
   data_keys = [ "product_bundles" ]
+  walk_keys = [ "product_bundles_barrier" ]
 
   # Product bundles are not built in SDK-only builds.
   if (has_board) {

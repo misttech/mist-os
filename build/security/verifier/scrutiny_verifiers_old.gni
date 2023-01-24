@@ -306,6 +306,7 @@ template("scrutiny_verifiers") {
                            [
                              "deps",
                              "testonly",
+                             "metadata",
                              "visibility",
                            ])
     if (!defined(deps)) {
