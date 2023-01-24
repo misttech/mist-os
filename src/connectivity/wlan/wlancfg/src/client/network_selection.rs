@@ -11,8 +11,8 @@ use {
         },
         config_management::{
             network_config::{AddAndGetRecent, PastConnectionsByBssid},
-            select_subset_potentially_hidden_networks, ConnectFailure, Credential, FailureReason,
-            SavedNetworksManagerApi,
+            select_authentication_method, select_subset_potentially_hidden_networks,
+            ConnectFailure, Credential, FailureReason, SavedNetworksManagerApi,
         },
         telemetry::{self, TelemetryEvent, TelemetrySender},
     },
@@ -445,10 +445,28 @@ impl NetworkSelector {
                     // scan.
                     bss.scanned_bss.observation = types::ScanObservation::Unknown;
                 }
+                // TODO(fxbug.dev/120520): Move this compatibility logic to `select_bss`, so that
+                // incompatible BSSs cannot be selected. This will then allow the authentication
+                // selection to be made infallible.
                 let mutual_security_protocols = match bss.scanned_bss.compatibility.as_ref() {
                     Some(compatibility) => compatibility.mutual_security_protocols().clone(),
                     None => {
                         error!("The selected BSS lacks compatibility information");
+                        return None;
+                    }
+                };
+                let authenticator = match select_authentication_method(
+                    mutual_security_protocols.clone(),
+                    &bss.saved_network_info.credential,
+                ) {
+                    Some(authenticator) => authenticator,
+                    None => {
+                        error!(
+                            "Failed to negotiate authentication for network with mutually supported
+                            security protocols: {:?}, and credential type: {:?}.",
+                            mutual_security_protocols.clone(),
+                            &bss.saved_network_info.credential.type_str()
+                        );
                         return None;
                     }
                 };
@@ -459,7 +477,7 @@ impl NetworkSelector {
                     bss_description: bss.scanned_bss.bss_description.clone().into(),
                     observation: bss.scanned_bss.observation,
                     has_multiple_bss_candidates: bss.multiple_bss_candidates,
-                    mutual_security_protocols,
+                    authenticator,
                 };
                 // If it was observed passively, augment with active scan.
                 match bss.scanned_bss.observation {
@@ -715,6 +733,7 @@ mod tests {
         fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync,
         fuchsia_inspect::{self as inspect, assert_data_tree},
         futures::{channel::mpsc, task::Poll},
+        lazy_static::lazy_static,
         pin_utils::pin_mut,
         rand::Rng,
         std::{convert::TryFrom, sync::Arc},
@@ -724,6 +743,10 @@ mod tests {
             security::SecurityDescriptor,
         },
     };
+
+    lazy_static! {
+        pub static ref TEST_PASSWORD: Credential = Credential::Password(b"password".to_vec());
+    }
 
     struct TestValues {
         network_selector: Arc<NetworkSelector>,
@@ -1339,38 +1362,31 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn select_bss_incompatible() {
+    fn select_bss_ignore_incompatible() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
-        // build networks list
-        let test_id_1 = types::NetworkIdentifier {
+        // Build network list with one network.
+        let network_id = types::NetworkIdentifier {
             ssid: types::Ssid::try_from("foo").unwrap(),
-            security_type: types::SecurityType::Wpa3,
+            security_type: types::SecurityType::Wpa2,
         };
-        let credential_1 = Credential::Password("foo_pass".as_bytes().to_vec());
-        let test_id_2 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("bar").unwrap(),
-            security_type: types::SecurityType::Wpa,
-        };
-        let credential_2 = Credential::Password("bar_pass".as_bytes().to_vec());
+        let credential = Credential::Password(b"password".to_vec());
 
-        let mut networks = vec![];
+        let mut bss_list = vec![];
 
-        // NOTE: The corresponding BSS has random compatibility. These mutual security protocols
-        //       are only used to verify the results and not to configure the BSS.
-
+        // Add two BSSs, both compatible to start.
         let bss_1 = types::Bss {
             rssi: -14,
             channel: generate_channel(1),
-            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
+            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
             ..generate_random_bss()
         };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
+        bss_list.push(InternalBss {
+            security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
             saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_1.clone(),
-                credential: credential_1.clone(),
+                network_id: network_id.clone(),
+                credential: credential.clone(),
                 has_ever_connected: true,
                 recent_failures: Vec::new(),
                 past_connections: PastConnectionsByBssid::new(),
@@ -1380,17 +1396,18 @@ mod tests {
             hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
         });
 
+        // Add a compatible BSS with significantly worse RSSI.
         let bss_2 = types::Bss {
-            compatibility: None,
-            rssi: -10,
+            rssi: -90,
             channel: generate_channel(1),
+            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
             ..generate_random_bss()
         };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
+        bss_list.push(InternalBss {
+            security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
             saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_1.clone(),
-                credential: credential_1.clone(),
+                network_id: network_id.clone(),
+                credential: credential.clone(),
                 has_ever_connected: true,
                 recent_failures: Vec::new(),
                 past_connections: PastConnectionsByBssid::new(),
@@ -1400,44 +1417,30 @@ mod tests {
             hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
         });
 
-        let mutual_security_protocols_3 = [SecurityDescriptor::WPA1];
-        let bss_3 = types::Bss {
-            compatibility: Compatibility::expect_some(mutual_security_protocols_3),
-            rssi: -12,
-            channel: generate_channel(1),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa1,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_2.clone(),
-                credential: credential_2.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_3.clone(),
-            multiple_bss_candidates: false,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
-
-        // stronger network returned
+        // The stronger BSS is selected initially.
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(networks.clone())),
-            Some(networks[2].clone())
+            exec.run_singlethreaded(test_values.network_selector.select_bss(bss_list.clone())),
+            Some(bss_list[0].clone())
         );
 
-        // mark the stronger network as incompatible
-        let mut modified_network = networks[2].clone();
-        let modified_bss =
-            types::Bss { compatibility: None, ..modified_network.scanned_bss.clone() };
-        modified_network.scanned_bss = modified_bss;
-        networks[2] = modified_network;
+        // Make the stronger BSS incompatible.
+        bss_list[0].scanned_bss.compatibility = None;
 
-        // other network returned
+        // The weaker, but still compatible, BSS is selected.
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(networks.clone())),
-            Some(networks[0].clone()),
+            exec.run_singlethreaded(test_values.network_selector.select_bss(bss_list.clone())),
+            Some(bss_list[1].clone())
+        );
+
+        // TODO(fxbug.dev/120520): After `select_bss` filters out incompatible BSSs, this None
+        // compatibility should change to a Some, to test that logic.
+        // Make both BSSs incompatible.
+        bss_list[1].scanned_bss.compatibility = None;
+
+        // No BSS is selected.
+        assert_eq!(
+            exec.run_singlethreaded(test_values.network_selector.select_bss(bss_list.clone())),
+            None
         );
     }
 
@@ -1596,7 +1599,6 @@ mod tests {
             ssid: types::Ssid::try_from("foo").unwrap(),
             security_type: types::SecurityType::Wpa3,
         };
-        let credential_1 = Credential::Password("foo_pass".as_bytes().to_vec());
         let mutual_security_protocols_1 = [SecurityDescriptor::WPA3_PERSONAL];
         let bss_1 = types::Bss {
             compatibility: Compatibility::expect_some(mutual_security_protocols_1),
@@ -1604,13 +1606,18 @@ mod tests {
             channel: generate_channel(36),
             ..generate_random_bss()
         };
+
         let candidate = types::ScannedCandidate {
             network: test_id_1.clone(),
-            credential: credential_1.clone(),
+            credential: TEST_PASSWORD.clone(),
             bss_description: bss_1.bss_description.clone().into(),
             observation: types::ScanObservation::Active,
             has_multiple_bss_candidates: false,
-            mutual_security_protocols: mutual_security_protocols_1.into_iter().collect(),
+            authenticator: select_authentication_method(
+                mutual_security_protocols_1.into(),
+                &TEST_PASSWORD,
+            )
+            .unwrap(),
         };
 
         let fut = augment_bss_with_active_scan(
@@ -1642,13 +1649,18 @@ mod tests {
             compatibility: Compatibility::expect_some(mutual_security_protocols_1),
             ..generate_random_bss()
         };
+
         let scanned_candidate = types::ScannedCandidate {
             network: test_id_1.clone(),
-            credential: Credential::Password("foo_pass".as_bytes().to_vec()),
+            credential: TEST_PASSWORD.clone(),
             bss_description: bss_1.bss_description.clone().into(),
             observation: types::ScanObservation::Passive,
             has_multiple_bss_candidates: true,
-            mutual_security_protocols: mutual_security_protocols_1.into_iter().collect(),
+            authenticator: select_authentication_method(
+                mutual_security_protocols_1.into(),
+                &TEST_PASSWORD,
+            )
+            .unwrap(),
         };
 
         let fut = augment_bss_with_active_scan(
@@ -2069,6 +2081,7 @@ mod tests {
         pin_mut!(network_selection_fut);
         let results =
             exec.run_singlethreaded(&mut network_selection_fut).expect("no selected candidate");
+        let mutual_security_protocols = [SecurityDescriptor::WPA3_PERSONAL];
         assert_eq!(
             &results,
             &types::ScannedCandidate {
@@ -2077,9 +2090,11 @@ mod tests {
                 bss_description: bss_desc1_active.into(),
                 observation: types::ScanObservation::Passive,
                 has_multiple_bss_candidates: false,
-                mutual_security_protocols: [SecurityDescriptor::WPA3_PERSONAL]
-                    .into_iter()
-                    .collect(),
+                authenticator: select_authentication_method(
+                    mutual_security_protocols.into(),
+                    &credential_1
+                )
+                .unwrap()
             },
         );
 
@@ -2156,14 +2171,13 @@ mod tests {
             ssid: types::Ssid::try_from("foo").unwrap(),
             security_type: types::SecurityType::Wpa3,
         };
-        let credential_1 = Credential::Password("foo_pass".as_bytes().to_vec());
 
         // insert saved networks
         assert!(exec
             .run_singlethreaded(
                 test_values
                     .real_saved_network_manager
-                    .store(test_id_1.clone(), credential_1.clone()),
+                    .store(test_id_1.clone(), TEST_PASSWORD.clone()),
             )
             .unwrap()
             .is_none());
@@ -2200,13 +2214,17 @@ mod tests {
             &results,
             &types::ScannedCandidate {
                 network: test_id_1.clone(),
-                credential: credential_1.clone(),
+                credential: TEST_PASSWORD.clone(),
                 bss_description: bss_desc_1.into(),
                 // A passive scan is never performed in the tested code path, so the
                 // observation mode cannot be known and this field should be `Unknown`.
                 observation: types::ScanObservation::Unknown,
                 has_multiple_bss_candidates: false,
-                mutual_security_protocols: mutual_security_protocols_1.into_iter().collect(),
+                authenticator: select_authentication_method(
+                    mutual_security_protocols_1.into(),
+                    &TEST_PASSWORD
+                )
+                .unwrap()
             },
         );
 

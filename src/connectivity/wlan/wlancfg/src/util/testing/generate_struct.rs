@@ -15,7 +15,7 @@ use {
         channel::{Cbw, Channel},
         random_fidl_bss_description,
         scan::Compatibility,
-        security::SecurityDescriptor,
+        security::{wep, wpa, SecurityAuthenticator, SecurityDescriptor},
     },
 };
 
@@ -207,5 +207,35 @@ pub fn generate_random_fidl_network_config_with_ssid(ssid: &str) -> fidl_policy:
         }),
         credential: Some(fidl_policy::Credential::Password(credential_bytes)),
         ..fidl_policy::NetworkConfig::EMPTY
+    }
+}
+
+pub fn generate_random_authenticator() -> SecurityAuthenticator {
+    let mut rng = rand::thread_rng();
+    match rng.gen_range(0..5) {
+        0 => SecurityAuthenticator::Open,
+        1 => {
+            SecurityAuthenticator::Wep(wep::WepAuthenticator { key: wep::WepKey::Wep40(*b"five0") })
+        }
+        2 => SecurityAuthenticator::Wpa(wpa::WpaAuthenticator::Wpa1 {
+            credentials: wpa::Wpa1Credentials::Passphrase(
+                wpa::credential::Passphrase::try_from("password").unwrap(),
+            ),
+        }),
+        3 => SecurityAuthenticator::Wpa(wpa::WpaAuthenticator::Wpa2 {
+            cipher: None,
+            authentication: wpa::Wpa2PersonalCredentials::Passphrase(
+                wpa::credential::Passphrase::try_from("password").unwrap(),
+            )
+            .into(),
+        }),
+        4 => SecurityAuthenticator::Wpa(wpa::WpaAuthenticator::Wpa3 {
+            cipher: None,
+            authentication: wpa::Wpa3PersonalCredentials::Passphrase(
+                wpa::credential::Passphrase::try_from("password").unwrap(),
+            )
+            .into(),
+        }),
+        _ => panic!(),
     }
 }

@@ -1464,7 +1464,7 @@ mod tests {
             telemetry::{TelemetryEvent, TelemetrySender},
             util::testing::{
                 create_inspect_persistence_channel, create_wlan_hasher, fakes::FakeScanRequester,
-                poll_sme_req,
+                generate_random_authenticator, poll_sme_req,
             },
         },
         async_trait::async_trait,
@@ -1483,10 +1483,7 @@ mod tests {
         pin_utils::pin_mut,
         std::convert::TryFrom,
         test_case::test_case,
-        wlan_common::{
-            assert_variant, channel::Cbw, random_fidl_bss_description,
-            security::SecurityDescriptor, RadioConfig,
-        },
+        wlan_common::{assert_variant, channel::Cbw, random_fidl_bss_description, RadioConfig},
     };
 
     // Responses that FakePhyManager will provide
@@ -1513,11 +1510,11 @@ mod tests {
         client_types::ConnectSelection {
             target: client_types::ScannedCandidate {
                 network: network,
-                credential: credential,
+                credential: credential.clone(),
                 bss_description: random_fidl_bss_description!(Wpa1, ssid: ssid.clone()).into(),
                 observation: client_types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
-                mutual_security_protocols: [SecurityDescriptor::WPA1].into_iter().collect(),
+                authenticator: generate_random_authenticator(),
             },
             reason: client_types::ConnectReason::FidlConnectRequest,
         }
@@ -2069,7 +2066,6 @@ mod tests {
                 poll_sme_req(&mut exec, &mut _sme_stream),
                 Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                     assert_eq!(req.ssid, TEST_SSID.clone());
-                    assert_eq!(Credential::Password(TEST_PASSWORD.as_bytes().to_vec()), req.authentication.credentials);
                     let (_stream, ctrl) = txn.expect("connect txn unused")
                         .into_stream_and_control_handle().expect("error accessing control handle");
                     ctrl
@@ -2227,14 +2223,12 @@ mod tests {
             let selection = client_types::ConnectSelection {
                 target: client_types::ScannedCandidate {
                     network: network_id.clone(),
-                    credential: credential,
+                    credential: credential.clone(),
                     bss_description: random_fidl_bss_description!(Wpa3, ssid: TEST_SSID.clone())
                         .into(),
                     observation: client_types::ScanObservation::Passive,
                     has_multiple_bss_candidates: true,
-                    mutual_security_protocols: [SecurityDescriptor::WPA3_PERSONAL]
-                        .into_iter()
-                        .collect(),
+                    authenticator: generate_random_authenticator(),
                 },
                 reason: client_types::ConnectReason::FidlConnectRequest,
             };
@@ -2284,7 +2278,6 @@ mod tests {
                 poll_sme_req(&mut exec, &mut _sme_stream),
                 Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                     assert_eq!(req.ssid, TEST_SSID.clone());
-                    assert_eq!(Credential::Password(TEST_PASSWORD.as_bytes().to_vec()), req.authentication.credentials);
                     let (_stream, ctrl) = txn.expect("connect txn unused")
                         .into_stream_and_control_handle().expect("error accessing control handle");
                     ctrl
@@ -2325,13 +2318,11 @@ mod tests {
         let selection = client_types::ConnectSelection {
             target: client_types::ScannedCandidate {
                 network: network,
-                credential: credential,
+                credential: credential.clone(),
                 bss_description: random_fidl_bss_description!(Wpa3, ssid: ssid.clone()).into(),
                 observation: client_types::ScanObservation::Passive,
                 has_multiple_bss_candidates: false,
-                mutual_security_protocols: [SecurityDescriptor::WPA3_PERSONAL]
-                    .into_iter()
-                    .collect(),
+                authenticator: generate_random_authenticator(),
             },
             reason: client_types::ConnectReason::FidlConnectRequest,
         };
@@ -2357,13 +2348,11 @@ mod tests {
         let connect_selection = client_types::ConnectSelection {
             target: client_types::ScannedCandidate {
                 network: network.clone(),
-                credential: credential,
+                credential: credential.clone(),
                 bss_description: random_fidl_bss_description!(Wpa3, ssid: ssid.clone()).into(),
                 observation: client_types::ScanObservation::Passive,
                 has_multiple_bss_candidates: true,
-                mutual_security_protocols: [SecurityDescriptor::WPA3_PERSONAL]
-                    .into_iter()
-                    .collect(),
+                authenticator: generate_random_authenticator(),
             },
             reason: client_types::ConnectReason::FidlConnectRequest,
         };
@@ -5089,7 +5078,6 @@ mod tests {
             poll_sme_req(&mut exec, &mut sme_stream),
             Poll::Ready(fidl_fuchsia_wlan_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
                 assert_eq!(req.ssid, TEST_SSID.clone());
-                assert_eq!(Credential::Password(TEST_PASSWORD.as_bytes().to_vec()), req.authentication.credentials);
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
                 ctrl
@@ -5380,15 +5368,14 @@ mod tests {
         // Create a candidate network.
         let ssid = TEST_SSID.clone();
         let network_id = NetworkIdentifier::new(ssid.clone(), SecurityType::Wpa);
-        let credential = Credential::Password(TEST_PASSWORD.as_bytes().to_vec());
         let network = Some(client_types::ScannedCandidate {
             network: network_id,
-            credential: credential,
+            credential: Credential::None,
             bss_description: random_fidl_bss_description!(Open, bssid: [20, 30, 40, 50, 60, 70])
                 .into(),
             observation: client_types::ScanObservation::Passive,
             has_multiple_bss_candidates: true,
-            mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),
+            authenticator: generate_random_authenticator(),
         });
 
         {
@@ -5451,15 +5438,14 @@ mod tests {
         // Create a candidate network.
         let ssid = TEST_SSID.clone();
         let network_id = NetworkIdentifier::new(ssid.clone(), SecurityType::Wpa);
-        let credential = Credential::Password(TEST_PASSWORD.as_bytes().to_vec());
         let network = Some(client_types::ScannedCandidate {
             network: network_id,
-            credential: credential,
+            credential: Credential::None,
             bss_description: random_fidl_bss_description!(Open, bssid: [20, 30, 40, 50, 60, 70])
                 .into(),
             observation: client_types::ScanObservation::Passive,
             has_multiple_bss_candidates: true,
-            mutual_security_protocols: [SecurityDescriptor::OPEN].into_iter().collect(),
+            authenticator: generate_random_authenticator(),
         });
 
         {
@@ -5509,7 +5495,7 @@ mod tests {
                 .into(),
             observation: client_types::ScanObservation::Passive,
             has_multiple_bss_candidates: true,
-            mutual_security_protocols: [SecurityDescriptor::WPA1].into_iter().collect(),
+            authenticator: generate_random_authenticator(),
         };
 
         iface_manager.clients[0].client_state_machine = Some(Box::new(FakeClient {

@@ -6,9 +6,8 @@ use {
     crate::config_management,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
-    std::collections::HashSet,
     wlan_common::{
-        self, bss::BssDescription, channel::Channel, security::SecurityDescriptor,
+        self, bss::BssDescription, channel::Channel, security::SecurityAuthenticator,
         sequestered::Sequestered,
     },
     wlan_metrics_registry::{
@@ -183,7 +182,7 @@ pub struct ScannedCandidate {
     pub bss_description: Sequestered<fidl_internal::BssDescription>,
     pub observation: ScanObservation,
     pub has_multiple_bss_candidates: bool,
-    pub mutual_security_protocols: HashSet<SecurityDescriptor>,
+    pub authenticator: SecurityAuthenticator,
 }
 
 // TODO(fxbug.dev/116570): This type should not derive `PartialEq`. Equality is only queried in
