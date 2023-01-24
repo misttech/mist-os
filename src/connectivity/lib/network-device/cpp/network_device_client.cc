@@ -112,10 +112,14 @@ void NetworkDeviceClient::OnDeviceError(fidl::UnbindInfo info) {
 }
 
 void NetworkDeviceClient::OnSessionError(fidl::UnbindInfo info) {
-  if (info.status() == ZX_ERR_PEER_CLOSED) {
-    FX_LOGS(WARNING) << "session detached";
-  } else {
-    FX_LOGS(ERROR) << "session handler error: " << info;
+  switch (info.status()) {
+    case ZX_ERR_PEER_CLOSED:
+    case ZX_ERR_CANCELED:
+      FX_LOGS(WARNING) << "session detached: " << info;
+      break;
+    default:
+      FX_LOGS(ERROR) << "session handler error: " << info;
+      break;
   }
   ErrorTeardown(info.status());
 }
