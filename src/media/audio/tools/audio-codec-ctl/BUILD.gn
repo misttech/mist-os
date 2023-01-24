@@ -4,6 +4,11 @@
 
 import("//build/components.gni")
 
+group("audio-codec-ctl") {
+  testonly = true
+  deps = [ ":bin" ]
+}
+
 executable("bin") {
   output_name = "audio-codec-ctl"
   sources = [ "main.cc" ]
@@ -16,8 +21,4 @@ executable("bin") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
-}
-
-fuchsia_shell_package("audio-codec-ctl") {
-  deps = [ ":bin" ]
 }
