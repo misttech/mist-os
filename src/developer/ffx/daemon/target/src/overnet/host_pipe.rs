@@ -112,19 +112,10 @@ impl HostPipeChild {
         event_queue: events::Queue<TargetEvent>,
         circuit: bool,
     ) -> Result<(Option<HostAddr>, HostPipeChild)> {
-        std::env::set_var(
-            "FFX_DAEMON_ABI_REVISION",
-            version_history::LATEST_VERSION.abi_revision.0.to_string(),
-        );
+        // TODO (119900): Re-enable ABI checks when ffx repository server uses ssh to setup
+        // repositories for older devices.
         let id_string = format!("{}", id);
-        let mut args = vec![
-            "-o",
-            "SendEnv=FFX_DAEMON_ABI_REVISION",
-            "echo",
-            "++ $SSH_CONNECTION ++",
-            "&&",
-            "remote_control_runner",
-        ];
+        let mut args = vec!["echo", "++ $SSH_CONNECTION ++", "&&", "remote_control_runner"];
 
         if circuit {
             args.push("--circuit");
