@@ -1,0 +1,10 @@
+{
+    "agent_types": [
+        "Restore",
+        "InspectExternalApis",
+        "InspectPolicyValues",
+        "InspectSettingProxy",
+        "InspectSettingTypeUsage",
+        "InspectSettingValues"
+    ]
+}
