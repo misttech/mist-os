@@ -8,9 +8,9 @@ use fidl_fuchsia_net_tun as fnet_tun;
 use fidl_fuchsia_netemul_internal as fnetemul_internal;
 use fidl_fuchsia_netemul_network as fnetemul_network;
 use fuchsia_zircon::{self as zx, HandleBased as _};
-use futures::{Future, FutureExt as _, StreamExt as _};
+use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
-use net_declare::fidl_mac;
+use net_declare::{fidl_mac, std_ip_v6};
 use net_types::Witness as _;
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
@@ -19,6 +19,7 @@ use netsvc_proto::{debuglog, netboot, tftp};
 use packet::{FragmentedBuffer as _, InnerPacketBuilder as _, ParseBuffer as _, Serializer};
 use std::borrow::Cow;
 use std::convert::{TryFrom as _, TryInto as _};
+use std::num::NonZeroU16;
 use test_case::test_case;
 use zerocopy::{byteorder::native_endian::U32, FromBytes, LayoutVerified, Unaligned};
 
@@ -391,18 +392,21 @@ where
     (realm, fs)
 }
 
-async fn with_netsvc_and_netstack_bind_port<F, Fut, A, V, P>(
-    port: u16,
-    avoid_ports: P,
+async fn with_netsvc_and_netstack_full<F1, F2, Fut2, X, A, V>(
+    port: Option<NonZeroU16>,
     name: &str,
     args: V,
-    test: F,
+    prepare_realm: F1,
+    test: F2,
 ) where
-    F: FnOnce(fuchsia_async::net::UdpSocket, u32) -> Fut,
-    Fut: futures::Future<Output = ()>,
+    // NOTE: We use a boxed future here so we can tie the lifetime of the
+    // returned future to the closure, which is necessary because we don't have
+    // higher-kinded types.
+    F1: for<'a> FnOnce(&'a netemul::TestRealm<'a>) -> futures::future::BoxFuture<'a, X>,
+    F2: FnOnce(fuchsia_async::net::UdpSocket, u32, X) -> Fut2,
+    Fut2: futures::Future<Output = ()>,
     A: Into<String>,
     V: IntoIterator<Item = A>,
-    P: IntoIterator<Item = u16>,
 {
     let netsvc_name = format!("{}-netsvc", name);
     let ns_name = format!("{}-netstack", name);
@@ -450,22 +454,29 @@ async fn with_netsvc_and_netstack_bind_port<F, Fut, A, V, P>(
     // Bind to the specified ports to avoid later binding to an unspecified port
     // that ends up matching these. Used by tests to avoid receiving unexpected
     // traffic.
-    let _captive_ports_socks = futures::stream::iter(avoid_ports.into_iter())
-        .then(|port| {
-            fuchsia_async::net::UdpSocket::bind_in_realm(
-                &netstack_realm,
-                std::net::SocketAddrV6::new(
-                    std::net::Ipv6Addr::UNSPECIFIED,
-                    port,
-                    /* flowinfo */ 0,
-                    /* scope id */ 0,
+
+    let (port, _captive_port_socks) = if let Some(port) = port {
+        (port.get(), vec![])
+    } else {
+        const AVOID_PORTS: [u16; 2] = [debuglog::MULTICAST_PORT.get(), netboot::ADVERT_PORT.get()];
+        let captive_ports_socks = futures::stream::iter(AVOID_PORTS.into_iter())
+            .then(|port| {
+                fuchsia_async::net::UdpSocket::bind_in_realm(
+                    &netstack_realm,
+                    std::net::SocketAddrV6::new(
+                        std::net::Ipv6Addr::UNSPECIFIED,
+                        port,
+                        /* flowinfo */ 0,
+                        /* scope id */ 0,
+                    )
+                    .into(),
                 )
-                .into(),
-            )
-            .map(move |r| r.unwrap_or_else(|e| panic!("bind in realm with {port}: {:?}", e)))
-        })
-        .collect::<Vec<_>>()
-        .await;
+                .map(move |r| r.unwrap_or_else(|e| panic!("bind in realm with {port}: {:?}", e)))
+            })
+            .collect::<Vec<_>>()
+            .await;
+        (0, captive_ports_socks)
+    };
 
     let sock = fuchsia_async::net::UdpSocket::bind_in_realm(
         &netstack_realm,
@@ -485,7 +496,10 @@ async fn with_netsvc_and_netstack_bind_port<F, Fut, A, V, P>(
     // matches some netsvc service port.
     let () = sock.as_ref().set_multicast_loop_v6(false).expect("failed to disable multicast loop");
 
-    let test_fut = test(sock, interface.id().try_into().expect("interface ID doesn't fit u32"));
+    let custom_args = prepare_realm(&netstack_realm).await;
+
+    let test_fut =
+        test(sock, interface.id().try_into().expect("interface ID doesn't fit u32"), custom_args);
     futures::select! {
         r = netsvc_stopped_fut.fuse() => {
             let e: component_events::events::Stopped = r.expect("failed to observe stopped event");
@@ -498,20 +512,33 @@ async fn with_netsvc_and_netstack_bind_port<F, Fut, A, V, P>(
 
 const DEFAULT_NETSVC_ARGS: [&str; 3] = ["--netboot", "--all-features", "--log-packets"];
 
+async fn with_netsvc_and_netstack_bind_port<F, Fut, A, V>(
+    port: Option<NonZeroU16>,
+    name: &str,
+    args: V,
+    test: F,
+) where
+    F: FnOnce(fuchsia_async::net::UdpSocket, u32) -> Fut,
+    Fut: futures::Future<Output = ()>,
+    A: Into<String>,
+    V: IntoIterator<Item = A>,
+{
+    with_netsvc_and_netstack_full(
+        port,
+        name,
+        args,
+        |_: &netemul::TestRealm<'_>| futures::future::ready(()).boxed(),
+        |sock, scope_id, ()| test(sock, scope_id),
+    )
+    .await
+}
+
 async fn with_netsvc_and_netstack<F, Fut>(name: &str, test: F)
 where
     F: FnOnce(fuchsia_async::net::UdpSocket, u32) -> Fut,
     Fut: futures::Future<Output = ()>,
 {
-    with_netsvc_and_netstack_bind_port(
-        /* unspecified port */ 0,
-        // Avoid the multicast ports, which will cause test flakes.
-        [debuglog::MULTICAST_PORT.get(), netboot::ADVERT_PORT.get()],
-        name,
-        DEFAULT_NETSVC_ARGS,
-        test,
-    )
-    .await
+    with_netsvc_and_netstack_bind_port(None, name, DEFAULT_NETSVC_ARGS, test).await
 }
 
 async fn discover(sock: &fuchsia_async::net::UdpSocket, scope_id: u32) -> std::net::Ipv6Addr {
@@ -732,8 +759,7 @@ async fn debuglog_inner(sock: fuchsia_async::net::UdpSocket, _scope_id: u32) {
 #[netstack_test]
 async fn debuglog(name: &str) {
     with_netsvc_and_netstack_bind_port(
-        debuglog::MULTICAST_PORT.get(),
-        [],
+        Some(debuglog::MULTICAST_PORT),
         name,
         DEFAULT_NETSVC_ARGS,
         debuglog_inner,
@@ -1052,8 +1078,7 @@ async fn pave_image(name: &str, image: &str) {
 #[netstack_test]
 async fn advertises(name: &str) {
     let () = with_netsvc_and_netstack_bind_port(
-        netsvc_proto::netboot::ADVERT_PORT.get(),
-        [],
+        Some(netsvc_proto::netboot::ADVERT_PORT),
         name,
         IntoIterator::into_iter(DEFAULT_NETSVC_ARGS).chain(["--advertise"]),
         |sock, scope| async move {
@@ -1400,4 +1425,58 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
             assert_eq!(mcast_filters, vec![]);
         }
     );
+}
+
+#[netstack_test]
+#[test_case(true; "unicast")]
+#[test_case(false; "all_nodes")]
+async fn replies_to_ping(name: &str, unicast: bool) {
+    with_netsvc_and_netstack_full(
+        None,
+        name,
+        DEFAULT_NETSVC_ARGS,
+        |realm| {
+            async move { realm.icmp_socket::<ping::Ipv6>().await.expect("icmp socket") }.boxed()
+        },
+        |sock, scope_id, icmp_socket| async move {
+            let device = discover(&sock, scope_id).await;
+
+            const SEQUENCE: u16 = 1234;
+            const BUFFER_SIZE: usize = 128;
+            const PORT: u16 = 4321;
+
+            let body: [u8; 4] = [1, 2, 3, 4];
+
+            let dst = if unicast { device } else { std_ip_v6!("ff02::1") };
+            let addr = std::net::SocketAddrV6::new(dst, PORT, /* flowinfo */ 0, scope_id);
+
+            let mut ping_stream =
+                ping::PingStream::<ping::Ipv6, _, BUFFER_SIZE>::new(&icmp_socket).fuse();
+            let ping_sink = ping::PingSink::<ping::Ipv6, _>::new(&icmp_socket);
+
+            // Create a future that tries to ping regularly so we don't suffer
+            // flakes in case of bad neighbor resolution. We'll always send
+            // pings with the same sequence number.
+            let mut sink = fuchsia_async::Interval::new(fuchsia_async::Duration::from_seconds(1))
+                .map(|()| Ok(ping::PingData { sequence: SEQUENCE, addr, body: body.to_vec() }))
+                .forward(ping_sink)
+                .map(|r| r.expect("sink error"))
+                .fuse();
+
+            let reply = futures::select! {
+                () = sink => panic!("sink ended unexpectedly"),
+                reply = ping_stream.try_next() => reply,
+            }
+            .expect("ping stream error")
+            .expect("ping stream ended unexpectedly");
+
+            let ping::PingData { addr: reply_addr, sequence, body: reply_body } = reply;
+
+            assert_eq!(reply_addr.ip(), &device);
+            assert_eq!(reply_addr.scope_id(), scope_id);
+            assert_eq!(sequence, SEQUENCE);
+            assert_eq!(&reply_body[..], &body[..]);
+        },
+    )
+    .await
 }

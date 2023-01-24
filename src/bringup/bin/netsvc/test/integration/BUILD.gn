@@ -21,6 +21,7 @@ rustc_test("bin") {
     "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
+    "//src/connectivity/lib/ping",
     "//src/connectivity/network/testing/netemul/fidl:fuchsia.netemul_rust",
     "//src/connectivity/network/testing/netemul/network-context/fidl:internal_rust",
     "//src/connectivity/network/testing/netemul/network-context/fidl:network_rust",

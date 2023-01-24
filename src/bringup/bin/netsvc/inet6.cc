@@ -507,7 +507,13 @@ void icmp6_recv(ip6_hdr_t* ip, void* _data, size_t len) {
   } else if (icmp->type == ICMP6_ECHO_REQUEST) {
     icmp->checksum = 0;
     icmp->type = ICMP6_ECHO_REPLY;
-    status = stack_state.SendIcmp6(_data, len, ip->dst, ip->src, false);
+
+    // If the target was on the ULA network, respond from it.
+    // Otherwise respond from the ll address.
+    const bool ula = ip->dst == stack_state.ula_ip6_addr;
+    const ip6_addr_t& saddr = ula ? stack_state.ula_ip6_addr : stack_state.ll_ip6_addr;
+
+    status = stack_state.SendIcmp6(_data, len, saddr, ip->src, false);
   } else {
     // Ignore
     return;
