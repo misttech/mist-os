@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::event;
-use crate::message::action_fuse::ActionFuseBuilder;
+use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{filter, group, Audience, MessageEvent, MessengerType, Status};
 use crate::message::receptor::Receptor;
 use crate::policy;
@@ -541,11 +541,9 @@ async fn test_action_fuse() {
     let (tx, mut rx) = futures::channel::mpsc::unbounded::<()>();
 
     {
-        let _ = ActionFuseBuilder::new()
-            .add_action(Box::new(move || {
-                tx.unbounded_send(()).unwrap();
-            }))
-            .build();
+        let _ = ActionFuse::create(Box::new(move || {
+            tx.unbounded_send(()).unwrap();
+        }));
     }
 
     assert!(rx.next().await.is_some());
@@ -571,13 +569,9 @@ async fn test_bind_to_recipient() {
         if let Some(MessageEvent::Message(payload, mut client)) = receptor.next().await {
             assert_eq!(payload, ORIGINAL.clone());
             client
-                .bind_to_recipient(
-                    ActionFuseBuilder::new()
-                        .add_action(Box::new(move || {
-                            tx.unbounded_send(()).unwrap();
-                        }))
-                        .build(),
-                )
+                .bind_to_recipient(ActionFuse::create(Box::new(move || {
+                    tx.unbounded_send(()).unwrap();
+                })))
                 .await;
         } else {
             panic!("Should have received message");

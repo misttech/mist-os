@@ -12,30 +12,6 @@ pub type TriggeredAction = Box<dyn FnOnce() + Send + Sync + 'static>;
 /// scope, the action will be triggered (if not defused).
 pub type ActionFuseHandle = Arc<Mutex<ActionFuse>>;
 
-/// ActionFuseBuilder allows creation of ActionFuses. Note that all parameters
-/// are completely optional to the builder. A fuse with no action or chained
-/// fuse is valid.
-pub(crate) struct ActionFuseBuilder {
-    actions: Vec<TriggeredAction>,
-}
-
-impl ActionFuseBuilder {
-    pub(crate) fn new() -> Self {
-        ActionFuseBuilder { actions: vec![] }
-    }
-
-    /// Adds an action to be executed once dropped.
-    pub(crate) fn add_action(mut self, action: TriggeredAction) -> Self {
-        self.actions.push(action);
-        self
-    }
-
-    /// Generates fuse based on parameters.
-    pub(crate) fn build(self) -> ActionFuseHandle {
-        ActionFuse::create(self.actions)
-    }
-}
-
 /// ActionFuse is a wrapper around a triggered action (a closure with no
 /// arguments and no return value). This action is invoked once the fuse goes
 /// out of scope (via the Drop trait). An ActionFuse can be defused, preventing
@@ -43,20 +19,20 @@ impl ActionFuseBuilder {
 pub struct ActionFuse {
     /// An optional action that will be invoked when the ActionFuse goes out of
     /// scope.
-    actions: Vec<TriggeredAction>,
+    actions: Option<TriggeredAction>,
 }
 
 impl ActionFuse {
     /// Returns an ActionFuse reference with the given TriggerAction.
-    pub(super) fn create(actions: Vec<TriggeredAction>) -> ActionFuseHandle {
-        Arc::new(Mutex::new(ActionFuse { actions }))
+    pub(crate) fn create(action: TriggeredAction) -> ActionFuseHandle {
+        Arc::new(Mutex::new(ActionFuse { actions: Some(action) }))
     }
 
     /// Suppresses the action from automatically executing.
     pub(crate) fn defuse(handle: ActionFuseHandle) {
         fasync::Task::spawn(async move {
             let mut fuse = handle.lock().await;
-            fuse.actions.clear();
+            fuse.actions = None;
         })
         .detach();
     }
@@ -64,7 +40,7 @@ impl ActionFuse {
 
 impl Drop for ActionFuse {
     fn drop(&mut self) {
-        while let Some(action) = self.actions.pop() {
+        if let Some(action) = self.actions.take() {
             (action)();
         }
     }

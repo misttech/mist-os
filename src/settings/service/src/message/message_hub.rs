@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::message::action_fuse::ActionFuseBuilder;
+use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{
     filter::Filter, messenger, ActionSender, Attribution, Audience, Fingerprint, Message,
     MessageAction, MessageClientId, MessageError, MessageType, MessengerAction, MessengerId,
@@ -460,24 +460,22 @@ impl MessageHub {
                     Messenger::new(Fingerprint { id, signature }, self.action_tx.clone());
 
                 // Create fuse to delete Messenger.
-                let fuse = ActionFuseBuilder::new()
-                    .add_action(Box::new(move || {
-                        // Do not send deletion request if other side is closed.
-                        if messenger_tx.is_closed() {
-                            return;
-                        }
+                let fuse = ActionFuse::create(Box::new(move || {
+                    // Do not send deletion request if other side is closed.
+                    if messenger_tx.is_closed() {
+                        return;
+                    }
 
-                        // ActionFuse drop method might cause the send failed.
-                        messenger_tx
-                            .unbounded_send(MessengerAction::DeleteBySignature(signature))
-                            .unwrap_or_else(|_| {
-                                fx_log_warn!(
-                                    "messenger_tx failed to send delete action for signature: {:?}",
-                                    signature
-                                )
-                            });
-                    }))
-                    .build();
+                    // ActionFuse drop method might cause the send failed.
+                    messenger_tx
+                        .unbounded_send(MessengerAction::DeleteBySignature(signature))
+                        .unwrap_or_else(|_| {
+                            fx_log_warn!(
+                                "messenger_tx failed to send delete action for signature: {:?}",
+                                signature
+                            )
+                        });
+                }));
 
                 self.next_id += 1;
                 let (beacon, receptor) =

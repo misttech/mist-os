@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::message::action_fuse::{ActionFuse, ActionFuseBuilder, ActionFuseHandle};
+use crate::message::action_fuse::{ActionFuse, ActionFuseHandle};
 use crate::message::base::{Audience, Message, MessageClientId, MessageType, Signature, Status};
 use crate::message::beacon::BeaconBuilder;
 use crate::message::message_builder::MessageBuilder;
@@ -46,11 +46,9 @@ impl MessageClient {
             id,
             message,
             messenger,
-            forwarder: ActionFuseBuilder::new()
-                .add_action(Box::new(move || {
-                    fuse_messenger_clone.forward(fuse_message_clone.clone(), None);
-                }))
-                .build(),
+            forwarder: ActionFuse::create(Box::new(move || {
+                fuse_messenger_clone.forward(fuse_message_clone.clone(), None);
+            })),
         }
     }
 

@@ -16,7 +16,7 @@ use crate::handler::setting_handler::{
     ControllerError, Event, ExitResult, SettingHandlerResult, State,
 };
 use crate::inspect::listener_logger::ListenerInspectLogger;
-use crate::message::action_fuse::ActionFuseBuilder;
+use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{Audience, MessageEvent, MessengerType, Status};
 use crate::{clock, event, service, trace, trace_guard};
 use anyhow::Error;
@@ -72,9 +72,7 @@ impl RequestInfo {
     /// to the request goes out of scope. This allows for the message handler to
     /// know when the recipient is no longer valid.
     async fn bind_to_scope(&mut self, trigger_fn: Box<dyn FnOnce() + Sync + Send>) {
-        let fuse = ActionFuseBuilder::new().add_action(trigger_fn).build();
-
-        self.client.bind_to_recipient(fuse).await;
+        self.client.bind_to_recipient(ActionFuse::create(trigger_fn)).await;
     }
 }
 

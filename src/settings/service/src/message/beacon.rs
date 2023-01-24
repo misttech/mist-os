@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::message::action_fuse::{ActionFuseBuilder, ActionFuseHandle};
+use crate::message::action_fuse::{ActionFuse, ActionFuseHandle};
 use crate::message::base::{Message, MessageClientId, MessageEvent, MessengerId, Status};
 use crate::message::message_client::MessageClient;
 use crate::message::messenger::Messenger;
@@ -89,16 +89,14 @@ impl Beacon {
         let receptor = Receptor::new(
             signature,
             event_rx,
-            ActionFuseBuilder::new()
-                .add_action(Box::new(move || {
-                    let sentinel = sentinel.clone();
-                    fasync::Task::spawn(async move {
-                        timeout_abort_client.abort();
-                        sentinel.lock().await.trigger().await;
-                    })
-                    .detach();
-                }))
-                .build(),
+            ActionFuse::create(Box::new(move || {
+                let sentinel = sentinel.clone();
+                fasync::Task::spawn(async move {
+                    timeout_abort_client.abort();
+                    sentinel.lock().await.trigger().await;
+                })
+                .detach();
+            })),
             fuses,
         );
 
