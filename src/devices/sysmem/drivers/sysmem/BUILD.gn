@@ -50,6 +50,7 @@ source_set("sysmem_common_srcs") {
     "utils.cc",
   ]
   public_deps = [
+    ":fuchsia.sysmem2.internal_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
     "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_hlcpp",
@@ -180,4 +181,14 @@ fuchsia_unittest_package("sysmem-unittest") {
       max_severity = "ERROR"
     }
   }
+}
+
+fidl("fuchsia.sysmem2.internal") {
+  sdk_category = "internal"
+  api = "fuchsia.sysmem2.internal.api"
+  sources = [ "combined_token.fidl" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.sysmem",
+    "//sdk/fidl/fuchsia.sysmem2",
+  ]
 }

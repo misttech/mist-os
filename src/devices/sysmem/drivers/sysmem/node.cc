@@ -74,6 +74,10 @@ void Node::Bind(NodeServerEnd server_end) {
       BindInternalV2(std::move(std::get<kVersionIndexV2>(server_end)),
                      std::move(error_handler_wrapper));
       break;
+    case kVersionIndexCombinedV1AndV2:
+      BindInternalCombinedV1AndV2(std::move(std::get<kVersionIndexCombinedV1AndV2>(server_end)),
+                                  std::move(error_handler_wrapper));
+      break;
   }
 }
 

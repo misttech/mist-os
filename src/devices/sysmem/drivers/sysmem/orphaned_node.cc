@@ -63,12 +63,17 @@ OrphanedNode::OrphanedNode(fbl::RefPtr<LogicalBufferCollection> logical_buffer_c
 
 void OrphanedNode::BindInternalV1(zx::channel server_end,
                                   ErrorHandlerWrapper error_handler_wrapper) {
-  ZX_PANIC("OrphanedNode::BindInternal() called");
+  ZX_PANIC("OrphanedNode::BindInternalV1() called");
 }
 
 void OrphanedNode::BindInternalV2(zx::channel server_end,
                                   ErrorHandlerWrapper error_handler_wrapper) {
-  ZX_PANIC("OrphanedNode::BindInternal() called");
+  ZX_PANIC("OrphanedNode::BindInternalV2() called");
+}
+
+void OrphanedNode::BindInternalCombinedV1AndV2(zx::channel server_end,
+                                               ErrorHandlerWrapper error_handler_wrapper) {
+  ZX_PANIC("OrphanedNode::BindInternalCombinedV1AndV2() called");
 }
 
 void OrphanedNode::CloseServerBinding(zx_status_t epitaph) {

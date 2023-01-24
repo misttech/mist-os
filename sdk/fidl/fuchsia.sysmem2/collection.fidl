@@ -312,6 +312,7 @@ protocol Node {
 /// We use a channel for the `BufferCollectionToken` instead of a single
 /// `eventpair` (pair) because this way we can detect error conditions like a
 /// participant dying mid-create.
+// LINT.IfChange
 @available(added=HEAD)
 protocol BufferCollectionToken {
     compose Node;
@@ -482,6 +483,7 @@ protocol BufferCollectionToken {
         1: group_request server_end:BufferCollectionTokenGroup;
     });
 };
+// LINT.ThenChange(//src/devices/sysmem/drivers/sysmem/combined_token.fidl)
 
 /// `BufferCollection` is a connection directly from a participant to sysmem re.
 /// a logical buffer collection; typically the logical buffer collection is

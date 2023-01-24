@@ -5,7 +5,9 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_BUFFER_COLLECTION_TOKEN_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_BUFFER_COLLECTION_TOKEN_H_
 
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2.internal/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 
 #include "lib/zx/channel.h"
 #include "logging.h"
@@ -73,81 +75,84 @@ class BufferCollectionToken : public Node, public LoggingMixin {
                       ErrorHandlerWrapper error_handler_wrapper) override;
   void BindInternalV2(zx::channel token_request,
                       ErrorHandlerWrapper error_handler_wrapper) override;
+  void BindInternalCombinedV1AndV2(zx::channel server_end,
+                                   ErrorHandlerWrapper error_handler_wrapper) override;
 
  private:
   friend class FidlServer;
 
-  struct V1 : public fidl::Server<fuchsia_sysmem::BufferCollectionToken> {
-    explicit V1(BufferCollectionToken& parent) : parent_(parent) {}
+  // We keep the protocol impl separate to clarify which methods are protocol impl.  Sysmem serves
+  // CombinedBufferCollectionToken which is both a V1 and V2 token at the same time.  This allows
+  // us to keep the V1 and V2 protocols separate from a client's point of view, while also avoiding
+  // any pointless token version conversions.  This happens to make sense for BufferCollectionToken
+  // V1 and V2 since the token is logically the same in all stateful aspects; this approach being
+  // used here is not an implicit proposal / promise to use this same approach for any hypothetical
+  // V3.
+  struct CombinedTokenServer
+      : public fidl::Server<fuchsia_sysmem2_internal::CombinedBufferCollectionToken> {
+    explicit CombinedTokenServer(BufferCollectionToken& parent) : parent_(parent) {}
 
+    // V1
+    //
     // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
     // BufferCollectionTokenGroup)
-    void Sync(SyncCompleter::Sync& completer) override;
-    void DeprecatedSync(DeprecatedSyncCompleter::Sync& completer) override;
-    void Close(CloseCompleter::Sync& completer) override;
-    void DeprecatedClose(DeprecatedCloseCompleter::Sync& completer) override;
-    void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
-    void IsAlternateFor(IsAlternateForRequest& request,
-                        IsAlternateForCompleter::Sync& completer) override;
-    void SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) override;
-    void DeprecatedSetName(DeprecatedSetNameRequest& request,
-                           DeprecatedSetNameCompleter::Sync& completer) override;
-    void SetDebugClientInfo(SetDebugClientInfoRequest& request,
-                            SetDebugClientInfoCompleter::Sync& completer) override;
-    void DeprecatedSetDebugClientInfo(
-        DeprecatedSetDebugClientInfoRequest& request,
-        DeprecatedSetDebugClientInfoCompleter::Sync& completer) override;
-    void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
-                                    SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
-    void DeprecatedSetDebugTimeoutLogDeadline(
-        DeprecatedSetDebugTimeoutLogDeadlineRequest& request,
-        DeprecatedSetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
-    void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
-
-    //
+    void SyncV1(SyncV1Completer::Sync& completer) override;
+    void DeprecatedSyncV1(DeprecatedSyncV1Completer::Sync& completer) override;
+    void CloseV1(CloseV1Completer::Sync& completer) override;
+    void DeprecatedCloseV1(DeprecatedCloseV1Completer::Sync& completer) override;
+    void GetNodeRefV1(GetNodeRefV1Completer::Sync& completer) override;
+    void IsAlternateForV1(IsAlternateForV1Request& request,
+                          IsAlternateForV1Completer::Sync& completer) override;
+    void SetNameV1(SetNameV1Request& request, SetNameV1Completer::Sync& completer) override;
+    void DeprecatedSetNameV1(DeprecatedSetNameV1Request& request,
+                             DeprecatedSetNameV1Completer::Sync& completer) override;
+    void SetDebugClientInfoV1(SetDebugClientInfoV1Request& request,
+                              SetDebugClientInfoV1Completer::Sync& completer) override;
+    void DeprecatedSetDebugClientInfoV1(
+        DeprecatedSetDebugClientInfoV1Request& request,
+        DeprecatedSetDebugClientInfoV1Completer::Sync& completer) override;
+    void SetDebugTimeoutLogDeadlineV1(
+        SetDebugTimeoutLogDeadlineV1Request& request,
+        SetDebugTimeoutLogDeadlineV1Completer::Sync& completer) override;
+    void DeprecatedSetDebugTimeoutLogDeadlineV1(
+        DeprecatedSetDebugTimeoutLogDeadlineV1Request& request,
+        DeprecatedSetDebugTimeoutLogDeadlineV1Completer::Sync& completer) override;
+    void SetVerboseLoggingV1(SetVerboseLoggingV1Completer::Sync& completer) override;
     // fuchsia.sysmem.BufferCollectionToken interface methods (see also "compose Node" methods
     // above)
+    void DuplicateSyncV1(DuplicateSyncV1Request& request,
+                         DuplicateSyncV1Completer::Sync& completer) override;
+    void DuplicateV1(DuplicateV1Request& request, DuplicateV1Completer::Sync& completer) override;
+    void CreateBufferCollectionTokenGroupV1(
+        CreateBufferCollectionTokenGroupV1Request& request,
+        CreateBufferCollectionTokenGroupV1Completer::Sync& completer) override;
+    void SetDispensableV1(SetDispensableV1Completer::Sync& completer) override;
+
+    // V2
     //
-    void DuplicateSync(DuplicateSyncRequest& request,
-                       DuplicateSyncCompleter::Sync& completer) override;
-    void Duplicate(DuplicateRequest& request, DuplicateCompleter::Sync& completer) override;
-    void CreateBufferCollectionTokenGroup(
-        CreateBufferCollectionTokenGroupRequest& request,
-        CreateBufferCollectionTokenGroupCompleter::Sync& completer) override;
-    void SetDispensable(SetDispensableCompleter::Sync& completer) override;
-
-    BufferCollectionToken& parent_;
-  };
-
-  struct V2 : public fidl::Server<fuchsia_sysmem2::BufferCollectionToken>,
-              public fbl::Recyclable<V2> {
-    explicit V2(BufferCollectionToken& parent) : parent_(parent) {}
-
     // FIDL "compose Node" "interface" (identical among BufferCollection, BufferCollectionToken,
     // BufferCollectionTokenGroup)
-    void Sync(SyncCompleter::Sync& completer) override;
-    void Close(CloseCompleter::Sync& completer) override;
-    void GetNodeRef(GetNodeRefCompleter::Sync& completer) override;
-    void IsAlternateFor(IsAlternateForRequest& request,
-                        IsAlternateForCompleter::Sync& completer) override;
-    void SetName(SetNameRequest& request, SetNameCompleter::Sync& completer) override;
-    void SetDebugClientInfo(SetDebugClientInfoRequest& request,
-                            SetDebugClientInfoCompleter::Sync& completer) override;
-    void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
-                                    SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
-    void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
-
-    //
+    void SyncV2(SyncV2Completer::Sync& completer) override;
+    void CloseV2(CloseV2Completer::Sync& completer) override;
+    void GetNodeRefV2(GetNodeRefV2Completer::Sync& completer) override;
+    void IsAlternateForV2(IsAlternateForV2Request& request,
+                          IsAlternateForV2Completer::Sync& completer) override;
+    void SetNameV2(SetNameV2Request& request, SetNameV2Completer::Sync& completer) override;
+    void SetDebugClientInfoV2(SetDebugClientInfoV2Request& request,
+                              SetDebugClientInfoV2Completer::Sync& completer) override;
+    void SetDebugTimeoutLogDeadlineV2(
+        SetDebugTimeoutLogDeadlineV2Request& request,
+        SetDebugTimeoutLogDeadlineV2Completer::Sync& completer) override;
+    void SetVerboseLoggingV2(SetVerboseLoggingV2Completer::Sync& completer) override;
     // fuchsia.sysmem.BufferCollectionToken interface methods (see also "compose Node" methods
     // above)
-    //
-    void DuplicateSync(DuplicateSyncRequest& request,
-                       DuplicateSyncCompleter::Sync& completer) override;
-    void Duplicate(DuplicateRequest& request, DuplicateCompleter::Sync& completer) override;
-    void CreateBufferCollectionTokenGroup(
-        CreateBufferCollectionTokenGroupRequest& request,
-        CreateBufferCollectionTokenGroupCompleter::Sync& completer) override;
-    void SetDispensable(SetDispensableCompleter::Sync& completer) override;
+    void DuplicateSyncV2(DuplicateSyncV2Request& request,
+                         DuplicateSyncV2Completer::Sync& completer) override;
+    void DuplicateV2(DuplicateV2Request& request, DuplicateV2Completer::Sync& completer) override;
+    void CreateBufferCollectionTokenGroupV2(
+        CreateBufferCollectionTokenGroupV2Request& request,
+        CreateBufferCollectionTokenGroupV2Completer::Sync& completer) override;
+    void SetDispensableV2(SetDispensableV2Completer::Sync& completer) override;
 
     BufferCollectionToken& parent_;
   };
@@ -165,13 +170,12 @@ class BufferCollectionToken : public Node, public LoggingMixin {
   bool CommonCreateBufferCollectionTokenGroupStage1(Completer& completer,
                                                     NodeProperties** out_node_properties);
 
-  std::optional<V1> v1_server_;
-  std::optional<V2> v2_server_;
+  std::optional<CombinedTokenServer> server_;
 
   std::optional<zx_status_t> async_failure_result_;
 
-  std::optional<fidl::ServerBindingRef<fuchsia_sysmem::BufferCollectionToken>> server_binding_v1_;
-  std::optional<fidl::ServerBindingRef<fuchsia_sysmem2::BufferCollectionToken>> server_binding_v2_;
+  std::optional<fidl::ServerBindingRef<fuchsia_sysmem2_internal::CombinedBufferCollectionToken>>
+      server_binding_;
 
   // This is set up to once during
   // LogicalBufferCollection::BindSharedCollection(), and essentially curries

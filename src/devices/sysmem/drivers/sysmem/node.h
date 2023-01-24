@@ -137,6 +137,8 @@ class Node : public fbl::RefCounted<Node> {
                               ErrorHandlerWrapper error_handler_wrapper) = 0;
   virtual void BindInternalV2(zx::channel server_end,
                               ErrorHandlerWrapper error_handler_wrapper) = 0;
+  virtual void BindInternalCombinedV1AndV2(zx::channel server_end,
+                                           ErrorHandlerWrapper error_handler_wrapper) = 0;
 
   template <typename Completer>
   void FailSync(Location location, Completer& completer, zx_status_t status, const char* format,
@@ -300,13 +302,13 @@ class Node : public fbl::RefCounted<Node> {
     completer.Reply(std::move(to_vend));
   }
 
-  template <class GetNodeRefCompleterSync>
+  template <class GetNodeRefCompleterSync, class Response = fuchsia_sysmem2::NodeGetNodeRefResponse>
   void GetNodeRefImplV2(GetNodeRefCompleterSync& completer) {
     zx::event to_vend;
     if (!CommonGetNodeRefImplStage1(completer, &to_vend)) {
       return;
     }
-    fuchsia_sysmem2::NodeGetNodeRefResponse response;
+    Response response;
     response.node_ref().emplace(std::move(to_vend));
     completer.Reply(std::move(response));
   }
@@ -360,19 +362,21 @@ class Node : public fbl::RefCounted<Node> {
     return true;
   }
 
-  template <class IsAlternateForRequest, class IsAlternateForCompleterSync>
+  template <class IsAlternateForRequest, class IsAlternateForCompleterSync,
+            class Response = fuchsia_sysmem::NodeIsAlternateForResponse>
   void IsAlternateForImplV1(IsAlternateForRequest& request,
                             IsAlternateForCompleterSync& completer) {
     bool is_alternate_for;
     if (!CommonIsAlternateFor(std::move(request.node_ref()), completer, &is_alternate_for)) {
       return;
     }
-    fuchsia_sysmem::NodeIsAlternateForResponse response;
+    Response response;
     response.is_alternate() = is_alternate_for;
     completer.Reply(fit::ok(std::move(response)));
   }
 
-  template <class IsAlternateForRequest, class IsAlternateForCompleterSync>
+  template <class IsAlternateForRequest, class IsAlternateForCompleterSync,
+            class Response = fuchsia_sysmem2::NodeIsAlternateForResponse>
   void IsAlternateForImplV2(IsAlternateForRequest& request,
                             IsAlternateForCompleterSync& completer) {
     if (!request.node_ref().has_value()) {
@@ -383,7 +387,7 @@ class Node : public fbl::RefCounted<Node> {
     if (!CommonIsAlternateFor(std::move(request.node_ref().value()), completer, &is_alernate_for)) {
       return;
     }
-    fuchsia_sysmem2::NodeIsAlternateForResponse response;
+    Response response;
     response.is_alternate() = is_alernate_for;
     completer.Reply(fit::ok(std::move(response)));
   }

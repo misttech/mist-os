@@ -322,6 +322,11 @@ void BufferCollectionTokenGroup::BindInternalV2(zx::channel group_request,
       });
 }
 
+void BufferCollectionTokenGroup::BindInternalCombinedV1AndV2(
+    zx::channel server_end, ErrorHandlerWrapper error_handler_wrapper) {
+  ZX_PANIC("BufferCollectionTokenGroup only serves V1 or V2 separately - never combined V1 and V2");
+}
+
 bool BufferCollectionTokenGroup::ReadyForAllocation() { return is_all_children_present_; }
 
 void BufferCollectionTokenGroup::OnBuffersAllocated(const AllocationResult& allocation_result) {

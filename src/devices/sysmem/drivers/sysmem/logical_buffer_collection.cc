@@ -394,6 +394,20 @@ void ReplicateColorSpaceDoNotCare(const std::vector<fuchsia_sysmem2::ColorSpace>
   ZX_DEBUG_ASSERT(*to_update[0].type() == *to_match[0].type());
 }
 
+TokenServerEndCombinedV1AndV2 ConvertV1TokenRequestToCombinedTokenRequest(
+    TokenServerEndV1 token_server_end_v1) {
+  // This is the only place we convert from a V1 token request to a combined V1 and V2 internal
+  // "request".
+  return TokenServerEndCombinedV1AndV2(token_server_end_v1.TakeChannel());
+}
+
+TokenServerEndCombinedV1AndV2 ConvertV2TokenRequestToCombinedTokenRequest(
+    TokenServerEndV2 token_server_end_v2) {
+  // This is the only place we convert from a V2 token request to a combined V1 and V2 internal
+  // "request".
+  return TokenServerEndCombinedV1AndV2(token_server_end_v2.TakeChannel());
+}
+
 }  // namespace
 
 // static
@@ -632,9 +646,11 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenStage1(
 
 void LogicalBufferCollection::CreateBufferCollectionTokenV1(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    TokenServerEndV1 token_request_v1) {
-  ZX_DEBUG_ASSERT(token_request_v1);
-  TokenServerEnd token_request(std::move(token_request_v1));
+    TokenServerEndV1 token_server_end_v1) {
+  ZX_DEBUG_ASSERT(token_server_end_v1);
+  TokenServerEndCombinedV1AndV2 server_end_combined =
+      ConvertV1TokenRequestToCombinedTokenRequest(std::move(token_server_end_v1));
+  TokenServerEnd token_request(std::move(server_end_combined));
   BufferCollectionToken* token;
   if (!CommonCreateBufferCollectionTokenStage1(self, new_node_properties, token_request, &token)) {
     return;
@@ -644,9 +660,11 @@ void LogicalBufferCollection::CreateBufferCollectionTokenV1(
 
 void LogicalBufferCollection::CreateBufferCollectionTokenV2(
     fbl::RefPtr<LogicalBufferCollection> self, NodeProperties* new_node_properties,
-    TokenServerEndV2 token_request_v2) {
-  ZX_DEBUG_ASSERT(token_request_v2);
-  TokenServerEnd token_request(std::move(token_request_v2));
+    TokenServerEndV2 token_server_end_v2) {
+  ZX_DEBUG_ASSERT(token_server_end_v2);
+  TokenServerEndCombinedV1AndV2 server_end_combined =
+      ConvertV2TokenRequestToCombinedTokenRequest(std::move(token_server_end_v2));
+  TokenServerEnd token_request(std::move(server_end_combined));
   BufferCollectionToken* token;
   if (!CommonCreateBufferCollectionTokenStage1(self, new_node_properties, std::move(token_request),
                                                &token)) {

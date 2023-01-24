@@ -115,6 +115,11 @@ void BufferCollection::BindInternalV2(zx::channel collection_request,
       });
 }
 
+void BufferCollection::BindInternalCombinedV1AndV2(zx::channel server_end,
+                                                   ErrorHandlerWrapper error_handler_wrapper) {
+  ZX_PANIC("BufferCollection only serves V1 or V2 separately - never combined V1 and V2");
+}
+
 void BufferCollection::V1::Sync(SyncCompleter::Sync& completer) { parent_.SyncImpl(completer); }
 
 void BufferCollection::V2::Sync(SyncCompleter::Sync& completer) { parent_.SyncImpl(completer); }

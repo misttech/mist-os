@@ -45,6 +45,9 @@ class OrphanedNode : public Node {
   void BindInternalV1(zx::channel server_end, ErrorHandlerWrapper error_handler_wrapper) override;
   // OrphanedNode::BindV2() will never happen; panics.
   void BindInternalV2(zx::channel server_end, ErrorHandlerWrapper error_handler_wrapper) override;
+  // This will never happen; panics.
+  void BindInternalCombinedV1AndV2(zx::channel server_end,
+                                   ErrorHandlerWrapper error_handler_wrapper) override;
   // NOP
   void CloseServerBinding(zx_status_t epitaph) override;
 

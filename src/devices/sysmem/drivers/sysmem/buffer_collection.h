@@ -78,6 +78,8 @@ class BufferCollection : public Node {
                       ErrorHandlerWrapper error_handler_wrapper) override;
   void BindInternalV2(zx::channel collection_request,
                       ErrorHandlerWrapper error_handler_wrapper) override;
+  void BindInternalCombinedV1AndV2(zx::channel server_end,
+                                   ErrorHandlerWrapper error_handler_wrapper) override;
 
  private:
   friend class FidlServer;

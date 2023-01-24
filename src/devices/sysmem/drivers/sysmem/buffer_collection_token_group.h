@@ -47,6 +47,8 @@ class BufferCollectionTokenGroup : public Node {
                       ErrorHandlerWrapper error_handler_wrapper) override;
   void BindInternalV2(zx::channel group_request,
                       ErrorHandlerWrapper error_handler_wrapper) override;
+  void BindInternalCombinedV1AndV2(zx::channel server_end,
+                                   ErrorHandlerWrapper error_handler_wrapper) override;
 
   void CloseServerBinding(zx_status_t epitaph) override;
 
