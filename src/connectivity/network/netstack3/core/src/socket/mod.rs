@@ -9,8 +9,8 @@ pub(crate) mod address;
 pub mod datagram;
 pub(crate) mod posix;
 
-use alloc::{collections::HashMap, vec::Vec};
-use core::{fmt::Debug, hash::Hash, marker::PhantomData};
+use alloc::collections::HashMap;
+use core::{convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData};
 use net_types::{
     ip::{Ip, IpAddress},
     AddrAndZone, SpecifiedAddr, Witness as _,
@@ -142,24 +142,49 @@ pub(crate) trait SocketMapStateSpec {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct IncompatibleError;
 
+pub(crate) trait Inserter<T> {
+    /// Inserts the provided item and consumes `self`.
+    ///
+    /// Inserts a single item and consumes the inserter (thus preventing
+    /// additional insertions).
+    fn insert(self, item: T);
+}
+
+impl<'a, T, E: Extend<T>> Inserter<T> for &'a mut E {
+    fn insert(self, item: T) {
+        self.extend([item])
+    }
+}
+
+impl<T> Inserter<T> for Never {
+    fn insert(self, _: T) {
+        match self {}
+    }
+}
+
 pub(crate) trait SocketMapAddrStateSpec {
     type Id;
     type SharingState;
+    type Inserter<'a>: Inserter<Self::Id> + 'a
+    where
+        Self: 'a,
+        Self::Id: 'a;
+
     /// Creates a new `Self` holding the provided socket with the given new
     /// sharing state at the specified address.
     fn new(new_sharing_state: &Self::SharingState, id: Self::Id) -> Self;
 
-    /// Gets the target in the existing socket(s) in `self` for a new socket
-    /// with the provided state.
+    /// Enables insertion in `self` for a new socket with the provided sharing
+    /// state.
     ///
     /// If the new state is incompatible with the existing socket(s),
-    /// implementations of this function should return
-    /// `Err(IncompatibleError)`. If `Ok(dest)` is returned, the new socket ID
-    /// will be appended to `dest`.
-    fn try_get_dest<'a, 'b>(
+    /// implementations of this function should return `Err(IncompatibleError)`.
+    /// If `Ok(x)` is returned, calling `x.insert(y)` will insert `y` into
+    /// `self`.
+    fn try_get_inserter<'a, 'b>(
         &'b mut self,
         new_sharing_state: &'a Self::SharingState,
-    ) -> Result<&'b mut Vec<Self::Id>, IncompatibleError>;
+    ) -> Result<Self::Inserter<'b>, IncompatibleError>;
 
     /// Returns `Ok` if an entry with the given sharing state could be added
     /// to `self`.
@@ -531,11 +556,11 @@ where
                         Some(bound) => bound,
                         None => unreachable!("found {:?} for address {:?}", bound, socket_addr),
                     };
-                    match AddrState::try_get_dest(bound, &tag_state) {
+                    match AddrState::try_get_inserter(bound, &tag_state) {
                         Ok(v) => {
                             let idmap_entry =
                                 id_to_sock.push_entry((state.into(), tag_state, socket_addr));
-                            v.push(idmap_entry.key().clone().into());
+                            v.insert(idmap_entry.key().clone().into());
                             Ok(idmap_entry)
                         }
                         Err(IncompatibleError) => Err((InsertError::Exists, state, tag_state)),
@@ -995,15 +1020,16 @@ mod tests {
     impl<I: Eq> SocketMapAddrStateSpec for Multiple<I> {
         type Id = I;
         type SharingState = char;
+        type Inserter<'a> = &'a mut Vec<I> where I: 'a;
 
         fn new(new_sharing_state: &char, id: I) -> Self {
             Self(*new_sharing_state, vec![id])
         }
 
-        fn try_get_dest<'a, 'b>(
+        fn try_get_inserter<'a, 'b>(
             &'b mut self,
             new_state: &'a char,
-        ) -> Result<&'b mut Vec<I>, IncompatibleError> {
+        ) -> Result<Self::Inserter<'b>, IncompatibleError> {
             let Self(c, v) = self;
             (new_state == c).then_some(v).ok_or(IncompatibleError)
         }

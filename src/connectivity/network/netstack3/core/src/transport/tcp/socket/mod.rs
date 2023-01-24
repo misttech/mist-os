@@ -558,6 +558,7 @@ impl<I: Ip> From<BoundId<I>> for SocketId<I> {
 impl<I: Ip> SocketMapAddrStateSpec for MaybeListenerId<I> {
     type Id = MaybeListenerId<I>;
     type SharingState = SharingState;
+    type Inserter<'a> = Never;
 
     fn new(SharingState: &SharingState, id: MaybeListenerId<I>) -> Self {
         id
@@ -568,10 +569,10 @@ impl<I: Ip> SocketMapAddrStateSpec for MaybeListenerId<I> {
         RemoveResult::IsLast
     }
 
-    fn try_get_dest<'a, 'b>(
+    fn try_get_inserter<'a, 'b>(
         &'b mut self,
         SharingState: &'a SharingState,
-    ) -> Result<&'b mut Vec<MaybeListenerId<I>>, IncompatibleError> {
+    ) -> Result<Self::Inserter<'b>, IncompatibleError> {
         // TODO(https://fxbug.dev/101596): Support sharing for TCP sockets.
         Err(IncompatibleError)
     }
@@ -588,6 +589,7 @@ impl<I: Ip> SocketMapAddrStateSpec for MaybeListenerId<I> {
 impl<I: Ip> SocketMapAddrStateSpec for MaybeClosedConnectionId<I> {
     type Id = MaybeClosedConnectionId<I>;
     type SharingState = SharingState;
+    type Inserter<'a> = Never;
 
     fn new(SharingState: &SharingState, id: MaybeClosedConnectionId<I>) -> Self {
         id
@@ -598,10 +600,10 @@ impl<I: Ip> SocketMapAddrStateSpec for MaybeClosedConnectionId<I> {
         RemoveResult::IsLast
     }
 
-    fn try_get_dest<'a, 'b>(
+    fn try_get_inserter<'a, 'b>(
         &'b mut self,
         SharingState: &'a SharingState,
-    ) -> Result<&'b mut Vec<MaybeClosedConnectionId<I>>, IncompatibleError> {
+    ) -> Result<Self::Inserter<'b>, IncompatibleError> {
         Err(IncompatibleError)
     }
 

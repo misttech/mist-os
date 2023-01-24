@@ -1483,7 +1483,6 @@ where
 
 #[cfg(test)]
 mod test {
-    use alloc::vec::Vec;
     use core::{convert::Infallible as Never, marker::PhantomData};
 
     use derivative::Derivative;
@@ -1626,13 +1625,15 @@ mod test {
     impl<S> SocketMapAddrStateSpec for Id<S> {
         type Id = Self;
         type SharingState = Sharing;
+        type Inserter<'a> = Never where Self: 'a;
+
         fn new(_sharing: &Self::SharingState, id: Self) -> Self {
             id
         }
-        fn try_get_dest<'a, 'b>(
+        fn try_get_inserter<'a, 'b>(
             &'b mut self,
             _new_sharing_state: &'a Self::SharingState,
-        ) -> Result<&'b mut Vec<Self::Id>, IncompatibleError> {
+        ) -> Result<Self::Inserter<'b>, IncompatibleError> {
             Err(IncompatibleError)
         }
         fn could_insert(

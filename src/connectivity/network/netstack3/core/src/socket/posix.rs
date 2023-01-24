@@ -247,6 +247,8 @@ impl<T> ToPosixSharingOptions for (T, PosixSharingOptions) {
 impl<I: Debug + Eq> SocketMapAddrStateSpec for PosixAddrState<I> {
     type Id = I;
     type SharingState = PosixSharingOptions;
+    type Inserter<'a> = &'a mut Vec<I> where I: 'a;
+
     fn new(new_sharing_state: &PosixSharingOptions, id: I) -> Self {
         match new_sharing_state {
             PosixSharingOptions::Exclusive => Self::Exclusive(id),
@@ -254,7 +256,7 @@ impl<I: Debug + Eq> SocketMapAddrStateSpec for PosixAddrState<I> {
         }
     }
 
-    fn try_get_dest<'a, 'b>(
+    fn try_get_inserter<'a, 'b>(
         &'b mut self,
         new_sharing_state: &'a PosixSharingOptions,
     ) -> Result<&'b mut Vec<I>, IncompatibleError> {
