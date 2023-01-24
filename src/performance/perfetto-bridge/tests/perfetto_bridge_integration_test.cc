@@ -4,16 +4,18 @@
 
 #include <fidl/fuchsia.tracing.controller/cpp/fidl.h>
 #include <fidl/fuchsia.tracing/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/socket.h>
 #include <stdlib.h>
 
 #include <gtest/gtest.h>
 #include <trace-test-utils/read_records.h>
 
-#include "lib/syslog/cpp/macros.h"
-
 TEST(PerfettoBridgeIntegrationTest, Init) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   zx::result client_end = component::Connect<fuchsia_tracing_controller::Controller>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
@@ -29,7 +31,7 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   ASSERT_TRUE(init_response.is_ok());
 
   client->StartTracing({});
-  sleep(2);
+  loop.Run(zx::deadline_after(zx::sec(2)));
   client->StopTracing({{{.write_results = true}}});
 
   uint8_t buffer[1024];
@@ -51,6 +53,8 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   trace::Chunk data{reinterpret_cast<uint64_t*>(buffer), actual >> 3};
   reader.ReadRecords(data);
   EXPECT_TRUE(saw_perfetto_blob);
+
+  loop.RunUntilIdle();
 }
 
 // TODO(fxb/120485): Add a test to cover calls to Controller::GetKnownCategories once

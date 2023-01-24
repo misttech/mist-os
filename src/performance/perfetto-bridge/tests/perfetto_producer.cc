@@ -31,6 +31,9 @@
 
 #include <protos/perfetto/trace/track_event/process_descriptor.gen.h>
 
+PERFETTO_DEFINE_CATEGORIES(perfetto::Category("test").SetDescription("A Test Event"));
+PERFETTO_TRACK_EVENT_STATIC_STORAGE();
+
 class FuchsiaProducer : public perfetto::Producer {
  public:
   FuchsiaProducer() = default;
@@ -88,7 +91,9 @@ class PerfettoTraceProvider : public fidl::Server<fuchsia_tracing_perfetto::Buff
 
     perfetto::TracingInitArgs args;
     args.backends = perfetto::kSystemBackend;
+
     perfetto::Tracing::Initialize(args);
+    perfetto::TrackEvent::Register();
 
     perfetto::base::ScopedSocketHandle scoped_handle(fd);
     perfetto::ipc::Client::ConnArgs conn_args(std::move(scoped_handle));
@@ -139,8 +144,6 @@ class PerfettoTraceProvider : public fidl::Server<fuchsia_tracing_perfetto::Buff
 };
 
 // Set up of test events to check for
-PERFETTO_DEFINE_CATEGORIES(perfetto::Category("test").SetDescription("A Test Event"));
-PERFETTO_TRACK_EVENT_STATIC_STORAGE();
 void EmitEvent(int count) { TRACE_EVENT("test", "SomeEvent", "count", count); }
 void EmitEvents() {
   TRACE_EVENT_BEGIN("test", "Event1");
