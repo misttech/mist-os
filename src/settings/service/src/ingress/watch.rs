@@ -399,8 +399,8 @@ mod tests {
         assert!(get_client.get_author() == work_messenger_signature);
 
         // Reply to the get request.
-        let _ = get_client.reply(Payload::Response(Ok(Some(get_info))).into()).send();
-        let _ = listen_client.reply(Payload::Response(Ok(Some(listen_info))).into()).send();
+        let _ = get_client.reply(Payload::Response(Ok(Some(get_info))).into());
+        let _ = listen_client.reply(Payload::Response(Ok(Some(listen_info))).into());
 
         assert_matches!(response_rx.await.expect("should receive successful response"),
                 Ok(x) if x == expected_info);

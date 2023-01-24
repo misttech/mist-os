@@ -245,7 +245,7 @@ async fn test_policy_message_hub() {
     // Send response.
     let reply_payload: service::Payload =
         Payload::Response(Ok(response::Payload::PolicyInfo(PolicyInfo::Audio(state)))).into();
-    client.reply(reply_payload.clone()).send().ack();
+    client.reply(reply_payload.clone()).ack();
 
     // Verify response received.
     let (result_payload, _) = reply_receptor.next_payload().await.expect("should receive result");

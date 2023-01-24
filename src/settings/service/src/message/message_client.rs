@@ -83,8 +83,8 @@ impl MessageClient {
         receptor
     }
 
-    /// Creates a MessageBuilder for the reply to this message.
-    pub(crate) fn reply(&self, payload: crate::Payload) -> MessageBuilder {
+    /// Sends a reply to this message.
+    pub(crate) fn reply(&self, payload: crate::Payload) -> Receptor {
         // Return a MessageBuilder for a reply. Note that the auto-forwarder is
         // handed off so the automatic forwarding behavior follows the
         // MessageBuilder rather than this MessageClient.
@@ -94,6 +94,7 @@ impl MessageClient {
             self.messenger.clone(),
         )
         .auto_forwarder(self.forwarder.clone())
+        .send()
     }
 
     /// Propagates a derived message on the path of the original message.

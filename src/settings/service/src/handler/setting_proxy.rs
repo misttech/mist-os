@@ -55,10 +55,8 @@ impl RequestInfo {
     /// Sends the supplied result as a reply with the associated [`Client`].
     pub(crate) fn reply(&self, result: SettingHandlerResult) {
         // Ignore the receptor result.
-        let _ = self
-            .client
-            .reply(HandlerPayload::Response(result.map_err(HandlerError::from)).into())
-            .send();
+        let _ =
+            self.client.reply(HandlerPayload::Response(result.map_err(HandlerError::from)).into());
     }
 
     /// Sends an acknowledge message back through the reply client. This used in

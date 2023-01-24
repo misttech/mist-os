@@ -151,8 +151,7 @@ impl PolicyProxy {
         let response = self.policy_handler.handle_policy_request(request).await;
         // Ignore the receptor result.
         let _ = message_client
-            .reply(service::Payload::Policy(policy_base::Payload::Response(response)))
-            .send();
+            .reply(service::Payload::Policy(policy_base::Payload::Response(response)));
     }
 
     async fn process_settings_event(&mut self, event: service::message::MessageEvent) {
@@ -191,8 +190,7 @@ impl PolicyProxy {
                 // message doesn't continue to be propagated to the setting handler.
                 // Ignore the receptor result.
                 let _ = message_client
-                    .reply(Payload::Response(result.map_err(HandlerError::from)).into())
-                    .send();
+                    .reply(Payload::Response(result.map_err(HandlerError::from)).into());
             }
             // Don't do anything with the message, it'll continue onwards to the handler as
             // expected.

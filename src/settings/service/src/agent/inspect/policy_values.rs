@@ -140,7 +140,7 @@ impl PolicyValuesInspectAgent {
                                 = agent_message {
                             // Since the agent runs at creation, there is no
                             // need to handle state here.
-                            client.reply(Payload::Complete(Ok(())).into()).send().ack();
+                            client.reply(Payload::Complete(Ok(())).into()).ack();
                         }
                     }
 
@@ -320,14 +320,12 @@ mod tests {
             &mut policy_receptor,
             Some(Box::new(|client| -> BoxFuture<'_, ()> {
                 Box::pin(async move {
-                    let mut receptor = client
-                        .reply(
-                            Payload::Response(Ok(policy_base::response::Payload::PolicyInfo(
-                                PolicyInfo::Audio(state_clone),
-                            )))
-                            .into(),
-                        )
-                        .send();
+                    let mut receptor = client.reply(
+                        Payload::Response(Ok(policy_base::response::Payload::PolicyInfo(
+                            PolicyInfo::Audio(state_clone),
+                        )))
+                        .into(),
+                    );
                     // Wait until the policy inspect agent receives the message and writes to
                     // inspect.
                     while let Some(event) = receptor.next().await {
@@ -394,14 +392,12 @@ mod tests {
             &mut policy_receptor,
             Some(Box::new(|client| -> BoxFuture<'_, ()> {
                 Box::pin(async move {
-                    let _ = client
-                        .reply(
-                            Payload::Response(Ok(policy_base::response::Payload::PolicyInfo(
-                                PolicyInfo::Audio(initial_state),
-                            )))
-                            .into(),
-                        )
-                        .send();
+                    let _ = client.reply(
+                        Payload::Response(Ok(policy_base::response::Payload::PolicyInfo(
+                            PolicyInfo::Audio(initial_state),
+                        )))
+                        .into(),
+                    );
                 })
             })),
         )
@@ -423,14 +419,12 @@ mod tests {
             &mut policy_receptor,
             Some(Box::new(|client| -> BoxFuture<'_, ()> {
                 Box::pin(async move {
-                    let _ = client
-                        .reply(
-                            Payload::Response(Ok(policy_base::response::Payload::PolicyInfo(
-                                UnknownInfo(true).into(),
-                            )))
-                            .into(),
-                        )
-                        .send();
+                    let _ = client.reply(
+                        Payload::Response(Ok(policy_base::response::Payload::PolicyInfo(
+                            UnknownInfo(true).into(),
+                        )))
+                        .into(),
+                    );
                 })
             })),
         )
@@ -444,14 +438,12 @@ mod tests {
             &mut policy_receptor,
             Some(Box::new(|client| -> BoxFuture<'_, ()> {
                 Box::pin(async move {
-                    let mut receptor = client
-                        .reply(
-                            Payload::Response(Ok(policy_base::response::Payload::PolicyInfo(
-                                PolicyInfo::Audio(state_clone),
-                            )))
-                            .into(),
-                        )
-                        .send();
+                    let mut receptor = client.reply(
+                        Payload::Response(Ok(policy_base::response::Payload::PolicyInfo(
+                            PolicyInfo::Audio(state_clone),
+                        )))
+                        .into(),
+                    );
                     // Wait until the policy inspect agent receives the message and writes to
                     // inspect.
                     while let Some(event) = receptor.next().await {

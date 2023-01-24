@@ -230,7 +230,7 @@ impl ExternalApiInspectAgent {
                                     = agent_message {
                                 // Since the agent runs at creation, there is no
                                 // need to handle state here.
-                                client.reply(Payload::Complete(Ok(())).into()).send().ack();
+                                client.reply(Payload::Complete(Ok(())).into()).ack();
                             }
                             agent_message_fut = agent_event.select_next_some();
                         },

@@ -283,7 +283,7 @@ async fn test_setting_message_pass_through() {
         &mut setting_proxy_receptor,
         Some(Box::new(|client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                let _ = client.reply(SETTING_RESPONSE_PAYLOAD.clone().into()).send();
+                let _ = client.reply(SETTING_RESPONSE_PAYLOAD.clone().into());
             })
         })),
     )
@@ -422,7 +422,7 @@ async fn test_setting_message_payload_replacement() {
         &mut setting_proxy_receptor,
         Some(Box::new(|client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                let _ = client.reply(SETTING_RESPONSE_PAYLOAD.clone().into()).send();
+                let _ = client.reply(SETTING_RESPONSE_PAYLOAD.clone().into());
             })
         })),
     )

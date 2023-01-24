@@ -98,7 +98,6 @@ impl TestAgent {
                                 Payload::Complete(agent.lock().await.handle(invocation).await)
                                     .into(),
                             )
-                            .send()
                             .ack();
                     }
                 })

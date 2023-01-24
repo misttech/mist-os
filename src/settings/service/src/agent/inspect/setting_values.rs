@@ -162,7 +162,7 @@ impl SettingValuesInspectAgent {
 
                             // Since the agent runs at creation, there is no
                             // need to handle state here.
-                            client.reply(Payload::Complete(Ok(())).into()).send().ack();
+                            client.reply(Payload::Complete(Ok(())).into()).ack();
                         }
                     },
                 }
@@ -302,9 +302,8 @@ mod tests {
         let (_, reply_client) =
             setting_proxy_receptor.next_payload().await.expect("payload should be present");
 
-        let mut reply_receptor = reply_client
-            .reply(SettingPayload::Response(Ok(Some(UnknownInfo(true).into()))).into())
-            .send();
+        let mut reply_receptor =
+            reply_client.reply(SettingPayload::Response(Ok(Some(UnknownInfo(true).into()))).into());
 
         while let Some(message_event) = reply_receptor.next().await {
             if matches!(message_event, service::message::MessageEvent::Status(Status::Acknowledged))

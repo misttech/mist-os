@@ -214,16 +214,14 @@ impl TestEnvironment {
                                 SettingRequest::Get => {
                                     let _ = client
                                         .reply(SettingPayload::Response(Ok(Some(
-                                            audio_info.clone().into()))).into())
-                                        .send();
+                                            audio_info.clone().into()))).into());
                                 }
                                 SettingRequest::Rebroadcast => {
                                     // Inform all the service message hub listeners.
                                     for listener in &listeners {
                                         let _ = listener
                                             .reply(SettingPayload::Response(Ok(Some(
-                                                audio_info.clone().into()))).into())
-                                            .send();
+                                                audio_info.clone().into()))).into());
                                     }
                                 }
                                 _ => {

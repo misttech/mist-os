@@ -165,7 +165,7 @@ async fn test_end_to_end_messaging() {
         &mut receptor_2,
         Some(Box::new(|client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                let _ = client.reply(REPLY.clone()).send();
+                let _ = client.reply(REPLY.clone());
             })
         })),
     )
@@ -198,7 +198,7 @@ async fn test_implicit_forward() {
         &mut receiver_3,
         Some(Box::new(|client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                let _ = client.reply(REPLY.clone()).send();
+                let _ = client.reply(REPLY.clone());
             })
         })),
     )
@@ -244,7 +244,7 @@ async fn test_observe_addressable() {
         &mut receptor_3,
         Some(Box::new(|client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                let _ = client.reply(REPLY.clone()).send();
+                let _ = client.reply(REPLY.clone());
             })
         })),
     )
@@ -457,7 +457,7 @@ async fn verify_messenger_behavior(messenger_type: MessengerType) {
             Box::pin(async move {
                 let mut author = captured_signature.lock().await;
                 *author = Some(client.get_author());
-                client.reply(REPLY.clone()).send().ack();
+                client.reply(REPLY.clone()).ack();
             })
         }))
     })
@@ -496,7 +496,7 @@ async fn test_unbound_messenger() {
         &mut unbound_receptor,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.reply(REPLY.clone()).send().ack();
+                client.reply(REPLY.clone()).ack();
             })
         })),
     )
@@ -613,7 +613,7 @@ async fn test_reply_propagation() {
         &mut target_receptor,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.reply(REPLY.clone()).send().ack();
+                client.reply(REPLY.clone()).ack();
             })
         })),
     )
@@ -699,7 +699,7 @@ async fn test_propagation() {
                 assert!(client.get_modifiers().contains(&modifier_1_signature));
                 assert!(client.get_modifiers().contains(&modifier_2_signature));
                 // ensure the message author has not been modified.
-                client.reply(REPLY.clone()).send().ack();
+                client.reply(REPLY.clone()).ack();
             })
         })),
     )

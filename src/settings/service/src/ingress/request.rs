@@ -174,7 +174,7 @@ mod tests {
 
         // Ensure the response is received and forwarded by the work.
         let reply = Ok(None);
-        let _ = client.reply(Payload::Response(reply.clone()).into()).send();
+        let _ = client.reply(Payload::Response(reply.clone()).into());
         assert!(response_rx.await.expect("should receive successful response") == reply);
     }
 

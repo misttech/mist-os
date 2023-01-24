@@ -275,7 +275,7 @@ impl SettingProxyInspectAgent {
                                 = agent_message {
                             // Since the agent runs at creation, there is no
                             // need to handle state here.
-                            client.reply(Payload::Complete(Ok(())).into()).send().ack();
+                            client.reply(Payload::Complete(Ok(())).into()).ack();
                         }
                     },
                 }
@@ -511,7 +511,7 @@ mod tests {
             if let Some(message_event) = futures::StreamExt::next(&mut receptor).await {
                 if let Ok((_, reply_client)) = HandlerPayload::try_from_with_client(message_event) {
                     if should_reply {
-                        reply_client.reply(HandlerPayload::Response(Ok(None)).into()).send().ack();
+                        reply_client.reply(HandlerPayload::Response(Ok(None)).into()).ack();
                     }
                 }
             }

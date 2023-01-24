@@ -155,9 +155,7 @@ where
                     }
 
                     // Always reply with an Ok for invocations. Ignore the receptor result.
-                    let _ = client
-                        .reply(service::Payload::Agent(agent::Payload::Complete(Ok(()))))
-                        .send();
+                    let _ = client.reply(service::Payload::Agent(agent::Payload::Complete(Ok(()))));
                 }
                 MessageEvent::Message(
                     service::Payload::Storage(Payload::Request(storage_request)),
@@ -233,9 +231,7 @@ where
 
         let guard = trace_guard!(id, "reply");
         // Ignore the receptor result.
-        let _ = responder
-            .reply(Payload::Response(StorageResponse::Read(storable.into())).into())
-            .send();
+        let _ = responder.reply(Payload::Response(StorageResponse::Read(storable.into())).into());
         drop(guard);
     }
 
@@ -258,11 +254,9 @@ where
         };
 
         // Ignore the receptor result.
-        let _ = responder
-            .reply(service::Payload::Storage(Payload::Response(StorageResponse::Write(
-                update_result,
-            ))))
-            .send();
+        let _ = responder.reply(service::Payload::Storage(Payload::Response(
+            StorageResponse::Write(update_result),
+        )));
     }
 
     async fn fidl_read<S>(&self, id: ftrace::Id, responder: service::message::MessageClient)
@@ -279,9 +273,7 @@ where
 
         let guard = trace_guard!(id, "reply");
         // Ignore the receptor result.
-        let _ = responder
-            .reply(Payload::Response(StorageResponse::Read(storable.into())).into())
-            .send();
+        let _ = responder.reply(Payload::Response(StorageResponse::Read(storable.into())).into());
         drop(guard);
     }
 
@@ -295,11 +287,9 @@ where
         };
 
         // Ignore the receptor result.
-        let _ = responder
-            .reply(service::Payload::Storage(Payload::Response(StorageResponse::Write(
-                update_result,
-            ))))
-            .send();
+        let _ = responder.reply(service::Payload::Storage(Payload::Response(
+            StorageResponse::Write(update_result),
+        )));
     }
 
     async fn handle_request(

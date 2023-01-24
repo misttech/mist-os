@@ -162,7 +162,6 @@ mod tests {
                         {
                             client
                                 .reply(Payload::Complete(Err(AgentError::UnexpectedError)).into())
-                                .send()
                                 .ack();
                         }
                     })

@@ -627,21 +627,19 @@ mod tests {
                         match storage_request {
                             StorageRequest::Read(_, _) => {
                                 // Just respond with the default value as we're not testing storage.
-                                let _ = message_client
-                                    .reply(service::Payload::Storage(StoragePayload::Response(
-                                        StorageResponse::Read(
-                                            InputInfoSources::default_value().into(),
-                                        ),
-                                    )))
-                                    .send();
+                                let _ = message_client.reply(service::Payload::Storage(
+                                    StoragePayload::Response(StorageResponse::Read(
+                                        InputInfoSources::default_value().into(),
+                                    )),
+                                ));
                             }
                             StorageRequest::Write(_, _) => {
                                 // Just respond with Unchanged as we're not testing storage.
-                                let _ = message_client
-                                    .reply(service::Payload::Storage(StoragePayload::Response(
-                                        StorageResponse::Write(Ok(UpdateState::Unchanged)),
-                                    )))
-                                    .send();
+                                let _ = message_client.reply(service::Payload::Storage(
+                                    StoragePayload::Response(StorageResponse::Write(Ok(
+                                        UpdateState::Unchanged,
+                                    ))),
+                                ));
                             }
                         }
                     }

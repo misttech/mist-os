@@ -56,10 +56,7 @@ impl CameraWatcherAgent {
             while let Ok((payload, client)) = receptor.next_of::<Payload>().await {
                 trace!(id, "payload");
                 if let Payload::Invocation(invocation) = payload {
-                    client
-                        .reply(Payload::Complete(agent.handle(invocation).await).into())
-                        .send()
-                        .ack();
+                    client.reply(Payload::Complete(agent.handle(invocation).await).into()).ack();
                 }
             }
             drop(guard);

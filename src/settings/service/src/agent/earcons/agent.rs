@@ -60,7 +60,7 @@ impl Agent {
             while let Ok((Payload::Invocation(invocation), client)) =
                 context.receptor.next_of::<Payload>().await
             {
-                client.reply(Payload::Complete(agent.handle(invocation).await).into()).send().ack();
+                client.reply(Payload::Complete(agent.handle(invocation).await).into()).ack();
             }
 
             fx_log_info!("Earcons agent done processing requests");

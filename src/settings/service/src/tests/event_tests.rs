@@ -54,7 +54,6 @@ async fn test_agent_event_propagation() {
                 {
                     client
                         .reply(Payload::Complete(Err(AgentError::UnhandledLifespan)).into())
-                        .send()
                         .ack();
                 }
             })

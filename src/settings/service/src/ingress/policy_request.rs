@@ -173,7 +173,7 @@ mod tests {
 
         // Ensure the response is received and forwarded by the work.
         let reply = Ok(crate::policy::response::Payload::Restore);
-        let _ = client.reply(Payload::Response(reply.clone()).into()).send();
+        let _ = client.reply(Payload::Response(reply.clone()).into());
         assert!(response_rx.await.expect("should receive successful response") == reply);
         work_task_handle.await;
     }
