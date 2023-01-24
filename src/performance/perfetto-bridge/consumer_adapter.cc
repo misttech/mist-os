@@ -15,6 +15,8 @@
 
 #include <algorithm>
 #include <functional>
+#include <unordered_set>
+#include <vector>
 
 #include <perfetto/ext/tracing/core/trace_packet.h>
 #include <perfetto/ext/tracing/core/tracing_service.h>
@@ -22,13 +24,17 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
+#include "lib/fpromise/bridge.h"
 #include "lib/trace-engine/context.h"
 #include "lib/trace-engine/instrumentation.h"
 #include "lib/trace-provider/provider.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
+#include <protos/perfetto/common/track_event_descriptor.gen.h>
 #include <protos/perfetto/config/track_event/track_event_config.gen.h>
+#include <third_party/perfetto/protos/perfetto/common/data_source_descriptor.gen.h>
 #include <third_party/perfetto/protos/perfetto/common/trace_stats.gen.h>
+#include <third_party/perfetto/protos/perfetto/common/tracing_service_state.gen.h>
 #include <third_party/perfetto/protos/perfetto/config/chrome/chrome_config.gen.h>
 #include <third_party/perfetto/protos/perfetto/config/data_source_config.gen.h>
 #include <third_party/perfetto/protos/perfetto/config/trace_config.gen.h>
@@ -46,6 +52,19 @@ constexpr int kConsumerStatsPollIntervalMs = 500;
 constexpr uint32_t kIncrementalStateClearMs = 4000;
 
 constexpr char kBlobName[] = "perfetto-bridge";
+constexpr char kChromiumTraceEvent[] = "org.chromium.trace_event";
+
+class EmptyConsumer : public perfetto::Consumer {
+ private:
+  void OnConnect() override {}
+  void OnDisconnect() override {}
+  void OnTracingDisabled(const std::string& error) override {}
+  void OnTraceData(std::vector<perfetto::TracePacket> packets, bool has_more) override {}
+  void OnDetach(bool success) override {}
+  void OnAttach(bool success, const perfetto::TraceConfig&) override {}
+  void OnTraceStats(bool success, const perfetto::TraceStats&) override {}
+  void OnObservableEvents(const perfetto::ObservableEvents&) override {}
+};
 
 void LogTraceStats(const perfetto::TraceStats& stats) {
   const auto& buffer_stats = stats.buffer_stats().front();
@@ -165,6 +184,10 @@ class FuchsiaTracingImpl : public FuchsiaTracing {
     return trace_provider_->GetProviderConfig();
   }
 
+  void SetGetKnownCategoriesCallback(trace::GetKnownCategoriesCallback callback) override {
+    trace_provider_->SetGetKnownCategoriesCallback(std::move(callback));
+  }
+
  private:
   trace_prolonged_context_t* prolonged_context_ = nullptr;
   trace_context_t* blob_write_context_ = nullptr;
@@ -187,6 +210,7 @@ ConsumerAdapter::ConsumerAdapter(ConnectConsumerCallback connect_callback,
   FX_DCHECK(fuchsia_tracing_);
   FX_DCHECK(perfetto_task_runner_);
 
+  fuchsia_tracing_->SetGetKnownCategoriesCallback([this] { return GetKnownCategories(); });
   fuchsia_tracing_->StartObserving(fit::bind_member(this, &ConsumerAdapter::OnTraceStateUpdate));
 }
 
@@ -399,6 +423,37 @@ void ConsumerAdapter::CallPerfettoFlush() {
 void ConsumerAdapter::CallPerfettoGetTraceStats(bool on_shutdown) {
   ChangeState(on_shutdown ? State::SHUTDOWN_STATS : State::STATS);
   consumer_endpoint_->GetTraceStats();
+}
+
+fpromise::promise<std::vector<trace::KnownCategory>> ConsumerAdapter::GetKnownCategories() {
+  fpromise::bridge<std::vector<trace::KnownCategory>> bridge;
+  auto completer = std::make_shared<fpromise::completer<std::vector<trace::KnownCategory>>>(
+      std::move(bridge.completer));
+  auto empty_consumer = std::make_shared<EmptyConsumer>();
+  const auto consumer_endpoint = connect_callback_(empty_consumer.get());
+  auto on_service_state = [completer, empty_consumer](
+                              bool success, const perfetto::TracingServiceState& service_state) {
+    if (!success) {
+      completer->complete_error();
+    }
+    std::unordered_set<trace::KnownCategory, trace::KnownCategoryHash> categories;
+    for (const auto& data_source : service_state.data_sources()) {
+      if (data_source.ds_descriptor().name() != kChromiumTraceEvent) {
+        continue;
+      }
+      auto raw_descriptor = data_source.ds_descriptor().track_event_descriptor_raw();
+      perfetto::protos::gen::TrackEventDescriptor track_event_descriptor;
+      track_event_descriptor.ParseFromArray(raw_descriptor.data(), raw_descriptor.size());
+      for (const auto& available_category : track_event_descriptor.available_categories()) {
+        categories.insert(
+            {.name = available_category.name(), .description = available_category.description()});
+      }
+    }
+    completer->complete_ok(std::vector<trace::KnownCategory>{categories.begin(), categories.end()});
+  };
+  consumer_endpoint->QueryServiceState(std::move(on_service_state));
+
+  return bridge.consumer.promise();
 }
 
 void ConsumerAdapter::OnTracingDisabled(const std::string& error) {

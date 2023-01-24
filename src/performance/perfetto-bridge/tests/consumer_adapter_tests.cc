@@ -152,6 +152,9 @@ class FakeFuchsiaTracing : public FuchsiaTracing {
   }
 
   trace::ProviderConfig* provider_config() { return &provider_config_; }
+  const trace::GetKnownCategoriesCallback& get_known_categories_callback() {
+    return get_known_categories_callback_;
+  }
 
   const std::vector<std::string>& GetReceivedBlobs() { return blobs_; }
 
@@ -181,12 +184,16 @@ class FakeFuchsiaTracing : public FuchsiaTracing {
   }
   void ReleaseWriteContext() override { has_write_context_ = false; }
   trace::ProviderConfig GetProviderConfig() override { return provider_config_; }
+  void SetGetKnownCategoriesCallback(trace::GetKnownCategoriesCallback callback) override {
+    get_known_categories_callback_ = std::move(callback);
+  }
 
   fit::function<void(trace_state_t)> observe_cb_;
   bool has_write_context_ = false;
   bool has_prolonged_context_ = false;
   std::vector<std::string> blobs_;
   trace::ProviderConfig provider_config_;
+  trace::GetKnownCategoriesCallback get_known_categories_callback_;
 };
 
 class ConsumerAdapterTest : public gtest::TestLoopFixture {

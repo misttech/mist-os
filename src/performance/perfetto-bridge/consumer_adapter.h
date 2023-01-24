@@ -17,7 +17,7 @@
 #include <perfetto/ext/tracing/core/tracing_service.h>
 
 #include "lib/fit/function.h"
-#include "lib/trace-engine/context.h"
+#include "lib/fpromise/promise.h"
 #include "lib/trace-engine/types.h"
 #include "src/lib/fxl/synchronization/thread_annotations.h"
 #include "src/tracing/core/tracing_service_impl.h"
@@ -39,6 +39,7 @@ class FuchsiaTracing {
   virtual void WriteBlob(const char* data, size_t size) = 0;
   virtual void ReleaseWriteContext() = 0;
   virtual trace::ProviderConfig GetProviderConfig() = 0;
+  virtual void SetGetKnownCategoriesCallback(trace::GetKnownCategoriesCallback callback) = 0;
 };
 
 // Adapts the Fuchsia Tracing protocol to the Perfetto Consumer protocol.
@@ -110,6 +111,8 @@ class ConsumerAdapter : public perfetto::Consumer {
 
   void CallPerfettoFlush();
   void CallPerfettoGetTraceStats(bool on_shutdown);
+
+  fpromise::promise<std::vector<trace::KnownCategory>> GetKnownCategories();
 
   // perfetto::Consumer implementation.
   void OnConnect() override;

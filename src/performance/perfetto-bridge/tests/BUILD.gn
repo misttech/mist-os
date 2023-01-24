@@ -18,6 +18,8 @@ executable("perfetto_bridge_integration_test_bin") {
     "//src/performance/lib/test_utils",
     "//third_party/googletest:gtest",
     "//third_party/perfetto:libperfetto_client_experimental",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-test-utils",
   ]
 }
