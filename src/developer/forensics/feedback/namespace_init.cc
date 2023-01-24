@@ -74,8 +74,8 @@ void CreatePreviousLogsFile(cobalt::Logger* cobalt, const StorageSize max_decomp
   // immediately after it's freed.
   feedback_data::system_log_recorder::ProductionDecoder decoder(max_decompressed_size.ToBytes());
   float compression_ratio;
-  if (!feedback_data::system_log_recorder::Concatenate(dir, &decoder, write_path,
-                                                       &compression_ratio)) {
+  if (!feedback_data::system_log_recorder::Concatenate(dir, max_decompressed_size, &decoder,
+                                                       write_path, &compression_ratio)) {
     return;
   }
   FX_LOGS(INFO) << fxl::StringPrintf(

@@ -39,6 +39,8 @@ namespace {
 const StorageSize kMaxLogLineSize =
     StorageSize::Bytes(Format(BuildLogMessage(syslog::LOG_INFO, "line X").value()).size());
 
+const StorageSize kMaxDecompressedSize = StorageSize::Kilobytes(256);
+
 std::unique_ptr<Encoder> MakeIdentityEncoder() {
   return std::unique_ptr<Encoder>(new IdentityEncoder());
 }
@@ -79,7 +81,8 @@ TEST(ReaderTest, MergeRepeatedMessages) {
   float compression_ratio;
   IdentityDecoder decoder;
 
-  ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+  ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                          &compression_ratio));
 
   std::string contents;
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -99,7 +102,7 @@ TEST(ReaderTest, SortsMessagesNoTimeTagOnly) {
   // decoded.
   files::ScopedTempDir temp_dir;
 
-  const std::string message = "!!! CANNOT DECODE!!!\n!!! CANNOT DECODE!!";
+  const std::string message = "!!! CANNOT DECODE!!!\n!!! CANNOT DECODE!!\n";
 
   EXPECT_TRUE(files::WriteFile(MakeLogFilePath(temp_dir, 0u), message));
 
@@ -108,7 +111,8 @@ TEST(ReaderTest, SortsMessagesNoTimeTagOnly) {
   float compression_ratio;
   IdentityDecoder decoder;
 
-  ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+  ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                          &compression_ratio));
 
   std::string contents;
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -136,7 +140,8 @@ TEST(ReaderTest, SortsMessagesMixed) {
   float compression_ratio;
   IdentityDecoder decoder;
 
-  ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+  ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                          &compression_ratio));
 
   std::string contents;
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -167,7 +172,8 @@ TEST(ReaderTest, SortsMessages) {
   IdentityDecoder decoder;
 
   float compression_ratio;
-  ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+  ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                          &compression_ratio));
   EXPECT_EQ(compression_ratio, 1.0);
 
   std::string contents;
@@ -209,7 +215,8 @@ TEST(ReaderTest, SortsMessagesDifferentTimestampLength) {
   float compression_ratio;
   IdentityDecoder decoder;
 
-  ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+  ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                          &compression_ratio));
 
   std::string contents;
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -243,7 +250,8 @@ TEST(ReaderTest, SortsMessagesMultipleFiles) {
   IdentityDecoder decoder;
 
   float compression_ratio;
-  ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+  ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                          &compression_ratio));
   EXPECT_EQ(compression_ratio, 1.0);
 
   std::string contents;

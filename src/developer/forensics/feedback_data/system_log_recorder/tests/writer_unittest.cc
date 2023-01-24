@@ -41,6 +41,8 @@ namespace {
 const auto kMaxLogLineSize =
     StorageSize::Bytes(Format(BuildLogMessage(syslog::LOG_INFO, "line X").value()).size());
 
+const auto kMaxDecompressedSize = StorageSize::Kilobytes(256);
+
 constexpr auto kRootDirectory = "/root";
 constexpr auto kWriteDirectory = "/root/write";
 constexpr auto kReadDirectory = "/read";
@@ -134,7 +136,8 @@ TEST(WriterTest, VerifyFileOrdering) {
 )");
 
   float compression_ratio;
-  ASSERT_TRUE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                          &compression_ratio));
   EXPECT_EQ(compression_ratio, 1.0);
 
   std::string contents;
@@ -200,7 +203,8 @@ TEST(WriterTest, WritesMessages) {
   IdentityDecoder decoder;
 
   float compression_ratio;
-  ASSERT_TRUE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                          &compression_ratio));
   EXPECT_EQ(compression_ratio, 1.0);
 
   std::string contents;
@@ -214,7 +218,8 @@ TEST(WriterTest, WritesMessages) {
   EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 4")));
   writer.Write();
 
-  ASSERT_TRUE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                          &compression_ratio));
   EXPECT_EQ(compression_ratio, 1.0);
 
   ASSERT_TRUE(files::ReadFileToString(kOutputFile, &contents));
@@ -242,7 +247,8 @@ TEST(WriterTest, VerifyCompressionRatio) {
   Decoder2x decoder;
 
   float compression_ratio;
-  ASSERT_TRUE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                          &compression_ratio));
   EXPECT_EQ(compression_ratio, 2.0);
 }
 
@@ -268,7 +274,8 @@ TEST(WriterTest, VerifyProductionEcoding) {
   ProductionDecoder decoder;
 
   float compression_ratio;
-  ASSERT_TRUE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                          &compression_ratio));
   EXPECT_FALSE(std::isnan(compression_ratio));
 
   std::string contents;
@@ -316,7 +323,8 @@ TEST(WriterTest, FilesAlreadyPresent) {
   ProductionDecoder decoder;
 
   float compression_ratio;
-  ASSERT_TRUE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                          &compression_ratio));
   EXPECT_FALSE(std::isnan(compression_ratio));
 
   std::string contents;
@@ -352,7 +360,8 @@ TEST(WriterTest, FailCreateDirectory) {
   IdentityDecoder decoder;
 
   float compression_ratio;
-  EXPECT_FALSE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  EXPECT_FALSE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                           &compression_ratio));
 
   std::string contents;
   EXPECT_FALSE(files::ReadFileToString(kOutputFile, &contents));
@@ -361,7 +370,8 @@ TEST(WriterTest, FailCreateDirectory) {
   EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 4")));
   writer.Write();
 
-  ASSERT_TRUE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                          &compression_ratio));
   EXPECT_EQ(compression_ratio, 1.0);
 
   ASSERT_TRUE(files::ReadFileToString(kOutputFile, &contents));
@@ -393,7 +403,8 @@ TEST(WriterTest, DirectoryDisappears) {
   IdentityDecoder decoder;
 
   float compression_ratio;
-  EXPECT_FALSE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  EXPECT_FALSE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                           &compression_ratio));
 
   std::string contents;
   EXPECT_FALSE(files::ReadFileToString(kOutputFile, &contents));
@@ -402,7 +413,8 @@ TEST(WriterTest, DirectoryDisappears) {
   EXPECT_TRUE(store.Add(BuildLogMessage(syslog::LOG_INFO, "line 4")));
   writer.Write();
 
-  ASSERT_TRUE(Concatenate(kWriteDirectory, &decoder, kOutputFile, &compression_ratio));
+  ASSERT_TRUE(Concatenate(kWriteDirectory, kMaxDecompressedSize, &decoder, kOutputFile,
+                          &compression_ratio));
   EXPECT_EQ(compression_ratio, 1.0);
 
   ASSERT_TRUE(files::ReadFileToString(kOutputFile, &contents));

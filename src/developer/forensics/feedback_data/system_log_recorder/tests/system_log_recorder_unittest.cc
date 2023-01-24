@@ -36,6 +36,7 @@ const auto kMaxLogLineSize =
     StorageSize::Bytes(std::string("[15604.000][07559][07687][] INFO: line X\n").size());
 const auto kDroppedFormatStrSize =
     StorageSize::Bytes(std::string("!!! DROPPED X MESSAGES !!!\n").size());
+const auto kMaxDecompressedSize = StorageSize::Kilobytes(256);
 
 TEST(Encoding, VerifyProductionEncoderDecoderVersion) {
   // Verify that the production decoder and encoder always have the same version.
@@ -151,7 +152,8 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_SmokeTest) {
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -164,7 +166,8 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_SmokeTest) {
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -178,7 +181,8 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_SmokeTest) {
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -193,7 +197,8 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_SmokeTest) {
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -207,7 +212,8 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_SmokeTest) {
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -222,7 +228,8 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_SmokeTest) {
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -315,7 +322,8 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_StopAndDeleteLogs) {
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -330,35 +338,40 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_StopAndDeleteLogs) {
 
   {
     float compression_ratio;
-    ASSERT_FALSE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_FALSE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                             &compression_ratio));
   }
 
   RunLoopFor(kWriterPeriod);
 
   {
     float compression_ratio;
-    ASSERT_FALSE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_FALSE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                             &compression_ratio));
   }
 
   RunLoopFor(kWriterPeriod);
 
   {
     float compression_ratio;
-    ASSERT_FALSE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_FALSE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                             &compression_ratio));
   }
 
   RunLoopFor(kWriterPeriod);
 
   {
     float compression_ratio;
-    ASSERT_FALSE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_FALSE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                             &compression_ratio));
   }
 
   RunLoopFor(kWriterPeriod);
 
   {
     float compression_ratio;
-    ASSERT_FALSE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_FALSE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                             &compression_ratio));
   }
 }
 
@@ -437,7 +450,8 @@ TEST_F(SystemLogRecorderTest, SingleThreaded_Flush) {
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));
@@ -452,7 +466,8 @@ FLUSH
 
   {
     float compression_ratio;
-    ASSERT_TRUE(Concatenate(temp_dir.path(), &decoder, output_path, &compression_ratio));
+    ASSERT_TRUE(Concatenate(temp_dir.path(), kMaxDecompressedSize, &decoder, output_path,
+                            &compression_ratio));
     EXPECT_EQ(compression_ratio, 1.0);
   }
   ASSERT_TRUE(files::ReadFileToString(output_path, &contents));

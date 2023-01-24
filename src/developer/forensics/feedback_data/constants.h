@@ -89,6 +89,7 @@ constexpr StorageSize kMaxWriteSize = StorageSize::Kilobytes(16);
 
 // Repeated messge format
 constexpr char kRepeatedStrPrefix[] = "!!! MESSAGE REPEATED ";
+constexpr char kRepeatedStrSuffix[] = " MORE TIMES !!!\n";
 constexpr char kRepeatedOnceFormatStr[] = "!!! MESSAGE REPEATED 1 MORE TIME !!!\n";
 constexpr char kRepeatedFormatStr[] = "!!! MESSAGE REPEATED %lu MORE TIMES !!!\n";
 
