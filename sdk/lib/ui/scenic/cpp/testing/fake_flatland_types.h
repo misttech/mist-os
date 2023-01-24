@@ -156,6 +156,7 @@ struct FakeImage {
   fuchsia::ui::composition::BlendMode blend_mode{kDefaultBlendMode};
   fuchsia::ui::composition::ImageFlip flip{kDefaultFlip};
 
+  zx_koid_t collection_id{};
   zx_koid_t import_token{};
   uint32_t vmo_index{0};
 };

@@ -92,7 +92,6 @@ void FakeFlatland::RegisterBufferCollection(
                 "FakeFlatland::RegisterBufferCollection: BufferCollection already "
                 "exists with koid %lu",
                 export_token_koid);
-  Disconnect(fuchsia::ui::composition::FlatlandError::BAD_OPERATION);
 }
 
 void FakeFlatland::Present(fuchsia::ui::composition::PresentArgs args) {
@@ -578,6 +577,7 @@ void FakeFlatland::CreateImage(fuchsia::ui::composition::ContentId image_id,
       image_id.value, std::make_shared<FakeContent>(FakeImage{
                           .id = image_id,
                           .image_properties = std::move(properties),
+                          .collection_id = import_token_koids.second,
                           .import_token = import_token_koids.first,
                           .vmo_index = vmo_index,
                       }));
@@ -585,15 +585,6 @@ void FakeFlatland::CreateImage(fuchsia::ui::composition::ContentId image_id,
                 "FakeFlatland::CreateImage: Internal error (content_map) adding "
                 "image with id: %lu",
                 image_id.value);
-
-  auto [_, emplace_binding_success] = graph_bindings_.images.emplace(
-      import_token_koids.first, ImageBinding{
-                                    .import_token = std::move(import_token),
-                                });
-  ZX_ASSERT_MSG(
-      emplace_binding_success,
-      "FakeFlatland::CreateImage: Internal error (images_binding) adding image with id %lu",
-      image_id.value);
 }
 
 void FakeFlatland::SetImageSampleRegion(fuchsia::ui::composition::ContentId image_id,

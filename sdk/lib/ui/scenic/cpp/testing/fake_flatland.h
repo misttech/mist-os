@@ -107,10 +107,6 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
     fidl::Binding<fuchsia::ui::composition::ChildViewWatcher> child_view_watcher;
   };
 
-  struct ImageBinding {
-    fuchsia::ui::composition::BufferCollectionImportToken import_token;
-  };
-
   struct BufferCollectionBinding {
     fuchsia::ui::composition::BufferCollectionExportToken export_token;
     fuchsia::sysmem::BufferCollectionTokenHandle sysmem_token;
@@ -121,7 +117,6 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
   struct GraphBindings {
     std::optional<std::pair<zx_koid_t, ParentViewportWatcher>> viewport_watcher;
     std::unordered_map<zx_koid_t, ChildViewWatcher> view_watchers;
-    std::unordered_map<zx_koid_t, ImageBinding> images;
     std::unordered_map<zx_koid_t, BufferCollectionBinding> buffer_collections;
   };
 
@@ -138,6 +133,8 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
   const std::string& debug_name() const { return debug_name_; }
 
   const FakeGraph& graph() { return current_graph_; }
+
+  GraphBindings& graph_bindings() { return graph_bindings_; }
 
   // Bind this instance's Flatland FIDL channel to the `dispatcher` and allow
   // processing of incoming FIDL requests.
