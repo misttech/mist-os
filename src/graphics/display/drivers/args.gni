@@ -8,5 +8,5 @@ declare_args() {
   # TODO(fxbug.dev/104963): Have this variable default to false when we're ready
   # to field bug reports, and remove it after the Tiger Lake driver gets enough
   # soak time with Kaby Lake display engines.
-  enable_legacy_i915_display_driver = true
+  enable_legacy_i915_display_driver = false
 }
