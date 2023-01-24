@@ -140,9 +140,9 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRanges) {
   AddChannelSet(formats, 2);
   AddChannelSet(formats, 4);
   AddChannelSet(formats, 8);
-  formats.mutable_sample_formats()->push_back(fuchsia::hardware::audio::SampleFormat::PCM_FLOAT);
-  formats.mutable_bytes_per_sample()->push_back(4);
-  formats.mutable_valid_bits_per_sample()->push_back(32);
+  formats.mutable_sample_formats()->push_back(fuchsia::hardware::audio::SampleFormat::PCM_SIGNED);
+  formats.mutable_bytes_per_sample()->push_back(2);
+  formats.mutable_valid_bits_per_sample()->push_back(16);
   formats.mutable_frame_rates()->push_back(16'000);
   formats.mutable_frame_rates()->push_back(24'000);
   formats.mutable_frame_rates()->push_back(48'000);
@@ -156,7 +156,7 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRanges) {
 
   ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
             ZX_OK);
-  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::FLOAT);
+  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::SIGNED_16);
   ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(16'000));  // Prefer closest available.
   ASSERT_EQ(channels_inout, static_cast<uint32_t>(2));                // Prefer 2 channels.
 
@@ -166,7 +166,7 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRanges) {
 
   ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
             ZX_OK);
-  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::FLOAT);
+  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::SIGNED_16);
   ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(96'000));  // Pick closest available.
   ASSERT_EQ(channels_inout, static_cast<uint32_t>(2));                // Prefer 2 channels.
 
@@ -177,9 +177,9 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRanges) {
   AddChannelSet(formats2, 6);
   AddChannelSet(formats2, 7);
   AddChannelSet(formats2, 8);
-  formats2.mutable_sample_formats()->push_back(fuchsia::hardware::audio::SampleFormat::PCM_SIGNED);
-  formats2.mutable_bytes_per_sample()->push_back(2);
-  formats2.mutable_valid_bits_per_sample()->push_back(16);
+  formats2.mutable_sample_formats()->push_back(fuchsia::hardware::audio::SampleFormat::PCM_FLOAT);
+  formats2.mutable_bytes_per_sample()->push_back(4);
+  formats2.mutable_valid_bits_per_sample()->push_back(32);
   formats2.mutable_frame_rates()->push_back(16'000);
   formats2.mutable_frame_rates()->push_back(24'000);
   fmts.push_back(std::move(formats2));
@@ -190,9 +190,9 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRanges) {
 
   ASSERT_EQ(SelectBestFormat(fmts, &frames_per_second_inout, &channels_inout, &sample_format_inout),
             ZX_OK);
-  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::SIGNED_16);  // Pick 16 bits.
-  ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(16'000));             // Pick closest.
-  ASSERT_EQ(channels_inout, static_cast<uint32_t>(8));                           // Pick highest.
+  ASSERT_EQ(sample_format_inout, fuchsia::media::AudioSampleFormat::FLOAT);  // Pick float.
+  ASSERT_EQ(frames_per_second_inout, static_cast<uint32_t>(16'000));         // Pick closest.
+  ASSERT_EQ(channels_inout, static_cast<uint32_t>(8));                       // Pick highest.
 }
 
 TEST(SelectBestFormatTest, SelectBestFormatOutsideRangesNewFidl) {
@@ -203,7 +203,7 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRangesNewFidl) {
   AddChannelSet(formats, 2);
   AddChannelSet(formats, 4);
   AddChannelSet(formats, 8);
-  formats.sample_types({{fuchsia_audio::SampleType::kFloat32}});
+  formats.sample_types({{fuchsia_audio::SampleType::kInt16}});
   formats.frame_rates({{16'000, 24'000, 48'000, 96'000}});
   fmts.push_back(std::move(formats));
 
@@ -215,7 +215,7 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRangesNewFidl) {
 
   auto result = SelectBestFormat(fmts, pref);
   ASSERT_TRUE(result.is_ok());
-  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kFloat32);
+  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kInt16);
   EXPECT_EQ(result->frames_per_second(), 16'000);  // pick closest available
   EXPECT_EQ(result->channels(), 2);                // prefer 2 channels
 
@@ -227,7 +227,7 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRangesNewFidl) {
 
   result = SelectBestFormat(fmts, pref);
   ASSERT_TRUE(result.is_ok());
-  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kFloat32);
+  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kInt16);
   EXPECT_EQ(result->frames_per_second(), 96'000);  // pick closest available
   EXPECT_EQ(result->channels(), 2);                // prefer 2 channels
 
@@ -238,7 +238,7 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRangesNewFidl) {
   AddChannelSet(formats2, 6);
   AddChannelSet(formats2, 7);
   AddChannelSet(formats2, 8);
-  formats2.sample_types({{fuchsia_audio::SampleType::kInt16}});
+  formats2.sample_types({{fuchsia_audio::SampleType::kFloat32}});
   formats2.frame_rates({{16'000, 24'000}});
   fmts.push_back(std::move(formats2));
 
@@ -250,9 +250,9 @@ TEST(SelectBestFormatTest, SelectBestFormatOutsideRangesNewFidl) {
 
   result = SelectBestFormat(fmts, pref);
   ASSERT_TRUE(result.is_ok());
-  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kInt16);  // pick 16 bits
-  EXPECT_EQ(result->frames_per_second(), 16'000);                       // pick closest
-  EXPECT_EQ(result->channels(), 8);                                     // pick highest
+  EXPECT_EQ(result->sample_type(), fuchsia_audio::SampleType::kFloat32);  // pick float
+  EXPECT_EQ(result->frames_per_second(), 16'000);                         // pick closest
+  EXPECT_EQ(result->channels(), 8);                                       // pick highest
 }
 
 TEST(SelectBestFormatTest, SelectBestFormatError) {

@@ -15,9 +15,10 @@
 
 namespace media::audio {
 
+namespace {
+
 bool IsSampleFormatInSupported(
     fuchsia::hardware::audio::SampleFormat sample_format, uint8_t bytes_per_sample,
-    uint8_t valid_bits_per_sample,
     const fuchsia::hardware::audio::PcmSupportedFormats& supported_formats) {
   auto& sf = supported_formats.sample_formats();
   if (std::find(sf.begin(), sf.end(), sample_format) == sf.end()) {
@@ -25,10 +26,6 @@ bool IsSampleFormatInSupported(
   }
   auto& bps = supported_formats.bytes_per_sample();
   if (std::find(bps.begin(), bps.end(), bytes_per_sample) == bps.end()) {
-    return false;
-  }
-  auto& vbps = supported_formats.valid_bits_per_sample();
-  if (std::find(vbps.begin(), vbps.end(), valid_bits_per_sample) == vbps.end()) {
     return false;
   }
   return true;
@@ -54,6 +51,8 @@ bool IsRateInSupported(uint32_t frame_rate,
   return false;
 }
 
+}  // namespace
+
 bool IsFormatInSupported(
     const fuchsia::media::AudioStreamType& stream_type,
     const std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& supported_formats) {
@@ -62,11 +61,9 @@ bool IsFormatInSupported(
     return false;
   }
 
-  // Is there a match for any given supported format where we find sample format, number of channels
-  // and rate.
   for (const auto& format : supported_formats) {
     if (IsSampleFormatInSupported(driver_format.sample_format, driver_format.bytes_per_sample,
-                                  driver_format.valid_bits_per_sample, format) &&
+                                  format) &&
         IsNumberOfChannelsInSupported(stream_type.channels, format) &&
         IsRateInSupported(stream_type.frames_per_second, format)) {
       return true;
@@ -101,32 +98,28 @@ zx_status_t SelectBestFormat(const std::vector<fuchsia::hardware::audio::PcmSupp
   uint32_t best_frame_rate_delta = std::numeric_limits<uint32_t>::max();
 
   for (const auto& format : fmts) {
-    // Start by scoring our sample format. Right now, the audio core supports 8-bit unsigned, 16-bit
-    // signed, 24-bit-in-32 signed and 32-bit float. If this sample format range does not support
-    // any of these, just skip it for now. Otherwise, 5 points if you match the requested format, 4
-    // for signed-24, 3 for signed-16, 2 for float-32, or 1 for unsigned-8.
+    // Start by scoring our sample format. Direct match gets 5 points. Otherwise, supported sample
+    // formats are scored by decreasing preference.
     DriverSampleFormat this_sample_format;
     int sample_format_score = 0;
 
-    // Check for direct match.
     if (IsSampleFormatInSupported(pref_sample_format.sample_format,
-                                  pref_sample_format.bytes_per_sample,
-                                  pref_sample_format.valid_bits_per_sample, format)) {
+                                  pref_sample_format.bytes_per_sample, format)) {
       this_sample_format = pref_sample_format;
       sample_format_score = 5;
-    } else if (IsSampleFormatInSupported(fuchsia::hardware::audio::SampleFormat::PCM_SIGNED, 4, 24,
-                                         format)) {
-      this_sample_format = {fuchsia::hardware::audio::SampleFormat::PCM_SIGNED, 4, 24};
-      sample_format_score = 4;
-    } else if (IsSampleFormatInSupported(fuchsia::hardware::audio::SampleFormat::PCM_SIGNED, 2, 16,
-                                         format)) {
-      this_sample_format = {fuchsia::hardware::audio::SampleFormat::PCM_SIGNED, 2, 16};
-      sample_format_score = 3;
-    } else if (IsSampleFormatInSupported(fuchsia::hardware::audio::SampleFormat::PCM_FLOAT, 4, 32,
+    } else if (IsSampleFormatInSupported(fuchsia::hardware::audio::SampleFormat::PCM_FLOAT, 4,
                                          format)) {
       this_sample_format = {fuchsia::hardware::audio::SampleFormat::PCM_FLOAT, 4, 32};
+      sample_format_score = 4;
+    } else if (IsSampleFormatInSupported(fuchsia::hardware::audio::SampleFormat::PCM_SIGNED, 4,
+                                         format)) {
+      this_sample_format = {fuchsia::hardware::audio::SampleFormat::PCM_SIGNED, 4, 24};
+      sample_format_score = 3;
+    } else if (IsSampleFormatInSupported(fuchsia::hardware::audio::SampleFormat::PCM_SIGNED, 2,
+                                         format)) {
+      this_sample_format = {fuchsia::hardware::audio::SampleFormat::PCM_SIGNED, 2, 16};
       sample_format_score = 2;
-    } else if (IsSampleFormatInSupported(fuchsia::hardware::audio::SampleFormat::PCM_UNSIGNED, 1, 8,
+    } else if (IsSampleFormatInSupported(fuchsia::hardware::audio::SampleFormat::PCM_UNSIGNED, 1,
                                          format)) {
       this_sample_format = {fuchsia::hardware::audio::SampleFormat::PCM_UNSIGNED, 1, 8};
       sample_format_score = 1;
@@ -157,7 +150,6 @@ zx_status_t SelectBestFormat(const std::vector<fuchsia::hardware::audio::PcmSupp
 
     // Next score based on supported frame rates. Score 3 points for a match, 2 points if we have to
     // scale up to the nearest supported rate, or 1 point if we have to scale down.
-    //
     uint32_t this_frame_rate = 0;
     uint32_t frame_rate_delta = std::numeric_limits<uint32_t>::max();
     int frame_rate_score = 0;
@@ -186,7 +178,9 @@ zx_status_t SelectBestFormat(const std::vector<fuchsia::hardware::audio::PcmSupp
     }
 
     // OK, we have computed the best option supported by this frame rate range. Weight the score,
-    // and it if it better then any of our previous best score, replace our previous best with this.
+    // and if it is better then any of our previous best score, replace our previous best with this.
+    //
+    // TODO(fxbug.dev/119661): reconsider this scoring formula
     uint32_t score;
     score = (sample_format_score * 100)   // format is the most important.
             + (channel_count_score * 10)  // channel count comes second.
@@ -206,8 +200,8 @@ zx_status_t SelectBestFormat(const std::vector<fuchsia::hardware::audio::PcmSupp
     }
   }
 
-  // If our score is still zero, then there must have be absolutely no supported formats in the set
-  // provided by the driver.
+  // If our score is still zero, then there must have been absolutely no supported formats in the
+  // set provided by the driver.
   if (!best_score) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -257,28 +251,18 @@ zx::result<media_audio::Format> SelectBestFormat(
           case fuchsia_audio::SampleType::kUint8:
             hw_fmt.mutable_sample_formats()->push_back(HardwareSampleFormat::PCM_UNSIGNED);
             hw_fmt.mutable_bytes_per_sample()->push_back(1);
-            for (uint8_t k = 0; k <= 8; k++) {
-              hw_fmt.mutable_valid_bits_per_sample()->push_back(k);
-            }
             break;
           case fuchsia_audio::SampleType::kInt16:
             hw_fmt.mutable_sample_formats()->push_back(HardwareSampleFormat::PCM_SIGNED);
             hw_fmt.mutable_bytes_per_sample()->push_back(2);
-            for (uint8_t k = 9; k <= 16; k++) {
-              hw_fmt.mutable_valid_bits_per_sample()->push_back(k);
-            }
             break;
           case fuchsia_audio::SampleType::kInt32:
             hw_fmt.mutable_sample_formats()->push_back(HardwareSampleFormat::PCM_SIGNED);
             hw_fmt.mutable_bytes_per_sample()->push_back(4);
-            for (uint8_t k = 17; k <= 32; k++) {
-              hw_fmt.mutable_valid_bits_per_sample()->push_back(k);
-            }
             break;
           case fuchsia_audio::SampleType::kFloat32:
             hw_fmt.mutable_sample_formats()->push_back(HardwareSampleFormat::PCM_FLOAT);
             hw_fmt.mutable_bytes_per_sample()->push_back(4);
-            hw_fmt.mutable_valid_bits_per_sample()->push_back(32);
             break;
           default:
             FX_LOGS(WARNING) << "sample type '" << fidl::ToUnderlying(sample_type)
