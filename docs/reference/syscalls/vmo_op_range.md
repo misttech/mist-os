@@ -39,7 +39,7 @@ object](/docs/reference/kernel_objects/vm_object.md) (VMO).
 
 *op* the operation to perform:
 
-*buffer* and *buffer_size* are currently unused.
+*buffer* and *buffer_size* may be required or unused depending on the *op* as described below.
 
 **ZX_VMO_OP_COMMIT** - Commit *size* bytes worth of pages starting at byte *offset* for the VMO.
 More information can be found in the [vm object documentation](/docs/reference/kernel_objects/vm_object.md).
@@ -62,9 +62,9 @@ should accommodate the struct. Returns information about the locked and previous
 in *buffer*, so that clients can reinitialize discarded contents if needed.
 
 The entire VMO should be locked at once, so *offset* should be 0 and *size* should be the current
-size of the VMO.  Requires the **ZX_RIGHT_READ** or **ZX_RIGHT_WRITE** right. Note that locking
-itself does not commit any pages in the VMO; it just marks the state of the VMO as “undiscardable”
-by the kernel.
+size of the VMO (the page-aligned size as would be returned by [`zx_vmo_get_size()`]). Requires the
+**ZX_RIGHT_READ** or **ZX_RIGHT_WRITE** right. Note that locking itself does not commit any pages in
+the VMO; it just marks the state of the VMO as “undiscardable” by the kernel.
 
 *buffer* should be a pointer of type `zx_info_lock_state_t`.
 
@@ -92,16 +92,17 @@ the *buffer* argument. It also affords clients the choice to not take any action
 to lock the VMO; clients must use **ZX_VMO_OP_LOCK** if they wish to lock the VMO again.
 
 The entire VMO should be locked at once, so *offset* should be 0 and *size* should be the current
-size of the VMO.  Requires the **ZX_RIGHT_READ** or **ZX_RIGHT_WRITE** right. Note that locking
-itself does not commit any pages in the VMO; it just marks the state of the VMO as “undiscardable”
-by the kernel.
+size of the VMO (the page-aligned size as would be returned by [`zx_vmo_get_size()`]). Requires the
+**ZX_RIGHT_READ** or **ZX_RIGHT_WRITE** right. Note that locking itself does not commit any pages in
+the VMO; it just marks the state of the VMO as “undiscardable” by the kernel.
 
 **ZX_VMO_OP_UNLOCK** - Unlocks a range of pages in a discardable VMO, indicating that the kernel is
 free to discard them under memory pressure. Unlocked pages that have not been discarded yet will be
 counted as committed pages.
 
 The entire VMO should be unlocked at once, so *offset* should be 0 and *size* should be the current
-size of the VMO. Requires the **ZX_RIGHT_READ** or **ZX_RIGHT_WRITE** right.
+size of the VMO (the page-aligned size as would be returned by [`zx_vmo_get_size()`]). Requires the
+**ZX_RIGHT_READ** or **ZX_RIGHT_WRITE** right.
 
 **ZX_VMO_OP_CACHE_SYNC** - Synchronize instruction caches with data caches, so previous writes are
 visible to instruction fetches.
