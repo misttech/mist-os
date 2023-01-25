@@ -187,8 +187,9 @@ sdk_molecule("fidl") {
 
   non_sdk_deps = [
     # Ensure that the API compatibility tests run on the APIs libraries in the
-    # "partner_internal" SDK category.
-    "//sdk/fidl:sdk_partner_internal_libs",
+    # "partner" and "partner_internal" SDK category.
+    ":sdk_partner_internal_libs",
+    ":sdk_partner_libs",
   ]
 }
 
@@ -204,6 +205,22 @@ sdk_molecule("fidl_testing") {
   deps = []
   foreach(target, sdk_fidl_testing_targets) {
     deps += [ "${target}_sdk($fidl_toolchain)" ]
+  }
+}
+
+group("sdk_fidl_partner_allowlist") {
+  visibility = sdk_fidl_targets + sdk_fidl_testing_targets
+}
+
+group("sdk_partner_libs") {
+  public_deps = []
+  fidl_libs = sdk_fidl_targets
+
+  foreach(fidl_library, fidl_libs) {
+    public_deps += [
+      "${fidl_library}($fidl_toolchain)",
+      "${fidl_library}_sdk($fidl_toolchain)",
+    ]
   }
 }
 

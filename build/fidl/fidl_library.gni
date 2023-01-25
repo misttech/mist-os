@@ -347,6 +347,16 @@ template("fidl_library") {
       ":$verification_target_name",
     ]
 
+    # Ignore the FIDL libraries that are only present in private versions of
+    # the SDK as they don't have the same versioning constraints.
+    target_dir = get_label_info(main_target_name, "dir")
+    is_vendor_library =
+        string_replace(target_dir, "//vendor/", "") != target_dir
+    if (!is_vendor_library && defined(invoker.sdk_category) &&
+        invoker.sdk_category == "partner") {
+      deps += [ "//sdk/fidl:sdk_fidl_partner_allowlist" ]
+    }
+
     # Ensures that all libraries that are in the "partner_internal" category are
     # in the "sdk_partner_internal_libs_allowlist" target. This is used to
     # ensure that the API compatibility tests actually run on these libraries.
