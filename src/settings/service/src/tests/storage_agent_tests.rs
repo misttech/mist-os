@@ -41,15 +41,13 @@ async fn test_read() {
     let (delegate, _) = create_test_environment().await;
     let (messenger, _) =
         delegate.create(MessengerType::Unbound).await.expect("should be able to get messenger");
-    let mut receptor = messenger
-        .message(
-            service::Payload::Storage(Payload::Request(StorageRequest::Read(
-                SettingType::Unknown.into(),
-                0.into(),
-            ))),
-            Audience::Address(Address::Storage),
-        )
-        .send();
+    let mut receptor = messenger.message(
+        service::Payload::Storage(Payload::Request(StorageRequest::Read(
+            SettingType::Unknown.into(),
+            0.into(),
+        ))),
+        Audience::Address(Address::Storage),
+    );
 
     assert_matches!(receptor.next_of::<Payload>().await,
         Ok((
@@ -76,15 +74,13 @@ async fn test_write() {
         .create(MessengerType::Unbound)
         .await
         .expect("should be able to get messenger");
-    let mut receptor = messenger
-        .message(
-            service::Payload::Storage(Payload::Request(StorageRequest::Write(
-                SettingInfo::Unknown(UnknownInfo(CHANGED_VALUE)).into(),
-                0.into(),
-            ))),
-            Audience::Address(Address::Storage),
-        )
-        .send();
+    let mut receptor = messenger.message(
+        service::Payload::Storage(Payload::Request(StorageRequest::Write(
+            SettingInfo::Unknown(UnknownInfo(CHANGED_VALUE)).into(),
+            0.into(),
+        ))),
+        Audience::Address(Address::Storage),
+    );
 
     assert_matches!(
         receptor.next_of::<Payload>().await,

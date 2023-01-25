@@ -253,12 +253,10 @@ async fn play_bluetooth_sound(
 /// Match the background volume to the current media volume before playing the bluetooth earcon.
 async fn match_background_to_media(messenger: service::message::Messenger) {
     // Get the current audio info.
-    let mut get_receptor = messenger
-        .message(
-            Payload::Request(Request::Get).into(),
-            Audience::Address(service::Address::Handler(SettingType::Audio)),
-        )
-        .send();
+    let mut get_receptor = messenger.message(
+        Payload::Request(Request::Get).into(),
+        Audience::Address(service::Address::Handler(SettingType::Audio)),
+    );
 
     // Extract media and background volumes.
     let mut media_volume = 0.0;
@@ -281,21 +279,19 @@ async fn match_background_to_media(messenger: service::message::Messenger) {
     if media_volume != background_volume {
         let id = ftrace::Id::new();
         trace!(id, "bluetooth_handler set background volume");
-        let mut receptor = messenger
-            .message(
-                Payload::Request(Request::SetVolume(
-                    vec![SetAudioStream {
-                        stream_type: AudioStreamType::Background,
-                        source: AudioSettingSource::System,
-                        user_volume_level: Some(media_volume),
-                        user_volume_muted: None,
-                    }],
-                    id,
-                ))
-                .into(),
-                Audience::Address(service::Address::Handler(SettingType::Audio)),
-            )
-            .send();
+        let mut receptor = messenger.message(
+            Payload::Request(Request::SetVolume(
+                vec![SetAudioStream {
+                    stream_type: AudioStreamType::Background,
+                    source: AudioSettingSource::System,
+                    user_volume_level: Some(media_volume),
+                    user_volume_muted: None,
+                }],
+                id,
+            ))
+            .into(),
+            Audience::Address(service::Address::Handler(SettingType::Audio)),
+        );
 
         if receptor.next_payload().await.is_err() {
             fx_log_err!(

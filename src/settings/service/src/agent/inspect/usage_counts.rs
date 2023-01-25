@@ -199,12 +199,10 @@ mod tests {
                 .await
                 .expect("should be created");
 
-            let _ = messenger
-                .message(
-                    HandlerPayload::Request(setting_request).into(),
-                    service::message::Audience::Address(service::Address::Handler(setting_type)),
-                )
-                .send();
+            let _ = messenger.message(
+                HandlerPayload::Request(setting_request).into(),
+                service::message::Audience::Address(service::Address::Handler(setting_type)),
+            );
 
             let _ = receptor.next_payload().await;
         }

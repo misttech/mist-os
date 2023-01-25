@@ -69,12 +69,10 @@ where
     async fn execute(self: Box<Self>, messenger: message::Messenger, id: fuchsia_trace::Id) {
         trace!(id, "Independent policy Work execute");
         // Send request through MessageHub.
-        let mut response_listener = messenger
-            .message(
-                Payload::Request(self.request.clone()).into(),
-                Audience::Address(Address::PolicyHandler(self.policy_type)),
-            )
-            .send();
+        let mut response_listener = messenger.message(
+            Payload::Request(self.request.clone()).into(),
+            Audience::Address(Address::PolicyHandler(self.policy_type)),
+        );
 
         // On success, invoke the responder with the converted response.
         self.responder.respond(R::from(match response_listener.next_of::<Payload>().await {

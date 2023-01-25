@@ -418,14 +418,12 @@ mod tests {
             let (_, mut receptor) =
                 self.delegate.create(MessengerType::Unbound).await.expect("should be created");
 
-            let _ = messenger
-                .message(
-                    service::Payload::Event(EventPayload::Event(Event::ExternalServiceEvent(
-                        external_api_event,
-                    ))),
-                    Audience::Broadcast,
-                )
-                .send();
+            let _ = messenger.message(
+                service::Payload::Event(EventPayload::Event(Event::ExternalServiceEvent(
+                    external_api_event,
+                ))),
+                Audience::Broadcast,
+            );
 
             let _ = receptor.next_payload().await;
         }

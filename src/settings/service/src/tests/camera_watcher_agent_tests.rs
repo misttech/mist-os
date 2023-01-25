@@ -75,8 +75,7 @@ async fn test_camera_agent_proxy() {
     // Create and send the invocation with faked services.
     let invocation = Invocation { lifespan: Lifespan::Service, service_context };
     let mut reply_receptor = agent_messenger
-        .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature))
-        .send();
+        .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature));
     let completion_result =
         if let Ok((Payload::Complete(result), _)) = reply_receptor.next_of::<Payload>().await {
             Some(result)
@@ -171,8 +170,7 @@ fn test_camera_devices_watcher_timeout() {
     // Create and send the invocation with faked services.
     let invocation = Invocation { lifespan: Lifespan::Service, service_context };
     let mut reply_receptor = agent_messenger
-        .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature))
-        .send();
+        .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature));
 
     // Advance time past the timeout.
     executor.set_fake_time(Time::from_nanos(CAMERA_WATCHER_TIMEOUT * 10_i64.pow(6)));
@@ -226,8 +224,7 @@ async fn test_camera_agent_delayed_devices() {
     // Create and send the invocation with faked services.
     let invocation = Invocation { lifespan: Lifespan::Service, service_context };
     let mut reply_receptor = agent_messenger
-        .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature))
-        .send();
+        .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature));
     let completion_result =
         if let Ok((Payload::Complete(result), _)) = reply_receptor.next_of::<Payload>().await {
             Some(result)

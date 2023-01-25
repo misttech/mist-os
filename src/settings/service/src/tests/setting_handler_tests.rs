@@ -153,16 +153,14 @@ async fn test_write_notify() {
         Arc::new(FidlStorageFactory::new(1, directory_proxy)),
     );
     blueprint.create(agent_context).await;
-    let mut invocation_receptor = invocation_messenger
-        .message(
-            crate::agent::Payload::Invocation(crate::agent::Invocation {
-                lifespan: crate::agent::Lifespan::Initialization,
-                service_context: Arc::new(crate::service_context::ServiceContext::new(None, None)),
-            })
-            .into(),
-            crate::message::base::Audience::Messenger(agent_receptor_signature),
-        )
-        .send();
+    let mut invocation_receptor = invocation_messenger.message(
+        crate::agent::Payload::Invocation(crate::agent::Invocation {
+            lifespan: crate::agent::Lifespan::Initialization,
+            service_context: Arc::new(crate::service_context::ServiceContext::new(None, None)),
+        })
+        .into(),
+        crate::message::base::Audience::Messenger(agent_receptor_signature),
+    );
     // Wait for storage to be initialized.
     while let Ok((payload, _)) = invocation_receptor.next_of::<crate::agent::Payload>().await {
         if let crate::agent::Payload::Complete(result) = payload {
@@ -339,7 +337,6 @@ async fn test_event_propagation() {
             Payload::Command(Command::ChangeState(State::Startup)).into(),
             Audience::Messenger(signature),
         )
-        .send()
         .ack();
 
     assert_eq!(Some(State::Startup), event_rx.next().await);
@@ -349,7 +346,6 @@ async fn test_event_propagation() {
             Payload::Command(Command::ChangeState(State::Listen)).into(),
             Audience::Messenger(signature),
         )
-        .send()
         .ack();
 
     assert_eq!(Some(State::Listen), event_rx.next().await);
@@ -359,7 +355,6 @@ async fn test_event_propagation() {
             Payload::Command(Command::ChangeState(State::EndListen)).into(),
             Audience::Messenger(signature),
         )
-        .send()
         .ack();
 
     assert_eq!(Some(State::EndListen), event_rx.next().await);
@@ -369,7 +364,6 @@ async fn test_event_propagation() {
             Payload::Command(Command::ChangeState(State::Teardown)).into(),
             Audience::Messenger(signature),
         )
-        .send()
         .ack();
 
     assert_eq!(Some(State::Teardown), event_rx.next().await);
@@ -420,7 +414,6 @@ async fn test_rebroadcast() {
             Payload::Command(Command::ChangeState(State::Listen)).into(),
             Audience::Messenger(signature),
         )
-        .send()
         .ack();
 
     // Request rebroadcast of data.
@@ -429,7 +422,6 @@ async fn test_rebroadcast() {
             Payload::Command(Command::HandleRequest(Request::Rebroadcast)).into(),
             Audience::Messenger(signature),
         )
-        .send()
         .ack();
 
     verify_payload(
@@ -469,7 +461,6 @@ async fn verify_controller_state(state: State, n: u8) {
             Payload::Command(Command::ChangeState(state)).into(),
             Audience::Messenger(signature),
         )
-        .send()
         .ack();
 
     assert_eq!(Some(state), event_rx.next().await);
@@ -560,12 +551,10 @@ async fn test_unimplemented_error() {
 
         assert!(ClientImpl::create(context, StubControllerBuilder::new().build()).await.is_ok());
 
-        let mut reply_receptor = messenger
-            .message(
-                Payload::Command(Command::HandleRequest(Request::Get)).into(),
-                Audience::Messenger(signature),
-            )
-            .send();
+        let mut reply_receptor = messenger.message(
+            Payload::Command(Command::HandleRequest(Request::Get)).into(),
+            Audience::Messenger(signature),
+        );
 
         while let Ok((payload, _)) = reply_receptor.next_of::<Payload>().await {
             if let Payload::Result(Err(ControllerError::UnimplementedRequest(incoming_type, _))) =

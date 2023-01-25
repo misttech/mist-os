@@ -10,6 +10,7 @@ use crate::message::base::{
 };
 use crate::message::beacon::Beacon;
 use crate::message::message_builder::MessageBuilder;
+use crate::message::receptor::Receptor;
 
 use fuchsia_syslog::fx_log_warn;
 use fuchsia_zircon::Duration;
@@ -77,8 +78,8 @@ impl MessengerClient {
 
     /// Creates a MessageBuilder for a new message with the specified payload
     /// and audience.
-    pub(crate) fn message(&self, payload: crate::Payload, audience: Audience) -> MessageBuilder {
-        MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone())
+    pub(crate) fn message(&self, payload: crate::Payload, audience: Audience) -> Receptor {
+        MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone()).send()
     }
 
     /// Creates a MessageBuilder for a new message with the specified payload,
@@ -88,9 +89,10 @@ impl MessengerClient {
         payload: crate::Payload,
         audience: Audience,
         duration: Option<Duration>,
-    ) -> MessageBuilder {
+    ) -> Receptor {
         MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone())
             .set_timeout(duration)
+            .send()
     }
 
     /// Returns the signature of the client that will handle any sent messages.

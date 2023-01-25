@@ -345,7 +345,6 @@ mod tests {
                 Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
                 Audience::Messenger(manager_signature),
             )
-            .send()
             .ack();
 
         for result in results {
@@ -416,7 +415,6 @@ mod tests {
                 Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
                 Audience::Messenger(manager_signature),
             )
-            .send()
             .ack();
 
         // Confirm received value matches the value sent from the second job.
@@ -472,7 +470,6 @@ mod tests {
                 Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
                 Audience::Messenger(manager_signature),
             )
-            .send()
             .ack();
 
         // Ensure the source started and completed before moving on.
@@ -559,7 +556,6 @@ mod tests {
                 Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
                 Audience::Messenger(manager_signature),
             )
-            .send()
             .ack();
 
         // Confirm received value matches the value sent from the second job.
@@ -627,7 +623,6 @@ mod tests {
                 Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
                 Audience::Messenger(manager_signature),
             )
-            .send()
             .ack();
 
         // Ensure the requests is in the hanging portion of execute.
@@ -654,7 +649,6 @@ mod tests {
                 Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
                 Audience::Messenger(manager_signature),
             )
-            .send()
             .ack();
 
         // Confirm received value matches the value sent from workload.
@@ -697,7 +691,6 @@ mod tests {
                 Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
                 Audience::Messenger(manager_signature),
             )
-            .send()
             .ack();
 
         // Ensure the request is in the hanging portion of execute.

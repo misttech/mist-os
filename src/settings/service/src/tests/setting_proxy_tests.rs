@@ -72,7 +72,6 @@ impl SettingHandler {
                 setting_handler::Payload::Event(Event::Changed(UnknownInfo(true).into())).into(),
                 Audience::Messenger(self.proxy_signature),
             )
-            .send()
             .ack();
     }
 
@@ -92,7 +91,6 @@ impl SettingHandler {
                                 setting_handler::Payload::Event(Event::Exited(result)).into(),
                                 Audience::Messenger(self.proxy_signature),
                             )
-                            .send()
                             .ack();
                         return None;
                     }
@@ -315,13 +313,10 @@ async fn init_listen_env() -> (TestEnvironment, ListenReceptor) {
     let environment = TestEnvironmentBuilder::new(setting_type).build().await;
 
     // Send a listen state and make sure sink is notified.
-    let mut listen_receptor = environment
-        .service_client
-        .message(
-            service::Payload::Setting(HandlerPayload::Request(Request::Listen)),
-            Audience::Address(service::Address::Handler(setting_type)),
-        )
-        .send();
+    let mut listen_receptor = environment.service_client.message(
+        service::Payload::Setting(HandlerPayload::Request(Request::Listen)),
+        Audience::Address(service::Address::Handler(setting_type)),
+    );
 
     assert!(listen_receptor.wait_for_acknowledge().await.is_ok(), "ack should be sent");
     (environment, listen_receptor)
@@ -436,13 +431,10 @@ async fn test_request() {
         .queue_action(Request::Get, HandlerAction::Respond(Ok(None)));
 
     // Send initial request.
-    let mut receptor = environment
-        .service_client
-        .message(
-            HandlerPayload::Request(Request::Get).into(),
-            Audience::Address(service::Address::Handler(setting_type)),
-        )
-        .send();
+    let mut receptor = environment.service_client.message(
+        HandlerPayload::Request(Request::Get).into(),
+        Audience::Address(service::Address::Handler(setting_type)),
+    );
 
     if let Ok((HandlerPayload::Response(response), _)) = receptor.next_of::<HandlerPayload>().await
     {
@@ -467,20 +459,14 @@ async fn test_request_order() {
         .queue_action(Request::Get, HandlerAction::Respond(Ok(None)));
 
     // Send multiple requests.
-    let receptor_1 = environment
-        .service_client
-        .message(
-            HandlerPayload::Request(Request::Get).into(),
-            Audience::Address(service::Address::Handler(setting_type)),
-        )
-        .send();
-    let receptor_2 = environment
-        .service_client
-        .message(
-            HandlerPayload::Request(Request::Get).into(),
-            Audience::Address(service::Address::Handler(setting_type)),
-        )
-        .send();
+    let receptor_1 = environment.service_client.message(
+        HandlerPayload::Request(Request::Get).into(),
+        Audience::Address(service::Address::Handler(setting_type)),
+    );
+    let receptor_2 = environment.service_client.message(
+        HandlerPayload::Request(Request::Get).into(),
+        Audience::Address(service::Address::Handler(setting_type)),
+    );
 
     // Wait for both requests to finish and add them to the list as they finish so we can verify the
     // order.
@@ -555,12 +541,10 @@ async fn inspect_catches_errors() {
     .await
     .expect("proxy creation should succeed");
 
-    let mut receptor = service_client
-        .message(
-            HandlerPayload::Request(Request::Get).into(),
-            Audience::Address(service::Address::Handler(SETTING_TYPE)),
-        )
-        .send();
+    let mut receptor = service_client.message(
+        HandlerPayload::Request(Request::Get).into(),
+        Audience::Address(service::Address::Handler(SETTING_TYPE)),
+    );
 
     let (payload, _) = receptor.next_payload().await.expect("should get payload");
     assert_matches::assert_matches!(
@@ -645,12 +629,10 @@ async fn inspect_errors_roll_after_limit() {
 
     for i in 0..(MAX_NODE_ERRORS + 1) {
         clock::mock::set(Time::from_nanos(i as i64 * 1000));
-        let mut receptor = service_client
-            .message(
-                HandlerPayload::Request(Request::Get).into(),
-                Audience::Address(service::Address::Handler(SETTING_TYPE)),
-            )
-            .send();
+        let mut receptor = service_client.message(
+            HandlerPayload::Request(Request::Get).into(),
+            Audience::Address(service::Address::Handler(SETTING_TYPE)),
+        );
 
         let (payload, _) = receptor.next_payload().await.expect("should get payload");
         assert_matches::assert_matches!(
@@ -722,15 +704,10 @@ fn test_regeneration() {
 
         // Send initial request.
         assert!(
-            get_response(
-                environment
-                    .service_client
-                    .message(
-                        HandlerPayload::Request(Request::Get).into(),
-                        Audience::Address(service::Address::Handler(setting_type)),
-                    )
-                    .send()
-            )
+            get_response(environment.service_client.message(
+                HandlerPayload::Request(Request::Get).into(),
+                Audience::Address(service::Address::Handler(setting_type)),
+            ))
             .await
             .is_some(),
             "response should have been received"
@@ -801,15 +778,10 @@ fn test_regeneration() {
 
         // Send followup request.
         assert!(
-            get_response(
-                environment
-                    .service_client
-                    .message(
-                        HandlerPayload::Request(Request::Get).into(),
-                        Audience::Address(service::Address::Handler(setting_type)),
-                    )
-                    .send()
-            )
+            get_response(environment.service_client.message(
+                HandlerPayload::Request(Request::Get).into(),
+                Audience::Address(service::Address::Handler(setting_type)),
+            ))
             .await
             .is_some(),
             "response should have been received"
@@ -850,15 +822,10 @@ fn test_retry() {
         let request = Request::Get;
 
         // Send request.
-        let handler_result = get_response(
-            environment
-                .service_client
-                .message(
-                    HandlerPayload::Request(request.clone()).into(),
-                    Audience::Address(service::Address::Handler(setting_type)),
-                )
-                .send(),
-        )
+        let handler_result = get_response(environment.service_client.message(
+            HandlerPayload::Request(request.clone()).into(),
+            Audience::Address(service::Address::Handler(setting_type)),
+        ))
         .await
         .expect("result should be present");
 
@@ -930,15 +897,10 @@ fn test_retry() {
         let request = Request::Get;
         // Ensure subsequent request succeeds
         assert_matches::assert_matches!(
-            get_response(
-                environment
-                    .service_client
-                    .message(
-                        HandlerPayload::Request(request.clone()).into(),
-                        Audience::Address(service::Address::Handler(setting_type)),
-                    )
-                    .send(),
-            )
+            get_response(environment.service_client.message(
+                HandlerPayload::Request(request.clone()).into(),
+                Audience::Address(service::Address::Handler(setting_type)),
+            ),)
             .await,
             Some(Ok(_))
         );
@@ -1003,15 +965,10 @@ async fn test_early_exit() {
     let request = Request::Get;
 
     // Send request.
-    let handler_result = get_response(
-        environment
-            .service_client
-            .message(
-                HandlerPayload::Request(request.clone()).into(),
-                Audience::Address(service::Address::Handler(setting_type)),
-            )
-            .send(),
-    )
+    let handler_result = get_response(environment.service_client.message(
+        HandlerPayload::Request(request.clone()).into(),
+        Audience::Address(service::Address::Handler(setting_type)),
+    ))
     .await
     .expect("result should be present");
 
@@ -1100,8 +1057,7 @@ fn test_timeout() {
             .message(
                 HandlerPayload::Request(request.clone()).into(),
                 Audience::Address(service::Address::Handler(setting_type)),
-            )
-            .send();
+            );
 
         assert_matches!(
             receptor.next_of::<HandlerPayload>().await.expect("should receive response").0,
@@ -1195,15 +1151,10 @@ fn test_timeout_no_retry() {
         let request = Request::Get;
 
         // Send request.
-        let handler_result = get_response(
-            environment
-                .service_client
-                .message(
-                    HandlerPayload::Request(request.clone()).into(),
-                    Audience::Address(service::Address::Handler(setting_type)),
-                )
-                .send(),
-        )
+        let handler_result = get_response(environment.service_client.message(
+            HandlerPayload::Request(request.clone()).into(),
+            Audience::Address(service::Address::Handler(setting_type)),
+        ))
         .await
         .expect("result should be present");
 

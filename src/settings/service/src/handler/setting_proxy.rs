@@ -516,7 +516,6 @@ impl SettingProxy {
                 .into(),
                 Audience::Messenger(handler_signature),
             )
-            .send()
             .ack();
 
         self.request(ProxyRequest::TeardownTimeout);
@@ -697,14 +696,11 @@ impl SettingProxy {
             event::handler::Event::Request(event::handler::Action::Execute, request.clone())
         );
 
-        let mut receptor = self
-            .messenger
-            .message_with_timeout(
-                setting_handler::Payload::Command(Command::HandleRequest(request.clone())).into(),
-                Audience::Messenger(signature),
-                self.request_timeout,
-            )
-            .send();
+        let mut receptor = self.messenger.message_with_timeout(
+            setting_handler::Payload::Command(Command::HandleRequest(request.clone())).into(),
+            Audience::Messenger(signature),
+            self.request_timeout,
+        );
 
         let proxy_request_sender_clone = self.proxy_request_sender.clone();
 
@@ -812,13 +808,10 @@ impl SettingProxy {
 
         let signature = self.client_signature.take().expect("signature should be set");
 
-        let mut controller_receptor = self
-            .messenger
-            .message(
-                setting_handler::Payload::Command(Command::ChangeState(State::Teardown)).into(),
-                Audience::Messenger(signature),
-            )
-            .send();
+        let mut controller_receptor = self.messenger.message(
+            setting_handler::Payload::Command(Command::ChangeState(State::Teardown)).into(),
+            Audience::Messenger(signature),
+        );
 
         // Wait for the teardown phase to be over before continuing.
         if controller_receptor.next().await != Some(MessageEvent::Status(Status::Received)) {

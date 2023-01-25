@@ -407,15 +407,13 @@ mod tests {
             delegate.create(MessengerType::Unbound).await.expect("messenger created");
         let (_, mut receptor) =
             delegate.create(MessengerType::Unbound).await.expect("receptor created");
-        let _ = messenger
-            .message(
-                service::Payload::Storage(Payload::Request(StorageRequest::Read(
-                    SettingType::Unknown.into(),
-                    0.into(),
-                ))),
-                Audience::Messenger(receptor.get_signature()),
-            )
-            .send();
+        let _ = messenger.message(
+            service::Payload::Storage(Payload::Request(StorageRequest::Read(
+                SettingType::Unknown.into(),
+                0.into(),
+            ))),
+            Audience::Messenger(receptor.get_signature()),
+        );
 
         // Will stall if not encountered.
         let responder =

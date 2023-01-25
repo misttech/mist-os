@@ -124,24 +124,19 @@ impl ClientProxy {
         setting_type: SettingType,
         request: Request,
     ) -> service::message::Receptor {
-        self.service_messenger
-            .message(
-                HandlerPayload::Request(request).into(),
-                Audience::Address(service::Address::Handler(setting_type)),
-            )
-            .send()
+        self.service_messenger.message(
+            HandlerPayload::Request(request).into(),
+            Audience::Address(service::Address::Handler(setting_type)),
+        )
     }
 
     /// Requests the setting handler to rebroadcast a settings changed event to its listeners.
     pub(crate) fn request_rebroadcast(&self, setting_type: SettingType) {
         // Ignore the receptor result.
-        let _ = self
-            .service_messenger
-            .message(
-                HandlerPayload::Request(Request::Rebroadcast).into(),
-                Audience::Address(service::Address::Handler(setting_type)),
-            )
-            .send();
+        let _ = self.service_messenger.message(
+            HandlerPayload::Request(Request::Rebroadcast).into(),
+            Audience::Address(service::Address::Handler(setting_type)),
+        );
     }
 }
 
@@ -156,14 +151,11 @@ impl ClientProxy {
         &self,
         id: ftrace::Id,
     ) -> T {
-        let mut receptor = self
-            .service_messenger
-            .message(
-                storage::Payload::Request(storage::StorageRequest::Read(T::POLICY_TYPE.into(), id))
-                    .into(),
-                Audience::Address(service::Address::Storage),
-            )
-            .send();
+        let mut receptor = self.service_messenger.message(
+            storage::Payload::Request(storage::StorageRequest::Read(T::POLICY_TYPE.into(), id))
+                .into(),
+            Audience::Address(service::Address::Storage),
+        );
 
         match receptor.next_of::<storage::Payload>().await {
             Ok((payload, _)) => {
@@ -199,14 +191,11 @@ impl ClientProxy {
         id: ftrace::Id,
     ) -> Result<UpdateState, PolicyError> {
         let policy_type = (&policy_info).into();
-        let mut receptor = self
-            .service_messenger
-            .message(
-                storage::Payload::Request(storage::StorageRequest::Write(policy_info.into(), id))
-                    .into(),
-                Audience::Address(service::Address::Storage),
-            )
-            .send();
+        let mut receptor = self.service_messenger.message(
+            storage::Payload::Request(storage::StorageRequest::Write(policy_info.into(), id))
+                .into(),
+            Audience::Address(service::Address::Storage),
+        );
 
         match receptor.next_of::<storage::Payload>().await {
             Ok((payload, _)) => {

@@ -133,13 +133,10 @@ impl EventHandler {
         // Send the event to all the interested setting types that are also available.
         for setting_type in self.recipient_settings.iter() {
             // Ignore the receptor result.
-            let _ = self
-                .messenger
-                .message(
-                    HandlerPayload::Request(setting_request.clone()).into(),
-                    Audience::Address(service::Address::Handler(*setting_type)),
-                )
-                .send();
+            let _ = self.messenger.message(
+                HandlerPayload::Request(setting_request.clone()).into(),
+                Audience::Address(service::Address::Handler(*setting_type)),
+            );
         }
     }
 }
@@ -320,7 +317,6 @@ mod tests {
                 HandlerPayload::Request(verification_request.clone()).into(),
                 Audience::Address(handler_address),
             )
-            .send()
             .ack();
 
         // Delete the messengers for the receptors we're selecting below. This will allow the while

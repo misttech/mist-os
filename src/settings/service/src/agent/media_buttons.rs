@@ -142,13 +142,10 @@ impl EventHandler {
                 "media buttons send event",
                 "setting_type" => format!("{setting_type:?}").as_str()
             );
-            let mut receptor = self
-                .messenger
-                .message(
-                    HandlerPayload::Request(setting_request.clone()).into(),
-                    Audience::Address(service::Address::Handler(*setting_type)),
-                )
-                .send();
+            let mut receptor = self.messenger.message(
+                HandlerPayload::Request(setting_request.clone()).into(),
+                Audience::Address(service::Address::Handler(*setting_type)),
+            );
             fasync::Task::spawn(async move {
                 let _ = receptor.next_payload().await;
                 drop(guard);

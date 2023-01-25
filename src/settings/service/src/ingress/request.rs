@@ -70,12 +70,10 @@ where
     async fn execute(self: Box<Self>, messenger: message::Messenger, id: ftrace::Id) {
         trace!(id, "Independent Work execute");
         // Send request through MessageHub.
-        let mut response_listener = messenger
-            .message(
-                Payload::Request(self.request.clone()).into(),
-                Audience::Address(Address::Handler(self.setting_type)),
-            )
-            .send();
+        let mut response_listener = messenger.message(
+            Payload::Request(self.request.clone()).into(),
+            Audience::Address(Address::Handler(self.setting_type)),
+        );
 
         // On success, invoke the responder with the converted response.
         self.responder.respond(R::from(match response_listener.next_of::<Payload>().await {

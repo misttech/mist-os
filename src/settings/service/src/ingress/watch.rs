@@ -229,20 +229,16 @@ impl<
 
         // Begin listening for changes before fetching current value to ensure no changes are
         // missed.
-        let mut listen_receptor = messenger
-            .message(
-                Payload::Request(Request::Listen).into(),
-                Audience::Address(Address::Handler(self.setting_type)),
-            )
-            .send();
+        let mut listen_receptor = messenger.message(
+            Payload::Request(Request::Listen).into(),
+            Audience::Address(Address::Handler(self.setting_type)),
+        );
 
         // Get current value.
-        let mut get_receptor = messenger
-            .message(
-                Payload::Request(Request::Get).into(),
-                Audience::Address(Address::Handler(self.setting_type)),
-            )
-            .send();
+        let mut get_receptor = messenger.message(
+            Payload::Request(Request::Get).into(),
+            Audience::Address(Address::Handler(self.setting_type)),
+        );
 
         // If a value was returned from the get call and considered updated (no existing or
         // different), return new value immediately.

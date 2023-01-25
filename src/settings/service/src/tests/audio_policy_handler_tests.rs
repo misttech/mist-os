@@ -137,12 +137,10 @@ impl TestEnvironment {
             .expect("messenger should be present")
             .0;
 
-        messenger
-            .message(
-                SettingPayload::Request(SettingRequest::Listen).into(),
-                Audience::Address(service::Address::Handler(SettingType::Audio)),
-            )
-            .send()
+        messenger.message(
+            SettingPayload::Request(SettingRequest::Listen).into(),
+            Audience::Address(service::Address::Handler(SettingType::Audio)),
+        )
     }
 
     async fn create_request_observer(&self) -> Receptor {
@@ -204,8 +202,7 @@ impl TestEnvironment {
                                     service::Payload::Setting(
                                         SettingPayload::Request(request.clone())),
                                     Audience::Broadcast,
-                                )
-                                .send();
+                                );
 
                             match request {
                                 SettingRequest::Listen => {
@@ -246,12 +243,10 @@ impl TestEnvironment {
             .await
             .expect("receptor for handler should be created")
             .0;
-        let mut receptor = messenger
-            .message(
-                service::Payload::Test(service::test::Payload::Audio(audio_info)),
-                Audience::Messenger(self.setting_handler_signature),
-            )
-            .send();
+        let mut receptor = messenger.message(
+            service::Payload::Test(service::test::Payload::Audio(audio_info)),
+            Audience::Messenger(self.setting_handler_signature),
+        );
 
         while let Some(event) = receptor.next().await {
             if MessageEvent::Status(Status::Acknowledged) == event {

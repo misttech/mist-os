@@ -180,7 +180,6 @@ impl Publisher {
                 Payload::Event(event).into(),
                 Audience::Role(service::Role::Event(event::Role::Sink)),
             )
-            .send()
             .ack();
     }
 }

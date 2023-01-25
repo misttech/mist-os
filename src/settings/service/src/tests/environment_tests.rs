@@ -130,12 +130,10 @@ async fn test_message_hub() {
         .await
         .expect("should be able to create messenger");
 
-    let mut client_receptor = messenger
-        .message(
-            Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD))),
-            Audience::Broadcast,
-        )
-        .send();
+    let mut client_receptor = messenger.message(
+        Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD))),
+        Audience::Broadcast,
+    );
 
     // Wait for reply from TestAgent.
     verify_payload(

@@ -177,13 +177,10 @@ impl SettingValuesInspectAgent {
     /// setting values.
     async fn fetch_initial_values(&mut self) {
         for setting_type in self.setting_types.clone() {
-            let mut receptor = self
-                .messenger_client
-                .message(
-                    SettingPayload::Request(Request::Get).into(),
-                    Audience::Address(service::Address::Handler(setting_type)),
-                )
-                .send();
+            let mut receptor = self.messenger_client.message(
+                SettingPayload::Request(Request::Get).into(),
+                Audience::Address(service::Address::Handler(setting_type)),
+            );
 
             if let Ok((SettingPayload::Response(Ok(Some(setting_info))), _)) =
                 receptor.next_of::<SettingPayload>().await
@@ -295,7 +292,6 @@ mod tests {
                 .into(),
                 Audience::Messenger(agent_signature),
             )
-            .send()
             .ack();
 
         // Setting handler reply to get.
@@ -362,8 +358,7 @@ mod tests {
                 HandlerPayload::Event(Event::Changed(SettingInfo::Unknown(UnknownInfo(false))))
                     .into(),
                 Audience::Messenger(proxy_receptor.get_signature()),
-            )
-            .send();
+            );
 
         // Await for the event changed. The agent will intercept it in-between so capturing here
         // will ensure the inspect operation has fully occurred.

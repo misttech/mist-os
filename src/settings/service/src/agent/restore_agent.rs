@@ -51,13 +51,10 @@ impl RestoreAgent {
         match invocation.lifespan {
             Lifespan::Initialization => {
                 for component in &self.available_components {
-                    let mut receptor = self
-                        .messenger
-                        .message(
-                            HandlerPayload::Request(Request::Restore).into(),
-                            Audience::Address(service::Address::Handler(*component)),
-                        )
-                        .send();
+                    let mut receptor = self.messenger.message(
+                        HandlerPayload::Request(Request::Restore).into(),
+                        Audience::Address(service::Address::Handler(*component)),
+                    );
 
                     let response = receptor
                         .next_of::<HandlerPayload>()
@@ -95,13 +92,10 @@ impl RestoreAgent {
                     }
                 }
                 for policy in &self.available_policies {
-                    let mut receptor = self
-                        .messenger
-                        .message(
-                            PolicyPayload::Request(PolicyRequest::Restore).into(),
-                            Audience::Address(service::Address::PolicyHandler(*policy)),
-                        )
-                        .send();
+                    let mut receptor = self.messenger.message(
+                        PolicyPayload::Request(PolicyRequest::Restore).into(),
+                        Audience::Address(service::Address::PolicyHandler(*policy)),
+                    );
 
                     let response = receptor
                         .next_of::<PolicyPayload>()

@@ -73,12 +73,10 @@ impl SettingHandlerFactory for SettingHandlerFactoryImpl {
 
         // At this point, we know the controller was constructed successfully.
         // Tell the controller to run the Startup phase to initialize its state.
-        let mut controller_receptor = controller_messenger
-            .message(
-                Payload::Command(Command::ChangeState(State::Startup)).into(),
-                Audience::Messenger(signature),
-            )
-            .send();
+        let mut controller_receptor = controller_messenger.message(
+            Payload::Command(Command::ChangeState(State::Startup)).into(),
+            Audience::Messenger(signature),
+        );
 
         // Wait for the startup phase to be over before continuing.
         while let Some(message_event) = controller_receptor.next().await {

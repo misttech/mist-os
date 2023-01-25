@@ -63,8 +63,7 @@ async fn test_media_buttons_proxied() {
     // Create and send the invocation with faked services.
     let invocation = Invocation { lifespan: Lifespan::Service, service_context };
     let mut reply_receptor = agent_messenger
-        .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature))
-        .send();
+        .message(Payload::Invocation(invocation).into(), Audience::Messenger(signature));
     let mut completion_result = None;
     if let Ok((Payload::Complete(result), _)) = reply_receptor.next_of::<Payload>().await {
         completion_result = Some(result);

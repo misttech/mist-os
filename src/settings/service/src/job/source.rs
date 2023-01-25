@@ -82,7 +82,6 @@ impl Seeder {
                 Payload::Source(Arc::new(Mutex::new(Some(mapped_stream)))).into(),
                 Audience::Messenger(self.manager_signature),
             )
-            .send()
             .ack();
     }
 }

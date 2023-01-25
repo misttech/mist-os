@@ -84,17 +84,14 @@ impl Authority {
         let mut pending_receptors = Vec::new();
 
         for &(debug_id, signature) in &self.agent_signatures {
-            let mut receptor = self
-                .messenger
-                .message(
-                    Payload::Invocation(Invocation {
-                        lifespan,
-                        service_context: Arc::clone(&service_context),
-                    })
-                    .into(),
-                    Audience::Messenger(signature),
-                )
-                .send();
+            let mut receptor = self.messenger.message(
+                Payload::Invocation(Invocation {
+                    lifespan,
+                    service_context: Arc::clone(&service_context),
+                })
+                .into(),
+                Audience::Messenger(signature),
+            );
 
             if sequential {
                 let result = process_payload(debug_id, receptor.next_of::<Payload>().await);

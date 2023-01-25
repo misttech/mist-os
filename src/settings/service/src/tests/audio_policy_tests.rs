@@ -229,8 +229,7 @@ async fn test_policy_message_hub() {
 
     // Send request.
     let mut reply_receptor = messenger
-        .message(request_payload.clone().into(), Audience::Address(policy_handler_address))
-        .send();
+        .message(request_payload.clone().into(), Audience::Address(policy_handler_address));
 
     // Wait and verify request received.
     let (payload, client) =

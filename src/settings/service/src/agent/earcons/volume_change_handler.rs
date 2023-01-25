@@ -49,12 +49,10 @@ impl VolumeChangeHandler {
         params: CommonEarconsParams,
         messenger: service::message::Messenger,
     ) -> Result<(), Error> {
-        let mut receptor = messenger
-            .message(
-                Payload::Request(Request::Get).into(),
-                Audience::Address(service::Address::Handler(SettingType::Audio)),
-            )
-            .send();
+        let mut receptor = messenger.message(
+            Payload::Request(Request::Get).into(),
+            Audience::Address(service::Address::Handler(SettingType::Audio)),
+        );
 
         // Get initial user media volume level.
         let last_user_volumes =
@@ -89,7 +87,6 @@ impl VolumeChangeHandler {
                     Payload::Request(Request::Listen).into(),
                     Audience::Address(service::Address::Handler(SettingType::Audio)),
                 )
-                .send()
                 .fuse();
             futures::pin_mut!(listen_receptor);
 
@@ -183,22 +180,19 @@ impl VolumeChangeHandler {
             if last_user_volume.is_some() && change_source != Some(AudioSettingSource::System) {
                 let id = ftrace::Id::new();
                 trace!(id, "volume_change_handler set background");
-                let mut receptor = self
-                    .messenger
-                    .message(
-                        Payload::Request(Request::SetVolume(
-                            vec![SetAudioStream {
-                                stream_type: AudioStreamType::Background,
-                                source: AudioSettingSource::System,
-                                user_volume_level: Some(new_user_volume),
-                                user_volume_muted: None,
-                            }],
-                            id,
-                        ))
-                        .into(),
-                        Audience::Address(service::Address::Handler(SettingType::Audio)),
-                    )
-                    .send();
+                let mut receptor = self.messenger.message(
+                    Payload::Request(Request::SetVolume(
+                        vec![SetAudioStream {
+                            stream_type: AudioStreamType::Background,
+                            source: AudioSettingSource::System,
+                            user_volume_level: Some(new_user_volume),
+                            user_volume_muted: None,
+                        }],
+                        id,
+                    ))
+                    .into(),
+                    Audience::Address(service::Address::Handler(SettingType::Audio)),
+                );
                 if let Err(e) = receptor.next_payload().await {
                     fx_log_err!("Failed to play sound after waiting for message response: {e:?}");
                 } else {

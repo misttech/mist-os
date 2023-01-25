@@ -229,12 +229,10 @@ async fn test_policy_messages_passed_to_handler() {
         service_delegate.create(MessengerType::Unbound).await.expect("policy messenger created");
 
     // Send a policy request to the policy proxy.
-    let mut policy_send_receptor = policy_messenger
-        .message(
-            policy_base::Payload::Request(policy_request).into(),
-            Audience::Address(service::Address::PolicyHandler(POLICY_TYPE)),
-        )
-        .send();
+    let mut policy_send_receptor = policy_messenger.message(
+        policy_base::Payload::Request(policy_request).into(),
+        Audience::Address(service::Address::PolicyHandler(POLICY_TYPE)),
+    );
 
     // Wait for a response.
     let (policy_response, _) = policy_send_receptor
@@ -270,12 +268,10 @@ async fn test_setting_message_pass_through() {
     let (messenger, _) = delegate.create(MessengerType::Unbound).await.expect("messenger created");
 
     // Send a setting request to the setting handler.
-    let mut settings_send_receptor = messenger
-        .message(
-            SETTING_REQUEST_PAYLOAD.clone().into(),
-            service::message::Audience::Address(service::Address::Handler(SETTING_TYPE)),
-        )
-        .send();
+    let mut settings_send_receptor = messenger.message(
+        SETTING_REQUEST_PAYLOAD.clone().into(),
+        service::message::Audience::Address(service::Address::Handler(SETTING_TYPE)),
+    );
 
     // Verify the setting handler received the original payload, then reply with a response.
     verify_payload(
@@ -334,12 +330,10 @@ async fn test_setting_message_result_replacement() {
     let (messenger, _) = delegate.create(MessengerType::Unbound).await.expect("messenger created");
 
     // Send a setting request from the requestor to the setting handler.
-    let mut settings_send_receptor = messenger
-        .message(
-            SETTING_REQUEST_PAYLOAD.clone().into(),
-            service::message::Audience::Address(setting_handler_address),
-        )
-        .send();
+    let mut settings_send_receptor = messenger.message(
+        SETTING_REQUEST_PAYLOAD.clone().into(),
+        service::message::Audience::Address(setting_handler_address),
+    );
 
     // We want to verify that the setting handler didn't receive the original message from the
     // client. To do this, we create a new messenger and send a message to the setting handler
@@ -348,12 +342,10 @@ async fn test_setting_message_result_replacement() {
     let (test_messenger, _) =
         delegate.create(MessengerType::Unbound).await.expect("messenger created");
 
-    let _ = test_messenger
-        .message(
-            SETTING_REQUEST_PAYLOAD_2.clone().into(),
-            service::message::Audience::Address(setting_handler_address),
-        )
-        .send();
+    let _ = test_messenger.message(
+        SETTING_REQUEST_PAYLOAD_2.clone().into(),
+        service::message::Audience::Address(setting_handler_address),
+    );
 
     verify_payload(
         service::Payload::try_from(SETTING_REQUEST_PAYLOAD_2.clone())
@@ -412,8 +404,7 @@ async fn test_setting_message_payload_replacement() {
 
     // Send a setting request from the client to the setting handler.
     let mut settings_send_receptor = messenger
-        .message(setting_request_1_payload.into(), Audience::Address(setting_handler_address))
-        .send();
+        .message(setting_request_1_payload.into(), Audience::Address(setting_handler_address));
 
     // Verify the setting handler receives the payload that the policy handler specifies, not the
     // original sent by the client.
@@ -459,12 +450,10 @@ async fn test_setting_response_pass_through() {
         delegate.create(MessengerType::Unbound).await.expect("messenger created");
 
     // Send a setting event from the setting proxy to the client.
-    let _ = setting_proxy_messenger
-        .message(
-            SETTING_RESPONSE_PAYLOAD.clone().into(),
-            Audience::Messenger(receptor.get_signature()),
-        )
-        .send();
+    let _ = setting_proxy_messenger.message(
+        SETTING_RESPONSE_PAYLOAD.clone().into(),
+        Audience::Messenger(receptor.get_signature()),
+    );
 
     // Verify the client receives the event.
     verify_payload(SETTING_RESPONSE_PAYLOAD.clone().into(), &mut receptor, None).await;
@@ -498,12 +487,10 @@ async fn test_setting_response_replace() {
         delegate.create(MessengerType::Unbound).await.expect("messenger created");
 
     // Send a setting request from the setting proxy to the client.
-    let _ = setting_proxy_messenger
-        .message(
-            SETTING_RESPONSE_PAYLOAD.clone().into(),
-            Audience::Messenger(receptor.get_signature()),
-        )
-        .send();
+    let _ = setting_proxy_messenger.message(
+        SETTING_RESPONSE_PAYLOAD.clone().into(),
+        Audience::Messenger(receptor.get_signature()),
+    );
 
     // Verify the client receives the event.
     verify_payload(
@@ -555,12 +542,10 @@ async fn test_multiple_messages() {
     // Send a few requests to the policy proxy.
     for _ in 0..3 {
         // Send a policy request.
-        let mut policy_send_receptor = policy_messenger
-            .message(
-                policy_base::Payload::Request(policy_request.clone()).into(),
-                Audience::Address(service::Address::PolicyHandler(POLICY_TYPE)),
-            )
-            .send();
+        let mut policy_send_receptor = policy_messenger.message(
+            policy_base::Payload::Request(policy_request.clone()).into(),
+            Audience::Address(service::Address::PolicyHandler(POLICY_TYPE)),
+        );
 
         // Verify a policy response is returned each time.
         verify_payload(
@@ -571,12 +556,10 @@ async fn test_multiple_messages() {
         .await;
 
         // Send a request that the policy proxy intercepts.
-        let mut settings_send_receptor = messenger
-            .message(
-                SETTING_REQUEST_PAYLOAD.clone().into(),
-                Audience::Address(service::Address::Handler(SETTING_TYPE)),
-            )
-            .send();
+        let mut settings_send_receptor = messenger.message(
+            SETTING_REQUEST_PAYLOAD.clone().into(),
+            Audience::Address(service::Address::Handler(SETTING_TYPE)),
+        );
 
         // Verify that the client receives the response that the policy handler returns
         // each time.

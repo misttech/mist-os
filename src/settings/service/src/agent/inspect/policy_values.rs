@@ -96,13 +96,10 @@ impl PolicyValuesInspectAgent {
             let id = fuchsia_trace::Id::new();
             trace!(id, "policy_values_inspect_agent");
             // Request initial values from all policy handlers.
-            let initial_get_receptor = agent
-                .messenger_client
-                .message(
-                    PolicyPayload::Request(Request::Get).into(),
-                    Audience::Role(service::Role::Policy(Role::PolicyHandler)),
-                )
-                .send();
+            let initial_get_receptor = agent.messenger_client.message(
+                PolicyPayload::Request(Request::Get).into(),
+                Audience::Role(service::Role::Policy(Role::PolicyHandler)),
+            );
 
             let initial_get_fuse = initial_get_receptor.fuse();
             let broker_fuse = broker_receptor.fuse();
@@ -201,8 +198,7 @@ impl PolicyValuesInspectAgent {
         // Send the request to the policy proxy.
         let mut send_receptor = self
             .messenger_client
-            .message(PolicyPayload::Request(Request::Get).into(), Audience::Messenger(signature))
-            .send();
+            .message(PolicyPayload::Request(Request::Get).into(), Audience::Messenger(signature));
 
         // Wait for a response from the policy proxy.
         let (payload, _) = send_receptor.next_payload().await?;
@@ -410,8 +406,7 @@ mod tests {
         ))
         .into();
         let _ = policy_sender
-            .message(test_request.clone(), Audience::Messenger(policy_receptor.get_signature()))
-            .send();
+            .message(test_request.clone(), Audience::Messenger(policy_receptor.get_signature()));
 
         // Policy proxy receives a request from the policy_sender.
         verify_payload(

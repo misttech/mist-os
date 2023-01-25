@@ -501,12 +501,10 @@ mod tests {
                 .await
                 .expect("should be created");
 
-            let mut reply_receptor = messenger
-                .message(
-                    HandlerPayload::Request(setting_request).into(),
-                    service::message::Audience::Address(service::Address::Handler(setting_type)),
-                )
-                .send();
+            let mut reply_receptor = messenger.message(
+                HandlerPayload::Request(setting_request).into(),
+                service::message::Audience::Address(service::Address::Handler(setting_type)),
+            );
 
             if let Some(message_event) = futures::StreamExt::next(&mut receptor).await {
                 if let Ok((_, reply_client)) = HandlerPayload::try_from_with_client(message_event) {

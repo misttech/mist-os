@@ -313,10 +313,10 @@ impl ClientImpl {
         let notify = self.notify.lock().await;
         if *notify {
             // Ignore the receptor result.
-            let _ = self
-                .messenger
-                .message(Payload::Event(event).into(), Audience::Messenger(self.notifier_signature))
-                .send();
+            let _ = self.messenger.message(
+                Payload::Event(event).into(),
+                Audience::Messenger(self.notifier_signature),
+            );
         }
     }
 }
@@ -417,18 +417,14 @@ pub mod persist {
                 "read_setting_info send",
                 "setting_type" => format!("{:?}", T::SETTING_TYPE).as_str()
             );
-            let mut receptor = self
-                .base
-                .messenger
-                .message(
-                    storage::Payload::Request(storage::StorageRequest::Read(
-                        T::SETTING_TYPE.into(),
-                        id,
-                    ))
-                    .into(),
-                    Audience::Address(service::Address::Storage),
-                )
-                .send();
+            let mut receptor = self.base.messenger.message(
+                storage::Payload::Request(storage::StorageRequest::Read(
+                    T::SETTING_TYPE.into(),
+                    id,
+                ))
+                .into(),
+                Audience::Address(service::Address::Storage),
+            );
             drop(guard);
 
             trace!(
@@ -482,18 +478,14 @@ pub mod persist {
                 "write_setting send",
                 "setting_type" => fst.as_str()
             );
-            let mut receptor = self
-                .base
-                .messenger
-                .message(
-                    storage::Payload::Request(storage::StorageRequest::Write(
-                        setting_info.clone().into(),
-                        id,
-                    ))
-                    .into(),
-                    Audience::Address(service::Address::Storage),
-                )
-                .send();
+            let mut receptor = self.base.messenger.message(
+                storage::Payload::Request(storage::StorageRequest::Write(
+                    setting_info.clone().into(),
+                    id,
+                ))
+                .into(),
+                Audience::Address(service::Address::Storage),
+            );
             drop(guard);
 
             trace!(
