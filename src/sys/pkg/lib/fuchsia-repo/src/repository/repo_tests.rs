@@ -77,6 +77,7 @@ macro_rules! repo_test_suite {
             use {
                 super::*,
                 assert_matches::assert_matches,
+                futures::{stream, StreamExt},
                 $crate::{
                     range::Range,
                     repository::{
@@ -87,7 +88,7 @@ macro_rules! repo_test_suite {
             };
 
             // Test to check that fetching a non-existing file returns a NotFound.
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn test_fetch_missing() {
                 let env = $create_env;
 
@@ -104,7 +105,7 @@ macro_rules! repo_test_suite {
             }
 
             // Test to check that fetching an empty file succeeds.
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn test_fetch_empty() {
                 let env = $create_env;
 
@@ -118,7 +119,7 @@ macro_rules! repo_test_suite {
             }
 
             // Test to check that we can fetch a small file, which fits in a single chunk.
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn test_fetch_small() {
                 let env = $create_env;
 
@@ -137,7 +138,7 @@ macro_rules! repo_test_suite {
             }
 
             // Test to check that we can fetch a range from a small file, which fits in a single chunk.
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn test_fetch_range_small() {
                 let env = $create_env;
 
@@ -176,7 +177,7 @@ macro_rules! repo_test_suite {
             }
 
             // Test to check that we can fetch a variety of ranges that cross the chunk boundary size.
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn test_fetch() {
                 let env = $create_env;
 
@@ -198,7 +199,7 @@ macro_rules! repo_test_suite {
                 env.stop().await;
             }
 
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn test_fetch_range() {
                 // We have a number of test cases, so we'll break them up into multiple concurrent
                 // tests.
@@ -272,13 +273,16 @@ macro_rules! repo_test_suite {
                     });
                 }
 
-                futures::future::join_all(futs).await;
+                // Limit the concurrent fetches to avoid "too many open files" errors.
+                let mut futs = stream::iter(futs).buffer_unordered(10);
+                while let Some(()) = futs.next().await {}
+                drop(futs);
 
                 env.stop().await;
             }
 
             // Helper to check that fetching an invalid range returns a NotSatisfiable error.
-            #[fuchsia_async::run_singlethreaded(test)]
+            #[fuchsia::test]
             async fn test_fetch_range_not_satisfiable() {
                 // We have a number of test cases, so we'll break them up into multiple concurrent
                 // tests.
@@ -341,7 +345,10 @@ macro_rules! repo_test_suite {
                     });
                 }
 
-                futures::future::join_all(futs).await;
+                // Limit the concurrent fetches to avoid "too many open files" errors.
+                let mut futs = stream::iter(futs).buffer_unordered(10);
+                while let Some(()) = futs.next().await {}
+                drop(futs);
 
                 env.stop().await;
             }
