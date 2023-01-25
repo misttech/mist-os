@@ -4,6 +4,8 @@
 
 #include "src/media/audio/audio_core/v1/audio_driver.h"
 
+#include <string>
+
 #include "src/media/audio/audio_core/v1/audio_device_manager.h"
 #include "src/media/audio/audio_core/v1/testing/fake_audio_device.h"
 #include "src/media/audio/audio_core/v1/testing/fake_audio_driver.h"
@@ -32,7 +34,8 @@ class AudioDriverTest : public testing::ThreadingModelFixture {
  protected:
   std::unique_ptr<AudioDriver> CreateAudioDriver() {
     return std::make_unique<AudioDriver>(
-        device_.get(), [this](zx::duration delay) { last_late_command_ = delay; });
+        device_.get(),
+        [this](zx::duration delay, const std::string&) { last_late_command_ = delay; });
   }
 
   static constexpr auto kSampleFormat = fuchsia::media::AudioSampleFormat::SIGNED_16;

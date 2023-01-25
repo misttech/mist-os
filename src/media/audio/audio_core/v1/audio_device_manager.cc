@@ -409,7 +409,7 @@ void AudioDeviceManager::OnDeviceUnplugged(const std::shared_ptr<AudioDevice>& d
   TRACE_DURATION("audio", "AudioDeviceManager::OnDeviceUnplugged");
   FX_DCHECK(device);
   FX_LOGS(INFO) << "Unplugged " << (device->is_input() ? "input" : "output") << " '"
-                << device->name() << "' at t=" << plug_time.get();
+                << device->name() << "' (" << device.get() << ") at t=" << plug_time.get();
 
   device->UpdatePlugState(/*plugged=*/false, plug_time);
 
@@ -424,7 +424,7 @@ void AudioDeviceManager::OnDevicePlugged(const std::shared_ptr<AudioDevice>& dev
   TRACE_DURATION("audio", "AudioDeviceManager::OnDevicePlugged");
   FX_DCHECK(device);
   FX_LOGS(INFO) << "Plugged " << (device->is_input() ? "input" : "output") << " '" << device->name()
-                << "' at t=" << plug_time.get();
+                << "' (" << device.get() << ") at t=" << plug_time.get();
 
   device->UpdatePlugState(/*plugged=*/true, plug_time);
 
@@ -446,14 +446,18 @@ void AudioDeviceManager::NotifyDeviceGainChanged(const AudioDevice& device) {
 
 void AudioDeviceManager::UpdateDefaultDevice(bool input) {
   TRACE_DURATION("audio", "AudioDeviceManager::UpdateDefaultDevice");
-  const auto new_dev =
+  const auto new_default =
       FindLastPlugged(input ? AudioObject::Type::Input : AudioObject::Type::Output);
-  uint64_t new_id = new_dev ? new_dev->token() : ZX_KOID_INVALID;
+  uint64_t new_id = new_default ? new_default->token() : ZX_KOID_INVALID;
   uint64_t& old_id = input ? default_input_token_ : default_output_token_;
 
   if (old_id != new_id) {
-    FX_LOGS(INFO) << "Default " << (input ? "input" : "output") << " '"
-                  << (new_dev ? new_dev->name() : "none") << "'";
+    if (new_default) {
+      FX_LOGS(INFO) << "Default " << (input ? "input" : "output") << ": '" << new_default->name()
+                    << "' (" << new_default.get() << ")";
+    } else {
+      FX_LOGS(INFO) << "Default " << (input ? "input" : "output") << ": NONE";
+    }
 
     for (auto& client : bindings_.bindings()) {
       client->events().OnDefaultDeviceChanged(old_id, new_id);
@@ -482,9 +486,13 @@ void AudioDeviceManager::AddDeviceByChannel(
   }
 
   if (new_device == nullptr) {
-    FX_LOGS(ERROR) << "Failed to instantiate audio " << (is_input ? "input" : "output") << " for '"
-                   << device_name << "'";
+    FX_LOGS(ERROR) << __FUNCTION__ << " failed to instantiate audio "
+                   << (is_input ? "input" : "output") << " '" << device_name << "'";
+    return;
   }
+
+  FX_LOGS(INFO) << __FUNCTION__ << " instantiated audio " << (is_input ? "input '" : "output '")
+                << device_name << "': " << new_device.get();
 
   AddDevice(std::move(new_device));
 }

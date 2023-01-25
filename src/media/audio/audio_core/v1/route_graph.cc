@@ -16,7 +16,7 @@ namespace media::audio {
 namespace {
 
 // TODO(fxbug.dev/55132): Remove this workaround. Just 64000 would still support the range needed.
-static constexpr int32_t kMinUltrasoundRate = 96000;
+constexpr int32_t kMinUltrasoundRate = 96000;
 
 bool DeviceConfigurationSupportsUsage(AudioDevice* device, StreamUsage usage) {
   if (usage != StreamUsage::WithRenderUsage(RenderUsage::ULTRASOUND) &&
@@ -42,7 +42,7 @@ RouteGraph::~RouteGraph() {
 }
 
 void RouteGraph::SetThrottleOutput(ThreadingModel* threading_model,
-                                   std::shared_ptr<AudioOutput> throttle_output) {
+                                   const std::shared_ptr<AudioOutput>& throttle_output) {
   fpromise::bridge<void, void> bridge;
   threading_model->FidlDomain().ScheduleTask(bridge.consumer.promise().then(
       [throttle_output](fpromise::result<void, void>& _) { return throttle_output->Shutdown(); }));
@@ -111,8 +111,8 @@ void RouteGraph::AddRenderer(std::shared_ptr<AudioObject> renderer) {
   FX_DCHECK(throttle_output_);
   FX_DCHECK(renderer->is_audio_renderer());
   if constexpr (kLogRoutingChanges) {
-    FX_LOGS(INFO) << "Adding renderer " << renderer.get() << " (" << renderer->usage()->ToString()
-                  << ") to route graph";
+    FX_LOGS(INFO) << "Adding renderer " << renderer.get() << " ("
+                  << renderer->usage().value_or(StreamUsage()).ToString() << ") to route graph";
   }
   renderers_.insert({renderer.get(), RoutableOwnedObject{std::move(renderer), {}}});
 
@@ -132,7 +132,7 @@ void RouteGraph::SetRendererRoutingProfile(const AudioObject& renderer, RoutingP
     return;
   }
 
-  it->second.profile = std::move(profile);
+  it->second.profile = profile;
   if (!it->second.profile.routable || !it->second.profile.usage.is_render_usage()) {
     link_matrix_.Unlink(*it->second.ref);
     return;
@@ -170,14 +170,21 @@ void RouteGraph::RemoveRenderer(const AudioObject& renderer) {
     return;
   }
 
+  if constexpr (kLogRoutingChanges) {
+    FX_LOGS(INFO) << "Removing renderer from route graph: " << &renderer << " ("
+                  << renderer.usage().value_or(StreamUsage()).ToString() << ")";
+  }
+
   link_matrix_.Unlink(*it->second.ref);
 
-  renderers_.erase(it);
   if constexpr (kLogRoutingChanges) {
-    FX_LOGS(INFO) << "Removed renderer from route graph: " << &renderer << " ("
-                  << renderer.usage()->ToString() << ")";
-    DisplayRenderers();
     link_matrix_.DisplayCurrentRouting();
+  }
+
+  renderers_.erase(it);
+
+  if constexpr (kLogRoutingChanges) {
+    DisplayRenderers();
   }
 }
 
@@ -186,8 +193,8 @@ void RouteGraph::AddCapturer(std::shared_ptr<AudioObject> capturer) {
   FX_DCHECK(capturer->is_audio_capturer());
 
   if constexpr (kLogRoutingChanges) {
-    FX_LOGS(INFO) << "Adding capturer " << capturer.get() << " (" << capturer->usage()->ToString()
-                  << ") to route graph";
+    FX_LOGS(INFO) << "Adding capturer " << capturer.get() << " ("
+                  << capturer->usage().value_or(StreamUsage()).ToString() << ") to route graph";
   }
 
   capturers_.insert({capturer.get(), RoutableOwnedObject{std::move(capturer), {}}});
@@ -208,7 +215,7 @@ void RouteGraph::SetCapturerRoutingProfile(const AudioObject& capturer, RoutingP
     return;
   }
 
-  it->second.profile = std::move(profile);
+  it->second.profile = profile;
   if (!it->second.profile.routable || !it->second.profile.usage.is_capture_usage()) {
     link_matrix_.Unlink(*it->second.ref);
     return;
@@ -246,14 +253,21 @@ void RouteGraph::RemoveCapturer(const AudioObject& capturer) {
     return;
   }
 
+  if constexpr (kLogRoutingChanges) {
+    FX_LOGS(INFO) << "Removing capturer " << &capturer << " ("
+                  << capturer.usage().value_or(StreamUsage()).ToString() << ") from route graph";
+  }
+
   link_matrix_.Unlink(*it->second.ref);
 
-  capturers_.erase(it);
   if constexpr (kLogRoutingChanges) {
-    FX_LOGS(INFO) << "Removed capturer " << &capturer << " (" << capturer.usage()->ToString()
-                  << ") from route graph";
-    DisplayCapturers();
     link_matrix_.DisplayCurrentRouting();
+  }
+
+  capturers_.erase(it);
+
+  if constexpr (kLogRoutingChanges) {
+    DisplayCapturers();
   }
 }
 
@@ -267,9 +281,11 @@ void RouteGraph::UpdateGraphForDeviceChange() {
     TRACE_DURATION("audio", "RouteGraph::UpdateGraphForDeviceChange.renderers");
     std::for_each(renderers_.begin(), renderers_.end(), [this](auto& renderer) {
       Target target;
-      if (!renderer.second.profile.routable ||
-          !((target = TargetForUsage(renderer.second.profile.usage)).is_linkable()) ||
-          link_matrix_.DestLinkCount(*renderer.second.ref) > 0u) {
+      if (!renderer.second.profile.routable) {
+        return;
+      }
+      target = TargetForUsage(renderer.second.profile.usage);
+      if (!target.is_linkable() || link_matrix_.DestLinkCount(*renderer.second.ref) > 0u) {
         return;
       }
 
@@ -282,9 +298,11 @@ void RouteGraph::UpdateGraphForDeviceChange() {
     TRACE_DURATION("audio", "RouteGraph::UpdateGraphForDeviceChange.capturers");
     std::for_each(capturers_.begin(), capturers_.end(), [this](auto& capturer) {
       Target target;
-      if (!capturer.second.profile.routable ||
-          !((target = TargetForUsage(capturer.second.profile.usage)).is_linkable()) ||
-          link_matrix_.SourceLinkCount(*capturer.second.ref) > 0u) {
+      if (!capturer.second.profile.routable) {
+        return;
+      }
+      target = TargetForUsage(capturer.second.profile.usage);
+      if (!target.is_linkable() || link_matrix_.SourceLinkCount(*capturer.second.ref) > 0u) {
         return;
       }
 
@@ -323,9 +341,8 @@ std::pair<RouteGraph::Targets, RouteGraph::UnlinkCommand> RouteGraph::CalculateT
 
       if (usage.is_render_usage()) {
         return Target(throttle_output_.get(), throttle_output_->profile().loudness_transform());
-      } else {
-        return Target();
       }
+      return Target();
     }();
 
     unlink[idx] = targets_[idx].device != new_targets[idx].device;

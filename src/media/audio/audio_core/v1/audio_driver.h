@@ -67,7 +67,7 @@ class AudioDriver {
 
   explicit AudioDriver(AudioDevice* owner);
 
-  using DriverTimeoutHandler = fit::function<void(zx::duration)>;
+  using DriverTimeoutHandler = fit::function<void(zx::duration, const std::string&)>;
   AudioDriver(AudioDevice* owner, DriverTimeoutHandler timeout_handler);
 
   virtual ~AudioDriver() = default;
@@ -160,13 +160,15 @@ class AudioDriver {
   static bool ValidatePcmSupportedFormats(
       std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& formats, bool is_input);
 
-  static constexpr uint32_t kDriverInfoHasUniqueId = (1u << 0);
-  static constexpr uint32_t kDriverInfoHasMfrStr = (1u << 1);
-  static constexpr uint32_t kDriverInfoHasProdStr = (1u << 2);
-  static constexpr uint32_t kDriverInfoHasGainState = (1u << 3);
-  static constexpr uint32_t kDriverInfoHasFormats = (1u << 4);
-  static constexpr uint32_t kDriverInfoHasClockDomain = (1u << 5);
-  static constexpr uint32_t kDriverInfoHasAll = kDriverInfoHasUniqueId | kDriverInfoHasMfrStr |
+  static constexpr uint32_t kStartedFetchingDriverInfo = (1u << 0);
+  static constexpr uint32_t kDriverInfoHasUniqueId = (1u << 1);
+  static constexpr uint32_t kDriverInfoHasMfrStr = (1u << 2);
+  static constexpr uint32_t kDriverInfoHasProdStr = (1u << 3);
+  static constexpr uint32_t kDriverInfoHasGainState = (1u << 4);
+  static constexpr uint32_t kDriverInfoHasFormats = (1u << 5);
+  static constexpr uint32_t kDriverInfoHasClockDomain = (1u << 6);
+  static constexpr uint32_t kDriverInfoHasAll = kStartedFetchingDriverInfo |
+                                                kDriverInfoHasUniqueId | kDriverInfoHasMfrStr |
                                                 kDriverInfoHasProdStr | kDriverInfoHasGainState |
                                                 kDriverInfoHasFormats | kDriverInfoHasClockDomain;
 
@@ -183,8 +185,12 @@ class AudioDriver {
   void ShutdownSelf(const char* debug_reason = nullptr, zx_status_t debug_status = ZX_OK)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(owner_->mix_domain().token());
 
-  // Evaluate each currently pending timeout. Program the command timeout timer appropriately.
-  void SetupCommandTimeout() FXL_EXCLUSIVE_LOCKS_REQUIRED(owner_->mix_domain().token());
+  // Detect an already-pending timer, and program the command timeout timer appropriately.
+  void SetCommandTimeout(const zx::duration& deadline, const std::string& cmd_tag)
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(owner_->mix_domain().token());
+  void ClearCommandTimeout() FXL_EXCLUSIVE_LOCKS_REQUIRED(owner_->mix_domain().token());
+  void SetupCommandTimeout(const std::string& cmd_tag)
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(owner_->mix_domain().token());
 
   // Update internal plug state bookkeeping and report up to our owner (if enabled).
   void ReportPlugStateChange(bool plugged, zx::time plug_time)
@@ -200,7 +206,8 @@ class AudioDriver {
   }
 
   bool fetching_driver_info() const FXL_EXCLUSIVE_LOCKS_REQUIRED(owner_->mix_domain().token()) {
-    return fetch_driver_info_deadline_ != zx::time::infinite();
+    return (fetched_driver_info_ & kStartedFetchingDriverInfo) &&
+           ((fetched_driver_info_ & kDriverInfoHasAll) != kDriverInfoHasAll);
   }
 
   void DriverCommandTimedOut() FXL_EXCLUSIVE_LOCKS_REQUIRED(owner_->mix_domain().token());
@@ -215,7 +222,6 @@ class AudioDriver {
   async::TaskClosure cmd_timeout_ FXL_GUARDED_BY(owner_->mix_domain().token());
 
   zx_koid_t stream_channel_koid_ = ZX_KOID_INVALID;
-  zx::time fetch_driver_info_deadline_ = zx::time::infinite();
   uint32_t fetched_driver_info_ FXL_GUARDED_BY(owner_->mix_domain().token()) = 0;
 
   // State fetched at driver startup time.
@@ -269,6 +275,7 @@ class AudioDriver {
   zx::time plug_time_ FXL_GUARDED_BY(plugged_lock_);
 
   zx::time driver_last_timeout_ = zx::time::infinite();
+  std::string driver_last_cmd_tag_;
 
   // Plug detection state.
   bool pd_hardwired_ = false;

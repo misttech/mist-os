@@ -53,18 +53,18 @@ class RouteGraph : public DeviceRouter {
   // Adds an |AudioInput| or |AudioOutput| to the route graph. An audio input may be connected to
   // transmit samples to an |AudioCapturer|; an audio output receives samples from an
   // |AudioRenderer|.
-  void AddDeviceToRoutes(AudioDevice* input) final;
+  void AddDeviceToRoutes(AudioDevice* device) final;
 
   // Removes an |AudioInput| or |AudioOutput| from the route graph. Any connected |AudioCapturer|s
   // or |AudioRenderer|s will be rerouted.
-  void RemoveDeviceFromRoutes(AudioDevice* input) final;
+  void RemoveDeviceFromRoutes(AudioDevice* device) final;
 
   //
   // TODO(fxbug.dev/13339): Remove throttle_output_.
   // Sets a throttle output which is linked to all AudioRenderers to throttle the rate at which we
   // return packets to clients.
   void SetThrottleOutput(ThreadingModel* threading_model,
-                         std::shared_ptr<AudioOutput> throttle_output);
+                         const std::shared_ptr<AudioOutput>& throttle_output);
 
   // Returns a boolean indicating if a |device| is contained in the route graph.
   bool ContainsDevice(const AudioDevice* device);

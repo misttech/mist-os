@@ -33,8 +33,9 @@ namespace media::audio {
 namespace {
 
 // TODO(fxbug.dev/39092): Log a cobalt metric for this.
-void LogMissedCommandDeadline(zx::duration delay) {
-  FX_LOGS(WARNING) << "Driver command missed deadline by " << delay.to_nsecs() << "ns";
+void LogMissedCommandDeadline(zx::duration delay, const std::string& cmd_tag) {
+  FX_LOGS(WARNING) << "Driver command '" << cmd_tag << "' missed deadline by " << delay.to_nsecs()
+                   << "ns";
 }
 
 }  // namespace
@@ -136,6 +137,7 @@ zx_status_t AudioDriver::GetDriverInfo() {
   if (fetching_driver_info()) {
     return ZX_OK;
   }
+  fetched_driver_info_ = kStartedFetchingDriverInfo;
 
   // Send the commands to get:
   // - persistent unique ID.
@@ -211,9 +213,8 @@ zx_status_t AudioDriver::GetDriverInfo() {
         for (auto& i : formats) {
           formats_.emplace_back(std::move(*i.mutable_pcm_supported_formats()));
         }
-        // Record that we have fetched our format list. This will transition us to Unconfigured
-        // state and let our owner know if we are done fetching all the initial driver info needed
-        // to operate.
+        // Record that we fetched the format list. This transitions us to Unconfigured state and
+        // tells our owner whether we have fetched all the initial driver info needed to operate.
         auto res = OnDriverInfoFetched(kDriverInfoHasFormats);
         if (res != ZX_OK) {
           ShutdownSelf("Failed to update info fetched.", res);
@@ -221,13 +222,13 @@ zx_status_t AudioDriver::GetDriverInfo() {
       });
 
   // Setup our command timeout.
-  fetch_driver_info_deadline_ =
-      async::Now(owner_->mix_domain().dispatcher()) + kDefaultShortCmdTimeout;
-  SetupCommandTimeout();
+  SetCommandTimeout(
+      kDefaultShortCmdTimeout,
+      "Fetch driver info (StreamConfig::GetProperties/GetSupportedFormats/WatchGainState)");
   return ZX_OK;
 }
 
-// Confirm that PcmSupportedFormats is well-formed (return false if not) and log the contents
+// Confirm that PcmSupportedFormats is well-formed (return false if not) and log the contents.
 bool AudioDriver::ValidatePcmSupportedFormats(
     std::vector<fuchsia::hardware::audio::PcmSupportedFormats>& formats, bool is_input) {
   for (size_t format_index = 0u; format_index < formats.size(); ++format_index) {
@@ -440,7 +441,7 @@ zx_status_t AudioDriver::Configure(const Format& format, zx::duration min_ring_b
   FX_CHECK(state_ == State::Unconfigured);
   state_ = State::Configuring_SettingFormat;
   stream_config_fidl_->CreateRingBuffer(std::move(fidl_format), std::move(request));
-  // No need for timeout, there is no reply to this FIDL message.
+  // No need for a driver command timeout: there is no reply to this FIDL message.
 
   ring_buffer_fidl_ =
       fidl::InterfaceHandle<fuchsia::hardware::audio::RingBuffer>(std::move(local_channel)).Bind();
@@ -464,8 +465,7 @@ void AudioDriver::RequestRingBufferProperties() {
   // Change state, setup our command timeout.
   FX_CHECK(state_ == State::Configuring_SettingFormat);
   state_ = State::Configuring_GettingRingBufferProperties;
-  configuration_deadline_ = async::Now(owner_->mix_domain().dispatcher()) + kDefaultLongCmdTimeout;
-  SetupCommandTimeout();
+  SetCommandTimeout(kDefaultLongCmdTimeout, "RingBuffer::GetProperties");
 
   ring_buffer_fidl_->GetProperties([this](fuchsia::hardware::audio::RingBufferProperties props) {
     if constexpr (kLogAudioDriverCallbacks) {
@@ -494,8 +494,7 @@ void AudioDriver::RequestDelayInfo() {
   // Change state, setup our command timeout.
   FX_CHECK(state_ == State::Configuring_GettingRingBufferProperties);
   state_ = State::Configuring_GettingDelayInfo;
-  configuration_deadline_ = async::Now(owner_->mix_domain().dispatcher()) + kDefaultLongCmdTimeout;
-  SetupCommandTimeout();
+  SetCommandTimeout(kDefaultLongCmdTimeout, "RingBuffer::WatchDelayInfo");
 
   ring_buffer_fidl_->WatchDelayInfo([this](fuchsia::hardware::audio::DelayInfo info) {
     if constexpr (kLogAudioDriverCallbacks) {
@@ -558,8 +557,7 @@ void AudioDriver::RequestRingBufferVmo(int64_t min_frames_64) {
   // Change state, setup our command timeout.
   FX_CHECK(state_ == State::Configuring_GettingDelayInfo);
   state_ = State::Configuring_GettingRingBufferVmo;
-  configuration_deadline_ = async::Now(owner_->mix_domain().dispatcher()) + kDefaultLongCmdTimeout;
-  SetupCommandTimeout();
+  SetCommandTimeout(kDefaultLongCmdTimeout, "RingBuffer::GetVmo");
 
   auto num_notifications_per_ring =
       ((clock_domain_ == fuchsia::hardware::audio::CLOCK_DOMAIN_MONOTONIC)) ? 0 : 2;
@@ -610,8 +608,7 @@ void AudioDriver::RequestRingBufferVmo(int64_t min_frames_64) {
 
         // We are now Configured. Let our owner know about this important milestone.
         state_ = State::Configured;
-        configuration_deadline_ = zx::time::infinite();
-        SetupCommandTimeout();
+        ClearCommandTimeout();
         owner_->OnDriverConfigComplete();
 
         RequestNextPlugStateChange();
@@ -638,6 +635,7 @@ void AudioDriver::RequestNextPlugStateChange() {
     ReportPlugStateChange(state.plugged(), zx::time(state.plug_state_time()));
     RequestNextPlugStateChange();
   });
+  // No need for a driver command timeout: this is a "hanging get".
 }
 
 // This position notification will be used to synthesize a clock for this audio device.
@@ -692,6 +690,7 @@ void AudioDriver::RequestNextClockRecoveryUpdate() {
 
   ring_buffer_fidl_->WatchClockRecoveryPositionInfo(
       [this](fuchsia::hardware::audio::RingBufferPositionInfo info) { ClockRecoveryUpdate(info); });
+  // No need for a driver command timeout: this is a "hanging get".
 }
 
 zx_status_t AudioDriver::Start() {
@@ -712,8 +711,7 @@ zx_status_t AudioDriver::Start() {
 
   // Change state, setup our command timeout and we are finished.
   state_ = State::Starting;
-  configuration_deadline_ = async::Now(owner_->mix_domain().dispatcher()) + kDefaultShortCmdTimeout;
-  SetupCommandTimeout();
+  SetCommandTimeout(kDefaultShortCmdTimeout, "RingBuffer::Start");
 
   ring_buffer_fidl_->Start([this](int64_t start_time) {
     if constexpr (kLogAudioDriverCallbacks) {
@@ -866,8 +864,7 @@ zx_status_t AudioDriver::Start() {
 
     // We are now Started. Let our owner know about this important milestone.
     state_ = State::Started;
-    configuration_deadline_ = zx::time::infinite();
-    SetupCommandTimeout();
+    ClearCommandTimeout();
     owner_->OnDriverStartComplete();
   });
   return ZX_OK;
@@ -894,8 +891,7 @@ zx_status_t AudioDriver::Stop() {
 
   // We are now in the Stopping state.
   state_ = State::Stopping;
-  configuration_deadline_ = async::Now(owner_->mix_domain().dispatcher()) + kDefaultShortCmdTimeout;
-  SetupCommandTimeout();
+  SetCommandTimeout(kDefaultShortCmdTimeout, "RingBuffer::Stop");
 
   ring_buffer_fidl_->Stop([this]() {
     if constexpr (kLogAudioDriverCallbacks) {
@@ -906,8 +902,7 @@ zx_status_t AudioDriver::Stop() {
     // We are now stopped and in Configured state. Let our owner know about this important
     // milestone.
     state_ = State::Configured;
-    configuration_deadline_ = zx::time::infinite();
-    SetupCommandTimeout();
+    ClearCommandTimeout();
     owner_->OnDriverStopComplete();
   });
 
@@ -936,7 +931,20 @@ void AudioDriver::ShutdownSelf(const char* reason, zx_status_t status) {
   state_ = State::Shutdown;
 }
 
-void AudioDriver::SetupCommandTimeout() {
+// Start a timer for the driver command described by 'cmd_tag'.
+void AudioDriver::SetCommandTimeout(const zx::duration& deadline, const std::string& cmd_tag) {
+  TRACE_DURATION("audio", "AudioDriver::SetCommandTimeout");
+  configuration_deadline_ = async::Now(owner_->mix_domain().dispatcher()) + deadline;
+  SetupCommandTimeout(cmd_tag);
+}
+
+void AudioDriver::ClearCommandTimeout() {
+  TRACE_DURATION("audio", "AudioDriver::ClearCommandTimeout");
+  configuration_deadline_ = zx::time::infinite();
+  SetupCommandTimeout("");
+}
+
+void AudioDriver::SetupCommandTimeout(const std::string& cmd_tag) {
   TRACE_DURATION("audio", "AudioDriver::SetupCommandTimeout");
 
   // If we have received a late response, report it now.
@@ -944,18 +952,15 @@ void AudioDriver::SetupCommandTimeout() {
     auto delay = async::Now(owner_->mix_domain().dispatcher()) - driver_last_timeout_;
     driver_last_timeout_ = zx::time::infinite();
     FX_DCHECK(timeout_handler_);
-    timeout_handler_(delay);
+    timeout_handler_(delay, driver_last_cmd_tag_);
   }
 
-  zx::time deadline;
-
-  deadline = fetch_driver_info_deadline_;
-  deadline = std::min(deadline, configuration_deadline_);
-
-  if (cmd_timeout_.last_deadline() != deadline) {
-    if (deadline != zx::time::infinite()) {
-      cmd_timeout_.PostForTime(owner_->mix_domain().dispatcher(), deadline);
+  if (cmd_timeout_.last_deadline() != configuration_deadline_) {
+    if (configuration_deadline_ != zx::time::infinite()) {
+      driver_last_cmd_tag_ = cmd_tag;
+      cmd_timeout_.PostForTime(owner_->mix_domain().dispatcher(), configuration_deadline_);
     } else {
+      driver_last_cmd_tag_ = "";
       cmd_timeout_.Cancel();
     }
   }
@@ -991,10 +996,8 @@ zx_status_t AudioDriver::OnDriverInfoFetched(uint32_t info) {
     // Now that we have our clock domain, we can establish our audio device clock
     SetUpClocks();
 
-    // We are done. Clear the fetch driver info timeout and let our owner know.
-    fetch_driver_info_deadline_ = zx::time::infinite();
     state_ = State::Unconfigured;
-    SetupCommandTimeout();
+    ClearCommandTimeout();
     owner_->OnDriverInfoFetched();
   }
 
@@ -1053,6 +1056,7 @@ zx_status_t AudioDriver::SetGain(const AudioDeviceSettings::GainState& gain_stat
                   << ")";
   }
   stream_config_fidl_->SetGain(std::move(gain_state2));
+  // No need for a driver command timeout: there is no reply to this FIDL message.
   return ZX_OK;
 }
 
@@ -1064,7 +1068,7 @@ zx_status_t AudioDriver::SelectBestFormat(uint32_t* frames_per_second_inout,
 }
 
 void AudioDriver::DriverCommandTimedOut() {
-  FX_LOGS(WARNING) << "Unexpected driver timeout";
+  FX_LOGS(WARNING) << "Unexpected driver timeout: '" << driver_last_cmd_tag_ << "'";
   driver_last_timeout_ = async::Now(owner_->mix_domain().dispatcher());
 }
 
@@ -1091,13 +1095,14 @@ zx_status_t AudioDriver::SetActiveChannels(uint64_t chan_bit_mask) {
                   << ") called by AudioDriver";
   }
 
-  // We choose not to use any watchdog timer for this command. If the driver works with other
-  // methods but not this one, then it will by default keep all channels active.
+  SetCommandTimeout(kDefaultLongCmdTimeout, "RingBuffer::SetActiveChannels");
 
   ring_buffer_fidl_->SetActiveChannels(
       chan_bit_mask,
       [this, chan_bit_mask](fuchsia::hardware::audio::RingBuffer_SetActiveChannels_Result result) {
         OBTAIN_EXECUTION_DOMAIN_TOKEN(token, &owner_->mix_domain());
+
+        ClearCommandTimeout();
 
         if (result.is_err()) {
           set_active_channels_err_ = result.err();

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <string>
+
 #include <fbl/algorithm.h>
 
 #include "src/media/audio/audio_core/v1/audio_device_manager.h"
@@ -121,7 +123,7 @@ class AudioDriverClockTest : public testing::ThreadingModelFixture {
 
  private:
   std::unique_ptr<AudioDriver> CreateAudioDriver() {
-    return std::make_unique<AudioDriver>(device_.get(), [](zx::duration) {});
+    return std::make_unique<AudioDriver>(device_.get(), [](zx::duration, const std::string&) {});
   }
 };
 
