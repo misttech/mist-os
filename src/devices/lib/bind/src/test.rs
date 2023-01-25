@@ -166,6 +166,10 @@ fn run_composite_bind_test_specs(
         node_map.insert(node.name, node.instructions);
     }
 
+    for node in composite_bind.optional_nodes {
+        node_map.insert(node.name, node.instructions);
+    }
+
     for node_spec in specs {
         if !node_map.contains_key(&node_spec.node) {
             return Err(TestError::CompositeNodeMissing(node_spec.node.clone()));
