@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
-#include <lib/driver/component/cpp/service_client.h>
 #include <lib/fit/defer.h>
 
 namespace audio::da7219 {

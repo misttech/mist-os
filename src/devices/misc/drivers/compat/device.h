@@ -14,8 +14,8 @@
 #include <lib/ddk/driver.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/symbols.h>
-#include <lib/driver/component/cpp/logger.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/scope.h>

@@ -7,7 +7,6 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/context.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
-#include <lib/driver/component/cpp/service_client.h>
 #include <lib/driver/devfs/cpp/connector.h>
 
 namespace driver_transport {
@@ -56,8 +55,7 @@ class ChildDriverTransportDriver : public fdf::DriverBase {
 
   // Connect to the parent's offered service.
   zx::result<> ConnectGizmoService() {
-    auto connect_result =
-        fdf::Connect<fuchsia_examples_gizmo::Service::Device>(*context().incoming());
+    auto connect_result = context().incoming()->Connect<fuchsia_examples_gizmo::Service::Device>();
     if (connect_result.is_error()) {
       FDF_SLOG(ERROR, "Failed to connect gizmo device protocol.",
                KV("status", connect_result.status_string()));

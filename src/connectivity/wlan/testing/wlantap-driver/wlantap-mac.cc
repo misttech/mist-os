@@ -7,7 +7,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <mutex>

@@ -6,7 +6,7 @@
 #define LIB_DRIVER_COMPONENT_CPP_TESTS_TEST_BASE_H_
 
 #include <fuchsia/io/cpp/fidl_test_base.h>
-#include <lib/driver/component/cpp/namespace.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/fpromise/promise.h>
 
 namespace fdf::testing {

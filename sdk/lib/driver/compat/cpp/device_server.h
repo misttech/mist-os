@@ -9,8 +9,8 @@
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/compat/cpp/service_offers.h>
-#include <lib/driver/component/cpp/handlers.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/outgoing/cpp/handlers.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 
 namespace compat {
 

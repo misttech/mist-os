@@ -15,7 +15,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/component/cpp/handlers.h>
+#include <lib/driver/outgoing/cpp/handlers.h>
 #include <lib/fdf/dispatcher.h>
 #include <stdint.h>
 #include <stdio.h>

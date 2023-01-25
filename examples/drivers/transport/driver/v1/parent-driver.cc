@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.examples.gizmo/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 
 #include <bind/fuchsia/examples/gizmo/cpp/bind.h>
 #include <ddktl/device.h>

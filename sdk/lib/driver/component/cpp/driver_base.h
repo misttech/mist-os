@@ -8,10 +8,10 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/structured_config.h>
 #include <lib/driver/component/cpp/driver_context.h>
-#include <lib/driver/component/cpp/logger.h>
-#include <lib/driver/component/cpp/namespace.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <lib/driver/component/cpp/start_args.h>
+#include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 namespace fdf {

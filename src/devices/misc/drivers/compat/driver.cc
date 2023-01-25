@@ -9,8 +9,8 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/binding_priv.h>
 #include <lib/driver/compat/cpp/connect.h>
-#include <lib/driver/component/cpp/promise.h>
 #include <lib/driver/component/cpp/start_args.h>
+#include <lib/driver/promise/cpp/promise.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>
 #include <lib/fpromise/bridge.h>

@@ -5,8 +5,8 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_DRIVER_CONTEXT_H_
 #define LIB_DRIVER_COMPONENT_CPP_DRIVER_CONTEXT_H_
 
-#include <lib/driver/component/cpp/namespace.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 
 namespace fdf {
 

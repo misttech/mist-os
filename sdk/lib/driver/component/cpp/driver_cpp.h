@@ -7,6 +7,6 @@
 
 #include <lib/driver/component/cpp/lifecycle.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/component/cpp/structured_logger.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 
 #endif  // LIB_DRIVER_COMPONENT_CPP_DRIVER_CPP_H_

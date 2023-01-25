@@ -7,7 +7,7 @@
 
 #include <fidl/fuchsia.wlan.softmac/cpp/driver/wire.h>
 #include <lib/ddk/device.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 #include <memory>

@@ -22,48 +22,24 @@ sdk_source_set("cpp") {
     "driver_context.cc",
     "driver_context.h",
     "driver_cpp.h",
-    "handlers.h",
     "lifecycle.h",
-    "logger.cc",
-    "logger.h",
-    "logger_internal.h",
-    "namespace.cc",
-    "namespace.h",
     "node_add_args.cc",
     "node_add_args.h",
     "node_group.h",
-    "outgoing_directory.cc",
-    "outgoing_directory.h",
     "prepare_stop_completer.cc",
     "prepare_stop_completer.h",
-    "service_client.h",
     "start_args.h",
-    "structured_logger.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/incoming/cpp",
+    "//sdk/lib/driver/logging/cpp",
+    "//sdk/lib/driver/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/symbols",
-    "//sdk/lib/fdio",
     "//sdk/lib/fidl",
-    "//sdk/lib/fidl_driver:fidl_driver_transport",
-    "//sdk/lib/syslog/structured_backend",
-  ]
-}
-
-source_set("cpp-promise") {
-  sources = [
-    "promise.cc",
-    "promise.h",
-  ]
-  public_deps = [
-    ":cpp",
-    "//sdk/lib/fit-promise",
   ]
 }
 

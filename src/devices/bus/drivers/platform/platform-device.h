@@ -9,7 +9,7 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/channel.h>
 

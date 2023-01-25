@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_COMPONENT_CPP_NAMESPACE_H_
-#define LIB_DRIVER_COMPONENT_CPP_NAMESPACE_H_
+#ifndef LIB_DRIVER_INCOMING_CPP_NAMESPACE_H_
+#define LIB_DRIVER_INCOMING_CPP_NAMESPACE_H_
 
 #include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
-#include <lib/driver/component/cpp/handlers.h>
 #include <lib/fdf/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
@@ -217,4 +216,4 @@ class Namespace {
 
 }  // namespace fdf
 
-#endif  // LIB_DRIVER_COMPONENT_CPP_NAMESPACE_H_
+#endif  // LIB_DRIVER_INCOMING_CPP_NAMESPACE_H_

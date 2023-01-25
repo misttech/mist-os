@@ -7,8 +7,8 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.demo/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_cpp.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <zircon/errors.h>
 
 #include <unordered_map>

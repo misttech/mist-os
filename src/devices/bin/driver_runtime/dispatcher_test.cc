@@ -8,7 +8,7 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/async/sequence_id.h>
 #include <lib/async/task.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/arena.h>
 #include <lib/fdf/channel.h>
 #include <lib/fdf/cpp/channel_read.h>
