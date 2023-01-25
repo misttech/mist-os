@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, HandleBased};
 use std::sync::Arc;
@@ -65,16 +66,45 @@ impl RemoteNode {
     }
 }
 
+/// Create a file handle from a zx::Handle.
+///
+/// The handle must be a channel, socket, vmo or debuglog object. If the handle is a
+/// channel, then the channel must implement the `fuchsia.unknown/Queryable` protocol.
+pub fn new_remote_file(
+    kernel: &Kernel,
+    handle: zx::Handle,
+    flags: OpenFlags,
+) -> Result<FileHandle, Errno> {
+    let handle_type =
+        handle.basic_info().map_err(|status| from_status_like_fdio!(status))?.object_type;
+    let zxio = Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?;
+    let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
+    let mode = get_mode(&attrs)?;
+    let ops: Box<dyn FileOps> = match handle_type {
+        zx::ObjectType::CHANNEL | zx::ObjectType::VMO | zx::ObjectType::DEBUGLOG => {
+            if mode.is_dir() {
+                Box::new(RemoteDirectoryObject::new(zxio))
+            } else {
+                Box::new(RemoteFileObject::new(zxio))
+            }
+        }
+        zx::ObjectType::SOCKET => Box::new(RemotePipeObject::new(Arc::new(zxio))),
+        _ => return error!(ENOSYS),
+    };
+    let file_handle = Anon::new_file_extended(kernel, ops, mode, FsCred::root(), flags);
+    update_into_from_attrs(&mut file_handle.name.entry.node.info_write(), &attrs);
+    Ok(file_handle)
+}
+
 pub fn create_fuchsia_pipe(
     current_task: &CurrentTask,
     socket: zx::Socket,
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno> {
-    let ops = Box::new(RemotePipeObject::new(socket.into_handle())?);
-    Ok(Anon::new_file(current_task, ops, flags))
+    new_remote_file(current_task.kernel(), socket.into(), flags)
 }
 
-fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: zxio_node_attributes_t) {
+fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
     /// st_blksize is measured in units of 512 bytes.
     const BYTES_PER_BLOCK: i64 = 512;
 
@@ -83,6 +113,15 @@ fn update_into_from_attrs(info: &mut FsNodeInfo, attrs: zxio_node_attributes_t) 
     info.storage_size = attrs.storage_size as usize;
     info.blksize = BYTES_PER_BLOCK;
     info.link_count = attrs.link_count;
+}
+
+fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {
+    let mut mode =
+        FileMode::from_bits(unsafe { zxio_get_posix_mode(attrs.protocols, attrs.abilities) });
+    let user_perms = mode.bits() & 0o700;
+    // Make sure the same permissions are granted to user, group, and other.
+    mode |= FileMode::from_bits((user_perms >> 3) | (user_perms >> 6));
+    Ok(mode)
 }
 
 fn get_zxio_signals_from_events(events: FdEvents) -> zxio::zxio_signals_t {
@@ -182,10 +221,9 @@ impl FsNodeOps for RemoteNode {
         // to set the mode based on the information we get during open.
         let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?;
         let ops = Box::new(RemoteNode { zxio, rights: self.rights });
-        let user_perms = mode.bits() & 0o700;
-        let mode = mode | FileMode::from_bits((user_perms >> 3) | (user_perms >> 6));
+        let mode = get_mode(&attrs)?;
         let child = node.fs().create_node_with_id(ops, attrs.id, mode, FsCred::root());
-
+        update_into_from_attrs(&mut child.info_write(), &attrs);
         Ok(child)
     }
 
@@ -214,15 +252,9 @@ impl FsNodeOps for RemoteNode {
         let attrs = zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
 
         let ops = Box::new(RemoteNode { zxio, rights: self.rights });
-        let mode =
-            FileMode::from_bits(unsafe { zxio_get_posix_mode(attrs.protocols, attrs.abilities) });
-        // Make sure the same permissions are granted to user, group, and other.
-        let user_perms = mode.bits() & 0o700;
-        let mode = mode | FileMode::from_bits((user_perms >> 3) | (user_perms >> 6));
-
+        let mode = get_mode(&attrs)?;
         let child = node.fs().create_node_with_id(ops, attrs.id, mode, FsCred::root());
-
-        update_into_from_attrs(&mut child.info_write(), attrs);
+        update_into_from_attrs(&mut child.info_write(), &attrs);
         Ok(child)
     }
 
@@ -233,7 +265,7 @@ impl FsNodeOps for RemoteNode {
     fn update_info<'a>(&self, node: &'a FsNode) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let attrs = self.zxio.attr_get().map_err(|status| from_status_like_fdio!(status))?;
         let mut info = node.info_write();
-        update_into_from_attrs(&mut info, attrs);
+        update_into_from_attrs(&mut info, &attrs);
         Ok(RwLockWriteGuard::downgrade(info))
     }
 }
@@ -556,9 +588,8 @@ struct RemotePipeObject {
 }
 
 impl RemotePipeObject {
-    fn new(handle: zx::Handle) -> Result<RemotePipeObject, Errno> {
-        let zxio = Arc::new(Zxio::create(handle).map_err(|status| from_status_like_fdio!(status))?);
-        Ok(RemotePipeObject { zxio })
+    fn new(zxio: Arc<Zxio>) -> Self {
+        Self { zxio }
     }
 }
 
@@ -619,7 +650,10 @@ mod test {
     use super::*;
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
+    use fidl::endpoints::Proxy;
     use fidl_fuchsia_io as fio;
+    use fuchsia_async as fasync;
+    use fuchsia_fs::{directory, file};
 
     #[::fuchsia::test]
     fn test_tree() -> Result<(), anyhow::Error> {
@@ -706,5 +740,45 @@ mod test {
         assert_eq!(pipe.query_events(&current_task), FdEvents::POLLOUT);
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
         assert!(fds.is_empty());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_new_remote_directory() {
+        let (kernel, _current_task) = create_kernel_and_task();
+        let pkg_channel: zx::Channel = directory::open_in_namespace(
+            "/pkg",
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+        )
+        .expect("failed to open /pkg")
+        .into_channel()
+        .expect("into_channel")
+        .into();
+
+        let fd =
+            new_remote_file(&kernel, pkg_channel.into(), OpenFlags::RDWR).expect("new_remote_file");
+        assert!(fd.node().is_dir());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_new_remote_file() {
+        let (kernel, _current_task) = create_kernel_and_task();
+        let content_channel: zx::Channel =
+            file::open_in_namespace("/pkg/meta/contents", fio::OpenFlags::RIGHT_READABLE)
+                .expect("failed to open /pkg/meta/contents")
+                .into_channel()
+                .expect("into_channel")
+                .into();
+
+        let fd = new_remote_file(&kernel, content_channel.into(), OpenFlags::RDONLY)
+            .expect("new_remote_file");
+        assert!(!fd.node().is_dir());
+    }
+
+    #[::fuchsia::test]
+    fn test_new_remote_vmo() {
+        let (kernel, _current_task) = create_kernel_and_task();
+        let vmo = zx::Vmo::create(*PAGE_SIZE).expect("Vmo::create");
+        let fd = new_remote_file(&kernel, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
+        assert!(!fd.node().is_dir());
     }
 }

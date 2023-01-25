@@ -9,6 +9,7 @@ use crate::device::mem::new_null_file;
 use crate::device::DeviceOps;
 use crate::dynamic_thread_pool::DynamicThreadPool;
 use crate::fs::devtmpfs::dev_tmp_fs;
+use crate::fs::fuchsia::new_remote_file;
 use crate::fs::{
     fs_node_impl_dir_readonly, DirEntryHandle, FdEvents, FdFlags, FdNumber, FileHandle, FileObject,
     FileOps, FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr,
@@ -2139,11 +2140,17 @@ impl BinderTask for RemoteBinderTask {
             get_requests: Some(vec![fd.raw()]),
             ..fbinder::FileRequest::EMPTY
         })?;
-        if let Some(files) = response.get_responses {
+        if let Some(mut files) = response.get_responses {
             if files.len() == 1 {
-                // TODO(qsr) Convert file.file into a file descriptor.
-                let file = &files[0];
-                return Ok((new_null_file(&self.kernel, file.flags.into()), FdFlags::empty()));
+                let file = files.pop().unwrap();
+                if let Some(handle) = file.file {
+                    return Ok((
+                        new_remote_file(&self.kernel, handle, file.flags.into())?,
+                        FdFlags::empty(),
+                    ));
+                } else {
+                    return Ok((new_null_file(&self.kernel, file.flags.into()), FdFlags::empty()));
+                }
             }
         }
         error!(ENOENT)

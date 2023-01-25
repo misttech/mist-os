@@ -118,6 +118,7 @@ if (target_cpu == "x64") {
     }
 
     test_deps = [
+      "//src/lib/fuchsia-fs",
       "//third_party/rust_crates:assert_matches",
       "//third_party/rust_crates:tracing-mutex",
     ]

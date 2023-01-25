@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use fuchsia_zircon as zx;
 
 use crate::fs::FileHandle;
 use crate::task::CurrentTask;
@@ -21,19 +21,14 @@ pub fn create_file_from_handle(
     current_task: &CurrentTask,
     handle: zx::Handle,
 ) -> Result<FileHandle, Errno> {
-    let info = handle.basic_info().map_err(|status| from_status_like_fdio!(status))?;
-    match info.object_type {
-        zx::ObjectType::SOCKET => {
-            create_fuchsia_pipe(current_task, zx::Socket::from_handle(handle), OpenFlags::RDWR)
-        }
-        _ => error!(ENOSYS),
-    }
+    new_remote_file(current_task.kernel(), handle, OpenFlags::RDWR)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::testing::*;
+    use zx::HandleBased;
 
     #[::fuchsia::test]
     fn test_create_from_invalid_handle() {

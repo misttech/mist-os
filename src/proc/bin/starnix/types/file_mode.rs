@@ -118,6 +118,12 @@ impl ops::BitAnd for FileMode {
     }
 }
 
+impl ops::BitOrAssign for FileMode {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
 impl ops::Not for FileMode {
     type Output = Self;
 
