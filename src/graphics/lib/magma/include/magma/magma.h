@@ -11,7 +11,7 @@
 // The Magma APIs are vendor independent. Some drivers may implement only the subset of the
 // APIs that are relevant. The format of data carried inside commands/command buffers is not
 // defined. Some APIs are explicitly extensible, such as magma_query, to allow for specific
-// vendor/driver needs.
+// vendor/driver needs.  Vendor specifics must be contained in a separate definitions file.
 //
 // Since client driver implementations may be written in a variety of languages (possibly C),
 // the Magma bindings have a C interface, and may be used to interact with both Magma and Sysmem.
