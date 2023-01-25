@@ -654,6 +654,80 @@ TEST_F(AmlG12TdmDaiTest, ClientCloseRingBufferChannel) {
   dai.release();  // Managed by the DDK.
 }
 
+TEST_F(AmlG12TdmDaiTest, GetDelayForMultipleRingBuffers) {
+  auto fake_parent = MockDevice::FakeRootParent();
+  metadata::AmlConfig metadata = GetDefaultMetadata();
+  fake_parent->SetMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
+
+  auto dai = std::make_unique<TestAmlG12TdmDai>(fake_parent.get(), pdev_.proto());
+  auto dai_proto = dai->GetProto();
+  ASSERT_OK(dai->InitPDev());
+  ASSERT_OK(dai->DdkAdd("test"));
+  dai.release();  // Managed by the DDK.
+
+  DaiClient client(&dai_proto);
+
+  // Get ring buffer formats.
+  ::fuchsia::hardware::audio::Dai_GetRingBufferFormats_Result ring_buffer_formats_out;
+  ASSERT_OK(client.dai_->GetRingBufferFormats(&ring_buffer_formats_out));
+  auto& all_pcm_formats = ring_buffer_formats_out.response().ring_buffer_formats;
+  auto& pcm_formats = all_pcm_formats[0].pcm_supported_formats();
+
+  // Get DAI formats.
+  ::fuchsia::hardware::audio::Dai_GetDaiFormats_Result dai_formats_out;
+  ASSERT_OK(client.dai_->GetDaiFormats(&dai_formats_out));
+  auto& all_dai_formats = dai_formats_out.response().dai_formats;
+  ASSERT_EQ(1, all_dai_formats.size());
+  auto& dai_formats = all_dai_formats[0];
+
+  // Create ring buffer, pick first ring buffer format and first DAI format.
+  ::fuchsia::hardware::audio::DaiFormat dai_format = {};
+  dai_format.number_of_channels = dai_formats.number_of_channels[0];
+  dai_format.sample_format = dai_formats.sample_formats[0];
+  dai_format.frame_format.set_frame_format_standard(
+      dai_formats.frame_formats[0].frame_format_standard());
+  dai_format.frame_rate = dai_formats.frame_rates[0];
+  dai_format.bits_per_sample = dai_formats.bits_per_sample[0];
+  dai_format.bits_per_slot = dai_formats.bits_per_slot[0];
+
+  ::fuchsia::hardware::audio::Format ring_buffer_format = {};
+  ring_buffer_format.mutable_pcm_format()->number_of_channels =
+      pcm_formats.channel_sets()[0].attributes().size();
+  ring_buffer_format.mutable_pcm_format()->sample_format = pcm_formats.sample_formats()[0];
+  ring_buffer_format.mutable_pcm_format()->frame_rate = pcm_formats.frame_rates()[0];
+  ring_buffer_format.mutable_pcm_format()->bytes_per_sample = pcm_formats.bytes_per_sample()[0];
+  ring_buffer_format.mutable_pcm_format()->valid_bits_per_sample =
+      pcm_formats.valid_bits_per_sample()[0];
+
+  // Get delay state for a first ring buffer.
+  {
+    ::fidl::InterfaceHandle<fuchsia::hardware::audio::RingBuffer> ring_buffer_client;
+    ::fidl::InterfaceRequest<fuchsia::hardware::audio::RingBuffer> ring_buffer_server =
+        ring_buffer_client.NewRequest();
+
+    client.dai_->CreateRingBuffer(std::move(dai_format), std::move(ring_buffer_format),
+                                  std::move(ring_buffer_server));
+
+    ::fuchsia::hardware::audio::RingBuffer_SyncProxy ring_buffer(ring_buffer_client.TakeChannel());
+    ::fuchsia::hardware::audio::DelayInfo delay_info;
+    ASSERT_OK(ring_buffer.WatchDelayInfo(&delay_info));
+  }
+
+  // Get delay state for a second ring buffer.
+  {
+    ::fidl::InterfaceHandle<fuchsia::hardware::audio::RingBuffer> ring_buffer_client;
+    ::fidl::InterfaceRequest<fuchsia::hardware::audio::RingBuffer> ring_buffer_server =
+        ring_buffer_client.NewRequest();
+
+    client.dai_->CreateRingBuffer(std::move(dai_format), std::move(ring_buffer_format),
+                                  std::move(ring_buffer_server));
+
+    ::fuchsia::hardware::audio::RingBuffer_SyncProxy ring_buffer(ring_buffer_client.TakeChannel());
+    ::fuchsia::hardware::audio::DelayInfo delay_info;
+    ASSERT_OK(ring_buffer.WatchDelayInfo(&delay_info));
+  }
+}
+
 }  // namespace audio::aml_g12
 
 // Redefine PDevMakeMmioBufferWeak per the recommendation in pdev.h.

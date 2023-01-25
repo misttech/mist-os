@@ -348,6 +348,11 @@ void AmlG12TdmDai::CreateRingBuffer(
   }
 
   ringbuffer_binding_.emplace(this, std::move(ring_buffer), loop_.dispatcher());
+  // Clear delay info sent state such that a call to WatchDelayInfo after CreateRingBuffer will be
+  // replied to the first time. Doing it here instead of in the error handler guarantees that once
+  // CreateRingBuffer is called, a WatchDelayInfo will be replied to even before the error handler
+  // is called for any previous ring buffer in use.
+  delay_info_sent_ = false;
   ringbuffer_binding_->set_error_handler([this](zx_status_t status) -> void {
     zxlogf(INFO, "RingBuffer protocol %s", zx_status_get_string(status));
     Stop([]() {});
