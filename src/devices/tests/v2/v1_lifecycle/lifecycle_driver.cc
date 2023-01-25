@@ -129,11 +129,11 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
     node().reset();
   }
 
-  void PrepareStop(PrepareStopContext* context) override {
+  void PrepareStop(fdf::PrepareStopCompleter completer) override {
     ZX_ASSERT(stop_completer_);
     ZX_ASSERT(stop_called_ == false);
     stop_completer_->Reply();
-    context->complete(context, ZX_OK);
+    completer(zx::ok());
   }
 
   void Stop() override { stop_called_ = true; }

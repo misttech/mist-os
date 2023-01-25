@@ -10,9 +10,8 @@
 #include <lib/driver/component/cpp/driver_context.h>
 #include <lib/driver/component/cpp/logger.h>
 #include <lib/driver/component/cpp/namespace.h>
-#include <lib/driver/component/cpp/outgoing_directory.h>
+#include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <lib/driver/component/cpp/start_args.h>
-#include <lib/driver/symbols/symbols.h>
 #include <lib/fdf/cpp/dispatcher.h>
 
 namespace fdf {
@@ -22,8 +21,9 @@ using DriverStartArgs = fuchsia_driver_framework::DriverStartArgs;
 // |DriverBase| is an interface that drivers should inherit from. It provides methods
 // for accessing the start args, as well as helper methods for common initialization tasks.
 //
-// There are two virtual methods, |Start| which must be overridden,
-// and |PrepareStop| and |Stop| which are optional to override.
+// There are four virtual methods:
+// |Start| which must be overridden.
+// |PrepareStop|, |Stop|, and the destructor |~DriverBase|, are optional to override.
 //
 // In order to work with the default |BasicFactory| factory implementation,
 // classes which inherit from |DriverBase| must implement a constructor with the following
@@ -89,6 +89,7 @@ class DriverBase {
   DriverBase(const DriverBase&) = delete;
   DriverBase& operator=(const DriverBase&) = delete;
 
+  // The destructor is called right after the |Stop| method.
   virtual ~DriverBase() = default;
 
   // This method will be called by the factory to start the driver. This is when
@@ -98,8 +99,16 @@ class DriverBase {
   // protocols being offered to the child has been added to the outgoing directory first.
   virtual zx::result<> Start() = 0;
 
-  virtual void PrepareStop(PrepareStopContext* context) { context->complete(context, ZX_OK); }
+  // This provides a way for the driver to asynchronously prepare to stop. The driver should
+  // initiate any teardowns that need to happen on the driver dispatchers. Once it is ready to stop,
+  // the completer's Complete function can be called (from any thread/context) with a result.
+  // After the completer is called, the framework will shutdown all of the driver's fdf dispatchers
+  // and deallocate the driver.
+  virtual void PrepareStop(PrepareStopCompleter completer) { completer(zx::ok()); }
 
+  // This is called after all the driver dispatchers belonging to this driver have been shutdown.
+  // This ensures that there are no pending tasks on any of the driver dispatchers that will access
+  // the driver after it has been destroyed.
   virtual void Stop() {}
 
   // This can be used to log in driver factories:
@@ -166,125 +175,6 @@ class DriverBase {
   async_dispatcher_t* dispatcher_;
   DriverContext driver_context_;
 };
-
-// This is the default Factory that is used to Create a Driver of type |Driver|, that inherits the
-// |DriverBase| class. |Driver| must implement a constructor with the following
-// signature and forward said parameters to the |DriverBase| base class:
-//
-//   T(DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
-template <typename Driver>
-class BasicFactory {
-  static_assert(std::is_base_of_v<DriverBase, Driver>, "Driver has to inherit from DriverBase");
-  static_assert(
-      std::is_constructible_v<Driver, DriverStartArgs, fdf::UnownedSynchronizedDispatcher>,
-      "Driver must contain a constructor with the signature '(fdf::DriverStartArgs, "
-      "fdf::UnownedDispatcher)' in order to be used with the BasicFactory.");
-
- public:
-  static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
-      DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher) {
-    std::unique_ptr<DriverBase> driver =
-        std::make_unique<Driver>(std::move(start_args), std::move(driver_dispatcher));
-    auto result = driver->Start();
-    if (result.is_error()) {
-      FDF_LOGL(WARNING, driver->logger(), "Failed to Start driver: %s", result.status_string());
-      return result.take_error();
-    }
-
-    return zx::ok(std::move(driver));
-  }
-};
-
-// |Lifecycle| implements static |Start| and |Stop| methods which will be used by the framework.
-//
-// By default, it will utilize |BasicFactory| to construct your primary driver class, |Driver|,
-// and invoke it's |Start| and |Stop| methods.
-//
-// |Driver| must inherit from |DriverBase|. If provided, |Factory| must implement a
-// public |CreateDriver| function with the following signature:
-// ```
-// static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
-//     DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-// ```
-//
-// This illustrates how to use a |Lifecycle| with the default |BasicFactory|:
-// ```
-// FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(fdf::Lifecycle<MyDriver>);
-// ```
-//
-// This illustrates how to use a |Lifecycle| with a custom factory:
-// ```
-// class CustomFactory {
-//  public:
-//   static zx::result<std::unique_ptr<DriverBase>> CreateDriver(
-//       DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-//   ...construct and start driver...
-// };
-// // We must define the lifecycle before passing into the macro, otherwise the macro expansion
-// // will think the comma is to pass a second macro argument.
-// using lifecycle = fdf::Lifecycle<MyDriver, CustomFactory>;
-// FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(lifecycle);
-// ```
-template <typename Driver, typename Factory = BasicFactory<Driver>>
-class Lifecycle {
-  static_assert(std::is_base_of_v<DriverBase, Driver>, "Driver has to inherit from DriverBase");
-
-  DECLARE_HAS_MEMBER_FN(has_create_driver, CreateDriver);
-  static_assert(has_create_driver_v<Factory>,
-                "Factory must implement a public static CreateDriver function.");
-  static_assert(std::is_same_v<decltype(&Factory::CreateDriver),
-                               zx::result<std::unique_ptr<DriverBase>> (*)(
-                                   DriverStartArgs start_args,
-                                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)>,
-                "CreateDriver must be a public static function with signature "
-                "'zx::result<std::unique_ptr<fdf::DriverBase>> (fdf::DriverStartArgs start_args, "
-                "fdf::UnownedSynchronizedDispatcher driver_dispatcher)'.");
-
- public:
-  static zx_status_t Start(EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher,
-                           void** driver) {
-    // Decode the incoming `msg`.
-    auto wire_format_metadata =
-        fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
-    fit::result start_args = fidl::StandaloneDecode<fuchsia_driver_framework::DriverStartArgs>(
-        fidl::EncodedMessage::FromEncodedCMessage(encoded_start_args.msg), wire_format_metadata);
-    if (!start_args.is_ok()) {
-      ZX_DEBUG_ASSERT_MSG(false, "Failed to decode start_args: %s",
-                          start_args.error_value().FormatDescription().c_str());
-      return start_args.error_value().status();
-    }
-
-    zx::result<std::unique_ptr<DriverBase>> created_driver = Factory::CreateDriver(
-        std::move(*start_args), fdf::UnownedSynchronizedDispatcher(dispatcher));
-
-    if (created_driver.is_error()) {
-      return created_driver.status_value();
-    }
-
-    // Store `driver` pointer.
-    *driver = (*created_driver).release();
-    return ZX_OK;
-  }
-
-  static void PrepareStop(PrepareStopContext* context) {
-    DriverBase* casted_driver = static_cast<DriverBase*>(context->driver);
-    casted_driver->PrepareStop(context);
-  }
-
-  static zx_status_t Stop(void* driver) {
-    DriverBase* casted_driver = static_cast<DriverBase*>(driver);
-    casted_driver->Stop();
-    delete casted_driver;
-    return ZX_OK;
-  }
-};
-
-#define FUCHSIA_DRIVER_LIFECYCLE_CPP_V2(lifecycle) \
-  FUCHSIA_DRIVER_LIFECYCLE_V1(.start = lifecycle::Start, .stop = lifecycle::Stop)
-
-#define FUCHSIA_DRIVER_LIFECYCLE_CPP_V3(lifecycle)                                               \
-  FUCHSIA_DRIVER_LIFECYCLE_V2(.start = lifecycle::Start, .prepare_stop = lifecycle::PrepareStop, \
-                              .stop = lifecycle::Stop)
 
 }  // namespace fdf
 

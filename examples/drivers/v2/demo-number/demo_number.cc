@@ -74,6 +74,8 @@ class DemoNumber : public fdf::DriverBase {
       : DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
         devfs_connector_(fit::bind_member<&DemoNumber::Connect>(this)) {}
 
+  ~DemoNumber() override { FDF_LOG(INFO, "Driver unloaded: %s", kDriverName.c_str()); }
+
   // Called by the driver framework to initialize the driver instance.
   zx::result<> Start() override {
     fuchsia_hardware_demo::Service::InstanceHandler handler({
@@ -118,9 +120,6 @@ class DemoNumber : public fdf::DriverBase {
 
     return zx::ok();
   }
-
-  // Called by the driver framework before the driver instance is destroyed.
-  void Stop() override { FDF_LOG(INFO, "Driver unloaded: %s", kDriverName.c_str()); }
 
  private:
   // Bind a connection request to a DemoNumberConnection.

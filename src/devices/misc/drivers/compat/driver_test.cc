@@ -521,8 +521,11 @@ class DriverTest : public testing::Test {
               reinterpret_cast<libsync::Completion*>(context->driver)->Signal();
             },
     };
-    async::PostTask(driver_dispatcher_.dispatcher(),
-                    [&driver, &stop_context] { driver->PrepareStop(&stop_context); });
+
+    async::PostTask(driver_dispatcher_.dispatcher(), [&driver, &stop_context] {
+      fdf::PrepareStopCompleter completer(&stop_context);
+      driver->PrepareStop(std::move(completer));
+    });
 
     // Keep running the test loop while we're waiting for a signal on the dispatcher thread.
     // The dispatcher thread needs to interact with our Node servers, which run on the test loop.

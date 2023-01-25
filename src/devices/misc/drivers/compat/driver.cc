@@ -244,10 +244,11 @@ zx_status_t Driver::RunOnDispatcher(fit::callback<zx_status_t()> task) {
   return status;
 }
 
-void Driver::PrepareStop(PrepareStopContext* context) {
+void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
   // TODO(http://fxbug.dev/97457): Query whether we should call suspend or unbind.
-  executor_.schedule_task(device_.UnbindOp().then(
-      [context](fpromise::result<void>& init) { return context->complete(context, ZX_OK); }));
+  executor_.schedule_task(
+      device_.UnbindOp().then([completer = std::move(completer)](
+                                  fpromise::result<void>& init) mutable { completer(zx::ok()); }));
 }
 
 promise<zx::resource, zx_status_t> Driver::GetRootResource(
