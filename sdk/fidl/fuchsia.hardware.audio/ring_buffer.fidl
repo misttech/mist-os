@@ -168,6 +168,11 @@ protocol RingBuffer {
     /// fit at least `min_frames`, and returns the actual `num_frames` allocated in
     /// `ring_buffer`.
     ///
+    /// Drivers must incorporate any internal requirements when reporting the ring buffer size
+    /// in the actual `num_frames` allocated. For instance the driver, not the client, must take
+    /// into account any ring buffer data copy semantics like minimum hardware or virtual FIFO copy
+    /// size as required by the driver.
+    ///
     /// If `clock_recovery_notifications_per_ring` is non-zero, the driver will send replies to
     /// `WatchClockRecoveryPositionInfo` client requests at most at
     /// `clock_recovery_notifications_per_ring` frequency. These notifications are meant to be used
@@ -175,8 +180,6 @@ protocol RingBuffer {
     ///
     // TODO(fxbug.dev/116353): Reconsider the `clock_recovery_notifications_per_ring` parameter,
     // once we must recover a clock from a device being actively rate-adjusted in hardware.
-    // TODO(fxbug.dev/116355): Clarify that drivers must incorporate "device DMA chunk size" into
-    // the final ring-buffer size, so that a client can safely operate within their `min_frames`.
     GetVmo(struct {
         min_frames uint32;
         clock_recovery_notifications_per_ring uint32;
