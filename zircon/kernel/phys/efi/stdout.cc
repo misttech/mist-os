@@ -31,6 +31,8 @@ template <>
 struct Traits<efi_simple_text_output_protocol> {
   using Char = char16_t;
 
+  // Minimum bytes to be reserved at the end of the `chars` buffer passed to `Write()`.
+  // Required for char16_t output, since EFI `OutputString()` takes \0 terminated string
   static constexpr size_t kMinLeft = 1;
 
   static size_t Write(efi_simple_text_output_protocol* out, ktl::span<char16_t> chars) {
@@ -44,6 +46,7 @@ template <>
 struct Traits<efi_serial_io_protocol> {
   using Char = uint8_t;
 
+  // Minimum bytes to be reserved at the end of the `chars` buffer passed to `Write()`.
   static constexpr size_t kMinLeft = 0;
 
   static size_t Write(efi_serial_io_protocol* out, ktl::span<uint8_t> chars) {
@@ -61,9 +64,14 @@ int EfiStdoutWrite(void* protocol, ktl::string_view str) {
   using Char = typename Traits<Protocol>::Char;
   using CharsFrom = uart::CharsFrom<ktl::string_view, Char>;
 
+  // Minimum bytes to be reserved at the end of the buffer
   constexpr size_t kMinLeft = Traits<Protocol>::kMinLeft;
   Char buf[kLineBufferSize];
   ktl::span<Char> left(buf);
+
+  if (str.empty()) {
+    return 0;
+  }
 
   int wrote = 0;
   auto flush = [protocol, &buf, &left, &wrote]() -> bool {
@@ -76,6 +84,8 @@ int EfiStdoutWrite(void* protocol, ktl::string_view str) {
       chars = chars.subspan(n);
       wrote += static_cast<int>(n);
     }
+
+    left = ktl::span<Char>(buf);
     return true;
   };
 
@@ -83,11 +93,12 @@ int EfiStdoutWrite(void* protocol, ktl::string_view str) {
     left.front() = c;
     left = left.subspan(1);
     if (left.size() == kMinLeft && !flush()) {
-      break;
+      return -1;
     }
   }
 
-  if ((left.size() < ktl::size(buf) - kMinLeft && !flush()) || wrote == 0) {
+  // Flush anything left in the buffer, signaled by having less space left than the capacity.
+  if ((left.size() < ktl::size(buf) && !flush()) || wrote == 0) {
     return -1;
   }
   return wrote;
