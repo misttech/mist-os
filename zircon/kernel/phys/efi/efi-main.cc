@@ -20,7 +20,6 @@
 #include <phys/efi/protocol.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/symbolize.h>
 
 #include "src/lib/utf_conversion/utf_conversion.h"
 

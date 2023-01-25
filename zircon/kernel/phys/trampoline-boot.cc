@@ -17,9 +17,9 @@
 
 #include <fbl/algorithm.h>
 #include <ktl/byte.h>
+#include <phys/main.h>
 #include <phys/page-table.h>
 #include <phys/stdio.h>
-#include <phys/symbolize.h>
 
 #include <ktl/enforce.h>
 

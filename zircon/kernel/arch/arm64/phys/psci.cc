@@ -15,7 +15,6 @@
 
 #include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/symbolize.h>
 
 // These are defined in assembly along with ArmPsciReset (see psci.S).  The
 // first argument is the operation and the other arguments vary by operation.
@@ -35,7 +34,8 @@ uint64_t gArmPsciResetRegisters[arch::kArmPsciRegisters] = {
 void ArmPsciSetup(const zbi_dcfg_arm_psci_driver_t* cfg) {
   if (!cfg) {
     gArmPsciDisabled = 1;
-    debugf("%s: No ZBI_KERNEL_DRIVER_ARM_PSCI item found in ZBI.  Early PSCI disabled.\n", ProgramName());
+    debugf("%s: No ZBI_KERNEL_DRIVER_ARM_PSCI item found in ZBI.  Early PSCI disabled.\n",
+           ProgramName());
     return;
   }
 

@@ -37,8 +37,10 @@
 
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
+#include <phys/uart.h>
 
 struct BootOptions;
+class Log;
 class MainSymbolize;
 
 namespace memalloc {
@@ -46,7 +48,8 @@ class Pool;
 }  // namespace memalloc
 
 using PhysLoadHandoffFunction =
-    void(FILE* log,                        // Copy this into FILE::stdout_.
+    void(Log* log,                         // Set gLog to this.
+         UartDriver& uart,                 // From GetUartDriver().
          MainSymbolize* symbolize,         // Set gSymbolize to this.
          const BootOptions* boot_options,  // Set gBootOptions to this.
          memalloc::Pool& allocation_pool,  // Pass to Pool::InitWithPool.
@@ -55,5 +58,9 @@ using PhysLoadHandoffFunction =
 
 // The loaded module is linked with -W,-e,... to make this the entry symbol.
 extern "C" [[noreturn]] PhysLoadHandoffFunction PhysLoadHandoff;
+
+// This should be run early in the handoff function to reinitialize
+// arch-specific state that's not included in the handoff data.
+void ArchOnPhysLoadHandoff();
 
 #endif  // ZIRCON_KERNEL_PHYS_PHYSLOAD_H_

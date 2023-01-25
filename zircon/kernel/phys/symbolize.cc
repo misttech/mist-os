@@ -17,6 +17,7 @@
 #include <ktl/string_view.h>
 #include <phys/elf-image.h>
 #include <phys/frame-pointer.h>
+#include <phys/main.h>
 #include <phys/stack.h>
 #include <pretty/hexdump.h>
 

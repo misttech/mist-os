@@ -105,7 +105,7 @@ template("distribution_manifest") {
       rebase_path(manifest_file, root_build_dir),
     ]
 
-    if (defined(invoker.prefix)) {
+    if (defined(invoker.prefix) && invoker.prefix != "") {
       args += [ "--prefix=${invoker.prefix}/" ]
     }
 

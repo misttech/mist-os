@@ -28,6 +28,8 @@
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 
+#include "log.h"
+
 #include <ktl/enforce.h>
 
 namespace {
@@ -38,6 +40,9 @@ constexpr size_t kMaxPhysloadModules = 4;
 }  // namespace
 
 [[noreturn]] void ZbiMain(void* zbi_ptr, arch::EarlyTicks ticks) {
+  PhysBootTimes times;
+  times.Set(PhysBootTimes::kZbiEntry, ticks);
+
   MainSymbolize symbolize("physload");
   if (gBootOptions->phys_verbose) {
     symbolize.Context();
@@ -45,12 +50,26 @@ constexpr size_t kMaxPhysloadModules = 4;
 
   InitMemory(zbi_ptr);
 
-  PhysBootTimes times;
-  times.Set(PhysBootTimes::kZbiEntry, ticks);
-
   // This marks the interval between handoff from the boot loader (kZbiEntry)
   // and phys environment setup with identity-mapped memory management et al.
   times.SampleNow(PhysBootTimes::kPhysSetup);
+
+  // Start collecting the log in memory as well as logging to the console.
+  Log log;
+
+  {
+    // Prime the log with what would already have been written to the console
+    // under kernel.phys.verbose=true (even if it wasn't), but don't send that
+    // to the console.
+    FILE log_file{&log};
+    symbolize.ContextAlways(&log_file);
+    Allocation::GetPool().PrintMemoryRanges(symbolize.name(), &log_file);
+  }
+
+  // Now mirror all stdout to the log, and write debugf there even if verbose
+  // logging to stdout is disabled.
+  gLog = &log;
+  log.SetStdout();
 
   auto zbi_header = static_cast<zbi_header_t*>(zbi_ptr);
   auto zbi = zbitl::StorageFromRawHeader<ktl::span<ktl::byte>>(zbi_header);
@@ -95,6 +114,7 @@ constexpr size_t kMaxPhysloadModules = 4;
 
   // Call into the entry point.  It must not return, but it will keep using the
   // same stack so it can safely take references to our stack objects.
-  next_elf.Handoff<PhysLoadHandoffFunction>(stdout, &symbolize, gBootOptions, Allocation::GetPool(),
-                                            times, ktl::move(kernel_storage));
+  next_elf.Handoff<PhysLoadHandoffFunction>(&log, GetUartDriver(), &symbolize, gBootOptions,
+                                            Allocation::GetPool(), times,
+                                            ktl::move(kernel_storage));
 }

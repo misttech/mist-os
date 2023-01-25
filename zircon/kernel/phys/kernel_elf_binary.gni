@@ -80,5 +80,8 @@ template("kernel_elf_binary") {
     if (defined(visibility)) {
       visibility += [ ":$image_target" ]
     }
+
+    output_name = image_target
+    output_extension = ""
   }
 }

@@ -21,7 +21,7 @@
 #include <ktl/variant.h>
 #include <phys/allocation.h>
 #include <phys/handoff.h>
-#include <phys/symbolize.h>
+#include <phys/main.h>
 #include <phys/zbitl-allocation.h>
 
 #include "handoff-entropy.h"

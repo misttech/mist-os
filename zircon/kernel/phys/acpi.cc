@@ -7,10 +7,11 @@
 #include "phys/acpi.h"
 
 #include <inttypes.h>
+#include <stdio.h>
 #include <zircon/errors.h>
 
 #include <fbl/no_destructor.h>
-#include <phys/symbolize.h>
+#include <phys/main.h>
 
 namespace {
 

@@ -282,7 +282,7 @@ if (current_toolchain == default_toolchain) {
     deps = [ "//zircon/kernel/phys:main" ]
   }
 
-  source_set("address-space") {
+  static_library("address-space") {
     sources = [
       "address-space.cc",
       "address-space.h",
@@ -312,6 +312,15 @@ if (current_toolchain == default_toolchain) {
       "//zircon/kernel/phys:handoff-prep.h",
     ]
     include_dirs = [ "//zircon/kernel/phys" ]
+  }
+
+  source_set("arch-on-physload-handoff") {
+    sources = [ "arch-on-physload-handoff.cc" ]
+    include_dirs = [ "//zircon/kernel/phys" ]
+    deps = [
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/phys:physload.header",
+    ]
   }
 
   # This is where code is actually loaded both for the Multiboot spec and for

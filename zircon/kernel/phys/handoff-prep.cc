@@ -20,6 +20,7 @@
 #include <phys/allocation.h>
 #include <phys/elf-image.h>
 #include <phys/handoff.h>
+#include <phys/main.h>
 #include <phys/new.h>
 #include <phys/symbolize.h>
 

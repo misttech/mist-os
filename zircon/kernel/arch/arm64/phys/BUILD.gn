@@ -14,7 +14,7 @@ variant("strict-align") {
 }
 
 if (toolchain_environment == "kernel.phys") {
-  source_set("address-space") {
+  static_library("address-space") {
     sources = [ "address-space.cc" ]
     include_dirs = [ "//." ]
     deps = [
@@ -47,7 +47,6 @@ if (toolchain_environment == "kernel.phys") {
       "//zircon/kernel/lib/libc",
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:stdio",
-      "//zircon/kernel/phys:symbolize",
     ]
   }
 
@@ -71,6 +70,12 @@ if (toolchain_environment == "kernel.phys") {
       "//zircon/kernel/phys:handoff-prep.h",
     ]
     include_dirs = [ "//zircon/kernel/phys" ]
+  }
+
+  source_set("arch-on-physload-handoff") {
+    sources = [ "arch-on-physload-handoff.cc" ]
+    include_dirs = [ "//zircon/kernel/phys" ]
+    deps = [ "//zircon/kernel/phys:physload.header" ]
   }
 }
 

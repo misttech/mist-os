@@ -403,6 +403,7 @@ if (current_toolchain != default_toolchain) {
       deps = [
         "..:allocation",
         "..:elf-image",
+        "..:log",
         "..:main",
         "..:physload.module",
         "..:stdio",
@@ -433,12 +434,39 @@ if (current_toolchain != default_toolchain) {
     ]
   }
 
+  kernel_package("elf-physboot-test-data") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    # Just "physboot" at top level is the default for `kernel.phys.next`.
+    prefix = ""
+    deps = [ "..:elf-physboot" ]
+  }
+
+  zbi("elf-physboot-test-zircon") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    deps = [
+      ":elf-physboot-test-data($phys_toolchain)",
+      "//zircon/kernel:zircon(//zircon/kernel:kernel_$current_cpu)",
+    ]
+  }
+
+  zbi_test("elf-physboot-core-tests") {
+    deps = [
+      ":elf-physboot-test-zircon",
+      "//zircon/system/utest/core:core-tests-standalone($default_toolchain)",
+    ]
+  }
+
   group("test") {
     testonly = true
     deps = [
       ":backtrace-test",
       ":efi-memory-test",
       ":efi-shell-smoke-test",
+      ":elf-physboot-core-tests",
       ":hello-world-test",
       ":phys-unittests",
       ":trampoline-boot-zbi-test",

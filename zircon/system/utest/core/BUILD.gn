@@ -176,25 +176,14 @@ group("tests") {
 
 template("core_tests") {
   kernel_zbi_test(target_name) {
-    args = [
-      "kernel.vdso.always_use_next=true",
-      "kernel.enable-debugging-syscalls=true",
-      "kernel.test.ram.reserve=0x8000",
-      "kernel.pmm.alloc-random-should-wait=true",
-    ]
-
-    if (defined(invoker.args)) {
-      args += invoker.args
-    }
-
     assert_no_deps = [
       "//zircon/system/core/*",
       "//zircon/system/dev/*",
     ]
-
     deps = [ ":core-tests-standalone" ]
     forward_variables_from(invoker,
                            [
+                             "args",
                              "device_types",
                              "timeout",
                            ])
@@ -214,6 +203,9 @@ if (is_fuchsia) {
 
     deps += all_bootfs_tests + unified_only
 
+    # These arguments are always needed in the ZBI to run this executable.
+    data_deps = [ ":core-tests-standalone.args" ]
+
     # LTO for this target requires a massive amount of memory,
     # and thus, should be run less concurrently with other large jobs.
     # See https://fxbug.dev/111094 for context.
@@ -223,6 +215,15 @@ if (is_fuchsia) {
         toolchain_variant.tags) {
       pool = "//build/config:highmem($default_toolchain)"
     }
+  }
+
+  kernel_cmdline("core-tests-standalone.args") {
+    args = [
+      "kernel.vdso.always_use_next=true",
+      "kernel.enable-debugging-syscalls=true",
+      "kernel.test.ram.reserve=0x8000",
+      "kernel.pmm.alloc-random-should-wait=true",
+    ]
   }
 }
 

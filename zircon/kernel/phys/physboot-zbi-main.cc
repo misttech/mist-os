@@ -12,6 +12,7 @@
 #include <phys/kernel-package.h>
 #include <phys/main.h>
 #include <phys/symbolize.h>
+#include <phys/uart.h>
 
 #include "log.h"
 #include "physboot.h"
@@ -61,5 +62,5 @@ void ZbiMain(void* zbi_ptr, arch::EarlyTicks ticks) {
   static const ktl::array<char, 512 * 1024> kPad{1};
   __asm__ volatile("" ::"m"(kPad), "r"(kPad.data()));
 
-  BootZircon(ktl::move(kernel_storage));
+  BootZircon(GetUartDriver(), ktl::move(kernel_storage));
 }

@@ -17,8 +17,8 @@
 #include <ktl/move.h>
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
+#include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/symbolize.h>
 #include <phys/zbitl-allocation.h>
 #include <pretty/cpp/sizes.h>
 

@@ -119,7 +119,6 @@ source_set("main") {
       "..:allocation",
       "..:main",
       "..:stdio",
-      "..:symbolize",
       "//src/lib/utf_conversion",
       "//zircon/kernel/arch/$zircon_cpu/phys/efi",
       "//zircon/kernel/lib/boot-options",
@@ -154,31 +153,30 @@ source_set("protocol") {
   }
 }
 
-source_set("file") {
-  public = [ "include/phys/efi/file.h" ]
-  public_deps = [
-    "//sdk/lib/fit",
-    "//zircon/kernel/lib/efi",
-  ]
-  if (is_kernel) {
-    public_deps += [
-      "//zircon/kernel/lib/ktl",
-      "//zircon/kernel/lib/libc",
+if (is_efi) {
+  source_set("file") {
+    public = [ "include/phys/efi/file.h" ]
+    public_deps = [
+      "//sdk/lib/fit",
+      "//zircon/kernel/lib/efi",
     ]
-  }
-  public_configs = [ ":includes" ]
+    if (is_kernel) {
+      public_deps += [
+        "//zircon/kernel/lib/ktl",
+        "//zircon/kernel/lib/libc",
+      ]
+    }
+    public_configs = [ ":includes" ]
 
-  sources = [ "file.cc" ]
-  deps = [
-    ":main",
-    ":protocol",
-    "//src/lib/utf_conversion",
-    "//zircon/system/ulib/fbl",
-  ]
-  include_dirs = [ "//" ]  # utf_conversion isn't a proper library.
-
-  if (is_kernel) {
-    deps += [ "..:symbolize" ]
+    sources = [ "file.cc" ]
+    deps = [
+      ":main",
+      ":protocol",
+      "..:main",
+      "//src/lib/utf_conversion",
+      "//zircon/system/ulib/fbl",
+    ]
+    include_dirs = [ "//" ]  # utf_conversion isn't a proper library.
   }
 }
 

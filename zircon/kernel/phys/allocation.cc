@@ -46,6 +46,7 @@ Allocation Allocation::New(fbl::AllocChecker& ac, memalloc::Type type, size_t si
   if (result.is_ok()) {
     alloc.data_ = {reinterpret_cast<ktl::byte*>(result.value()), size};
     alloc.alignment_ = alignment;
+    alloc.type_ = type;
   }
   return alloc;
 }
@@ -62,6 +63,7 @@ void Allocation::reset() {
 void Allocation::Resize(fbl::AllocChecker& ac, size_t new_size) {
   ZX_ASSERT(!data_.empty());
   ZX_ASSERT(new_size > 0);
+  ZX_ASSERT(type_ != memalloc::Type::kMaxExtended);
 
   if (new_size == size_bytes()) {
     return;

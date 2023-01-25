@@ -4,21 +4,19 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include "../physload.h"
-
 #include <lib/boot-options/boot-options.h>
-#include <zircon/assert.h>
 
-#include <ktl/string_view.h>
-#include <phys/allocation.h>
 #include <phys/elf-image.h>
-#include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 
-#include "../log.h"
+#include "log.h"
+#include "physboot.h"
+#include "physload.h"
 
 #include <ktl/enforce.h>
+
+PhysBootTimes gBootTimes;
 
 extern "C" void PhysLoadHandoff(Log* log, UartDriver& uart, MainSymbolize* symbolize,
                                 const BootOptions* boot_options, memalloc::Pool& allocation_pool,
@@ -33,17 +31,13 @@ extern "C" void PhysLoadHandoff(Log* log, UartDriver& uart, MainSymbolize* symbo
   gSymbolize = symbolize;
   gBootOptions = boot_options;
   Allocation::InitWithPool(allocation_pool);
+  gBootTimes = boot_times;
 
-  symbolize->set_name("physload-test");
+  ArchOnPhysLoadHandoff();
 
-  ktl::string_view me = symbolize->modules().back()->name();
-  ZX_ASSERT_MSG(me == "physload-test-data/physload-test",
-                "symbolize->name() \"%s\", last module name \"%.*s\"", symbolize->name(),
-                static_cast<int>(me.size()), me.data());
+  symbolize->set_name("physboot");
+  debugf("%s: Loading Zircon...\n", symbolize->name());
 
-  Allocation::GetPool().PrintMemoryRanges(symbolize->name());
-
-  printf("\n*** Test succeeded ***\n%s\n\n", BOOT_TEST_SUCCESS_STRING);
-
-  abort();
+  // Now we're ready for the main physboot logic.
+  BootZircon(uart, ktl::move(kernel_storage));
 }

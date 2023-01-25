@@ -40,6 +40,7 @@ Allocation Allocation::New(fbl::AllocChecker& ac, memalloc::Type type, size_t si
   ZX_ASSERT(!max_addr);
 
   Allocation alloc;
+  alloc.type_ = type;
 
   // If we need larger alignment, allocate extra pages to ensure we can get it.
   size_t alloc_size = fbl::round_up(size, kEfiPageSize);

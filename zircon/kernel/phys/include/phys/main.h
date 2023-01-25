@@ -73,4 +73,10 @@ void ArchSetUp(void* zbi);
 // Try to reboot or shut down the machine in a panic situation.
 [[noreturn]] void ArchPanicReset();
 
+// Returns the name of the current program, according to the currently
+// registered Symbolize object. If no Symbolize has yet been registered, then
+// it is assumed that we were in an early set-up context before we have had a
+// chance to construct one; in that case, "early-init" is returned.
+const char* ProgramName();
+
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_MAIN_H_

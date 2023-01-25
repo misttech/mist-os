@@ -22,20 +22,28 @@ import("//build/zbi/zbi_input.gni")
 #       to "layer" the kernel-package prefix on a prefixed collection inside.
 #     - Type: list(label)
 #
-#   data_deps
+#   * data_deps
 #     - Optional: The usual GN meaning, though in this case no resource()
 #     targets in its graph will contribute to the dependent ZBI.
 #     - Type: list(label)
 #
-#   metadata, testonly, visibility
+#   * prefix
+#     - Optional: The directory prefix for files reached by `deps`.
+#       This should be left to the default for actual kernel packages,
+#       and used only for special cases that go outside package selection.
+#     - Type: string
+#     - Default: "$target_name"
+#
+#   * metadata, testonly, visibility
 #     - Optional: The usual GN meanings.
 #
 template("kernel_package") {
   zbi_input(target_name) {
     forward_variables_from(invoker,
                            [
-                             "deps",
                              "data_deps",
+                             "deps",
+                             "prefix",
                              "testonly",
                              "visibility",
                            ])
@@ -51,6 +59,8 @@ template("kernel_package") {
     # implicit distribution_manifest() collection done here.  But it won't
     # apply to the zbi_input_args metadata found in deps/data_deps, which
     # appear *before* this target's zbi_input_args in the zbi() collection.
-    prefix = target_name
+    if (!defined(prefix)) {
+      prefix = target_name
+    }
   }
 }

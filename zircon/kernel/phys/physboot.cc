@@ -21,12 +21,11 @@
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
 #include <phys/stdio.h>
+#include <phys/symbolize.h>
 #include <phys/uart.h>
 
 #include "handoff-prep.h"
 #include "log.h"
-
-#include <ktl/enforce.h>
 
 #ifdef __x86_64__
 #include <phys/trampoline-boot.h>
@@ -49,6 +48,7 @@ constexpr uint64_t kKernelBssEstimate = 1024 * 1024 * 2;
 
 ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
   // Now we select our kernel ZBI.
+  debugf("%s: Locating ZBI file in kernel package...\n", gSymbolize->name());
   auto it = kernelfs.find(kKernelZbiName);
   if (auto result = kernelfs.take_error(); result.is_error()) {
     printf("physboot: Error in looking for kernel ZBI within STORAGE_KERNEL item: ");
@@ -63,6 +63,9 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
   }
   ktl::span<ktl::byte> kernel_bytes = {const_cast<ktl::byte*>(it->data.data()), it->data.size()};
 
+  debugf("%s: Found %zu-byte kernel ZBI, locating patches...\n", gSymbolize->name(),
+         kernel_bytes.size());
+
   // Patch the kernel image in the BOOTFS in place before loading it.
   code_patching::Patcher patcher;
   if (auto result = patcher.Init(kernelfs); result.is_error()) {
@@ -70,8 +73,10 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
     code_patching::PrintPatcherError(result.error_value());
     abort();
   }
+  debugf("%s: Applying %zu patches...\n", gSymbolize->name(), patcher.patches().size());
   ArchPatchCode(ktl::move(patcher), kernel_bytes, KERNEL_LINK_ADDRESS);
 
+  debugf("%s: Examining ZBI...\n", gSymbolize->name());
   BootZbi::InputZbi kernel_zbi(kernel_bytes);
   ChainBoot boot;
   if (auto result = boot.Init(kernel_zbi); result.is_error()) {
@@ -80,6 +85,7 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
     abort();
   }
 
+  debugf("%s: Loading ZBI kernel...\n", gSymbolize->name());
   if (auto result = boot.Load(kKernelBssEstimate); result.is_error()) {
     printf("physboot: Cannot load decompressed kernel: ");
     zbitl::PrintViewCopyError(result.error_value());
@@ -91,7 +97,8 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
 
 }  // namespace
 
-[[noreturn]] void BootZircon(KernelStorage kernel_storage) {
+[[noreturn]] void BootZircon(UartDriver& uart, KernelStorage kernel_storage) {
+  debugf("%s: Finding kernel package...\n", gSymbolize->name());
   KernelStorage::Bootfs kernelfs;
   if (auto result = kernel_storage.root().subdir(kDefaultKernelPackage); result.is_error()) {
     printf("physboot: Failed to read kernel package %.*s: ",
@@ -183,8 +190,7 @@ ChainBoot LoadZirconZbi(KernelStorage::Bootfs kernelfs) {
   // into the handoff BootOptions.  There should be no more printing from here
   // on.  TODO(fxbug.dev/84107): Actually there is some printing in BootZbi,
   // but no current drivers carry post-Init() state so it's harmless for now.
-  GetUartDriver().Visit(
-      [&handoff_options](const auto& driver) { handoff_options.serial = driver.uart(); });
+  uart.Visit([&handoff_options](const auto& driver) { handoff_options.serial = driver.uart(); });
 
   // Even though the kernel is still a ZBI and mostly using the ZBI protocol
   // for booting, the PhysHandoff pointer (physical address) is now the

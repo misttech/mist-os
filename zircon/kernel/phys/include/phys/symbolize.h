@@ -31,12 +31,6 @@ class Symbolize;
 // The Symbolize instance registered by MainSymbolize.
 extern Symbolize* gSymbolize;
 
-// Returns the name of the current program, according to the currently
-// registered Symbolize object. If no Symbolize has yet been registered, then
-// it is assumed that we were in an early set-up context before we have had a
-// chance to construct one; in that case, "early-init" is returned.
-const char* ProgramName();
-
 class Symbolize {
  public:
   template <class BootStackType>
@@ -54,6 +48,8 @@ class Symbolize {
       : name_(name), output_(f), writer_(Sink{output_}) {}
 
   const char* name() const { return name_; }
+
+  void set_name(const char* new_name) { name_ = new_name; }
 
   auto modules() const { return modules_.as_span(); }
 

@@ -6,6 +6,7 @@
 
 #include "phys/efi/file.h"
 
+#include <stdio.h>
 #include <zircon/assert.h>
 
 #include <efi/protocol/file.h>
@@ -15,7 +16,7 @@
 #include <ktl/unique_ptr.h>
 #include <phys/efi/main.h>
 #include <phys/efi/protocol.h>
-#include <phys/symbolize.h>
+#include <phys/main.h>
 
 #include "src/lib/utf_conversion/utf_conversion.h"
 

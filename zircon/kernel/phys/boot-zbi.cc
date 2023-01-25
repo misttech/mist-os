@@ -12,8 +12,8 @@
 #include <lib/zbitl/item.h>
 #include <zircon/boot/image.h>
 
+#include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/symbolize.h>
 #include <pretty/cpp/sizes.h>
 
 namespace {
