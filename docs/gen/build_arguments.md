@@ -52,7 +52,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1765
+From //build/config/BUILDCONFIG.gn:1785
 
 ### allow_legacy_data_partition_names
 
@@ -2988,7 +2988,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1512
+From //build/config/BUILDCONFIG.gn:1532
 
 ### extra_vbmeta_descriptors
 
@@ -3643,7 +3643,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -4295,6 +4295,9 @@ Each element of the list is one variant, which is a scope defining:
   configs = ["//build/config/sanitizers:hwasan"]
   tags = ["hwasan", "instrumentation-runtime", "instrumented", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only"]
 }, {
+  configs = ["//build/config/sanitizers:hwasan", "//build/config/sanitizers:ubsan"]
+  tags = ["hwasan", "instrumentation-runtime", "instrumented", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only", "ubsan"]
+}, {
   configs = ["//build/config/sanitizers:ubsan"]
   remove_common_configs = ["//build/config:no_rtti"]
   tags = ["instrumented", "instrumentation-runtime", "kernel-excluded", "ubsan"]
@@ -4368,7 +4371,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1330
+From //build/config/BUILDCONFIG.gn:1354
 
 ### legacy_base_driver_package_labels
 
@@ -6252,6 +6255,17 @@ public config (which may -include a file or add defines directly).
 
 From //third_party/pigweed/src/pw_protobuf/BUILD.gn:31
 
+### pw_protobuf_compiler_GENERATE_LEGACY_ENUM_SNAKE_CASE_NAMES
+
+pwpb previously generated field enum names in SNAKE_CASE rather than
+kConstantCase. Set this variable to temporarily enable legacy SNAKE_CASE
+support while you migrate your codebase to kConstantCase.
+b/266298474
+
+**Current value (from the default):** `true`
+
+From //third_party/pigweed/src/pw_protobuf_compiler/toolchain.gni:28
+
 ### pw_protobuf_compiler_TOOLCHAIN
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_protobuf_compiler/toolchain:protocol_buffer"`
@@ -7377,7 +7391,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1755
+From //build/config/BUILDCONFIG.gn:1775
 
 ### select_variant_canonical
 
@@ -7387,7 +7401,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1760
+From //build/config/BUILDCONFIG.gn:1780
 
 ### select_variant_shortcuts
 
@@ -7439,7 +7453,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1558
+From //build/config/BUILDCONFIG.gn:1578
 
 ### size_checker_input
 
@@ -7786,7 +7800,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -7875,7 +7889,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1542
+From //build/config/BUILDCONFIG.gn:1562
 
 ### universe_package_labels
 
@@ -8014,6 +8028,18 @@ to migrate from minfs to fxfs.
 **Current value (from the default):** `false`
 
 From //src/storage/fshost/generated_fshost_config.gni:46
+
+### use_elf_physboot
+
+Use the physload ZBI kernel and the ELF physboot module rather than
+monolithic physboot ZBI kernel.
+
+**TODO(mcgrathr):** Eventually ELF physboot become the default and the old
+ZBI physboot will be removed.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/phys/BUILD.gn:25
 
 ### use_flatland_by_default
 
