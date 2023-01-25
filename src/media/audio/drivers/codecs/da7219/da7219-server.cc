@@ -12,15 +12,11 @@ namespace audio::da7219 {
 
 // Core methods.
 
-Core::Core(Logger* logger, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c, zx::interrupt irq)
-    : logger_(logger),
-      i2c_(std::move(i2c)),
-      irq_(std::move(irq)),
-      config_(MakeConfig()),
-      loop_(&config_) {
+Core::Core(Logger* logger, fidl::ClientEnd<fuchsia_hardware_i2c::Device> i2c, zx::interrupt irq,
+           async_dispatcher_t* dispatcher)
+    : logger_(logger), i2c_(std::move(i2c)), irq_(std::move(irq)), dispatcher_(dispatcher) {
   irq_handler_.set_object(irq_.get());
-  irq_handler_.Begin(loop_.dispatcher());
-  loop_.StartThread();
+  irq_handler_.Begin(dispatcher_);
 }
 
 void Core::PlugDetected(bool plugged, bool with_mic) {
@@ -76,7 +72,6 @@ void Core::Shutdown() {
     DA7219_LOG(ERROR, "Could not deactive the HW: %s", zx_status_get_string(status));
   }
 
-  loop_.Shutdown();
   irq_handler_.Cancel();
   irq_.destroy();
 }

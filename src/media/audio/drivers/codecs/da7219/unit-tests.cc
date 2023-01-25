@@ -21,7 +21,10 @@ namespace audio::da7219 {
 
 class Da7219Test : public zxtest::Test {
  public:
-  Da7219Test() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  Da7219Test()
+      : loop_client_(&kAsyncLoopConfigNeverAttachToThread),
+        config_(MakeConfig()),
+        loop_driver_(&config_) {}
   void SetUp() override {
     // IDs check.
     mock_i2c_.ExpectWrite({0x81}).ExpectReadStop({0x23}, ZX_OK);
@@ -32,13 +35,15 @@ class Da7219Test : public zxtest::Test {
     auto i2c_endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
     EXPECT_TRUE(i2c_endpoints.is_ok());
 
-    EXPECT_OK(loop_.StartThread());
-    fidl::BindServer(loop_.dispatcher(), std::move(i2c_endpoints->server), &mock_i2c_);
+    EXPECT_OK(loop_client_.StartThread());
+    EXPECT_OK(loop_driver_.StartThread());
+    fidl::BindServer(loop_client_.dispatcher(), std::move(i2c_endpoints->server), &mock_i2c_);
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
     zx::interrupt irq2;
     ASSERT_OK(irq_.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq2));
 
-    core_ = std::make_shared<Core>(nullptr, std::move(i2c_endpoints->client), std::move(irq2));
+    core_ = std::make_shared<Core>(nullptr, std::move(i2c_endpoints->client), std::move(irq2),
+                                   loop_driver_.dispatcher());
     ASSERT_OK(core_->Initialize());
 
     auto codec_connector_endpoints =
@@ -91,9 +96,16 @@ class Da7219Test : public zxtest::Test {
   zx::interrupt& irq() { return irq_; }
 
  protected:
+  static constexpr async_loop_config_t MakeConfig() {
+    async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
+    config.irq_support = true;
+    return config;
+  }
   std::shared_ptr<zx_device> fake_root_;
   mock_i2c::MockI2c mock_i2c_;
-  async::Loop loop_;
+  async::Loop loop_client_;
+  async_loop_config_t config_;
+  async::Loop loop_driver_;
   zx::interrupt irq_;
   std::shared_ptr<Core> core_;
   fidl::WireSyncClient<fuchsia_hardware_audio::CodecConnector> codec_connector_;

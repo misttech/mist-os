@@ -73,8 +73,9 @@ zx_status_t Driver::Bind(void* ctx, zx_device_t* parent) {
   // Driver class that allows the creation of multiple instances (one for input and one for output)
   // via multiple DdkAdd invocations.
   // logger is null since it is only used with DFv2.
+  async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   auto core = std::make_shared<Core>(nullptr, std::move(i2c_endpoints->client),
-                                     std::move(result.value().value()->irq));
+                                     std::move(result.value().value()->irq), dispatcher);
   status = core->Initialize();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not initialize");

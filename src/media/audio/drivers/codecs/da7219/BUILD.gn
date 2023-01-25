@@ -51,8 +51,8 @@ source_set("common-dfv1") {
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
     "//src/devices/lib/acpi",
     "//src/devices/lib/driver",
+    "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddktl",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/hwreg-i2c",
     "//zircon/system/ulib/zx",
   ]
@@ -82,6 +82,7 @@ test("da7219-unit-tests") {
     ":common-dfv1",
     "//src/devices/i2c/testing/mock-i2c",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -122,7 +123,6 @@ source_set("common-dfv2") {
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/sys/service/cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/hwreg-i2c",
   ]
 }
