@@ -21,18 +21,31 @@ expect_includes("gvisor_test") {
   includes = [ "meta/gvisor.shard.cml" ]
 
   # Uses starbionic_test_runner
+  deps = [ "//src/proc/tests:starnix_test" ]
+}
+
+expect_includes("gvisor_test_with_expectations") {
+  includes = [ "meta/gvisor_with_expectations.shard.cml" ]
+
+  # Uses starbionic_test_runner
   deps = [ "//src/proc/tests:starnix_test_with_expectations" ]
 }
 
 template("gvisor_test_component") {
-  # Without this gn gives an error: `You set the variable "invoker" here and it was unused before it
-  # went out of scope.`
-  not_needed([ "invoker" ])
-
   meta_dir = "//src/proc/tests/android/gvisor/meta"
   starnix_test_component(target_name) {
-    use_expectations = true
-    deps = [ ":gvisor_test" ]
+    forward_variables_from(invoker, "*")
+
+    use_expectations = false
+    if (defined(invoker.use_expectations)) {
+      use_expectations = invoker.use_expectations
+    }
+
+    if (use_expectations) {
+      deps = [ ":gvisor_test_with_expectations" ]
+    } else {
+      deps = [ ":gvisor_test" ]
+    }
   }
 }
 
@@ -287,6 +300,7 @@ gvisor_benchmarks = [
 
 foreach(test_name, gvisor_tests) {
   gvisor_test_component(test_name) {
+    use_expectations = true
   }
 }
 
