@@ -583,7 +583,8 @@ async fn network_layer_state(
                 .iter_health()
                 .fold_while(
                     (false, false),
-                    |(found_healthy_neighbors, _found_healthy_gateway), (neighbor, health)| {
+                    |(discovered_healthy_neighbors, _discovered_healthy_gateway),
+                     (neighbor, health)| {
                         let is_gateway = device_routes.iter().any(|route| {
                             route
                                 .next_hop
@@ -596,7 +597,10 @@ async fn network_layer_state(
                             // keeping whether we've previously found a healthy neighbor.
                             neighbor_cache::NeighborHealth::Unhealthy { .. }
                             | neighbor_cache::NeighborHealth::Unknown => {
-                                itertools::FoldWhile::Continue((found_healthy_neighbors, false))
+                                itertools::FoldWhile::Continue((
+                                    discovered_healthy_neighbors,
+                                    false,
+                                ))
                             }
                             // If there's a healthy gateway, then we're done. If it's
                             // not a gateway, then we know we have a healthy neighbor, but
@@ -613,10 +617,6 @@ async fn network_layer_state(
                 .into_inner()
         }
     };
-
-    if device_routes.is_empty() && !discovered_healthy_neighbors {
-        return State::Up;
-    }
 
     let relevant_routes = device_routes.iter().filter(
         |fnet_stack::ForwardingEntry { subnet, device_id: _, next_hop: _, metric: _ }| {
@@ -662,19 +662,87 @@ async fn network_layer_state(
         .await
         .is_some();
 
-    // Neighbor table is not always up to date within each iteration of the probe because the
-    // neighbors table is updated in a separate stream. Therefore, we can consider response to ping
-    // as a signal of an active gateway or use the neighbor discovery signal.
-    // TODO(https://fxbug.dev/119354): Ping internet even if default gateway isn't responding to
-    // probes
-    if !gateway_pingable && !discovered_healthy_gateway {
-        return State::Local;
-    };
+    // The neighbor table is not always up to date within each iteration of the probe
+    // because the neighbors table is updated in a separate stream. Therefore, we can
+    // consider response to ping as a signal of an active gateway or use the neighbor
+    // discovery signal. Potentially, both signals could be inaccurate, so we
+    // continue to ping internet even if local network signals fail.
 
-    if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
-        return State::Gateway;
-    }
-    return State::Internet;
+    // In the match suite below, all possible states for the three booleans have been
+    // included. A few states should never be reached, but are included for
+    // completeness and metrics tracking.
+    // -----------------------------------------------------------------------------
+    // | discovered | discovered | gateway  |                                      |
+    // | healthy    | healthy    | pingable | state                                |
+    // | neighbors  | gateway    |          |                                      |
+    // |------------|------------|----------|--------------------------------------|
+    // | false      | false      | false    | If there are no routes on the device,|
+    // |            |            |          | Up, or else Local.                   |
+    // |------------|------------|----------|--------------------------------------|
+    // | false      | false      | true     | If internet is pingable, Internet,   |
+    // |            |            |          | or else Gateway.                     |
+    // |------------|------------|----------|--------------------------------------|
+    // | false      | true       | false    | Invalid state                        |
+    // |------------|------------|----------|--------------------------------------|
+    // | false      | true       | true     | Invalid state                        |
+    // |------------|------------|----------|--------------------------------------|
+    // | true       | false      | false    | If internet is pingable, Internet, or|
+    // |            |            |          | else Local.                          |
+    // |------------|------------|----------|--------------------------------------|
+    // | true       | false      | true     | If internet is pingable, Internet, or|
+    // |            |            |          | else Gateway.                        |
+    // |------------|------------|----------|--------------------------------------|
+    // | true       | true       | false    | If internet is pingable, Internet, or|
+    // |            |            |          | else Gateway.                        |
+    // |------------|------------|----------|--------------------------------------|
+    // | true       | true       | true     | If internet is pingable, Internet, or|
+    // |            |            |          | else Gateway.                        |
+    // -----------------------------------------------------------------------------
+
+    return match (discovered_healthy_neighbors, discovered_healthy_gateway, gateway_pingable) {
+        // TODO(fxbug.dev/120510): Add metrics for tracking abnormal states
+        (false, false, false) => {
+            if device_routes.is_empty() {
+                return State::Up;
+            }
+            State::Local
+        }
+        (false, false, true) => {
+            if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
+                return State::Gateway;
+            }
+            tracing::info!("gateway ARP/ND  failing with internet available");
+            return State::Internet;
+        }
+        (false, true, _) => {
+            error!(
+                "invalid state: cannot have gateway discovered while neighbors are undiscovered"
+            );
+            State::None
+        }
+        (true, false, gateway_pingable) => {
+            if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
+                if gateway_pingable {
+                    return State::Gateway;
+                }
+                return State::Local;
+            }
+            tracing::info!("gateway ARP/ND failing with internet available");
+            if !gateway_pingable {
+                tracing::info!("gateway ping failing with internet available");
+            }
+            State::Internet
+        }
+        (true, true, gateway_pingable) => {
+            if !p.ping(name, std::net::SocketAddr::new(internet_ping_address, 0)).await {
+                return State::Gateway;
+            }
+            if !gateway_pingable {
+                tracing::info!("gateway ping failing with internet available");
+            }
+            State::Internet
+        }
+    };
 }
 
 #[cfg(test)]
@@ -877,6 +945,7 @@ mod tests {
 
         let fnet_ext::IpAddress(net1_gateway_ext) = net1_gateway.into();
 
+        // TODO(fxrev.dev/120580): Extract test cases into variants/helper function
         assert_eq!(
             network_layer_state(
                 ETHERNET_INTERFACE_NAME,
@@ -893,6 +962,90 @@ mod tests {
             .await,
             State::Internet,
             "All is good. Can reach internet"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
+                &route_table,
+                &FakePing {
+                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
+                    gateway_response: false,
+                    internet_response: true,
+                },
+                Some(&InterfaceNeighborCache {
+                    neighbors: [(
+                        net1_gateway,
+                        NeighborState::new(NeighborHealth::Healthy {
+                            last_observed: fuchsia_zircon::Time::default(),
+                        })
+                    )]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr
+            )
+            .await,
+            State::Internet,
+            "Can reach internet, gateway responding via ARP/ND"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
+                &route_table,
+                &FakePing {
+                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
+                    gateway_response: false,
+                    internet_response: true,
+                },
+                Some(&InterfaceNeighborCache {
+                    neighbors: [(
+                        net1,
+                        NeighborState::new(NeighborHealth::Healthy {
+                            last_observed: fuchsia_zircon::Time::default(),
+                        })
+                    )]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr,
+            )
+            .await,
+            State::Internet,
+            "Gateway not responding via ping or ARP/ND. Can reach internet"
+        );
+
+        assert_eq!(
+            network_layer_state(
+                ETHERNET_INTERFACE_NAME,
+                ID1,
+                &route_table_4,
+                &FakePing {
+                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
+                    gateway_response: true,
+                    internet_response: true,
+                },
+                Some(&InterfaceNeighborCache {
+                    neighbors: [(
+                        net1_gateway,
+                        NeighborState::new(NeighborHealth::Healthy {
+                            last_observed: fuchsia_zircon::Time::default(),
+                        })
+                    )]
+                    .iter()
+                    .cloned()
+                    .collect::<HashMap<fnet::IpAddress, NeighborState>>()
+                }),
+                ping_internet_addr,
+            )
+            .await,
+            State::Internet,
+            "No default route, but healthy gateway with internet/gateway response"
         );
 
         assert_eq!(
@@ -967,24 +1120,6 @@ mod tests {
             .await,
             State::Local,
             "No default route"
-        );
-
-        assert_eq!(
-            network_layer_state(
-                ETHERNET_INTERFACE_NAME,
-                ID1,
-                &route_table_4,
-                &FakePing {
-                    gateway_addrs: std::iter::once(net1_gateway_ext).collect(),
-                    gateway_response: true,
-                    internet_response: true,
-                },
-                None,
-                ping_internet_addr,
-            )
-            .await,
-            State::Local,
-            "No default route, with internet and gateway response"
         );
 
         assert_eq!(
