@@ -240,7 +240,7 @@ impl FileOps for TimerFile {
             handler(events);
         };
         waiter
-            .wake_on_signals(
+            .wake_on_zircon_signals(
                 &self.timer,
                 TimerFile::get_signals_from_events(events),
                 Box::new(signal_handler),

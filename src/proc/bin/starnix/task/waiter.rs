@@ -234,12 +234,12 @@ impl Waiter {
         key
     }
 
-    /// Establish an asynchronous wait for the signals on the given handle,
-    /// optionally running a FnOnce.
-    pub fn wake_on_signals(
+    /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
+    /// confused with POSIX signals), optionally running a FnOnce.
+    pub fn wake_on_zircon_signals(
         &self,
         handle: &dyn zx::AsHandleRef,
-        signals: zx::Signals,
+        zx_signals: zx::Signals,
         handler: SignalHandler,
         options: WaitAsyncOptions,
     ) -> Result<WaitKey, zx::Status> {
@@ -250,7 +250,7 @@ impl Waiter {
         } else {
             zx::WaitAsyncOpts::empty()
         };
-        handle.wait_async_handle(&self.0.port, key, signals, zx_options)?;
+        handle.wait_async_handle(&self.0.port, key, zx_signals, zx_options)?;
         Ok(WaitKey { key })
     }
 

@@ -334,7 +334,7 @@ pub fn zxio_wait_async(
 
     let (handle, signals) = zxio.wait_begin(get_zxio_signals_from_events(events));
     // unwrap OK here as errors are only generated from misuse
-    waiter.wake_on_signals(&handle, signals, Box::new(signal_handler), options).unwrap()
+    waiter.wake_on_zircon_signals(&handle, signals, Box::new(signal_handler), options).unwrap()
 }
 
 pub fn zxio_cancel_wait(zxio: &Arc<Zxio>, waiter: &Waiter, key: WaitKey) -> bool {
