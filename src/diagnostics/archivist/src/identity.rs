@@ -8,6 +8,7 @@ use crate::events::{
 };
 use diagnostics_message::MonikerWithUrl;
 use fidl_fuchsia_sys_internal::SourceIdentity;
+use flyweights::FlyStr;
 use std::convert::TryFrom;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -17,16 +18,16 @@ pub struct ComponentIdentity {
     pub relative_moniker: Moniker,
 
     /// Instance id (only set for v1 components)
-    pub instance_id: Option<String>,
+    pub instance_id: Option<Box<str>>,
 
     /// The url with which the associated component was launched.
-    pub url: String,
+    pub url: FlyStr,
 }
 
 impl ComponentIdentity {
     pub fn from_identifier_and_url(
         identifier: ComponentIdentifier,
-        url: impl Into<String>,
+        url: impl Into<FlyStr>,
     ) -> Self {
         ComponentIdentity {
             relative_moniker: identifier.relative_moniker_for_selectors(),
@@ -42,7 +43,7 @@ impl ComponentIdentity {
     pub fn unknown() -> Self {
         Self::from_identifier_and_url(
             ComponentIdentifier::Legacy {
-                instance_id: "0".to_string(),
+                instance_id: "0".into(),
                 moniker: vec!["UNKNOWN"].into(),
             },
             "fuchsia-pkg://UNKNOWN",
@@ -56,7 +57,7 @@ impl ComponentIdentity {
     pub fn unique_key(&self) -> UniqueKey {
         let mut key = self.relative_moniker.iter().cloned().collect::<Vec<_>>();
         if let Some(instance_id) = &self.instance_id {
-            key.push(instance_id.clone())
+            key.push(instance_id.into())
         }
         key.into()
     }
@@ -70,7 +71,7 @@ impl TryFrom<SourceIdentity> for ComponentIdentity {
         moniker.push(component.component_name);
         let id = ComponentIdentifier::Legacy {
             moniker: moniker.into(),
-            instance_id: component.instance_id,
+            instance_id: component.instance_id.into_boxed_str(),
         };
         Ok(Self::from_identifier_and_url(id, component.component_url))
     }
@@ -79,19 +80,19 @@ impl TryFrom<SourceIdentity> for ComponentIdentity {
 #[cfg(test)]
 impl From<Vec<&str>> for ComponentIdentity {
     fn from(moniker_segments: Vec<&str>) -> Self {
-        Self { relative_moniker: moniker_segments.into(), instance_id: None, url: "".to_string() }
+        Self { relative_moniker: moniker_segments.into(), instance_id: None, url: "".into() }
     }
 }
 
 impl From<ComponentIdentity> for MonikerWithUrl {
     fn from(identity: ComponentIdentity) -> Self {
-        Self { moniker: identity.to_string(), url: identity.url }
+        Self { moniker: identity.to_string(), url: identity.url.into() }
     }
 }
 
 impl From<&ComponentIdentity> for MonikerWithUrl {
     fn from(identity: &ComponentIdentity) -> Self {
-        Self { moniker: identity.to_string(), url: identity.url.clone() }
+        Self { moniker: identity.to_string(), url: identity.url.to_string() }
     }
 }
 

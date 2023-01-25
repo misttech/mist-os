@@ -145,6 +145,18 @@ impl From<String> for FlyStr {
     }
 }
 
+impl From<Box<str>> for FlyStr {
+    fn from(s: Box<str>) -> Self {
+        Self::new(s)
+    }
+}
+
+impl From<&Box<str>> for FlyStr {
+    fn from(s: &Box<str>) -> Self {
+        Self::new(&**s)
+    }
+}
+
 impl Into<String> for FlyStr {
     fn into(self) -> String {
         self.as_str().to_owned()

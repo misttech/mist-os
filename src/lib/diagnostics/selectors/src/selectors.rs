@@ -297,12 +297,13 @@ where
 ///
 /// Requires: hierarchy_path is not empty.
 ///           selectors contains valid Selectors.
-pub fn match_component_moniker_against_selectors<'a, T>(
-    moniker: &[String],
-    selectors: &'a [T],
+pub fn match_component_moniker_against_selectors<'a, T, S>(
+    moniker: &[T],
+    selectors: &'a [S],
 ) -> Result<Vec<&'a Selector>, anyhow::Error>
 where
-    T: Borrow<Selector>,
+    T: AsRef<str> + std::string::ToString,
+    S: Borrow<Selector>,
 {
     if moniker.is_empty() {
         return Err(format_err!(
@@ -334,12 +335,13 @@ where
 ///
 /// Requires: moniker is not empty.
 ///           component_selectors contains valid ComponentSelectors.
-pub fn match_moniker_against_component_selectors<'a, T>(
-    moniker: &[String],
-    selectors: &'a [T],
+pub fn match_moniker_against_component_selectors<'a, S, T>(
+    moniker: &[T],
+    selectors: &'a [S],
 ) -> Result<Vec<&'a ComponentSelector>, anyhow::Error>
 where
-    T: Borrow<ComponentSelector> + 'a,
+    S: Borrow<ComponentSelector> + 'a,
+    T: AsRef<str> + std::string::ToString,
 {
     if moniker.is_empty() {
         return Err(format_err!(

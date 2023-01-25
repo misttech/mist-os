@@ -423,7 +423,7 @@ mod tests {
         static ref LEGACY_IDENTITY: Arc<ComponentIdentity> =
             Arc::new(ComponentIdentity::from_identifier_and_url(
                 ComponentIdentifier::Legacy {
-                    instance_id: "12345".to_string(),
+                    instance_id: "12345".to_string().into_boxed_str(),
                     moniker: vec!["a", "b", "foo.cmx"].into(),
                 },
                 TEST_URL

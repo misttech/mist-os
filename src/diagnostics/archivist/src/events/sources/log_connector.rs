@@ -88,6 +88,7 @@ mod tests {
         LogConnectionListenerMarker, LogConnectionListenerProxy, LogConnectorMarker,
         LogConnectorRequest, LogConnectorRequestStream, SourceIdentity,
     };
+    use flyweights::FlyStr;
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use std::collections::BTreeSet;
@@ -132,8 +133,8 @@ mod tests {
             .expect("on new connection");
         let event = event_stream.next().await.expect("received event");
         let expected_identity = ComponentIdentity {
-            url: "fuchsia-pkg://test".to_string(),
-            instance_id: Some("0".to_string()),
+            url: FlyStr::new("fuchsia-pkg://test"),
+            instance_id: Some("0".to_string().into_boxed_str()),
             relative_moniker: vec!["testing"].into(),
         };
         match event.payload {

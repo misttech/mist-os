@@ -101,7 +101,7 @@ impl LogsArtifactsContainer {
         budget: BudgetHandle,
     ) -> Self {
         let stats = LogStreamStats::default()
-            .with_inspect(parent_node, identity.relative_moniker.join("/"))
+            .with_inspect(parent_node, identity.relative_moniker.to_string())
             .expect("failed to attach component log stats");
         stats.set_url(&identity.url);
         let new = Self {
@@ -175,7 +175,7 @@ impl LogsArtifactsContainer {
                                             LogsDataBuilder::new(BuilderArgs {
                                                 moniker: identity.to_string(),
                                                 timestamp_nanos: (*last_timestamp).into(),
-                                                component_url: Some(identity.url.clone()),
+                                                component_url: Some(identity.url.to_string()),
                                                 severity: diagnostics_data::Severity::Warn,
                                             })
                                             .add_error(
@@ -651,8 +651,8 @@ mod tests {
             LogsArtifactsContainer::new(
                 Arc::new(ComponentIdentity::from_identifier_and_url(
                     ComponentIdentifier::Moniker(vec![
-                        MonikerSegment { name: "foo".to_string(), collection: None },
-                        MonikerSegment { name: "bar".to_string(), collection: None },
+                        MonikerSegment { name: "foo".into(), collection: None },
+                        MonikerSegment { name: "bar".into(), collection: None },
                     ]),
                     "fuchsia-pkg://test",
                 )),

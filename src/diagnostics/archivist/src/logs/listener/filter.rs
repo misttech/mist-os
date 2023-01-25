@@ -126,7 +126,7 @@ mod tests {
         );
         let mut builder = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: fuchsia_zircon::Time::from_nanos(1).into(),
-            component_url: Some(identity.url.clone()),
+            component_url: Some(identity.url.to_string()),
             moniker: identity.to_string(),
             severity: Severity::Info,
         });

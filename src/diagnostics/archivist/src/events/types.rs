@@ -13,14 +13,15 @@ use fidl_fuchsia_io as fio;
 use fidl_fuchsia_logger as flogger;
 use fidl_fuchsia_sys_internal::SourceIdentity;
 use fidl_table_validation::ValidFidlTable;
+use flyweights::FlyStr;
 use fuchsia_zircon as zx;
 use std::{convert::TryFrom, ops::Deref, sync::Arc};
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct Moniker(Vec<String>);
+pub struct Moniker(Vec<FlyStr>);
 
 impl Deref for Moniker {
-    type Target = Vec<String>;
+    type Target = Vec<FlyStr>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -28,27 +29,33 @@ impl Deref for Moniker {
 
 impl std::fmt::Display for Moniker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.join("/"))
+        for (i, segment) in self.0.iter().enumerate() {
+            write!(f, "{segment}")?;
+            if i != self.0.len() - 1 {
+                write!(f, "/")?;
+            }
+        }
+        Ok(())
     }
 }
 
 impl From<Vec<&str>> for Moniker {
     fn from(other: Vec<&str>) -> Moniker {
-        Moniker(other.into_iter().map(|s| s.to_string()).collect())
+        Moniker(other.into_iter().map(|s| s.into()).collect())
     }
 }
 
 impl From<Vec<String>> for Moniker {
     fn from(other: Vec<String>) -> Moniker {
-        Moniker(other)
+        Moniker(other.into_iter().map(FlyStr::from).collect())
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct UniqueKey(Vec<String>);
+pub struct UniqueKey(Vec<FlyStr>);
 
 impl Deref for UniqueKey {
-    type Target = Vec<String>;
+    type Target = Vec<FlyStr>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
@@ -56,18 +63,24 @@ impl Deref for UniqueKey {
 
 impl From<Vec<String>> for UniqueKey {
     fn from(other: Vec<String>) -> UniqueKey {
-        UniqueKey(other)
+        UniqueKey(other.into_iter().map(FlyStr::from).collect())
     }
 }
 
 impl From<Vec<&str>> for UniqueKey {
     fn from(other: Vec<&str>) -> UniqueKey {
-        UniqueKey(other.into_iter().map(|s| s.to_string()).collect())
+        UniqueKey(other.into_iter().map(|s| s.into()).collect())
     }
 }
 
-impl From<UniqueKey> for Vec<String> {
-    fn from(other: UniqueKey) -> Vec<String> {
+impl From<Vec<FlyStr>> for UniqueKey {
+    fn from(other: Vec<FlyStr>) -> UniqueKey {
+        UniqueKey(other)
+    }
+}
+
+impl From<UniqueKey> for Vec<FlyStr> {
+    fn from(other: UniqueKey) -> Vec<FlyStr> {
         other.0
     }
 }
@@ -152,9 +165,9 @@ impl std::fmt::Debug for LogSinkRequestedPayload {
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct MonikerSegment {
     /// The name of the component's collection, if any.
-    pub collection: Option<String>,
+    pub collection: Option<FlyStr>,
     /// The name of the component.
-    pub name: String,
+    pub name: FlyStr,
 }
 
 impl std::fmt::Display for MonikerSegment {
@@ -174,7 +187,7 @@ pub enum ComponentIdentifier {
         moniker: Moniker,
 
         /// The instance ID of the component.
-        instance_id: String,
+        instance_id: Box<str>,
     },
     Moniker(Vec<MonikerSegment>),
 }
@@ -189,7 +202,7 @@ impl ComponentIdentifier {
                 if segments.is_empty() {
                     Moniker(vec![])
                 } else {
-                    Moniker(segments.iter().map(|s| s.to_string()).collect())
+                    Moniker(segments.iter().map(|s| s.to_string().into()).collect())
                 }
             }
         }
@@ -199,13 +212,13 @@ impl ComponentIdentifier {
         match self {
             Self::Legacy { instance_id, .. } => {
                 let mut key = self.relative_moniker_for_selectors().0;
-                key.push(instance_id.clone());
+                key.push(instance_id.into());
                 UniqueKey(key)
             }
             Self::Moniker(segments) => {
                 let mut key = vec![];
                 for segment in segments {
-                    key.push(segment.to_string());
+                    key.push(segment.to_string().into());
                 }
                 UniqueKey(key)
             }
@@ -216,14 +229,14 @@ impl ComponentIdentifier {
         if moniker == "<component_manager>" {
             return Ok(ComponentIdentifier::Moniker(vec![MonikerSegment {
                 collection: None,
-                name: "<component_manager>".to_string(),
+                name: "<component_manager>".into(),
             }]));
         }
 
         if moniker == "." {
             return Ok(ComponentIdentifier::Moniker(vec![MonikerSegment {
                 collection: None,
-                name: "<root>".to_string(),
+                name: "<root>".into(),
             }]));
         }
 
@@ -236,11 +249,9 @@ impl ComponentIdentifier {
             let mut parts = raw_segment.split(':');
             let segment = match (parts.next(), parts.next()) {
                 // we have a component name and a collection
-                (Some(c), Some(n)) => {
-                    MonikerSegment { collection: Some(c.to_string()), name: n.to_string() }
-                }
+                (Some(c), Some(n)) => MonikerSegment { collection: Some(c.into()), name: n.into() },
                 // we have a component name
-                (Some(n), None) => MonikerSegment { collection: None, name: n.to_string() },
+                (Some(n), None) => MonikerSegment { collection: None, name: n.into() },
                 _ => return Err(MonikerError::InvalidSegment(raw_segment.to_string())),
             };
             segments.push(segment);

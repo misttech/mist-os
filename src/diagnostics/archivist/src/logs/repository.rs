@@ -20,6 +20,7 @@ use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
 use diagnostics_data::LogsData;
 use fidl_fuchsia_diagnostics::{self, LogInterestSelector, Selector, StreamMode};
+use flyweights::FlyStr;
 use fuchsia_async as fasync;
 use fuchsia_inspect as inspect;
 use fuchsia_trace as ftrace;
@@ -232,7 +233,7 @@ impl EventConsumer for LogsRepository {
 }
 
 pub struct LogsRepositoryState {
-    logs_data_store: trie::Trie<String, Arc<LogsArtifactsContainer>>,
+    logs_data_store: trie::Trie<FlyStr, Arc<LogsArtifactsContainer>>,
     inspect_node: inspect::Node,
 
     /// Receives the logger tasks. This will be taken once in wait for termination hence why it's

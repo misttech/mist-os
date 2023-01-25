@@ -227,7 +227,7 @@ mod tests {
     fn fake_message(timestamp: i64) -> LogsData {
         diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
             timestamp_nanos: timestamp.into(),
-            component_url: Some(TEST_IDENTITY.url.clone()),
+            component_url: Some(TEST_IDENTITY.url.to_string()),
             moniker: TEST_IDENTITY.to_string(),
             severity: Severity::Debug,
         })

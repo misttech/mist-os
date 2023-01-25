@@ -43,6 +43,7 @@ mod tests {
     use super::*;
     use crate::events::types::*;
     use fidl_fuchsia_logger::LogSinkMarker;
+    use flyweights::FlyStr;
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use std::collections::BTreeSet;
@@ -62,8 +63,8 @@ mod tests {
 
         let event = event_stream.next().await.expect("received event");
         let expected_identity = ComponentIdentity {
-            url: "fuchsia-pkg://UNKNOWN".to_string(),
-            instance_id: Some("0".to_string()),
+            url: FlyStr::new("fuchsia-pkg://UNKNOWN"),
+            instance_id: Some("0".to_string().into_boxed_str()),
             relative_moniker: vec!["UNKNOWN"].into(),
         };
         match event.payload {

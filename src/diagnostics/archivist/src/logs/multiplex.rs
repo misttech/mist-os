@@ -103,7 +103,7 @@ impl<I> Multiplexer<I> {
         match &component_selectors {
             None => true,
             Some(selectors) => selectors::match_moniker_against_component_selectors(
-                &identity.relative_moniker,
+                identity.relative_moniker.as_slice(),
                 selectors,
             )
             .map(|matched_selectors| !matched_selectors.is_empty())

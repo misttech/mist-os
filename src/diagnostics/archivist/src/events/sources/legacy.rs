@@ -135,7 +135,7 @@ mod tests {
             ComponentIdentity::from_identifier_and_url(
                 ComponentIdentifier::Legacy {
                     moniker: moniker.into(),
-                    instance_id: other.instance_id,
+                    instance_id: other.instance_id.into_boxed_str(),
                 },
                 &*MOCK_URL,
             )

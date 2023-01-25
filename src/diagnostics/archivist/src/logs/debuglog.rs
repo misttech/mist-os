@@ -181,7 +181,7 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.clone()),
+                component_url: Some(KERNEL_IDENTITY.url.to_string()),
                 moniker: KERNEL_IDENTITY.to_string(),
                 severity: Severity::Info,
             })
@@ -213,7 +213,7 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.clone()),
+                component_url: Some(KERNEL_IDENTITY.url.to_string()),
                 moniker: KERNEL_IDENTITY.to_string(),
                 severity: Severity::Info,
             })
@@ -231,7 +231,7 @@ mod tests {
             data,
             LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.clone()),
+                component_url: Some(KERNEL_IDENTITY.url.to_string()),
                 moniker: KERNEL_IDENTITY.to_string(),
                 severity: Severity::Info,
             })
@@ -265,7 +265,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![LogsDataBuilder::new(BuilderArgs {
                 timestamp_nanos: klog.record.timestamp.into(),
-                component_url: Some(KERNEL_IDENTITY.url.clone()),
+                component_url: Some(KERNEL_IDENTITY.url.to_string()),
                 moniker: KERNEL_IDENTITY.to_string(),
                 severity: Severity::Info,
             })

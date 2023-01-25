@@ -18,6 +18,7 @@ use async_trait::async_trait;
 use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{self, Selector};
 use fidl_fuchsia_io as fio;
+use flyweights::FlyStr;
 use fuchsia_async as fasync;
 use fuchsia_fs;
 use futures::channel::{mpsc, oneshot};
@@ -158,7 +159,7 @@ struct InspectRepositoryInner {
     // simplciity, we maintain the ComponentIdentity inside as that one contains the instance id
     // which would make the identity unique in v1.
     diagnostics_directories:
-        trie::Trie<String, (Arc<ComponentIdentity>, InspectArtifactsContainer)>,
+        trie::Trie<FlyStr, (Arc<ComponentIdentity>, InspectArtifactsContainer)>,
 
     /// Tasks waiting for PEER_CLOSED signals on diagnostics directories are sent here.
     diagnostics_dir_closed_snd: mpsc::UnboundedSender<fasync::Task<()>>,
@@ -268,7 +269,7 @@ mod tests {
     async fn inspect_repo_disallows_duplicated_dirs() {
         let inspect_repo = Arc::new(InspectRepository::default());
         let moniker = vec!["a", "b", "foo.cmx"].into();
-        let instance_id = "1234".to_string();
+        let instance_id = "1234".to_string().into_boxed_str();
 
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
@@ -306,7 +307,7 @@ mod tests {
     async fn data_repo_updates_existing_entry_to_hold_inspect_data() {
         let data_repo = Arc::new(InspectRepository::default());
         let moniker = vec!["a", "b", "foo.cmx"].into();
-        let instance_id = "1234".to_string();
+        let instance_id = "1234".to_string().into_boxed_str();
 
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
@@ -334,7 +335,7 @@ mod tests {
     async fn repo_removes_entries_when_inspect_is_disconnected() {
         let data_repo = Arc::new(InspectRepository::default());
         let moniker = vec!["a", "b", "foo.cmx"].into();
-        let instance_id = "1234".to_string();
+        let instance_id = "1234".to_string().into_boxed_str();
         let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
@@ -365,7 +366,8 @@ mod tests {
         let data_repo = Arc::new(InspectRepository::new(vec![Arc::downgrade(&pipeline)]));
         let moniker = vec!["a", "b", "foo.cmx"].into();
         let instance_id = "1234".to_string();
-        let component_id = ComponentIdentifier::Legacy { instance_id, moniker };
+        let component_id =
+            ComponentIdentifier::Legacy { instance_id: instance_id.into_boxed_str(), moniker };
         let identity = Arc::new(ComponentIdentity::from_identifier_and_url(component_id, TEST_URL));
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("create directory proxy");
@@ -408,7 +410,7 @@ mod tests {
     async fn data_repo_filters_inspect_by_selectors() {
         let data_repo = Arc::new(InspectRepository::default());
         let realm_path = vec!["a".to_string(), "b".to_string()];
-        let instance_id = "1234".to_string();
+        let instance_id = "1234".to_string().into_boxed_str();
 
         let mut moniker = realm_path.clone();
         moniker.push("foo.cmx".to_string());
@@ -434,7 +436,7 @@ mod tests {
         let mut moniker = realm_path;
         moniker.push("foo2.cmx".to_string());
         let component_id2 = ComponentIdentifier::Legacy {
-            instance_id: "12345".to_string(),
+            instance_id: "12345".to_string().into_boxed_str(),
             moniker: moniker.into(),
         };
         let identity2 =
