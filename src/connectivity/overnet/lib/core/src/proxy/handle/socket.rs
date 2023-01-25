@@ -102,13 +102,11 @@ impl IO<'_> for SocketWriter {
         socket: &Socket,
         fut_ctx: &mut Context<'_>,
     ) -> Poll<Result<(), zx_status::Status>> {
-        let n = ready!(Pin::new(&mut &socket.socket).poll_write(fut_ctx, &mut msg.0))?;
-        if n == msg.0.len() {
-            Poll::Ready(Ok(()))
-        } else {
+        while !msg.0.is_empty() {
+            let n = ready!(Pin::new(&mut &socket.socket).poll_write(fut_ctx, &mut msg.0))?;
             msg.0.drain(..n);
-            Poll::Pending
         }
+        Poll::Ready(Ok(()))
     }
 }
 
@@ -146,5 +144,38 @@ impl Serializer for SocketMessageSerializer {
     ) -> Poll<Result<(), Error>> {
         std::mem::swap(bytes, &mut msg.0);
         Poll::Ready(Ok(()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use futures::AsyncReadExt as _;
+
+    #[fuchsia::test]
+    async fn stream_socket_partial_write() {
+        let (tx, rx) = fidl::Socket::create(fidl::SocketOpts::STREAM).expect("create socket");
+        let socket = tx.into_proxied().expect("create proxied socket");
+
+        const KERNEL_BUF_SIZE: usize = 257024;
+        const EXPECTED_DATA: u8 = 0xff;
+        const EXPECTED_LEN: usize = KERNEL_BUF_SIZE * 2;
+
+        let mut writer = SocketWriter::new();
+        let mut msg = SocketMessage(vec![EXPECTED_DATA; EXPECTED_LEN]);
+        // Write more than the size of the underlying kernel buffer into the
+        // proxied socket to exercise that overnet handles partial writes to the
+        // zircon socket correctly.
+        fuchsia_async::Task::spawn(async {
+            futures::future::poll_fn(move |cx| writer.poll_io(&mut msg, &socket, cx))
+                .await
+                .expect("write to socket")
+        })
+        .detach();
+
+        let mut data = vec![0u8; EXPECTED_LEN];
+        let mut rx = fuchsia_async::Socket::from_socket(rx).expect("create async socket");
+        rx.read_exact(&mut data).await.expect("read from socket");
+        assert_eq!(data, vec![EXPECTED_DATA; EXPECTED_LEN]);
     }
 }
