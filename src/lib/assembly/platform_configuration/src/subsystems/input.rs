@@ -7,8 +7,8 @@ use assembly_config_schema::platform_config::input_config::PlatformInputConfig;
 
 pub(crate) struct InputSubsystemConfig;
 impl DefineSubsystemConfiguration<PlatformInputConfig> for InputSubsystemConfig {
-    fn define_configuration<'a>(
-        _context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        _context: &ConfigurationContext<'_>,
         input_config: &PlatformInputConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {

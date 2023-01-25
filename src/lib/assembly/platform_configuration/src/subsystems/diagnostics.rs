@@ -9,8 +9,8 @@ use assembly_config_schema::platform_config::diagnostics_config::{
 
 pub(crate) struct DiagnosticsSubsystem;
 impl DefineSubsystemConfiguration<Option<DiagnosticsConfig>> for DiagnosticsSubsystem {
-    fn define_configuration<'a>(
-        _context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        _context: &ConfigurationContext<'_>,
         diagnostics_config: &Option<DiagnosticsConfig>,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {

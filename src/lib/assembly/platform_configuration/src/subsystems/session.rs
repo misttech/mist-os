@@ -7,8 +7,8 @@ use anyhow::ensure;
 
 pub(crate) struct SessionConfig;
 impl DefineSubsystemConfiguration<String> for SessionConfig {
-    fn define_configuration<'a>(
-        _context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        _context: &ConfigurationContext<'_>,
         session_url: &String,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {

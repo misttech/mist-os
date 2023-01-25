@@ -12,8 +12,8 @@ use assembly_config_schema::{BoardInformation, BuildType, FeatureSupportLevel};
 pub(crate) trait DefineSubsystemConfiguration<T> {
     /// Given the feature_set_level and build_type, along with the configuration
     /// schema for the subsystem, add its configuration to the builder.
-    fn define_configuration<'a>(
-        context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        context: &ConfigurationContext<'_>,
         subsystem_config: &T,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()>;
@@ -211,7 +211,7 @@ impl PackageConfigBuilder for PackageConfiguration {
             }
             Entry::Occupied(_) => {
                 Err(anyhow!("Each component's configuration can only be set once"))
-                    .with_context(|| format!("Setting configuration for component: {}", pkg_path))
+                    .with_context(|| format!("Setting configuration for component: {pkg_path}"))
                     .with_context(|| anyhow!("Setting configuration for package: {}", self.name))
             }
         }
@@ -225,7 +225,7 @@ impl ComponentConfigBuilder for ComponentConfiguration {
         key: &str,
         value: serde_json::Value,
     ) -> Result<&mut dyn ComponentConfigBuilder> {
-        if let Some(_) = self.fields.insert(key.to_owned(), value.into()) {
+        if self.fields.insert(key.to_owned(), value).is_some() {
             Err(anyhow!("Each Structured Config field can only be set once for a component"))
                 .with_context(|| {
                     format!("Setting configuration for component: {}", self.manifest_path)
@@ -263,7 +263,7 @@ impl BootfsConfigBuilder for BootfsConfig {
             Entry::Occupied(_) => {
                 Err(anyhow!("Each component's configuration can only be set once"))
                     .with_context(|| {
-                        format!("Setting configuration for component: {}", component_manifest_path)
+                        format!("Setting configuration for component: {component_manifest_path}")
                     })
                     .context("Setting configuration in bootfs")
             }

@@ -10,8 +10,8 @@ use assembly_config_schema::{
 
 pub(crate) struct DevelopmentConfig;
 impl DefineSubsystemConfiguration<Option<DevelopmentSupportConfig>> for DevelopmentConfig {
-    fn define_configuration<'a>(
-        context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        context: &ConfigurationContext<'_>,
         config: &Option<DevelopmentSupportConfig>,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {

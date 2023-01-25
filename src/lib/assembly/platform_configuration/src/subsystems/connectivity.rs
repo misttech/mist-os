@@ -8,8 +8,8 @@ use assembly_config_schema::FeatureSupportLevel;
 
 pub(crate) struct ConnectivitySubsystemConfig;
 impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySubsystemConfig {
-    fn define_configuration<'a>(
-        context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        context: &ConfigurationContext<'_>,
         connectivity_config: &PlatformConnectivityConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {

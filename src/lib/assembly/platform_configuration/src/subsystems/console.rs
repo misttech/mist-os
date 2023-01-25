@@ -31,8 +31,8 @@ const BASE_CONSOLE_DENIED_TAGS: &[&str] = &["NUD", "klog"];
 
 pub(crate) struct ConsoleSubsystemConfig;
 impl DefineSubsystemConfiguration<Vec<String>> for ConsoleSubsystemConfig {
-    fn define_configuration<'a>(
-        _context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        _context: &ConfigurationContext<'_>,
         additional_serial_log_tags: &Vec<String>,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {

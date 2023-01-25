@@ -9,8 +9,8 @@ use assembly_config_schema::{
 
 pub(crate) struct IdentitySubsystemConfig;
 impl DefineSubsystemConfiguration<PlatformIdentityConfig> for IdentitySubsystemConfig {
-    fn define_configuration<'a>(
-        context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        context: &ConfigurationContext<'_>,
         identity_config: &PlatformIdentityConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {

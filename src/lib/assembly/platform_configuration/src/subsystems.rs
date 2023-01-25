@@ -33,8 +33,8 @@ const EXAMPLE_ENABLED_FLAG: &str = "assembly_example_enabled";
 
 struct CommonBundles;
 impl DefineSubsystemConfiguration<()> for CommonBundles {
-    fn define_configuration<'a>(
-        context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        context: &ConfigurationContext<'_>,
         _: &(),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {

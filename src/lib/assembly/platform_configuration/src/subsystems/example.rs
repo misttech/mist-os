@@ -8,8 +8,8 @@ use assembly_config_schema::BuildType;
 
 pub(crate) struct ExampleSubsystemConfig;
 impl DefineSubsystemConfiguration<()> for ExampleSubsystemConfig {
-    fn define_configuration<'a>(
-        context: &ConfigurationContext<'a>,
+    fn define_configuration(
+        context: &ConfigurationContext<'_>,
         _subsystem_config: &(),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
