@@ -922,4 +922,24 @@ where
             ..Telemetry::EMPTY
         })
     }
+
+    async fn get_feature_config(&self) -> ZxResult<FeatureConfig> {
+        let driver_state = self.driver_state.lock();
+        let ot = &driver_state.ot_instance;
+
+        Ok(FeatureConfig { trel_enabled: Some(ot.trel_is_enabled()), ..FeatureConfig::EMPTY })
+    }
+
+    async fn update_feature_config(&self, config: FeatureConfig) -> ZxResult<()> {
+        let driver_state = self.driver_state.lock();
+        let ot = &driver_state.ot_instance;
+
+        if let Some(trel_enabled) = config.trel_enabled {
+            if trel_enabled != ot.trel_is_enabled() {
+                ot.trel_set_enabled(trel_enabled);
+            }
+        }
+
+        Ok(())
+    }
 }

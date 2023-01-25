@@ -332,6 +332,19 @@ pub trait Driver: Send + Sync {
             ..Telemetry::EMPTY
         })
     }
+
+    /// Returns the current OpenThread feature configuration for this
+    /// interface.
+    ///
+    /// A blank field in the returned value means that feature is not
+    /// supported.
+    async fn get_feature_config(&self) -> ZxResult<FeatureConfig>;
+
+    /// Updates the current OpenThread feature configuration for this
+    /// interface.
+    ///
+    /// Any field left blank in `config` will leave that field unchanged.
+    async fn update_feature_config(&self, _config: FeatureConfig) -> ZxResult<()>;
 }
 
 /// Wraps around a FIDL responder to prevent a drop from causing a shutdown.
@@ -1171,6 +1184,47 @@ impl<T: Driver> ServeTo<CountersRequestStream> for T {
         request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
             |err| {
                 fx_log_err!("Error serving CountersRequestStream: {:?}", err);
+
+                if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
+                    request_control_handle.shutdown_with_epitaph(*epitaph);
+                }
+
+                err
+            },
+        )
+    }
+}
+
+#[async_trait()]
+impl<T: Driver> ServeTo<FeatureRequestStream> for T {
+    async fn serve_to(&self, request_stream: FeatureRequestStream) -> anyhow::Result<()> {
+        let request_control_handle = request_stream.control_handle();
+
+        let closure = |command| async {
+            match command {
+                FeatureRequest::UpdateFeatureConfig { responder, config, .. } => {
+                    let responder = ResponderNoShutdown::wrap(responder);
+                    self.update_feature_config(config)
+                        .err_into::<Error>()
+                        .and_then(|()| ready(responder.unwrap().send().map_err(Error::from)))
+                        .await
+                        .context("error in UpdateFeatureConfig request")?;
+                }
+                FeatureRequest::GetFeatureConfig { responder, .. } => {
+                    let responder = ResponderNoShutdown::wrap(responder);
+                    self.get_feature_config()
+                        .err_into::<Error>()
+                        .and_then(|x| ready(responder.unwrap().send(x).map_err(Error::from)))
+                        .await
+                        .context("error in GetFeatureConfig request")?;
+                }
+            }
+            Result::<(), Error>::Ok(())
+        };
+
+        request_stream.err_into::<Error>().try_for_each_concurrent(None, closure).await.map_err(
+            |err| {
+                fx_log_err!("Error serving FeatureRequestStream: {:?}", err);
 
                 if let Some(epitaph) = err.downcast_ref::<ZxStatus>() {
                     request_control_handle.shutdown_with_epitaph(*epitaph);

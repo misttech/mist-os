@@ -475,4 +475,12 @@ impl Driver for DummyDevice {
     async fn make_joinable(&self, _duration: fuchsia_zircon::Duration, _port: u16) -> ZxResult<()> {
         Ok(())
     }
+
+    async fn get_feature_config(&self) -> ZxResult<FeatureConfig> {
+        Ok(FeatureConfig::EMPTY)
+    }
+
+    async fn update_feature_config(&self, _config: FeatureConfig) -> ZxResult<()> {
+        Ok(())
+    }
 }
