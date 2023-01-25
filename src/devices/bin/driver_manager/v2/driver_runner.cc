@@ -585,13 +585,13 @@ zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
 zx::result<> DriverRunner::CreateComponent(std::string name, Collection collection, std::string url,
                                            CreateComponentOpts opts) {
   fidl::Arena arena;
-  fdecl::wire::Child child_decl(arena);
-  child_decl.set_name(arena, fidl::StringView::FromExternal(name))
-      .set_url(arena, fidl::StringView::FromExternal(url))
-      .set_startup(fdecl::wire::StartupMode::kLazy);
-  fcomponent::wire::CreateChildArgs child_args(arena);
+  auto child_decl_builder = fdecl::wire::Child::Builder(arena);
+  child_decl_builder.name(fidl::StringView::FromExternal(name))
+      .url(fidl::StringView::FromExternal(url))
+      .startup(fdecl::wire::StartupMode::kLazy);
+  auto child_args_builder = fcomponent::wire::CreateChildArgs::Builder(arena);
   if (opts.node != nullptr) {
-    child_args.set_dynamic_offers(arena, opts.node->offers());
+    child_args_builder.dynamic_offers(opts.node->offers());
   }
   fprocess::wire::HandleInfo handle_info;
   if (opts.token) {
@@ -599,8 +599,8 @@ zx::result<> DriverRunner::CreateComponent(std::string name, Collection collecti
         .handle = std::move(opts.token),
         .id = kTokenId,
     };
-    child_args.set_numbered_handles(
-        arena, fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
+    child_args_builder.numbered_handles(
+        fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
   }
   auto open_callback = [name,
                         url](fidl::WireUnownedResult<fcomponent::Realm::OpenExposedDir>& result) {
@@ -638,8 +638,8 @@ zx::result<> DriverRunner::CreateComponent(std::string name, Collection collecti
         }
       };
   realm_
-      ->CreateChild(fdecl::wire::CollectionRef{.name = CollectionName(collection)}, child_decl,
-                    child_args)
+      ->CreateChild(fdecl::wire::CollectionRef{.name = CollectionName(collection)},
+                    child_decl_builder.Build(), child_args_builder.Build())
       .Then(std::move(create_callback));
   return zx::ok();
 }

@@ -59,10 +59,6 @@ source_set("driver_runner") {
     "//src/lib/ddk",
     "//src/lib/storage/vfs/cpp",
   ]
-
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 executable("driver_runner_test") {
@@ -83,10 +79,6 @@ executable("driver_runner_test") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zircon-internal",
   ]
-
-  # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
-  # rather than builders.
-  configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
 fuchsia_unittest_component("driver-runner-test") {

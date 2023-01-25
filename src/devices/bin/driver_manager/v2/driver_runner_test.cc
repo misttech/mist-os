@@ -371,18 +371,18 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     program_entries[1].value =
         fdata::wire::DictionaryValue::WithStr(arena, driver.colocate ? "true" : "false");
 
-    fdata::wire::Dictionary program(arena);
-    program.set_entries(arena, std::move(program_entries));
+    auto program_builder = fdata::wire::Dictionary::Builder(arena);
+    program_builder.entries(std::move(program_entries));
 
     auto outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     EXPECT_EQ(ZX_OK, outgoing_endpoints.status_value());
 
-    frunner::wire::ComponentStartInfo start_info(arena);
-    start_info.set_resolved_url(arena, driver.url)
-        .set_program(arena, std::move(program))
-        .set_ns(arena)
-        .set_outgoing_dir(std::move(outgoing_endpoints->server))
-        .set_numbered_handles(arena, realm().GetHandles());
+    auto start_info_builder = frunner::wire::ComponentStartInfo::Builder(arena);
+    start_info_builder.resolved_url(driver.url)
+        .program(program_builder.Build())
+        .outgoing_dir(std::move(outgoing_endpoints->server))
+        .ns({})
+        .numbered_handles(realm().GetHandles());
 
     auto controller_endpoints = fidl::CreateEndpoints<frunner::ComponentController>();
     EXPECT_EQ(ZX_OK, controller_endpoints.status_value());
@@ -390,7 +390,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     {
       fidl::WireServer<frunner::ComponentRunner>::StartCompleter::Sync completer(&transaction);
       fidl::WireRequest<frunner::ComponentRunner::Start> request{
-          start_info, std::move(controller_endpoints->server)};
+          start_info_builder.Build(), std::move(controller_endpoints->server)};
       static_cast<fidl::WireServer<frunner::ComponentRunner>&>(driver_runner)
           .Start(&request, completer);
     }
