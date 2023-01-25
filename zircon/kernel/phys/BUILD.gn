@@ -10,10 +10,20 @@ import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/arch/$zircon_cpu/phys/phys.gni")
+import("//zircon/kernel/kernel_package.gni")
 import("//zircon/kernel/params.gni")
 import("kernel_elf_binary.gni")
 import("kernel_elf_interp.gni")
 import("zbi_executable.gni")
+
+declare_args() {
+  # Use the physload ZBI kernel and the ELF physboot module rather than
+  # monolithic physboot ZBI kernel.
+  #
+  # **TODO(mcgrathr):** Eventually ELF physboot become the default and the old
+  # ZBI physboot will be removed.
+  use_elf_physboot = false
+}
 
 arch_phys = "//zircon/kernel/arch/$zircon_cpu/phys"
 
@@ -572,7 +582,7 @@ group("boot_tests") {
   ]
 }
 
-zbi_executable("physboot") {
+zbi_executable("zbi-physboot") {
   sources = [ "physboot-zbi-main.cc" ]
   deps = [
     ":allocation",
@@ -587,6 +597,24 @@ zbi_executable("physboot") {
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/libc",
   ]
+}
+
+# TODO(mcgrathr): When the switch is removed, rename physboot.package to
+# physboot and remove this group.
+group("physboot") {
+  if (use_elf_physboot) {
+    public_deps = [ ":physboot.package" ]
+  } else {
+    public_deps = [ ":zbi-physboot" ]
+  }
+}
+
+kernel_package("physboot.package") {
+  visibility = [ ":*" ]
+
+  # Just "physboot" at top level is the default for `kernel.phys.next`.
+  prefix = ""
+  deps = [ ":elf-physboot(:kernel.phys_$current_cpu)" ]
 }
 
 if (toolchain_environment == "kernel.phys") {
