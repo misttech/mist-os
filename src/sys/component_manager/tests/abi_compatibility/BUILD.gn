@@ -1,0 +1,94 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/component/config.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+
+rustc_test("integration_bin") {
+  edition = "2021"
+  name = "abi_integration_test"
+  source_root = "src/integration_test.rs"
+  deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
+    "//src/lib/versioning/version-history/rust:version-history",
+    "//src/sys/lib/cm_rust",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
+  ]
+  sources = [ "src/integration_test.rs" ]
+}
+
+fuchsia_component("integration_test") {
+  testonly = true
+  manifest = "meta/integration_test.cml"
+  deps = [ ":integration_bin" ]
+}
+fuchsia_test_package("abi_compatibility_tests") {
+  test_components = [ ":integration_test" ]
+  deps = [
+    ":component_manager_allow_all",
+    ":component_manager_enforce_presence",
+    ":component_manager_enforce_presence_compatibility",
+    "//src/sys/component_manager:component-manager-realm-builder-cmp",
+  ]
+}
+
+component_config(
+    "component_manager_abi_enforce_presence_compatibility_config") {
+  sources = [ "configs/abi_enforce_presence_compatibility_config.json5" ]
+  dest = "data/component_manager_enforce_presence_compatibility_config"
+}
+
+fuchsia_component("component_manager_enforce_presence_compatibility") {
+  testonly = true
+  deps = [
+    ":component_manager_abi_enforce_presence_compatibility_config",
+    "//src/sys/component_manager:bin",
+  ]
+  manifest = "meta/component_manager_enforce_presence_compatibility.cml"
+}
+
+component_config("component_manager_abi_enforce_presence_config") {
+  sources = [ "configs/abi_enforce_presence_config.json5" ]
+  dest = "data/component_manager_enforce_presence_config"
+}
+
+fuchsia_component("component_manager_enforce_presence") {
+  testonly = true
+  deps = [
+    ":component_manager_abi_enforce_presence_config",
+    "//src/sys/component_manager:bin",
+  ]
+  manifest = "meta/component_manager_enforce_presence.cml"
+}
+
+component_config("component_manager_abi_allow_all_config") {
+  sources = [ "configs/abi_allow_all_config.json5" ]
+  dest = "data/component_manager_allow_all_config"
+}
+
+fuchsia_component("component_manager_allow_all") {
+  testonly = true
+  deps = [
+    ":component_manager_abi_allow_all_config",
+    "//src/sys/component_manager:bin",
+  ]
+  manifest = "meta/component_manager_allow_all.cml"
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":abi_compatibility_tests" ]
+}

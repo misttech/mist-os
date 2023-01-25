@@ -79,6 +79,8 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Mod
                 ModelError::ResolverError { url: component.component_url.clone(), err }
             })?;
         let component_info = Component::try_from(component_info)?;
+        let policy = component.context.abi_revision_policy();
+        policy.check_compatibility(&component.abs_moniker, component_info.abi_revision)?;
         if first_resolve {
             {
                 let mut state = component.lock_state().await;
