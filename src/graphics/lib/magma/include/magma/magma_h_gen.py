@@ -76,7 +76,7 @@ def top_level_docs():
         '// The Magma bindings are OS independent so a client driver targeting Magma can easily be built\n'
         '// for Fuchsia or Linux. On Fuchsia the APIs are backed by Zircon and FIDL; for virtualized Linux\n'
         '// they are backed by a virtualization transport (virtmagma). APIs prefixed by \'magma_virt_\' are\n'
-        '// for virtualization only.\n'
+        '// for virtualization only.  32-bit and 64-bit builds are supported for virtualized clients.\n'
         '//\n'
         '// On Fuchsia the system driver is a separate process, so Magma APIs follow a feed forward design\n'
         '// where possible to allow for efficient pipelining of requests.\n'
