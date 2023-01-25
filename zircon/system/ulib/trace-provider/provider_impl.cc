@@ -4,8 +4,8 @@
 
 #include "provider_impl.h"
 
-#include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
-#include <fidl/fuchsia.tracing/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.provider/cpp/wire.h>
+#include <fidl/fuchsia.tracing/cpp/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/zx/process.h>
 #include <stdio.h>
@@ -23,13 +23,13 @@
 
 namespace {
 trace_buffering_mode_t FidlBufferingModeToTraceEngineBufferingMode(
-    fuchsia_tracing::BufferingMode buffering_mode) {
+    fuchsia_tracing::wire::BufferingMode buffering_mode) {
   switch (buffering_mode) {
-    case fuchsia_tracing::BufferingMode::kOneshot:
+    case fuchsia_tracing::wire::BufferingMode::kOneshot:
       return TRACE_BUFFERING_MODE_ONESHOT;
-    case fuchsia_tracing::BufferingMode::kCircular:
+    case fuchsia_tracing::wire::BufferingMode::kCircular:
       return TRACE_BUFFERING_MODE_CIRCULAR;
-    case fuchsia_tracing::BufferingMode::kStreaming:
+    case fuchsia_tracing::wire::BufferingMode::kStreaming:
       return TRACE_BUFFERING_MODE_STREAMING;
   }
 }
@@ -37,19 +37,20 @@ trace_buffering_mode_t FidlBufferingModeToTraceEngineBufferingMode(
 trace_start_mode_t FidlBufferingDispositionToTraceEngineStartMode(
     fuchsia_tracing::BufferDisposition buffer_disposition) {
   switch (buffer_disposition) {
-    case fuchsia_tracing::BufferDisposition::kClearEntire:
+    case fuchsia_tracing::wire::BufferDisposition::kClearEntire:
       return TRACE_START_CLEAR_ENTIRE_BUFFER;
-    case fuchsia_tracing::BufferDisposition::kClearNondurable:
+    case fuchsia_tracing::wire::BufferDisposition::kClearNondurable:
       return TRACE_START_CLEAR_NONDURABLE_BUFFER;
-    case fuchsia_tracing::BufferDisposition::kRetain:
+    case fuchsia_tracing::wire::BufferDisposition::kRetain:
       return TRACE_START_RETAIN_BUFFER;
   }
 }
 
-std::vector<std::string> CloneCategories(const fuchsia_tracing_provider::ProviderConfig& config) {
+std::vector<std::string> CloneCategories(
+    const fuchsia_tracing_provider::wire::ProviderConfig& config) {
   std::vector<std::string> categories;
-  categories.reserve(config.categories().size());
-  for (const auto& category : config.categories()) {
+  categories.reserve(config.categories.count());
+  for (const auto& category : config.categories) {
     categories.emplace_back(category.data(), category.size());
   }
   return categories;
@@ -70,23 +71,24 @@ TraceProviderImpl::TraceProviderImpl(std::string name, async_dispatcher_t* dispa
          fidl::ServerEnd<fuchsia_tracing_provider::Provider> server_end) { OnClose(); });
 }
 
-void TraceProviderImpl::Initialize(InitializeRequest& request,
-                                   InitializeCompleter::Sync& completer) {
-  fuchsia_tracing_provider::ProviderConfig& config = request.config();
+void TraceProviderImpl::Initialize(
+    fuchsia_tracing_provider::wire::ProviderInitializeRequest* request,
+    InitializeCompleter::Sync& completer) {
+  fuchsia_tracing_provider::wire::ProviderConfig& config = request->config;
   Session::InitializeEngine(
-      dispatcher_, FidlBufferingModeToTraceEngineBufferingMode(config.buffering_mode()),
-      std::move(config.buffer()), std::move(config.fifo()), CloneCategories(config));
+      dispatcher_, FidlBufferingModeToTraceEngineBufferingMode(config.buffering_mode),
+      std::move(config.buffer), std::move(config.fifo), CloneCategories(config));
   provider_config_ = {
-      .buffering_mode = FidlBufferingModeToTraceEngineBufferingMode(config.buffering_mode()),
+      .buffering_mode = FidlBufferingModeToTraceEngineBufferingMode(config.buffering_mode),
       .categories = CloneCategories(config),
   };
 }
 
-void TraceProviderImpl::Start(StartRequest& request, StartCompleter::Sync& completer) {
-  const fuchsia_tracing_provider::StartOptions& options = request.options();
+void TraceProviderImpl::Start(fuchsia_tracing_provider::wire::ProviderStartRequest* request,
+                              StartCompleter::Sync& completer) {
+  const fuchsia_tracing_provider::wire::StartOptions& options = request->options;
   // TODO(fxbug.dev/22973): Add support for additional categories.
-  Session::StartEngine(
-      FidlBufferingDispositionToTraceEngineStartMode(options.buffer_disposition()));
+  Session::StartEngine(FidlBufferingDispositionToTraceEngineStartMode(options.buffer_disposition));
 }
 
 void TraceProviderImpl::Stop(StopCompleter::Sync& completer) { Session::StopEngine(); }
@@ -104,12 +106,15 @@ void TraceProviderImpl::GetKnownCategories(GetKnownCategoriesCompleter::Sync& co
             return;
           }
           auto known_categories = result.take_value();
-          std::vector<fuchsia_tracing::KnownCategory> known_categories_fidl;
+          std::vector<fuchsia_tracing::wire::KnownCategory> known_categories_fidl;
           known_categories_fidl.reserve(known_categories.size());
           for (const auto& known_category : known_categories) {
-            known_categories_fidl.emplace_back(known_category.name, known_category.description);
+            known_categories_fidl.push_back(fuchsia_tracing::wire::KnownCategory{
+                fidl::StringView::FromExternal(known_category.name),
+                fidl::StringView::FromExternal(known_category.description)});
           }
-          completer.Reply(known_categories_fidl);
+          completer.Reply(fidl::VectorView<fuchsia_tracing::wire::KnownCategory>::FromExternal(
+              known_categories_fidl));
         });
     executor_.schedule_task(std::move(promise));
     return;
