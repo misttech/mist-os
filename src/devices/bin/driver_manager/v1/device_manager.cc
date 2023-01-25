@@ -12,35 +12,6 @@
 
 namespace fdm = fuchsia_device_manager;
 
-namespace {
-
-// TODO(fxb/118905): Remove debug logs once the flake is resolved.
-void LogTopologicalPath(const fbl::RefPtr<Device> dev) {
-  auto result = dev->GetTopologicalPath();
-  if (result.is_ok()) {
-    LOGF(INFO, "Added device at %s", result->c_str());
-  } else {
-    LOGF(WARNING, "Unable to retrieve topological path for device %s: %s", dev->name().data(),
-         zx_status_get_string(result.status_value()));
-  }
-
-  if (dev->name() != "backlight") {
-    return;
-  }
-
-  if (!dev->parent()) {
-    LOGF(WARNING, "Flake debug(fxb/118905): backlight missing parent");
-    return;
-  }
-
-  LOGF(INFO, "Flake debug(fxb/118905): Logging backlight's parent's children:");
-  for (const auto& child : dev->children()) {
-    LOGF(INFO, "   child: %s", child->name().c_str());
-  }
-}
-
-}  // namespace
-
 DeviceManager::DeviceManager(Coordinator* coordinator, DriverHostCrashPolicy crash_policy)
     : coordinator_(coordinator), crash_policy_(crash_policy) {}
 
@@ -192,8 +163,6 @@ zx_status_t DeviceManager::AddDevice(
           dev->props().size(), dev->parent().get());
   }
 
-  LogTopologicalPath(dev);
-
   *new_device = std::move(dev);
   return ZX_OK;
 }
@@ -219,10 +188,7 @@ zx_status_t DeviceManager::AddCompositeDevice(const fbl::RefPtr<Device>& dev, st
   return ZX_OK;
 }
 
-void DeviceManager::AddToDevices(fbl::RefPtr<Device> new_device) {
-  LogTopologicalPath(new_device);
-  devices_.push_back(new_device);
-}
+void DeviceManager::AddToDevices(fbl::RefPtr<Device> new_device) { devices_.push_back(new_device); }
 
 void DeviceManager::ScheduleRemove(const fbl::RefPtr<Device>& dev) {
   dev->CreateUnbindRemoveTasks(
