@@ -562,7 +562,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/1c:00:1/gt6853-touch/gt6853",
 
       // Amber LED.
-      "sys/platform/05:00:1c/gpio-light",
+      "sys/platform/05:00:1c/aml_light",
       "class/light/000",
 
       "sys/platform/05:05:1:1/aml-gpio/gpio-82/spi-1/aml-spi-1/spi/spi-1-0/spi-banjo-1-0/selina-composite/selina",
@@ -595,6 +595,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/pt/sherlock",
       "sys/platform/05:04:1/aml-gpio",
       "sys/platform/05:00:14/clocks",
+      "sys/platform/05:00:1c/aml_light",
       "sys/platform/05:00:2/aml-i2c",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/05:04:a/aml-thermal-pll/thermal",
@@ -630,7 +631,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:1d",  // pwm
       "sys/platform/05:04:15/aml-mipi/imx227-sensor/imx227/gdc",
       "sys/platform/05:04:15/aml-mipi/imx227-sensor/imx227/ge2d",
-      "sys/platform/05:00:1c/gpio-light",
+      "sys/platform/05:00:1c/aml_light",
       "sys/platform/05:04:15/aml-mipi/imx227-sensor",
       "sys/platform/05:04:15/aml-mipi/imx227-sensor/imx227/isp",
       "sys/platform/05:04:15/aml-mipi/imx227-sensor/imx227/isp/arm-isp/camera-controller",

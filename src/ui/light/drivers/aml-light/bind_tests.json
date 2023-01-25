@@ -1,48 +1,69 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.GPIO_LIGHT",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "match",
-        "name": "All Match"
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.GPIO_LIGHT",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.GPIO_LIGHT",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "abort",
-        "name": "Mismatch Protocol"
+        "node": "gpio-amber-led",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.GPIO_AMBER_LED",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.GPIO_LIGHT",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC"
-        },
-        "expected": "abort",
-        "name": "Mismatch VID"
+        "node": "pwm-amber-led",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.pwm.BIND_PROTOCOL.PWM",
+                    "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.AMBER_LED"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.GPIO_LIGHT",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "abort",
-        "name": "Mismatch PID"
+        "node": "gpio-green-led",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.GPIO_GREEN_LED",
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC"
-        },
-        "expected": "abort",
-        "name": "Mismatch DID"
+        "node": "pwm-green-led",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.pwm.BIND_PROTOCOL.PWM",
+                    "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.GREEN_LED"
+                }
+            }
+        ]
     }
 ]

@@ -12,9 +12,16 @@ driver_bind_rules("aml_light_bind") {
   header_output = "aml_light_bind.h"
   bind_output = "aml-light.bindbc"
   tests = "bind_tests.json"
+
+  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # fragments for composite bind rules.
+  disable_fragment_gen = true
+
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.pwm",
   ]
 }
 

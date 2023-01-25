@@ -9,8 +9,14 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/component/cpp/node_group.h>
 
+#include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/ams/platform/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/lights.h>
 #include <ddktl/metadata/light-sensor.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
@@ -18,7 +24,6 @@
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/nelson_gpio_light_bind.h"
 #include "src/devices/board/drivers/nelson/nelson_tcs3400_light_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
@@ -107,20 +112,52 @@ zx_status_t Nelson::LightInit() {
     zxlogf(ERROR, "%s: Configure mute LED GPIO on failed %d", __func__, status);
   }
 
+  auto amber_led_gpio_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d3::GPIOAO_PIN_ID_PIN_11),
+  };
+
+  auto amber_led_gpio_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_GPIO_AMBER_LED),
+  };
+
+  auto amber_led_pwm_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PWM_ID,
+                              bind_fuchsia_amlogic_platform_s905d3::BIND_PWM_ID_PWM_AO_A),
+  };
+
+  auto amber_led_pwm_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_pwm::BIND_PROTOCOL_PWM),
+      fdf::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                        bind_fuchsia_pwm::PWM_ID_FUNCTION_AMBER_LED),
+  };
+
+  auto nodes = std::vector{
+      fuchsia_driver_framework::NodeRepresentation{{
+          .bind_rules = amber_led_gpio_bind_rules,
+          .properties = amber_led_gpio_properties,
+      }},
+      fuchsia_driver_framework::NodeRepresentation{{
+          .bind_rules = amber_led_pwm_bind_rules,
+          .properties = amber_led_pwm_properties,
+      }},
+  };
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('LIGH');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, light_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, gpio_light_fragments,
-                                               std::size(gpio_light_fragments)),
-      "pdev");
+  auto node_group = fuchsia_driver_framework::NodeGroup{{.name = "light_dev", .nodes = nodes}};
+  auto result = pbus_.buffer(arena)->AddNodeGroup(fidl::ToWire(fidl_arena, light_dev),
+                                                  fidl::ToWire(fidl_arena, node_group));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Light(light_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddNodeGroup Light(light_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Light(light_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddNodeGroup Light(light_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

@@ -144,21 +144,6 @@ driver_bind_rules("astro-video-bind") {
   ]
 }
 
-driver_bind_rules("astro-gpio-light-bind") {
-  rules = "bind/astro-gpio-light.bind"
-  header_output = "astro-gpio-light-bind.h"
-  bind_output = "astro-gpio-light-bind.bc"
-  tests = "bind-tests/astro-gpio-light-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
-  ]
-}
-
 driver_bind_rules("tcs3400-light-bind") {
   rules = "bind/tcs3400-light.bind"
   header_output = "tcs3400-light-bind.h"
@@ -334,7 +319,6 @@ fuchsia_driver("astro-driver") {
     ":astro-dai-test-out-bind_header",
     ":astro-display-bind_header",
     ":astro-dwc2-phy-bind_header",
-    ":astro-gpio-light-bind_header",
     ":astro-mali-bind_header",
     ":astro-pwm-bind_header",
     ":astro-securemem-bind_header",
@@ -366,6 +350,7 @@ fuchsia_driver("astro-driver") {
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/broadcom",
@@ -429,7 +414,6 @@ group("tests") {
     ":astro-dai-test-out-bind_test",
     ":astro-display-bind_test",
     ":astro-dwc2-phy-bind_test",
-    ":astro-gpio-light-bind_test",
     ":astro-mali-bind_test",
     ":astro-pwm-bind_test",
     ":astro-securemem-bind_test",

@@ -2,10 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.amlogic.platform;
-using fuchsia.platform;
+composite aml_light;
 
-fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
-fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.GPIO_LIGHT;
+using fuchsia.amlogic.platform;
+using fuchsia.gpio;
+using fuchsia.platform;
+using fuchsia.pwm;
+
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+  fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.GPIO_LIGHT;
+}
+
+node "gpio-amber-led" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.GPIO_AMBER_LED;
+}
+
+node "pwm-amber-led" {
+  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.AMBER_LED;
+}
+
+optional node "gpio-green-led" {
+  fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.GPIO_GREEN_LED;
+}
+
+optional node "pwm-green-led" {
+  fuchsia.BIND_PROTOCOL == fuchsia.pwm.BIND_PROTOCOL.PWM;
+  fuchsia.pwm.PWM_ID_FUNCTION == fuchsia.pwm.PWM_ID_FUNCTION.GREEN_LED;
+}

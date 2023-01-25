@@ -16,4 +16,6 @@ extend uint fuchsia.BIND_INIT_STEP {
 enum FUNCTION {
    TOUCH_INTERRUPT,
    TOUCH_RESET,
+   GPIO_AMBER_LED,
+   GPIO_GREEN_LED,
 };

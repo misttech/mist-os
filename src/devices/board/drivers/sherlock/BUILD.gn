@@ -287,21 +287,6 @@ driver_bind_rules("sherlock-xhci-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-gpio-light-bind") {
-  rules = "bind/sherlock-gpio-light.bind"
-  header_output = "sherlock-gpio-light-bind.h"
-  bind_output = "sherlock-gpio-light-bind.bc"
-  tests = "bind-tests/sherlock-gpio-light-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
-  ]
-}
-
 driver_bind_rules("sherlock-light-sensor-bind") {
   rules = "bind/sherlock-light-sensor.bind"
   header_output = "sherlock-light-sensor-bind.h"
@@ -602,7 +587,6 @@ template("sherlock_driver") {
       ":sherlock-display-bind_header",
       ":sherlock-dwc2-phy-bind_header",
       ":sherlock-emmc-bind_header",
-      ":sherlock-gpio-light-bind_header",
       ":sherlock-hevc-enc-bind_header",
       ":sherlock-light-sensor-bind_header",
       ":sherlock-mali-bind_header",
@@ -643,6 +627,7 @@ template("sherlock_driver") {
       "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
       "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
       "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+      "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
       "//src/devices/bus/lib/platform-bus-composites",
       "//src/devices/lib/amlogic",
       "//src/devices/lib/broadcom",

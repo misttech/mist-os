@@ -99,20 +99,6 @@ driver_bind_rules("nelson_tcs3400_light_bind") {
   ]
 }
 
-driver_bind_rules("nelson_gpio_light_bind") {
-  rules = "bind/nelson_gpio_light.bind"
-  header_output = "nelson_gpio_light_bind.h"
-  bind_output = "nelson_gpio_light_bind.bc"
-  tests = "bind-tests/nelson_gpio_light-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
-  ]
-}
-
 driver_bind_rules("nelson_mali_bind") {
   rules = "bind/nelson_mali.bind"
   header_output = "nelson_mali_bind.h"
@@ -415,7 +401,6 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson_display_bind_header",
     ":nelson_dwc2_bind_header",
     ":nelson_emmc_bind_header",
-    ":nelson_gpio_light_bind_header",
     ":nelson_mali_bind_header",
     ":nelson_ot_radio_bind_header",
     ":nelson_selina_bind_header",
@@ -447,8 +432,11 @@ fuchsia_driver("nelson-module-driver") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/connectivity/openthread/lib/ot-radio",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.amlogic.platform.s905d3:fuchsia.amlogic.platform.s905d3_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
+    "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
+    "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/bus/lib/platform-bus-composites",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/broadcom",
@@ -514,7 +502,6 @@ group("tests") {
     ":nelson_bt_uart_bind_test",
     ":nelson_display_bind_test",
     ":nelson_dwc2_bind_test",
-    ":nelson_gpio_light_bind_test",
     ":nelson_mali_bind_test",
     ":nelson_ot_radio_bind_test",
     ":nelson_selina_bind_test",
