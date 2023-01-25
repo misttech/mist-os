@@ -130,7 +130,7 @@ impl PackageManifest {
     ///
     /// This directory must be a flat file that contains all the package blobs.
     pub fn from_blobs_dir(dir: &Path, meta_far_hash: Hash) -> Result<Self, PackageManifestError> {
-        let meta_far_path = dir.join(meta_far_hash.to_string());
+        let meta_far_path = dir.join(meta_far_hash.to_string()).canonicalize()?;
 
         let mut meta_far_file = File::open(&meta_far_path)?;
         let meta_far_size = meta_far_file.metadata()?.len();
@@ -614,6 +614,7 @@ mod tests {
     use {
         super::*,
         crate::PackageBuildManifest,
+        camino::Utf8Path,
         fuchsia_merkle::Hash,
         pretty_assertions::assert_eq,
         serde_json::json,
@@ -822,10 +823,12 @@ mod tests {
     #[test]
     fn test_from_blobs_dir() {
         let temp = TempDir::new().unwrap();
-        let gen_dir = temp.path().join("gen");
+        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
+
+        let gen_dir = temp_dir.join("gen");
         std::fs::create_dir_all(&gen_dir).unwrap();
 
-        let blobs_dir = temp.path().join("blobs");
+        let blobs_dir = temp_dir.join("blobs");
         std::fs::create_dir_all(&blobs_dir).unwrap();
 
         // Helper to write some content into a blob.
@@ -837,7 +840,7 @@ mod tests {
             let path = blobs_dir.join(hash.to_string());
             std::fs::write(&path, contents).unwrap();
 
-            (path.to_str().unwrap().to_string(), hash)
+            (path, hash)
         };
 
         // Create a package.
@@ -849,20 +852,18 @@ mod tests {
         std::fs::write(&meta_package_path, r#"{"name":"package","version":"0"}"#).unwrap();
 
         let external_contents = BTreeMap::from([
-            ("file-1".into(), file1_path.clone()),
-            ("file-2".into(), file2_path.clone()),
+            ("file-1".into(), file1_path.to_string()),
+            ("file-2".into(), file2_path.to_string()),
         ]);
 
-        let far_contents = BTreeMap::from([(
-            MetaPackage::PATH.into(),
-            meta_package_path.to_str().unwrap().to_string(),
-        )]);
+        let far_contents =
+            BTreeMap::from([(MetaPackage::PATH.into(), meta_package_path.to_string())]);
 
         let package_build_manifest =
             PackageBuildManifest::from_external_and_far_contents(external_contents, far_contents)
                 .unwrap();
 
-        let gen_meta_far_path = temp.path().join("meta.far");
+        let gen_meta_far_path = temp_dir.join("meta.far");
         let _package_manifest = crate::build::build(
             &package_build_manifest,
             &gen_meta_far_path,
@@ -884,7 +885,7 @@ mod tests {
         // We should be able to create a manifest from the blob directory that matches the one
         // created by the builder.
         assert_eq!(
-            PackageManifest::from_blobs_dir(&blobs_dir, meta_far_hash).unwrap(),
+            PackageManifest::from_blobs_dir(blobs_dir.as_std_path(), meta_far_hash).unwrap(),
             PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
                 package: PackageMetadata {
                     name: "package".parse().unwrap(),
@@ -892,19 +893,19 @@ mod tests {
                 },
                 blobs: vec![
                     BlobInfo {
-                        source_path: meta_far_path.to_str().unwrap().to_string(),
+                        source_path: meta_far_path.canonicalize_utf8().unwrap().to_string(),
                         path: PackageManifest::META_FAR_BLOB_PATH.into(),
                         merkle: meta_far_hash,
                         size: 12288,
                     },
                     BlobInfo {
-                        source_path: file1_path,
+                        source_path: file1_path.canonicalize_utf8().unwrap().to_string(),
                         path: "file-1".into(),
                         merkle: file1_hash,
                         size: 6,
                     },
                     BlobInfo {
-                        source_path: file2_path,
+                        source_path: file2_path.canonicalize_utf8().unwrap().to_string(),
                         path: "file-2".into(),
                         merkle: file2_hash,
                         size: 6,
@@ -920,10 +921,12 @@ mod tests {
     #[test]
     fn test_from_blobs_dir_with_subpackages() {
         let temp = TempDir::new().unwrap();
-        let gen_dir = temp.path().join("gen");
+        let temp_dir = Utf8Path::from_path(temp.path()).unwrap();
+
+        let gen_dir = temp_dir.join("gen");
         std::fs::create_dir_all(&gen_dir).unwrap();
 
-        let blobs_dir = temp.path().join("blobs");
+        let blobs_dir = temp_dir.join("blobs");
         std::fs::create_dir_all(&blobs_dir).unwrap();
 
         // Helper to write some content into a blob.
@@ -935,7 +938,7 @@ mod tests {
             let path = blobs_dir.join(hash.to_string());
             std::fs::write(&path, contents).unwrap();
 
-            (path.to_str().unwrap().to_string(), hash)
+            (path, hash)
         };
 
         // Create a package.
@@ -957,20 +960,20 @@ mod tests {
             }"#).unwrap();
 
         let external_contents = BTreeMap::from([
-            ("file-1".into(), file1_path.clone()),
-            ("file-2".into(), file2_path.clone()),
+            ("file-1".into(), file1_path.to_string()),
+            ("file-2".into(), file2_path.to_string()),
         ]);
 
         let far_contents = BTreeMap::from([
-            (MetaPackage::PATH.into(), meta_package_path.to_str().unwrap().to_string()),
-            (MetaSubpackages::PATH.into(), meta_subpackages_path.to_str().unwrap().to_string()),
+            (MetaPackage::PATH.into(), meta_package_path.to_string()),
+            (MetaSubpackages::PATH.into(), meta_subpackages_path.to_string()),
         ]);
 
         let package_build_manifest =
             PackageBuildManifest::from_external_and_far_contents(external_contents, far_contents)
                 .unwrap();
 
-        let gen_meta_far_path = temp.path().join("meta.far");
+        let gen_meta_far_path = temp_dir.join("meta.far");
         let _package_manifest = crate::build::build(
             &package_build_manifest,
             &gen_meta_far_path,
@@ -992,7 +995,7 @@ mod tests {
         // We should be able to create a manifest from the blob directory that matches the one
         // created by the builder.
         assert_eq!(
-            PackageManifest::from_blobs_dir(&blobs_dir, meta_far_hash).unwrap(),
+            PackageManifest::from_blobs_dir(blobs_dir.as_std_path(), meta_far_hash).unwrap(),
             PackageManifest(VersionedPackageManifest::Version1(PackageManifestV1 {
                 package: PackageMetadata {
                     name: "package".parse().unwrap(),
@@ -1000,19 +1003,19 @@ mod tests {
                 },
                 blobs: vec![
                     BlobInfo {
-                        source_path: meta_far_path.to_str().unwrap().to_string(),
+                        source_path: meta_far_path.canonicalize_utf8().unwrap().to_string(),
                         path: PackageManifest::META_FAR_BLOB_PATH.into(),
                         merkle: meta_far_hash,
                         size: 16384,
                     },
                     BlobInfo {
-                        source_path: file1_path,
+                        source_path: file1_path.canonicalize_utf8().unwrap().to_string(),
                         path: "file-1".into(),
                         merkle: file1_hash,
                         size: 6,
                     },
                     BlobInfo {
-                        source_path: file2_path,
+                        source_path: file2_path.canonicalize_utf8().unwrap().to_string(),
                         path: "file-2".into(),
                         merkle: file2_hash,
                         size: 6,
