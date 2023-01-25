@@ -2,13 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(fxbug.dev/120248): Remove once no longer referenced by buildbots.
-group("core") {
-  testonly = true
-
-  deps = [ "//bundles/buildbot/dfv2/core" ]
-}
-
 # The dependencies of this group should be the same as :host-tests. If there is a
 # target in :host-tests's dependencies that is not in this group then that
 # either means the target includes a test that is failing and has been
