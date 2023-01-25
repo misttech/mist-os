@@ -85,23 +85,21 @@ impl MessageClient {
 
     /// Sends a reply to this message.
     pub(crate) fn reply(&self, payload: crate::Payload) -> Receptor {
-        // Return a MessageBuilder for a reply. Note that the auto-forwarder is
-        // handed off so the automatic forwarding behavior follows the
-        // MessageBuilder rather than this MessageClient.
+        ActionFuse::defuse(self.forwarder.clone());
+
         MessageBuilder::new(
             payload,
             MessageType::Reply(Box::new(self.message.clone())),
             self.messenger.clone(),
         )
-        .auto_forwarder(self.forwarder.clone())
         .send()
     }
 
     /// Propagates a derived message on the path of the original message.
     pub(crate) fn propagate(&self, payload: crate::Payload) -> Receptor {
-        MessageBuilder::derive(payload, self.message.clone(), self.messenger.clone())
-            .auto_forwarder(self.forwarder.clone())
-            .send()
+        ActionFuse::defuse(self.forwarder.clone());
+
+        MessageBuilder::derive(payload, self.message.clone(), self.messenger.clone()).send()
     }
 
     /// Report back to the clients that the message has been acknowledged.
