@@ -10,7 +10,7 @@ test("vdso") {
   sources = [ "vdso.cc" ]
   deps = [
     "//sdk/lib/fdio",
-    "//zircon/system/ulib/elfload",
+    "//src/lib/elfldltl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",

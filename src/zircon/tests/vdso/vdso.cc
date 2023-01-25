@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/elfldltl/container.h>
+#include <lib/elfldltl/diagnostics.h>
+#include <lib/elfldltl/load.h>
+#include <lib/elfldltl/vmar-loader.h>
+#include <lib/elfldltl/vmo.h>
+#include <lib/elfldltl/zircon.h>
 #include <lib/zx/process.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
@@ -12,8 +18,8 @@
 #include <zircon/syscalls.h>
 
 #include <new>
+#include <vector>
 
-#include <elfload/elfload.h>
 #include <fbl/array.h>
 #include <zxtest/zxtest.h>
 
@@ -37,25 +43,44 @@ class ScratchPad {
   uintptr_t vdso_total_size() const { return vdso_code_offset_ + vdso_code_size_; }
 
   zx_status_t load_vdso(zx::vmar* segments_vmar = nullptr, bool really_load = true) {
-    elf_load_header_t header;
-    uintptr_t phoff;
-    zx_status_t status = elf_load_prepare(vdso_vmo.get(), nullptr, 0, &header, &phoff);
-    if (status == ZX_OK) {
-      fbl::Array<elf_phdr_t> phdrs(new elf_phdr_t[header.e_phnum], header.e_phnum);
-      status = elf_load_read_phdrs(vdso_vmo.get(), phdrs.data(), phoff, header.e_phnum);
-      if (status == ZX_OK) {
-        for (const auto& ph : phdrs) {
-          if (ph.p_type == PT_LOAD && (ph.p_type & PF_X)) {
-            vdso_code_offset_ = ph.p_vaddr;
-            vdso_code_size_ = ph.p_memsz;
-          }
+    zx_status_t status = ZX_OK;
+    auto report = [&status](auto&&... args) -> bool {
+      auto check = [&status](auto arg) {
+        if constexpr (std::is_same_v<decltype(arg), elfldltl::ZirconError>) {
+          status = arg.status;
         }
-        if (really_load) {
-          status = elf_load_map_segments(
-              root_vmar_.get(), &header, phdrs.data(), vdso_vmo.get(),
-              segments_vmar ? segments_vmar->reset_and_get_address() : nullptr, &vdso_base_,
-              nullptr);
+      };
+      (check(args), ...);
+      return false;
+    };
+    auto diag = elfldltl::Diagnostics(report, elfldltl::DiagnosticsPanicFlags());
+    elfldltl::UnownedVmoFile file(vdso_vmo.borrow(), diag);
+    elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container> load_info;
+    elfldltl::RemoteVmarLoader loader{root_vmar()};
+    auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
+        diag, file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>());
+    ZX_ASSERT(headers);
+    auto& [ehdr, phdrs_result] = *headers;
+    cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result.get();
+    ZX_ASSERT(elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())));
+    load_info.VisitSegments([this](const auto& segment) {
+      if (segment.executable()) {
+        vdso_code_offset_ = segment.vaddr();
+        vdso_code_size_ = segment.memsz();
+        return false;
+      }
+      return true;
+    });
+    if (really_load) {
+      if (loader.Load(diag, load_info, vdso_vmo.borrow())) {
+        ZX_ASSERT(status == ZX_OK);
+        vdso_base_ = load_info.vaddr_start() + loader.load_bias();
+        zx::vmar vmar = std::move(loader).Commit();
+        if (segments_vmar) {
+          *segments_vmar = std::move(vmar);
         }
+      } else {
+        ZX_ASSERT(status != ZX_OK);
       }
     }
     return status;
