@@ -13,6 +13,8 @@ Module for satisfying all Mobly APIs used in Mobly Driver.
 
 LATEST_RES_SYMLINK_NAME = 'latest'
 
+MoblyConfigComponent = Dict[str, Any]
+
 
 class ApiException(Exception):
     pass
@@ -63,7 +65,7 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
 def new_testbed_config(
         testbed_name: str, log_path: str, fuchsia_controllers: List[Dict[str,
                                                                          Any]],
-        test_params_dict: Dict[str, Any]) -> Dict[str, Any]:
+        test_params_dict: MoblyConfigComponent) -> MoblyConfigComponent:
     """Returns a Mobly testbed config which is required for running Mobly tests.
 
     This method expects the |fuchsia_controller| object to follow the schema of
@@ -110,7 +112,7 @@ def new_testbed_config(
     Returns:
       A Mobly Config that corresponds to the user-specified arguments.
     """
-    tb_config_dict = {
+    config_dict = {
         keys.Config.key_testbed.value:
             [
                 {
@@ -127,25 +129,30 @@ def new_testbed_config(
                 keys.Config.key_log_path.value: log_path
             }
     }
-    update_config_test_params(tb_config_dict, test_params_dict)
-    return tb_config_dict
+    return get_config_with_test_params(config_dict, test_params_dict)
 
 
-def update_config_test_params(
-        tb_config_dict: Dict[str, Any], params_dict: Dict[str, Any]) -> None:
-    """Updates the 'TestParams' field in |tb_config_dict| with |params_dict|.
+def get_config_with_test_params(
+        config_dict: MoblyConfigComponent,
+        params_dict: MoblyConfigComponent) -> MoblyConfigComponent:
+    """Returns a Mobly config with the 'TestParams' field updated to |params_dict|.
 
     Replaces the field if it already exists.
 
     Args:
-        tb_config_dict: The Mobly config dictionary to update.
+        config_dict: The Mobly config dictionary to update.
         params_dict: The Mobly testbed params dictionary to add to the config.
 
+    Returns:
+      A MoblyConfigComponent object.
+
     Raises:
-      ApiException if |tb_config_dict| is invalid.
+      ApiException if |config_dict| is invalid.
     """
     try:
-        for tb in tb_config_dict[keys.Config.key_testbed.value]:
+        ret = config_dict.copy()
+        for tb in ret[keys.Config.key_testbed.value]:
             tb[keys.Config.key_testbed_test_params.value] = params_dict
-    except (TypeError, KeyError) as e:
+        return ret
+    except (AttributeError, KeyError, TypeError) as e:
         raise ApiException('Unexpected Mobly config content: %s' % e)

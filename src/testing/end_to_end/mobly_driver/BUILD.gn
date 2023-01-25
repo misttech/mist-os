@@ -24,19 +24,15 @@ if (is_host) {
     ]
   }
 
-  python_library("base_mobly_driver") {
-    sources = [ "base_mobly_driver.py" ]
-  }
-
   python_library("mobly_driver_lib") {
     sources = [ "mobly_driver_lib.py" ]
-    library_deps = [ ":base_mobly_driver" ]
+    library_deps = [ "drivers:base_mobly_driver" ]
   }
 
   python_host_test("mobly_driver_lib_test") {
     main_source = "mobly_driver_lib_test.py"
     sources = [
-      "base_mobly_driver.py",
+      "drivers/base_mobly_driver.py",
       "mobly_driver_lib.py",
     ]
     libraries = [
@@ -50,6 +46,7 @@ if (is_host) {
     public_deps = [
       ":api_mobly_test($host_toolchain)",
       ":mobly_driver_lib_test($host_toolchain)",
+      "drivers:tests",
     ]
   }
 }

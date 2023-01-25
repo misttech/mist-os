@@ -127,16 +127,16 @@ class ApiMoblyTest(unittest.TestCase):
                     }]
                 }),
         ])
-    def test_update_config_test_params_success(
+    def test_get_config_with_test_params_success(
             self, name, config_dict, params_dict, expected_config_dict):
-        api_mobly.update_config_test_params(config_dict, params_dict)
-        self.assertDictEqual(config_dict, expected_config_dict)
+        ret = api_mobly.get_config_with_test_params(config_dict, params_dict)
+        self.assertDictEqual(ret, expected_config_dict)
 
     @parameterized.expand([
         ('Config is None', None),
         ('Config is empty', {}),
     ])
-    def test_update_config_test_params_raises_exception(
+    def test_get_config_with_test_params_raises_exception(
             self, name, config_dict):
-        with self.assertRaises(api_mobly.ApiException) as ctx:
-            api_mobly.update_config_test_params(config_dict, None)
+        with self.assertRaises(api_mobly.ApiException):
+            api_mobly.get_config_with_test_params(config_dict, None)

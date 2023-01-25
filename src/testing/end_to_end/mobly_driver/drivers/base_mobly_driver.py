@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
 
 class BaseDriver(ABC):
@@ -13,7 +14,7 @@ class BaseDriver(ABC):
     environment-specific implementations.
     """
 
-    def __init__(params_path: str) -> None:
+    def __init__(self, params_path: Optional[str] = None) -> None:
         """Initializes the instance.
 
         Args:

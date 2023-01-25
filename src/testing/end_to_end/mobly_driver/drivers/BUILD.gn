@@ -1,0 +1,40 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_host_test.gni")
+import("//build/python/python_library.gni")
+
+if (is_host) {
+  python_library("base_mobly_driver") {
+    sources = [ "base_mobly_driver.py" ]
+  }
+
+  python_library("local_driver") {
+    sources = [ "local_driver.py" ]
+    library_deps = [
+      ":base_mobly_driver",
+      "//src/testing/end_to_end/mobly_driver:api_mobly",
+      "//third_party/pyyaml:yaml",
+    ]
+  }
+
+  python_host_test("local_driver_test") {
+    main_source = "local_driver_test.py"
+    sources = [
+      "../api_mobly.py",
+      "base_mobly_driver.py",
+      "local_driver.py",
+    ]
+    libraries = [
+      ":base_mobly_driver",
+      "//src/testing/end_to_end/mobly_driver:api_mobly",
+      "//third_party/parameterized",
+    ]
+  }
+
+  group("tests") {
+    testonly = true
+    public_deps = [ ":local_driver_test($host_toolchain)" ]
+  }
+}
