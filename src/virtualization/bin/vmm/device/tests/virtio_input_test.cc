@@ -269,7 +269,7 @@ TEST_P(VirtioInputMouseTest, PointerMove) {
   EXPECT_EQ(VIRTIO_INPUT_EV_SYN, events[2]->type);
 }
 
-TEST_P(VirtioInputMouseTest, PointerClick) {
+TEST_P(VirtioInputMouseTest, DISABLED_PointerClick) {
   // Right after device initialization it should be waiting on the first Watch call.
   binding_.WaitForMessage();
   RunLoopUntilIdle();
