@@ -40,5 +40,17 @@
             to: "#context_provider",
             dependency: "weak_for_migration",
         },
+        {
+            directory: "root-ssl-certificates",
+            from: "parent",
+            to: "#context_provider",
+            availability: "optional",
+        },
+        {
+            directory: "tzdata-icu-44-le",
+            from: "#tzdata-provider",
+            to: "#context_provider",
+            source_availability: "unknown",
+        },
     ],
 }
