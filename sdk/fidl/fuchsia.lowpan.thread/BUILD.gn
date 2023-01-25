@@ -9,6 +9,7 @@ fidl("fuchsia.lowpan.thread") {
 
   sources = [
     "dataset.fidl",
+    "feature.fidl",
     "meshcop.fidl",
     "overview.fidl",
   ]
