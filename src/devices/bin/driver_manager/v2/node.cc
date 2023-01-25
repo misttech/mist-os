@@ -42,35 +42,35 @@ const char* State2String(NodeState state) {
 }
 
 template <typename R, typename F>
-std::optional<R> VisitOffer(fdecl::wire::Offer& offer, F apply) {
+std::optional<R> VisitOffer(fdecl::Offer& offer, F apply) {
   // Note, we access each field of the union as mutable, so that `apply` can
   // modify the field if necessary.
   switch (offer.Which()) {
-    case fdecl::wire::Offer::Tag::kService:
+    case fdecl::Offer::Tag::kService:
       return apply(offer.service());
-    case fdecl::wire::Offer::Tag::kProtocol:
+    case fdecl::Offer::Tag::kProtocol:
       return apply(offer.protocol());
-    case fdecl::wire::Offer::Tag::kDirectory:
+    case fdecl::Offer::Tag::kDirectory:
       return apply(offer.directory());
-    case fdecl::wire::Offer::Tag::kStorage:
+    case fdecl::Offer::Tag::kStorage:
       return apply(offer.storage());
-    case fdecl::wire::Offer::Tag::kRunner:
+    case fdecl::Offer::Tag::kRunner:
       return apply(offer.runner());
-    case fdecl::wire::Offer::Tag::kResolver:
+    case fdecl::Offer::Tag::kResolver:
       return apply(offer.resolver());
-    case fdecl::wire::Offer::Tag::kEvent:
+    case fdecl::Offer::Tag::kEvent:
       return apply(offer.event());
-    case fdecl::wire::Offer::Tag::kEventStream:
+    case fdecl::Offer::Tag::kEventStream:
       return apply(offer.event_stream());
     default:
       return {};
   }
 }
 
-fidl::StringView CollectionName(Collection collection) {
+const char* CollectionName(Collection collection) {
   switch (collection) {
     case Collection::kNone:
-      return {};
+      return "";
     case Collection::kHost:
       return "driver-hosts";
     case Collection::kBoot:
@@ -82,26 +82,27 @@ fidl::StringView CollectionName(Collection collection) {
   }
 }
 
-fit::result<fdf::wire::NodeError, fdecl::wire::Offer> AddOfferToNodeOffer(
-    fdecl::wire::Offer add_offer, fidl::AnyArena& arena, fdecl::wire::ChildRef source_ref) {
+fit::result<fdf::wire::NodeError, fdecl::Offer> AddOfferToNodeOffer(fdecl::Offer add_offer,
+                                                                    fdecl::Ref source) {
   auto has_source_name =
-      VisitOffer<bool>(add_offer, [](auto& decl) { return decl.has_source_name(); });
+      VisitOffer<bool>(add_offer, [](const auto& decl) { return decl->source_name().has_value(); });
   if (!has_source_name.value_or(false)) {
     return fit::as_error(fdf::wire::NodeError::kOfferSourceNameMissing);
   }
-  auto has_ref = VisitOffer<bool>(
-      add_offer, [](auto& decl) { return decl.has_source() || decl.has_target(); });
+  auto has_ref = VisitOffer<bool>(add_offer, [](const auto& decl) {
+    return decl->source().has_value() || decl->target().has_value();
+  });
   if (has_ref.value_or(false)) {
     return fit::as_error(fdf::wire::NodeError::kOfferRefExists);
   }
 
   // Assign the source of the offer.
-  VisitOffer<bool>(add_offer, [&arena, source_ref](auto& decl) mutable {
-    decl.set_source(arena, fdecl::wire::Ref::WithChild(arena, source_ref));
+  VisitOffer<bool>(add_offer, [source = std::move(source)](auto decl) mutable {
+    decl->source(std::move(source));
     return true;
   });
 
-  return fit::ok(fidl::ToWire(arena, fidl::ToNatural(add_offer)));
+  return fit::ok(std::move(add_offer));
 }
 
 bool IsDefaultOffer(std::string_view target_name) {
@@ -626,19 +627,19 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     while (source_node && source_node->collection_ == Collection::kNone) {
       source_node = source_node->GetPrimaryParent();
     }
-    fdecl::wire::ChildRef source_ref{
-        .name = {child->arena_, source_node->MakeComponentMoniker()},
-        .collection = CollectionName(source_node->collection_),
-    };
+    fdecl::Ref source_ref =
+        fdecl::Ref::WithChild(fdecl::ChildRef()
+                                  .name(source_node->MakeComponentMoniker())
+                                  .collection(CollectionName(source_node->collection_)));
 
     for (auto& offer : args.offers()) {
-      fit::result new_offer = AddOfferToNodeOffer(offer, child->arena_, source_ref);
+      fit::result new_offer = AddOfferToNodeOffer(fidl::ToNatural(offer), source_ref);
       if (new_offer.is_error()) {
         LOGF(ERROR, "Failed to add Node '%s': Bad add offer: %d",
              child->MakeTopologicalPath().c_str(), new_offer.error_value());
         return new_offer.take_error();
       }
-      child->offers_.push_back(new_offer.value());
+      child->offers_.push_back(fidl::ToWire(child->arena_, new_offer.value()));
     }
   }
 
