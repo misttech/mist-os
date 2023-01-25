@@ -136,8 +136,9 @@ class Writer {
   // Emits the markup for a dumpfile, given its type and name.
   //
   // {{{dumpfile:$type:$name}}}
-  Writer& Dumpfile(std::string_view type, std::string_view name) {
-    return BeginElement(kDumpfile).Field(type).Field(name).EndElement();
+  Writer& Dumpfile(std::string_view type, std::string_view name,
+                   std::string_view name_suffix = "") {
+    return BeginElement(kDumpfile).Field(type).Field(name).Literal(name_suffix).EndElement();
   }
 
   //

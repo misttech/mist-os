@@ -40,6 +40,7 @@
 #include <phys/uart.h>
 
 struct BootOptions;
+class ElfImage;
 class Log;
 class MainSymbolize;
 
@@ -48,7 +49,8 @@ class Pool;
 }  // namespace memalloc
 
 using PhysLoadHandoffFunction =
-    void(Log* log,                         // Set gLog to this.
+    void(ElfImage& self,                   // The module just handed off to.
+         Log* log,                         // Set gLog to this.
          UartDriver& uart,                 // From GetUartDriver().
          MainSymbolize* symbolize,         // Set gSymbolize to this.
          const BootOptions* boot_options,  // Set gBootOptions to this.
@@ -59,8 +61,14 @@ using PhysLoadHandoffFunction =
 // The loaded module is linked with -W,-e,... to make this the entry symbol.
 extern "C" [[noreturn]] PhysLoadHandoffFunction PhysLoadHandoff;
 
+// PhysLoadHandoff calls PhysLoadModuleMain after initializing all the global
+// variables that hold the rest of the state handed off.
+extern "C" [[noreturn]] void PhysLoadModuleMain(UartDriver& uart, PhysBootTimes boot_times,
+                                                KernelStorage kernel_storage);
+
 // This should be run early in the handoff function to reinitialize
 // arch-specific state that's not included in the handoff data.
+// PhysLoadHandoff calls it before PhysLoadModuleMain.
 void ArchOnPhysLoadHandoff();
 
 #endif  // ZIRCON_KERNEL_PHYS_PHYSLOAD_H_

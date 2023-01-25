@@ -182,4 +182,12 @@ mov %edx, CPUID_EDX + \addr
 .label __stop_BootCpuidLeaf
 .quad 0
 
+#else
+
+// Just having an empty input section is enough to make sure the linker
+// defines the __start and __stop symbols. So just in case there are no
+// actual entries in the link, the loop above will just have zero
+// iterations because the start and stop addresses match.
+.section BootCpuidLeaf, "aR", %progbits
+
 #endif  // _WIN32

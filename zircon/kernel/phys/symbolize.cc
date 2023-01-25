@@ -99,10 +99,10 @@ void Symbolize::BackTraceFrame(unsigned int n, uintptr_t pc, bool interrupt) {
   writer_.Newline();
 }
 
-void Symbolize::DumpFile(ktl::string_view type, ktl::string_view name, ktl::string_view desc,
-                         size_t size_bytes) {
+void Symbolize::DumpFile(ktl::string_view announce, size_t size_bytes, ktl::string_view sink_name,
+                         ktl::string_view vmo_name, ktl::string_view vmo_name_suffix) {
   Context();
-  writer_.Prefix(name_).Prefix(desc).Dumpfile(type, name);
+  writer_.Prefix(name_).Prefix(announce).Dumpfile(sink_name, vmo_name, vmo_name_suffix);
   Printf(" %zu bytes\n", size_bytes);
 }
 

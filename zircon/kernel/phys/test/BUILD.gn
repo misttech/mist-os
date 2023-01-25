@@ -417,6 +417,7 @@ if (current_toolchain != default_toolchain) {
       visibility = [ ":*" ]
       testonly = true
 
+      prefix = ""
       deps = [ ":physload-test" ]
     }
   }
@@ -424,7 +425,7 @@ if (current_toolchain != default_toolchain) {
   kernel_cmdline("physload-test.cmdline") {
     visibility = [ ":*" ]
     testonly = true
-    args = [ "kernel.phys.next=physload-test-data/physload-test" ]
+    args = [ "kernel.phys.next=physload-test" ]
   }
 
   zbi_test("zbi-physload-test") {

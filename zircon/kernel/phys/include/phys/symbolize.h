@@ -102,9 +102,8 @@ class Symbolize {
                                          unsigned int n = 0);
 
   // Print the trigger markup element for a dumpfile.
-  // TODO(mcgrathr): corresponds to a ZBI item
-  void DumpFile(ktl::string_view type, ktl::string_view name, ktl::string_view desc,
-                size_t size_bytes);
+  void DumpFile(ktl::string_view announce, size_t size_bytes, ktl::string_view sink_name,
+                ktl::string_view vmo_name, ktl::string_view vmo_name_suffix = "");
 
   // Dump some stack up to the SP.
   PHYS_SINGLETHREAD void PrintStack(uintptr_t sp,

@@ -43,8 +43,9 @@ class ElfImage {
   using BootfsDir = zbitl::BootfsView<ktl::span<ktl::byte>>;
   using Error = BootfsDir::Error;
 
-  using PublishVmoFunction =
-      fit::inline_function<ktl::span<ktl::byte>(ktl::string_view name, size_t content_size)>;
+  using PublishDebugdataFunction = fit::inline_function<ktl::span<ktl::byte>(
+      ktl::string_view sink_name, ktl::string_view vmo_name, ktl::string_view suffix,
+      size_t content_size)>;
 
   // An ELF image is found at "dir/name". That can be an ELF file or a subtree.
   // The subtree should contain "image.elf", "code-patches.bin", etc.  A
@@ -143,9 +144,11 @@ class ElfImage {
     return load_.SymbolizerContext(writer, id, name(), build_id_->desc, LoadAddress(), prefix);
   }
 
-  // Publish instrumentation VMOs for this module.  The argument is something
-  // called like HandoffPrep::PublishVmo, which see.
-  void PublishInstrumentation(PublishVmoFunction publish_vmo) const;
+  // Publish instrumentation VMOs for this module.  The argument is similar
+  // called like HandoffPrep::PublishVmo, which see; PublishDebugdataFunction
+  // takes different arguments to name the data, so it can be used to compose
+  // either a ZBI_TYPE_DEBUGDATA payload or a named VMO.
+  void PublishDebugdata(PublishDebugdataFunction publish_debugdata) const;
 
   // Call the image's entry point as a function type F.
   template <typename F, typename... Args>
@@ -163,13 +166,38 @@ class ElfImage {
     ZX_PANIC("ELF image entry point returned!");
   }
 
+  // A function called by Handoff calls this on its own module to provide code
+  // that must be instantiated separately in each module to publish per-module
+  // instrumentation data.
+  void OnHandoff() { publish_self_ = PublishSelf; }
+
  private:
+  // PublishSelf takes one of these for each particular kind of per-module
+  // instrumentation VMO supported.  The callback knows what kind of data it's
+  // for and deals with calling a PublishDebugdataFunction with the right
+  // arguments.  That code exists in the module where PublishDebugdata is
+  // called.  PublishSelf exists separately in each module and deals with
+  // filling the buffer with the right per-module data.
+  using PublishSelfCallback = fit::inline_function<ktl::span<ktl::byte>(size_t content_size)>;
+
+  // publish_self_ is set to point to this by the module itself, so it points
+  // to the instantiation of this function inside that one module.  The first
+  // argument is always with the module that contains the code being called.
+  static void PublishSelf(const ElfImage& module, PublishSelfCallback llvmprofdata);
+
+  // Subroutine of PublishDebugdata only used inside elf-image-vmos.cc.
+  template <const ktl::string_view& kSinkName, const ktl::string_view& kSuffix,
+            const ktl::string_view& kAnnounce>
+  PublishSelfCallback MakePublishSelfCallback(PublishDebugdataFunction& publish_debugdata) const;
+
+  // This is only called from PublishSelf so it will always be the
+  // instantiation inside this module.
+  void PublishSelfLlvmProfdata(PublishSelfCallback publish) const;
+
   ktl::span<const code_patching::Directive> patches() const { return patcher_.patches(); }
 
   ktl::span<ktl::byte> GetBytesToPatch(const code_patching::Directive& patch,
                                        const Allocation& loaded);
-
-  void PublishSelfLlvmProfdata(PublishVmoFunction& publish_vmo) const;
 
   ktl::string_view name_;
   elfldltl::DirectMemory image_{{}};
@@ -180,6 +208,7 @@ class ElfImage {
   ktl::optional<ktl::string_view> interp_;
   code_patching::Patcher patcher_;
   ktl::optional<uintptr_t> load_bias_;
+  decltype(PublishSelf)* publish_self_ = nullptr;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ELF_IMAGE_H_

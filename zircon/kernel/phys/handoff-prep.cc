@@ -76,6 +76,31 @@ void FindTestRamReservation(RamReservation& ram) {
          ProgramName(), ram.size);
 }
 
+// Construct a VMO name for the instrumentation data from the debugdata
+// protocol sink name, the module name and the canonical file name suffix for
+// this sink.
+constexpr PhysVmo::Name DebugdataVmoName(ktl::string_view sink_name, ktl::string_view vmo_name,
+                                         ktl::string_view vmo_name_suffix) {
+  PhysVmo::Name name{};
+  ktl::span<char> buffer{name};
+  // TODO(fxbug.dev/120396)): Currently this matches the old "data/phys/..."
+  // format and doesn't contain the sink name.  Later change maybe to
+  // "i/sink-name/module+suffix" but omit whole suffix if it doesn't all fit?
+  for (ktl::string_view str : {"data/phys/"sv, vmo_name, vmo_name_suffix}) {
+    buffer = buffer.subspan(str.copy(buffer.data(), buffer.size() - 1));
+    if (buffer.empty()) {
+      break;
+    }
+  }
+  return name;
+}
+
+// Returns a pointer into the array that was passed by reference.
+constexpr ktl::string_view VmoNameString(const PhysVmo::Name& name) {
+  ktl::string_view str(name.data(), name.size());
+  return str.substr(0, str.find_first_of('\0'));
+}
+
 }  // namespace
 
 void HandoffPrep::Init(ktl::span<ktl::byte> buffer) {
@@ -89,11 +114,13 @@ void HandoffPrep::Init(ktl::span<ktl::byte> buffer) {
 }
 
 void HandoffPrep::SetInstrumentation() {
-  auto publish_vmo = [this](ktl::string_view name, size_t content_size) {
-    return PublishVmo(name, content_size);
+  auto publish_debugdata = [this](ktl::string_view sink_name, ktl::string_view vmo_name,
+                                  ktl::string_view vmo_name_suffix, size_t content_size) {
+    PhysVmo::Name phys_vmo_name = DebugdataVmoName(sink_name, vmo_name, vmo_name_suffix);
+    return PublishVmo(VmoNameString(phys_vmo_name), content_size);
   };
   for (const ElfImage* module : gSymbolize->modules()) {
-    module->PublishInstrumentation(publish_vmo);
+    module->PublishDebugdata(publish_debugdata);
   }
 }
 

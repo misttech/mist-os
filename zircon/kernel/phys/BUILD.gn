@@ -517,6 +517,7 @@ if (toolchain_environment == "kernel.phys" ||
   static_library("elf-image") {
     public = [ "include/phys/elf-image.h" ]
     sources = [
+      "elf-image-self-vmos.cc",
       "elf-image-vmos.cc",
       "elf-image.cc",
     ]
@@ -705,13 +706,21 @@ if (is_kernel) {
   }
 
   # A physload-compatible module depends on this.
-  group("physload.module") {
+  source_set("physload.module") {
     visibility = [ "./*" ]
     public_deps = [ ":physload.header" ]
     public_configs = [ ":physload.module.config" ]
+    sources = [ "physload-module.cc" ]
     deps = [
+      ":allocation",
+      ":elf-image",
+      ":log",
+      ":main",
       ":physload.interp",
+      ":stdio",
+      ":symbolize",
       "$arch_phys:arch-on-physload-handoff",
+      "//zircon/kernel/lib/boot-options",
     ]
     data_deps = [ ":physload" ]
   }

@@ -245,4 +245,6 @@ void ElfImage::InitSelf(ktl::string_view name, elfldltl::DirectMemory& memory, u
   build_id_ = *notes.begin();
 
   name_ = name;
+
+  OnHandoff();
 }
