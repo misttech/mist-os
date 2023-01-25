@@ -129,7 +129,7 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
                 let server_end = channel.into_zx_channel().into();
                 svc_dir
                     .open(
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                        fio::OpenFlags::empty(),
                         fio::MODE_TYPE_SERVICE,
                         &protocol_name,
                         server_end,

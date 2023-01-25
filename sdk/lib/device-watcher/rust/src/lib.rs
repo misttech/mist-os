@@ -35,7 +35,7 @@ pub async fn wait_for_device_with<T>(
                 fidl::endpoints::create_proxy::<ControllerMarker>()?;
             let () = dev_dir
                 .open(
-                    fio::OpenFlags::RIGHT_READABLE,
+                    fio::OpenFlags::empty(),
                     fio::MODE_TYPE_SERVICE,
                     filename,
                     server_end.into_channel().into(),
@@ -144,7 +144,7 @@ pub async fn recursive_wait_and_open_node(
     recursive_wait_and_open_node_with_flags(
         Clone::clone(dir),
         name,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
         fio::MODE_TYPE_SERVICE,
     )
     .await

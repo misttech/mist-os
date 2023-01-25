@@ -56,9 +56,7 @@ zx_status_t fdio_ns_open(fdio_ns_t* ns, const char* path, uint32_t flags, zx_han
 
 __EXPORT
 zx_status_t fdio_ns_service_connect(fdio_ns_t* ns, const char* path, zx_handle_t request) {
-  // TODO(https://fxbug.dev/101092): Shrink this to 0.
-  constexpr uint32_t flags = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable);
-  return fdio_ns_open(ns, path, flags, request);
+  return fdio_ns_open(ns, path, 0, request);
 }
 
 __EXPORT

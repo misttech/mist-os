@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
 #include <fidl/fuchsia.device.inspect.test/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/async/cpp/executor.h>
@@ -58,12 +59,13 @@ TEST_F(InspectTestCase, InspectDevfs) {
 }
 
 TEST_F(InspectTestCase, ReadInspectData) {
+  constexpr char path[] = "diagnostics/class/test/000.inspect";
+
   // Wait for inspect data to appear
-  zx::result inspect_channel = device_watcher::RecursiveWaitForFile(
-      devmgr().devfs_root().get(), "diagnostics/class/test/000.inspect");
-  ASSERT_OK(inspect_channel);
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr().devfs_root().get(), path));
+
   fbl::unique_fd fd;
-  ASSERT_OK(fdio_fd_create(inspect_channel.value().release(), fd.reset_and_get_address()));
+  ASSERT_TRUE(fd.reset(openat(devmgr().devfs_root().get(), path, O_RDONLY)), "%s", strerror(errno));
   {
     zx::vmo vmo;
     ASSERT_OK(fdio_get_vmo_clone(fd.get(), vmo.reset_and_get_address()));

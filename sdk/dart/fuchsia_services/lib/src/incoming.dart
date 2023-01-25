@@ -123,7 +123,7 @@ class Incoming {
           'See [Incoming.request] for more information');
     }
 
-    _dirProxy.open(OpenFlags.rightReadable, modeTypeService, serviceName,
+    _dirProxy.open(OpenFlags.$none, modeTypeService, serviceName,
         InterfaceRequest<Node>(channel));
   }
 

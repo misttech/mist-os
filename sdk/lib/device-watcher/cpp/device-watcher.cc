@@ -129,11 +129,9 @@ zx::result<zx::channel> RecursiveWaitForFileHelper(const int dir_fd, std::string
     }
     return zx::ok(std::move(client));
   }
-  if (zx_status_t status =
-          fdio_open_at(channel, std::string(target).c_str(),
-                       static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
-                                             fuchsia_io::wire::OpenFlags::kDirectory),
-                       server.release());
+  if (zx_status_t status = fdio_open_at(
+          channel, std::string(target).c_str(),
+          static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory), server.release());
       status != ZX_OK) {
     return zx::error(status);
   }

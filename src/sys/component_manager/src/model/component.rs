@@ -651,7 +651,7 @@ impl ComponentInstance {
                     endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>().unwrap();
                 let mut server_channel = server_channel.into_channel();
                 let options = OpenRunnerOptions {
-                    flags: fio::OpenFlags::RIGHT_READABLE,
+                    flags: fio::OpenFlags::empty(),
                     open_mode: fio::MODE_TYPE_SERVICE,
                     server_chan: &mut server_channel,
                 };

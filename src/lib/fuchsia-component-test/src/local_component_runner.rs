@@ -25,7 +25,7 @@ impl MemberOpener for DirectoryProtocolImpl {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
         let Self(directory) = self;
         directory.open(
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::MODE_TYPE_SERVICE,
             member,
             ServerEnd::new(server_end),
@@ -118,7 +118,7 @@ impl LocalComponentHandles {
         fuchsia_fs::directory::open_directory_no_describe(
             &svc_dir_proxy,
             name,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::OpenFlags::empty(),
         )
         .map_err(Into::into)
     }
@@ -151,7 +151,7 @@ impl LocalComponentHandles {
         let directory_proxy = fuchsia_fs::directory::open_directory_no_describe(
             &service_dir,
             instance_name,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fuchsia_fs::OpenFlags::empty(),
         )?;
         Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
     }

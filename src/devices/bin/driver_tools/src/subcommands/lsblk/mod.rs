@@ -27,7 +27,7 @@ pub async fn lsblk(_cmd: LsblkCommand, dev: fio::DirectoryProxy) -> Result<()> {
     if let Ok(block_dir) = fuchsia_fs::directory::open_directory_no_describe(
         &dev,
         "class/block",
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     ) {
         for device in get_devices::<BlockDevice>(&block_dir).await? {
             println!("{}", device);
@@ -39,7 +39,7 @@ pub async fn lsblk(_cmd: LsblkCommand, dev: fio::DirectoryProxy) -> Result<()> {
     if let Ok(skip_block_dir) = fuchsia_fs::directory::open_directory_no_describe(
         &dev,
         "class/skip-block",
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     ) {
         for device in get_devices::<SkipBlockDevice>(&skip_block_dir).await? {
             println!("{}", device);
@@ -73,7 +73,7 @@ async fn get_devices<DeviceType: New + New<Output = DeviceType>>(
         let device = fuchsia_fs::directory::open_node_no_describe(
             dir,
             &msg.filename.to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::MODE_TYPE_SERVICE,
         )?;
         let device = DeviceType::new(msg.filename.to_str().unwrap(), device).await?;

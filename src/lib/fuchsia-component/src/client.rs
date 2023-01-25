@@ -34,8 +34,7 @@ use {
 /// Path to the service directory in an application's root namespace.
 const SVC_DIR: &'static str = "/svc";
 
-// TODO(https://fxbug.dev/101092): Shrink this to 0.
-const SERVICE_FLAGS: fio::OpenFlags = fio::OpenFlags::empty().union(fio::OpenFlags::RIGHT_READABLE);
+const SERVICE_FLAGS: fio::OpenFlags = fio::OpenFlags::empty();
 const SERVICE_DIR_FLAGS: fio::OpenFlags = SERVICE_FLAGS.union(fio::OpenFlags::DIRECTORY);
 
 /// A protocol connection request that allows checking if the protocol exists.

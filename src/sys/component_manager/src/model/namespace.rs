@@ -503,6 +503,11 @@ fn serve_and_install_svc_dirs(
             create_endpoints::<fio::NodeMarker>().expect("could not create node proxy endpoints");
         pseudo_dir.clone().open(
             ExecutionScope::new(),
+            // TODO(https://fxbug.dev/101092): remove RIGHT_WRITABLE once all downstream consumers
+            // contain commit 333c0fb2b6de303972e89629ba5485d5cd21a41a.
+            //
+            // TODO(https://fxbug.dev/101092): remove RIGHT_READABLE once all downstream consumers
+            // contain this commit.
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             fio::MODE_TYPE_DIRECTORY,
             Path::dot(),

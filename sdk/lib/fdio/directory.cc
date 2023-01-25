@@ -28,9 +28,7 @@ zx_status_t fdio_service_connect(const char* path, zx_handle_t h) {
 
 __EXPORT
 zx_status_t fdio_service_connect_at(zx_handle_t dir, const char* path, zx_handle_t h) {
-  // TODO(https://fxbug.dev/101092): Shrink this to 0.
-  constexpr uint32_t flags = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable);
-  return fdio_open_at(dir, path, flags, h);
+  return fdio_open_at(dir, path, 0, h);
 }
 
 __EXPORT

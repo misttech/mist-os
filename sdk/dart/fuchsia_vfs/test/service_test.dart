@@ -100,6 +100,7 @@ void main() {
 
     test('connect to service passes with valid flags', () async {
       var supportedFlags = [
+        io_fidl.OpenFlags.$none,
         io_fidl.OpenFlags.rightReadable,
         io_fidl.OpenFlags.rightWritable
       ];

@@ -53,10 +53,7 @@ void main() {
 
       // connect to the service through the composed directory
       final proxy = AsyncProxy(AsyncProxyController());
-      composedDir.open(
-          io.OpenFlags.rightReadable | io.OpenFlags.rightWritable,
-          io.modeTypeService,
-          'test.foo',
+      composedDir.open(io.OpenFlags.$none, io.modeTypeService, 'test.foo',
           InterfaceRequest<io.Node>(proxy.ctrl.request().passChannel()));
 
       expect(() => completer.future, returnsNormally);

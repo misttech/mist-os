@@ -109,6 +109,8 @@ impl Resolver for RemoteResolver {
             .map_err(ResolverError::internal)?;
         let component = self.component.upgrade().map_err(ResolverError::routing_error)?;
         let open_options = OpenResolverOptions {
+            // TODO(https://fxbug.dev/101092): change this to empty() once all downstream
+            // consumers contain this commit.
             flags: fio::OpenFlags::RIGHT_READABLE,
             open_mode: fio::MODE_TYPE_SERVICE,
             server_chan: &mut server_end.into_channel(),

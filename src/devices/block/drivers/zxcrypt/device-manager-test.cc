@@ -44,11 +44,10 @@ std::string GetInspectInstanceGuid(const zx::vmo& inspect_vmo) {
 }
 
 void GetInspectVMOHandle(const fbl::unique_fd& devfs_root, zx::vmo& out_vmo) {
-  zx::result channel = device_watcher::RecursiveWaitForFile(
-      devfs_root.get(), "diagnostics/class/zxcrypt/000.inspect");
-  ASSERT_OK(channel);
+  constexpr char path[] = "diagnostics/class/zxcrypt/000.inspect";
+  ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root.get(), path));
   fbl::unique_fd fd;
-  ASSERT_OK(fdio_fd_create(channel.value().release(), fd.reset_and_get_address()));
+  ASSERT_TRUE(fd.reset(openat(devfs_root.get(), path, O_RDONLY)), "%s", strerror(errno));
   ASSERT_OK(fdio_get_vmo_clone(fd.get(), out_vmo.reset_and_get_address()));
 }
 
