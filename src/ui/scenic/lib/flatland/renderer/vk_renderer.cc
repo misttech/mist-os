@@ -359,18 +359,23 @@ std::optional<vk::BufferCollectionFUCHSIA> VkRenderer::GetAllocatedVulkanBufferC
   std::scoped_lock lock(lock_);
   // Make sure that the collection that will back this image's memory
   // is actually registered with the renderer.
-  const std::unordered_map<GlobalBufferCollectionId, CollectionData>& collections =
+  std::unordered_map<GlobalBufferCollectionId, CollectionData>& collections =
       GetBufferCollectionsFor(usage);
-  const auto collection_itr = collections.find(collection_id);
+  auto collection_itr = collections.find(collection_id);
   if (collection_itr == collections.end()) {
     FX_LOGS(WARNING) << "Collection with id " << collection_id << " does not exist.";
     return std::nullopt;
   }
 
+  auto& [collection, vk_collection, is_allocated] = collection_itr->second;
+  // If we've checked the allocation before we don't need to do so again.
+  if (is_allocated) {
+    return vk_collection;
+  }
+
   // Check to see if the buffers are allocated and return std::nullptr if not.
   zx_status_t allocation_status = ZX_OK;
-  if (const zx_status_t status =
-          collection_itr->second.collection->CheckBuffersAllocated(&allocation_status);
+  if (const zx_status_t status = collection->CheckBuffersAllocated(&allocation_status);
       status != ZX_OK) {
     FX_LOGS(WARNING) << "Collection was not allocated (FIDL status: "
                      << zx_status_get_string(status) << ").";
@@ -382,7 +387,8 @@ std::optional<vk::BufferCollectionFUCHSIA> VkRenderer::GetAllocatedVulkanBufferC
     return std::nullopt;
   }
 
-  return collection_itr->second.vk_collection;
+  is_allocated = true;
+  return vk_collection;
 }
 
 bool VkRenderer::ImportBufferCollection(

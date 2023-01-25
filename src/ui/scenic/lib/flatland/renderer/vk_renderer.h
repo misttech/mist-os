@@ -96,6 +96,9 @@ class VkRenderer final : public Renderer {
   struct CollectionData {
     fuchsia::sysmem::BufferCollectionSyncPtr collection;
     vk::BufferCollectionFUCHSIA vk_collection;
+
+    // Bit to track whether we've confirmed the allocation's completion.
+    bool is_allocated = false;
   };
 
   // Creates a vk::BufferCollectionFUCHSIA with the proper constraints set.
