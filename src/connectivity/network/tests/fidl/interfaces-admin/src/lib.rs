@@ -2133,3 +2133,37 @@ async fn reinstall_same_port<N: Netstack>(name: &str) {
         );
     }
 }
+
+#[netstack_test]
+async fn synchronous_remove<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+    let ep = sandbox.create_endpoint(name).await.expect("create endpoint");
+    let iface = ep.into_interface_in_realm(&realm).await.expect("install interface");
+    iface.control().remove().await.expect("remove completes").expect("remove succeeds");
+
+    let reason = iface.wait_removal().await.expect("wait removal");
+    assert_eq!(reason, finterfaces_admin::InterfaceRemovedReason::User);
+}
+
+#[netstack_test]
+async fn no_remove_loopback<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+    let fidl_fuchsia_net_interfaces_ext::Properties { id, .. } = realm
+        .loopback_properties()
+        .await
+        .expect("fetching loopback properties")
+        .expect("no loopback interface");
+
+    let control = realm.interface_control(id).expect("get interface control");
+
+    assert_eq!(
+        control.remove().await.expect("remove"),
+        Err(finterfaces_admin::ControlRemoveError::NotAllowed)
+    );
+
+    // Reach out again to ensure the interface hasn't been removed and that the
+    // channel is still open.
+    assert_eq!(control.get_id().await.expect("get id"), id);
+}

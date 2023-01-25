@@ -323,9 +323,17 @@ async fn run_netdevice_interface_control<
     let link_state_fut = run_link_state_watcher(ctx.clone(), id, status_stream).fuse();
     let (interface_control_stop_sender, interface_control_stop_receiver) =
         futures::channel::oneshot::channel();
-    let interface_control_fut =
-        run_interface_control(ctx.clone(), id, interface_control_stop_receiver, control_receiver)
-            .fuse();
+
+    // Device-backed interfaces are always removable.
+    let removable = true;
+    let interface_control_fut = run_interface_control(
+        ctx.clone(),
+        id,
+        interface_control_stop_receiver,
+        control_receiver,
+        removable,
+    )
+    .fuse();
     futures::pin_mut!(link_state_fut);
     futures::pin_mut!(interface_control_fut);
     futures::select! {
@@ -406,6 +414,7 @@ pub(crate) async fn run_interface_control(
         fnet_interfaces_admin::InterfaceRemovedReason,
     >,
     control_receiver: futures::channel::mpsc::Receiver<OwnedControlHandle>,
+    removable: bool,
 ) {
     // An event indicating that the individual control request streams should stop.
     let cancel_request_streams = async_utils::event::Event::new();
@@ -424,61 +433,91 @@ pub(crate) async fn run_interface_control(
                 ReqStreamState { owns_interface, control_handle, ctx: ctx.clone(), id };
             // Attach `cancel_request_streams` as a short-circuit mechanism to stop handling new
             // `ControlRequest`.
-            request_stream
-                .take_until(cancel_request_streams.wait_or_dropped())
-                // Convert the request stream into a future, dispatching each incoming
-                // `ControlRequest` and retaining the `ReqStreamState` along the way.
-                .fold(initial_state, |mut state, request| async move {
+            let request_stream =
+                request_stream.take_until(cancel_request_streams.wait_or_dropped());
+
+            // Convert the request stream into a future, dispatching each incoming
+            // `ControlRequest` and retaining the `ReqStreamState` along the way.
+            async_utils::fold::fold_while(
+                request_stream,
+                initial_state,
+                |mut state, request| async move {
                     let ReqStreamState { ctx, id, owns_interface, control_handle: _ } = &mut state;
                     match request {
-                        Err(e) => log::log!(
-                            util::fidl_err_log_level(&e),
-                            "error operating {} stream for interface {}: {:?}",
-                            fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
-                            id,
-                            e,
-                        ),
+                        Err(e) => {
+                            log::log!(
+                                util::fidl_err_log_level(&e),
+                                "error operating {} stream for interface {}: {:?}",
+                                fnet_interfaces_admin::ControlMarker::DEBUG_NAME,
+                                id,
+                                e,
+                            );
+                            async_utils::fold::FoldWhile::Continue(state)
+                        }
                         Ok(req) => {
-                            match dispatch_control_request(req, ctx, *id, owns_interface).await {
+                            match dispatch_control_request(req, ctx, *id, removable, owns_interface)
+                                .await
+                            {
                                 Err(e) => {
                                     log::log!(
                                         util::fidl_err_log_level(&e),
                                         "failed to handle request for interface {}: {:?}",
                                         id,
                                         e
-                                    )
+                                    );
+                                    async_utils::fold::FoldWhile::Continue(state)
                                 }
-                                Ok(()) => {}
+                                Ok(ControlRequestResult::Continue) => {
+                                    async_utils::fold::FoldWhile::Continue(state)
+                                }
+                                Ok(ControlRequestResult::Remove) => {
+                                    // Short-circuit the stream, user called
+                                    // remove.
+                                    async_utils::fold::FoldWhile::Done(state.control_handle)
+                                }
                             }
                         }
                     }
-                    // Return `state` to be used when handling the next `ControlRequest`.
-                    state
-                })
+                },
+            )
         },
     );
     // Enable the stream of futures to be polled concurrently.
     let mut stream_of_fut = stream_of_fut.buffer_unordered(std::usize::MAX);
 
-    let remove_reason = {
-        // Drive the `ControlRequestStreams` to completion, short-circuiting if an owner terminates.
-        let interface_control_fut = async {
-            while let Some(ReqStreamState { owns_interface, control_handle: _, ctx: _, id: _ }) =
-                stream_of_fut.next().await
-            {
-                if owns_interface {
-                    return;
+    let (remove_reason, removal_requester) = {
+        // Drive the `ControlRequestStreams` to completion, short-circuiting if
+        // an owner terminates or if interface removal is requested.
+        let mut interface_control_stream = stream_of_fut.by_ref().filter_map(|stream_result| {
+            futures::future::ready(match stream_result {
+                async_utils::fold::FoldResult::StreamEnded(ReqStreamState {
+                    owns_interface,
+                    control_handle: _,
+                    ctx: _,
+                    id: _,
+                }) => {
+                    // If we own the interface, return `Some(None)` to stop
+                    // operating on the request streams.
+                    owns_interface.then(|| None)
                 }
-            }
-        }
-        .fuse();
+                async_utils::fold::FoldResult::ShortCircuited(control_handle) => {
+                    // If it was short-circuited by a call to remove, return
+                    // `Some(Some(control_handle))` so we stop operating on
+                    // the request streams and inform the requester of
+                    // removal when done.
+                    Some(Some(control_handle))
+                }
+            })
+        });
 
-        futures::pin_mut!(interface_control_fut);
         futures::select! {
-            // One of the interface's owning channels hung up; inform the other channels.
-            () = interface_control_fut => fnet_interfaces_admin::InterfaceRemovedReason::User,
+            // One of the interface's owning channels hung up or `Remove` was
+            // called; inform the other channels.
+            removal_requester = interface_control_stream.next() => {
+                (fnet_interfaces_admin::InterfaceRemovedReason::User, removal_requester.flatten())
+            }
             // Cancelation event was received with a specified remove reason.
-            reason = stop_receiver => reason.expect("failed to receive stop"),
+            reason = stop_receiver => (reason.expect("failed to receive stop"), None),
         }
     };
 
@@ -488,18 +527,31 @@ pub(crate) async fn run_interface_control(
     // completion, allowing each handle to send termination events.
     assert!(cancel_request_streams.signal(), "expected the event to be unsignaled");
     if !stream_of_fut.is_terminated() {
-        while let Some(ReqStreamState { owns_interface: _, control_handle, ctx: _, id: _ }) =
-            stream_of_fut.next().await
-        {
-            control_handle.send_on_interface_removed(remove_reason).unwrap_or_else(|e| {
-                log::log!(
-                    util::fidl_err_log_level(&e),
-                    "failed to send terminal event: {:?} for interface {}",
-                    e,
-                    id
-                )
-            });
-        }
+        stream_of_fut
+            .map(|fold_result| match fold_result {
+                async_utils::fold::FoldResult::StreamEnded(ReqStreamState {
+                    owns_interface: _,
+                    control_handle,
+                    ctx: _,
+                    id: _,
+                }) => control_handle,
+                async_utils::fold::FoldResult::ShortCircuited(control_handle) => control_handle,
+            })
+            // Append the client that requested that the interface be removed
+            // (if there is one) so it receives the terminal event too.
+            .chain(futures::stream::iter(removal_requester))
+            .for_each(|control_handle| {
+                control_handle.send_on_interface_removed(remove_reason).unwrap_or_else(|e| {
+                    log::log!(
+                        util::fidl_err_log_level(&e),
+                        "failed to send terminal event: {:?} for interface {}",
+                        e,
+                        id
+                    )
+                });
+                futures::future::ready(())
+            })
+            .await;
     }
     // Cancel the `AddressStateProvider` workers and drive them to completion.
     let address_state_providers = {
@@ -525,13 +577,19 @@ pub(crate) async fn run_interface_control(
     address_state_providers.collect::<()>().await;
 }
 
+enum ControlRequestResult {
+    Continue,
+    Remove,
+}
+
 /// Serves a `fuchsia.net.interfaces.admin/Control` Request.
 async fn dispatch_control_request(
     req: fnet_interfaces_admin::ControlRequest,
     ctx: &NetstackContext,
     id: BindingId,
+    removable: bool,
     owns_interface: &mut bool,
-) -> Result<(), fidl::Error> {
+) -> Result<ControlRequestResult, fidl::Error> {
     log::debug!("serving {:?}", req);
     match req {
         fnet_interfaces_admin::ControlRequest::AddAddress {
@@ -569,10 +627,17 @@ async fn dispatch_control_request(
             *owns_interface = false;
             Ok(())
         }
+        fnet_interfaces_admin::ControlRequest::Remove { responder } => {
+            if removable {
+                return responder.send(&mut Ok(())).map(|()| ControlRequestResult::Remove);
+            }
+            responder.send(&mut Err(fnet_interfaces_admin::ControlRemoveError::NotAllowed))
+        }
         fnet_interfaces_admin::ControlRequest::GetAuthorizationForInterface { responder: _ } => {
             todo!("https://fxbug.dev/117844 support GetAuthorizationForInterface")
         }
     }
+    .map(|()| ControlRequestResult::Continue)
 }
 
 /// Cleans up and removes the specified NetDevice interface.
@@ -1202,8 +1267,9 @@ mod tests {
 
         // Start the interface control worker.
         let (_stop_sender, stop_receiver) = futures::channel::oneshot::channel();
+        let removable = false;
         let interface_control_fut =
-            run_interface_control(ctx, binding_id, stop_receiver, control_receiver);
+            run_interface_control(ctx, binding_id, stop_receiver, control_receiver, removable);
 
         // Add an address.
         let (asp_client_end, asp_server_end) =

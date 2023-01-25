@@ -1166,6 +1166,25 @@ impl<'a> TestInterface<'a> {
         std::mem::drop(endpoint);
         (control, device_control)
     }
+
+    /// Waits for this interface to signal that it's been removed.
+    pub async fn wait_removal(self) -> Result<fnet_interfaces_admin::InterfaceRemovedReason> {
+        let Self {
+            // Keep this alive, we don't want to trigger removal.
+            endpoint: _endpoint,
+            id: _,
+            realm: _,
+            control,
+            // Keep this alive, we don't want to trigger removal.
+            device_control: _device_control,
+        } = self;
+        match control.wait_termination().await {
+            fnet_interfaces_ext::admin::TerminalError::Fidl(e) => {
+                Err(e).context("waiting interface control termination")
+            }
+            fnet_interfaces_ext::admin::TerminalError::Terminal(reason) => Ok(reason),
+        }
+    }
 }
 
 /// Get the [`socket2::Domain`] for `addr`.

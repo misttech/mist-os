@@ -165,6 +165,7 @@ type adminControlImpl struct {
 	ns          *Netstack
 	nicid       tcpip.NICID
 	cancelServe context.CancelFunc
+	syncRemoval bool
 	doneChannel chan struct{}
 	// TODO(https://fxbug.dev/85061): encode owned, strong, and weak refs once
 	// cloning Control is allowed.
@@ -219,6 +220,21 @@ func (ci *adminControlImpl) Detach(fidl.Context) error {
 	// once we allow cloning Control.
 	ci.isStrongRef = false
 	return nil
+}
+
+func (ci *adminControlImpl) Remove(fidl.Context) (admin.ControlRemoveResult, error) {
+	nicInfo, ok := ci.ns.stack.NICInfo()[ci.nicid]
+	if !ok {
+		panic(fmt.Sprintf("Remove on NIC %d not present", ci.nicid))
+	}
+	if nicInfo.Flags.Loopback {
+		return admin.ControlRemoveResultWithErr(admin.ControlRemoveErrorNotAllowed), nil
+	}
+
+	ci.syncRemoval = true
+	ci.cancelServe()
+
+	return admin.ControlRemoveResultWithResponse(admin.ControlRemoveResponse{}), nil
 }
 
 func (ci *adminControlImpl) GetAuthorizationForInterface(fidl.Context) (admin.GrantForInterfaceAuthorization, error) {
@@ -600,7 +616,15 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 			defer ifs.adminControls.mu.Unlock()
 			wasCanceled := errors.Is(ctx.Err(), context.Canceled)
 			if wasCanceled {
-				reason := ifs.adminControls.mu.removalReason
+				reason := func() admin.InterfaceRemovedReason {
+					if impl.syncRemoval {
+						return admin.InterfaceRemovedReasonUser
+					} else {
+						return ifs.adminControls.mu.removalReason
+					}
+
+				}()
+
 				if reason == 0 {
 					panic("serve context canceled without storing a reason")
 				}
@@ -615,26 +639,31 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 			}
 
 			delete(ifs.adminControls.mu.controls, impl)
-			// Don't consider destroying if not a strong ref.
-			//
-			// Note that the implementation can change from a strong to a weak ref if
-			// Detach is called, which is how we allow interfaces to leak.
-			//
-			// This is also how we prevent destruction from interfaces created with
-			// the legacy API, since they never have strong refs.
-			if !impl.isStrongRef {
-				return nil
-			}
-			ifs.adminControls.mu.strongRefCount--
 
-			// If serving was canceled, that means that removal happened due to
-			// outside cancelation already.
-			if wasCanceled {
-				return nil
-			}
-			// Don't destroy if there are any strong refs left.
-			if ifs.adminControls.mu.strongRefCount != 0 {
-				return nil
+			// Always proceed with removal if this was a synchronous remove
+			// request.
+			if !impl.syncRemoval {
+				// Don't consider destroying if not a strong ref.
+				//
+				// Note that the implementation can change from a strong to a weak ref if
+				// Detach is called, which is how we allow interfaces to leak.
+				//
+				// This is also how we prevent destruction from interfaces created with
+				// the legacy API, since they never have strong refs.
+				if !impl.isStrongRef {
+					return nil
+				}
+				ifs.adminControls.mu.strongRefCount--
+
+				// If serving was canceled, that means that removal happened due to
+				// outside cancelation already.
+				if wasCanceled {
+					return nil
+				}
+				// Don't destroy if there are any strong refs left.
+				if ifs.adminControls.mu.strongRefCount != 0 {
+					return nil
+				}
 			}
 
 			// We're good to remove this interface.

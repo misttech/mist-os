@@ -165,6 +165,16 @@ protocol Control {
         };
     });
 
+    /// Initiates interface removal.
+    ///
+    /// This method returns success once interface removal has started. When the
+    /// interface is removed, a `USER` removed reason is issued in
+    /// [`OnInterfaceRemoved`] and the server end is closed.
+    Remove() -> () error flexible enum {
+        /// This interface can't be removed.
+        NOT_ALLOWED = 1;
+    };
+
     /// Terminal event. Immediately precedes the closure of the server end of
     /// the protocol.
     ///

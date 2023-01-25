@@ -631,12 +631,14 @@ impl Netstack {
             fnet_interfaces_admin::InterfaceRemovedReason,
         >,
         control_receiver: futures::channel::mpsc::Receiver<interfaces_admin::OwnedControlHandle>,
+        removable: bool,
     ) -> fuchsia_async::Task<()> {
         fuchsia_async::Task::spawn(interfaces_admin::run_interface_control(
             self.ctx.clone(),
             id,
             stop_receiver,
             control_receiver,
+            removable,
         ))
     }
 
@@ -722,7 +724,10 @@ impl Netstack {
 
         let (stop_sender, stop_receiver) = futures::channel::oneshot::channel();
 
-        let task = self.spawn_interface_control(binding_id, stop_receiver, control_receiver);
+        // Loopback interface can't be removed.
+        let removable = false;
+        let task =
+            self.spawn_interface_control(binding_id, stop_receiver, control_receiver, removable);
         (stop_sender, binding_id, task)
     }
 }

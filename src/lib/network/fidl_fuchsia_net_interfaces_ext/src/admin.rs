@@ -208,6 +208,16 @@ impl Control {
         self.or_terminal_event(self.proxy.enable()).await
     }
 
+    /// Calls Remove on the proxy.
+    pub async fn remove(
+        &self,
+    ) -> Result<
+        fnet_interfaces_admin::ControlRemoveResult,
+        TerminalError<fnet_interfaces_admin::InterfaceRemovedReason>,
+    > {
+        self.or_terminal_event(self.proxy.remove()).await
+    }
+
     /// Calls Disable on the proxy.
     pub async fn disable(
         &self,
