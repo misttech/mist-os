@@ -8,7 +8,7 @@ use {
     bt_avdtp::{self as avdtp, MediaStream},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_media as media, fidl_fuchsia_media_sessions2 as sessions2,
-    fidl_fuchsia_metrics as cobalt, fuchsia_async as fasync,
+    fuchsia_async as fasync,
     fuchsia_bluetooth::{inspect::DataStreamInspect, types::PeerId},
     fuchsia_inspect::Node,
     fuchsia_inspect_derive::{AttachError, Inspect},
@@ -27,7 +27,7 @@ use crate::player;
 
 #[derive(Clone)]
 pub struct SinkTaskBuilder {
-    metrics_proxy: Option<cobalt::MetricEventLoggerProxy>,
+    metrics_logger: bt_metrics::MetricsLogger,
     publisher: sessions2::PublisherProxy,
     audio_consumer_factory: media::SessionAudioConsumerFactoryProxy,
     domain: String,
@@ -35,12 +35,12 @@ pub struct SinkTaskBuilder {
 
 impl SinkTaskBuilder {
     pub fn new(
-        metrics_proxy: Option<cobalt::MetricEventLoggerProxy>,
+        metrics_logger: bt_metrics::MetricsLogger,
         publisher: sessions2::PublisherProxy,
         audio_consumer_factory: media::SessionAudioConsumerFactoryProxy,
         domain: String,
     ) -> Self {
-        Self { metrics_proxy, publisher, audio_consumer_factory, domain }
+        Self { metrics_logger, publisher, audio_consumer_factory, domain }
     }
 }
 
@@ -169,8 +169,8 @@ impl MediaTaskRunner for ConfiguredSinkTask {
             Err(MediaTaskError::Other(format!("Unrecoverable streaming error: {:?}", err)))
         };
         let codec_type = self.codec_config.codec_type().clone();
-        let metrics_proxy = self.builder.metrics_proxy.clone();
-        let task = RunningSinkTask::start(media_player_fut, metrics_proxy, codec_type);
+        let metrics_logger = self.builder.metrics_logger.clone();
+        let task = RunningSinkTask::start(media_player_fut, metrics_logger, codec_type);
         Ok(Box::new(task))
     }
 
@@ -212,7 +212,7 @@ struct RunningSinkTask {
 impl RunningSinkTask {
     fn start(
         media_task: impl Future<Output = Result<(), MediaTaskError>> + Send + 'static,
-        metrics: Option<cobalt::MetricEventLoggerProxy>,
+        metrics: bt_metrics::MetricsLogger,
         codec_type: avdtp::MediaCodecType,
     ) -> Self {
         let (sender, receiver) = oneshot::channel();
@@ -234,14 +234,7 @@ impl RunningSinkTask {
                 trace::instant!("bt-a2dp", "Media:Stop", trace::Scope::Thread);
                 let end_time = fasync::Time::now();
 
-                if let Some(sender) = metrics {
-                    report_stream_metrics(
-                        sender,
-                        &codec_type,
-                        (end_time - start_time).into_seconds(),
-                    )
-                    .await;
-                }
+                report_stream_metrics(metrics, &codec_type, (end_time - start_time).into_seconds())
             }
         })
         .detach();
@@ -323,8 +316,8 @@ async fn media_stream_task(
     }
 }
 
-async fn report_stream_metrics(
-    metrics_proxy: cobalt::MetricEventLoggerProxy,
+fn report_stream_metrics(
+    metrics_logger: bt_metrics::MetricsLogger,
     codec_type: &avdtp::MediaCodecType,
     duration_seconds: i64,
 ) {
@@ -337,18 +330,11 @@ async fn report_stream_metrics(
         }
         _ => bt_metrics::A2dpStreamDurationInSecondsMigratedMetricDimensionCodec::Unknown,
     };
-
-    match metrics_proxy
-        .log_integer(
-            bt_metrics::A2DP_STREAM_DURATION_IN_SECONDS_MIGRATED_METRIC_ID,
-            duration_seconds,
-            &[codec as u32],
-        )
-        .await
-    {
-        Ok(Ok(())) => (),
-        e => warn!("failed to log metrics: {:?}", e),
-    }
+    metrics_logger.log_integer(
+        bt_metrics::A2DP_STREAM_DURATION_IN_SECONDS_MIGRATED_METRIC_ID,
+        duration_seconds,
+        vec![codec as u32],
+    );
 }
 
 #[cfg(all(test, feature = "test_encoding"))]
@@ -365,7 +351,7 @@ mod tests {
             StreamSinkRequest,
         },
         fidl_fuchsia_media_sessions2::{PublisherMarker, PublisherRequest},
-        fidl_fuchsia_metrics::MetricEventPayload,
+        fidl_fuchsia_metrics as cobalt,
         fuchsia_bluetooth::types::Channel,
         fuchsia_inspect as inspect,
         fuchsia_inspect_derive::WithInspect,
@@ -375,10 +361,10 @@ mod tests {
         std::sync::{Arc, RwLock},
     };
 
-    fn fake_cobalt_sender(
-    ) -> (cobalt::MetricEventLoggerProxy, cobalt::MetricEventLoggerRequestStream) {
-        fidl::endpoints::create_proxy_and_stream::<cobalt::MetricEventLoggerMarker>()
-            .expect("failed to create MetricsEventLogger proxy")
+    fn fake_cobalt_sender() -> (bt_metrics::MetricsLogger, cobalt::MetricEventLoggerRequestStream) {
+        let (c, s) = fidl::endpoints::create_proxy_and_stream::<cobalt::MetricEventLoggerMarker>()
+            .expect("failed to create MetricsEventLogger proxy");
+        (bt_metrics::MetricsLogger::from_proxy(c), s)
     }
 
     #[fuchsia::test]
@@ -389,8 +375,12 @@ mod tests {
         let (audio_consumer_factory_proxy, mut audio_factory_requests) =
             create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
                 .expect("proxy pair creation");
-        let builder =
-            SinkTaskBuilder::new(None, proxy, audio_consumer_factory_proxy, "Tests".to_string());
+        let builder = SinkTaskBuilder::new(
+            bt_metrics::MetricsLogger::default(),
+            proxy,
+            audio_consumer_factory_proxy,
+            "Tests".to_string(),
+        );
 
         let sbc_config = MediaCodecConfig::min_sbc();
         let mut runner = builder.configure(&PeerId(1), &sbc_config).expect("configured");
@@ -435,14 +425,14 @@ mod tests {
     #[fuchsia::test]
     fn dropped_task_reports_metrics() {
         let mut exec = fasync::TestExecutor::new();
-        let (send, mut recv) = fake_cobalt_sender();
+        let (metrics_logger, mut recv) = fake_cobalt_sender();
         let (proxy, mut session_requests) =
             fidl::endpoints::create_proxy_and_stream::<PublisherMarker>().unwrap();
         let (audio_consumer_factory_proxy, _audio_factory_requests) =
             create_proxy_and_stream::<SessionAudioConsumerFactoryMarker>()
                 .expect("proxy pair creation");
         let builder = SinkTaskBuilder::new(
-            Some(send),
+            metrics_logger,
             proxy,
             audio_consumer_factory_proxy,
             "Tests".to_string(),
@@ -488,16 +478,12 @@ mod tests {
     /// Test that cobalt metrics are sent after stream ends
     fn test_cobalt_metrics() {
         let mut exec = fasync::TestExecutor::new();
-        let (send, mut recv) = fake_cobalt_sender();
+        let (metrics_logger, mut recv) = fake_cobalt_sender();
         const TEST_DURATION: i64 = 1;
-
-        let report_fut =
-            report_stream_metrics(send, &avdtp::MediaCodecType::AUDIO_AAC, TEST_DURATION);
-        pin_mut!(report_fut);
-        exec.run_until_stalled(&mut report_fut).expect_pending("should be pending");
-
-        match exec.run_until_stalled(&mut recv.next()).expect("should be ready") {
-            Some(Ok(req)) => {
+        // First report the stream metrics.
+        report_stream_metrics(metrics_logger, &avdtp::MediaCodecType::AUDIO_AAC, TEST_DURATION);
+        match exec.run_singlethreaded(&mut recv.next()).expect("should be ready") {
+            Ok(req) => {
                 let got = respond_to_metrics_req_for_test(req);
                 assert_eq!(
                     bt_metrics::A2DP_STREAM_DURATION_IN_SECONDS_MIGRATED_METRIC_ID,
@@ -510,12 +496,10 @@ mod tests {
                     ],
                     got.event_codes
                 );
-                assert_eq!(MetricEventPayload::IntegerValue(TEST_DURATION), got.payload);
+                assert_eq!(cobalt::MetricEventPayload::IntegerValue(TEST_DURATION), got.payload);
             }
             x => panic!("should have received request: {:?}", x),
         }
-
-        assert!(exec.run_until_stalled(&mut report_fut).is_ready());
     }
 
     fn once_player_gen(

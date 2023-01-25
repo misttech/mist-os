@@ -15,7 +15,6 @@ shared_deps = [
   "//sdk/fidl/fuchsia.bluetooth.internal.a2dp:fuchsia.bluetooth.internal.a2dp_rust",
   "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
   "//sdk/fidl/fuchsia.media.sessions2:fuchsia.media.sessions2_rust",
-  "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
   "//sdk/fidl/fuchsia.settings:fuchsia.settings_rust",
   "//src/connectivity/bluetooth/fidl:component_rust",
   "//src/connectivity/bluetooth/lib/async-helpers",
@@ -161,6 +160,7 @@ rustc_test("encoding_integration_bin") {
 
   deps = shared_deps + [
            "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
+           "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
            "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_rust",
            "//src/connectivity/bluetooth/lib/async-helpers:async-test-helpers",
            "//src/connectivity/bluetooth/lib/bt-avdtp",

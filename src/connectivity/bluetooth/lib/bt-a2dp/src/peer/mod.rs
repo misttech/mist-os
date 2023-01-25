@@ -12,7 +12,6 @@ use {
         ChannelParameters, ConnectParameters, L2capParameters, ProfileDescriptor, ProfileProxy,
         PSM_AVDTP,
     },
-    fidl_fuchsia_metrics,
     fuchsia_async::{self as fasync, DurationExt},
     fuchsia_bluetooth::{
         inspect::DebugExt,
@@ -63,8 +62,8 @@ pub struct Peer {
     /// and this peer is disconnected.  Shared weakly with ClosedPeer future objects that complete
     /// when the peer disconnects.
     closed_wakers: Arc<Mutex<Option<Vec<Waker>>>>,
-    /// Cobalt Sender, if we are sending metrics.
-    metrics: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+    /// Used to report peer metrics to Cobalt.
+    metrics: bt_metrics::MetricsLogger,
     /// A task waiting to start a stream if it hasn't been started yet.
     start_stream_task: Mutex<Option<fasync::Task<avdtp::Result<()>>>>,
 }
@@ -172,36 +171,6 @@ impl StreamPermits {
     }
 }
 
-fn report_occurrences<I: 'static + IntoIterator<Item = u32> + std::marker::Send>(
-    metrics_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-    metric_id: u32,
-    event_codes: I,
-) where
-    <I as IntoIterator>::IntoIter: std::marker::Send,
-{
-    fasync::Task::spawn(async move {
-        for code in event_codes {
-            let res = metrics_proxy.log_occurrence(metric_id, 1, &[code]).await;
-            bt_metrics::log_on_failure(res);
-        }
-    })
-    .detach();
-}
-
-fn report_integer(
-    metrics_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-    metric_id: u32,
-    int_val: i64,
-    event_codes: Vec<u32>,
-) {
-    fasync::Task::spawn(async move {
-        bt_metrics::log_on_failure(
-            metrics_proxy.log_integer(metric_id, int_val, &event_codes[..]).await,
-        );
-    })
-    .detach();
-}
-
 impl Peer {
     /// Make a new Peer which is connected to the peer `id` using the AVDTP `peer`.
     /// The `streams` are the local endpoints available to the peer.
@@ -215,7 +184,7 @@ impl Peer {
         streams: Streams,
         permits: Option<Permits>,
         profile: ProfileProxy,
-        metrics: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+        metrics: bt_metrics::MetricsLogger,
     ) -> Self {
         let inner = Arc::new(Mutex::new(PeerInner::new(peer, id, streams, metrics.clone())));
         let reservations_receiver = if let Some(permits) = permits {
@@ -320,28 +289,20 @@ impl Peer {
                 };
             }
             inner.lock().set_remote_endpoints(&remote_streams);
-            if let Some(sender) = metrics {
-                Self::record_cobalt_metrics(sender, &remote_streams)
-            }
+            Self::record_cobalt_metrics(metrics, &remote_streams);
             Ok(remote_streams)
         }
     }
 
-    fn record_cobalt_metrics(
-        metrics: fidl_fuchsia_metrics::MetricEventLoggerProxy,
-        endpoints: &[StreamEndpoint],
-    ) {
+    fn record_cobalt_metrics(metrics: bt_metrics::MetricsLogger, endpoints: &[StreamEndpoint]) {
         let codec_metrics: HashSet<_> = endpoints
             .iter()
             .filter_map(|endpoint| {
                 endpoint.codec_type().map(|t| codectype_to_availability_metric(t) as u32)
             })
             .collect();
-        report_occurrences(
-            metrics.clone(),
-            bt_metrics::A2DP_CODEC_AVAILABILITY_MIGRATED_METRIC_ID,
-            codec_metrics,
-        );
+        metrics
+            .log_occurrences(bt_metrics::A2DP_CODEC_AVAILABILITY_MIGRATED_METRIC_ID, codec_metrics);
 
         let cap_metrics: HashSet<_> = endpoints
             .iter()
@@ -356,11 +317,7 @@ impl Peer {
                     .map(|t| t as u32)
             })
             .collect();
-        report_occurrences(
-            metrics.clone(),
-            bt_metrics::A2DP_REMOTE_PEER_CAPABILITIES_METRIC_ID,
-            cap_metrics,
-        );
+        metrics.log_occurrences(bt_metrics::A2DP_REMOTE_PEER_CAPABILITIES_METRIC_ID, cap_metrics);
     }
 
     const TRANSPORT_CHANNEL_PARAMS: L2capParameters = L2capParameters {
@@ -576,8 +533,8 @@ struct PeerInner {
     remote_endpoints: Option<Vec<StreamEndpoint>>,
     /// The inspect node representing the remote endpoints.
     remote_inspect: fuchsia_inspect::Node,
-    /// Cobalt logger to use and hand out to peers, if we are using one.
-    metrics: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+    /// Cobalt logger used to report peer metrics.
+    metrics: bt_metrics::MetricsLogger,
 }
 
 impl Inspect for &mut PeerInner {
@@ -595,7 +552,7 @@ impl PeerInner {
         peer: avdtp::Peer,
         peer_id: PeerId,
         local: Streams,
-        metrics: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+        metrics: bt_metrics::MetricsLogger,
     ) -> Self {
         Self {
             peer,
@@ -959,14 +916,11 @@ impl PeerInner {
                 info!(peer = %self.peer_id, "stream {stream_id} reported delay {}.{} ms", delay / 10, delay % 10);
                 let res = responder.send();
                 // Record delay to cobalt.
-                if let Some(sender) = &self.metrics {
-                    report_integer(
-                        sender.clone(),
-                        bt_metrics::AVDTP_DELAY_REPORT_IN_NANOSECONDS_METRIC_ID,
-                        delay_ns,
-                        Vec::new(),
-                    );
-                }
+                self.metrics.log_integer(
+                    bt_metrics::AVDTP_DELAY_REPORT_IN_NANOSECONDS_METRIC_ID,
+                    delay_ns,
+                    vec![],
+                );
                 res
             }
         }
@@ -1064,12 +1018,13 @@ mod tests {
     use crate::media_types::*;
     use crate::stream::tests::make_sbc_endpoint;
 
-    fn fake_metrics() -> (
-        fidl_fuchsia_metrics::MetricEventLoggerProxy,
-        fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
-    ) {
-        fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
-            .expect("failed to create MetricsEventLogger proxy")
+    fn fake_metrics(
+    ) -> (bt_metrics::MetricsLogger, fidl_fuchsia_metrics::MetricEventLoggerRequestStream) {
+        let (c, s) = fidl::endpoints::create_proxy_and_stream::<
+            fidl_fuchsia_metrics::MetricEventLoggerMarker,
+        >()
+        .expect("failed to create MetricsEventLogger proxy");
+        (bt_metrics::MetricsLogger::from_proxy(c), s)
     }
 
     fn setup_avdtp_peer() -> (avdtp::Peer, Channel) {
@@ -1113,12 +1068,22 @@ mod tests {
         Peer,
     ) {
         let (avdtp, remote) = setup_avdtp_peer();
-        let (s, r) = fake_metrics();
-        let (metrics, cobalt_receiver) = if use_cobalt { (Some(s), Some(r)) } else { (None, None) };
+        let (metrics_logger, cobalt_receiver) = if use_cobalt {
+            let (l, r) = fake_metrics();
+            (l, Some(r))
+        } else {
+            (bt_metrics::MetricsLogger::default(), None)
+        };
         let (profile_proxy, requests) =
             create_proxy_and_stream::<ProfileMarker>().expect("test proxy pair creation");
-        let peer =
-            Peer::create(PeerId(1), avdtp, build_test_streams(), None, profile_proxy, metrics);
+        let peer = Peer::create(
+            PeerId(1),
+            avdtp,
+            build_test_streams(),
+            None,
+            profile_proxy,
+            metrics_logger,
+        );
 
         (remote, requests, cobalt_receiver, peer)
     }
@@ -1183,7 +1148,14 @@ mod tests {
         let id = PeerId(1);
 
         let avdtp = avdtp::Peer::new(signaling);
-        let peer = Peer::create(id, avdtp, Streams::new(), None, proxy, None);
+        let peer = Peer::create(
+            id,
+            avdtp,
+            Streams::new(),
+            None,
+            proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
 
         let closed_fut = peer.closed();
 
@@ -1764,7 +1736,14 @@ mod tests {
         );
         streams.insert(source);
 
-        let peer = Peer::create(PeerId(1), avdtp, streams, None, profile_proxy, None);
+        let peer = Peer::create(
+            PeerId(1),
+            avdtp,
+            streams,
+            None,
+            profile_proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
         let remote = avdtp::Peer::new(remote);
         let mut remote_events = remote.take_request_stream();
 
@@ -1944,7 +1923,14 @@ mod tests {
         let next_task_fut = test_builder.next_task();
         pin_mut!(next_task_fut);
 
-        let peer = Peer::create(PeerId(1), avdtp, streams, None, profile_proxy, None);
+        let peer = Peer::create(
+            PeerId(1),
+            avdtp,
+            streams,
+            None,
+            profile_proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
         let remote_peer = avdtp::Peer::new(remote);
 
         let discover_fut = remote_peer.discover();
@@ -2051,7 +2037,14 @@ mod tests {
             test_builder.builder(),
         ));
 
-        let _peer = Peer::create(PeerId(1), avdtp, streams, None, profile_proxy, None);
+        let _peer = Peer::create(
+            PeerId(1),
+            avdtp,
+            streams,
+            None,
+            profile_proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
         let remote_peer = avdtp::Peer::new(remote);
 
         let sbc_endpoint_id = 1_u8.try_into().expect("should be able to get sbc endpointid");
@@ -2108,7 +2101,14 @@ mod tests {
         let next_task_fut = test_builder.next_task();
         pin_mut!(next_task_fut);
 
-        let peer = Peer::create(PeerId(1), avdtp, streams, None, profile_proxy, None);
+        let peer = Peer::create(
+            PeerId(1),
+            avdtp,
+            streams,
+            None,
+            profile_proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
         let remote_peer = avdtp::Peer::new(remote);
 
         let sbc_endpoint_id = 1_u8.try_into().expect("should be able to get sbc endpointid");
@@ -2194,8 +2194,14 @@ mod tests {
         let permits = Permits::new(1);
         let taken_permit = permits.get().expect("permit taken");
 
-        let peer =
-            Peer::create(PeerId(1), avdtp, streams, Some(permits.clone()), profile_proxy, None);
+        let peer = Peer::create(
+            PeerId(1),
+            avdtp,
+            streams,
+            Some(permits.clone()),
+            profile_proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
         let remote_peer = avdtp::Peer::new(remote);
 
         let sbc_endpoint_id = 1_u8.try_into().expect("should be able to get sbc endpointid");
@@ -2346,8 +2352,14 @@ mod tests {
 
         let permits = Permits::new(2);
 
-        let peer =
-            Peer::create(PeerId(1), avdtp, streams, Some(permits.clone()), profile_proxy, None);
+        let peer = Peer::create(
+            PeerId(1),
+            avdtp,
+            streams,
+            Some(permits.clone()),
+            profile_proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
         let remote_peer = avdtp::Peer::new(remote);
 
         let one_media_task = start_sbc_stream(
@@ -2445,8 +2457,14 @@ mod tests {
 
         let permits = Permits::new(2);
 
-        let peer =
-            Peer::create(PeerId(1), avdtp, streams, Some(permits.clone()), profile_proxy, None);
+        let peer = Peer::create(
+            PeerId(1),
+            avdtp,
+            streams,
+            Some(permits.clone()),
+            profile_proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
         let remote_peer = avdtp::Peer::new(remote);
 
         let one_media_task = start_sbc_stream(

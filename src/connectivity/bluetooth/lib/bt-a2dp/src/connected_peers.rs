@@ -7,7 +7,6 @@ use bt_avdtp as avdtp;
 use fidl_fuchsia_bluetooth_bredr::{
     self as bredr, ChannelParameters, ProfileDescriptor, ProfileProxy,
 };
-use fidl_fuchsia_metrics;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::{
     detachable_map::{DetachableMap, DetachableWeak},
@@ -186,7 +185,7 @@ pub struct ConnectedPeers {
     /// Profile Proxy, used to connect new transport sockets.
     profile: ProfileProxy,
     /// Cobalt logger to use and hand out to peers, if we are using one.
-    metrics: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+    metrics: bt_metrics::MetricsLogger,
     /// The 'peers' node of the inspect tree. All connected peers own a child node of this node.
     inspect: inspect::Node,
     /// Inspect node for which is the current preferred peer direction.
@@ -204,7 +203,7 @@ impl ConnectedPeers {
         codec_negotiation: CodecNegotiation,
         permits: Permits,
         profile: ProfileProxy,
-        metrics: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+        metrics: bt_metrics::MetricsLogger,
     ) -> Self {
         Self {
             connected: DetachableMap::new(),
@@ -525,7 +524,7 @@ mod tests {
             CodecNegotiation::build(vec![], avdtp::EndpointType::Sink).unwrap(),
             Permits::new(1),
             proxy,
-            None,
+            bt_metrics::MetricsLogger::default(),
         );
 
         (exec, id, peers, stream)
@@ -703,7 +702,13 @@ mod tests {
             sbc_source_codec.clone(),
         ));
 
-        let peers = ConnectedPeers::new(streams, negotiation.clone(), Permits::new(1), proxy, None);
+        let peers = ConnectedPeers::new(
+            streams,
+            negotiation.clone(),
+            Permits::new(1),
+            proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
 
         (exec, peers, stream, sbc_sink_codec, aac_sink_codec)
     }

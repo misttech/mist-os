@@ -20,7 +20,6 @@ use fidl_fuchsia_media::{
     AudioChannelId, AudioPcmMode, PcmFormat, SessionAudioConsumerFactoryMarker,
 };
 use fidl_fuchsia_media_sessions2 as sessions2;
-use fidl_fuchsia_metrics as metrics;
 use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_bluetooth::{
     assigned_numbers::AssignedNumber,
@@ -105,7 +104,7 @@ fn find_codec_cap<'a>(endpoint: &'a StreamEndpoint) -> Option<&'a ServiceCapabil
 
 #[derive(Clone)]
 struct StreamsBuilder {
-    metrics_sender: Option<metrics::MetricEventLoggerProxy>,
+    metrics_logger: bt_metrics::MetricsLogger,
     codec_negotiation: CodecNegotiation,
     domain: String,
     aac_available: bool,
@@ -115,7 +114,7 @@ struct StreamsBuilder {
 
 impl StreamsBuilder {
     async fn system_available(
-        metrics_sender: Option<metrics::MetricEventLoggerProxy>,
+        metrics_logger: bt_metrics::MetricsLogger,
         config: &A2dpConfiguration,
     ) -> Result<Self, Error> {
         // TODO(fxbug.dev/1126): detect codecs, add streams for each codec
@@ -157,7 +156,7 @@ impl StreamsBuilder {
         let codec_negotiation = CodecNegotiation::build(caps_available, avdtp::EndpointType::Sink)?;
 
         Ok(Self {
-            metrics_sender,
+            metrics_logger,
             codec_negotiation,
             domain: config.domain.clone(),
             aac_available,
@@ -287,7 +286,7 @@ impl StreamsBuilder {
             >()
             .context("Failed to connect to AudioConsumerFactory")?;
             let sink_task_builder = sink_task::SinkTaskBuilder::new(
-                self.metrics_sender.clone(),
+                self.metrics_logger.clone(),
                 publisher,
                 audio_consumer_factory,
                 domain,
@@ -541,10 +540,8 @@ async fn main() -> Result<(), Error> {
             .ok()
     });
 
-    // Set up metrics logger.
-    let metrics_logger = bt_metrics::create_metrics_logger()
-        .map_err(|e| warn!("Failed to create metrics logger: {e}"))
-        .ok();
+    // Set up the metrics logger.
+    let metrics_logger = bt_metrics::MetricsLogger::new();
 
     let stream_builder = StreamsBuilder::system_available(metrics_logger.clone(), &config).await?;
 
@@ -674,7 +671,7 @@ mod tests {
             CodecNegotiation::build(vec![], avdtp::EndpointType::Sink).unwrap(),
             Permits::new(1),
             proxy,
-            None,
+            bt_metrics::MetricsLogger::default(),
         )));
         (peers, stream)
     }
@@ -687,7 +684,10 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let config =
             A2dpConfiguration { source: Some(AudioSourceType::BigBen), ..Default::default() };
-        let mut streams_fut = Box::pin(StreamsBuilder::system_available(None, &config));
+        let mut streams_fut = Box::pin(StreamsBuilder::system_available(
+            bt_metrics::MetricsLogger::default(),
+            &config,
+        ));
 
         let streams = exec.run_singlethreaded(&mut streams_fut);
 
@@ -704,7 +704,10 @@ mod tests {
             enable_sink: false,
             ..Default::default()
         };
-        let mut builder_fut = Box::pin(StreamsBuilder::system_available(None, &config));
+        let mut builder_fut = Box::pin(StreamsBuilder::system_available(
+            bt_metrics::MetricsLogger::default(),
+            &config,
+        ));
 
         let builder = exec.run_singlethreaded(&mut builder_fut);
 
@@ -716,7 +719,10 @@ mod tests {
 
         config.enable_aac = false;
 
-        let mut builder_fut = Box::pin(StreamsBuilder::system_available(None, &config));
+        let mut builder_fut = Box::pin(StreamsBuilder::system_available(
+            bt_metrics::MetricsLogger::default(),
+            &config,
+        ));
 
         let builder = exec.run_singlethreaded(&mut builder_fut);
 

@@ -79,6 +79,22 @@ impl MetricsLogger {
         })
         .detach();
     }
+
+    pub fn log_occurrences<I: 'static + IntoIterator<Item = u32> + std::marker::Send>(
+        &self,
+        id: u32,
+        event_codes: I,
+    ) where
+        <I as IntoIterator>::IntoIter: std::marker::Send,
+    {
+        let Some(c) = self.0.clone() else { return };
+        fasync::Task::spawn(async move {
+            for code in event_codes {
+                log_on_failure(c.log_occurrence(id, 1, &[code]).await);
+            }
+        })
+        .detach();
+    }
 }
 
 /// Test-only

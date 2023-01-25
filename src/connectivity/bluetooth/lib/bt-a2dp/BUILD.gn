@@ -14,7 +14,6 @@ rustc_library("bt-a2dp") {
     "//sdk/fidl/fuchsia.bluetooth.avdtp:fuchsia.bluetooth.avdtp_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
-    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//src/connectivity/bluetooth/lib/bt-avdtp",
     "//src/connectivity/bluetooth/lib/bt-metrics",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
@@ -34,6 +33,7 @@ rustc_library("bt-a2dp") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//src/lib/async-utils",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",

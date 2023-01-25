@@ -475,7 +475,14 @@ mod tests {
             make_sbc_endpoint(1, EndpointType::Source),
             test_builder.builder(),
         ));
-        let peer = Peer::create(fake_peer_id, avdtp_peer, streams, None, profile_proxy, None);
+        let peer = Peer::create(
+            fake_peer_id,
+            avdtp_peer,
+            streams,
+            None,
+            profile_proxy,
+            bt_metrics::MetricsLogger::default(),
+        );
         let _ = peer_map.insert(fake_peer_id, peer);
         let weak_peer = peer_map.get(&fake_peer_id).expect("just inserted");
 
