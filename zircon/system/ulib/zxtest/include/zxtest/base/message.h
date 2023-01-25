@@ -26,9 +26,13 @@ inline std::string_view ToStringView(std::string_view str) { return str; }
 
 // We avoid calling std::string_view's constructor of a single `const char*`
 // argument, as that will call std::char_traits<char>::length() which may not
-// support nullptrs. Similarly we avoid calling strlen on a nullptr, as it
-// varies by implementation whether that is supported.
-inline std::string_view ToStringView(const char* str) { return {str, str ? strlen(str) : 0}; }
+// support nullptrs.
+inline std::string_view ToStringView(const char* str) {
+  if (!str) {
+    return {};
+  }
+  return {str, strlen(str)};
+}
 
 inline std::string_view ToStringView(char* str) {
   return ToStringView(static_cast<const char*>(str));
@@ -36,10 +40,17 @@ inline std::string_view ToStringView(char* str) {
 
 // Else, default to assuming that std::data will yield a C string.
 template <typename Stringlike>
-inline std::string_view ToStringView(const Stringlike& str) {
+inline std::enable_if_t<!std::is_convertible_v<Stringlike, nullptr_t>, std::string_view>
+ToStringView(const Stringlike& str) {
   static_assert(
       std::is_convertible_v<decltype(std::data(std::declval<Stringlike&>())), const char*>);
   return ToStringView(std::data(str));
+}
+
+template <typename Stringlike>
+inline std::enable_if_t<std::is_convertible_v<Stringlike, nullptr_t>, std::string_view>
+ToStringView(const Stringlike& str) {
+  return {};
 }
 
 }  // namespace internal
@@ -162,24 +173,8 @@ fbl::String PrintValue(const std::tuple<Ts...>& value) {
   return fbl::String(buffer, current);
 }
 
-template <typename T>
-constexpr bool is_nullptr_v = std::is_null_pointer_v<std::remove_reference_t<T>>;
-
-template <typename StringTypeA, class StringTypeB>
-typename std::enable_if<is_nullptr_v<StringTypeA> ^ is_nullptr_v<StringTypeB>, bool>::type StrCmp(
-    StringTypeA&&, StringTypeB&&) {
-  return false;
-}
-
 template <typename StringTypeA, typename StringTypeB>
-typename std::enable_if<is_nullptr_v<StringTypeA> && is_nullptr_v<StringTypeB>, bool>::type StrCmp(
-    StringTypeA&&, StringTypeB&&) {
-  return true;
-}
-
-template <typename StringTypeA, typename StringTypeB>
-typename std::enable_if<!(is_nullptr_v<StringTypeA> || is_nullptr_v<StringTypeB>), bool>::type
-StrCmp(StringTypeA&& actual, StringTypeB&& expected) {
+inline bool StrCmp(StringTypeA&& actual, StringTypeB&& expected) {
   std::string_view actual_sv = internal::ToStringView(actual);
   std::string_view expected_sv = internal::ToStringView(expected);
   return actual_sv == expected_sv;
