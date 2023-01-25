@@ -6,6 +6,7 @@
 #define LIB_STDCOMPAT_INCLUDE_LIB_STDCOMPAT_ALGORITHM_H_
 
 #include <algorithm>
+#include <iterator>
 
 #include "internal/algorithm.h"
 
@@ -19,6 +20,8 @@ using std::sort;
 
 using std::remove;
 using std::remove_if;
+
+using std::lower_bound;
 
 #else
 
@@ -50,6 +53,31 @@ constexpr bool is_sorted(ForwardIt first, ForwardIt end, Comparator comp = Compa
 
 using internal::remove;
 using internal::remove_if;
+
+template <typename ForwardIt, typename T, typename Comparator>
+constexpr ForwardIt lower_bound(ForwardIt first, ForwardIt last, const T& value, Comparator comp) {
+  using difference_t = typename std::iterator_traits<ForwardIt>::difference_type;
+  difference_t length = std::distance(first, last);
+
+  while (length > 0) {
+    difference_t step = length / 2;
+    auto it = std::next(first, step);
+
+    if (comp(*it, value)) {
+      first = std::next(it);
+      length -= step + 1;
+    } else {
+      length = step;
+    }
+  }
+
+  return first;
+}
+
+template <typename ForwardIt, typename T>
+constexpr ForwardIt lower_bound(ForwardIt first, ForwardIt last, const T& value) {
+  return ::cpp20::lower_bound(first, last, value, std::less<>{});
+}
 
 #endif
 

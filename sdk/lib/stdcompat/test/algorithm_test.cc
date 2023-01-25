@@ -12,6 +12,7 @@
 #include <array>
 #include <cstdint>
 #include <deque>
+#include <functional>
 #include <iostream>
 #include <queue>
 #include <vector>
@@ -192,6 +193,46 @@ TEST(RemoveTest, WithSelfMoveAvoided) {
   ASSERT_EQ(container.front(), "value 1");
 }
 
+TEST(LowerBoundTest, CheckReturnValue) {
+  constexpr std::array kValues{1, 2, 3, 4, 5, 6, 7, 8, 15};
+
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 0) == kValues.begin());
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 1) == kValues.begin());
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 2) == kValues.begin() + 1);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 3) == kValues.begin() + 2);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 4) == kValues.begin() + 3);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 5) == kValues.begin() + 4);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 6) == kValues.begin() + 5);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 7) == kValues.begin() + 6);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 8) == kValues.begin() + 7);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 9) == kValues.begin() + 8);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 15) == kValues.begin() + 8);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 16) == kValues.end());
+
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 1, std::less_equal<>{}) ==
+                kValues.begin() + 1);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 2, std::less_equal<>{}) ==
+                kValues.begin() + 2);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 3, std::less_equal<>{}) ==
+                kValues.begin() + 3);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 4, std::less_equal<>{}) ==
+                kValues.begin() + 4);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 5, std::less_equal<>{}) ==
+                kValues.begin() + 5);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 6, std::less_equal<>{}) ==
+                kValues.begin() + 6);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 7, std::less_equal<>{}) ==
+                kValues.begin() + 7);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 8, std::less_equal<>{}) ==
+                kValues.begin() + 8);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 9, std::less_equal<>{}) ==
+                kValues.begin() + 8);
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 15, std::less_equal<>{}) ==
+                kValues.end());
+  static_assert(cpp20::lower_bound(kValues.begin(), kValues.end(), 15, std::less_equal<>{}) ==
+                kValues.end());
+}
+
 #if defined(__cpp_lib_constexpr_algorithms) && __cpp_lib_constexpr_algorithms >= 201806L && \
     !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 
@@ -233,6 +274,32 @@ TEST(IsSortedTest, IsAliasWhenStdIsAvailable) {
 
     static_assert(is_sorted_cpp20 == is_sorted_std,
                   "cpp20::is_sorted_std should be an alias of std::sort.");
+  }
+}
+
+TEST(LowerBoundTest, IsAliasWhenStdIsAvailable) {
+  {
+    using iterator_type = decltype(std::declval<std::vector<int>>().begin());
+    constexpr iterator_type (*lower_bound_cpp20)(iterator_type, iterator_type, const int&) =
+        cpp20::lower_bound;
+    constexpr iterator_type (*lower_bound_std)(iterator_type, iterator_type, const int&) =
+        std::lower_bound;
+
+    static_assert(lower_bound_cpp20 == lower_bound_std,
+                  "cpp20::lower_bound should be an alias of std::lower_bound.");
+  }
+
+  {
+    using iterator_type = decltype(std::declval<std::vector<int>>().begin());
+    auto comp = [](const int& a, const int& b) -> bool { return false; };
+    using iterator_type = decltype(std::declval<std::vector<int>>().begin());
+    constexpr iterator_type (*lower_bound_cpp20)(iterator_type, iterator_type, const int&,
+                                                 decltype(comp)) = cpp20::lower_bound;
+    constexpr iterator_type (*lower_bound_std)(iterator_type, iterator_type, const int&,
+                                               decltype(comp)) = std::lower_bound;
+
+    static_assert(lower_bound_cpp20 == lower_bound_std,
+                  "cpp20::lower_bound should be an alias of std::lower_bound.");
   }
 }
 
