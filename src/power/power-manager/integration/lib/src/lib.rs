@@ -13,7 +13,8 @@ use {
     },
     fidl::endpoints::DiscoverableProtocolMarker,
     fidl::AsHandleRef as _,
-    fidl_fuchsia_io as fio, fidl_fuchsia_testing as ftesting,
+    fidl_fuchsia_hardware_power_statecontrol as fpower, fidl_fuchsia_io as fio,
+    fidl_fuchsia_testing as ftesting,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     std::collections::HashMap,
     std::sync::atomic::{AtomicU64, Ordering},
@@ -346,4 +347,25 @@ pub struct Mocks {
     pub input_settings_service: Arc<MockInputSettingsService>,
     pub system_controller_service: Arc<MockSystemControllerService>,
     pub temperature: HashMap<String, Arc<MockTemperatureDriver>>,
+}
+
+/// Tests that Power Manager triggers a thermal reboot if the temperature sensor at the given path
+/// reaches the provided temperature. The provided TestEnv is consumed because Power Manager
+/// triggers a reboot.
+pub async fn test_thermal_reboot(mut env: TestEnv, sensor_path: &str, temperature: f32) {
+    let mut reboot_watcher = client_connectors::RebootWatcherClient::new(&env).await;
+
+    // 1) set the mock temperature to the provided temperature
+    // 2) verify the reboot watcher sees the reboot request for 'HighTemperature'
+    // 3) verify the system controller receives the reboot request
+    // 4) verify the Driver Manager receives the termination state request
+    env.set_temperature(sensor_path, temperature);
+    assert_eq!(reboot_watcher.get_reboot_reason().await, fpower::RebootReason::HighTemperature);
+    env.mocks.system_controller_service.wait_for_shutdown_request().await;
+    assert_eq!(
+        env.mocks.driver_manager.current_termination_state(),
+        fidl_fuchsia_device_manager::SystemPowerState::Reboot
+    );
+
+    env.destroy().await;
 }
