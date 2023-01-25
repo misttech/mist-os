@@ -9,6 +9,7 @@
 #include <lib/zx/time.h>
 
 #include <memory>
+#include <string_view>
 #include <variant>
 
 #include <src/lib/fostr/fidl/fuchsia/net/http/formatting.h>
@@ -25,71 +26,64 @@
 #include "third_party/crashpad/src/util/net/http_body.h"
 #include "third_party/crashpad/src/util/net/http_headers.h"
 #include "third_party/crashpad/src/util/net/http_multipart_builder.h"
-#include "third_party/crashpad/src/util/net/http_transport.h"
 #include "third_party/crashpad/src/util/net/url.h"
 
 namespace forensics {
 namespace crash_reports {
 namespace {
 
-// Builds a fuchsia::net::http::Request. crashpad::HTTPTransport is used as the base class so
-// standard HTTP request building functionality doesn't need to be reimplemented.
-class HttpRequestBuilder : public crashpad::HTTPTransport {
- public:
-  std::optional<fuchsia::net::http::Request> Build() && {
-    using namespace fuchsia::net::http;
+// Builds a fuchsia::net::http::Request.
+std::optional<fuchsia::net::http::Request> BuildRequest(const std::string_view method,
+                                                        const std::string_view url,
+                                                        const zx::duration timeout,
+                                                        const crashpad::HTTPHeaders& headers,
+                                                        crashpad::HTTPBodyStream& body) {
+  using fuchsia::net::http::Body;
+  using fuchsia::net::http::Header;
+  using fuchsia::net::http::Request;
 
-    // Create the headers for the request.
-    std::vector<Header> http_headers;
-    for (const auto& [name, value] : headers()) {
-      http_headers.push_back(Header{
-          .name = std::vector<uint8_t>(name.begin(), name.end()),
-          .value = std::vector<uint8_t>(value.begin(), value.end()),
-      });
-    }
-
-    // Create the request body as a single VMO.
-    // TODO(fxbug.dev/59191): Consider using a zx::socket to transmit the HTTP request body to the
-    // server piecewise.
-    std::vector<uint8_t> body;
-
-    // Reserve 256 kb for the request body.
-    body.reserve(256 * 1024);
-    while (true) {
-      // Copy the body in 32 kb chunks.
-      std::array<uint8_t, 32 * 1024> buf;
-      const auto result = body_stream()->GetBytesBuffer(buf.data(), buf.max_size());
-
-      FX_CHECK(result >= 0);
-      if (result == 0) {
-        break;
-      }
-
-      body.insert(body.end(), buf.data(), buf.data() + result);
-    }
-
-    fsl::SizedVmo body_vmo;
-    if (!fsl::VmoFromVector(body, &body_vmo)) {
-      return std::nullopt;
-    }
-
-    // Create the request.
-    Request request;
-    request.set_method(method())
-        .set_url(url())
-        .set_deadline(zx::deadline_after(zx::sec((uint64_t)timeout())).get())
-        .set_headers(std::move(http_headers))
-        .set_body(Body::WithBuffer(std::move(body_vmo).ToTransport()));
-
-    return request;
+  std::vector<Header> http_headers;
+  for (const auto& [name, value] : headers) {
+    http_headers.push_back(Header{
+        .name = std::vector<uint8_t>(name.begin(), name.end()),
+        .value = std::vector<uint8_t>(value.begin(), value.end()),
+    });
   }
 
- private:
-  bool ExecuteSynchronously(std::string* response_body) override {
-    FX_LOGS(FATAL) << "Not implemented";
-    return false;
+  // Create the request body as a single VMO.
+  // TODO(fxbug.dev/59191): Consider using a zx::socket to transmit the HTTP request body to the
+  // server piecewise.
+  std::vector<uint8_t> body_vec;
+
+  // Reserve 256 kb for the request body.
+  body_vec.reserve(256 * 1024);
+  while (true) {
+    // Copy the body in 32 kb chunks.
+    std::array<uint8_t, 32 * 1024> buf;
+    const auto result = body.GetBytesBuffer(buf.data(), buf.max_size());
+
+    FX_CHECK(result >= 0);
+    if (result == 0) {
+      break;
+    }
+
+    body_vec.insert(body_vec.end(), buf.data(), buf.data() + result);
   }
-};
+
+  fsl::SizedVmo body_vmo;
+  if (!fsl::VmoFromVector(body_vec, &body_vmo)) {
+    return std::nullopt;
+  }
+
+  Request request;
+  request.set_method(std ::string(method))
+      .set_url(std::string(url))
+      .set_deadline(zx::deadline_after(timeout).get())
+      .set_headers(std::move(http_headers))
+      .set_body(Body::WithBuffer(std::move(body_vmo).ToTransport()));
+
+  return request;
+}
 
 }  // namespace
 
@@ -164,15 +158,9 @@ void CrashServer::MakeRequest(const Report& report, const Snapshot& snapshot,
   crashpad::HTTPHeaders headers;
   http_multipart_builder.PopulateContentHeaders(&headers);
 
-  HttpRequestBuilder request_builder;
-  for (const auto& header : headers) {
-    request_builder.SetHeader(header.first, header.second);
-  }
-  request_builder.SetBodyStream(http_multipart_builder.GetBodyStream());
-  request_builder.SetTimeout(60.0);  // 1 minute.
-  request_builder.SetURL(url);
+  auto request =
+      BuildRequest("POST", url, zx::min(1), headers, *http_multipart_builder.GetBodyStream());
 
-  auto request = std::move(request_builder).Build();
   if (!request.has_value()) {
     callback(CrashServer::UploadStatus::kFailure, "");
     return;
