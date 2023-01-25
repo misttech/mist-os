@@ -50,18 +50,30 @@ class MediaPlayerTests : public gtest::RealLoopFixture {
  protected:
   MediaPlayerTests()
       : fake_reader_(dispatcher()),
-        fake_audio_(dispatcher()),
-        fake_scenic_(dispatcher()),
-        fake_sysmem_(dispatcher()) {}
+        fake_audio_owned_(std::make_unique<FakeAudio>(dispatcher())),
+        fake_audio_(fake_audio_owned_.get()),
+        fake_scenic_owned_(std::make_unique<FakeScenic>(dispatcher())),
+        fake_scenic_(fake_scenic_owned_.get()),
+        fake_sysmem_owned_(std::make_unique<FakeSysmem>(dispatcher())),
+        fake_sysmem_(fake_sysmem_owned_.get()) {}
 
   void SetUp() override {
     auto realm_builder = component_testing::RealmBuilder::Create();
 
     realm_builder.AddChild("mediaplayer", "#meta/mediaplayer.cm");
-    realm_builder.AddLocalChild("audio", &fake_audio_);
-    realm_builder.AddLocalChild("sysmem", &fake_sysmem_);
-    realm_builder.AddLocalChild("scenic", &fake_scenic_);
-    fake_scenic_.SetSysmemAllocator(&fake_sysmem_);
+    realm_builder.AddLocalChild("audio", [this]() {
+      EXPECT_TRUE(!!fake_audio_owned_);
+      return std::move(fake_audio_owned_);
+    });
+    realm_builder.AddLocalChild("sysmem", [this]() {
+      EXPECT_TRUE(!!fake_sysmem_owned_);
+      return std::move(fake_sysmem_owned_);
+    });
+    realm_builder.AddLocalChild("scenic", [this]() {
+      EXPECT_TRUE(!!fake_scenic_owned_);
+      return std::move(fake_scenic_owned_);
+    });
+    fake_scenic_->SetSysmemAllocator(fake_sysmem_);
 
     // Route fuchsia.media.playback.Player up to the parent
     realm_builder.AddRoute(component_testing::Route{
@@ -151,9 +163,12 @@ class MediaPlayerTests : public gtest::RealLoopFixture {
   std::list<std::unique_ptr<FakeSysmem::Expectations>> BearSysmemExpectations();
 
   FakeWavReader fake_reader_;
-  FakeAudio fake_audio_;
-  FakeScenic fake_scenic_;
-  FakeSysmem fake_sysmem_;
+  std::unique_ptr<FakeAudio> fake_audio_owned_;
+  FakeAudio* fake_audio_;
+  std::unique_ptr<FakeScenic> fake_scenic_owned_;
+  FakeScenic* fake_scenic_;
+  std::unique_ptr<FakeSysmem> fake_sysmem_owned_;
+  FakeSysmem* fake_sysmem_;
   std::optional<component_testing::RealmRoot> realm_;
 
   fuchsia::media::playback::PlayerPtr player_;
@@ -369,22 +384,22 @@ std::list<std::unique_ptr<FakeSysmem::Expectations>> MediaPlayerTests::BearSysme
 
 // Play a synthetic WAV file from beginning to end.
 TEST_F(MediaPlayerTests, PlayWav) {
-  fake_audio_.renderer().ExpectPackets({{0, 4096, 0x20c39d1e31991800},
-                                        {1024, 4096, 0xeaf137125d313800},
-                                        {2048, 4096, 0x6162095671991800},
-                                        {3072, 4096, 0x36e551c7dd41f800},
-                                        {4096, 4096, 0x23dcbf6fb1991800},
-                                        {5120, 4096, 0xee0a5963dd313800},
-                                        {6144, 4096, 0x647b2ba7f1991800},
-                                        {7168, 4096, 0x39fe74195d41f800},
-                                        {8192, 4096, 0xb3de76b931991800},
-                                        {9216, 4096, 0x7e0c10ad5d313800},
-                                        {10240, 4096, 0xf47ce2f171991800},
-                                        {11264, 4096, 0xca002b62dd41f800},
-                                        {12288, 4096, 0xb6f7990ab1991800},
-                                        {13312, 4096, 0x812532fedd313800},
-                                        {14336, 4096, 0xf7960542f1991800},
-                                        {15360, 4052, 0x7308a9824acbd5ea}});
+  fake_audio_->renderer().ExpectPackets({{0, 4096, 0x20c39d1e31991800},
+                                         {1024, 4096, 0xeaf137125d313800},
+                                         {2048, 4096, 0x6162095671991800},
+                                         {3072, 4096, 0x36e551c7dd41f800},
+                                         {4096, 4096, 0x23dcbf6fb1991800},
+                                         {5120, 4096, 0xee0a5963dd313800},
+                                         {6144, 4096, 0x647b2ba7f1991800},
+                                         {7168, 4096, 0x39fe74195d41f800},
+                                         {8192, 4096, 0xb3de76b931991800},
+                                         {9216, 4096, 0x7e0c10ad5d313800},
+                                         {10240, 4096, 0xf47ce2f171991800},
+                                         {11264, 4096, 0xca002b62dd41f800},
+                                         {12288, 4096, 0xb6f7990ab1991800},
+                                         {13312, 4096, 0x812532fedd313800},
+                                         {14336, 4096, 0xf7960542f1991800},
+                                         {15360, 4052, 0x7308a9824acbd5ea}});
 
   fuchsia::media::playback::SeekingReaderPtr fake_reader_ptr;
   fidl::InterfaceRequest<fuchsia::media::playback::SeekingReader> reader_request =
@@ -399,29 +414,29 @@ TEST_F(MediaPlayerTests, PlayWav) {
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
 }
 
 // Play a synthetic WAV file from beginning to end, delaying the retirement of
 // the last packet to simulate delayed end-of-stream recognition.
 // TODO(fxbug.dev/35616): Flaking.
 TEST_F(MediaPlayerTests, PlayWavDelayEos) {
-  fake_audio_.renderer().ExpectPackets({{0, 4096, 0x20c39d1e31991800},
-                                        {1024, 4096, 0xeaf137125d313800},
-                                        {2048, 4096, 0x6162095671991800},
-                                        {3072, 4096, 0x36e551c7dd41f800},
-                                        {4096, 4096, 0x23dcbf6fb1991800},
-                                        {5120, 4096, 0xee0a5963dd313800},
-                                        {6144, 4096, 0x647b2ba7f1991800},
-                                        {7168, 4096, 0x39fe74195d41f800},
-                                        {8192, 4096, 0xb3de76b931991800},
-                                        {9216, 4096, 0x7e0c10ad5d313800},
-                                        {10240, 4096, 0xf47ce2f171991800},
-                                        {11264, 4096, 0xca002b62dd41f800},
-                                        {12288, 4096, 0xb6f7990ab1991800},
-                                        {13312, 4096, 0x812532fedd313800},
-                                        {14336, 4096, 0xf7960542f1991800},
-                                        {15360, 4052, 0x7308a9824acbd5ea}});
+  fake_audio_->renderer().ExpectPackets({{0, 4096, 0x20c39d1e31991800},
+                                         {1024, 4096, 0xeaf137125d313800},
+                                         {2048, 4096, 0x6162095671991800},
+                                         {3072, 4096, 0x36e551c7dd41f800},
+                                         {4096, 4096, 0x23dcbf6fb1991800},
+                                         {5120, 4096, 0xee0a5963dd313800},
+                                         {6144, 4096, 0x647b2ba7f1991800},
+                                         {7168, 4096, 0x39fe74195d41f800},
+                                         {8192, 4096, 0xb3de76b931991800},
+                                         {9216, 4096, 0x7e0c10ad5d313800},
+                                         {10240, 4096, 0xf47ce2f171991800},
+                                         {11264, 4096, 0xca002b62dd41f800},
+                                         {12288, 4096, 0xb6f7990ab1991800},
+                                         {13312, 4096, 0x812532fedd313800},
+                                         {14336, 4096, 0xf7960542f1991800},
+                                         {15360, 4052, 0x7308a9824acbd5ea}});
 
   fuchsia::media::playback::SeekingReaderPtr fake_reader_ptr;
   fidl::InterfaceRequest<fuchsia::media::playback::SeekingReader> reader_request =
@@ -432,21 +447,21 @@ TEST_F(MediaPlayerTests, PlayWavDelayEos) {
   player_->CreateReaderSource(std::move(fake_reader_ptr), source.NewRequest());
   player_->SetSource(std::move(source));
 
-  fake_audio_.renderer().DelayPacketRetirement(15360);
+  fake_audio_->renderer().DelayPacketRetirement(15360);
 
   commands_.Play();
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
 }
 
 // Play a synthetic WAV file from beginning to end, retaining packets. This
 // tests the ability of the player to handle the case in which the audio
 // renderer is holding on to packets for too long.
 TEST_F(MediaPlayerTests, PlayWavRetainPackets) {
-  fake_audio_.renderer().SetRetainPackets(true);
-  fake_audio_.renderer().ExpectPackets({
+  fake_audio_->renderer().SetRetainPackets(true);
+  fake_audio_->renderer().ExpectPackets({
       {0, 4096, 0x20c39d1e31991800},     {1024, 4096, 0xeaf137125d313800},
       {2048, 4096, 0x6162095671991800},  {3072, 4096, 0x36e551c7dd41f800},
       {4096, 4096, 0x23dcbf6fb1991800},  {5120, 4096, 0xee0a5963dd313800},
@@ -504,13 +519,13 @@ TEST_F(MediaPlayerTests, PlayWavRetainPackets) {
     EXPECT_FALSE(commands_.at_end_of_stream());
 
     // Retire packets.
-    fake_audio_.renderer().SetRetainPackets(false);
+    fake_audio_->renderer().SetRetainPackets(false);
   });
 
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
 }
 
 // Play a short synthetic WAV file from beginning to end, retaining packets. This
@@ -518,23 +533,23 @@ TEST_F(MediaPlayerTests, PlayWavRetainPackets) {
 // renderer not retiring packets, but all of the audio content fits into the
 // payload VMO.
 TEST_F(MediaPlayerTests, PlayShortWavRetainPackets) {
-  fake_audio_.renderer().SetRetainPackets(true);
-  fake_audio_.renderer().ExpectPackets({{0, 4096, 0x20c39d1e31991800},
-                                        {1024, 4096, 0xeaf137125d313800},
-                                        {2048, 4096, 0x6162095671991800},
-                                        {3072, 4096, 0x36e551c7dd41f800},
-                                        {4096, 4096, 0x23dcbf6fb1991800},
-                                        {5120, 4096, 0xee0a5963dd313800},
-                                        {6144, 4096, 0x647b2ba7f1991800},
-                                        {7168, 4096, 0x39fe74195d41f800},
-                                        {8192, 4096, 0xb3de76b931991800},
-                                        {9216, 4096, 0x7e0c10ad5d313800},
-                                        {10240, 4096, 0xf47ce2f171991800},
-                                        {11264, 4096, 0xca002b62dd41f800},
-                                        {12288, 4096, 0xb6f7990ab1991800},
-                                        {13312, 4096, 0x812532fedd313800},
-                                        {14336, 4096, 0xf7960542f1991800},
-                                        {15360, 4052, 0x7308a9824acbd5ea}});
+  fake_audio_->renderer().SetRetainPackets(true);
+  fake_audio_->renderer().ExpectPackets({{0, 4096, 0x20c39d1e31991800},
+                                         {1024, 4096, 0xeaf137125d313800},
+                                         {2048, 4096, 0x6162095671991800},
+                                         {3072, 4096, 0x36e551c7dd41f800},
+                                         {4096, 4096, 0x23dcbf6fb1991800},
+                                         {5120, 4096, 0xee0a5963dd313800},
+                                         {6144, 4096, 0x647b2ba7f1991800},
+                                         {7168, 4096, 0x39fe74195d41f800},
+                                         {8192, 4096, 0xb3de76b931991800},
+                                         {9216, 4096, 0x7e0c10ad5d313800},
+                                         {10240, 4096, 0xf47ce2f171991800},
+                                         {11264, 4096, 0xca002b62dd41f800},
+                                         {12288, 4096, 0xb6f7990ab1991800},
+                                         {13312, 4096, 0x812532fedd313800},
+                                         {14336, 4096, 0xf7960542f1991800},
+                                         {15360, 4052, 0x7308a9824acbd5ea}});
 
   fuchsia::media::playback::SeekingReaderPtr fake_reader_ptr;
   fidl::InterfaceRequest<fuchsia::media::playback::SeekingReader> reader_request =
@@ -556,13 +571,13 @@ TEST_F(MediaPlayerTests, PlayShortWavRetainPackets) {
     EXPECT_FALSE(commands_.at_end_of_stream());
 
     // Retire packets.
-    fake_audio_.renderer().SetRetainPackets(false);
+    fake_audio_->renderer().SetRetainPackets(false);
   });
 
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
 }
 
 // Opens an SBC elementary stream using |ElementarySource|.
@@ -715,10 +730,10 @@ TEST_F(MediaPlayerTests, ElementarySourceWithBogus) {
 
 // Play a real A/V file from beginning to end.
 TEST_F(MediaPlayerTests, PlayBear) {
-  fake_sysmem_.SetExpectations(BearSysmemExpectations());
+  fake_sysmem_->SetExpectations(BearSysmemExpectations());
 
   // ARM64 hashes
-  fake_audio_.renderer().ExpectPackets(
+  fake_audio_->renderer().ExpectPackets(
       {{1024, 8192, 0xe378bf675ba71490},   {2048, 8192, 0x5f7fc82beb8b4b74},
        {3072, 8192, 0xb25935423814b8a6},   {4096, 8192, 0xc9fb1d58b0bde3f6},
        {5120, 8192, 0xb896f085158b4586},   {6144, 8192, 0x0fd4218f2faef458},
@@ -780,7 +795,7 @@ TEST_F(MediaPlayerTests, PlayBear) {
        {119808, 8192, 0x0000000000000000}, {120832, 8192, 0x0000000000000000}});
 
   // X64 hashes
-  fake_audio_.renderer().ExpectPackets(
+  fake_audio_->renderer().ExpectPackets(
       {{1024, 8192, 0xe07048ea42002dc8},   {2048, 8192, 0x56ccb8a6089d573c},
        {3072, 8192, 0x4d1bebb95f7baa6a},   {4096, 8192, 0x8fb71764268f4c7a},
        {5120, 8192, 0x7b33af6ed09ce576},   {6144, 8192, 0x48ed1201b9eefa48},
@@ -841,7 +856,7 @@ TEST_F(MediaPlayerTests, PlayBear) {
        {117760, 8192, 0x0000000000000000}, {118784, 8192, 0x0000000000000000},
        {119808, 8192, 0x0000000000000000}, {120832, 8192, 0x0000000000000000}});
 
-  fake_scenic_.session().SetExpectations(
+  fake_scenic_->session().SetExpectations(
       1,
       {
           .pixel_format = {.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8},
@@ -913,17 +928,17 @@ TEST_F(MediaPlayerTests, PlayBear) {
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.create_audio_renderer_called());
-  EXPECT_TRUE(fake_audio_.renderer().expected());
-  EXPECT_TRUE(fake_scenic_.session().expected());
-  EXPECT_TRUE(fake_sysmem_.expected());
+  EXPECT_TRUE(fake_audio_->create_audio_renderer_called());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
+  EXPECT_TRUE(fake_scenic_->session().expected());
+  EXPECT_TRUE(fake_sysmem_->expected());
 }
 
 // Play a real A/V file from beginning to end with no audio.
 TEST_F(MediaPlayerTests, PlayBearSilent) {
-  fake_sysmem_.SetExpectations(BearSysmemExpectations());
+  fake_sysmem_->SetExpectations(BearSysmemExpectations());
 
-  fake_scenic_.session().SetExpectations(
+  fake_scenic_->session().SetExpectations(
       1,
       {
           .pixel_format = {.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8},
@@ -995,61 +1010,61 @@ TEST_F(MediaPlayerTests, PlayBearSilent) {
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_FALSE(fake_audio_.create_audio_renderer_called());
-  EXPECT_TRUE(fake_scenic_.session().expected());
-  EXPECT_TRUE(fake_sysmem_.expected());
+  EXPECT_FALSE(fake_audio_->create_audio_renderer_called());
+  EXPECT_TRUE(fake_scenic_->session().expected());
+  EXPECT_TRUE(fake_sysmem_->expected());
 }
 
 // Play an opus file from beginning to end.
 TEST_F(MediaPlayerTests, PlayOpus) {
   // The decoder works a bit differently on x64 vs arm64, hence the two lists here.
-  fake_audio_.renderer().ExpectPackets({{-336, 1296, 0x47ff30edd64831d6},
-                                        {312, 1920, 0xcc4016bbb348e52b},
-                                        {1272, 1920, 0xe54a89514c636028},
-                                        {2232, 1920, 0x8ef31ce86009d7da},
-                                        {3192, 1920, 0x36490fe70ca3bb81},
-                                        {4152, 1920, 0x4a8bdd8e9c2f42bb},
-                                        {5112, 1920, 0xbc8cea1839f0299e},
-                                        {6072, 1920, 0x868a68451d7ab814},
-                                        {7032, 1920, 0x84ac9b11a685a9a9},
-                                        {7992, 1920, 0xe4359c110afe8adb},
-                                        {8952, 1920, 0x2092c7fbf2ff0f0c},
-                                        {9912, 1920, 0x8002d77665736d63},
-                                        {10872, 1920, 0x541b415fbdc7b268},
-                                        {11832, 1920, 0xe81ef757a5953573},
-                                        {12792, 1920, 0xbc70aba0ed44f7dc}});
-  fake_audio_.renderer().ExpectPackets({{-336, 1296, 0xbf1f56243e245a2c},
-                                        {312, 1920, 0x670e69ee3076c4b2},
-                                        {1272, 1920, 0xe0667e312e65207d},
-                                        {2232, 1920, 0x291ffa6baf5dd2b1},
-                                        {3192, 1920, 0x1b408d840e27bcc1},
-                                        {4152, 1920, 0xdbf5034a75bc761b},
-                                        {5112, 1920, 0x46fa968eb705415b},
-                                        {6072, 1920, 0x9f47ee9cbb3c814c},
-                                        {7032, 1920, 0x7256d4c58d7afe56},
-                                        {7992, 1920, 0xb2a7bc50ce80c898},
-                                        {8952, 1920, 0xb314415fd9c3a694},
-                                        {9912, 1920, 0x34d9ce067ffacc37},
-                                        {10872, 1920, 0x661cc8ec834fb30a},
-                                        {11832, 1920, 0x05fd64442f53c5cc},
-                                        {12792, 1920, 0x3e2a98426c8680d0}});
+  fake_audio_->renderer().ExpectPackets({{-336, 1296, 0x47ff30edd64831d6},
+                                         {312, 1920, 0xcc4016bbb348e52b},
+                                         {1272, 1920, 0xe54a89514c636028},
+                                         {2232, 1920, 0x8ef31ce86009d7da},
+                                         {3192, 1920, 0x36490fe70ca3bb81},
+                                         {4152, 1920, 0x4a8bdd8e9c2f42bb},
+                                         {5112, 1920, 0xbc8cea1839f0299e},
+                                         {6072, 1920, 0x868a68451d7ab814},
+                                         {7032, 1920, 0x84ac9b11a685a9a9},
+                                         {7992, 1920, 0xe4359c110afe8adb},
+                                         {8952, 1920, 0x2092c7fbf2ff0f0c},
+                                         {9912, 1920, 0x8002d77665736d63},
+                                         {10872, 1920, 0x541b415fbdc7b268},
+                                         {11832, 1920, 0xe81ef757a5953573},
+                                         {12792, 1920, 0xbc70aba0ed44f7dc}});
+  fake_audio_->renderer().ExpectPackets({{-336, 1296, 0xbf1f56243e245a2c},
+                                         {312, 1920, 0x670e69ee3076c4b2},
+                                         {1272, 1920, 0xe0667e312e65207d},
+                                         {2232, 1920, 0x291ffa6baf5dd2b1},
+                                         {3192, 1920, 0x1b408d840e27bcc1},
+                                         {4152, 1920, 0xdbf5034a75bc761b},
+                                         {5112, 1920, 0x46fa968eb705415b},
+                                         {6072, 1920, 0x9f47ee9cbb3c814c},
+                                         {7032, 1920, 0x7256d4c58d7afe56},
+                                         {7992, 1920, 0xb2a7bc50ce80c898},
+                                         {8952, 1920, 0xb314415fd9c3a694},
+                                         {9912, 1920, 0x34d9ce067ffacc37},
+                                         {10872, 1920, 0x661cc8ec834fb30a},
+                                         {11832, 1920, 0x05fd64442f53c5cc},
+                                         {12792, 1920, 0x3e2a98426c8680d0}});
 
   commands_.SetFile(kOpusFilePath);
   commands_.Play();
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
 }
 
 // Play a real A/V file from beginning to end, retaining audio packets. This
 // tests the ability of the player to handle the case in which the audio
 // renderer is holding on to packets for too long.
 TEST_F(MediaPlayerTests, PlayBearRetainAudioPackets) {
-  fake_sysmem_.SetExpectations(BearSysmemExpectations());
+  fake_sysmem_->SetExpectations(BearSysmemExpectations());
 
   CreateView();
-  fake_audio_.renderer().SetRetainPackets(true);
+  fake_audio_->renderer().SetRetainPackets(true);
 
   commands_.SetFile(kBearFilePath);
   commands_.Play();
@@ -1063,20 +1078,20 @@ TEST_F(MediaPlayerTests, PlayBearRetainAudioPackets) {
     EXPECT_FALSE(commands_.at_end_of_stream());
 
     // Retire packets.
-    fake_audio_.renderer().SetRetainPackets(false);
+    fake_audio_->renderer().SetRetainPackets(false);
   });
 
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
-  EXPECT_TRUE(fake_scenic_.session().expected());
-  EXPECT_TRUE(fake_sysmem_.expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
+  EXPECT_TRUE(fake_scenic_->session().expected());
+  EXPECT_TRUE(fake_sysmem_->expected());
 }
 
 // Regression test for fxbug.dev/28417.
 TEST_F(MediaPlayerTests, RegressionTestUS544) {
-  fake_sysmem_.SetExpectations(BearSysmemExpectations());
+  fake_sysmem_->SetExpectations(BearSysmemExpectations());
 
   CreateView();
   commands_.SetFile(kBearFilePath);
@@ -1096,15 +1111,15 @@ TEST_F(MediaPlayerTests, RegressionTestUS544) {
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
-  EXPECT_TRUE(fake_scenic_.session().expected());
-  EXPECT_TRUE(fake_sysmem_.expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
+  EXPECT_TRUE(fake_scenic_->session().expected());
+  EXPECT_TRUE(fake_sysmem_->expected());
 }
 
 // Regression test for QA-539.
 // Verifies that the player can play two files in a row.
 TEST_F(MediaPlayerTests, RegressionTestQA539) {
-  fake_sysmem_.SetExpectations(BearSysmemExpectations());
+  fake_sysmem_->SetExpectations(BearSysmemExpectations());
 
   CreateView();
   commands_.SetFile(kBearFilePath);
@@ -1120,30 +1135,30 @@ TEST_F(MediaPlayerTests, RegressionTestQA539) {
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
-  EXPECT_TRUE(fake_scenic_.session().expected());
-  EXPECT_TRUE(fake_sysmem_.expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
+  EXPECT_TRUE(fake_scenic_->session().expected());
+  EXPECT_TRUE(fake_sysmem_->expected());
 }
 
 // Play an LPCM elementary stream using |ElementarySource|. We delay calling SetSource to ensure
 // that the SimpleStreamSink defers taking any action until it's properly connected.
 TEST_F(MediaPlayerTests, ElementarySourceDeferred) {
-  fake_audio_.renderer().ExpectPackets({{0, 4096, 0xd2fbd957e3bf0000},
-                                        {1024, 4096, 0xda25db3fa3bf0000},
-                                        {2048, 4096, 0xe227e0f6e3bf0000},
-                                        {3072, 4096, 0xe951e2dea3bf0000},
-                                        {4096, 4096, 0x37ebf7d3e3bf0000},
-                                        {5120, 4096, 0x3f15f9bba3bf0000},
-                                        {6144, 4096, 0x4717ff72e3bf0000},
-                                        {7168, 4096, 0x4e42015aa3bf0000},
-                                        {8192, 4096, 0xeabc5347e3bf0000},
-                                        {9216, 4096, 0xf1e6552fa3bf0000},
-                                        {10240, 4096, 0xf9e85ae6e3bf0000},
-                                        {11264, 4096, 0x01125ccea3bf0000},
-                                        {12288, 4096, 0x4fac71c3e3bf0000},
-                                        {13312, 4096, 0x56d673aba3bf0000},
-                                        {14336, 4096, 0x5ed87962e3bf0000},
-                                        {15360, 4096, 0x66027b4aa3bf0000}});
+  fake_audio_->renderer().ExpectPackets({{0, 4096, 0xd2fbd957e3bf0000},
+                                         {1024, 4096, 0xda25db3fa3bf0000},
+                                         {2048, 4096, 0xe227e0f6e3bf0000},
+                                         {3072, 4096, 0xe951e2dea3bf0000},
+                                         {4096, 4096, 0x37ebf7d3e3bf0000},
+                                         {5120, 4096, 0x3f15f9bba3bf0000},
+                                         {6144, 4096, 0x4717ff72e3bf0000},
+                                         {7168, 4096, 0x4e42015aa3bf0000},
+                                         {8192, 4096, 0xeabc5347e3bf0000},
+                                         {9216, 4096, 0xf1e6552fa3bf0000},
+                                         {10240, 4096, 0xf9e85ae6e3bf0000},
+                                         {11264, 4096, 0x01125ccea3bf0000},
+                                         {12288, 4096, 0x4fac71c3e3bf0000},
+                                         {13312, 4096, 0x56d673aba3bf0000},
+                                         {14336, 4096, 0x5ed87962e3bf0000},
+                                         {15360, 4096, 0x66027b4aa3bf0000}});
 
   fuchsia::media::playback::ElementarySourcePtr elementary_source;
   player_->CreateElementarySource(0, false, false, nullptr, elementary_source.NewRequest());
@@ -1180,32 +1195,32 @@ TEST_F(MediaPlayerTests, ElementarySourceDeferred) {
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
   EXPECT_FALSE(sink_connection_closed_);
 }
 
 // Play a real A/V file from beginning to end at rate 2.0.
 TEST_F(MediaPlayerTests, PlayBear2) {
-  fake_sysmem_.SetExpectations(BearSysmemExpectations());
+  fake_sysmem_->SetExpectations(BearSysmemExpectations());
 
   // Only a few packets will be seen by audio renderer, and none of them would be actually rendered
   // since Play won't be called due to 2.0 being an unsupported rate.
 
   // ARM64 hashes
-  fake_audio_.renderer().ExpectPackets({{1024, 8192, 0xe378bf675ba71490},
-                                        {2048, 8192, 0x5f7fc82beb8b4b74},
-                                        {3072, 8192, 0xb25935423814b8a6},
-                                        {4096, 8192, 0xc9fb1d58b0bde3f6},
-                                        {5120, 8192, 0xb896f085158b4586}});
+  fake_audio_->renderer().ExpectPackets({{1024, 8192, 0xe378bf675ba71490},
+                                         {2048, 8192, 0x5f7fc82beb8b4b74},
+                                         {3072, 8192, 0xb25935423814b8a6},
+                                         {4096, 8192, 0xc9fb1d58b0bde3f6},
+                                         {5120, 8192, 0xb896f085158b4586}});
 
   // X64 hashes
-  fake_audio_.renderer().ExpectPackets({{1024, 8192, 0xe07048ea42002dc8},
-                                        {2048, 8192, 0x56ccb8a6089d573c},
-                                        {3072, 8192, 0x4d1bebb95f7baa6a},
-                                        {4096, 8192, 0x8fb71764268f4c7a},
-                                        {5120, 8192, 0x7b33af6ed09ce576}});
+  fake_audio_->renderer().ExpectPackets({{1024, 8192, 0xe07048ea42002dc8},
+                                         {2048, 8192, 0x56ccb8a6089d573c},
+                                         {3072, 8192, 0x4d1bebb95f7baa6a},
+                                         {4096, 8192, 0x8fb71764268f4c7a},
+                                         {5120, 8192, 0x7b33af6ed09ce576}});
 
-  fake_scenic_.session().SetExpectations(
+  fake_scenic_->session().SetExpectations(
       1,
       {
           .pixel_format = {.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8},
@@ -1278,9 +1293,9 @@ TEST_F(MediaPlayerTests, PlayBear2) {
   QuitOnEndOfStream();
 
   Execute();
-  EXPECT_TRUE(fake_audio_.renderer().expected());
-  EXPECT_TRUE(fake_scenic_.session().expected());
-  EXPECT_TRUE(fake_sysmem_.expected());
+  EXPECT_TRUE(fake_audio_->renderer().expected());
+  EXPECT_TRUE(fake_scenic_->session().expected());
+  EXPECT_TRUE(fake_sysmem_->expected());
 }
 
 }  // namespace test

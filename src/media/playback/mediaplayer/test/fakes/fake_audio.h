@@ -16,7 +16,7 @@
 namespace media_player {
 namespace test {
 // Implements Audio for testing.
-class FakeAudio : public fuchsia::media::Audio, public component_testing::LocalComponent {
+class FakeAudio : public fuchsia::media::Audio, public component_testing::LocalComponentImpl {
  public:
   FakeAudio(async_dispatcher_t* dispatcher)
       : dispatcher_(dispatcher), fake_audio_renderer_(dispatcher) {}
@@ -39,19 +39,16 @@ class FakeAudio : public fuchsia::media::Audio, public component_testing::LocalC
       bool loopback) override {
     FX_NOTIMPLEMENTED();
   }
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override {
-    handles_ = std::move(handles);
-    handles_->outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_));
-  }
+  void OnStart() override { outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)); }
 
  private:
   async_dispatcher_t* dispatcher_;
   fidl::BindingSet<fuchsia::media::Audio> bindings_;
   FakeAudioRenderer fake_audio_renderer_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
   bool create_audio_renderer_called_ = false;
 };
-class FakeAudioCore : public fuchsia::media::AudioCore, public component_testing::LocalComponent {
+class FakeAudioCore : public fuchsia::media::AudioCore,
+                      public component_testing::LocalComponentImpl {
  public:
   FakeAudioCore(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
     fake_audio_renderers_.emplace_back(std::make_unique<FakeAudioRenderer>(dispatcher_));
@@ -101,16 +98,12 @@ class FakeAudioCore : public fuchsia::media::AudioCore, public component_testing
                       ::fuchsia::media::Behavior behavior) override {}
   void ResetInteractions() override {}
   void LoadDefaults() override {}
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override {
-    handles_ = std::move(handles);
-    handles_->outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_));
-  }
+  void OnStart() override { outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)); }
 
  private:
   async_dispatcher_t* dispatcher_;
   fidl::BindingSet<fuchsia::media::AudioCore> bindings_;
   std::vector<std::unique_ptr<FakeAudioRenderer>> fake_audio_renderers_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
 };
 }  // namespace test
 }  // namespace media_player

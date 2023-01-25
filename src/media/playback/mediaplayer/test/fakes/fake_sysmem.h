@@ -22,7 +22,7 @@ class FakeBufferCollection;
 
 // Implements sysmem for testing.
 class FakeSysmem : public fuchsia::sysmem::testing::Allocator_TestBase,
-                   public component_testing::LocalComponent {
+                   public component_testing::LocalComponentImpl {
  public:
   explicit FakeSysmem(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
   ~FakeSysmem() override = default;
@@ -81,10 +81,7 @@ class FakeSysmem : public fuchsia::sysmem::testing::Allocator_TestBase,
 
   void NotImplemented_(const std::string& name) override;
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override {
-    handles_ = std::move(handles);
-    handles_->outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_));
-  }
+  void OnStart() override { outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)); }
 
  private:
   async_dispatcher_t* dispatcher_;
@@ -99,7 +96,6 @@ class FakeSysmem : public fuchsia::sysmem::testing::Allocator_TestBase,
   std::unordered_map<FakeBufferCollection*, std::unique_ptr<FakeBufferCollection>>
       bound_collections_;
   uint32_t next_collection_id_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
 
   // Disallow copy, assign and move.
   FakeSysmem(const FakeSysmem&) = delete;

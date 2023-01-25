@@ -17,7 +17,8 @@ namespace media_player {
 namespace test {
 
 // Implements Scenic for testing.
-class FakeScenic : public fuchsia::ui::scenic::Scenic, public component_testing::LocalComponent {
+class FakeScenic : public fuchsia::ui::scenic::Scenic,
+                   public component_testing::LocalComponentImpl {
  public:
   explicit FakeScenic(async_dispatcher_t* dispatcher)
       : dispatcher_(dispatcher), fake_session_(dispatcher) {}
@@ -47,16 +48,12 @@ class FakeScenic : public fuchsia::ui::scenic::Scenic, public component_testing:
 
   void TakeScreenshot(TakeScreenshotCallback callback) override;
 
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> handles) override {
-    handles_ = std::move(handles);
-    handles_->outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_));
-  }
+  void OnStart() override { outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)); }
 
  private:
   async_dispatcher_t* dispatcher_;
   fidl::BindingSet<fuchsia::ui::scenic::Scenic> bindings_;
   FakeSession fake_session_;
-  std::unique_ptr<component_testing::LocalComponentHandles> handles_;
 };
 
 }  // namespace test

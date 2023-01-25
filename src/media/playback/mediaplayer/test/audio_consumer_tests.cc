@@ -50,8 +50,9 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
     // Configure the realm.
     // ...
     realm_builder.AddChild("mediaplayer", "#meta/mediaplayer.cm");
-    realm_builder.AddLocalChild("audiocore", &fake_audio_);
-    realm_builder.AddLocalChild("audio", &fake_audio_main_);
+    realm_builder.AddLocalChild("audiocore",
+                                [this]() { return std::move(fake_audio_core_owned_); });
+    realm_builder.AddLocalChild("audio", [this]() { return std::move(fake_audio_owned_); });
     realm_builder.AddChild("scenic",
                            "fuchsia-pkg://fuchsia.com/test-ui-stack#meta/test-ui-stack.cm");
     // My additions of scenic and audio
@@ -132,8 +133,10 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
   fit::function<bool()> teardown_callback_;
   bool got_status_ = false;
   fuchsia::media::AudioConsumerStatus last_status_;
-  FakeAudioCore fake_audio_{dispatcher()};
-  FakeAudio fake_audio_main_{dispatcher()};
+  std::unique_ptr<FakeAudioCore> fake_audio_core_owned_{
+      std::make_unique<FakeAudioCore>(dispatcher())};
+  FakeAudioCore* fake_audio_core_{fake_audio_core_owned_.get()};
+  std::unique_ptr<FakeAudio> fake_audio_owned_{std::make_unique<FakeAudio>(dispatcher())};
   std::optional<component_testing::RealmRoot> realm_;
 };
 // Test that factory channel is closed and we still have a connection to the created AudioConsumer
@@ -478,7 +481,7 @@ TEST_F(AudioConsumerTests, CheckPtsRate) {
   stream_type.channels = kSamplesPerFrame;
   stream_type.sample_format = fuchsia::media::AudioSampleFormat::SIGNED_16;
   bool sink_connection_closed = false;
-  fake_audio_.renderer().ExpectPackets({{kFramesPerSecond, kVmoSize, 0x0000000000000000}});
+  fake_audio_core_->renderer().ExpectPackets({{kFramesPerSecond, kVmoSize, 0x0000000000000000}});
   got_status_ = false;
   std::vector<zx::vmo> vmos(kNumVmos);
   for (uint32_t i = 0; i < kNumVmos; i++) {
@@ -506,7 +509,7 @@ TEST_F(AudioConsumerTests, CheckPtsRate) {
   bool sent_packet = false;
   sink->SendPacket(*packet, [&sent_packet]() { sent_packet = true; });
   RunLoopUntil([&sent_packet]() { return sent_packet; });
-  RunLoopUntil([this]() { return fake_audio_.renderer().expected(); });
+  RunLoopUntil([this]() { return fake_audio_core_->renderer().expected(); });
   EXPECT_FALSE(sink_connection_closed);
 }
 // Test that packet buffers are consumed in the order they were supplied
@@ -517,7 +520,7 @@ TEST_F(AudioConsumerTests, BufferOrdering) {
   stream_type.channels = kSamplesPerFrame;
   stream_type.sample_format = fuchsia::media::AudioSampleFormat::SIGNED_16;
   bool sink_connection_closed = false;
-  fake_audio_.renderer().ExpectPackets(
+  fake_audio_core_->renderer().ExpectPackets(
       {{0, kVmoSize, 0x0000000000000000}, {kFramesPerSecond / 1000, kVmoSize, 0xa844a65edadbefbf}});
   std::vector<zx::vmo> vmos(kNumVmos);
   for (uint32_t i = 0; i < kNumVmos; i++) {
@@ -547,7 +550,7 @@ TEST_F(AudioConsumerTests, BufferOrdering) {
   sent_packet = false;
   sink->SendPacket(*packet, [&sent_packet]() { sent_packet = true; });
   RunLoopUntil([&sent_packet]() { return sent_packet; });
-  RunLoopUntil([this]() { return fake_audio_.renderer().expected(); });
+  RunLoopUntil([this]() { return fake_audio_core_->renderer().expected(); });
   EXPECT_FALSE(sink_connection_closed);
 }
 // Test that status reports flow correctly when client always requeues watch requests
@@ -620,16 +623,16 @@ TEST_F(AudioConsumerTests, SetRateBeforeStart) {
   stream_type.sample_format = fuchsia::media::AudioSampleFormat::SIGNED_16;
   constexpr uint32_t kBytesPerFrame = kSamplesPerFrame * sizeof(int16_t);
   bool sink_connection_closed = false;
-  fake_audio_.renderer().ExpectPackets({{255, kVmoSize, 0x0000000000000000},
-                                        {511, kVmoSize, 0x0000000000000000},
-                                        {768, kVmoSize, 0x0000000000000000},
-                                        {1023, kVmoSize, 0x0000000000000000},
-                                        {1279, kVmoSize, 0x0000000000000000},
-                                        {1536, kVmoSize, 0x0000000000000000},
-                                        {1791, kVmoSize, 0x0000000000000000},
-                                        {2047, kVmoSize, 0x0000000000000000},
-                                        {2304, kVmoSize, 0x0000000000000000},
-                                        {2559, kVmoSize, 0x0000000000000000}});
+  fake_audio_core_->renderer().ExpectPackets({{255, kVmoSize, 0x0000000000000000},
+                                              {511, kVmoSize, 0x0000000000000000},
+                                              {768, kVmoSize, 0x0000000000000000},
+                                              {1023, kVmoSize, 0x0000000000000000},
+                                              {1279, kVmoSize, 0x0000000000000000},
+                                              {1536, kVmoSize, 0x0000000000000000},
+                                              {1791, kVmoSize, 0x0000000000000000},
+                                              {2047, kVmoSize, 0x0000000000000000},
+                                              {2304, kVmoSize, 0x0000000000000000},
+                                              {2559, kVmoSize, 0x0000000000000000}});
   std::vector<zx::vmo> vmos(kNumVmos);
   for (uint32_t i = 0; i < kNumVmos; i++) {
     std::array<char, 1> test_data = {static_cast<char>(i)};
@@ -654,7 +657,7 @@ TEST_F(AudioConsumerTests, SetRateBeforeStart) {
   }
   auto initial_pts = kVmoSize / kBytesPerFrame * pts_rate;
   audio_consumer_->Start(fuchsia::media::AudioConsumerStartFlags::SUPPLY_DRIVEN, 0, initial_pts);
-  RunLoopUntil([this]() { return fake_audio_.renderer().expected(); });
+  RunLoopUntil([this]() { return fake_audio_core_->renderer().expected(); });
   EXPECT_FALSE(sink_connection_closed);
 }
 TEST_F(AudioConsumerTests, VolumeControl) {
@@ -676,10 +679,10 @@ TEST_F(AudioConsumerTests, VolumeControl) {
   volume_control->SetVolume(0.5f);
   volume_control->SetMute(true);
   RunLoopUntil([this]() {
-    return fake_audio_.renderer().gain() == -20.0f && fake_audio_.renderer().mute();
+    return fake_audio_core_->renderer().gain() == -20.0f && fake_audio_core_->renderer().mute();
   });
-  EXPECT_EQ(fake_audio_.renderer().gain(), -20.0f);
-  EXPECT_EQ(fake_audio_.renderer().mute(), true);
+  EXPECT_EQ(fake_audio_core_->renderer().gain(), -20.0f);
+  EXPECT_EQ(fake_audio_core_->renderer().mute(), true);
 }
 }  // namespace test
 }  // namespace media_player
