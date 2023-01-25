@@ -39,7 +39,7 @@ class TestDriver {
     }
 
     // Connect to the incoming service.
-    auto svc_dir = fdf::NsValue(start_args.ns(), "/svc");
+    auto svc_dir = fdf::NsValue(start_args.incoming(), "/svc");
     if (svc_dir.is_error()) {
       return svc_dir.take_error();
     }

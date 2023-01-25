@@ -76,7 +76,7 @@ class DriverBase {
         driver_dispatcher_(std::move(driver_dispatcher)),
         dispatcher_(driver_dispatcher_->async_dispatcher()),
         driver_context_(driver_dispatcher_->get()) {
-    auto ns = std::move(start_args_.ns());
+    auto ns = std::move(start_args_.incoming());
     ZX_ASSERT(ns.has_value());
     Namespace incoming = Namespace::Create(ns.value()).value();
     logger_ = Logger::Create(incoming, dispatcher_, name_).value();

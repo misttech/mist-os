@@ -205,12 +205,12 @@ class Namespace {
   fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir() const { return svc_dir_; }
 
  private:
-  explicit Namespace(fdio_ns_t* ns, fidl::ClientEnd<fuchsia_io::Directory> svc_dir);
+  explicit Namespace(fdio_ns_t* incoming, fidl::ClientEnd<fuchsia_io::Directory> svc_dir);
 
   Namespace(const Namespace& other) = delete;
   Namespace& operator=(const Namespace& other) = delete;
 
-  fdio_ns_t* ns_ = nullptr;
+  fdio_ns_t* incoming_ = nullptr;
   fidl::ClientEnd<fuchsia_io::Directory> svc_dir_;
 };
 

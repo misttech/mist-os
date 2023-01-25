@@ -190,7 +190,7 @@ class DriverHostTest : public testing::Test {
           .symbols = std::move(symbols),
           .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
           .program = std::move(dictionary),
-          .ns = std::move(ns_entries),
+          .incoming = std::move(ns_entries),
           .outgoing_dir = std::move(std::move(outgoing_dir_endpoints->server)),
       }};
       Completer completer(&transaction);
@@ -410,7 +410,7 @@ TEST_F(DriverHostTest, Start_InvalidStartArgs) {
     fdf::DriverStartArgs driver_start_args{{
         .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
     }};
-    driver_start_args.ns().emplace();
+    driver_start_args.incoming().emplace();
     fidl::Request<fdh::DriverHost::Start> request(std::move(driver_start_args),
                                                   std::move(endpoints->server));
     driver_host().Start(request, completer);
@@ -426,7 +426,7 @@ TEST_F(DriverHostTest, Start_InvalidStartArgs) {
 
     fdf::DriverStartArgs driver_start_args{{
         .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
-        .ns = std::move(entries1),
+        .incoming = std::move(entries1),
     }};
 
     Completer completer(&transaction);
@@ -446,7 +446,7 @@ TEST_F(DriverHostTest, Start_InvalidStartArgs) {
     fdf::DriverStartArgs driver_start_args{{
         .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
         .program = fdata::Dictionary{},
-        .ns = std::move(entries2),
+        .incoming = std::move(entries2),
     }};
 
     Completer completer(&transaction);
@@ -507,7 +507,7 @@ TEST_F(DriverHostTest, Start_InvalidBinary) {
     fdf::DriverStartArgs driver_start_args{{
         .url = "fuchsia-pkg://fuchsia.com/driver#meta/driver.cm",
         .program = std::move(dictionary),
-        .ns = std::move(ns_entries),
+        .incoming = std::move(ns_entries),
     }};
     fidl::Request<fdh::DriverHost::Start> request(std::move(driver_start_args),
                                                   std::move(driver_endpoints->server));

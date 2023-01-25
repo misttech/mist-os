@@ -70,7 +70,7 @@ zx::result<fidl::ClientEnd<fdh::Driver>> DriverHostComponent::Start(
       .node_name(fidl::StringView::FromExternal(node_name))
       .url(start_info.resolved_url())
       .program(start_info.program())
-      .ns(start_info.ns())
+      .incoming(start_info.ns())
       .outgoing_dir(std::move(start_info.outgoing_dir()));
 
   auto status = SetEncodedConfig(args, start_info);

@@ -494,7 +494,7 @@ class DriverTest : public testing::Test {
          .symbols = std::move(symbols),
          .url = std::string("fuchsia-pkg://fuchsia.com/driver#meta/driver.cm"),
          .program = std::move(program),
-         .ns = std::move(ns_entries),
+         .incoming = std::move(ns_entries),
          .outgoing_dir = std::move(outgoing_dir_endpoints->server),
          .config = std::nullopt});
 

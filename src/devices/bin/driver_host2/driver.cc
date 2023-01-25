@@ -49,8 +49,8 @@ class FileEventHandler : public fidl::AsyncEventHandler<fio::File> {
 
 zx::result<fidl::ClientEnd<fio::File>> OpenDriverFile(
     const fdf::DriverStartArgs& start_args, const fuchsia_data::wire::Dictionary& program) {
-  const auto& ns = start_args.ns();
-  auto pkg = ns ? fdf::NsValue(*ns, "/pkg") : zx::error(ZX_ERR_INVALID_ARGS);
+  const auto& incoming = start_args.incoming();
+  auto pkg = incoming ? fdf::NsValue(*incoming, "/pkg") : zx::error(ZX_ERR_INVALID_ARGS);
   if (pkg.is_error()) {
     LOGF(ERROR, "Failed to start driver, missing '/pkg' directory: %s", pkg.status_string());
     return pkg.take_error();
