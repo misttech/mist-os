@@ -27,7 +27,7 @@ use {
     fuchsia_async as fasync,
     futures::{
         channel::{mpsc, oneshot},
-        future::{join_all, Either},
+        future::Either,
         prelude::*,
         StreamExt,
     },
@@ -51,6 +51,8 @@ pub(crate) struct TestRunBuilder {
 impl TestRunBuilder {
     /// Serve a RunControllerRequestStream. Returns Err if the client stops the test
     /// prematurely or there is an error serving he stream.
+    /// Be careful, |run_task| is dropped once the other end of |controller| is dropped
+    /// or |kill| on the controller is called.
     async fn run_controller(
         mut controller: RunControllerRequestStream,
         run_task: futures::future::RemoteHandle<()>,
@@ -58,7 +60,7 @@ impl TestRunBuilder {
         event_recv: mpsc::Receiver<RunEvent>,
         diagnostics: DiagnosticNode,
     ) {
-        let mut task = Some(run_task);
+        let mut run_task = Some(run_task);
         let mut stop_sender = Some(stop_sender);
         let (events_responder_sender, mut events_responder_recv) = mpsc::unbounded();
         let diagnostics_ref = &diagnostics;
@@ -79,7 +81,7 @@ impl TestRunBuilder {
                     RunControllerRequest::Kill { .. } => {
                         diagnostics_ref.set_flag("killed");
                         // dropping the remote handle cancels it.
-                        drop(task.take());
+                        drop(run_task.take());
                         // after this all `senders` go away and subsequent GetEvent call will
                         // return rest of events and eventually a empty array and will close the
                         // connection after that.
@@ -167,17 +169,15 @@ impl TestRunBuilder {
         let (debug_data_processor, debug_data_sender) =
             DebugDataProcessor::new(debug_data_directory);
 
+        let debug_task = fasync::Task::local(
+            debug_data_processor
+                .collect_and_serve(event_sender.clone())
+                .unwrap_or_else(|err| warn!(?err, "Error serving debug data")),
+        );
+
+        // This future returns the task which needs to be completed before completion.
         let suite_scheduler_fut = async move {
             diagnostics_ref.set_property("execution", "executing");
-
-            let mut debug_tasks = vec![];
-
-            let sender_clone = event_sender.clone();
-            debug_tasks.push(fasync::Task::local(
-                debug_data_processor
-                    .collect_and_serve(sender_clone)
-                    .unwrap_or_else(|err| warn!(?err, "Error serving debug data")),
-            ));
 
             let serial_executor = scheduler::SerialScheduler {};
 
@@ -224,18 +224,18 @@ impl TestRunBuilder {
 
             drop(debug_data_sender); // needed for debug_data_processor to complete.
 
-            debug_tasks.push(fasync::Task::local(debug_data_server::send_kernel_debug_data(
-                event_sender,
-                accumulate_debug_data,
-            )));
-            join_all(debug_tasks).await;
             diagnostics_ref.set_property("execution", "complete");
         };
 
         let (remote, remote_handle) = suite_scheduler_fut.remote_handle();
 
         let ((), ()) = futures::future::join(
-            remote,
+            remote.then(|_| async move {
+                // send debug data once the test completes.
+                debug_data_server::send_kernel_debug_data(event_sender, accumulate_debug_data)
+                    .await;
+                debug_task.await;
+            }),
             Self::run_controller(
                 controller,
                 remote_handle,

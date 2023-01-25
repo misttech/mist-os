@@ -74,6 +74,7 @@ pub(crate) async fn send_kernel_debug_data(
     accumulate: bool,
 ) {
     if !accumulate {
+        tracing::info!("Serving kernel debug data");
         // If we're not accumulating, we don't need the custom copy logic.
         if let Err(e) = serve_iterator(DEBUG_DATA_PATH, event_sender).await {
             warn!("Error serving kernel debug data: {:?}", e);
@@ -216,6 +217,7 @@ pub(crate) async fn serve_iterator(
             .map(|file_name| {
                 let (file, server) = create_endpoints::<fio::NodeMarker>()?;
                 directory.open(fuchsia_fs::OpenFlags::RIGHT_READABLE, 0, &file_name, server)?;
+                tracing::info!("Serving debug data file {}: {}", dir_path, file_name);
                 Ok(ftest_manager::DebugData {
                     file: Some(ClientEnd::new(file.into_channel())),
                     name: file_name.into(),
