@@ -12,6 +12,7 @@ use crate::message::beacon::Beacon;
 use crate::message::message_builder::MessageBuilder;
 
 use fuchsia_syslog::fx_log_warn;
+use fuchsia_zircon::Duration;
 use std::collections::HashSet;
 use std::convert::identity;
 
@@ -78,6 +79,18 @@ impl MessengerClient {
     /// and audience.
     pub(crate) fn message(&self, payload: crate::Payload, audience: Audience) -> MessageBuilder {
         MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone())
+    }
+
+    /// Creates a MessageBuilder for a new message with the specified payload,
+    /// audience, and timeout.
+    pub(crate) fn message_with_timeout(
+        &self,
+        payload: crate::Payload,
+        audience: Audience,
+        duration: Option<Duration>,
+    ) -> MessageBuilder {
+        MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone())
+            .set_timeout(duration)
     }
 
     /// Returns the signature of the client that will handle any sent messages.

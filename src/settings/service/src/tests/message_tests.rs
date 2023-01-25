@@ -272,8 +272,11 @@ fn test_timeout() {
             delegate.create(MessengerType::Addressable(crate::Address::Test(2))).await.unwrap();
 
         let mut reply_receptor = messenger_client_1
-            .message(ORIGINAL.clone(), Audience::Address(crate::Address::Test(2)))
-            .set_timeout(Some(timeout_ms.millis()))
+            .message_with_timeout(
+                ORIGINAL.clone(),
+                Audience::Address(crate::Address::Test(2)),
+                Some(timeout_ms.millis()),
+            )
             .send();
 
         verify_payload(

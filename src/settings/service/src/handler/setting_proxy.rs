@@ -699,11 +699,11 @@ impl SettingProxy {
 
         let mut receptor = self
             .messenger
-            .message(
+            .message_with_timeout(
                 setting_handler::Payload::Command(Command::HandleRequest(request.clone())).into(),
                 Audience::Messenger(signature),
+                self.request_timeout,
             )
-            .set_timeout(self.request_timeout)
             .send();
 
         let proxy_request_sender_clone = self.proxy_request_sender.clone();
