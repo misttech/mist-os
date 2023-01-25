@@ -308,25 +308,35 @@ impl InputPipeline {
         fasync::Task::local(async move {
             // Watches the input device directory for new input devices. Creates new InputDeviceBindings
             // that send InputEvents to `input_event_receiver`.
-            let device_watcher = Self::get_device_watcher().await;
-            if device_watcher.is_err() {
-                fx_log_err!("Input pipeline is unable to watch the input report directory. New input devices will not be supported.");
-                return;
-            }
-            let dir_proxy = fuchsia_fs::directory::open_in_namespace(
+            match async {
+                let dir_proxy = fuchsia_fs::directory::open_in_namespace(
                     input_device::INPUT_REPORT_PATH,
                     fio::OpenFlags::RIGHT_READABLE,
                 )
-                .expect("Unable to open input report directory.");
-            let _ = Self::watch_for_devices(
-                device_watcher.unwrap(),
-                dir_proxy,
-                input_device_types,
-                input_event_sender,
-                input_device_bindings,
-                false, /* break_on_idle */
-            )
-            .await;
+                .with_context(|| format!("failed to open {}", input_device::INPUT_REPORT_PATH))?;
+                let device_watcher =
+                    Watcher::new(&dir_proxy).await.context("failed to create watcher")?;
+                Self::watch_for_devices(
+                    device_watcher,
+                    dir_proxy,
+                    input_device_types,
+                    input_event_sender,
+                    input_device_bindings,
+                    false, /* break_on_idle */
+                )
+                .await
+                .context("failed to watch for devices")
+            }
+            .await
+            {
+                Ok(()) => {}
+                Err(err) => {
+                    fx_log_err!(
+                        "Input pipeline is unable to watch for new input devices: {:?}",
+                        err
+                    )
+                }
+            }
         })
         .detach();
 
@@ -358,18 +368,6 @@ impl InputPipeline {
         }
 
         fx_log_err!("Input pipeline stopped handling input events.");
-    }
-
-    /// Returns a [`fuchsia_vfs_watcher::Watcher`] to the input report directory.
-    ///
-    /// # Errors
-    /// If the input report directory cannot be read.
-    async fn get_device_watcher() -> Result<Watcher, Error> {
-        let input_report_dir_proxy = fuchsia_fs::directory::open_in_namespace(
-            input_device::INPUT_REPORT_PATH,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )?;
-        Watcher::new(&input_report_dir_proxy).await
     }
 
     /// Watches the input report directory for new input devices. Creates InputDeviceBindings
