@@ -18,7 +18,7 @@
 
 #include <fbl/unique_fd.h>
 
-constexpr std::chrono::duration kTimeout = std::chrono::seconds(10);
+constexpr std::chrono::duration kTimeout = std::chrono::seconds(2);
 
 constexpr char kFastUdpEnvVar[] = "FAST_UDP";
 
