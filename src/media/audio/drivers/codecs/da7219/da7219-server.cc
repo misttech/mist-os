@@ -475,25 +475,20 @@ void Server::SignalProcessingConnect(SignalProcessingConnectRequestView request,
       request->protocol.Close(ZX_ERR_ALREADY_BOUND);
       return;
     }
-    auto on_unbound =
-        [this](
-            fidl::WireServer<fuchsia_hardware_audio_signalprocessing::SignalProcessing>*,
-            fidl::UnbindInfo info,
-            fidl::ServerEnd<fuchsia_hardware_audio_signalprocessing::SignalProcessing> server_end) {
-          if (info.is_peer_closed()) {
-            DA7219_LOG(DEBUG, "Client disconnected");
-          } else if (!info.is_user_initiated()) {
-            // Do not log canceled cases which happens too often in particular in test cases.
-            if (info.status() != ZX_ERR_CANCELED) {
-              DA7219_LOG(ERROR, "Client connection unbound: %s", info.status_string());
-            }
-          }
-          if (signal_) {
-            signal_.reset();
-          }
-        };
-    signal_.emplace(fidl::BindServer(core_->dispatcher(), std::move(request->protocol), this,
-                                     std::move(on_unbound)));
+    auto on_closed = [this](fidl::UnbindInfo info) {
+      if (info.is_peer_closed()) {
+        DA7219_LOG(DEBUG, "Client disconnected");
+      } else if (!info.is_user_initiated()) {
+        // Do not log canceled cases which happens too often in particular in test cases.
+        if (info.status() != ZX_ERR_CANCELED) {
+          DA7219_LOG(ERROR, "Client connection unbound: %s", info.status_string());
+        }
+      }
+      if (signal_) {
+        signal_.reset();
+      }
+    };
+    signal_.emplace(core_->dispatcher(), std::move(request->protocol), this, std::move(on_closed));
   } else {
     request->protocol.Close(ZX_ERR_NOT_SUPPORTED);
   }
@@ -555,7 +550,7 @@ void Server::WatchElementState(WatchElementStateRequestView request,
     } else {
       // The client called WatchElementState when another hanging get was pending.
       // This is an error condition and hence we unbind the channel.
-      signal_->Unbind();
+      signal_->Close(ZX_ERR_BAD_STATE);
     }
 
   } else {

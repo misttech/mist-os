@@ -101,7 +101,7 @@ class Server : public fidl::WireServer<fuchsia_hardware_audio::Codec>,
   Logger* logger_;
   std::shared_ptr<Core> core_;
   bool is_input_;
-  std::optional<fidl::ServerBindingRef<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
+  std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_;
 
   // Plug state. Must reply to the first Watch request, if there is no plug state update before the
