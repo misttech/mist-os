@@ -378,7 +378,8 @@ struct vm_page {
     ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_or(kLoanedStateIsLoaned);
   }
   void clear_is_loaned() {
-    ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_and(~kLoanedStateIsLoaned);
+    ktl::atomic_ref<uint8_t>(loaned_state_priv)
+        .fetch_and(static_cast<uint8_t>(~kLoanedStateIsLoaned));
   }
 
   // Manipulation of 'loan_cancelled' should only be done by the PmmNode under its lock, but may be
@@ -387,7 +388,8 @@ struct vm_page {
     ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_or(kLoanedStateIsLoanCancelled);
   }
   void clear_is_loan_cancelled() {
-    ktl::atomic_ref<uint8_t>(loaned_state_priv).fetch_and(~kLoanedStateIsLoanCancelled);
+    ktl::atomic_ref<uint8_t>(loaned_state_priv)
+        .fetch_and(static_cast<uint8_t>(~kLoanedStateIsLoanCancelled));
   }
 
   void dump() const;
