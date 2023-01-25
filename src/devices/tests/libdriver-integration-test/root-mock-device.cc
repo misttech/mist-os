@@ -5,6 +5,7 @@
 #include "root-mock-device.h"
 
 #include <fcntl.h>
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fuchsia/device/cpp/fidl.h>
 #include <fuchsia/device/test/cpp/fidl.h>
 #include <lib/devmgr-integration-test/fixture.h>
@@ -104,13 +105,15 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
   path.append(kName);
 
   // Connect to the created device.
-  zx::result channel =
-      device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), path.c_str());
-  if (channel.is_error()) {
-    return channel.error_value();
-  }
   fidl::SynchronousInterfacePtr<fuchsia::device::test::Device> test_dev;
-  test_dev.Bind(std::move(channel.value()));
+  {
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), path.c_str());
+    if (channel.is_error()) {
+      return channel.error_value();
+    }
+    test_dev.Bind(std::move(channel.value()));
+  }
 
   auto destroy_device = fit::defer([&test_dev] { test_dev->Destroy(); });
 
@@ -124,41 +127,42 @@ zx_status_t RootMockDevice::CreateFromTestRoot(
     return status;
   }
 
-  // Open a new connection to the test device to return.  We do to simplify
-  // handling around the blocking nature of fuchsia.device.Controller/Bind.  Needs to
-  // happen before the bind(), since bind() will cause us to get blocked in the mock device
-  // driver waiting for input on what to do.
-  //
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  fidl::InterfacePtr<fuchsia::device::test::Device> test_device;
-  fidl::SynchronousInterfacePtr<fuchsia::device::Controller> controller;
-  {
-    fidl::SynchronousInterfacePtr node =
-        fidl::InterfaceHandle<fuchsia::io::Node>(test_dev.Unbind().TakeChannel()).BindSync();
-    if (zx_status_t status = node->Clone(fuchsia::io::OpenFlags::CLONE_SAME_RIGHTS,
-                                         fidl::InterfaceRequest<fuchsia::io::Node>(
-                                             test_device.NewRequest(dispatcher).TakeChannel()));
-        status != ZX_OK) {
-      return status;
-    }
-    controller.Bind(node.Unbind().TakeChannel());
-  }
+  // Open a new connection to the test device, and call Bind on it.
+  // We need to call Bind asynchronously because the device's bind hook will call back into our
+  // test in order to see what to respond.
 
-  // Bind the mock device driver in a separate thread, since this call is
-  // synchronous.
-  std::thread thrd{[controller = std::move(controller)]() {
-    fuchsia::device::Controller_Bind_Result result;
-    zx_status_t status = controller->Bind(MOCK_DEVICE_LIB, &result);
-    ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
-    // BasicLifecycleTest.BindError.
-    if (result.is_err()) {
-      ZX_ASSERT_MSG(result.err() == ZX_ERR_NOT_SUPPORTED, "%s", zx_status_get_string(result.err()));
+  fidl::WireSharedClient<fuchsia_device::Controller> controller_client;
+  {
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), path.c_str());
+    if (channel.is_error()) {
+      return channel.error_value();
     }
-  }};
-  thrd.detach();
+    controller_client.Bind(fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value())),
+                           dispatcher);
+  }
+  controller_client->Bind(MOCK_DEVICE_LIB)
+      .Then([client = controller_client.Clone()](
+                fidl::WireUnownedResult<fuchsia_device::Controller::Bind>& result) {
+        // TODO(https://fxbug.dev/120616): Since no one waits for this call, there's a good chance
+        // the test will exit before we get a callback.
+        if (result.is_dispatcher_shutdown()) {
+          return;
+        }
+        ZX_ASSERT_MSG(result.ok(), "%s: %s", result.status_string(),
+                      result.FormatDescription().c_str());
+        const fit::result response = result.value();
+        if (response.is_error()) {
+          // BasicLifecycleTest.BindError expects ZX_ERR_NOT_SUPPORTED.
+          ZX_ASSERT_MSG(response.error_value() == ZX_ERR_NOT_SUPPORTED, "%s",
+                        zx_status_get_string(result->error_value()));
+        }
+      });
 
   destroy_device.cancel();
 
+  fidl::InterfacePtr<fuchsia::device::test::Device> test_device;
+  test_device.Bind(test_dev.Unbind(), dispatcher);
   auto mock = std::make_unique<RootMockDevice>(std::move(hooks), std::move(test_device),
                                                std::move(server), dispatcher, std::move(path));
   *mock_out = std::move(mock);
