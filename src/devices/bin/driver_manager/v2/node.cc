@@ -82,6 +82,28 @@ fidl::StringView CollectionName(Collection collection) {
   }
 }
 
+fit::result<fdf::wire::NodeError, fdecl::wire::Offer> AddOfferToNodeOffer(
+    fdecl::wire::Offer add_offer, fidl::AnyArena& arena, fdecl::wire::ChildRef source_ref) {
+  auto has_source_name =
+      VisitOffer<bool>(add_offer, [](auto& decl) { return decl.has_source_name(); });
+  if (!has_source_name.value_or(false)) {
+    return fit::as_error(fdf::wire::NodeError::kOfferSourceNameMissing);
+  }
+  auto has_ref = VisitOffer<bool>(
+      add_offer, [](auto& decl) { return decl.has_source() || decl.has_target(); });
+  if (has_ref.value_or(false)) {
+    return fit::as_error(fdf::wire::NodeError::kOfferRefExists);
+  }
+
+  // Assign the source of the offer.
+  VisitOffer<bool>(add_offer, [&arena, source_ref](auto& decl) mutable {
+    decl.set_source(arena, fdecl::wire::Ref::WithChild(arena, source_ref));
+    return true;
+  });
+
+  return fit::ok(fidl::ToWire(arena, fidl::ToNatural(add_offer)));
+}
+
 bool IsDefaultOffer(std::string_view target_name) {
   return std::string_view("default").compare(target_name) == 0;
 }
@@ -597,40 +619,26 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
 
   if (args.has_offers()) {
     child->offers_.reserve(args.offers().count());
+
+    // Find a parent node with a collection. This indicates that a driver has
+    // been bound to the node, and the driver is running within the collection.
+    Node* source_node = this;
+    while (source_node && source_node->collection_ == Collection::kNone) {
+      source_node = source_node->GetPrimaryParent();
+    }
+    fdecl::wire::ChildRef source_ref{
+        .name = {child->arena_, source_node->MakeComponentMoniker()},
+        .collection = CollectionName(source_node->collection_),
+    };
+
     for (auto& offer : args.offers()) {
-      auto has_source_name =
-          VisitOffer<bool>(offer, [](auto& decl) { return decl.has_source_name(); });
-      if (!has_source_name.value_or(false)) {
-        LOGF(ERROR, "Failed to add Node '%.*s', an offer must have a source name",
-             static_cast<int>(name.size()), name.data());
-        return fit::as_error(fdf::wire::NodeError::kOfferSourceNameMissing);
+      fit::result new_offer = AddOfferToNodeOffer(offer, child->arena_, source_ref);
+      if (new_offer.is_error()) {
+        LOGF(ERROR, "Failed to add Node '%s': Bad add offer: %d",
+             child->MakeTopologicalPath().c_str(), new_offer.error_value());
+        return new_offer.take_error();
       }
-      auto has_ref = VisitOffer<bool>(
-          offer, [](auto& decl) { return decl.has_source() || decl.has_target(); });
-      if (has_ref.value_or(false)) {
-        LOGF(ERROR, "Failed to add Node '%.*s', an offer must not have a source or target",
-             static_cast<int>(name.size()), name.data());
-        return fit::as_error(fdf::wire::NodeError::kOfferRefExists);
-      }
-
-      // Find a parent node with a collection. This indicates that a driver has
-      // been bound to the node, and the driver is running within the collection.
-      auto source_node = this;
-      while (source_node && source_node->collection_ == Collection::kNone) {
-        source_node = source_node->GetPrimaryParent();
-      }
-      VisitOffer<bool>(offer, [&arena = child->arena_, source_node](auto& decl) mutable {
-        // Assign the source of the offer.
-        fdecl::wire::ChildRef source_ref{
-            .name = {arena, source_node->MakeComponentMoniker()},
-            .collection = CollectionName(source_node->collection_),
-        };
-        decl.set_source(arena, fdecl::wire::Ref::WithChild(arena, source_ref));
-        return true;
-      });
-
-      auto natural = fidl::ToNatural(offer);
-      child->offers_.push_back(fidl::ToWire(child->arena_, std::move(natural)));
+      child->offers_.push_back(new_offer.value());
     }
   }
 
