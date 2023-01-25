@@ -25,31 +25,12 @@ use {
 /// Errors produced by `Model`.
 #[derive(Debug, Error, Clone)]
 pub enum ModelError {
-    #[error("could not add static child \"{child_name}\" to parent {parent_moniker}: {err}")]
-    AddStaticChild {
-        parent_moniker: AbsoluteMoniker,
-        child_name: String,
-        #[source]
-        err: AddChildError,
-    },
     #[error("component instance with moniker {} has shut down", moniker)]
     InstanceShutDown { moniker: AbsoluteMoniker },
     #[error("component instance with moniker {} is being destroyed", moniker)]
     InstanceDestroyed { moniker: AbsoluteMoniker },
     #[error("component collection not found with name {}", name)]
     CollectionNotFound { name: String },
-    #[error(
-        "component address could not be computed for component '{}' at url '{}': {:#?}",
-        moniker,
-        url,
-        err
-    )]
-    ComponentAddressNotAvailable {
-        url: String,
-        moniker: AbsoluteMoniker,
-        #[source]
-        err: ResolverError,
-    },
     #[error("{} is not supported", feature)]
     Unsupported { feature: String },
     #[error("package directory handle missing")]
@@ -73,12 +54,6 @@ pub enum ModelError {
         #[source]
         err: ClonableError,
     },
-    #[error("failed to resolve \"{}\": {}", url, err)]
-    ResolverError {
-        url: String,
-        #[source]
-        err: ResolverError,
-    },
     #[error("Routing error: {}", err)]
     RoutingError {
         #[from]
@@ -98,20 +73,6 @@ pub enum ModelError {
     ComponentInstanceError {
         #[from]
         err: ComponentInstanceError,
-    },
-    #[error("error in expose dir VFS for component {moniker}: {err}")]
-    ExposeDirError {
-        moniker: AbsoluteMoniker,
-
-        #[source]
-        err: VfsError,
-    },
-    #[error("error in namespace dir VFS for component {moniker}: {err}")]
-    NamespaceDirError {
-        moniker: AbsoluteMoniker,
-
-        #[source]
-        err: VfsError,
     },
     #[error("error in hub dir VFS for component {moniker}: {err}")]
     HubDirError {
@@ -155,11 +116,6 @@ pub enum ModelError {
         #[from]
         err: ComponentIdIndexError,
     },
-    #[error("component ABI error: {}", err)]
-    AbiRevisionError {
-        #[from]
-        err: AbiRevisionError,
-    },
     #[error("structured config error: {}", err)]
     StructuredConfigError {
         #[from]
@@ -167,11 +123,15 @@ pub enum ModelError {
     },
     #[error("timed out after {:?}", duration)]
     Timeout { duration: zx::Duration },
-    #[error("error with discover action for {moniker}: {err}")]
-    DiscoverError {
-        moniker: AbsoluteMoniker,
-        #[source]
-        err: DiscoverError,
+    #[error("error with discover action: {err}")]
+    DiscoverActionError {
+        #[from]
+        err: DiscoverActionError,
+    },
+    #[error("error with resolve action: {err}")]
+    ResolveActionError {
+        #[from]
+        err: ResolveActionError,
     },
 }
 
@@ -292,12 +252,15 @@ pub enum AddDynamicChildError {
         err: AddChildError,
     },
     #[error("failed to discover child: {}", err)]
-    DiscoverFailed {
+    DiscoverActionError {
         #[from]
-        err: DiscoverError,
+        err: DiscoverActionError,
     },
     #[error("failed to resolve parent: {}", err)]
-    ResolveFailed { err: ComponentInstanceError },
+    ResolveActionError {
+        #[from]
+        err: ResolveActionError,
+    },
 }
 
 // This is implemented for fuchsia.component.Realm protocol
@@ -326,8 +289,8 @@ impl Into<fcomponent::Error> for AddDynamicChildError {
             AddDynamicChildError::AddChildError {
                 err: AddChildError::ChildMonikerInvalid { .. },
             } => fcomponent::Error::InvalidArguments,
-            AddDynamicChildError::DiscoverFailed { .. } => fcomponent::Error::Internal,
-            AddDynamicChildError::ResolveFailed { .. } => fcomponent::Error::Internal,
+            AddDynamicChildError::DiscoverActionError { .. } => fcomponent::Error::Internal,
+            AddDynamicChildError::ResolveActionError { .. } => fcomponent::Error::Internal,
         }
     }
 }
@@ -339,8 +302,8 @@ impl Into<fsys::CreateError> for AddDynamicChildError {
             AddDynamicChildError::CollectionNotFound { .. } => {
                 fsys::CreateError::CollectionNotFound
             }
-            AddDynamicChildError::DiscoverFailed { .. } => fsys::CreateError::Internal,
-            AddDynamicChildError::ResolveFailed { .. } => fsys::CreateError::Internal,
+            AddDynamicChildError::DiscoverActionError { .. } => fsys::CreateError::Internal,
+            AddDynamicChildError::ResolveActionError { .. } => fsys::CreateError::Internal,
             AddDynamicChildError::EagerStartupUnsupported => {
                 fsys::CreateError::EagerStartupForbidden
             }
@@ -395,7 +358,125 @@ pub enum DynamicOfferError {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum DiscoverError {
+pub enum DiscoverActionError {
     #[error("instance {moniker} was destroyed")]
     InstanceDestroyed { moniker: AbsoluteMoniker },
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum ResolveActionError {
+    #[error("discover action failed: {err}")]
+    DiscoverActionError {
+        #[from]
+        err: DiscoverActionError,
+    },
+    #[error("instance {moniker} was shut down")]
+    InstanceShutDown { moniker: AbsoluteMoniker },
+    #[error("instance {moniker} was destroyed")]
+    InstanceDestroyed { moniker: AbsoluteMoniker },
+    #[error(
+        "component address could not parsed for moniker '{}' at url '{}': {}",
+        moniker,
+        url,
+        err
+    )]
+    ComponentAddressParseError {
+        url: String,
+        moniker: AbsoluteMoniker,
+        #[source]
+        err: ResolverError,
+    },
+    #[error("resolver error for \"{}\": {}", url, err)]
+    ResolverError {
+        url: String,
+        #[source]
+        err: ResolverError,
+    },
+    #[error("error in expose dir VFS for component {moniker}: {err}")]
+    // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
+    ExposeDirError {
+        moniker: AbsoluteMoniker,
+
+        #[source]
+        err: VfsError,
+    },
+    #[error("error in namespace dir VFS for component {moniker}: {err}")]
+    NamespaceDirError {
+        moniker: AbsoluteMoniker,
+
+        #[source]
+        err: VfsError,
+    },
+    #[error("could not add static child \"{}\": {}", child_name, err)]
+    AddStaticChildError {
+        child_name: String,
+        #[source]
+        err: AddChildError,
+    },
+    #[error("structured config error: {}", err)]
+    StructuredConfigError {
+        #[from]
+        err: StructuredConfigError,
+    },
+    #[error("package dir proxy creation failed: {}", err)]
+    PackageDirProxyCreateError {
+        #[source]
+        err: fidl::Error,
+    },
+    #[error("ABI compatibility check failed: {}", err)]
+    AbiCompatibilityError {
+        #[from]
+        err: AbiRevisionError,
+    },
+}
+
+// This is implemented for fuchsia.sys2.LifecycleController protocol
+impl Into<fsys::ResolveError> for ResolveActionError {
+    fn into(self) -> fsys::ResolveError {
+        match self {
+            ResolveActionError::ResolverError {
+                err: ResolverError::PackageNotFound(_), ..
+            } => fsys::ResolveError::PackageNotFound,
+            ResolveActionError::ResolverError {
+                err: ResolverError::ManifestNotFound(_), ..
+            } => fsys::ResolveError::ManifestNotFound,
+            ResolveActionError::InstanceShutDown { .. }
+            | ResolveActionError::InstanceDestroyed { .. } => fsys::ResolveError::InstanceNotFound,
+            ResolveActionError::ExposeDirError { .. }
+            | ResolveActionError::NamespaceDirError { .. }
+            | ResolveActionError::ResolverError { .. }
+            | ResolveActionError::StructuredConfigError { .. }
+            | ResolveActionError::ComponentAddressParseError { .. }
+            | ResolveActionError::AddStaticChildError { .. }
+            | ResolveActionError::DiscoverActionError { .. }
+            | ResolveActionError::AbiCompatibilityError { .. }
+            | ResolveActionError::PackageDirProxyCreateError { .. } => fsys::ResolveError::Internal,
+        }
+    }
+}
+
+// This is implemented for fuchsia.sys2.LifecycleController protocol.
+// Starting a component instance also causes a resolve.
+impl Into<fsys::StartError> for ResolveActionError {
+    fn into(self) -> fsys::StartError {
+        match self {
+            ResolveActionError::ResolverError {
+                err: ResolverError::PackageNotFound(_), ..
+            } => fsys::StartError::PackageNotFound,
+            ResolveActionError::ResolverError {
+                err: ResolverError::ManifestNotFound(_), ..
+            } => fsys::StartError::ManifestNotFound,
+            ResolveActionError::InstanceShutDown { .. }
+            | ResolveActionError::InstanceDestroyed { .. } => fsys::StartError::InstanceNotFound,
+            ResolveActionError::ExposeDirError { .. }
+            | ResolveActionError::NamespaceDirError { .. }
+            | ResolveActionError::ResolverError { .. }
+            | ResolveActionError::StructuredConfigError { .. }
+            | ResolveActionError::ComponentAddressParseError { .. }
+            | ResolveActionError::AddStaticChildError { .. }
+            | ResolveActionError::DiscoverActionError { .. }
+            | ResolveActionError::AbiCompatibilityError { .. }
+            | ResolveActionError::PackageDirProxyCreateError { .. } => fsys::StartError::Internal,
+        }
+    }
 }

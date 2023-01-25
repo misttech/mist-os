@@ -4,7 +4,7 @@
 
 use {
     crate::model::{
-        component::WeakComponentInstance, dir_tree::DirTree, error::ModelError,
+        component::WeakComponentInstance, dir_tree::DirTree, error::ResolveActionError,
         mutable_directory::MutableDirectory, routing_fns::route_use_fn,
     },
     cm_rust::ComponentDecl,
@@ -35,17 +35,20 @@ impl NamespaceDir {
         component: WeakComponentInstance,
         decl: ComponentDecl,
         pkg_dir: Option<fio::DirectoryProxy>,
-    ) -> Result<Self, ModelError> {
+    ) -> Result<Self, ResolveActionError> {
         let mut dir = pfs::simple();
         let tree = DirTree::build_from_uses(route_use_fn, component.clone(), &decl);
-        tree.install(&mut dir).map_err(|err| ModelError::NamespaceDirError {
+        tree.install(&mut dir).map_err(|err| ResolveActionError::NamespaceDirError {
             moniker: component.abs_moniker.clone(),
             err,
         })?;
 
         if let Some(pkg_dir) = pkg_dir {
             dir.add_node("pkg", remote_dir(pkg_dir)).map_err(|err| {
-                ModelError::NamespaceDirError { moniker: component.abs_moniker.clone(), err }
+                ResolveActionError::NamespaceDirError {
+                    moniker: component.abs_moniker.clone(),
+                    err,
+                }
             })?;
         }
 

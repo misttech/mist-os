@@ -11,8 +11,9 @@ use {
         context::ModelContext,
         environment::Environment,
         error::{
-            AddChildError, AddDynamicChildError, DiscoverError, DynamicOfferError, ModelError,
-            OpenExposedDirError, RebootError, StructuredConfigError,
+            AddChildError, AddDynamicChildError, DiscoverActionError, DynamicOfferError,
+            ModelError, OpenExposedDirError, RebootError, ResolveActionError,
+            StructuredConfigError,
         },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
@@ -67,7 +68,7 @@ use {
         boxed::Box,
         clone::Clone,
         collections::{HashMap, HashSet},
-        convert::{TryFrom, TryInto},
+        convert::TryFrom,
         fmt,
         path::PathBuf,
         sync::{Arc, Weak},
@@ -152,7 +153,7 @@ pub struct Package {
 }
 
 impl TryFrom<ResolvedComponent> for Component {
-    type Error = ModelError;
+    type Error = ResolveActionError;
 
     fn try_from(
         ResolvedComponent {
@@ -181,7 +182,7 @@ impl TryFrom<ResolvedComponent> for Component {
 }
 
 impl TryFrom<ResolvedPackage> for Package {
-    type Error = ModelError;
+    type Error = ResolveActionError;
 
     fn try_from(package: ResolvedPackage) -> Result<Self, Self::Error> {
         Ok(Self {
@@ -189,7 +190,7 @@ impl TryFrom<ResolvedPackage> for Package {
             package_dir: package
                 .directory
                 .into_proxy()
-                .expect("could not convert package dir to proxy"),
+                .map_err(|err| ResolveActionError::PackageDirProxyCreateError { err })?,
         })
     }
 }
@@ -456,7 +457,7 @@ impl ComponentInstance {
     /// error if the instance is destroyed.
     pub async fn lock_resolved_state<'a>(
         self: &'a Arc<Self>,
-    ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ComponentInstanceError>
+    ) -> Result<MappedMutexGuard<'a, InstanceState, ResolvedInstanceState>, ResolveActionError>
     {
         fn get_resolved(s: &mut InstanceState) -> &mut ResolvedInstanceState {
             match s {
@@ -471,20 +472,20 @@ impl ComponentInstance {
                     return Ok(MutexGuard::map(state, get_resolved));
                 }
                 InstanceState::Destroyed => {
-                    return Err(ComponentInstanceError::instance_not_found(
-                        self.abs_moniker.clone(),
-                    ));
+                    return Err(ResolveActionError::InstanceDestroyed {
+                        moniker: self.abs_moniker.clone(),
+                    });
                 }
                 InstanceState::New | InstanceState::Unresolved => {}
             }
             // Drop the lock before doing the work to resolve the state.
         }
-        self.resolve()
-            .await
-            .map_err(|err| ComponentInstanceError::resolve_failed(self.abs_moniker.clone(), err))?;
+        self.resolve().await?;
         let state = self.state.lock().await;
         if let InstanceState::Destroyed = *state {
-            return Err(ComponentInstanceError::instance_not_found(self.abs_moniker.clone()));
+            return Err(ResolveActionError::InstanceDestroyed {
+                moniker: self.abs_moniker.clone(),
+            });
         }
         Ok(MutexGuard::map(state, get_resolved))
     }
@@ -492,7 +493,7 @@ impl ComponentInstance {
     /// Resolves the component declaration, populating `ResolvedInstanceState` as necessary. A
     /// `Resolved` event is dispatched if the instance was not previously resolved or an error
     /// occurs.
-    pub async fn resolve(self: &Arc<Self>) -> Result<Component, ModelError> {
+    pub async fn resolve(self: &Arc<Self>) -> Result<Component, ResolveActionError> {
         ActionSet::register(self.clone(), ResolveAction::new()).await
     }
 
@@ -688,10 +689,7 @@ impl ComponentInstance {
                 return Err(AddDynamicChildError::EagerStartupUnsupported);
             }
         }
-        let mut state = self
-            .lock_resolved_state()
-            .await
-            .map_err(|err| AddDynamicChildError::ResolveFailed { err })?;
+        let mut state = self.lock_resolved_state().await?;
         let collection_decl = state
             .decl()
             .find_collection(&collection_name)
@@ -1226,7 +1224,13 @@ impl ComponentInstanceInterface for ComponentInstance {
         self: &'a Arc<Self>,
     ) -> Result<Box<dyn ResolvedInstanceInterface<Component = Self> + 'a>, ComponentInstanceError>
     {
-        Ok(Box::new(ComponentInstance::lock_resolved_state(self).await?))
+        Ok(Box::new(ComponentInstance::lock_resolved_state(self).await.map_err(|err| {
+            let err: anyhow::Error = err.into();
+            ComponentInstanceError::ResolveFailed {
+                moniker: self.abs_moniker.clone(),
+                err: err.into(),
+            }
+        })?))
     }
 
     fn new_route_mapper() -> NoopRouteMapper {
@@ -1422,7 +1426,8 @@ impl ResolvedInstanceState {
         config: Option<ConfigFields>,
         address: ComponentAddress,
         context_to_resolve_children: Option<ComponentResolutionContext>,
-    ) -> Result<Self, ModelError> {
+    ) -> Result<Self, ResolveActionError> {
+        // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
         let exposed_dir = ExposedDir::new(
             ExecutionScope::new(),
             WeakComponentInstance::new(&component),
@@ -1590,7 +1595,7 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         numbered_handles: Option<Vec<fidl_fuchsia_process::HandleInfo>>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
-    ) -> Result<BoxFuture<'static, Result<(), DiscoverError>>, AddChildError> {
+    ) -> Result<BoxFuture<'static, Result<(), DiscoverActionError>>, AddChildError> {
         let child = self.add_child_internal(
             component,
             child,
@@ -1730,14 +1735,10 @@ impl ResolvedInstanceState {
         &mut self,
         component: &Arc<ComponentInstance>,
         decl: &ComponentDecl,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), ResolveActionError> {
         for child in decl.children.iter() {
             self.add_child(component, child, None, None, None).await.map_err(|err| {
-                ModelError::AddStaticChild {
-                    parent_moniker: component.abs_moniker.clone(),
-                    child_name: child.name.clone(),
-                    err,
-                }
+                ResolveActionError::AddStaticChildError { child_name: child.name.to_string(), err }
             })?;
         }
         Ok(())

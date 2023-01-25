@@ -182,9 +182,7 @@ mod tests {
             model::{Model, ModelParams},
             testing::mocks::MockResolver,
         },
-        ::routing::{
-            config::RuntimeConfig, environment::DebugRegistration, error::ComponentInstanceError,
-        },
+        ::routing::{config::RuntimeConfig, environment::DebugRegistration},
         assert_matches::assert_matches,
         cm_rust::{CapabilityName, RegistrationSource, RunnerRegistration},
         cm_rust_testing::{
@@ -659,9 +657,7 @@ mod tests {
         .await?;
         assert_matches!(
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await,
-            Err(ModelError::ComponentInstanceError {
-                err: ComponentInstanceError::ResolveFailed { .. }
-            })
+            Err(ModelError::ResolveActionError { .. })
         );
         Ok(())
     }

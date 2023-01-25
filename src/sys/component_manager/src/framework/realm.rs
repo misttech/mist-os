@@ -208,7 +208,7 @@ impl RealmCapabilityHost {
         match Self::get_child(component, child.clone()).await? {
             Some(child) => {
                 child.start(&start_reason).await.map_err(|e| match e {
-                    ModelError::ResolverError { err: error, .. } => {
+                    ModelError::ResolveActionError { err: error, .. } => {
                         debug!(%error, "failed to resolve child");
                         fcomponent::Error::InstanceCannotResolve
                     }
@@ -297,15 +297,9 @@ impl RealmCapabilityHost {
         child: fdecl::ChildRef,
     ) -> Result<Option<Arc<ComponentInstance>>, fcomponent::Error> {
         let parent = parent.upgrade().map_err(|_| fcomponent::Error::InstanceDied)?;
-        let state = parent.lock_resolved_state().await.map_err(|e| match e {
-            ComponentInstanceError::ResolveFailed { moniker, err: error, .. } => {
-                debug!(%moniker, %error, "failed to resolve instance");
-                return fcomponent::Error::InstanceCannotResolve;
-            }
-            error => {
-                error!(%error, "failed to resolve InstanceState");
-                return fcomponent::Error::Internal;
-            }
+        let state = parent.lock_resolved_state().await.map_err(|error| {
+            debug!(%error, moniker=%parent.abs_moniker, "failed to resolve instance");
+            fcomponent::Error::InstanceCannotResolve
         })?;
         let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fcomponent::Error::InvalidArguments)?;

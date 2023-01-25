@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{ComponentInstance, InstanceState},
-        error::DiscoverError,
+        error::DiscoverActionError,
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
@@ -25,7 +25,7 @@ impl DiscoverAction {
 
 #[async_trait]
 impl Action for DiscoverAction {
-    type Output = Result<(), DiscoverError>;
+    type Output = Result<(), DiscoverActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_discover(component).await
     }
@@ -34,7 +34,7 @@ impl Action for DiscoverAction {
     }
 }
 
-async fn do_discover(component: &Arc<ComponentInstance>) -> Result<(), DiscoverError> {
+async fn do_discover(component: &Arc<ComponentInstance>) -> Result<(), DiscoverActionError> {
     let is_discovered = {
         let state = component.lock_state().await;
         match *state {
@@ -42,7 +42,7 @@ async fn do_discover(component: &Arc<ComponentInstance>) -> Result<(), DiscoverE
             InstanceState::Unresolved => true,
             InstanceState::Resolved(_) => true,
             InstanceState::Destroyed => {
-                return Err(DiscoverError::InstanceDestroyed {
+                return Err(DiscoverActionError::InstanceDestroyed {
                     moniker: component.abs_moniker.clone(),
                 });
             }

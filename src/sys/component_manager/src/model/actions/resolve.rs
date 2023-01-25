@@ -9,7 +9,7 @@ use {
             Component, ComponentInstance, InstanceState, ResolvedInstanceState,
             WeakComponentInstance,
         },
-        error::ModelError,
+        error::ResolveActionError,
         hooks::{Event, EventPayload},
         resolver::Resolver,
     },
@@ -31,7 +31,7 @@ impl ResolveAction {
 
 #[async_trait]
 impl Action for ResolveAction {
-    type Output = Result<Component, ModelError>;
+    type Output = Result<Component, ResolveActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_resolve(component).await
     }
@@ -40,17 +40,17 @@ impl Action for ResolveAction {
     }
 }
 
-async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, ModelError> {
+async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, ResolveActionError> {
     {
         let execution = component.lock_execution().await;
         if execution.is_shut_down() {
-            return Err(ModelError::instance_shut_down(component.abs_moniker.clone()));
+            return Err(ResolveActionError::InstanceShutDown {
+                moniker: component.abs_moniker.clone(),
+            });
         }
     }
     // Ensure `Resolved` is dispatched after `Discovered`.
-    ActionSet::register(component.clone(), DiscoverAction::new())
-        .await
-        .map_err(|err| ModelError::DiscoverError { moniker: component.abs_moniker.clone(), err })?;
+    ActionSet::register(component.clone(), DiscoverAction::new()).await?;
     let result = async move {
         let first_resolve = {
             let state = component.lock_state().await;
@@ -61,14 +61,16 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Mod
                 InstanceState::Unresolved => true,
                 InstanceState::Resolved(_) => false,
                 InstanceState::Destroyed => {
-                    return Err(ModelError::instance_destroyed(component.abs_moniker.clone()));
+                    return Err(ResolveActionError::InstanceDestroyed {
+                        moniker: component.abs_moniker.clone(),
+                    });
                 }
             }
         };
         let component_url = &component.component_url;
         let component_address =
             ComponentAddress::from(component_url, component).await.map_err(|err| {
-                ModelError::ComponentAddressNotAvailable {
+                ResolveActionError::ComponentAddressParseError {
                     url: component.component_url.clone(),
                     moniker: component.abs_moniker.clone(),
                     err,
@@ -76,7 +78,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Mod
             })?;
         let component_info =
             component.environment.resolve(&component_address, component).await.map_err(|err| {
-                ModelError::ResolverError { url: component.component_url.clone(), err }
+                ResolveActionError::ResolverError { url: component.component_url.clone(), err }
             })?;
         let component_info = Component::try_from(component_info)?;
         let policy = component.context.abi_revision_policy();
@@ -89,7 +91,9 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Mod
                         panic!("Component was marked Resolved during Resolve action?");
                     }
                     InstanceState::Destroyed => {
-                        return Err(ModelError::instance_destroyed(component.abs_moniker.clone()));
+                        return Err(ResolveActionError::InstanceDestroyed {
+                            moniker: component.abs_moniker.clone(),
+                        });
                     }
                     InstanceState::New | InstanceState::Unresolved => {}
                 }
@@ -138,7 +142,7 @@ pub mod tests {
             actions::test_utils::{is_executing, is_resolved, is_stopped},
             actions::{ActionSet, ResolveAction, ShutdownAction, StartAction, StopAction},
             component::StartReason,
-            error::ModelError,
+            error::ResolveActionError,
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
         },
         assert_matches::assert_matches,
@@ -185,7 +189,7 @@ pub mod tests {
         // Error to resolve a shut-down component.
         assert_matches!(
             ActionSet::register(component_a.clone(), ResolveAction::new()).await,
-            Err(ModelError::InstanceShutDown { .. })
+            Err(ResolveActionError::InstanceShutDown { .. })
         );
         assert!(is_resolved(&component_a).await);
         assert!(is_stopped(&component_root, &"a".try_into().unwrap()).await);

@@ -25,7 +25,7 @@ use {
     lazy_static::lazy_static,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, MonikerError, RelativeMoniker},
     routing::component_instance::ComponentInstanceInterface,
-    routing::{error::ComponentInstanceError, resolving::ResolverError},
+    routing::error::ComponentInstanceError,
     std::convert::TryFrom,
     std::path::PathBuf,
     std::sync::{Arc, Weak},
@@ -64,17 +64,9 @@ impl LifecycleController {
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::ResolveError::BadMoniker)?;
         let instance =
             self.model.find(&moniker).await.ok_or(fsys::ResolveError::InstanceNotFound)?;
-        instance.resolve().await.map(|_| ()).map_err(|e| match e {
-            ModelError::ResolverError { err: ResolverError::PackageNotFound(_), .. } => {
-                fsys::ResolveError::PackageNotFound
-            }
-            ModelError::ResolverError { err: ResolverError::ManifestNotFound(_), .. } => {
-                fsys::ResolveError::ManifestNotFound
-            }
-            error => {
-                warn!(%moniker, %error, "failed to resolve instance");
-                fsys::ResolveError::Internal
-            }
+        instance.resolve().await.map(|_| ()).map_err(|error| {
+            warn!(%moniker, %error, "failed to resolve instance");
+            error.into()
         })
     }
 
@@ -88,12 +80,7 @@ impl LifecycleController {
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::StartError::BadMoniker)?;
         let instance = self.model.find(&moniker).await.ok_or(fsys::StartError::InstanceNotFound)?;
         instance.start(&StartReason::Debug).await.map(|_| ()).map_err(|e| match e {
-            ModelError::ResolverError { err: ResolverError::PackageNotFound(_), .. } => {
-                fsys::StartError::PackageNotFound
-            }
-            ModelError::ResolverError { err: ResolverError::ManifestNotFound(_), .. } => {
-                fsys::StartError::ManifestNotFound
-            }
+            ModelError::ResolveActionError { err } => err.into(),
             error => {
                 warn!(%moniker, %error, "failed to start instance");
                 fsys::StartError::Internal
@@ -460,7 +447,7 @@ mod deprecated {
     ) -> Result<Arc<ComponentInstance>, fcomponent::Error> {
         let moniker = join_monikers(scope_moniker, &moniker)?;
         model.look_up(&moniker).await.map_err(|e| match e {
-            error @ ModelError::ResolverError { .. }
+            error @ ModelError::ResolveActionError { .. }
             | error @ ModelError::ComponentInstanceError {
                 err: ComponentInstanceError::ResolveFailed { .. },
             } => {

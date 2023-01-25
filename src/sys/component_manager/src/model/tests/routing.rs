@@ -19,7 +19,7 @@ use {
         model::{
             actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction},
             component::StartReason,
-            error::ModelError,
+            error::{ModelError, ResolveActionError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             routing::{RouteRequest, RouteSource, RoutingError},
             testing::{routing_test_helpers::*, test_helpers::*},
@@ -28,6 +28,7 @@ use {
     ::routing::{
         capability_source::{AggregateCapability, ComponentCapability, InternalCapability},
         error::ComponentInstanceError,
+        resolving::ResolverError,
         route_capability,
     },
     anyhow::Error,
@@ -2366,16 +2367,17 @@ async fn resolver_is_not_available() {
         // Bind "c". We expect to see a failure that the scheme is not registered.
         async move {
             match universe.start_instance(&vec!["c"].try_into().unwrap()).await {
-                Err(ModelError::ComponentInstanceError {
-                    err: ComponentInstanceError::ResolveFailed { err: resolve_error, .. },
+                Err(ModelError::ResolveActionError {
+                    err:
+                        ResolveActionError::ResolverError {
+                            url,
+                            err: ResolverError::SchemeNotRegistered,
+                        },
                 }) => {
-                    assert_eq!(
-                        resolve_error.to_string(),
-                        "failed to resolve \"base://c\": scheme not registered"
-                    );
+                    assert_eq!(url, "base://c");
                 }
                 _ => {
-                    panic!("expected ModelError wrapping ComponentInstanceError::ResolveFailed");
+                    panic!("expected ResolverError");
                 }
             };
         },
@@ -2469,15 +2471,17 @@ async fn resolver_component_decl_is_validated() {
         // Bind "b". We expect to see a ResolverError.
         async move {
             match universe.start_instance(&vec!["b"].try_into().unwrap()).await {
-                Err(ModelError::ComponentInstanceError {
-                    err: ComponentInstanceError::ResolveFailed { err: resolve_error, .. },
+                Err(ModelError::ResolveActionError {
+                    err:
+                        ResolveActionError::ResolverError {
+                            url,
+                            err: ResolverError::ManifestInvalid(_),
+                        },
                 }) => {
-                    assert!(resolve_error
-                        .to_string()
-                        .starts_with("failed to resolve \"base://b\": component manifest invalid"));
+                    assert_eq!(url, "base://b");
                 }
                 _ => {
-                    panic!("expected ModelError wrapping ComponentInstanceError::ResolveFailed");
+                    panic!("expected ResolverError");
                 }
             };
         },
