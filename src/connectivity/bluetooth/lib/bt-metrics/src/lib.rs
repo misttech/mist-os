@@ -46,6 +46,41 @@ pub fn log_on_failure(result: Result<Result<(), metrics::Error>, fidl::Error>) {
     };
 }
 
+/// An optional client connection to the Cobalt logging service.
+#[derive(Clone, Default)]
+pub struct MetricsLogger(Option<metrics::MetricEventLoggerProxy>);
+
+impl MetricsLogger {
+    pub fn new() -> Self {
+        let logger =
+            create_metrics_logger().map_err(|e| warn!("Failed to create metrics logger: {e}")).ok();
+        Self(logger)
+    }
+
+    /// Test-only
+    pub fn from_proxy(proxy: metrics::MetricEventLoggerProxy) -> Self {
+        Self(Some(proxy))
+    }
+
+    /// Logs an occurrence metric using the Cobalt logger. Does not block execution.
+    pub fn log_occurrence(&self, id: u32, event_codes: Vec<u32>) {
+        let Some(c) = self.0.clone() else { return };
+        fuchsia_async::Task::spawn(async move {
+            log_on_failure(c.log_occurrence(id, 1, &event_codes).await);
+        })
+        .detach();
+    }
+
+    /// Logs an integer metric using the Cobalt logger. Does not block execution.
+    pub fn log_integer(&self, id: u32, value: i64, event_codes: Vec<u32>) {
+        let Some(c) = self.0.clone() else { return };
+        fuchsia_async::Task::spawn(async move {
+            log_on_failure(c.log_integer(id, value, &event_codes).await);
+        })
+        .detach();
+    }
+}
+
 /// Test-only
 pub fn respond_to_metrics_req_for_test(
     request: metrics::MetricEventLoggerRequest,

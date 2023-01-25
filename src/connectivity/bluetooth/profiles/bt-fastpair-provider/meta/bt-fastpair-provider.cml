@@ -33,6 +33,10 @@
             ],
             from: "parent",
         },
+        {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            availability: "optional",
+        },
     ],
     expose: [
         {

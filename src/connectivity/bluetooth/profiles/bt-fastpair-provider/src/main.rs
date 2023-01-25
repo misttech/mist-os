@@ -34,8 +34,11 @@ async fn main() -> Result<(), Error> {
         warn!("Couldn't serve inspect: {}", e);
     }
 
+    // Set up the metrics logger.
+    let metrics_logger = bt_metrics::MetricsLogger::new();
+
     let (fidl_service_sender, fidl_service_receiver) = mpsc::channel(1);
-    let mut server = Provider::new(provider_config).await?;
+    let mut server = Provider::new(provider_config, metrics_logger).await?;
     if let Err(e) = server.iattach(&inspector.root(), "provider") {
         warn!("Couldn't attach inspect to the Provider server: {:?}", e);
     }

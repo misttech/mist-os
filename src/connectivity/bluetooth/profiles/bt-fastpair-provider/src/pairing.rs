@@ -4,6 +4,7 @@
 
 use async_helpers::maybe_stream::MaybeStream;
 use async_utils::stream::FutureMap;
+use bt_metrics::MetricsLogger;
 use core::{
     pin::Pin,
     task::{Context, Poll},
@@ -262,6 +263,8 @@ struct PairingManagerInspect {
     finished_procedures: Option<BoundedListNode>,
     active_procedures: HashMap<PeerId, ActiveProcedureInspect>,
     inspect_node: inspect::Node,
+    /// Used to log component metrics via Cobalt.
+    metrics: MetricsLogger,
 }
 
 impl Inspect for &mut PairingManagerInspect {
@@ -277,6 +280,11 @@ impl Inspect for &mut PairingManagerInspect {
 }
 
 impl PairingManagerInspect {
+    fn with_metrics(mut self, metrics: MetricsLogger) -> Self {
+        self.metrics = metrics;
+        self
+    }
+
     fn set_owner(&self, owner: &PairingDelegateOwner) {
         match owner {
             PairingDelegateOwner::FastPair => self.owner.set("FastPair"),
@@ -307,6 +315,12 @@ impl PairingManagerInspect {
         let node_writer = bounded_list_node.create_entry();
         let _ = node_writer.adopt(&inspect_node);
         let _ = node_writer.record(inspect_node);
+        // Record the pairing time to Cobalt.
+        self.metrics.log_integer(
+            bt_metrics::FASTPAIR_PROVIDER_PAIRING_TIME_SECONDS_METRIC_ID,
+            pairing_time_seconds as i64,
+            vec![],
+        );
     }
 }
 
@@ -371,7 +385,11 @@ impl Inspect for &mut PairingManager {
 }
 
 impl PairingManager {
-    pub fn new(pairing: PairingProxy, upstream_client: PairingArgs) -> Result<Self, Error> {
+    pub fn new(
+        pairing: PairingProxy,
+        upstream_client: PairingArgs,
+        metrics: MetricsLogger,
+    ) -> Result<Self, Error> {
         let delegate = upstream_client.delegate.clone();
         let upstream_connection = async move {
             let _ = delegate.on_closed().await;
@@ -386,7 +404,7 @@ impl PairingManager {
             relay_tasks: FuturesUnordered::new(),
             procedures: FutureMap::new(),
             terminated: false,
-            inspect_node: PairingManagerInspect::default(),
+            inspect_node: PairingManagerInspect::default().with_metrics(metrics),
         };
         this.set_pairing_delegate(PairingDelegateOwner::Upstream)?;
         Ok(this)
@@ -874,8 +892,9 @@ pub(crate) mod tests {
                 output: OutputCapability::None,
                 delegate,
             };
-            let manager = PairingManager::new(pairing_svc.clone(), client)
-                .expect("can create pairing manager");
+            let manager =
+                PairingManager::new(pairing_svc.clone(), client, MetricsLogger::default())
+                    .expect("can create pairing manager");
             // Expect the manager to register a delegate on behalf of the upstream.
             let (_, _, delegate, _) = downstream_pairing_server
                 .select_next_some()

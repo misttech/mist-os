@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use async_helpers::maybe_stream::MaybeStream;
+use bt_metrics::MetricsLogger;
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fidl_fuchsia_bluetooth_fastpair::{ProviderEnableResponder, ProviderWatcherProxy};
 use fidl_fuchsia_bluetooth_gatt2 as gatt;
@@ -29,6 +30,28 @@ use crate::types::packets::{
     MessageStreamPacket,
 };
 use crate::types::{AccountKey, AccountKeyList, Error, SharedSecret};
+
+/// Logs the current pairing status to Cobalt.
+/// `success` is true if Fast Pair pairing is successful.
+fn log_pairing_status(metrics: &MetricsLogger, success: bool) {
+    let event_code = if success {
+        bt_metrics::FastpairProviderPairingStatusMetricDimensionResult::Success
+    } else {
+        bt_metrics::FastpairProviderPairingStatusMetricDimensionResult::Failure
+    };
+    metrics.log_occurrence(
+        bt_metrics::FASTPAIR_PROVIDER_PAIRING_STATUS_METRIC_ID,
+        vec![event_code as u32],
+    );
+}
+
+/// Logs the peer request to Cobalt.
+fn log_peer_request(
+    metrics: &MetricsLogger,
+    code: bt_metrics::FastpairProviderPeerRequestMetricDimensionRequestType,
+) {
+    metrics.log_occurrence(bt_metrics::FASTPAIR_PROVIDER_PEER_REQUEST_METRIC_ID, vec![code as u32]);
+}
 
 /// The types of FIDL requests that the Provider server can service.
 pub enum ServiceRequest {
@@ -93,6 +116,8 @@ pub struct Provider {
     message_stream: MessageStream,
     /// The inspect node associated with the server.
     inspect_node: ProviderInspect,
+    /// Reports component metrics to Cobalt.
+    metrics: MetricsLogger,
 }
 
 impl Inspect for &mut Provider {
@@ -108,7 +133,7 @@ impl Inspect for &mut Provider {
 }
 
 impl Provider {
-    pub async fn new(config: Config) -> Result<Self, Error> {
+    pub async fn new(config: Config, metrics: MetricsLogger) -> Result<Self, Error> {
         let advertiser = LowEnergyAdvertiser::new()?;
         let gatt = GattService::new(config.clone()).await?;
         let watcher = fuchsia_component::client::connect_to_protocol::<HostWatcherMarker>()?;
@@ -126,6 +151,7 @@ impl Provider {
             pairing: MaybeStream::default(),
             message_stream: MessageStream::new(profile),
             inspect_node: ProviderInspect::default(),
+            metrics,
         })
     }
 
@@ -263,6 +289,7 @@ impl Provider {
         // TODO(fxbug.dev/96217): Track the salt in `request` to prevent replay attacks.
         debug!(%peer_id, "Received key based pairing request: {:?}", request);
         let pairing_type = PairingType::from_action(&request.action, discoverable);
+        use bt_metrics::FastpairProviderPeerRequestMetricDimensionRequestType as PeerRequestType;
         match request.action {
             KeyBasedPairingAction::SeekerInitiatesPairing { received_provider_address }
             | KeyBasedPairingAction::PersonalizedNameWrite { received_provider_address } => {
@@ -276,15 +303,19 @@ impl Provider {
 
                 if matches!(request.action, KeyBasedPairingAction::SeekerInitiatesPairing { .. }) {
                     self.inspect_node.pairing_request_count.add(1);
+                } else {
+                    log_peer_request(&self.metrics, PeerRequestType::PersonalizedNameWrite);
                 }
             }
             KeyBasedPairingAction::ProviderInitiatesPairing { .. } => {
                 // TODO(fxbug.dev/120378): Use `sys.Access/Pair` to pair to peer.
+                log_peer_request(&self.metrics, PeerRequestType::ProviderInitiatesPairing);
             }
             KeyBasedPairingAction::RetroactiveWrite { seeker_address: _ } => {
                 // TODO(fxbug.dev/115567): This can be improved by using a timeout after an
                 // OnPairingComplete signal is received. A retroactive write can only occur within
                 // some finite period of time.
+                log_peer_request(&self.metrics, PeerRequestType::RetroactivePairing);
             }
         }
 
@@ -349,6 +380,7 @@ impl Provider {
                 if let Some(p) = self.pairing.inner_mut() {
                     let _ = p.cancel_pairing_procedure(&peer_id);
                 }
+                log_pairing_status(&self.metrics, /* success= */ false);
             }
         }
     }
@@ -387,6 +419,7 @@ impl Provider {
                 if let Some(p) = self.pairing.inner_mut() {
                     let _ = p.cancel_pairing_procedure(&peer_id);
                 }
+                log_pairing_status(&self.metrics, /* success= */ false);
             }
         }
     }
@@ -438,7 +471,10 @@ impl Provider {
             GattRequest::KeyBasedPairing { peer_id, encrypted_request, response } => {
                 match self.handle_key_based_pairing_request(peer_id, encrypted_request, response) {
                     Ok(_) => info!(%peer_id, "Successfully started key-based pairing"),
-                    Err(e) => warn!(%peer_id, "Couldn't start key-based pairing: {e:?}"),
+                    Err(e) => {
+                        warn!(%peer_id, "Couldn't start key-based pairing: {e:?}");
+                        log_pairing_status(&self.metrics, /* success= */ false);
+                    }
                 }
             }
             GattRequest::VerifyPasskey { peer_id, encrypted_passkey, response } => {
@@ -476,8 +512,11 @@ impl Provider {
         match request {
             ServiceRequest::Pairing(client) => {
                 if self.pairing.inner_mut().map_or(true, |p| p.is_terminated()) {
-                    let mut pairing_manager =
-                        PairingManager::new(self.pairing_svc.clone(), client)?;
+                    let mut pairing_manager = PairingManager::new(
+                        self.pairing_svc.clone(),
+                        client,
+                        self.metrics.clone(),
+                    )?;
                     let _ = pairing_manager.iattach(self.inspect_node.node(), "pairing_manager");
                     self.pairing.set(pairing_manager);
                 } else {
@@ -543,13 +582,14 @@ impl Provider {
                             self.pairing = Default::default();
                         }
                         Some(id) => {
-                            // Pairing completed for peer - notify the Fast Pair FIDL client &
-                            // `sys.Pairing` FIDL client of completion.
+                            // Pairing completed for peer - notify the Fast Pair FIDL client,
+                            // the `sys.Pairing` FIDL client, and record to metrics.
                             info!(%id, "Fast Pair pairing completed");
                             self.upstream.notify_pairing_complete(id);
                             if let Some(pairing) = self.pairing.inner_mut() {
                                 pairing.notify_pairing_complete(id);
                             }
+                            log_pairing_status(&self.metrics, /* success= */ true);
                         }
                     }
                 }
@@ -656,6 +696,7 @@ mod tests {
             pairing: Some(pairing).into(),
             message_stream,
             inspect_node: ProviderInspect::default(),
+            metrics: MetricsLogger::default(),
         };
 
         (this, peripheral_server, local_service_proxy, watcher_server, mock_pairing, mock_upstream)

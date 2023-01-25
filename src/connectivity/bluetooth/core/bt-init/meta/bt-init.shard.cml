@@ -85,6 +85,12 @@
             to: [ "#bt-fastpair-provider" ],
         },
         {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "parent",
+            to: [ "#bt-fastpair-provider" ],
+            availability: "same_as_target",
+        },
+        {
             protocol: [
                 "fuchsia.bluetooth.gatt2.Server",
                 "fuchsia.bluetooth.le.Peripheral",

@@ -19,6 +19,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.bluetooth.le:fuchsia.bluetooth.le_rust",
     "//sdk/fidl/fuchsia.bluetooth.sys:fuchsia.bluetooth.sys_rust",
     "//src/connectivity/bluetooth/lib/async-helpers",
+    "//src/connectivity/bluetooth/lib/bt-metrics",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
     "//src/connectivity/bluetooth/lib/packet-encoding",
     "//src/connectivity/bluetooth/lib/profile-client",

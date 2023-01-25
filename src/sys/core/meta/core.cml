@@ -610,6 +610,7 @@
             protocol: "fuchsia.metrics.MetricEventLoggerFactory",
             from: "#cobalt",
             to: [
+                "#bluetooth-core",
                 "#cobalt_system_metrics",
                 "#pkg-resolver",
                 "#sysmem_connector",
