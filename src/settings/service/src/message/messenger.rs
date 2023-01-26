@@ -4,12 +4,11 @@
 
 use crate::message::action_fuse::ActionFuseHandle;
 use crate::message::base::{
-    messenger, ActionSender, Audience, CreateMessengerResult, Fingerprint, Message, MessageAction,
-    MessageError, MessageType, MessengerAction, MessengerActionSender, MessengerId, MessengerType,
-    Signature,
+    messenger, ActionSender, Attribution, Audience, CreateMessengerResult, Fingerprint, Message,
+    MessageAction, MessageError, MessageType, MessengerAction, MessengerActionSender, MessengerId,
+    MessengerType, Signature,
 };
-use crate::message::beacon::Beacon;
-use crate::message::message_builder::MessageBuilder;
+use crate::message::beacon::{Beacon, BeaconBuilder};
 use crate::message::receptor::Receptor;
 
 use fuchsia_syslog::fx_log_warn;
@@ -79,7 +78,7 @@ impl MessengerClient {
     /// Creates a MessageBuilder for a new message with the specified payload
     /// and audience.
     pub(crate) fn message(&self, payload: crate::Payload, audience: Audience) -> Receptor {
-        MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone()).send()
+        self.message_with_timeout(payload, audience, None)
     }
 
     /// Creates a MessageBuilder for a new message with the specified payload,
@@ -90,9 +89,14 @@ impl MessengerClient {
         audience: Audience,
         duration: Option<Duration>,
     ) -> Receptor {
-        MessageBuilder::new(payload, MessageType::Origin(audience), self.messenger.clone())
-            .set_timeout(duration)
-            .send()
+        let (beacon, receptor) =
+            BeaconBuilder::new(self.messenger.clone()).set_timeout(duration).build();
+        self.messenger.transmit(
+            MessageAction::Send(payload, Attribution::Source(MessageType::Origin(audience))),
+            Some(beacon),
+        );
+
+        receptor
     }
 
     /// Returns the signature of the client that will handle any sent messages.

@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use crate::message::action_fuse::{ActionFuse, ActionFuseHandle};
-use crate::message::base::{Audience, Message, MessageClientId, MessageType, Signature, Status};
+use crate::message::base::{
+    Attribution, Audience, Message, MessageAction, MessageClientId, MessageType, Signature, Status,
+};
 use crate::message::beacon::BeaconBuilder;
-use crate::message::message_builder::MessageBuilder;
 use crate::message::messenger::Messenger;
 use crate::message::receptor::Receptor;
 
@@ -85,21 +86,15 @@ impl MessageClient {
 
     /// Sends a reply to this message.
     pub(crate) fn reply(&self, payload: crate::Payload) -> Receptor {
-        ActionFuse::defuse(self.forwarder.clone());
-
-        MessageBuilder::new(
-            payload,
-            MessageType::Reply(Box::new(self.message.clone())),
-            self.messenger.clone(),
-        )
-        .send()
+        self.send(payload, Attribution::Source(MessageType::Reply(Box::new(self.message.clone()))))
     }
 
     /// Propagates a derived message on the path of the original message.
     pub(crate) fn propagate(&self, payload: crate::Payload) -> Receptor {
-        ActionFuse::defuse(self.forwarder.clone());
-
-        MessageBuilder::derive(payload, self.message.clone(), self.messenger.clone()).send()
+        self.send(
+            payload,
+            Attribution::Derived(Box::new(self.message.clone()), self.messenger.get_signature()),
+        )
     }
 
     /// Report back to the clients that the message has been acknowledged.
@@ -111,5 +106,14 @@ impl MessageClient {
     /// goes out of scope.
     pub(crate) async fn bind_to_recipient(&mut self, fuse: ActionFuseHandle) {
         self.message.bind_to_author(fuse).await;
+    }
+
+    fn send(&self, payload: crate::Payload, attribution: Attribution) -> Receptor {
+        let (beacon, receptor) = BeaconBuilder::new(self.messenger.clone()).build();
+        self.messenger.transmit(MessageAction::Send(payload, attribution), Some(beacon));
+
+        ActionFuse::defuse(self.forwarder.clone());
+
+        receptor
     }
 }

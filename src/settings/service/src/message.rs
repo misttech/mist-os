@@ -10,7 +10,6 @@ pub(self) mod beacon;
 pub mod action_fuse;
 pub mod base;
 pub mod delegate;
-pub mod message_builder;
 pub mod message_client;
 pub mod message_hub;
 pub mod messenger;
