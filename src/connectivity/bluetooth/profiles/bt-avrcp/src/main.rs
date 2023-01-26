@@ -4,17 +4,15 @@
 
 #![recursion_limit = "1024"]
 
-use {
-    anyhow::{format_err, Context, Error},
-    fuchsia_bluetooth::profile::{psm_from_protocol, Psm},
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect as inspect,
-    fuchsia_inspect_derive::Inspect,
-    futures::{channel::mpsc, stream::StreamExt, FutureExt},
-    profile_client::ProfileEvent,
-    tracing::{error, info, warn},
-};
+use anyhow::{format_err, Context, Error};
+use fuchsia_bluetooth::profile::{psm_from_protocol, Psm};
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect as inspect;
+use fuchsia_inspect_derive::Inspect;
+use futures::{channel::mpsc, stream::StreamExt, FutureExt};
+use profile_client::ProfileEvent;
+use tracing::{error, info, warn};
 
 mod browse_controller_service;
 mod controller_service;
@@ -33,14 +31,11 @@ use crate::{
 };
 
 fn record_avrcp_capabilities(
-    metrics_proxy: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+    metrics_logger: bt_metrics::MetricsLogger,
     service: &AvrcpService,
     peer_id: PeerId,
 ) {
-    let Some(metrics_proxy) = metrics_proxy else {
-        return;
-    };
-    let mut event_codes_list = Vec::new();
+    info!("Logging AVRCP capabilities metrics for {peer_id}");
     let remote_role = match service {
         AvrcpService::Controller { .. } => {
             bt_metrics::AvrcpRemotePeerCapabilitiesMetricDimensionRemoteRole::Controller
@@ -49,37 +44,27 @@ fn record_avrcp_capabilities(
             let remote_role =
                 bt_metrics::AvrcpRemotePeerCapabilitiesMetricDimensionRemoteRole::Target;
             if features.contains(AvrcpTargetFeatures::SUPPORTSCOVERART) {
-                event_codes_list.push(vec![
+                let event_codes = vec![
                     remote_role as u32,
                     bt_metrics::AvrcpRemotePeerCapabilitiesMetricDimensionFeature::SupportsCoverArt
                         as u32,
-                ]);
+                ];
+                metrics_logger.log_occurrence(
+                    bt_metrics::AVRCP_REMOTE_PEER_CAPABILITIES_METRIC_ID,
+                    event_codes,
+                );
             }
             remote_role
         }
     };
     if service.supports_browsing() {
-        event_codes_list.push(vec![
+        let event_codes = vec![
             remote_role as u32,
             bt_metrics::AvrcpRemotePeerCapabilitiesMetricDimensionFeature::SupportsBrowsing as u32,
-        ]);
+        ];
+        metrics_logger
+            .log_occurrence(bt_metrics::AVRCP_REMOTE_PEER_CAPABILITIES_METRIC_ID, event_codes);
     }
-    // Log the occurrences (in the background)
-    fuchsia_async::Task::spawn(async move {
-        for event_codes in event_codes_list {
-            bt_metrics::log_on_failure(
-                metrics_proxy
-                    .log_occurrence(
-                        bt_metrics::AVRCP_REMOTE_PEER_CAPABILITIES_METRIC_ID,
-                        1,
-                        &event_codes,
-                    )
-                    .await,
-            );
-        }
-        info!("Finished recording AVRCP capabilities for {peer_id}");
-    })
-    .detach();
 }
 
 #[fuchsia::main(logging_tags = ["avrcp"])]
@@ -105,11 +90,9 @@ async fn main() -> Result<(), Error> {
     }
 
     // Set up cobalt 1.1 logger.
-    let cobalt = bt_metrics::create_metrics_logger()
-        .map_err(|e| warn!("Failed to create metrics: {e}"))
-        .ok();
+    let cobalt = bt_metrics::MetricsLogger::new();
 
-    let mut metrics_node = MetricsNode::default().with_cobalt_proxy(cobalt.clone());
+    let mut metrics_node = MetricsNode::default().with_cobalt_logger(cobalt.clone());
     if let Err(e) = metrics_node.iattach(inspect.root(), METRICS_NODE_NAME) {
         warn!("Failed to attach to inspect metrics: {:?}", e);
     }
@@ -180,7 +163,7 @@ async fn main() -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bt_metrics::respond_to_metrics_req_for_test;
+    use bt_metrics::{respond_to_metrics_req_for_test, MetricsLogger};
     use fidl_fuchsia_metrics::*;
     use fuchsia_async::{Time, WaitState};
 
@@ -192,6 +175,7 @@ mod tests {
         let (proxy, mut receiver) =
             fidl::endpoints::create_proxy_and_stream::<MetricEventLoggerMarker>()
                 .expect("failed to create MetricsEventLogger proxy");
+        let metrics_logger = MetricsLogger::from_proxy(proxy);
 
         // Target with browsing and cover art features.
         let test_target = AvrcpService::Target {
@@ -200,7 +184,7 @@ mod tests {
             protocol_version: AvrcpProtocolVersion(1, 6),
         };
         // Spins off a Task to record to metrics.
-        record_avrcp_capabilities(Some(proxy), &test_target, PeerId(1));
+        record_avrcp_capabilities(metrics_logger, &test_target, PeerId(1));
 
         let mut cobalt_recv_fut = receiver.next();
         let log_request = exec.run_singlethreaded(&mut cobalt_recv_fut);
@@ -231,6 +215,7 @@ mod tests {
         let (proxy, mut receiver) =
             fidl::endpoints::create_proxy_and_stream::<MetricEventLoggerMarker>()
                 .expect("failed to create MetricsEventLogger proxy");
+        let metrics_logger = MetricsLogger::from_proxy(proxy);
 
         // Target with browsing and cover art features.
         let test_controller = AvrcpService::Controller {
@@ -239,7 +224,7 @@ mod tests {
             protocol_version: AvrcpProtocolVersion(1, 6),
         };
         // Spins off a Task to record to metrics.
-        record_avrcp_capabilities(Some(proxy), &test_controller, PeerId(1));
+        record_avrcp_capabilities(metrics_logger, &test_controller, PeerId(1));
 
         let mut cobalt_recv_fut = receiver.next();
         let log_request = exec.run_singlethreaded(&mut cobalt_recv_fut);

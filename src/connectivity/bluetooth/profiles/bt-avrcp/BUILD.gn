@@ -16,7 +16,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.bluetooth.avrcp:fuchsia.bluetooth.avrcp_rust",
     "//sdk/fidl/fuchsia.bluetooth.avrcp.test:fuchsia.bluetooth.avrcp.test_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
-    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//src/connectivity/bluetooth/lib/bt-avctp",
     "//src/connectivity/bluetooth/lib/bt-metrics",
     "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
@@ -44,6 +43,7 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//src/connectivity/bluetooth/lib/async-helpers:async-test-helpers",
     "//src/lib/async-utils",
     "//third_party/rust_crates:assert_matches",

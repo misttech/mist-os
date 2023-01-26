@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use bt_metrics::MetricsLogger;
 use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
-use fidl_fuchsia_metrics;
-use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_derive::Inspect;
@@ -188,8 +187,8 @@ impl MetricsNodeInner {
 pub struct MetricsNode {
     #[inspect(forward)]
     inner: Arc<Mutex<MetricsNodeInner>>,
-    /// Cobalt logger for this object.
-    cobalt_proxy: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+    /// Logger for reporting component metrics to Cobalt.
+    metrics_logger: MetricsLogger,
 }
 
 impl MetricsNode {
@@ -217,11 +216,8 @@ impl MetricsNode {
         self.inner.lock().browse_channel_collisions.add(1);
     }
 
-    pub fn with_cobalt_proxy(
-        mut self,
-        cobalt_proxy: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
-    ) -> Self {
-        self.cobalt_proxy = cobalt_proxy;
+    pub fn with_cobalt_logger(mut self, metrics_logger: MetricsLogger) -> Self {
+        self.metrics_logger = metrics_logger;
         self
     }
 
@@ -272,23 +268,12 @@ impl MetricsNode {
         }
 
         // For now we only log for "browsing" dimension (first dimension).
-        // Also log to cobalt if cobalt exists.
-        if let Some(cobalt) = self.cobalt_proxy.clone() {
-            let browse_cap : bt_metrics::AvrcpTargetDistinctPeerPlayerCapabilitiesMetricDimensionBrowsing = highest_browse_support.into();
-            let cobalt_event_codes = [browse_cap as u32, 0, 0];
-            let cobalt_task = fasync::Task::spawn(async move {
-                bt_metrics::log_on_failure(
-                    cobalt
-                        .log_occurrence(
-                            bt_metrics::AVRCP_TARGET_DISTINCT_PEER_PLAYER_CAPABILITIES_METRIC_ID,
-                            1,
-                            &cobalt_event_codes,
-                        )
-                        .await,
-                );
-            });
-            cobalt_task.detach();
-        }
+        let browse_cap : bt_metrics::AvrcpTargetDistinctPeerPlayerCapabilitiesMetricDimensionBrowsing = highest_browse_support.into();
+        let cobalt_event_codes = [browse_cap as u32, 0, 0];
+        self.metrics_logger.log_occurrence(
+            bt_metrics::AVRCP_TARGET_DISTINCT_PEER_PLAYER_CAPABILITIES_METRIC_ID,
+            cobalt_event_codes.to_vec(),
+        );
     }
 }
 
@@ -298,6 +283,7 @@ mod tests {
     use async_utils::PollExt;
     use bt_metrics::respond_to_metrics_req_for_test;
     use fidl_fuchsia_metrics::{MetricEventLoggerMarker, MetricEventPayload};
+    use fuchsia_async as fasync;
     use fuchsia_inspect::assert_data_tree;
     use fuchsia_inspect_derive::WithInspect;
     use futures::stream::StreamExt;
@@ -455,7 +441,7 @@ mod tests {
         let metrics = MetricsNode::default()
             .with_inspect(inspect.root(), "metrics")
             .unwrap()
-            .with_cobalt_proxy(Some(proxy));
+            .with_cobalt_logger(MetricsLogger::from_proxy(proxy));
 
         // Peer #1 has no players that support browsing in any way.
         let id1 = PeerId(1101);
