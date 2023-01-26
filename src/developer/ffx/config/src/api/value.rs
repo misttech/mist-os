@@ -218,6 +218,18 @@ impl TryFrom<ConfigValue> for bool {
     }
 }
 
+impl ValueStrategy for Option<bool> {}
+
+impl TryFrom<ConfigValue> for Option<bool> {
+    type Error = ConfigError;
+
+    fn try_from(value: ConfigValue) -> std::result::Result<Self, Self::Error> {
+        Ok(value.0.and_then(|v| {
+            v.as_bool().or_else(|| if let Value::String(s) = v { s.parse().ok() } else { None })
+        }))
+    }
+}
+
 impl ValueStrategy for PathBuf {}
 
 impl TryFrom<ConfigValue> for PathBuf {

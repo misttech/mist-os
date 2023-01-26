@@ -76,7 +76,11 @@ pub async fn repository_server_mode() -> Result<String> {
 
 /// Return if the repository server is enabled.
 pub async fn get_repository_server_enabled() -> Result<bool> {
-    Ok(ffx_config::get(CONFIG_KEY_SERVER_ENABLED).await?)
+    if let Some(enabled) = ffx_config::get(CONFIG_KEY_SERVER_ENABLED).await? {
+        Ok(enabled)
+    } else {
+        Ok(false)
+    }
 }
 
 /// Sets if the repository server is enabled.
