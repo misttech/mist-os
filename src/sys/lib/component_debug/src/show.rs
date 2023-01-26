@@ -7,11 +7,13 @@ use {
         io::Directory,
         list::{get_all_instances, Instance as ListInstance},
     },
+    ansi_term::Colour,
     anyhow::{bail, format_err, Context, Result},
     cm_rust::{ExposeDecl, ExposeDeclCommon, FidlIntoNative, UseDecl},
     fidl_fuchsia_component_config as fconfig, fidl_fuchsia_sys2 as fsys,
     fuchsia_async::TimeoutExt,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
+    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
 };
 
 #[cfg(feature = "serde")]
@@ -372,6 +374,94 @@ impl Instance {
         let url = hub_dir.read_file("url").await?;
 
         Ok(Instance { moniker, url, is_cmx: true, instance_id: None, resolved })
+    }
+}
+
+/// Creates a table containing information about the given instance.
+pub fn create_table(instance: Instance) -> Table {
+    let mut table = Table::new();
+    table.set_format(*FORMAT_CLEAN);
+
+    add_basic_info_to_table(&mut table, &instance);
+    add_resolved_info_to_table(&mut table, &instance);
+    add_started_info_to_table(&mut table, &instance);
+
+    table
+}
+
+fn add_basic_info_to_table(table: &mut Table, instance: &Instance) {
+    table.add_row(row!(r->"Moniker:", instance.moniker));
+    table.add_row(row!(r->"URL:", instance.url));
+
+    if let Some(instance_id) = &instance.instance_id {
+        table.add_row(row!(r->"Instance ID:", instance_id));
+    } else {
+        table.add_row(row!(r->"Instance ID:", "None"));
+    }
+
+    if instance.is_cmx {
+        table.add_row(row!(r->"Type:", "CMX Component"));
+    } else {
+        table.add_row(row!(r->"Type:", "CML Component"));
+    };
+}
+
+fn add_resolved_info_to_table(table: &mut Table, instance: &Instance) {
+    if let Some(resolved) = &instance.resolved {
+        table.add_row(row!(r->"Component State:", Colour::Green.paint("Resolved")));
+        let incoming_capabilities = resolved.incoming_capabilities.join("\n");
+        let exposed_capabilities = resolved.exposed_capabilities.join("\n");
+        table.add_row(row!(r->"Incoming Capabilities:", incoming_capabilities));
+        table.add_row(row!(r->"Exposed Capabilities:", exposed_capabilities));
+
+        if let Some(merkle_root) = &resolved.merkle_root {
+            table.add_row(row!(r->"Merkle root:", merkle_root));
+        }
+
+        if let Some(config) = &resolved.config {
+            if !config.is_empty() {
+                let mut config_table = Table::new();
+                let mut format = *FORMAT_CLEAN;
+                format.padding(0, 0);
+                config_table.set_format(format);
+
+                for field in config {
+                    config_table.add_row(row!(field.key, " -> ", field.value));
+                }
+
+                table.add_row(row!(r->"Configuration:", config_table));
+            }
+        }
+    } else {
+        table.add_row(row!(r->"Component State:", Colour::Red.paint("Unresolved")));
+    }
+}
+
+fn add_started_info_to_table(table: &mut Table, instance: &Instance) {
+    if let Some(Resolved { started: Some(started), .. }) = &instance.resolved {
+        table.add_row(row!(r->"Execution State:", Colour::Green.paint("Running")));
+        table.add_row(row!(r->"Start reason:", started.start_reason));
+
+        if let Some(runtime) = &started.elf_runtime {
+            if let Some(utc_estimate) = &runtime.process_start_time_utc_estimate {
+                table.add_row(row!(r->"Running since:", utc_estimate));
+            } else if let Some(ticks) = &runtime.process_start_time {
+                table.add_row(row!(r->"Running for:", format!("{} ticks", ticks)));
+            }
+
+            table.add_row(row!(r->"Job ID:", runtime.job_id));
+
+            if let Some(process_id) = &runtime.process_id {
+                table.add_row(row!(r->"Process ID:", process_id));
+            }
+        }
+
+        if let Some(outgoing_capabilities) = &started.outgoing_capabilities {
+            let outgoing_capabilities = outgoing_capabilities.join("\n");
+            table.add_row(row!(r->"Outgoing Capabilities:", outgoing_capabilities));
+        }
+    } else {
+        table.add_row(row!(r->"Execution State:", Colour::Red.paint("Stopped")));
     }
 }
 

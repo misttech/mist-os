@@ -3,15 +3,13 @@
 // found in the LICENSE file.
 
 use {
-    ansi_term::Colour,
     anyhow::Result,
-    component_debug::list::{get_all_instances, Instance, InstanceState},
+    component_debug::list::{create_table, get_all_instances, Instance, InstanceState},
     ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query},
     ffx_component_list_args::ComponentListCommand,
     ffx_core::ffx_plugin,
     ffx_writer::Writer,
     fidl_fuchsia_developer_remotecontrol as rc,
-    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
     serde::{Deserialize, Serialize},
 };
 
@@ -50,11 +48,11 @@ pub async fn list(
     #[ffx(machine = Vec<ListComponent>)] mut writer: Writer,
     cmd: ComponentListCommand,
 ) -> Result<()> {
-    let ComponentListCommand { only, verbose } = cmd;
+    let ComponentListCommand { filter, verbose } = cmd;
     let query_proxy = connect_to_realm_query(&rcs_proxy).await?;
     let explorer_proxy = connect_to_realm_explorer(&rcs_proxy).await?;
 
-    let instances = get_all_instances(&explorer_proxy, &query_proxy, only).await?;
+    let instances = get_all_instances(&explorer_proxy, &query_proxy, filter).await?;
 
     if writer.is_machine() {
         let instances: Vec<SerializableInstance> =
@@ -69,27 +67,4 @@ pub async fn list(
         }
     }
     Ok(())
-}
-
-fn create_table(instances: Vec<Instance>) -> Table {
-    let mut table = Table::new();
-    table.set_format(*FORMAT_CLEAN);
-    table.set_titles(row!("Type", "State", "Moniker", "URL"));
-
-    for instance in instances {
-        let component_type = if instance.is_cmx { "CMX" } else { "CML" };
-
-        let state = if instance.state == InstanceState::Started {
-            Colour::Green.paint("Running")
-        } else {
-            Colour::Red.paint("Stopped")
-        };
-        table.add_row(row!(
-            component_type,
-            state,
-            instance.moniker.to_string(),
-            instance.url.unwrap_or_default()
-        ));
-    }
-    table
 }

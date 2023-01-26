@@ -45,11 +45,10 @@ use {argh::FromArgs, component_debug::list::ListFilter, ffx_core::ffx_command};
 
 pub struct ComponentListCommand {
     #[argh(option, long = "only", short = 'o')]
-    /// output only cmx/cml/running/stopped components depending on the flag.
-    pub only: Option<ListFilter>,
+    /// filter the instance list by a criteria: cmx, cml, running, stopped
+    pub filter: Option<ListFilter>,
 
     #[argh(switch, long = "verbose", short = 'v')]
-    /// whether or not to display a column showing component type, a column
-    /// showing running/stopped and a column showing the url.
+    /// show detailed information about each instance
     pub verbose: bool,
 }

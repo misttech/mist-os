@@ -4,9 +4,8 @@
 
 use {
     anyhow::{format_err, Context, Result},
-    component_debug::show::find_instances,
+    component_debug::show::{create_table, find_instances},
     errors::ffx_error,
-    ffx_component_show::create_table,
     ffx_core::ffx_plugin,
     ffx_session_show_args::SessionShowCommand,
     fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_sys2 as fsys,

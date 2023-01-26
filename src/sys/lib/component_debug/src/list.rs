@@ -4,6 +4,7 @@
 
 use {
     crate::io::Directory,
+    ansi_term::Colour,
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
     futures::future::{join, join_all, BoxFuture, FutureExt},
@@ -11,6 +12,7 @@ use {
         AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase, RelativeMoniker,
         RelativeMonikerBase,
     },
+    prettytable::{cell, format::consts::FORMAT_CLEAN, row, Table},
     std::collections::HashSet,
     std::str::FromStr,
 };
@@ -414,6 +416,30 @@ async fn open_all_job_ids(job_ids_dir: Directory) -> Result<Vec<Directory>> {
         .map(|job_id| job_ids_dir.open_dir_readable(&job_id))
         .collect::<Result<Vec<Directory>>>()?;
     Ok(dirs)
+}
+
+/// Creates a verbose table containing information about all instances.
+pub fn create_table(instances: Vec<Instance>) -> Table {
+    let mut table = Table::new();
+    table.set_format(*FORMAT_CLEAN);
+    table.set_titles(row!("Type", "State", "Moniker", "URL"));
+
+    for instance in instances {
+        let component_type = if instance.is_cmx { "CMX" } else { "CML" };
+
+        let state = if instance.state == InstanceState::Started {
+            Colour::Green.paint("Running")
+        } else {
+            Colour::Red.paint("Stopped")
+        };
+        table.add_row(row!(
+            component_type,
+            state,
+            instance.moniker.to_string(),
+            instance.url.unwrap_or_default()
+        ));
+    }
+    table
 }
 
 #[cfg(test)]

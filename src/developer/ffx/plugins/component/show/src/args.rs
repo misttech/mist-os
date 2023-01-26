@@ -22,5 +22,5 @@ following commands are valid:
 pub struct ComponentShowCommand {
     #[argh(positional)]
     /// component URL, moniker or instance ID. Partial matches allowed.
-    pub filter: String,
+    pub query: String,
 }
