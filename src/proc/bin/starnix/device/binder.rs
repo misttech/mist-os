@@ -2141,6 +2141,7 @@ impl BinderTask for RemoteBinderTask {
             ..fbinder::FileRequest::EMPTY
         })?;
         if let Some(mut files) = response.get_responses {
+            // Validate that the server returned a single response, as a single fd was sent.
             if files.len() == 1 {
                 let file = files.pop().unwrap();
                 if let Some(handle) = file.file {
@@ -2165,6 +2166,7 @@ impl BinderTask for RemoteBinderTask {
             ..fbinder::FileRequest::EMPTY
         })?;
         if let Some(fds) = response.add_responses {
+            // Validate that the server returned a single response, as a single file was sent.
             if fds.len() == 1 {
                 let fd = fds[0];
                 return Ok(FdNumber::from_raw(fd));
