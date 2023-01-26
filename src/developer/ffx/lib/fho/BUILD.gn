@@ -41,6 +41,7 @@ rustc_library("lib") {
 
   sources = [
     "src/adapters.rs",
+    "src/from_env.rs",
     "src/lib.rs",
     "src/metadata.rs",
     "src/search.rs",

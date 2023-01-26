@@ -3,11 +3,13 @@
 // found in the LICENSE file.
 
 pub mod adapters;
+mod from_env;
 mod metadata;
 mod search;
 mod subtool;
 pub mod testing;
 
+pub use from_env::*;
 pub use metadata::*;
 pub use search::*;
 pub use subtool::*;
