@@ -15,7 +15,8 @@ executable("bin") {
     "test_thread.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.scheduler",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync",

@@ -4,8 +4,11 @@
 
 #include "test_thread.h"
 
+#include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/result.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/time.h>
 #include <zircon/threads.h>
@@ -37,23 +40,13 @@ TestThread::TestThread(const TestThreadBehavior& behavior, zx::profile profile)
 TestThread::~TestThread() { ZX_ASSERT(!thread_.has_value()); }
 
 zx_status_t TestThread::InitStatics() {
-  {
-    zx::channel channel0, channel1;
-    zx_status_t status;
-
-    if ((status = zx::channel::create(0u, &channel0, &channel1)) != ZX_OK) {
-      return status;
-    }
-
-    if ((status = fdio_service_connect(
-             (std::string("/svc/") + fuchsia::scheduler::ProfileProvider::Name_).c_str(),
-             channel0.release())) != ZX_OK) {
-      return status;
-    }
-
-    profile_provider_ =
-        std::make_unique<fuchsia::scheduler::ProfileProvider_SyncProxy>(std::move(channel1));
+  // Get a handle to the root job.  We will need this in order to create
+  // profiles.
+  zx::result<zx::job> maybe_root_job = GetRootJob();
+  if (maybe_root_job.is_error()) {
+    return maybe_root_job.error_value();
   }
+  root_job_ = std::move(maybe_root_job.value());
 
   // Create the proper number of mutexes and cond_vars, then shuffle the array
   // of object pointers so that the acquisition ordering requirements are
@@ -70,26 +63,50 @@ zx_status_t TestThread::InitStatics() {
   return ZX_OK;
 }
 
+zx::result<zx::job> TestThread::GetRootJob() {
+  auto connect_result = component::Connect<fuchsia_kernel::RootJob>();
+
+  if (connect_result.is_error()) {
+    printf("Failed to connect to RootJob Service (%d)\n", connect_result.status_value());
+    return zx::error(connect_result.status_value());
+  }
+
+  auto response = fidl::WireCall(connect_result.value())->Get();
+  if (response.status() != ZX_OK) {
+    printf("RootJob service failed to grant root job handle (%d)\n", response.status());
+    return zx::error(response.status());
+  }
+
+  return zx::ok(std::move(response.value().job));
+}
+
 zx_status_t TestThread::AddThread(const TestThreadBehavior& behavior) {
   zx::profile profile;
-  zx_status_t fidl_status;
   zx_status_t status;
+  zx_profile_info_t profile_info{};
 
   if (behavior.profile_type == ProfileType::Fair) {
-    status =
-        profile_provider_->GetProfile(behavior.priority, "pi_stress/fair", &fidl_status, &profile);
+    profile_info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
+    profile_info.priority = behavior.priority;
   } else {
-    status =
-        profile_provider_->GetDeadlineProfile(behavior.capacity, behavior.deadline, behavior.period,
-                                              "pi_stress/deadline", &fidl_status, &profile);
+    profile_info.flags = ZX_PROFILE_INFO_FLAG_DEADLINE;
+    profile_info.deadline_params.capacity = behavior.capacity;
+    profile_info.deadline_params.relative_deadline = behavior.deadline;
+    profile_info.deadline_params.period = behavior.period;
   }
+
+  status = zx::profile::create(root_job_, 0, &profile_info, &profile);
 
   if (status != ZX_OK) {
+    if (behavior.profile_type == ProfileType::Fair) {
+      profile_info.flags = ZX_PROFILE_INFO_FLAG_PRIORITY;
+      printf("Failed to create Fair profile with priority %u\n", profile_info.priority);
+    } else {
+      printf("Failed to create Deadline profile with capacity(%ld) deadline(%ld) period(%ld)\n",
+             profile_info.deadline_params.capacity, profile_info.deadline_params.relative_deadline,
+             profile_info.deadline_params.period);
+    }
     return status;
-  }
-
-  if (fidl_status != ZX_OK) {
-    return fidl_status;
   }
 
   threads_.emplace_back(std::unique_ptr<TestThread>(new TestThread(behavior, std::move(profile))));
@@ -111,8 +128,6 @@ void TestThread::Shutdown() {
     t->Join();
   }
   threads_.clear();
-
-  profile_provider_.reset();
 }
 
 TestThread& TestThread::random_thread() {
