@@ -6,6 +6,7 @@ import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 source_set("sys_driver_cpp") {
   public_deps = [
+    ":connection",
     "$magma_build_root/include:magma",
     "$magma_build_root/include:msd",
     "$magma_build_root/src/magma_util:macros",
@@ -29,13 +30,41 @@ source_set("sys_driver_cpp") {
   ]
 
   deps = [
-    "$magma_build_root/src/magma_util/platform:connection",
     "$magma_build_root/src/magma_util/platform:device",
+    "$magma_build_root/src/magma_util/platform:event",
     "$magma_build_root/src/magma_util/platform:object",
     "$magma_build_root/src/magma_util/platform:semaphore",
     "$magma_build_root/src/magma_util/platform:thread",
     "$magma_build_root/src/magma_util/platform:trace",
   ]
+}
+
+source_set("connection") {
+  configs += [
+    "//src/graphics/lib/magma/src/magma_util/platform:platform_include_config",
+  ]
+
+  sources = [
+    "zircon_connection.cc",
+    "zircon_connection.h",
+  ]
+
+  public_deps = [
+    "$magma_build_root/include:msd",
+    "$magma_build_root/src/magma_util:macros",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/lib/stdcompat",
+    "//src/graphics/lib/magma/src/magma_util/platform:object",
+    "//src/graphics/lib/magma/src/magma_util/platform:thread",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:event",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+    "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/zx",
+  ]
+
+  # Fidl bindings should not introduce a dep on libasync-default.so
+  assert_no_deps = [ "//zircon/system/ulib/async-default" ]
 }
 
 source_set("device_impl") {

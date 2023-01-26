@@ -13,8 +13,8 @@
 #include "magma_system_buffer.h"
 #include "magma_system_context.h"
 #include "magma_util/macros.h"
-#include "magma_util/platform/platform_connection.h"
 #include "msd.h"
+#include "zircon_connection.h"
 
 using msd_connection_unique_ptr_t =
     std::unique_ptr<msd_connection_t, decltype(&msd_connection_close)>;
@@ -26,7 +26,7 @@ static inline msd_connection_unique_ptr_t MsdConnectionUniquePtr(msd_connection_
 class MagmaSystemDevice;
 
 class MagmaSystemConnection : private MagmaSystemContext::Owner,
-                              public magma::PlatformConnection::Delegate {
+                              public magma::ZirconConnection::Delegate {
  public:
   MagmaSystemConnection(std::weak_ptr<MagmaSystemDevice> device,
                         msd_connection_unique_ptr_t msd_connection_t);

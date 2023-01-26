@@ -8,6 +8,7 @@
 #include "magma_util/macros.h"
 #include "platform_handle.h"
 #include "platform_object.h"
+#include "zircon_connection.h"
 
 uint32_t MagmaSystemDevice::GetDeviceId() {
   uint64_t result;
@@ -19,7 +20,7 @@ uint32_t MagmaSystemDevice::GetDeviceId() {
   return static_cast<uint32_t>(result);
 }
 
-std::shared_ptr<magma::PlatformConnection> MagmaSystemDevice::Open(
+std::shared_ptr<magma::ZirconConnection> MagmaSystemDevice::Open(
     std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
     std::unique_ptr<magma::PlatformHandle> server_endpoint,
     std::unique_ptr<magma::PlatformHandle> server_notification_endpoint) {
@@ -27,18 +28,18 @@ std::shared_ptr<magma::PlatformConnection> MagmaSystemDevice::Open(
   if (!msd_connection)
     return DRETP(nullptr, "msd_device_open failed");
 
-  return magma::PlatformConnection::Create(
+  return magma::ZirconConnection::Create(
       std::make_unique<MagmaSystemConnection>(std::move(device),
                                               MsdConnectionUniquePtr(msd_connection)),
       client_id, std::move(server_endpoint), std::move(server_notification_endpoint));
 }
 
 void MagmaSystemDevice::StartConnectionThread(
-    std::shared_ptr<magma::PlatformConnection> platform_connection, void* device_handle) {
+    std::shared_ptr<magma::ZirconConnection> platform_connection, void* device_handle) {
   std::unique_lock<std::mutex> lock(connection_list_mutex_);
 
   auto shutdown_event = platform_connection->ShutdownEvent();
-  std::thread thread(magma::PlatformConnection::RunLoop, std::move(platform_connection),
+  std::thread thread(magma::ZirconConnection::RunLoop, std::move(platform_connection),
                      device_handle);
 
   connection_map_->insert(std::pair<std::thread::id, Connection>(
@@ -89,9 +90,9 @@ magma::Status MagmaSystemDevice::Query(uint64_t id, magma_handle_t* result_buffe
                                        uint64_t* result_out) {
   switch (id) {
     case MAGMA_QUERY_MAXIMUM_INFLIGHT_PARAMS:
-      *result_out = magma::PlatformConnection::kMaxInflightMessages;
+      *result_out = magma::ZirconConnection::kMaxInflightMessages;
       *result_out <<= 32;
-      *result_out |= magma::PlatformConnection::kMaxInflightMemoryMB;
+      *result_out |= magma::ZirconConnection::kMaxInflightMemoryMB;
       return MAGMA_STATUS_OK;
   }
   return msd_device_query(msd_dev(), id, result_buffer_out, result_out);

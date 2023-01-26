@@ -14,10 +14,10 @@
 
 #include "magma_system_connection.h"
 #include "msd.h"
-#include "platform_connection.h"
 #include "platform_event.h"
 #include "platform_handle.h"
 #include "platform_thread.h"
+#include "zircon_connection.h"
 
 using msd_device_unique_ptr_t = std::unique_ptr<msd_device_t, decltype(&msd_device_destroy)>;
 
@@ -40,7 +40,7 @@ class MagmaSystemDevice {
 
   // Opens a connection to the device. On success, returns the connection handle
   // to be passed to the client.
-  static std::shared_ptr<magma::PlatformConnection> Open(
+  static std::shared_ptr<magma::ZirconConnection> Open(
       std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
       std::unique_ptr<magma::PlatformHandle> server_endpoint,
       std::unique_ptr<magma::PlatformHandle> server_notification_endpoint);
@@ -55,7 +55,7 @@ class MagmaSystemDevice {
 
   // Called on driver thread.  |device_handle| may be used by the connection thread for
   // initialization/configuration but should not be retained.
-  void StartConnectionThread(std::shared_ptr<magma::PlatformConnection> platform_connection,
+  void StartConnectionThread(std::shared_ptr<magma::ZirconConnection> platform_connection,
                              void* device_handle);
 
   // Called on connection thread
