@@ -256,6 +256,7 @@ TEST(OutputDevicePipelineTest, EmptyNoLoopback) {
   DeleteCreateGainControlCalls(h.server->calls());
   EXPECT_EQ(h.server->calls().size(), 3u);
 
+  EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::MEDIA), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::SYSTEM_AGENT), kMixerId);
@@ -355,6 +356,7 @@ TEST(OutputDevicePipelineTest, MultilevelWithEffectsAndLoopback) {
   DeleteCreateGainControlCalls(h.server->calls());
   EXPECT_EQ(h.server->calls().size(), 11u);
 
+  EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kLinearizeMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::MEDIA), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::SYSTEM_AGENT), kMixMixerId);
@@ -505,6 +507,7 @@ TEST(OutputDevicePipelineTest, UpsampleAfterLoopback) {
   DeleteCreateGainControlCalls(h.server->calls());
   EXPECT_EQ(h.server->calls().size(), 7u);
 
+  EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kLinearizeMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::MEDIA), kMixMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::SYSTEM_AGENT), kMixMixerId);
@@ -624,6 +627,7 @@ TEST(OutputDevicePipelineTest, RechannelEffects) {
   DeleteCreateGainControlCalls(h.server->calls());
   EXPECT_EQ(h.server->calls().size(), 7u);
 
+  EXPECT_EQ(pipeline->consumer_node(), kConsumerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::BACKGROUND), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::MEDIA), kMixerId);
   EXPECT_EQ(pipeline->DestNodeForUsage(RenderUsage::SYSTEM_AGENT), kMixerId);

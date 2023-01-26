@@ -182,6 +182,8 @@ TEST(InputDevicePipelineTest, CreateForDevice) {
   static constexpr NodeId kStereoMixerId = 3;
   static constexpr NodeId kStereoSplitterId = 4;
 
+  EXPECT_EQ(pipeline->producer_node(), kProducerId);
+
   // Formats match the device.
   EXPECT_EQ(pipeline->SourceNodeForFormat(kFormatIntMono), kRootSplitterId);
   EXPECT_EQ(pipeline->SourceNodeForFormat(kFormatFloatMono), kRootSplitterId);
@@ -301,6 +303,8 @@ TEST(InputDevicePipelineTest, CreateForLoopback) {
   h.loop.RunUntilIdle();
   ASSERT_TRUE(pipeline);
 
+  EXPECT_EQ(pipeline->producer_node(), std::nullopt);
+
   EXPECT_TRUE(pipeline->SupportsUsage(CaptureUsage::LOOPBACK));
   EXPECT_FALSE(pipeline->SupportsUsage(CaptureUsage::BACKGROUND));
   EXPECT_FALSE(pipeline->SupportsUsage(CaptureUsage::FOREGROUND));
@@ -411,6 +415,8 @@ TEST(InputDevicePipelineTest, ConcurrentCreateSourceNode) {
   });
   h.loop.RunUntilIdle();
   ASSERT_TRUE(pipeline);
+
+  EXPECT_EQ(pipeline->producer_node(), std::nullopt);
 
   EXPECT_TRUE(pipeline->SupportsUsage(CaptureUsage::LOOPBACK));
   EXPECT_FALSE(pipeline->SupportsUsage(CaptureUsage::BACKGROUND));

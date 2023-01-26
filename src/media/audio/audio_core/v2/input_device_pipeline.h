@@ -116,6 +116,9 @@ class InputDevicePipeline : public std::enable_shared_from_this<InputDevicePipel
   // Returns a volume control for the given usage, or nullptr if `!SupportedUsage(usage)`.
   std::shared_ptr<UsageVolume> UsageVolumeForUsage(media::audio::CaptureUsage usage) const;
 
+  // Returns the ProducerNode at the root of this pipeline, or std::nullopt for loopback pipelines.
+  std::optional<NodeId> producer_node() const { return producer_node_; }
+
   // Returns this pipeline's volume curve.
   std::shared_ptr<media::audio::VolumeCurve> volume_curve() const { return volume_curve_; }
 

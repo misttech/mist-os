@@ -83,6 +83,9 @@ class OutputDevicePipeline : public std::enable_shared_from_this<OutputDevicePip
   // Returns a volume control for the given usage, or nullptr if `!SupportedUsage(usage)`.
   std::shared_ptr<UsageVolume> UsageVolumeForUsage(media::audio::RenderUsage usage) const;
 
+  // Returns the ConsumerNode at the root of this pipeline.
+  NodeId consumer_node() const { return consumer_node_; }
+
   // Returns the loopback interface, or `nullptr` if this output pipeline does not support loopback.
   std::shared_ptr<InputDevicePipeline> loopback() const { return loopback_; }
 
