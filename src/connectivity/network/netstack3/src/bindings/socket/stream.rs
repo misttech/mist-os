@@ -56,8 +56,8 @@ use packet_formats::utils::NonZeroDuration;
 use crate::bindings::{
     socket::{IntoErrno, IpSockAddrExt, SockAddr, ZXSIO_SIGNAL_CONNECTED, ZXSIO_SIGNAL_INCOMING},
     util::{
-        DeviceNotFoundError, IntoFidl, NeedsDataNotifier, NeedsDataWatcher, TryFromFidlWithContext,
-        TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
+        ConversionContext, DeviceNotFoundError, NeedsDataNotifier, NeedsDataWatcher,
+        TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
     StackTime,
 };
@@ -626,7 +626,6 @@ where
         let ip = ip.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS));
         let (connection, socket, watcher) = match self.id {
             SocketId::Bound(bound, LocalZirconSocketAndNotifier(ref socket, ref notifier)) => {
-                let (ip, _): (_, Option<DeviceId<StackTime>>) = ip.into_addr_zone();
                 let connection = connect_bound::<I, _>(
                     sync_ctx,
                     non_sync_ctx,
@@ -773,11 +772,11 @@ where
             SocketId::Listener(listener) => {
                 let mut guard = self.ctx.lock().await;
                 let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
-                let (accepted, SocketAddr { ip, port }, peer) =
-                    accept::<I, _>(sync_ctx, non_sync_ctx, listener)
-                        .map_err(IntoErrno::into_errno)?;
-                let addr =
-                    <I::SocketAddress as SockAddr>::new(Some(ZonedAddr::Unzoned(ip)), port.get());
+                let (accepted, addr, peer) = accept::<I, _>(sync_ctx, non_sync_ctx, listener)
+                    .map_err(IntoErrno::into_errno)?;
+                let addr = addr
+                    .try_into_fidl_with_ctx(&non_sync_ctx)
+                    .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"));
                 let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
                 let (client, request_stream) =
                     fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>()
@@ -1344,15 +1343,23 @@ where
     }
 }
 
-impl<A: IpAddress> TryIntoFidl<<A::Version as IpSockAddrExt>::SocketAddress> for SocketAddr<A>
+impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::SocketAddress>
+    for SocketAddr<A, D>
 where
     A::Version: IpSockAddrExt,
+    D: TryIntoFidlWithContext<
+        <<A::Version as IpSockAddrExt>::SocketAddress as SockAddr>::Zone,
+        Error = DeviceNotFoundError,
+    >,
 {
-    type Error = Never;
+    type Error = DeviceNotFoundError;
 
-    fn try_into_fidl(self) -> Result<<A::Version as IpSockAddrExt>::SocketAddress, Self::Error> {
+    fn try_into_fidl_with_ctx<C: ConversionContext>(
+        self,
+        ctx: &C,
+    ) -> Result<<A::Version as IpSockAddrExt>::SocketAddress, Self::Error> {
         let Self { ip, port } = self;
-        Ok((Some(ip), port).into_fidl())
+        Ok((ip, port).try_into_fidl_with_ctx(ctx)?)
     }
 }
 

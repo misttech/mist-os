@@ -4,16 +4,16 @@
 
 //! Generate initial sequence numbers securely.
 
-use core::hash::{Hash, Hasher};
+use core::{
+    hash::{Hash, Hasher},
+    num::NonZeroU16,
+};
 
-use net_types::ip::IpAddress;
+use net_types::{ip::IpAddress, SpecifiedAddr};
 use rand::RngCore;
 use siphasher::sip128::SipHasher24;
 
-use crate::{
-    transport::tcp::{seqnum::SeqNum, socket::SocketAddr},
-    Instant,
-};
+use crate::{transport::tcp::seqnum::SeqNum, Instant};
 
 /// A generator of TCP initial sequence numbers.
 #[derive(Default)]
@@ -39,8 +39,8 @@ impl<I: Instant> IsnGenerator<I> {
     pub(crate) fn generate<A: IpAddress>(
         &self,
         now: I,
-        local: SocketAddr<A>,
-        remote: SocketAddr<A>,
+        local: (SpecifiedAddr<A>, NonZeroU16),
+        remote: (SpecifiedAddr<A>, NonZeroU16),
     ) -> SeqNum {
         let Self { secret, timestamp } = self;
 

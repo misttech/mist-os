@@ -2514,22 +2514,21 @@ async fn send_to_remote_with_zone<N: Netstack>(name: &str) {
     .await
 }
 
-#[netstack_test]
-async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
-    match N::VERSION {
-        NetstackVersion::Netstack2
-        | NetstackVersion::ProdNetstack2
-        | NetstackVersion::Netstack2WithFastUdp => (),
-        NetstackVersion::Netstack3 => {
-            // TODO(https://fxbug.dev/100759): Re-enable this once Netstack3
-            // supports fallible device access.
-            return;
-        }
-    }
-
+async fn tcp_communicate_with_remote_with_zone<
+    N: Netstack,
+    M: for<'a, 's> Fn(
+        &'s netemul::TestRealm<'a>,
+        &'s Interface<'a, net_types::ip::Ipv6Addr>,
+        net_types::ip::Ipv6Addr,
+    ) -> LocalBoxFuture<'s, fasync::net::TcpStream>,
+>(
+    name: &str,
+    make_multinic_conn: M,
+) {
     const PORT: u16 = 80;
     const NUM_BYTES: usize = 10;
 
+    let make_multinic_conn = &make_multinic_conn;
     with_multinic_and_peer_networks::<N, net_types::ip::Ipv6, _>(
         name,
         2,
@@ -2553,16 +2552,9 @@ async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
 
                 let _: Vec<()> = join_all(interfaces_and_listeners.into_iter().map(
                     |(multinic_interface, (peer_listener, peer_ip))| async move {
-                        let Interface { iface: interface, ip: _ } = multinic_interface;
-                        let id: u8 = interface.id().try_into().unwrap();
-                        let mut host_conn = fasync::net::TcpStream::connect_in_realm(
-                            multinic,
-                            std::net::SocketAddrV6::new(peer_ip.clone().into(), PORT, 0, id.into())
-                                .into(),
-                        )
-                        .await
-                        .expect("can connect");
-
+                        let mut host_conn =
+                            make_multinic_conn(multinic, multinic_interface, peer_ip).await;
+                        let id: u8 = multinic_interface.iface.id().try_into().unwrap();
                         let data = [id; NUM_BYTES];
                         let (_peer_listener, mut peer_conn, _) =
                             peer_listener.accept().await.expect("receive connection");
@@ -2581,5 +2573,65 @@ async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
             })
         },
     )
+    .await
+}
+
+#[netstack_test]
+async fn tcp_connect_to_remote_with_zone<N: Netstack>(name: &str) {
+    match N::VERSION {
+        NetstackVersion::Netstack2
+        | NetstackVersion::ProdNetstack2
+        | NetstackVersion::Netstack2WithFastUdp => (),
+        NetstackVersion::Netstack3 => {
+            // TODO(https://fxbug.dev/100759): Re-enable this once Netstack3
+            // supports fallible device access.
+            return;
+        }
+    }
+    const PORT: u16 = 80;
+    const NUM_BYTES: usize = 10;
+
+    tcp_communicate_with_remote_with_zone::<N, _>(name, |realm, interface, peer_ip| {
+        Box::pin(async move {
+            let Interface { iface: interface, ip: _ } = interface;
+            let id: u8 = interface.id().try_into().unwrap();
+            fasync::net::TcpStream::connect_in_realm(
+                realm,
+                std::net::SocketAddrV6::new(peer_ip.clone().into(), PORT, 0, id.into()).into(),
+            )
+            .await
+            .expect("can connect")
+        })
+    })
+    .await
+}
+
+#[netstack_test]
+#[ignore]
+// Skip this test on Netstack2 since the second bind fails with an address
+// conflict.
+// TODO(https://github.com/google/gvisor/issues/8390): Un-skip this for
+// Netstack2.
+// TODO(https://fxbug.dev/100759): Re-enable this for Netstack3 once it supports
+// fallible device access.
+async fn tcp_bind_with_zone_connect_unzoned<N: Netstack>(name: &str) {
+    const PORT: u16 = 80;
+    const NUM_BYTES: usize = 10;
+
+    tcp_communicate_with_remote_with_zone::<N, _>(name, |realm, interface, peer_ip| {
+        Box::pin(async move {
+            let Interface { iface: interface, ip } = interface;
+            let id: u8 = interface.id().try_into().unwrap();
+            let socket = TcpSocket::new_in_realm::<Ipv6>(realm).await.expect("create TCP socket");
+            socket
+                .bind(&std::net::SocketAddrV6::new(ip.clone().into(), PORT, 0, id.into()).into())
+                .expect("no conflict");
+            let remote_addr = std::net::SocketAddrV6::new(peer_ip.clone().into(), PORT, 0, 0);
+            fasync::net::TcpStream::connect_from_raw(socket, remote_addr.into())
+                .expect("is connected")
+                .await
+                .expect("connected")
+        })
+    })
     .await
 }

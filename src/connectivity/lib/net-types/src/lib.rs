@@ -962,6 +962,10 @@ impl<A: IpAddress, I: Ip, D> GenericOverIp<I> for ZonedAddr<A, D> {
     type Type = ZonedAddr<I::Addr, D>;
 }
 
+impl<A: IpAddress, I: Ip, Z> GenericOverIp<I> for AddrAndZone<A, Z> {
+    type Type = AddrAndZone<I::Addr, Z>;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

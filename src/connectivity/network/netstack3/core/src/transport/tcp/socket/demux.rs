@@ -37,7 +37,7 @@ use crate::{
         socket::{
             do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, Listener,
             ListenerId, MaybeClosedConnectionId, MaybeListener, MaybeListenerId, NonSyncContext,
-            SharingState, SocketAddr, Sockets, SyncContext, TcpIpTransportContext, TimerId,
+            SharingState, Sockets, SyncContext, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
         BufferSizes, Control, KeepAlive, SocketOptions, UserError,
@@ -405,8 +405,8 @@ where
 
     let isn = isn.generate(
         now,
-        SocketAddr { ip: ip_sock.local_ip().clone(), port: local_port },
-        SocketAddr { ip: ip_sock.remote_ip().clone(), port: remote_port },
+        (ip_sock.local_ip().clone(), local_port),
+        (ip_sock.remote_ip().clone(), remote_port),
     );
 
     let mut state = State::Listen(Closed::<Initial>::listen(isn, buffer_sizes.clone()));

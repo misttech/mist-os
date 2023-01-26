@@ -190,21 +190,23 @@ pub(crate) trait SyncContext<I: IpExt, C: NonSyncContext>: IpDeviceIdContext<I> 
 
 /// Socket address includes the ip address and the port number.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, GenericOverIp)]
-pub struct SocketAddr<A: IpAddress> {
+pub struct SocketAddr<A: IpAddress, D> {
     /// The IP component of the address.
-    pub ip: SpecifiedAddr<A>,
+    pub ip: ZonedAddr<A, D>,
     /// The port component of the address.
     pub port: NonZeroU16,
 }
 
-impl<A: IpAddress> From<SocketAddr<A>> for IpAddr<SocketAddr<Ipv4Addr>, SocketAddr<Ipv6Addr>> {
-    fn from(
-        SocketAddr { ip, port }: SocketAddr<A>,
-    ) -> IpAddr<SocketAddr<Ipv4Addr>, SocketAddr<Ipv6Addr>> {
-        match ip.into() {
-            IpAddr::V4(ip) => IpAddr::V4(SocketAddr { ip, port }),
-            IpAddr::V6(ip) => IpAddr::V6(SocketAddr { ip, port }),
-        }
+impl<A: IpAddress, D> From<SocketAddr<A, D>>
+    for IpAddr<SocketAddr<Ipv4Addr, D>, SocketAddr<Ipv6Addr, D>>
+{
+    fn from(addr: SocketAddr<A, D>) -> IpAddr<SocketAddr<Ipv4Addr, D>, SocketAddr<Ipv6Addr, D>> {
+        let IpInvariant(addr) = <A::Version as Ip>::map_ip(
+            addr,
+            |i| IpInvariant(IpAddr::V4(i)),
+            |i| IpInvariant(IpAddr::V6(i)),
+        );
+        addr
     }
 }
 
@@ -629,13 +631,16 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
         &mut self,
         _ctx: &mut C,
         id: ListenerId<I>,
-    ) -> Result<(ConnectionId<I>, SocketAddr<I::Addr>, C::ReturnedBuffers), AcceptError>;
+    ) -> Result<
+        (ConnectionId<I>, SocketAddr<I::Addr, Self::DeviceId>, C::ReturnedBuffers),
+        AcceptError,
+    >;
 
     fn connect_bound(
         &mut self,
         ctx: &mut C,
         id: BoundId<I>,
-        remote: SocketAddr<I::Addr>,
+        remote: SocketAddr<I::Addr, Self::DeviceId>,
         netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError>;
 
@@ -804,7 +809,10 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
         &mut self,
         _ctx: &mut C,
         id: ListenerId<I>,
-    ) -> Result<(ConnectionId<I>, SocketAddr<I::Addr>, C::ReturnedBuffers), AcceptError> {
+    ) -> Result<
+        (ConnectionId<I>, SocketAddr<I::Addr, Self::DeviceId>, C::ReturnedBuffers),
+        AcceptError,
+    > {
         self.with_tcp_sockets_mut(|sockets| {
             let listener = sockets.get_listener_by_id_mut(id).expect("invalid listener id");
             let (conn_id, client_buffers) =
@@ -812,8 +820,13 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
             let (conn, SharingState, conn_addr) =
                 conn_id.get_from_socketmap_mut(&mut sockets.socketmap);
             conn.acceptor = None;
-            let (remote_ip, remote_port) = conn_addr.ip.remote;
-            Ok((conn_id, SocketAddr { ip: remote_ip, port: remote_port }, client_buffers))
+            let ConnAddr { ip: ConnIpAddr { local: _, remote }, device } = conn_addr;
+            let (remote_ip, remote_port) = *remote;
+            Ok((
+                conn_id,
+                SocketAddr { ip: maybe_zoned(remote_ip, device), port: remote_port },
+                client_buffers,
+            ))
         })
     }
 
@@ -821,25 +834,29 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
         &mut self,
         ctx: &mut C,
         id: BoundId<I>,
-        remote: SocketAddr<I::Addr>,
+        remote: SocketAddr<I::Addr, Self::DeviceId>,
         netstack_buffers: C::ProvidedBuffers,
     ) -> Result<ConnectionId<I>, ConnectError> {
         let bound_id = MaybeListenerId::from(id);
+        let SocketAddr { ip: remote_ip, port: remote_port } = remote;
         self.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
             |ip_transport_ctx, isn, sockets| {
                 let (bound, SharingState, bound_addr) =
                     sockets.socketmap.listeners().get_by_id(&bound_id).expect("invalid socket id");
                 let bound = assert_matches!(bound, MaybeListener::Bound(b) => b);
                 let BoundState { buffer_sizes, socket_options } = bound.clone();
-                let ListenerAddr { ip, device } = bound_addr;
+                let ListenerAddr { ip, device: bound_device } = bound_addr;
                 let ListenerIpAddr { addr: local_ip, identifier: local_port } = *ip;
+
+                let (remote_ip, device) =
+                    crate::transport::resolve_addr_with_device(remote_ip, bound_device.as_ref())?;
 
                 let ip_sock = ip_transport_ctx
                     .new_ip_socket(
                         ctx,
                         device.as_ref(),
                         local_ip,
-                        remote.ip,
+                        remote_ip,
                         IpProto::Tcp.into(),
                         DefaultSendOptions,
                     )
@@ -856,7 +873,7 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                     ip_sock,
                     device,
                     local_port,
-                    remote.port,
+                    remote_port,
                     netstack_buffers,
                     buffer_sizes.clone(),
                     socket_options.clone(),
@@ -1562,7 +1579,10 @@ pub fn accept<I: Ip, C>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: ListenerId<I>,
-) -> Result<(ConnectionId<I>, SocketAddr<I::Addr>, C::ReturnedBuffers), AcceptError>
+) -> Result<
+    (ConnectionId<I>, SocketAddr<I::Addr, DeviceId<C::Instant>>, C::ReturnedBuffers),
+    AcceptError,
+>
 where
     C: crate::NonSyncContext,
 {
@@ -1602,7 +1622,7 @@ pub fn connect_bound<I, C>(
     mut sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: BoundId<I>,
-    remote: SocketAddr<I::Addr>,
+    remote: SocketAddr<I::Addr, DeviceId<C::Instant>>,
     netstack_buffers: C::ProvidedBuffers,
 ) -> Result<ConnectionId<I>, ConnectError>
 where
@@ -1683,8 +1703,8 @@ where
 {
     let isn = isn.generate(
         ctx.now(),
-        SocketAddr { ip: ip_sock.local_ip().clone(), port: local_port },
-        SocketAddr { ip: ip_sock.remote_ip().clone(), port: remote_port },
+        (ip_sock.local_ip().clone(), local_port),
+        (ip_sock.remote_ip().clone(), remote_port),
     );
     let conn_addr = ConnAddr {
         ip: ConnIpAddr {
@@ -1831,9 +1851,9 @@ pub struct BoundInfo<A: IpAddress, D> {
 #[derive(Clone, Debug, Eq, PartialEq, GenericOverIp)]
 pub struct ConnectionInfo<A: IpAddress, D> {
     /// The local address the socket is bound to.
-    pub local_addr: (ZonedAddr<A, D>, NonZeroU16),
+    pub local_addr: SocketAddr<A, D>,
     /// The remote address the socket is connected to.
-    pub remote_addr: (ZonedAddr<A, D>, NonZeroU16),
+    pub remote_addr: SocketAddr<A, D>,
     /// The device the socket is bound to.
     pub device: Option<D>,
 }
@@ -1868,7 +1888,10 @@ impl<A: IpAddress, D: Clone> From<ListenerAddr<A, D, NonZeroU16>> for BoundInfo<
 impl<A: IpAddress, D: Clone> From<ConnAddr<A, D, NonZeroU16, NonZeroU16>> for ConnectionInfo<A, D> {
     fn from(addr: ConnAddr<A, D, NonZeroU16, NonZeroU16>) -> Self {
         let ConnAddr { ip: ConnIpAddr { local, remote }, device } = addr;
-        let convert = |(ip, port): (SpecifiedAddr<A>, NonZeroU16)| (maybe_zoned(ip, &device), port);
+        let convert = |(ip, port): (SpecifiedAddr<A>, NonZeroU16)| SocketAddr {
+            ip: maybe_zoned(ip, &device),
+            port,
+        };
         Self { local_addr: convert(local), remote_addr: convert(remote), device }
     }
 }
@@ -2548,7 +2571,7 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     conn,
-                    SocketAddr { ip: I::FAKE_CONFIG.remote_ip, port: PORT_1 },
+                    SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 },
                     client_ends.clone(),
                 )
                 .expect("failed to connect")
@@ -2593,9 +2616,12 @@ mod tests {
                 SocketHandler::accept(sync_ctx, non_sync_ctx, server).expect("failed to accept")
             });
         if bind_client {
-            assert_eq!(addr, SocketAddr { ip: I::FAKE_CONFIG.local_ip, port: PORT_1 });
+            assert_eq!(
+                addr,
+                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: PORT_1 }
+            );
         } else {
-            assert_eq!(addr.ip, I::FAKE_CONFIG.local_ip);
+            assert_eq!(addr.ip, ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip));
         }
 
         let mut assert_connected = |name: &'static str, conn_id: ConnectionId<I>| {
@@ -2791,6 +2817,35 @@ mod tests {
         });
     }
 
+    #[test]
+    fn connect_bound_requires_zone() {
+        let ll_ip = LinkLocalAddr::new(net_ip_v6!("fe80::1")).unwrap().into_specified();
+
+        let TcpCtx { mut sync_ctx, mut non_sync_ctx } =
+            TcpCtx::<Ipv6, _>::with_sync_ctx(TcpSyncCtx::new(
+                Ipv6::FAKE_CONFIG.local_ip,
+                Ipv6::FAKE_CONFIG.remote_ip,
+                Ipv6::FAKE_CONFIG.subnet.prefix(),
+            ));
+        let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
+        let bound = SocketHandler::bind(&mut sync_ctx, &mut non_sync_ctx, unbound, None, None)
+            .expect("bind succeeds");
+        assert_matches!(
+            SocketHandler::connect_bound(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                bound,
+                SocketAddr { ip: ZonedAddr::Unzoned(ll_ip), port: PORT_1 },
+                Default::default(),
+            ),
+            Err(ConnectError::Zone(ZonedAddressError::RequiredZoneNotProvided))
+        );
+
+        sync_ctx.with_tcp_sockets(|sockets| {
+            assert_matches!(sockets.socketmap.listeners().get_by_id(&bound.into()), Some(_));
+        });
+    }
+
     // The test verifies that if client tries to connect to a closed port on
     // server, the connection is aborted and RST is received.
     #[ip_test]
@@ -2812,7 +2867,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 conn,
-                SocketAddr { ip: I::FAKE_CONFIG.remote_ip, port: PORT_1 },
+                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_1 },
                 Default::default(),
             )
             .expect("failed to connect")
@@ -3013,15 +3068,15 @@ mod tests {
                 I::FAKE_CONFIG.remote_ip,
                 I::FAKE_CONFIG.subnet.prefix(),
             ));
-        let local = SocketAddr { ip: I::FAKE_CONFIG.local_ip, port: PORT_1 };
-        let remote = SocketAddr { ip: I::FAKE_CONFIG.remote_ip, port: PORT_2 };
+        let local = SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), port: PORT_1 };
+        let remote = SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), port: PORT_2 };
 
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
         let bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            Some(ZonedAddr::Unzoned(local.ip)),
+            Some(local.ip),
             Some(local.port),
         )
         .expect("bind should succeed");
@@ -3037,11 +3092,7 @@ mod tests {
 
         assert_eq!(
             SocketHandler::get_connection_info(&sync_ctx, connected),
-            ConnectionInfo {
-                local_addr: (ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip), PORT_1),
-                remote_addr: (ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip), PORT_2),
-                device: None
-            }
+            ConnectionInfo { local_addr: local, remote_addr: remote, device: None }
         );
     }
 
@@ -3119,9 +3170,12 @@ mod tests {
         let device = assert_matches!(device, Some(device) => device);
         assert_eq!(
             local_addr,
-            (ZonedAddr::Zoned(AddrAndZone::new(*server_ip, device).unwrap()), PORT_1)
+            SocketAddr {
+                ip: ZonedAddr::Zoned(AddrAndZone::new(*server_ip, device).unwrap()),
+                port: PORT_1
+            }
         );
-        let (remote_ip, _remote_port) = remote_addr;
+        let SocketAddr { ip: remote_ip, port: _ } = remote_addr;
         assert_eq!(remote_ip, ZonedAddr::Zoned(AddrAndZone::new(*client_ip, device).unwrap()));
     }
 
@@ -3135,45 +3189,47 @@ mod tests {
                 remote_ip,
                 Ipv6::LINK_LOCAL_UNICAST_SUBNET.prefix(),
             ));
-        let local = SocketAddr { ip: local_ip, port: PORT_1 };
-        let remote = SocketAddr { ip: remote_ip, port: PORT_2 };
 
-        let local_addr = ZonedAddr::Zoned(AddrAndZone::new(*local.ip, FakeDeviceId).unwrap());
+        let local_addr = SocketAddr {
+            ip: ZonedAddr::Zoned(AddrAndZone::new(*local_ip, FakeDeviceId).unwrap()),
+            port: PORT_1,
+        };
+        let remote_addr = SocketAddr {
+            ip: ZonedAddr::Zoned(AddrAndZone::new(*remote_ip, FakeDeviceId).unwrap()),
+            port: PORT_2,
+        };
 
         let unbound = SocketHandler::create_socket(&mut sync_ctx, &mut non_sync_ctx);
         let bound = SocketHandler::bind(
             &mut sync_ctx,
             &mut non_sync_ctx,
             unbound,
-            Some(local_addr),
-            Some(local.port),
+            Some(local_addr.ip),
+            Some(local_addr.port),
         )
         .expect("bind should succeed");
 
         assert_eq!(
             SocketHandler::get_bound_info(&sync_ctx, bound),
-            BoundInfo { addr: Some(local_addr), port: PORT_1, device: Some(FakeDeviceId) }
+            BoundInfo {
+                addr: Some(local_addr.ip),
+                port: local_addr.port,
+                device: Some(FakeDeviceId)
+            }
         );
 
         let connected = SocketHandler::connect_bound(
             &mut sync_ctx,
             &mut non_sync_ctx,
             bound,
-            remote,
+            remote_addr,
             Default::default(),
         )
         .expect("connect should succeed");
 
         assert_eq!(
             SocketHandler::get_connection_info(&sync_ctx, connected),
-            ConnectionInfo {
-                local_addr: (local_addr, PORT_1),
-                remote_addr: (
-                    ZonedAddr::Zoned(AddrAndZone::new(*remote_ip, FakeDeviceId).unwrap()),
-                    PORT_2
-                ),
-                device: Some(FakeDeviceId)
-            }
+            ConnectionInfo { local_addr, remote_addr, device: Some(FakeDeviceId) }
         );
     }
 
