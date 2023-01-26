@@ -72,7 +72,7 @@ To explore the capabilities of the target component, navigate to the `/ns` direc
 in the component's interactive shell. The `/ns` directory contains the component's
 namespace, exactly as the component would see it, for example:
 
-```none {:.deviste-disable-click-to-copy}
+```none {:.devsite-disable-click-to-copy}
 [host]$ ffx component explore /bootstrap/archivist
 Moniker: /bootstrap/archivist
 $ {{ '<strong>' }}cd ns{{ '</strong>' }}
@@ -86,7 +86,7 @@ svc
 If you want the shell's namespace to match the component namespace,
 use the `-l` (or `--layout`) flag, for example:
 
-```none {:.deviste-disable-click-to-copy}
+```none {:.devsite-disable-click-to-copy}
 [host]$ ffx component explore /bootstrap/archivist -l namespace
 Moniker: /bootstrap/archivist
 $ {{ '<strong>' }}ls{{ '</strong>' }}
@@ -104,7 +104,7 @@ For more details on these directories, see
 The `/exposed` directory contains the capabilities exposed from your target
 component to its parent, for example:
 
-```none {:.deviste-disable-click-to-copy}
+```none {:.devsite-disable-click-to-copy}
 [host]$ ffx component explore /bootstrap/archivist
 Moniker: /bootstrap/archivist
 $ {{ '<strong>' }}cd exposed{{ '</strong>' }}
@@ -125,7 +125,7 @@ If the target component is running on the device, the `/out` directory
 contains all the capabilities currently served by the component, for
 example:
 
-```none {:.deviste-disable-click-to-copy}
+```none {:.devsite-disable-click-to-copy}
 [host]$ ffx component explore /bootstrap/archivist
 Moniker: /bootstrap/archivist
 $ {{ '<strong>' }}cd out{{ '</strong>' }}
@@ -147,7 +147,7 @@ fuchsia.logger.Log
 If the target component is running on the device, the `/runtime` directory
 contains debug information provided by the component runner, for example:
 
-```none {:.deviste-disable-click-to-copy}
+```none {:.devsite-disable-click-to-copy}
 [host]$ ffx component explore /bootstrap/archivist
 Moniker: /bootstrap/archivist
 $ {{ '<strong>' }}cd runtime/elf{{ '</strong>' }}
@@ -192,7 +192,7 @@ Commands:
 To run a command in the component's on-device shell non-interactively and receive
 `stdout`, `stderr`, and exit code, use the `-c` (or `--command`) flag, for example:
 
-```none {:.deviste-disable-click-to-copy}
+```none {:.devsite-disable-click-to-copy}
 [host]$ ffx component explore /bootstrap/archivist -c "cat /runtime/elf/process_id"
 Moniker: /bootstrap/archivist
 2542
