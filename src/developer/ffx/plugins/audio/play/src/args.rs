@@ -21,6 +21,7 @@ pub struct PlayCommand {
 #[argh(subcommand)]
 pub enum SubCommand {
     Render(RenderCommand),
+    Device(DeviceCommand),
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -44,6 +45,13 @@ pub struct RenderCommand {
 
     #[argh(option, description = "mute the renderer.")]
     pub mute: bool,
+}
+
+#[derive(FromArgs, Debug, PartialEq)]
+#[argh(subcommand, name = "device", description = "Send audio data to ring buffer.")]
+pub struct DeviceCommand {
+    #[argh(option, description = "id of device (path)")]
+    pub id: String,
 }
 
 fn str_to_usage(src: &str) -> Result<AudioRenderUsage, String> {

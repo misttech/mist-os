@@ -15,6 +15,9 @@ using zx;
 type PlayLocation = flexible union {
     /// Play audio through an AudioRenderer.
     1: renderer RendererInfo;
+
+    /// Play audio directly to device ring buffer.
+    2: ring_buffer DeviceSelector;
 };
 
 /// Configuration for AudioRenderer.
