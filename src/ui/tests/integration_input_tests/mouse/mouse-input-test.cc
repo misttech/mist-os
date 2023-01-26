@@ -54,8 +54,8 @@ namespace {
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
 using component_testing::ConfigValue;
-using component_testing::LocalComponent;
 using component_testing::LocalComponentHandles;
+using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -91,30 +91,14 @@ int ButtonsToInt(const std::vector<fuchsia::ui::test::input::MouseButton>& butto
   return result;
 }
 
-// `MouseInputListener` is a local test protocol that our test apps use to let us know
-// what position and button press state the mouse cursor has.
-class MouseInputListenerServer : public fuchsia::ui::test::input::MouseInputListener,
-                                 public LocalComponent {
+// Contains the current mouse input state.
+//
+// Used to be part of MouseInputListenerServer. The state is now externalized,
+// because the new AddLocalChild API does not allow directly inspecting the
+// state of the local child component itself.  Instead, this state is shared
+// between the test fixture and the local component below.
+class MouseInputState {
  public:
-  explicit MouseInputListenerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-  void ReportMouseInput(
-      fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest request) override {
-    events_.push(std::move(request));
-  }
-
-  // |MockComponent::Start|
-  // When the component framework requests for this component to start, this
-  // method will be invoked by the realm_builder library.
-  void Start(std::unique_ptr<LocalComponentHandles> mock_handles) override {
-    FX_CHECK(mock_handles->outgoing()->AddPublicService(
-                 fidl::InterfaceRequestHandler<fuchsia::ui::test::input::MouseInputListener>(
-                     [this](auto request) {
-                       bindings_.AddBinding(this, std::move(request), dispatcher_);
-                     })) == ZX_OK);
-    mock_handles_.emplace_back(std::move(mock_handles));
-  }
-
   size_t SizeOfEvents() const { return events_.size(); }
 
   fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest PopEvent() {
@@ -130,11 +114,42 @@ class MouseInputListenerServer : public fuchsia::ui::test::input::MouseInputList
   void ClearEvents() { events_ = {}; }
 
  private:
+  friend class MouseInputListenerServer;
+
+  std::queue<fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest> events_;
+};
+
+// `MouseInputListener` is a local test protocol that our test apps use to let us know
+// what position and button press state the mouse cursor has.
+class MouseInputListenerServer : public fuchsia::ui::test::input::MouseInputListener,
+                                 public LocalComponentImpl {
+ public:
+  explicit MouseInputListenerServer(async_dispatcher_t* dispatcher,
+                                    std::weak_ptr<MouseInputState> state)
+      : dispatcher_(dispatcher), state_(std::move(state)) {}
+
+  void ReportMouseInput(
+      fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest request) override {
+    if (auto s = state_.lock()) {
+      s->events_.push(std::move(request));
+    }
+  }
+
+  // When the component framework requests for this component to start, this
+  // method will be invoked by the realm_builder library.
+  void OnStart() override {
+    FX_CHECK(outgoing()->AddPublicService(
+                 fidl::InterfaceRequestHandler<fuchsia::ui::test::input::MouseInputListener>(
+                     [this](auto request) {
+                       bindings_.AddBinding(this, std::move(request), dispatcher_);
+                     })) == ZX_OK);
+  }
+
+ private:
   // Not owned.
   async_dispatcher_t* dispatcher_ = nullptr;
   fidl::BindingSet<fuchsia::ui::test::input::MouseInputListener> bindings_;
-  std::vector<std::unique_ptr<LocalComponentHandles>> mock_handles_;
-  std::queue<fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest> events_;
+  std::weak_ptr<MouseInputState> state_;
 };
 
 constexpr auto kMouseInputListener = "mouse_input_listener";
@@ -146,12 +161,9 @@ struct Position {
 
 class MouseInputBase : public ui_testing::PortableUITest {
  protected:
-  MouseInputBase()
-      : mouse_input_listener_(std::make_unique<MouseInputListenerServer>(dispatcher())) {}
+  MouseInputBase() : mouse_state_(std::make_shared<MouseInputState>()) {}
 
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
-
-  MouseInputListenerServer* mouse_input_listener() { return mouse_input_listener_.get(); }
 
   void SetUp() override {
     ui_testing::PortableUITest::SetUp();
@@ -173,7 +185,7 @@ class MouseInputBase : public ui_testing::PortableUITest {
 
   void TearDown() override {
     // at the end of test, ensure event queue is empty.
-    ASSERT_EQ(mouse_input_listener_->SizeOfEvents(), 0u);
+    ASSERT_EQ(mouse_state_->SizeOfEvents(), 0u);
   }
 
   // Subclass should implement this method to add v2 components to the test realm
@@ -230,7 +242,10 @@ class MouseInputBase : public ui_testing::PortableUITest {
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
     // |MouseInputListener| service in the constructed realm.
-    realm_builder()->AddLocalChild(kMouseInputListener, mouse_input_listener());
+    auto* d = dispatcher();
+    realm_builder()->AddLocalChild(kMouseInputListener, [d, s = mouse_state_]() {
+      return std::make_unique<MouseInputListenerServer>(d, s);
+    });
 
     // Expose scenic to the test fixture.
     realm_builder()->AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
@@ -251,7 +266,7 @@ class MouseInputBase : public ui_testing::PortableUITest {
   uint32_t display_width() const { return display_width_; }
   uint32_t display_height() const { return display_height_; }
 
-  std::unique_ptr<MouseInputListenerServer> mouse_input_listener_;
+  std::shared_ptr<MouseInputState> mouse_state_;
 
   // Override test-ui-stack config.
   bool use_scene_manager() override { return true; }
@@ -321,11 +336,11 @@ TEST_F(FlutterInputTest, FlutterMouseMove) {
   LaunchClient();
 
   SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 1, /* movement_y = */ 2);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  ASSERT_EQ(mouse_input_listener_->SizeOfEvents(), 1u);
+  ASSERT_EQ(mouse_state_->SizeOfEvents(), 1u);
 
-  auto e = mouse_input_listener_->PopEvent();
+  auto e = mouse_state_->PopEvent();
 
   // If the first mouse event is cursor movement, Flutter first sends an ADD event with updated
   // location.
@@ -342,13 +357,13 @@ TEST_F(FlutterInputTest, FlutterMouseDown) {
 
   SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},
                      /* movement_x = */ 0, /* movement_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 3; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 3; });
 
-  ASSERT_EQ(mouse_input_listener_->SizeOfEvents(), 3u);
+  ASSERT_EQ(mouse_state_->SizeOfEvents(), 3u);
 
-  auto event_add = mouse_input_listener_->PopEvent();
-  auto event_down = mouse_input_listener_->PopEvent();
-  auto event_noop_move = mouse_input_listener_->PopEvent();
+  auto event_add = mouse_state_->PopEvent();
+  auto event_down = mouse_state_->PopEvent();
+  auto event_noop_move = mouse_state_->PopEvent();
 
   // If the first mouse event is a button press, Flutter first sends an ADD event with no buttons.
   VerifyEvent(event_add,
@@ -380,13 +395,13 @@ TEST_F(FlutterInputTest, FlutterMouseDownUp) {
 
   SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},
                      /* movement_x = */ 0, /* movement_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 3; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 3; });
 
-  ASSERT_EQ(mouse_input_listener_->SizeOfEvents(), 3u);
+  ASSERT_EQ(mouse_state_->SizeOfEvents(), 3u);
 
-  auto event_add = mouse_input_listener_->PopEvent();
-  auto event_down = mouse_input_listener_->PopEvent();
-  auto event_noop_move = mouse_input_listener_->PopEvent();
+  auto event_add = mouse_state_->PopEvent();
+  auto event_down = mouse_state_->PopEvent();
+  auto event_noop_move = mouse_state_->PopEvent();
 
   // If the first mouse event is a button press, Flutter first sends an ADD event with no buttons.
   VerifyEvent(event_add,
@@ -413,11 +428,11 @@ TEST_F(FlutterInputTest, FlutterMouseDownUp) {
               /*component_name=*/"mouse-input-flutter");
 
   SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 0, /* movement_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  ASSERT_EQ(mouse_input_listener_->SizeOfEvents(), 1u);
+  ASSERT_EQ(mouse_state_->SizeOfEvents(), 1u);
 
-  auto event_up = mouse_input_listener_->PopEvent();
+  auto event_up = mouse_state_->PopEvent();
   VerifyEvent(event_up,
               /*expected_x=*/static_cast<double>(display_width()) / 2.f,
               /*expected_y=*/static_cast<double>(display_height()) / 2.f,
@@ -431,13 +446,13 @@ TEST_F(FlutterInputTest, FlutterMouseDownMoveUp) {
 
   SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},
                      /* movement_x = */ 0, /* movement_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 3; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 3; });
 
-  ASSERT_EQ(mouse_input_listener_->SizeOfEvents(), 3u);
+  ASSERT_EQ(mouse_state_->SizeOfEvents(), 3u);
 
-  auto event_add = mouse_input_listener_->PopEvent();
-  auto event_down = mouse_input_listener_->PopEvent();
-  auto event_noop_move = mouse_input_listener_->PopEvent();
+  auto event_add = mouse_state_->PopEvent();
+  auto event_down = mouse_state_->PopEvent();
+  auto event_noop_move = mouse_state_->PopEvent();
 
   // If the first mouse event is a button press, Flutter first sends an ADD event with no buttons.
   VerifyEvent(event_add,
@@ -465,11 +480,11 @@ TEST_F(FlutterInputTest, FlutterMouseDownMoveUp) {
 
   SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},
                      /* movement_x = */ kClickToDragThreshold, /* movement_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  ASSERT_EQ(mouse_input_listener_->SizeOfEvents(), 1u);
+  ASSERT_EQ(mouse_state_->SizeOfEvents(), 1u);
 
-  auto event_move = mouse_input_listener_->PopEvent();
+  auto event_move = mouse_state_->PopEvent();
 
   VerifyEventLocationOnTheRightOfExpectation(
       event_move,
@@ -480,11 +495,11 @@ TEST_F(FlutterInputTest, FlutterMouseDownMoveUp) {
       /*component_name=*/"mouse-input-flutter");
 
   SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 0, /* movement_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  ASSERT_EQ(mouse_input_listener_->SizeOfEvents(), 1u);
+  ASSERT_EQ(mouse_state_->SizeOfEvents(), 1u);
 
-  auto event_up = mouse_input_listener_->PopEvent();
+  auto event_up = mouse_state_->PopEvent();
 
   VerifyEventLocationOnTheRightOfExpectation(
       event_up,
@@ -505,12 +520,12 @@ TEST_F(FlutterInputTest, DISABLED_FlutterMouseWheelIssue103098) {
 
   SimulateMouseScroll(/* pressed_buttons = */ {}, /* scroll_x = */ 1, /* scroll_y = */ 0);
   // Here we expected 2 events, ADD - Scroll, but got 3, Move - Scroll - Scroll.
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 3; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 3; });
 
   double initial_x = static_cast<double>(display_width()) / 2.f;
   double initial_y = static_cast<double>(display_height()) / 2.f;
 
-  auto event_1 = mouse_input_listener_->PopEvent();
+  auto event_1 = mouse_state_->PopEvent();
   EXPECT_NEAR(event_1.local_x(), initial_x, 1);
   EXPECT_NEAR(event_1.local_y(), initial_y, 1);
   // Flutter will scale the count of ticks to pixel.
@@ -518,7 +533,7 @@ TEST_F(FlutterInputTest, DISABLED_FlutterMouseWheelIssue103098) {
   EXPECT_EQ(event_1.wheel_y_physical_pixel(), 0);
   EXPECT_EQ(event_1.phase(), fuchsia::ui::test::input::MouseEventPhase::MOVE);
 
-  auto event_2 = mouse_input_listener_->PopEvent();
+  auto event_2 = mouse_state_->PopEvent();
   VerifyEvent(event_2,
               /*expected_x=*/initial_x,
               /*expected_y=*/initial_y,
@@ -529,7 +544,7 @@ TEST_F(FlutterInputTest, DISABLED_FlutterMouseWheelIssue103098) {
   EXPECT_GT(event_2.wheel_x_physical_pixel(), 0);
   EXPECT_EQ(event_2.wheel_y_physical_pixel(), 0);
 
-  auto event_3 = mouse_input_listener_->PopEvent();
+  auto event_3 = mouse_state_->PopEvent();
   VerifyEvent(event_3,
               /*expected_x=*/initial_x,
               /*expected_y=*/initial_y,
@@ -550,9 +565,9 @@ TEST_F(FlutterInputTest, FlutterMouseWheel) {
   // TODO(fxbug.dev/103098): Send a mouse move as the first event to workaround.
   SimulateMouseEvent(/* pressed_buttons = */ {},
                      /* movement_x = */ 1, /* movement_y = */ 2);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  auto event_add = mouse_input_listener_->PopEvent();
+  auto event_add = mouse_state_->PopEvent();
   VerifyEvent(event_add,
               /*expected_x=*/initial_x,
               /*expected_y=*/initial_y,
@@ -561,9 +576,9 @@ TEST_F(FlutterInputTest, FlutterMouseWheel) {
               /*component_name=*/"mouse-input-flutter");
 
   SimulateMouseScroll(/* pressed_buttons = */ {}, /* scroll_x = */ 1, /* scroll_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  auto event_wheel_h = mouse_input_listener_->PopEvent();
+  auto event_wheel_h = mouse_state_->PopEvent();
 
   VerifyEvent(event_wheel_h,
               /*expected_x=*/initial_x,
@@ -576,9 +591,9 @@ TEST_F(FlutterInputTest, FlutterMouseWheel) {
   EXPECT_EQ(event_wheel_h.wheel_y_physical_pixel(), 0);
 
   SimulateMouseScroll(/* pressed_buttons = */ {}, /* scroll_x = */ 0, /* scroll_y = */ 1);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  auto event_wheel_v = mouse_input_listener_->PopEvent();
+  auto event_wheel_v = mouse_state_->PopEvent();
 
   VerifyEvent(event_wheel_v,
               /*expected_x=*/initial_x,
@@ -692,18 +707,17 @@ class ChromiumInputTest : public MouseInputBase {
 
       RunLoopWithTimeoutOrUntil(
           [this] {
-            return this->mouse_input_listener_->SizeOfEvents() > 0 &&
-                   this->mouse_input_listener_->LastEvent().phase() ==
+            return mouse_state_->SizeOfEvents() > 0 &&
+                   mouse_state_->LastEvent().phase() ==
                        fuchsia::ui::test::input::MouseEventPhase::UP;
           },
           kFirstEventRetryInterval);
-      if (mouse_input_listener_->SizeOfEvents() > 0 &&
-          mouse_input_listener_->LastEvent().phase() ==
-              fuchsia::ui::test::input::MouseEventPhase::UP) {
+      if (mouse_state_->SizeOfEvents() > 0 &&
+          mouse_state_->LastEvent().phase() == fuchsia::ui::test::input::MouseEventPhase::UP) {
         Position p;
-        p.x = mouse_input_listener_->LastEvent().local_x();
-        p.y = mouse_input_listener_->LastEvent().local_y();
-        mouse_input_listener_->ClearEvents();
+        p.x = mouse_state_->LastEvent().local_x();
+        p.y = mouse_state_->LastEvent().local_y();
+        mouse_state_->ClearEvents();
         return p;
       }
     }
@@ -749,9 +763,9 @@ TEST_F(ChromiumInputTest, ChromiumMouseMove) {
 
   SimulateMouseEvent(/* pressed_buttons = */ {},
                      /* movement_x = */ 5, /* movement_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  auto event_move = mouse_input_listener_->PopEvent();
+  auto event_move = mouse_state_->PopEvent();
 
   VerifyEventLocationOnTheRightOfExpectation(
       event_move,
@@ -776,11 +790,11 @@ TEST_F(ChromiumInputTest, ChromiumMouseDownMoveUp) {
                      /* movement_x = */ kClickToDragThreshold, /* movement_y = */ 0);
   SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 0, /* movement_y = */ 0);
 
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 3; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 3; });
 
-  auto event_down = mouse_input_listener_->PopEvent();
-  auto event_move = mouse_input_listener_->PopEvent();
-  auto event_up = mouse_input_listener_->PopEvent();
+  auto event_down = mouse_state_->PopEvent();
+  auto event_move = mouse_state_->PopEvent();
+  auto event_up = mouse_state_->PopEvent();
 
   VerifyEvent(event_down,
               /*expected_x=*/initial_x,
@@ -812,9 +826,9 @@ TEST_F(ChromiumInputTest, ChromiumMouseWheel) {
   double initial_y = initial_position.y;
 
   SimulateMouseScroll(/* pressed_buttons = */ {}, /* scroll_x = */ 1, /* scroll_y = */ 0);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  auto event_wheel_h = mouse_input_listener_->PopEvent();
+  auto event_wheel_h = mouse_state_->PopEvent();
 
   VerifyEvent(event_wheel_h,
               /*expected_x=*/initial_x,
@@ -828,9 +842,9 @@ TEST_F(ChromiumInputTest, ChromiumMouseWheel) {
   EXPECT_EQ(event_wheel_h.wheel_y_physical_pixel(), 0);
 
   SimulateMouseScroll(/* pressed_buttons = */ {}, /* scroll_x = */ 0, /* scroll_y = */ 1);
-  RunLoopUntil([this] { return this->mouse_input_listener_->SizeOfEvents() == 1; });
+  RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
-  auto event_wheel_v = mouse_input_listener_->PopEvent();
+  auto event_wheel_v = mouse_state_->PopEvent();
 
   VerifyEvent(event_wheel_v,
               /*expected_x=*/initial_x,
