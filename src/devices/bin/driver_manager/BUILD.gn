@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/cpp/cpp_fuzzer.gni")
 import("//build/fuzz.gni")
@@ -153,8 +152,6 @@ source_set("lib") {
     "//src/lib/loader_service",
     "//src/lib/pkg_url",
     "//src/lib/storage/vfs/cpp",
-    "//src/storage/memfs",
-    "//src/storage/memfs:lib",
     "//src/zircon/lib/zircon",
     "//zircon/system/public",
     "//zircon/system/ulib/async-default",
@@ -300,16 +297,19 @@ fuchsia_test_package("driver-manager-tests") {
   ]
 }
 
-fuchsia_component("driver_manager_component") {
+fuchsia_component("component") {
   component_name = "driver_manager"
   manifest = "meta/driver_manager.cml"
   restricted_features = [ "allow_long_names" ]
   deps = [ ":driver_manager" ]
 }
 
-bootfs_files_for_assembly("bootfs") {
+fuchsia_package("package") {
+  package_name = "driver_manager"
   deps = [
-    ":driver_manager_component",
-    "//src/storage/memfs",
+    ":component",
+    "//src/devices/bin/driver_host",
+    "//src/devices/internal/drivers/fragment",
+    "//src/devices/internal/drivers/fragment:fragment.proxy",
   ]
 }

@@ -13,7 +13,7 @@
         },
         {
             name: "driver_manager",
-            url: "fuchsia-boot:///#meta/driver_manager.cm",
+            url: "fuchsia-boot:///driver_manager#meta/driver_manager.cm",
             environment: "#driver_manager-env",
         },
         {

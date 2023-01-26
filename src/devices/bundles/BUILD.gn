@@ -65,8 +65,6 @@ group("bootstrap-dev") {
     "//src/devices/clock/drivers/clock",
     "//src/devices/gpio/drivers/gpio",
     "//src/devices/i2c/drivers/i2c",
-    "//src/devices/internal/drivers/fragment",
-    "//src/devices/internal/drivers/fragment:fragment.proxy",
     "//src/devices/power/drivers/power",
     "//src/devices/pwm/drivers/pwm",
     "//src/devices/serial/drivers/serial",
