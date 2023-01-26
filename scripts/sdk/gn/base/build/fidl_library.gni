@@ -185,7 +185,7 @@ template("fidl_library") {
 
     script = "${fuchsia_sdk}/build/gn_run_binary.py"
     args = [
-      rebase_path("${fuchsia_tool_dir}/fidlgen", root_build_dir),
+      rebase_path("${fuchsia_tool_dir}/fidlgen_hlcpp", root_build_dir),
       "--json",
       rebase_path(_json_representation, root_build_dir),
       "--root",
@@ -232,5 +232,9 @@ template("fidl_library") {
     public_deps += [ "${fuchsia_sdk}/pkg/fidl_cpp" ]
 
     public_configs = [ ":${invoker.target_name}_config" ]
+  }
+
+  group("${target_name}_hlcpp") {
+    public_deps = [ ":${invoker.target_name}" ]
   }
 }
