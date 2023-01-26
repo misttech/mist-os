@@ -62,8 +62,8 @@ namespace {
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
 using component_testing::Directory;
-using component_testing::LocalComponent;
 using component_testing::LocalComponentHandles;
+using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -111,43 +111,14 @@ bool CheckViewExistsInUpdates(
   return update_count > 0;
 }
 
-// `KeyboardInputListener` is a test protocol that our test Flutter app uses to let us know
-// what text is being entered into its only text field.
+// Externalized test specific keyboard input state.
 //
-// The text field contents are reported on almost every change, so if you are entering a long
-// text, you will see calls corresponding to successive additions of characters, not just the
-// end result.
-class KeyboardInputListenerServer : public fuchsia::ui::test::input::KeyboardInputListener,
-                                    public LocalComponent {
+// A shsared instance of this object is kept in the test fixture, and also
+// injected into KeyboardInputListener below.
+class KeyboardInputState {
  public:
-  explicit KeyboardInputListenerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-  KeyboardInputListenerServer(const KeyboardInputListenerServer&) = delete;
-  KeyboardInputListenerServer& operator=(const KeyboardInputListenerServer&) = delete;
-
-  // |fuchsia::ui::test::input::KeyboardInputListener|
-  void ReportTextInput(
-      fuchsia::ui::test::input::KeyboardInputListenerReportTextInputRequest request) override {
-    FX_LOGS(INFO) << "App sent: '" << request.text() << "'";
-    response_ = request.text();
-  }
-
-  // |fuchsia::ui::test::input::KeyboardInputListener|
-  void ReportReady(ReportReadyCallback callback) override {
-    ready_ = true;
-    callback();
-  }
-
   // If true, the remote end of the connection sent the `ReportReady` signal.
   bool IsReady() const { return ready_; }
-
-  // Starts this server.
-  void Start(std::unique_ptr<LocalComponentHandles> handles) override {
-    handles_ = std::move(handles);
-
-    ASSERT_EQ(ZX_OK,
-              handles_->outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)));
-  }
 
   // Returns true if the last response received matches `expected`.  If a match is found,
   // the match is consumed, so a next call to HasResponse starts from scratch.
@@ -169,17 +140,60 @@ class KeyboardInputListenerServer : public fuchsia::ui::test::input::KeyboardInp
   }
 
  private:
+  friend class KeyboardInputListenerServer;
+
+  std::optional<std::string> response_ = std::nullopt;
+  bool ready_ = false;
+};
+
+// `KeyboardInputListener` is a test protocol that our test Flutter app uses to let us know
+// what text is being entered into its only text field.
+//
+// The text field contents are reported on almost every change, so if you are entering a long
+// text, you will see calls corresponding to successive additions of characters, not just the
+// end result.
+class KeyboardInputListenerServer : public fuchsia::ui::test::input::KeyboardInputListener,
+                                    public LocalComponentImpl {
+ public:
+  KeyboardInputListenerServer(async_dispatcher_t* dispatcher,
+                              std::weak_ptr<KeyboardInputState> state)
+      : dispatcher_(dispatcher), state_(std::move(state)) {}
+
+  KeyboardInputListenerServer(const KeyboardInputListenerServer&) = delete;
+  KeyboardInputListenerServer& operator=(const KeyboardInputListenerServer&) = delete;
+
+  // |fuchsia::ui::test::input::KeyboardInputListener|
+  void ReportTextInput(
+      fuchsia::ui::test::input::KeyboardInputListenerReportTextInputRequest request) override {
+    FX_LOGS(INFO) << "App sent: '" << request.text() << "'";
+    if (auto s = state_.lock()) {
+      s->response_ = request.text();
+    }
+  }
+
+  // |fuchsia::ui::test::input::KeyboardInputListener|
+  void ReportReady(ReportReadyCallback callback) override {
+    if (auto s = state_.lock()) {
+      s->ready_ = true;
+    }
+    callback();
+  }
+
+  // Starts this server.
+  void OnStart() override {
+    ASSERT_EQ(ZX_OK, outgoing()->AddPublicService(bindings_.GetHandler(this, dispatcher_)));
+  }
+
+ private:
   // Not owned.
   async_dispatcher_t* dispatcher_ = nullptr;
   fidl::BindingSet<fuchsia::ui::test::input::KeyboardInputListener> bindings_;
-  std::unique_ptr<LocalComponentHandles> handles_;
-  std::optional<std::string> response_;
-  bool ready_ = false;
+  std::weak_ptr<KeyboardInputState> state_;
 };
 
 constexpr auto kResponseListener = "test_text_response_listener";
 constexpr auto kTextInputFlutter = "text_input_flutter";
-static constexpr auto kTextInputFlutterUrl = "#meta/text-input-flutter-realm.cm";
+constexpr auto kTextInputFlutterUrl = "#meta/text-input-flutter-realm.cm";
 
 constexpr auto kTestUIStack = "ui";
 constexpr auto kTestUIStackUrl =
@@ -187,8 +201,7 @@ constexpr auto kTestUIStackUrl =
 
 class TextInputTest : public gtest::RealLoopFixture {
  protected:
-  TextInputTest()
-      : test_response_listener_(std::make_unique<KeyboardInputListenerServer>(dispatcher())) {}
+  TextInputTest() : keyboard_input_state_(std::make_shared<KeyboardInputState>()) {}
 
   void RegisterKeyboard() {
     FX_LOGS(INFO) << "Registering fake keyboard";
@@ -233,7 +246,10 @@ class TextInputTest : public gtest::RealLoopFixture {
   void BuildRealm() {
     FX_LOGS(INFO) << "Building realm";
     realm_builder_.AddChild(kTestUIStack, kTestUIStackUrl);
-    realm_builder_.AddLocalChild(kResponseListener, test_response_listener_.get());
+    realm_builder_.AddLocalChild(kResponseListener,
+                                 [d = dispatcher(), s = keyboard_input_state_]() {
+                                   return std::make_unique<KeyboardInputListenerServer>(d, s);
+                                 });
     realm_builder_.AddChild(kTextInputFlutter, kTextInputFlutterUrl);
 
     // Route base system services to flutter and the test UI stack.
@@ -317,7 +333,7 @@ class TextInputTest : public gtest::RealLoopFixture {
     return watch_response.has_value();
   }
 
-  std::unique_ptr<KeyboardInputListenerServer> test_response_listener_;
+  std::shared_ptr<KeyboardInputState> keyboard_input_state_;
 
   fuchsia::ui::test::input::RegistryPtr input_registry_;
   fuchsia::ui::test::input::KeyboardPtr fake_keyboard_;
@@ -331,7 +347,7 @@ class TextInputTest : public gtest::RealLoopFixture {
 
 TEST_F(TextInputTest, FlutterTextFieldEntry) {
   FX_LOGS(INFO) << "Wait for the initial text response";
-  RunLoopUntil([&] { return test_response_listener_->HasResponse(""); });
+  RunLoopUntil([&] { return keyboard_input_state_->HasResponse(""); });
 
   FX_LOGS(INFO) << "Sending a text message";
   bool done = false;
@@ -341,7 +357,7 @@ TEST_F(TextInputTest, FlutterTextFieldEntry) {
   RunLoopUntil([&] { return done; });
   FX_LOGS(INFO) << "Message was sent";
 
-  RunLoopUntil([&] { return test_response_listener_->HasResponse("Hello\nworld!"); });
+  RunLoopUntil([&] { return keyboard_input_state_->HasResponse("Hello\nworld!"); });
 }
 
 // See README.md for instructions on how to run this test with chrome remote
@@ -350,12 +366,9 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
  protected:
   static constexpr auto kTapRetryInterval = zx::sec(1);
 
-  ChromiumInputBase()
-      : response_listener_(std::make_unique<KeyboardInputListenerServer>(dispatcher())) {}
+  ChromiumInputBase() : keyboard_input_state_(std::make_shared<KeyboardInputState>()) {}
 
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }
-
-  KeyboardInputListenerServer* response_listener() { return response_listener_.get(); }
 
   void SetUp() override {
     // Post a "just in case" quit task, if the test hangs.
@@ -482,7 +495,9 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
 
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
-    realm_->AddLocalChild(kResponseListener, response_listener());
+    realm_->AddLocalChild(kResponseListener, [d = dispatcher(), s = keyboard_input_state_]() {
+      return std::make_unique<KeyboardInputListenerServer>(d, s);
+    });
 
     for (const auto& [name, component] : components) {
       realm_->AddChild(name, component);
@@ -517,9 +532,11 @@ class ChromiumInputBase : public gtest::RealLoopFixture {
 
   std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
-  std::unique_ptr<Realm> realm_;
 
-  std::unique_ptr<KeyboardInputListenerServer> response_listener_;
+  // Needs to outlive realm_ below.
+  std::shared_ptr<KeyboardInputState> keyboard_input_state_;
+
+  std::unique_ptr<Realm> realm_;
 
   // The registry for registering various fake devices.
   fuchsia::ui::test::input::RegistryPtr input_registry_;
@@ -686,7 +703,7 @@ class ChromiumInputTest : public ChromiumInputBase {
     FX_LOGS(INFO) << "Waiting on client view focused";
     RunLoopUntil([this] { return ui_test_manager_->ClientViewIsFocused(); });
     FX_LOGS(INFO) << "Waiting on response listener ready";
-    RunLoopUntil([this]() { return this->response_listener()->IsReady(); });
+    RunLoopUntil([this]() { return keyboard_input_state_->IsReady(); });
     CancelTaps();
   }
 };
@@ -705,7 +722,7 @@ TEST_F(ChromiumInputTest, BasicInputTest) {
   // below may only be fulfilled if it did, in fact, finish.
   fake_keyboard_->SimulateUsAsciiTextEntry(std::move(request), [] {});
 
-  RunLoopUntil([&] { return response_listener_->ResponseContains("Hello\\nworld!"); });
+  RunLoopUntil([&] { return keyboard_input_state_->ResponseContains("Hello\\nworld!"); });
 
   FX_LOGS(INFO) << "Done";
 }
