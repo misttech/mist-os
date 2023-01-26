@@ -379,35 +379,17 @@ struct fidl_type {
   final:                             \
   fidl_type
 
-#if __cplusplus <= 201703L
-
-// When compiling in C++14 mode, the rules around initialization
-// changes such that the compiler requires an explicit constructor.
-// Since coding tables are defined in C and consumed in C++,
-// it is safe to delete the constructor.
-// Note that this still allows the use of C++ designated initializers.
-#define FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(cls) cls() = delete;
-
-#else  // __cplusplus <= 201703L
-
-#define FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(cls)
-
-#endif  // __cplusplus <= 201703L
-
 #else  // __cplusplus
 
 // No inheritance in C mode. This is okay because inheriting
 // from an empty class does not affect the object layout at all.
 #define FIDL_INTERNAL_INHERIT_TYPE_T
-#define FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(cls)
 
 #endif  // __cplusplus
 
 struct FidlCodedPrimitive FIDL_INTERNAL_INHERIT_TYPE_T {
   const FidlTypeTag tag;
   const FidlCodedPrimitiveSubtype type;
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedPrimitive)
 };
 
 struct FidlCodedEnum FIDL_INTERNAL_INHERIT_TYPE_T {
@@ -418,8 +400,6 @@ struct FidlCodedEnum FIDL_INTERNAL_INHERIT_TYPE_T {
   // flexible enums.
   const EnumValidationPredicate validate;
   const char* name;  // may be nullptr if omitted at compile time
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedEnum)
 };
 
 struct FidlCodedBits FIDL_INTERNAL_INHERIT_TYPE_T {
@@ -428,8 +408,6 @@ struct FidlCodedBits FIDL_INTERNAL_INHERIT_TYPE_T {
   const FidlStrictness strictness;
   const uint64_t mask;
   const char* name;  // may be nullptr if omitted at compile time
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedBits)
 };
 
 // Though the |size| is implied by the fields, computing that information is not
@@ -450,15 +428,11 @@ struct FidlCodedStruct FIDL_INTERNAL_INHERIT_TYPE_T {
   const uint32_t size_v2;
   const struct FidlStructElement* const elements;
   const char* name;  // may be nullptr if omitted at compile time
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedStruct)
 };
 
 struct FidlCodedStructPointer FIDL_INTERNAL_INHERIT_TYPE_T {
   const FidlTypeTag tag;
   const struct FidlCodedStruct* const struct_type;
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedStructPointer)
 };
 
 struct FidlCodedTable FIDL_INTERNAL_INHERIT_TYPE_T {
@@ -467,8 +441,6 @@ struct FidlCodedTable FIDL_INTERNAL_INHERIT_TYPE_T {
   const uint32_t field_count;
   const struct FidlTableField* const fields;
   const char* name;  // may be nullptr if omitted at compile time
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedTable)
 };
 
 struct FidlCodedXUnion FIDL_INTERNAL_INHERIT_TYPE_T {
@@ -480,8 +452,6 @@ struct FidlCodedXUnion FIDL_INTERNAL_INHERIT_TYPE_T {
   // The fields are in ordinal order, with ordinal 1 at index 0.
   const struct FidlXUnionField* const fields;
   const char* name;  // may be nullptr if omitted at compile time
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedXUnion)
 };
 
 // An array is essentially a struct with |array_size / element_size| of the same field, named at
@@ -495,8 +465,6 @@ struct FidlCodedArray FIDL_INTERNAL_INHERIT_TYPE_T {
   const uint16_t element_size_v2;
   const uint32_t array_size_v2;
   const fidl_type_t* const element;
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedArray)
 };
 
 struct FidlCodedHandle FIDL_INTERNAL_INHERIT_TYPE_T {
@@ -506,16 +474,12 @@ struct FidlCodedHandle FIDL_INTERNAL_INHERIT_TYPE_T {
   const zx_rights_t handle_rights;
 
   static_assert(ZX_OBJ_TYPE_UPPER_BOUND <= UINT32_MAX, "");
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedHandle)
 };
 
 struct FidlCodedString FIDL_INTERNAL_INHERIT_TYPE_T {
   const FidlTypeTag tag;
   const FidlNullability nullable;
   const uint32_t max_size;
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedString)
 };
 
 // Note that:
@@ -528,8 +492,6 @@ struct FidlCodedVector FIDL_INTERNAL_INHERIT_TYPE_T {
   const uint32_t max_count;
   const uint32_t element_size_v2;
   const fidl_type_t* const element;
-
-  FIDL_INTERNAL_DELETE_DEFAULT_CONSTRUCTOR(FidlCodedVector)
 };
 
 #ifdef __cplusplus
