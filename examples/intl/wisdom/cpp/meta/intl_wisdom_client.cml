@@ -13,6 +13,9 @@
 
         // The binary to run for this component.
         binary: "bin/intl_wisdom_client",
+
+        // Forward stdout to log so that tests can use LogSink to verify.
+        forward_stdout_to: "log",
     },
 
     // Capabilities used by this component.

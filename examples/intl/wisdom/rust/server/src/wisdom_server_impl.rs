@@ -44,7 +44,7 @@ fn build_response(
     let date_style = usys::UDateFormatStyle::UDAT_FULL;
 
     // TODO(fmil): I18N I18ize this response.
-    let mut response = String::from("\nA wise one knows the time...\n\n");
+    let mut response = String::from("A wise one knows the time...\n");
 
     for locale in locale_ids {
         for calendar in calendars {
@@ -60,7 +60,7 @@ fn build_response(
     // TODO(fmil): I18N I18ize this response.
     // Note that this Unicode shenanigan has a space between the two letters "t", but some editors
     // won't render it.  It's there though.
-    response.push_str("\nBut is it the 𝒄𝒐𝒓𝒓𝒆𝒄𝒕 time?\n");
+    response.push_str("But is it the 𝒄𝒐𝒓𝒓𝒆𝒄𝒕 time?\n");
     Ok(response)
 }
 
@@ -143,7 +143,7 @@ mod tests {
                 },
                 timestamp_ms: 0,
                 expected_regex: vec![
-                    r"\nA wise one knows the time...\n\n",
+                    r"A wise one knows the time...\n",
                     r"Thursday, January 1, 1970 at 12:00:00.*AM GMT\n",
                     r"donderdag 1.*",
                 ]
@@ -167,7 +167,7 @@ mod tests {
                 },
                 timestamp_ms: 100000000, // About a day after the Unix Epoch
                 expected_regex: vec![
-                    "\nA wise one knows the time...\n\n",
+                    "A wise one knows the time...\n",
                     r"Thursday, January 1, 1970 at 7:46:40.?PM Pacific Standard Time\n",
                     r"donderdag.*",
                 ]
@@ -186,7 +186,7 @@ mod tests {
                 },
                 timestamp_ms: 100000000, // About a day after the Unix Epoch
                 expected_regex: vec![
-                    r"\nA wise one knows the time...\n\n",
+                    r"A wise one knows the time...\n",
                     r"Thursday, Tevet 23, 5730 at 10:46:40.PM Eastern Standard Time",
                     r".*",
                 ]
@@ -207,7 +207,7 @@ mod tests {
                 },
                 timestamp_ms: 100000000, // About a day after the Unix Epoch
                 expected_regex: vec![
-                    "\nA wise one knows the time...\n\n",
+                    "A wise one knows the time...\n",
                     "الخميس، ٢٣ شوال ١٣٨٩ هـ في ١٠:٤٦:٤٠ م التوقيت الرسمي الشرقي لأمريكا الشمالية",
                     r".*",
                 ]

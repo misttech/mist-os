@@ -95,7 +95,7 @@ std::string IntlWisdomServerImpl::BuildResponse(
     const std::vector<std::unique_ptr<Calendar>>& calendars) const {
   std::ostringstream response;
 
-  response << "\nA wise one knows the time...\n\n";
+  response << "A wise one knows the time...\n";
 
   for (auto& locale : locales) {
     for (auto& calendar : calendars) {
@@ -112,7 +112,7 @@ std::string IntlWisdomServerImpl::BuildResponse(
     }
   }
 
-  response << "\nBut is it the 𝒄𝒐𝒓𝒓𝒆𝒄𝒕 time?\n";
+  response << "But is it the 𝒄𝒐𝒓𝒓𝒆𝒄𝒕 time?\n";
   return response.str();
 }
 

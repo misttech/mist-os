@@ -67,6 +67,11 @@ async fn wisdom_integration_test() -> Result<(), Error> {
     let goldens = File::open("/pkg/data/golden-output.txt")?;
     let mut lines = io::BufReader::new(goldens).lines();
 
+    // TODO(fxbug.dev/120617): There are flaky tests that caused by unexpected
+    // blank lines on log. It maybe an issue on the stdout to log forwarded,
+    // we may want to change to use fidl to pass the result from client to test
+    // body to avoid this issue.
+
     // Verify each line matches the log output
     while let Some(line_regex) = lines.next() {
         let logs = log_stream.next().await.expect("got log result")?;
