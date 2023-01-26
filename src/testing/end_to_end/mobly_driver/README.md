@@ -8,4 +8,6 @@ The Mobly Driver is responsible for mediating Mobly test execution in various ex
 fx set core.qemu-x64 --with-host //src/testing/end_to_end/mobly_driver:tests
 fx test host_x64/obj/src/testing/end_to_end/mobly_driver/api_mobly_test.sh --host --output
 fx test host_x64/obj/src/testing/end_to_end/mobly_driver/mobly_driver_lib_test.sh --host --output
+fx test host_x64/obj/src/testing/end_to_end/mobly_driver/drivers/common_test.sh --host --output
+fx test host_x64/obj/src/testing/end_to_end/mobly_driver/drivers/local_driver_test.sh --host --output
 ```

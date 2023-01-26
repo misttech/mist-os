@@ -2,9 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""
-Module for satisfying all Fuchsia Infra APIs used in Mobly Driver.
-"""
+"""Contains all Fuchsia Infra APIs used in Mobly Driver."""
 
 # Defined in https://osscs.corp.google.com/fuchsia/fuchsia/+/main:tools/botanist/constants/constants.go.
 BOT_ENV_TESTBED_CONFIG = 'FUCHSIA_TESTBED_CONFIG'

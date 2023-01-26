@@ -2,14 +2,12 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Contains all Mobly APIs used in Mobly Driver."""
 
 import os
 from mobly import keys
 from mobly import records
 from typing import List, Dict, Any
-"""
-Module for satisfying all Mobly APIs used in Mobly Driver.
-"""
 
 LATEST_RES_SYMLINK_NAME = 'latest'
 
@@ -25,7 +23,7 @@ def get_test_output_dir_path(mobly_output_path: str, testbed_name: str) -> str:
 
     Args:
         mobly_output_path: absolute path to Mobly's top-level output directory.
-        testbed_name: Mobly testbed name that corresponds to the test output of interest.
+        testbed_name: Mobly testbed name that corresponds to the test output.
 
     Raises:
       ApiException if arguments are invalid.
@@ -44,7 +42,7 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
 
     Args:
         mobly_output_path: absolute path to Mobly's top-level output directory.
-        testbed_name: Mobly testbed name that corresponds to the test output of interest.
+        testbed_name: Mobly testbed name that corresponds to the test output.
 
     Raises:
       ApiException if arguments are invalid.
@@ -59,9 +57,10 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
         records.OUTPUT_FILE_SUMMARY)
 
 
-# TODO(fxbug.dev/119213) - Update |fuchsia_controllers| type to use HoneyDew's definition.
-# When HoneyDew's FuchsiaDevice Mobly device class is available, we should use that class
-# as the Pytype to reduce the chance of HoneyDew controller instantiation error.
+# TODO(fxbug.dev/119213) - Update |fuchsia_controllers| type to use HoneyDew's
+# definition. When HoneyDew's FuchsiaDevice Mobly device class is available, we
+# should use that class as the Pytype to reduce the chance of controller
+# instantiation error.
 def new_testbed_config(
         testbed_name: str, log_path: str, fuchsia_controllers: List[Dict[str,
                                                                          Any]],
@@ -119,7 +118,7 @@ def new_testbed_config(
                     keys.Config.key_testbed_name.value: testbed_name,
                     keys.Config.key_testbed_controllers.value:
                         {
-                            # TODO(fxbug.dev/119213) - Replace using HoneyDew's definition.
+                            # TODO(fxbug.dev/119213) - Replace using HoneyDew.
                             'FuchsiaDevice': fuchsia_controllers
                         },
                 },
@@ -135,7 +134,7 @@ def new_testbed_config(
 def get_config_with_test_params(
         config_dict: MoblyConfigComponent,
         params_dict: MoblyConfigComponent) -> MoblyConfigComponent:
-    """Returns a Mobly config with the 'TestParams' field updated to |params_dict|.
+    """Returns a Mobly config with a populated 'TestParams' field.
 
     Replaces the field if it already exists.
 

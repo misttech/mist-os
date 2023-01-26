@@ -2,6 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+"""Contains module-level functions for running Mobly Driver."""
 
 import subprocess
 import time
@@ -15,7 +16,7 @@ class MoblyTestTimeoutException(Exception):
 
 
 class MoblyTestFailureException(Exception):
-    """Raised when the underlying Mobly test returns a a non-zero return code."""
+    """Raised when the underlying Mobly test returns a non-zero return code."""
 
 
 def _execute_test(
@@ -23,20 +24,20 @@ def _execute_test(
         python_path: str,
         test_path: str,
         timeout_sec: int = 0) -> None:
-    """Executes a Mobly test with the specified |tb_config_yaml_content| as test input.
+    """Executes a Mobly test with the specified Mobly Driver.
 
     Mobly test output is streamed to the console.
 
     Args:
         driver: The environment-specific Mobly driver to use for test execution.
-        python_path: absolute path to the Python runtime to use for test execution.
+        python_path: absolute path to the Python runtime for to use.
         test_path: absolute path to the Mobly test executable to run.
         timeout_sec: Number of seconds before a test is killed due to timeout.
           If set to 0, timeout is not enforced.
 
     Raises:
       MoblyTestFailureException if Mobly test returns non-zero return code.
-      MoblyTestTimeoutException if Mobly test duration exceeds specified timeout.
+      MoblyTestTimeoutException if Mobly test duration exceeds timeout.
     """
     with NamedTemporaryFile(mode='w') as tmp_config:
         config = driver.generate_test_config()
@@ -57,8 +58,8 @@ def _execute_test(
                 if rc is not None:
                     if rc == 0:
                         return
-                    # TODO(fxbug.dev/119651) - differentiate between legitimate test failures vs
-                    # unexpected crashes.
+                    # TODO(fxbug.dev/119651) - differentiate between legitimate
+                    # test failures vs unexpected crashes.
                     raise MoblyTestFailureException('Mobly test failed.')
                 output = proc.stdout.readline()
                 if output:
@@ -78,8 +79,8 @@ def run(
     """Runs the Mobly Driver which handles the lifecycle of a Mobly test.
 
     This method manages the lifecycle of a Mobly test's execution.
-    At a high level, run() creates a Mobly config, triggers a Mobly test with it,
-    and performs any necessary clean up after test execution.
+    At a high level, run() creates a Mobly config, triggers a Mobly test with
+    it, and performs any necessary clean up after test execution.
 
     Args:
     driver: The environment-specific Mobly driver to use for test execution.
@@ -89,8 +90,8 @@ def run(
           If set to 0, timeout is not enforced.
 
     Raises:
-      MoblyTestFailureException if the Mobly test returns a non-zero return code.
-      MoblyTestTimeoutException if Mobly test duration exceeds specified timeout.
+      MoblyTestFailureException if the test returns a non-zero return code.
+      MoblyTestTimeoutException if the test duration exceeds specified timeout.
       ValueError if any argument is invalid.
     """
     if not driver:
