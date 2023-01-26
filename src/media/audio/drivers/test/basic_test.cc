@@ -76,8 +76,8 @@ void BasicTest::RequestStreamProperties() {
   ExpectCallbacks();
 }
 
-// Request that the driver return its gain capabilities and current state.
-void BasicTest::RequestGain() {
+// Request that the driver return its gain capabilities and current state, expecting a response.
+void BasicTest::WatchGainStateAndExpectUpdate() {
   // We reconnect the stream every time we run a test, and by driver interface definition the driver
   // must reply to the first watch request, so we get gain state by issuing a watch FIDL call.
   stream_config()->WatchGainState(
@@ -109,9 +109,16 @@ void BasicTest::RequestGain() {
   ExpectCallbacks();
 }
 
+// Request that the driver return its current gain state, expecting no response (no change).
+void BasicTest::WatchGainStateAndExpectNoUpdate() {
+  stream_config()->WatchGainState([](fuchsia::hardware::audio::GainState gain_state) {
+    FAIL() << "Unexpected gain update received";
+  });
+}
+
 // Determine an appropriate gain state to request, then call other method to request that driver set
-// gain. This method assumes that the driver already successfully responded to a GetGain request.
-// If this device's gain is fixed and cannot be changed, then SKIP the test.
+// gain. This method assumes that the driver already successfully responded to a GetInitialGainState
+// request. If this device's gain is fixed and cannot be changed, then SKIP the test.
 void BasicTest::RequestSetGain() {
   if (stream_props_.max_gain_db() == stream_props_.min_gain_db()) {
     GTEST_SKIP() << "*** Audio " << ((device_type() == DeviceType::Input) ? "input" : "output")
@@ -131,8 +138,8 @@ void BasicTest::RequestSetGain() {
   stream_config()->SetGain(std::move(gain_state));
 }
 
-// Request that driver retrieve the current plug detection state.
-void BasicTest::RequestPlugDetect() {
+// Request that the driver return its current plug state, expecting a valid response.
+void BasicTest::WatchPlugStateAndExpectUpdate() {
   // Since we reconnect to the audio stream every time we run this test and we are guaranteed by
   // the audio driver interface definition that the driver will reply to the first watch request,
   // we can get the plug state by issuing a watch FIDL call.
@@ -149,6 +156,13 @@ void BasicTest::RequestPlugDetect() {
   ExpectCallbacks();
 }
 
+// Request that the driver return its current plug state, expecting no response (no change).
+void BasicTest::WatchPlugStateAndExpectNoUpdate() {
+  stream_config()->WatchPlugState([](fuchsia::hardware::audio::PlugState state) {
+    FAIL() << "Unexpected plug update received";
+  });
+}
+
 #define DEFINE_BASIC_TEST_CLASS(CLASS_NAME, CODE)                               \
   class CLASS_NAME : public BasicTest {                                         \
    public:                                                                      \
@@ -161,18 +175,27 @@ void BasicTest::RequestPlugDetect() {
 // Verify a valid unique_id, manufacturer, product and gain capabilities is successfully received.
 DEFINE_BASIC_TEST_CLASS(StreamProperties, { RequestStreamProperties(); });
 
-// Verify valid get gain responses are successfully received.
-DEFINE_BASIC_TEST_CLASS(GetGain, {
+// Verify the initial WatchGainState responses are successfully received.
+DEFINE_BASIC_TEST_CLASS(GetInitialGainState, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
 
-  RequestGain();
+  WatchGainStateAndExpectUpdate();
+  WaitForError();
+});
+
+// Verify that no response is received, for a subsequent WatchGainState request.
+DEFINE_BASIC_TEST_CLASS(WatchGainSecondTimeNoResponse, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
+
+  WatchGainStateAndExpectNoUpdate();
   WaitForError();
 });
 
 // Verify valid set gain responses are successfully received.
 DEFINE_BASIC_TEST_CLASS(SetGain, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestGain());
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
 
   RequestSetGain();
   WaitForError();
@@ -186,15 +209,24 @@ DEFINE_BASIC_TEST_CLASS(GetFormats, {
   WaitForError();
 });
 
-// Verify valid plug detect responses are successfully received.
-DEFINE_BASIC_TEST_CLASS(PlugDetect, {
+// Verify that a valid initial plug detect response is successfully received.
+DEFINE_BASIC_TEST_CLASS(GetInitialPlugState, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
 
-  RequestPlugDetect();
+  WatchPlugStateAndExpectUpdate();
   WaitForError();
 
   // Someday: determine how to trigger the driver's internal hardware-detect mechanism, so it emits
   // unsolicited PLUG/UNPLUG events -- otherwise driver plug detect updates are not fully testable.
+});
+
+// Verify that no response is received, for a subsequent WatchPlugState request.
+DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(WatchPlugStateAndExpectUpdate());
+
+  WatchPlugStateAndExpectNoUpdate();
+  WaitForError();
 });
 
 // Register separate test case instances for each enumerated device
@@ -209,10 +241,12 @@ DEFINE_BASIC_TEST_CLASS(PlugDetect, {
 
 void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
   REGISTER_BASIC_TEST(StreamProperties, device_entry);
-  REGISTER_BASIC_TEST(GetGain, device_entry);
+  REGISTER_BASIC_TEST(GetInitialGainState, device_entry);
+  REGISTER_BASIC_TEST(WatchGainSecondTimeNoResponse, device_entry);
   REGISTER_BASIC_TEST(SetGain, device_entry);
   REGISTER_BASIC_TEST(GetFormats, device_entry);
-  REGISTER_BASIC_TEST(PlugDetect, device_entry);
+  REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
+  REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
 }
 
 }  // namespace media::audio::drivers::test

@@ -20,9 +20,14 @@ class BasicTest : public TestBase {
 
  protected:
   void RequestStreamProperties();
-  void RequestGain();
+
+  void WatchGainStateAndExpectUpdate();
+  void WatchGainStateAndExpectNoUpdate();
+
   void RequestSetGain();
-  void RequestPlugDetect();
+
+  void WatchPlugStateAndExpectUpdate();
+  void WatchPlugStateAndExpectNoUpdate();
 
  private:
   static constexpr size_t kUniqueIdLength = 16;
