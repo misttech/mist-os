@@ -12,7 +12,7 @@ use crate::utils::result_debug_panic::ResultDebugPanic;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
-use fidl_fuchsia_hardware_thermal as fthermal;
+use fidl_fuchsia_hardware_temperature as ftemperature;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
@@ -28,7 +28,7 @@ use std::rc::Rc;
 /// Node: TemperatureHandler
 ///
 /// Summary: Responds to temperature requests from other nodes by polling the specified driver
-///          using the thermal FIDL protocol. May be configured to cache the polled temperature
+///          using the temperature FIDL protocol. May be configured to cache the polled temperature
 ///          for a while to prevent excessive polling of the sensor. (Polling errors are not
 ///          cached.)
 ///
@@ -38,13 +38,13 @@ use std::rc::Rc;
 /// Sends Messages: N/A
 ///
 /// FIDL dependencies:
-///     - fuchsia.hardware.thermal: the node uses this protocol to query the thermal driver
+///     - fuchsia.hardware.temperature: the node uses this protocol to query the temperature driver
 ///       specified by `driver_path` in the TemperatureHandler constructor
 
 /// A builder for constructing the TemperatureHandler node
 pub struct TemperatureHandlerBuilder<'a> {
     driver_path: Option<String>,
-    driver_proxy: Option<fthermal::DeviceProxy>,
+    driver_proxy: Option<ftemperature::DeviceProxy>,
     cache_duration: Option<zx::Duration>,
     inspect_root: Option<&'a inspect::Node>,
 }
@@ -61,7 +61,7 @@ impl<'a> TemperatureHandlerBuilder<'a> {
     }
 
     #[cfg(test)]
-    pub fn driver_proxy(mut self, proxy: fthermal::DeviceProxy) -> Self {
+    pub fn driver_proxy(mut self, proxy: ftemperature::DeviceProxy) -> Self {
         self.driver_proxy = Some(proxy);
         self
     }
@@ -292,7 +292,7 @@ struct MutableInner {
 
     /// Proxy to the temperature driver. Populated during `init()` unless previously supplied (in a
     /// test).
-    driver_proxy: Option<fthermal::DeviceProxy>,
+    driver_proxy: Option<ftemperature::DeviceProxy>,
 
     /// Allow the debug service to set an override temperature. If set, `ReadTemperature` will
     /// always respond with this temperature.
@@ -311,14 +311,13 @@ impl Node for TemperatureHandler {
     async fn init(&self) -> Result<(), Error> {
         fuchsia_trace::duration!("power_manager", "TemperatureHandler::init");
 
-        // Connect to the thermal driver. Typically this is None, but it may be set by tests.
-        let driver_proxy =
-            match &self.mutable_inner.borrow().driver_proxy {
-                Some(p) => p.clone(),
-                None => fuchsia_component::client::connect_to_protocol_at_path::<
-                    fthermal::DeviceMarker,
-                >(&self.driver_path)?,
-            };
+        // Connect to the temperature driver. Typically this is None, but it may be set by tests.
+        let driver_proxy = match &self.mutable_inner.borrow().driver_proxy {
+            Some(p) => p.clone(),
+            None => fuchsia_component::client::connect_to_protocol_at_path::<
+                ftemperature::DeviceMarker,
+            >(&self.driver_path)?,
+        };
 
         self.mutable_inner.borrow_mut().driver_proxy = Some(driver_proxy);
         self.init_done.signal();
@@ -379,19 +378,18 @@ pub mod tests {
     use inspect::assert_data_tree;
     use std::task::Poll;
 
-    /// Spawns a new task that acts as a fake thermal driver for testing purposes. The driver only
-    /// handles requests for GetTemperatureCelsius - trying to send any other requests to it is a
-    /// bug. Each GetTemperatureCelsius responds with a value provided by the supplied
-    /// `get_temperature` closure.
+    /// Spawns a new task that acts as a fake temperature driver for testing purposes. Each
+    /// GetTemperatureCelsius call responds with a value provided by the supplied `get_temperature`
+    /// closure.
     pub fn fake_temperature_driver(
         mut get_temperature: impl FnMut() -> Celsius + 'static,
-    ) -> fthermal::DeviceProxy {
+    ) -> ftemperature::DeviceProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fthermal::DeviceMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<ftemperature::DeviceMarker>().unwrap();
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
-                    Some(fthermal::DeviceRequest::GetTemperatureCelsius { responder }) => {
+                    Some(ftemperature::DeviceRequest::GetTemperatureCelsius { responder }) => {
                         let _ =
                             responder.send(zx::Status::OK.into_raw(), get_temperature().0 as f32);
                     }
@@ -405,7 +403,7 @@ pub mod tests {
     }
 
     /// Tests that the node can handle the 'ReadTemperature' message as expected. The test
-    /// checks for the expected temperature value which is returned by the fake thermal driver.
+    /// checks for the expected temperature value which is returned by the fake temperature driver.
     #[fasync::run_singlethreaded(test)]
     async fn test_read_temperature() {
         // Readings for the fake temperature driver.
@@ -539,7 +537,7 @@ pub mod tests {
             "type": "TemperatureHandler",
             "name": "temperature",
             "config": {
-                "driver_path": "/dev/class/thermal/000",
+                "driver_path": "/dev/class/temperature/000",
                 "cache_duration_ms": 1000
             }
         });

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fidl_fuchsia_hardware_thermal as fhardwarethermal, fuchsia_zircon as zx, futures::TryStreamExt,
+    fidl_fuchsia_hardware_temperature as ftemperature, fuchsia_zircon as zx, futures::TryStreamExt,
     parking_lot::RwLock, std::sync::Arc, tracing::*,
 };
 
@@ -31,14 +31,13 @@ impl MockTemperatureDriver {
         let name = self.name.clone();
         let current_temperature = self.current_temperature.clone();
 
-        vfs::service::host(move |mut stream: fhardwarethermal::DeviceRequestStream| {
+        vfs::service::host(move |mut stream: ftemperature::DeviceRequestStream| {
             let name = name.clone();
             let current_temperature_clone = current_temperature.clone();
             async move {
                 info!("MockTemperatureDriver [{}]: new connection", name);
-                while let Some(fhardwarethermal::DeviceRequest::GetTemperatureCelsius {
-                    responder,
-                }) = stream.try_next().await.unwrap()
+                while let Some(ftemperature::DeviceRequest::GetTemperatureCelsius { responder }) =
+                    stream.try_next().await.unwrap()
                 {
                     info!(
                         "MockTemperatureDriver [{}]: received temperature request; sending {}",
@@ -86,7 +85,7 @@ mod tests {
             dir_server,
         );
 
-        let driver_proxy = connect_to_named_protocol_at_dir_root::<fhardwarethermal::DeviceMarker>(
+        let driver_proxy = connect_to_named_protocol_at_dir_root::<ftemperature::DeviceMarker>(
             &fio::DirectoryProxy::from_channel(dir.into_channel().unwrap()),
             "mock",
         )

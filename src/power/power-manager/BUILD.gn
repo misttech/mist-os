@@ -37,7 +37,7 @@ power_manager_deps = [
   "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_rust",
   "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_rust",
   "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
-  "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_rust",
+  "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
   "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
