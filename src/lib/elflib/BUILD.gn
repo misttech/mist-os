@@ -108,7 +108,10 @@ fuchsia_library_fuzzer("elflib_fuzzer") {
 
 fuchsia_fuzzer_component("elflib-fuzzer-component") {
   manifest = "meta/elflib_fuzzer.cml"
-  deps = [ ":elflib_fuzzer" ]
+  deps = [
+    ":elflib_fuzzer",
+    ":test_data",
+  ]
 }
 
 fuchsia_fuzzer_package("elflib-fuzzers") {

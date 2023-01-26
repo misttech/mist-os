@@ -4,6 +4,9 @@
 {
     include: [ "//src/sys/fuzzing/libfuzzer/default.shard.cml" ],
     program: {
-        args: [ "test/elflib_fuzzer" ],
+        args: [
+            "test/elflib_fuzzer",
+            "data/",
+        ],
     },
 }

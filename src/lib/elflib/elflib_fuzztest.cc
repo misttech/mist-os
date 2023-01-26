@@ -19,6 +19,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     elf->GetPLTOffsets();
     elf->GetSharedObjectDependencies();
     elf->GetAndClearWarnings();
+    elf->GetGNUBuildID();
   }
   return 0;
 }
