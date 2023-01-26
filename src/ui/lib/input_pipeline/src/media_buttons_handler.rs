@@ -15,7 +15,8 @@ use {
     fuchsia_syslog::fx_log_info,
     fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,
-    futures::{channel::mpsc, lock::Mutex, StreamExt, TryStreamExt},
+    futures::{channel::mpsc, StreamExt, TryStreamExt},
+    std::cell::RefCell,
     std::collections::HashMap,
     std::rc::Rc,
 };
@@ -24,7 +25,7 @@ use {
 #[derive(Debug)]
 pub struct MediaButtonsHandler {
     /// The mutable fields of this handler.
-    inner: Mutex<MediaButtonsHandlerInner>,
+    inner: RefCell<MediaButtonsHandlerInner>,
 
     /// The FIDL proxy used to report media button activity to the activity
     /// service.
@@ -63,8 +64,7 @@ impl UnhandledInputHandler for MediaButtonsHandler {
                 self.send_event_to_listeners(&media_buttons_event).await;
 
                 // Store the sent event.
-                let mut inner = self.inner.lock().await;
-                inner.last_event = Some(media_buttons_event);
+                self.inner.borrow_mut().last_event = Some(media_buttons_event);
 
                 // Report the event to the Activity Service.
                 if let Err(e) = self.report_media_buttons_activity(event_time).await {
@@ -100,7 +100,7 @@ impl MediaButtonsHandler {
     ) -> Rc<Self> {
         let media_buttons_handler = Self {
             aggregator_proxy,
-            inner: Mutex::new(MediaButtonsHandlerInner {
+            inner: RefCell::new(MediaButtonsHandlerInner {
                 listeners: HashMap::new(),
                 last_event: None,
                 send_event_task_tracker: LocalTaskTracker::new(),
@@ -132,12 +132,14 @@ impl MediaButtonsHandler {
                 } => {
                     if let Ok(proxy) = listener.into_proxy() {
                         // Add the listener to the registry.
-                        let mut inner = self.inner.lock().await;
-                        inner.listeners.insert(proxy.as_channel().raw_handle(), proxy.clone());
+                        self.inner
+                            .borrow_mut()
+                            .listeners
+                            .insert(proxy.as_channel().raw_handle(), proxy.clone());
                         let proxy_clone = proxy.clone();
 
                         // Send the listener the last media button event.
-                        if let Some(event) = &inner.last_event {
+                        if let Some(event) = &self.inner.borrow().last_event {
                             let event_to_send = event.clone();
                             let fut = async move {
                                 match proxy_clone.on_event(event_to_send).await {
@@ -150,7 +152,10 @@ impl MediaButtonsHandler {
                                     }
                                 }
                             };
-                            inner.send_event_task_tracker.track(fasync::Task::local(fut));
+                            self.inner
+                                .borrow()
+                                .send_event_task_tracker
+                                .track(fasync::Task::local(fut));
                         }
                     }
                     let _ = responder.send();
@@ -205,9 +210,9 @@ impl MediaButtonsHandler {
     /// # Parameters
     /// - `event`: The event to send to the listeners.
     async fn send_event_to_listeners(self: &Rc<Self>, event: &fidl_ui_input::MediaButtonsEvent) {
-        let inner = self.inner.lock().await;
+        let tracker = &self.inner.borrow().send_event_task_tracker;
 
-        for (handle, listener) in &inner.listeners {
+        for (handle, listener) in &self.inner.borrow().listeners {
             let weak_handler = Rc::downgrade(&self);
             let listener_clone = listener.clone();
             let handle_clone = handle.clone();
@@ -217,7 +222,7 @@ impl MediaButtonsHandler {
                     Ok(_) => {}
                     Err(e) => {
                         if let Some(handler) = weak_handler.upgrade() {
-                            handler.inner.lock().await.listeners.remove(&handle_clone);
+                            handler.inner.borrow_mut().listeners.remove(&handle_clone);
                             fx_log_info!(
                                 "Unregistering listener; unable to send MediaButtonsEvent: {:?}",
                                 e
@@ -226,7 +231,8 @@ impl MediaButtonsHandler {
                     }
                 }
             };
-            inner.send_event_task_tracker.track(fasync::Task::local(fut));
+
+            tracker.track(fasync::Task::local(fut));
         }
     }
 
@@ -372,7 +378,7 @@ mod tests {
                 .expect("Failed to create interaction observation Aggregator proxy and stream.");
         let media_buttons_handler = Rc::new(MediaButtonsHandler {
             aggregator_proxy: Some(aggregator_proxy),
-            inner: Mutex::new(MediaButtonsHandlerInner {
+            inner: RefCell::new(MediaButtonsHandlerInner {
                 listeners: HashMap::new(),
                 last_event: Some(create_ui_input_media_buttons_event(Some(1), None, None, None)),
                 send_event_task_tracker: LocalTaskTracker::new(),
@@ -405,7 +411,7 @@ mod tests {
             }
         };
         futures::join!(register_listener_fut, assert_fut);
-        assert_eq!(media_buttons_handler.inner.lock().await.listeners.len(), 1);
+        assert_eq!(media_buttons_handler.inner.borrow().listeners.len(), 1);
     }
 
     /// Tests that all supported buttons are sent.
@@ -521,9 +527,7 @@ mod tests {
             let _ = device_listener_proxy.register_listener(first_listener).await;
             let _ = device_listener_proxy.register_listener(second_listener).await;
             let _ = device_listener_proxy.register_listener(third_listener).await;
-            let inner = media_buttons_handler.inner.lock().await;
-            assert_eq!(inner.listeners.len(), 3);
-            drop(inner);
+            assert_eq!(media_buttons_handler.inner.borrow().listeners.len(), 3);
 
             // Generate input event to be handled by MediaButtonsHandler.
             let descriptor = testing_utilities::consumer_controls_device_descriptor();
@@ -579,7 +583,7 @@ mod tests {
 
         // Should only be two listeners still registered in 'inner' after we unregister the listener with closed channel.
         let _ = exec.run_singlethreaded(async {
-            assert_eq!(media_buttons_handler_clone.inner.lock().await.listeners.len(), 2);
+            assert_eq!(media_buttons_handler_clone.inner.borrow().listeners.len(), 2);
         });
     }
 
