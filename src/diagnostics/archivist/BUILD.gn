@@ -1,7 +1,6 @@
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
 import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
@@ -14,22 +13,6 @@ import("//build/rust/rustc_library.gni")
 import("//src/diagnostics/archivist/build/archivist.gni")
 import("//src/diagnostics/archivist/configs.gni")
 import("//tools/fidl/measure-tape/measure_tape.gni")
-
-bootfs_files_for_assembly("no-detect-service-config-for-assembly") {
-  deps = [ ":no-detect-service-config" ]
-}
-
-bootfs_files_for_assembly("no-service-config-for-assembly") {
-  deps = [ ":no-service-config" ]
-}
-
-bootfs_files_for_assembly("bringup-config-for-assembly") {
-  deps = [ ":bringup-config" ]
-}
-
-bootfs_files_for_assembly("default-service-config-for-assembly") {
-  deps = [ ":default-service-config" ]
-}
 
 measure_tape("logmessage_measure_tape") {
   target_binding = "rust"

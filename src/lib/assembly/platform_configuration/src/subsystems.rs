@@ -148,7 +148,7 @@ pub fn define_configuration(
         &config.platform.diagnostics,
         &mut builder,
     )
-    .context("Configuring the diagnostics subsystem")?;
+    .context("Configuring the 'diagnostics' subsystem")?;
 
     Ok(builder.build())
 }

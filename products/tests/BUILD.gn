@@ -16,6 +16,9 @@ product_assembly_configuration("minimal_boot_user") {
       "session-manager",
       "session:session",
     ]
+    diagnostics = {
+      archivist = "default-service"
+    }
   }
   product = {
     session_url =

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# LINT.IfChange
 default_config = {
   bind_services = [
     "fuchsia.component.DetectBinder",
@@ -29,6 +30,8 @@ bringup_config = {
 
   bind_services = []
 }
+
+# LINT.ThenChange(/src/lib/assembly/platform_configuration/src/subsystems/diagnostics.rs)
 
 low_mem_default_config = {
   forward_variables_from(default_config, "*")

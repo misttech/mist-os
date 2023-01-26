@@ -18,6 +18,9 @@ product_assembly_configuration("minimal") {
         "touchscreen",
       ]
     }
+    diagnostics = {
+      archivist = "default-service"
+    }
   }
   product = {
   }

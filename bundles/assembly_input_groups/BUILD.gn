@@ -152,7 +152,6 @@ assembly_input_groups("bootstrap") {
     "//bundles:bootstrap",
     "//bundles/drivers:bootstrap",
     "//src/sys/component_manager:component_manager_bootfs_config",
-    "//src/diagnostics/archivist:default-service-config",
   ]
 
   cmdline_deps = [

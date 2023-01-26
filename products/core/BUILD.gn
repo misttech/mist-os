@@ -19,6 +19,11 @@ product_assembly_configuration("core") {
         "touchscreen",
       ]
     }
+
+    # TODO(fxbug.dev/118809): soft transition, remove.
+    diagnostics = {
+      archivist = "default-service"
+    }
   }
   product = {
   }

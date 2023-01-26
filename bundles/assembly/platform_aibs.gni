@@ -24,17 +24,11 @@ platform_aib_names = [
   # Feature-level / Subsystem-level bundles
 
   # SWD (Software Delivery)
-  "omaha-client",
+  "omaha_client",
 
   # Kernel args
   "kernel_args_user",
   "kernel_args_userdebug",
-
-  # Archivist
-  "archivist-no-detect-service",
-  "archivist-no-service",
-  "archivist-bringup",
-  "archivist-minimal",
 
   # WLAN
   "wlan_base",
@@ -63,7 +57,7 @@ _eng_aib_names = [
   "common_minimal_eng",
 
   # SWD (Software Delivery)
-  "system-update-checker",
+  "system_update_checker",
 
   # Kernel args
   "kernel_args_eng",

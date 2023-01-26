@@ -10,13 +10,9 @@ PLATFORM_AIB_NAMES = [
     "common_minimal",
     "common_minimal_userdebug",
     "emulator_support",
-    "omaha-client",
+    "omaha_client",
     "kernel_args_user",
     "kernel_args_userdebug",
-    "archivist-no-detect-service",
-    "archivist-no-service",
-    "archivist-bringup",
-    "archivist-minimal",
     "wlan_base",
     "wlan_legacy_privacy_support",
     "wlan_contemporary_privacy_only_support",
@@ -27,6 +23,6 @@ PLATFORM_AIB_NAMES = [
 # The names of all of the platform's Assembly Input Bundles.
 ENG_PLATFORM_AIB_NAMES = PLATFORM_AIB_NAMES + [
     "common_minimal_eng",
-    "system-update-checker",
+    "system_update_checker",
     "kernel_args_eng",
 ]

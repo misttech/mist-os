@@ -16,9 +16,6 @@ product_bootfs_labels = [
   "//bundles/drivers:utils",
 ]
 
-# Enable the archivist: logging and inspect gathering.
-product_bootfs_labels += [ "//src/diagnostics/archivist:bringup-config" ]
-
 meta_package_labels = []
 
 base_driver_package_labels = []

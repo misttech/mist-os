@@ -45,11 +45,11 @@ pub(crate) struct ConfigurationContext<'a> {
 ///
 /// // to set a single field on multiple components in the same package:
 /// let mut swd_package = builder.package("swd");
-/// swd_package.component("foo").field("some_key", "some_value");
-/// swd_package.component("bar").field("some_key", "some_value");
+/// swd_package.component("meta/foo.cm").field("some_key", "some_value");
+/// swd_package.component("meta/bar.cm").field("some_key", "some_value");
 ///
 /// // to set multiple fieds on the same component:
-/// swd_package.component("mine")
+/// swd_package.component("meta/mine.cm")
 ///   .field("a", "value1")
 ///   .field("b", "value2");
 /// ```

@@ -355,31 +355,11 @@ assembly_input_bundle("emulator_support") {
   deps = [ _qemu_kernel_target ]
 }
 
-assembly_input_bundle("system-update-checker") {
+assembly_input_bundle("system_update_checker") {
   testonly = true
 }
 
-assembly_input_bundle("omaha-client") {
-}
-
-assembly_input_bundle("archivist-no-detect-service") {
-  bootfs_files_labels =
-      [ "//src/diagnostics/archivist:no-detect-service-config-for-assembly" ]
-}
-
-assembly_input_bundle("archivist-no-service") {
-  bootfs_files_labels =
-      [ "//src/diagnostics/archivist:no-service-config-for-assembly" ]
-}
-
-assembly_input_bundle("archivist-bringup") {
-  bootfs_files_labels =
-      [ "//src/diagnostics/archivist:bringup-config-for-assembly" ]
-}
-
-assembly_input_bundle("archivist-minimal") {
-  bootfs_files_labels =
-      [ "//src/diagnostics/archivist:default-service-config-for-assembly" ]
+assembly_input_bundle("omaha_client") {
 }
 
 assembly_input_bundle("wlan_base") {

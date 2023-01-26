@@ -22,6 +22,9 @@ workstation_platform_config = {
       "touchscreen",
     ]
   }
+  diagnostics = {
+    archivist = "default-service"
+  }
 }
 
 workstation_product_config = {

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
 import("//build/images/paths.gni")
 import("//build/images/vboot/vboot.gni")
@@ -51,10 +52,8 @@ if (is_fuchsia) {
       "//bundles/drivers:usb-peripheral-stack",
       "//bundles/drivers:utils",
     ]
-    bootfs_labels += [
-      "//src/sys/component_manager:component_manager_bootfs_config",
-      "//src/diagnostics/archivist:default-service-config",
-    ]
+    bootfs_labels +=
+        [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
     if (custom_signing_script != "") {
       zbi_signing_script = custom_signing_script
@@ -233,11 +232,29 @@ if (is_fuchsia) {
     core_realm_definition = ":core-eng"
   }
 
+  product_assembly_configuration("for-fastboot") {
+    platform = {
+      build_type = "user"
+      feature_set_level = "bringup"
+      diagnostics = {
+        archivist = "default-service"
+      }
+    }
+    product = {
+    }
+  }
+
   # A minimal recovery image that runs userspace fastboot on tcp.
   assembled_system("recovery-fastboot") {
     forward_variables_from(recovery_base, "*")
     base_packages = []
     core_realm_definition = ":core-eng"
+
+    product_assembly_config_file =
+        get_label_info(":for-fastboot", "target_out_dir") +
+        "/for-fastboot/product_assembly_config.json"
+    product_assembly_config_dep = ":for-fastboot"
+
     base_packages = [
       "//build/info:build-info",
       "//src/connectivity/network",
@@ -263,7 +280,6 @@ if (is_fuchsia) {
       "//bundles/drivers:usb-host-stack",
       "//bundles/drivers:usb-peripheral-stack",
       "//src/sys/component_manager:component_manager_bootfs_config",
-      "//src/diagnostics/archivist:default-service-config",
       "//src/devices/bundles:debugging",
     ]
 
@@ -318,10 +334,8 @@ if (is_fuchsia) {
       "//bundles/drivers:usb-host-stack",
       "//bundles/drivers:usb-peripheral-stack",
     ]
-    bootfs_labels += [
-      "//src/diagnostics/archivist:default-service-config",
-      "//src/sys/component_manager:component_manager_bootfs_config",
-    ]
+    bootfs_labels +=
+        [ "//src/sys/component_manager:component_manager_bootfs_config" ]
 
     if (custom_signing_script != "") {
       zbi_signing_script = custom_signing_script
