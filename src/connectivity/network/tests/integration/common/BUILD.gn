@@ -32,6 +32,7 @@ rustc_library("netstack_testing_common") {
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//sdk/fidl/fuchsia.stash:fuchsia.stash_rust",
+    "//src/connectivity/lib/net-declare",
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/lib/packet-formats-dhcp",

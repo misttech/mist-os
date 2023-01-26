@@ -345,12 +345,12 @@ async fn slaac_with_privacy_extensions(test_name: &str, sub_test_name: &str, for
 
     // Send a Router Advertisement with information for a SLAAC prefix.
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
-        ipv6_consts::PREFIX.prefix(),  /* prefix_length */
-        false,                         /* on_link_flag */
-        true,                          /* autonomous_address_configuration_flag */
-        99999,                         /* valid_lifetime */
-        99999,                         /* preferred_lifetime */
-        ipv6_consts::PREFIX.network(), /* prefix */
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        false,                                /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        99999,                                /* valid_lifetime */
+        99999,                                /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
     send_ra_with_router_lifetime(&fake_ep, 0, &options)
         .await
@@ -378,9 +378,11 @@ async fn slaac_with_privacy_extensions(test_name: &str, sub_test_name: &str, for
                      }| {
                         match addr {
                             net::IpAddress::Ipv4(net::Ipv4Address { .. }) => None,
-                            net::IpAddress::Ipv6(net::Ipv6Address { addr }) => ipv6_consts::PREFIX
-                                .contains(&net_types_ip::Ipv6Addr::from_bytes(addr))
-                                .then_some(()),
+                            net::IpAddress::Ipv6(net::Ipv6Address { addr }) => {
+                                ipv6_consts::GLOBAL_PREFIX
+                                    .contains(&net_types_ip::Ipv6Addr::from_bytes(addr))
+                                    .then_some(())
+                            }
                         }
                     },
                 )
@@ -654,12 +656,12 @@ async fn on_and_off_link_route_discovery(test_name: &str, sub_test_name: &str, f
 
     let options = [
         NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
-            ipv6_consts::PREFIX.prefix(),  /* prefix_length */
-            true,                          /* on_link_flag */
-            false,                         /* autonomous_address_configuration_flag */
-            6234,                          /* valid_lifetime */
-            0,                             /* preferred_lifetime */
-            ipv6_consts::PREFIX.network(), /* prefix */
+            ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+            true,                                 /* on_link_flag */
+            false,                                /* autonomous_address_configuration_flag */
+            6234,                                 /* valid_lifetime */
+            0,                                    /* preferred_lifetime */
+            ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
         )),
         NdpOptionBuilder::RouteInformation(RouteInformation::new(
             SUBNET_WITH_MORE_SPECIFIC_ROUTE,
@@ -707,9 +709,9 @@ async fn on_and_off_link_route_discovery(test_name: &str, sub_test_name: &str, f
             net_stack::ForwardingEntry {
                 subnet: net::Subnet {
                     addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: ipv6_consts::PREFIX.network().ipv6_bytes(),
+                        addr: ipv6_consts::GLOBAL_PREFIX.network().ipv6_bytes(),
                     }),
-                    prefix_len: ipv6_consts::PREFIX.prefix(),
+                    prefix_len: ipv6_consts::GLOBAL_PREFIX.prefix(),
                 },
                 device_id: nicid,
                 next_hop: None,
@@ -742,7 +744,7 @@ async fn slaac_regeneration_after_dad_failure(name: &str) {
                             // If the NS target_address does not have the prefix we have advertised,
                             // this is for some other address. We ignore it as it is not relevant to
                             // our test.
-                            if !ipv6_consts::PREFIX.contains(message.target_address()) {
+                            if !ipv6_consts::GLOBAL_PREFIX.contains(message.target_address()) {
                                 return None;
                             }
 
@@ -755,7 +757,7 @@ async fn slaac_regeneration_after_dad_failure(name: &str) {
             .on_timeout(timeout.after_now(), || {
                 Err(anyhow::anyhow!(
                     "timed out waiting for a neighbor solicitation targetting address of prefix: {}",
-                    ipv6_consts::PREFIX,
+                    ipv6_consts::GLOBAL_PREFIX,
                 ))
             })
             .await.unwrap().expect("failed to get next OnData event")
@@ -769,12 +771,12 @@ async fn slaac_regeneration_after_dad_failure(name: &str) {
 
     // Send a Router Advertisement with information for a SLAAC prefix.
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
-        ipv6_consts::PREFIX.prefix(),  /* prefix_length */
-        false,                         /* on_link_flag */
-        true,                          /* autonomous_address_configuration_flag */
-        99999,                         /* valid_lifetime */
-        99999,                         /* preferred_lifetime */
-        ipv6_consts::PREFIX.network(), /* prefix */
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        false,                                /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        99999,                                /* valid_lifetime */
+        99999,                                /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
     send_ra_with_router_lifetime(&fake_ep, 0, &options)
         .await
@@ -829,7 +831,7 @@ async fn slaac_regeneration_after_dad_failure(name: &str) {
                                 configured_addr, tried_address,
                                 "address which previously failed DAD was assigned"
                             );
-                            if ipv6_consts::PREFIX.contains(&configured_addr) {
+                            if ipv6_consts::GLOBAL_PREFIX.contains(&configured_addr) {
                                 slaac_addrs += 1;
                             }
                             if configured_addr == target_address {
@@ -998,12 +1000,12 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac(name: &str) {
         .expect("create raw socket");
 
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
-        ipv6_consts::PREFIX.prefix(),  /* prefix_length */
-        true,                          /* on_link_flag */
-        true,                          /* autonomous_address_configuration_flag */
-        6234,                          /* valid_lifetime */
-        0,                             /* preferred_lifetime */
-        ipv6_consts::PREFIX.network(), /* prefix */
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        true,                                 /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        6234,                                 /* valid_lifetime */
+        0,                                    /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
     let ra = RouterAdvertisement::new(
         0,     /* current_hop_limit */
@@ -1066,7 +1068,7 @@ async fn sending_ra_with_autoconf_flag_triggers_slaac(name: &str) {
                             addr,
                         }) => net_types_ip::Ipv6Addr::from_bytes(*addr),
                     };
-                    ipv6_consts::PREFIX.contains(&addr).then(|| ())
+                    ipv6_consts::GLOBAL_PREFIX.contains(&addr).then(|| ())
                 },
             )
         },

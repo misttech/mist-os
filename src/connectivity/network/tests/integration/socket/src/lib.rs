@@ -580,12 +580,12 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
     // SendMsgPreflight call.
     const VALID_LIFETIME_SECONDS: u32 = 4;
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
-        ipv6_consts::PREFIX.prefix(),  /* prefix_length */
-        false,                         /* on_link_flag */
-        true,                          /* autonomous_address_configuration_flag */
-        VALID_LIFETIME_SECONDS,        /* valid_lifetime */
-        0,                             /* preferred_lifetime */
-        ipv6_consts::PREFIX.network(), /* prefix */
+        ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
+        false,                                /* on_link_flag */
+        true,                                 /* autonomous_address_configuration_flag */
+        VALID_LIFETIME_SECONDS,               /* valid_lifetime */
+        0,                                    /* preferred_lifetime */
+        ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
     ndp::send_ra_with_router_lifetime(&fake_ep, 0, &options)
         .await
@@ -604,7 +604,7 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
                  }| match addr {
                     fnet::IpAddress::Ipv4(_) => None,
                     fnet::IpAddress::Ipv6(addr @ fnet::Ipv6Address { addr: bytes }) => {
-                        ipv6_consts::PREFIX
+                        ipv6_consts::GLOBAL_PREFIX
                             .contains(&net_types::ip::Ipv6Addr::from_bytes(*bytes))
                             .then_some(*addr)
                     }
