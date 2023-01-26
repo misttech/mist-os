@@ -18,8 +18,9 @@ class ApiException(Exception):
     pass
 
 
-def get_test_output_dir_path(mobly_output_path: str, testbed_name: str) -> str:
-    """Returns the absolute path to the Mobly testbed's test output directory.
+def get_latest_test_output_dir_symlink_path(
+        mobly_output_path: str, testbed_name: str) -> str:
+    """Returns the absolute path to the Mobly testbed's latest output directory.
 
     Args:
         mobly_output_path: absolute path to Mobly's top-level output directory.
@@ -53,8 +54,8 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
     if not mobly_output_path or not testbed_name:
         raise ApiException('Arguments must be non-empty.')
     return os.path.join(
-        get_test_output_dir_path(mobly_output_path, testbed_name),
-        records.OUTPUT_FILE_SUMMARY)
+        get_latest_test_output_dir_symlink_path(
+            mobly_output_path, testbed_name), records.OUTPUT_FILE_SUMMARY)
 
 
 # TODO(fxbug.dev/119213) - Update |fuchsia_controllers| type to use HoneyDew's

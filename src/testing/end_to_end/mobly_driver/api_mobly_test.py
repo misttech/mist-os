@@ -13,18 +13,19 @@ from parameterized import parameterized
 
 class ApiMoblyTest(unittest.TestCase):
 
-    def test_get_test_output_dir_path_success(self):
-        api_mobly.get_test_output_dir_path('output_path', 'tb')
+    def test_get_latest_test_output_dir_symlink_path_success(self):
+        api_mobly.get_latest_test_output_dir_symlink_path('output_path', 'tb')
 
     @parameterized.expand(
         [
             ('Output path is empty', '', 'tb'),
             ('Testbed name is empty', 'ouput_path', ''),
         ])
-    def test_get_test_output_dir_path_raises_exception(
+    def test_get_latest_test_output_dir_symlink_path_raises_exception(
             self, name, output_path, tb_name):
         with self.assertRaises(api_mobly.ApiException) as ctx:
-            api_mobly.get_test_output_dir_path(output_path, tb_name)
+            api_mobly.get_latest_test_output_dir_symlink_path(
+                output_path, tb_name)
 
     def test_get_result_path_success(self):
         api_mobly.get_result_path('output_path', 'tb')

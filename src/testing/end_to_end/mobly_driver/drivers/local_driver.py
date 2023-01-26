@@ -17,7 +17,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
     """Local Mobly test driver.
 
     This driver is used when executing Mobly tests in the local environment.
-    In the local environment, it is assumed that users have full knowledge of 
+    In the local environment, it is assumed that users have full knowledge of
     the physical testbed that will be used during the Mobly test so LocalDriver
     allows for the Mobly |config_path| to be supllied directly by the user.
     """
