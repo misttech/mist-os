@@ -278,7 +278,7 @@ void Lp50xxLight::GetInfo(GetInfoRequestView request, GetInfoCompleter::Sync& co
   }
 
   completer.ReplySuccess({
-      .name = ::fidl::StringView::FromExternal(name, strlen(name)),
+      .name = ::fidl::StringView::FromExternal(name),
       .capability = fuchsia_hardware_light::wire::Capability::kRgb,
   });
 
@@ -369,7 +369,7 @@ void Lp50xxLight::GetGroupInfo(GetGroupInfoRequestView request,
   }
 
   completer.ReplySuccess({
-      .name = ::fidl::StringView::FromExternal(name, strlen(name)),
+      .name = ::fidl::StringView::FromExternal(name),
       .count = static_cast<uint32_t>(group2led_[request->group_id].size()),
       .capability = fuchsia_hardware_light::wire::Capability::kRgb,
   });

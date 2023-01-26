@@ -254,7 +254,7 @@ zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev, const Driver* dri
   const char* libname = driver->libname.c_str();
   dev->flags |= DEV_CTX_BOUND;
   dev->device_controller()
-      ->BindDriver(fidl::StringView::FromExternal(libname, strlen(libname)), std::move(*vmo))
+      ->BindDriver(fidl::StringView::FromExternal(libname), std::move(*vmo))
       .ThenExactlyOnce([dev](fidl::WireUnownedResult<fdm::DeviceController::BindDriver>& result) {
         if (result.is_peer_closed()) {
           // TODO(fxbug.dev/56208): If we're closed from the driver host we only log a warning,

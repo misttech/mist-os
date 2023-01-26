@@ -180,8 +180,7 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     std::vector<fuchsia_gpu_magma::wire::IcdInfo> icd_infos;
     for (auto& item : msd_icd_infos) {
       auto icd_info = fuchsia_gpu_magma::wire::IcdInfo::Builder(allocator);
-      icd_info.component_url(
-          fidl::StringView::FromExternal(item.component_url, strlen(item.component_url)));
+      icd_info.component_url(fidl::StringView::FromExternal(item.component_url));
       fuchsia_gpu_magma::wire::IcdFlags flags;
       if (item.support_flags & ICD_SUPPORT_FLAG_VULKAN)
         flags |= fuchsia_gpu_magma::wire::IcdFlags::kSupportsVulkan;

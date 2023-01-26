@@ -50,7 +50,7 @@ void GpioLight::GetInfo(GetInfoRequestView request, GetInfoCompleter::Sync& comp
   }
 
   completer.ReplySuccess({
-      .name = ::fidl::StringView::FromExternal(name, strlen(name)),
+      .name = ::fidl::StringView::FromExternal(name),
       .capability = fuchsia_hardware_light::wire::Capability::kSimple,
   });
 }

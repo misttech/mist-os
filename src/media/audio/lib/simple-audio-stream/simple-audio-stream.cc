@@ -585,8 +585,8 @@ void SimpleAudioStream::GetProperties(
     stream_properties.unique_id().data_[i] = unique_id_.data[i];
   }
 
-  auto product = fidl::StringView::FromExternal(prod_name_, strlen(prod_name_));
-  auto manufacturer = fidl::StringView::FromExternal(mfr_name_, strlen(mfr_name_));
+  auto product = fidl::StringView::FromExternal(prod_name_);
+  auto manufacturer = fidl::StringView::FromExternal(mfr_name_);
 
   stream_properties.set_is_input(is_input())
       .set_can_mute(cur_gain_state_.can_mute)

@@ -227,8 +227,7 @@ zx_status_t Paver::WriteABImage(fidl::WireSyncClient<fuchsia_paver::DataSink> da
     }
   } else if (command_ == Command::kFirmware) {
     auto result = data_sink->WriteFirmware(
-        configuration_, fidl::StringView::FromExternal(firmware_type_, strlen(firmware_type_)),
-        std::move(buffer));
+        configuration_, fidl::StringView::FromExternal(firmware_type_), std::move(buffer));
     if (auto status = ProcessWriteFirmwareResult(result, firmware_type_); status != ZX_OK) {
       return status;
     }
@@ -500,8 +499,8 @@ int Paver::MonitorBuffer() {
   // Blocks until paving is complete.
   switch (command_) {
     case Command::kDataFile: {
-      auto res = fshost_admin_svc_->WriteDataFile(
-          fidl::StringView::FromExternal(path_, strlen(path_)), std::move(buffer.vmo));
+      auto res = fshost_admin_svc_->WriteDataFile(fidl::StringView::FromExternal(path_),
+                                                  std::move(buffer.vmo));
       status = res.status() == ZX_OK ? (res.ok() ? ZX_OK : res->error_value()) : res.status();
       break;
     }

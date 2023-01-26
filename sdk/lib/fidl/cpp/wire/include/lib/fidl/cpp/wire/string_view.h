@@ -56,6 +56,10 @@ class StringView final : private VectorView<const char> {
   //     std::string foo = path + "/foo";
   //     auto foo_view = fidl::StringView::FromExternal(foo);
   //
+  //     char name[kLength];
+  //     snprintf(name, sizeof(name), "Hello %d", 123);
+  //     auto name_view = fidl::StringView::FromExternal(name);
+  //
   static StringView FromExternal(std::string_view from) { return StringView(from); }
   static StringView FromExternal(const char* data, size_t size) { return StringView(data, size); }
 

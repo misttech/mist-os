@@ -60,7 +60,7 @@ void RamNandCtl::CreateDevice(CreateDeviceRequestView request,
 
   // devmgr is now in charge of the device.
   [[maybe_unused]] NandDevice* dummy = device.release();
-  completer.Reply(ZX_OK, fidl::StringView::FromExternal(dummy->name(), strlen(dummy->name())));
+  completer.Reply(ZX_OK, fidl::StringView::FromExternal(dummy->name()));
 }
 
 }  // namespace
