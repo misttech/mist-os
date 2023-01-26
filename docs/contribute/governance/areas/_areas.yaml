@@ -2,7 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(pascallouis): Align with docs/contribute/governance/rfcs/_areas.yaml
+# NOTE: This should be a subset of the areas listed in
+# docs/contribute/governance/rfcs/_areas.yaml.
 
 - name: 'Bluetooth'
   api_primary: 'jamuraa@google.com'
