@@ -74,10 +74,7 @@ impl ToolEnv {
         self.injector
     }
 
-    pub async fn build_tool<'a, T: FfxTool>(
-        &'a self,
-        context: &'a EnvironmentContext,
-    ) -> Result<T::Main<'a>> {
+    pub async fn build_tool<T: FfxTool>(self, context: EnvironmentContext) -> Result<T::Main> {
         let tool_cmd = ToolCommand::<T>::from_args(
             &Vec::from_iter(self.ffx_cmd_line.cmd_iter()),
             &Vec::from_iter(self.ffx_cmd_line.subcmd_iter()),
@@ -89,12 +86,13 @@ impl ToolEnv {
         self.build_tool_from_cmd::<T>(cmd, context).await
     }
 
-    pub async fn build_tool_from_cmd<'a, T: FfxTool>(
-        &'a self,
+    pub async fn build_tool_from_cmd<T: FfxTool>(
+        self,
         cmd: T::Command,
-        context: &'a EnvironmentContext,
-    ) -> Result<T::Main<'a>> {
-        let env = FhoEnvironment { injector: &self.injector, context, ffx: &self.ffx_cmd_line };
+        context: EnvironmentContext,
+    ) -> Result<T::Main> {
+        let env =
+            FhoEnvironment { injector: Box::new(self.injector), context, ffx: self.ffx_cmd_line };
         T::from_env(env, cmd).await
     }
 }
@@ -177,7 +175,7 @@ mod internal {
 
     #[async_trait(?Send)]
     impl TryFromEnv for NewTypeString {
-        async fn try_from_env(_env: &FhoEnvironment<'_>) -> Result<Self> {
+        async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
             Ok(Self(String::from("foobar")))
         }
     }
@@ -198,7 +196,7 @@ mod internal {
 
     #[async_trait(?Send)]
     impl CheckEnv for SimpleCheck {
-        async fn check_env(self, _env: &FhoEnvironment<'_>) -> Result<()> {
+        async fn check_env(self, _env: &FhoEnvironment) -> Result<()> {
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow_mut() += 1);
             if self.0 {
                 Ok(())

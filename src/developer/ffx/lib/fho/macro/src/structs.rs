@@ -103,7 +103,7 @@ impl ToTokens for CommandFieldTypeDecl<'_> {
 /// let results_names = join_results_names;
 /// quote! {
 /// #(#asserts)*
-/// fn try_from_env(_env: FhoEnvironment<'_>) -> Result<Self> {
+/// fn try_from_env(_env: FhoEnvironment) -> Result<Self> {
 ///
 ///     #vcc
 ///
@@ -223,11 +223,11 @@ impl ToTokens for NamedFieldStruct<'_> {
         let res = quote_spanned! {span=>
             #(#try_from_env_type_assertions)*
             #struct_decl {
-                type Main<'a> = Self;
+                type Main = Self;
 
                 #command_field_decl
                 async fn from_env(
-                    _env: fho::FhoEnvironment<'_>,
+                    _env: fho::FhoEnvironment,
                     cmd: Self::Command,
                 ) -> Result<Self, fho::Error> {
                     // Allow unused in the event that things don't compile (then

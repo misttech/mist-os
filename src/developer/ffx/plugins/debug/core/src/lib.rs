@@ -19,7 +19,7 @@ use {
 };
 
 pub async fn ffx_plugin_impl(
-    injector: &dyn ffx_core::Injector,
+    injector: Box<dyn ffx_core::Injector>,
     cmd: ffx_debug_core_args::CoreCommand,
 ) -> Result<()> {
     let sdk = ffx_config::global_env_context()

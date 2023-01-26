@@ -127,7 +127,7 @@ async fn run_legacy_subcommand(
             DaemonVersionCheck::SameBuildId(context.daemon_version_string()?),
         )
         .await?;
-    ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await
+    ffx_lib_suite::ffx_plugin_impl(Box::new(injector), subcommand).await
 }
 
 fn is_daemon(subcommand: &FfxBuiltIn) -> bool {

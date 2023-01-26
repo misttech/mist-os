@@ -65,7 +65,7 @@ mod test {
             .try_daemon_closure(|| async { Ok(Some(setup_fake_daemon_server())) });
         let writer = SimpleWriter::new_test(None);
         let tool = tool_env
-            .build_tool_from_cmd::<StopTool>(StopCommand {}, &config_env.context)
+            .build_tool_from_cmd::<StopTool>(StopCommand {}, config_env.context.clone())
             .await
             .unwrap();
         let result = tool.main(&writer).await;

@@ -16,12 +16,12 @@ use crate::FhoEnvironment;
 
 #[async_trait(?Send)]
 pub trait TryFromEnv: Sized {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self>;
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self>;
 }
 
 #[async_trait(?Send)]
 pub trait CheckEnv {
-    async fn check_env(self, env: &FhoEnvironment<'_>) -> Result<()>;
+    async fn check_env(self, env: &FhoEnvironment) -> Result<()>;
 }
 
 #[async_trait(?Send)]
@@ -29,7 +29,7 @@ impl<T> TryFromEnv for Arc<T>
 where
     T: TryFromEnv,
 {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         T::try_from_env(env).await.map(Arc::new)
     }
 }
@@ -39,7 +39,7 @@ impl<T> TryFromEnv for Rc<T>
 where
     T: TryFromEnv,
 {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         T::try_from_env(env).await.map(Rc::new)
     }
 }
@@ -49,7 +49,7 @@ impl<T> TryFromEnv for Box<T>
 where
     T: TryFromEnv,
 {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         T::try_from_env(env).await.map(Box::new)
     }
 }
@@ -59,7 +59,7 @@ impl<T> TryFromEnv for Result<T>
 where
     T: TryFromEnv,
 {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         Ok(T::try_from_env(env).await)
     }
 }
@@ -70,7 +70,7 @@ pub struct AvailabilityFlag<T>(pub T);
 
 #[async_trait(?Send)]
 impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
-    async fn check_env(self, _env: &FhoEnvironment<'_>) -> Result<()> {
+    async fn check_env(self, _env: &FhoEnvironment) -> Result<()> {
         let flag = self.0.as_ref();
         if ffx_config::get(flag).await.unwrap_or(false) {
             Ok(())
@@ -129,7 +129,7 @@ impl<P: Proxy + Clone, S: FuchsiaComponentSelector, const TIMEOUT: u64> TryFromE
 where
     P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
 {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
             .with_user_message(|| format!("Failed creating proxy for selector {}", S::SELECTOR))?;
         let _ = selectors::parse_selector::<VerboseError>(S::SELECTOR)
@@ -217,7 +217,7 @@ impl<P: Proxy + Clone> TryFromEnv for DaemonProtocol<P>
 where
     P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
 {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let svc_name = <P::Protocol as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME;
         let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>()
             .with_user_message(|| format!("Failed creating proxy for service {}", svc_name))?;
@@ -234,7 +234,7 @@ where
 
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::DaemonProxy {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         env.injector.daemon_factory().await.user_message("Failed to create daemon proxy")
     }
 }
@@ -245,7 +245,7 @@ impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
     /// started. If you would like to use the normal flow of attempting to connect to the daemon,
     /// and starting a new instance of the daemon if none is currently present, you should use the
     /// impl for `ffx_fidl::DaemonProxy`, which returns a `Result<ffx_fidl::DaemonProxy>`.
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let res = env
             .injector
             .try_daemon()
@@ -257,21 +257,21 @@ impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
 
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::TargetProxy {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         env.injector.target_factory().await.user_message("Failed to create target proxy")
     }
 }
 
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::FastbootProxy {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         env.injector.fastboot_factory().await.user_message("Failed to create fastboot proxy")
     }
 }
 
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_writer::Writer {
-    async fn try_from_env(env: &FhoEnvironment<'_>) -> Result<Self> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         env.injector.writer().await.user_message("Failed to create writer")
     }
 }

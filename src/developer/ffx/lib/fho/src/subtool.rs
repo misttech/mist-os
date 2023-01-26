@@ -21,10 +21,10 @@ use crate::{FhoToolMetadata, TryFromEnv};
 #[async_trait(?Send)]
 pub trait FfxTool: Sized {
     type Command: FromArgs + SubCommand;
-    type Main<'a>: FfxMain;
+    type Main: FfxMain;
 
     fn forces_stdout_log() -> bool;
-    async fn from_env(env: FhoEnvironment<'_>, cmd: Self::Command) -> Result<Self::Main<'_>>;
+    async fn from_env(env: FhoEnvironment, cmd: Self::Command) -> Result<Self::Main>;
 
     /// Executes the tool. This is intended to be invoked by the user in main.
     async fn execute_tool() {
@@ -94,10 +94,10 @@ struct FhoTool<M: FfxTool> {
     command: ToolCommand<M>,
 }
 
-pub struct FhoEnvironment<'a> {
-    pub ffx: &'a FfxCommandLine,
-    pub context: &'a EnvironmentContext,
-    pub injector: &'a dyn Injector,
+pub struct FhoEnvironment {
+    pub ffx: FfxCommandLine,
+    pub context: EnvironmentContext,
+    pub injector: Box<dyn Injector>,
 }
 
 impl MetadataCmd {
@@ -157,7 +157,7 @@ async fn run_main<T: FfxTool>(
             DaemonVersionCheck::SameVersionInfo(build_info),
         )
         .await?;
-    let env = FhoEnvironment { ffx: &cmd, context: &suite.context, injector: &injector };
+    let env = FhoEnvironment { ffx: cmd, context: suite.context, injector: Box::new(injector) };
     let writer = TryFromEnv::try_from_env(&env).await?;
     let main = T::from_env(env, tool).await?;
     main.main(&writer).await.map(|_| ExitStatus::from_raw(0))
@@ -208,7 +208,7 @@ mod tests {
         let tool_env = fho::testing::ToolEnv::new()
             .set_ffx_cmd(FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap());
         let writer = SimpleWriter::new_test(None);
-        let fake_tool = tool_env.build_tool::<FakeTool>(&config_env.context).await.unwrap();
+        let fake_tool = tool_env.build_tool::<FakeTool>(config_env.context.clone()).await.unwrap();
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),
             1,
@@ -237,7 +237,7 @@ mod tests {
         let tool_env = fho::testing::ToolEnv::new()
             .set_ffx_cmd(FfxCommandLine::new(None, &["ffx", "fake", "stuff"]).unwrap());
         tool_env
-            .build_tool::<FakeToolWillFail>(&config_env.context)
+            .build_tool::<FakeToolWillFail>(config_env.context.clone())
             .await
             .expect_err("Should not have been able to create tool with a negative pre-check");
         assert_eq!(
