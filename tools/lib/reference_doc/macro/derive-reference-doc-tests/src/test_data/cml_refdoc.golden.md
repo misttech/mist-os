@@ -663,9 +663,6 @@ _`object` (optional)_
 The configuration schema as defined by a component. Each key represents a single field
 in the schema.
 
-NOTE: This feature is currently experimental and access is controlled through an allowlist
-in fuchsia.git at `//tools/cmc/build/restricted_features/BUILD.gn`.
-
 Configuration fields are JSON objects and must define a `type` which can be one of the
 following strings:
 `bool`, `uint8`, `int8`, `uint16`, `int16`, `uint32`, `int32`, `uint64`, `int64`,
