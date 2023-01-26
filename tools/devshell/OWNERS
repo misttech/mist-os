@@ -1,6 +1,7 @@
 abarth@google.com
 gboone@google.com
 mangini@google.com
+olivernewman@google.com
 
 per-file             add-update-source,build-push,lib/updates.sh = file: /src/sys/pkg/OWNERS
 # per-file-COMPONENT add-update-source,build-push,lib/updates.sh = Packages
