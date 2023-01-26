@@ -84,13 +84,17 @@ pub struct Kernel {
 }
 
 impl Kernel {
-    pub fn new(name: &[u8], features: &[String]) -> Result<Kernel, zx::Status> {
+    pub fn new(
+        name: &[u8],
+        cmdline: &[u8],
+        features: &[String],
+    ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker = Box::new(|x: Vec<u8>| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
         let job = fuchsia_runtime::job_default().create_child_job()?;
         set_zx_name(&job, name);
 
-        Ok(Kernel {
+        Ok(Arc::new(Kernel {
             job,
             starnix_process: fuchsia_runtime::process_self()
                 .duplicate(zx::Rights::SAME_RIGHTS)
@@ -100,7 +104,7 @@ impl Kernel {
             default_abstract_vsock_namespace: AbstractVsockSocketNamespace::new(
                 vsock_address_maker,
             ),
-            cmdline: Vec::new(),
+            cmdline: cmdline.to_vec(),
             anon_fs: OnceCell::new(),
             pipe_fs: OnceCell::new(),
             dev_tmp_fs: OnceCell::new(),
@@ -115,7 +119,7 @@ impl Kernel {
             binders: Default::default(),
             iptables: RwLock::new(IpTables::new()),
             shared_futexes: Default::default(),
-        })
+        }))
     }
 
     /// Opens a device file (driver) identified by `dev`.

@@ -45,8 +45,7 @@ pub fn create_kernel_and_task() -> (Arc<Kernel>, CurrentTask) {
 fn create_kernel_and_task_with_fs(
     create_fs: impl FnOnce(&Kernel) -> FileSystemHandle,
 ) -> (Arc<Kernel>, CurrentTask) {
-    let kernel =
-        Arc::new(Kernel::new(b"test-kernel", &Vec::new()).expect("failed to create kernel"));
+    let kernel = Kernel::new(b"test-kernel", &[], &Vec::new()).expect("failed to create kernel");
 
     let task = Task::create_process_without_parent(
         &kernel,

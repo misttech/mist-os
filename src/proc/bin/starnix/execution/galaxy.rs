@@ -182,10 +182,8 @@ pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
 
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
-    let mut kernel = Kernel::new(config.name.as_bytes(), &config.features)?;
-    kernel.cmdline = config.kernel_cmdline.as_bytes().to_vec();
-
-    let kernel = Arc::new(kernel);
+    let kernel =
+        Kernel::new(config.name.as_bytes(), config.kernel_cmdline.as_bytes(), &config.features)?;
 
     let node = inspect::component::inspector().root().create_child("galaxy");
     create_galaxy_inspect(kernel.clone(), &node);
