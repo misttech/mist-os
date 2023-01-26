@@ -67,6 +67,13 @@ api.  It consists of
 headers (example:
 [intel](/src/graphics/drivers/msd-intel-gen/include/magma_intel_gen_defs.h)).
 
+On Fuchsia, Magma includes a
+[magma_sysmem.h](/src/graphics/lib/magma/include/magma/magma_sysmem.h) header
+that clients may use to interact with
+[sysmem](/docs/development/graphics/sysmem/concepts/sysmem.md).  The Magma
+headers and a static library that implement them are available in the Fuchsia
+SDK at [@fuchsia_pkg//pkg/magma_client][libmagma].
+
 ### Physical devices
 During the Fuchsia boot sequence, a Magma system driver is instantiated for each
 physical device capable of accelerated graphics.  The instantiation creates a
@@ -206,3 +213,5 @@ management will be detailed in further documentation.
 ## Testing Strategy
 
 See [test_strategy](test_strategy.md).
+
+[libmagma]: /src/graphics/lib/magma/src/libmagma
