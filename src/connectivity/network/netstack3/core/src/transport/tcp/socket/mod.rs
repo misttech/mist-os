@@ -1055,11 +1055,11 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
             let ListenerAddr { device: old_device, ip: ip_addr } = addr;
             let ListenerIpAddr { identifier: _, addr: ip } = ip_addr;
             if let Some(ip) = ip {
-                // TODO(https://fxbug.dev/115524): add an assert for
-                // `must_have_zone = true` implying `device != None` once that's
-                // enforced as an invariant for bind & connect.
-                if crate::socket::must_have_zone(ip) && &device != old_device {
-                    return Err(SetDeviceError::ZoneChange);
+                if crate::socket::must_have_zone(ip) {
+                    debug_assert!(old_device.is_some());
+                    if &device != old_device {
+                        return Err(SetDeviceError::ZoneChange);
+                    }
                 }
             }
             let ip = *ip_addr;
@@ -1085,12 +1085,10 @@ impl<I: IpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I, C> for
                     ip: ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) },
                 } = addr;
 
-                // TODO(https://fxbug.dev/115524): add an assert for
-                // `must_have_zone = true` implying `device != None` once that's
-                // enforced as an invariant for bind & connect.
                 if crate::socket::must_have_zone(local_ip)
                     || crate::socket::must_have_zone(remote_ip)
                 {
+                    debug_assert!(device.is_some());
                     if &new_device != device {
                         return Err(SetDeviceError::ZoneChange);
                     }
