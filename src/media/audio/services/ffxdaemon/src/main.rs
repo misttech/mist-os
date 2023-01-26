@@ -388,6 +388,10 @@ impl AudioDaemon {
                             self.record_capturer(payload, responder).await?;
                             Ok(())
                         }
+                        Some(RecordLocation::Loopback(..)) => {
+                            self.record_capturer(payload, responder).await?;
+                            Ok(())
+                        }
                         Some(..) => Err(anyhow::anyhow!("No RecordLocation variant specified.")),
                         None => Err(anyhow::anyhow!("RecordLocation argument missing. ")),
                     }?;
