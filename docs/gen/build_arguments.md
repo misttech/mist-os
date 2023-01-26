@@ -221,7 +221,7 @@ be visible to Driver Manager. These package labels are also considered to be in 
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:24
+From //products/common/bringup.gni:21
 
 **Overridden from the default:** `[]`
 
@@ -229,7 +229,7 @@ From //BUILD.gn:38
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:24
+From //products/common/bringup.gni:21
 
 **Overridden from the default:** `[]`
 
@@ -4377,7 +4377,7 @@ From //build/config/BUILDCONFIG.gn:1354
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:25
+From //products/common/bringup.gni:22
 
 **Overridden from the default:** `[]`
 
@@ -4385,7 +4385,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:25
+From //products/common/bringup.gni:22
 
 **Overridden from the default:** `[]`
 
@@ -4395,7 +4395,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:28
+From //products/common/bringup.gni:25
 
 **Overridden from the default:** `[]`
 
@@ -4403,7 +4403,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:28
+From //products/common/bringup.gni:25
 
 **Overridden from the default:** `[]`
 
@@ -4413,7 +4413,7 @@ From //BUILD.gn:47
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:31
+From //products/common/bringup.gni:28
 
 **Overridden from the default:** `[]`
 
@@ -4421,7 +4421,7 @@ From //BUILD.gn:56
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:31
+From //products/common/bringup.gni:28
 
 **Overridden from the default:** `[]`
 
@@ -4455,7 +4455,7 @@ From //BUILD.gn:73
 
 **Current value for `target_cpu = "arm64"`:** `["//tools/net/device-finder:host", "//build/images/tools:fastboot"]`
 
-From //products/common/bringup.gni:34
+From //products/common/bringup.gni:31
 
 **Overridden from the default:** `[]`
 
@@ -4463,7 +4463,7 @@ From //BUILD.gn:65
 
 **Current value for `target_cpu = "x64"`:** `["//tools/net/device-finder:host", "//build/images/tools:fastboot"]`
 
-From //products/common/bringup.gni:34
+From //products/common/bringup.gni:31
 
 **Overridden from the default:** `[]`
 
@@ -4665,7 +4665,7 @@ they must be separated into their own list.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:22
+From //products/common/bringup.gni:19
 
 **Overridden from the default:** `[]`
 
@@ -4673,7 +4673,7 @@ From //build/images/args.gni:99
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:22
+From //products/common/bringup.gni:19
 
 **Overridden from the default:** `[]`
 
@@ -5426,7 +5426,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:46
+From //products/common/bringup.gni:43
 
 **Overridden from the default:** `[]`
 
@@ -5434,7 +5434,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:46
+From //products/common/bringup.gni:43
 
 **Overridden from the default:** `[]`
 
@@ -5640,7 +5640,7 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:24
 
 A list of binary labels to include in ZBIs built for this product.
 
-**Current value for `target_cpu = "arm64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//src/diagnostics/archivist:bringup-config", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//bundles:diagnostics-eng"]`
+**Current value for `target_cpu = "arm64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//bundles:diagnostics-eng"]`
 
 From //products/bringup.gni:14
 
@@ -5648,7 +5648,7 @@ From //products/bringup.gni:14
 
 From //build/product.gni:11
 
-**Current value for `target_cpu = "x64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//src/diagnostics/archivist:bringup-config", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//bundles:diagnostics-eng"]`
+**Current value for `target_cpu = "x64"`:** `["//bundles:bootstrap", "//bundles:debugging", "//bundles/bringup:manual_testing", "//bundles/drivers:bootstrap", "//bundles/drivers:bootstrap-eng", "//bundles/drivers:usb-host-stack", "//bundles/drivers:utils", "//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//bundles/drivers:usb-peripheral-stack", "//src/sys/component_manager:component_manager_bootfs_config", "//bundles:diagnostics-eng"]`
 
 From //products/bringup.gni:14
 
@@ -7288,7 +7288,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:48
+From //products/common/bringup.gni:45
 
 **Overridden from the default:** `[]`
 
@@ -7296,7 +7296,7 @@ From //BUILD.gn:89
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:48
+From //products/common/bringup.gni:45
 
 **Overridden from the default:** `[]`
 
