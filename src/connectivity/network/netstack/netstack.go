@@ -1002,7 +1002,7 @@ func (ifs *ifState) remove(reason admin.InterfaceRemovedReason) {
 
 	// Close all open control channels with the interface before removing it from
 	// the stack. That prevents any further administrative action from happening.
-	ifs.adminControls.onInterfaceRemove(reason)
+	pendingNotification := ifs.adminControls.stopServing()
 	// Detach the endpoint and wait for clean termination before we remove the
 	// NIC from the stack, that ensures that we can't be racing with other calls
 	// to onDown that are signalling link status changes.
@@ -1020,6 +1020,7 @@ func (ifs *ifState) remove(reason admin.InterfaceRemovedReason) {
 
 	ifs.onDownLocked(name, true /* closed */)
 
+	sendControlTerminationReason(pendingNotification, reason)
 	_ = syslog.Infof("NIC %s: removed", name)
 }
 

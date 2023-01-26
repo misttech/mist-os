@@ -166,7 +166,7 @@ type adminControlImpl struct {
 	nicid       tcpip.NICID
 	cancelServe context.CancelFunc
 	syncRemoval bool
-	doneChannel chan struct{}
+	doneChannel chan zx.Channel
 	// TODO(https://fxbug.dev/85061): encode owned, strong, and weak refs once
 	// cloning Control is allowed.
 	isStrongRef bool
@@ -532,24 +532,46 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 type adminControlCollection struct {
 	mu struct {
 		sync.Mutex
-		removalReason  admin.InterfaceRemovedReason
+		tearingDown    bool
 		controls       map[*adminControlImpl]struct{}
 		strongRefCount uint
 	}
 }
 
-func (c *adminControlCollection) onInterfaceRemove(reason admin.InterfaceRemovedReason) {
+func (c *adminControlCollection) stopServing() []zx.Channel {
 	c.mu.Lock()
 	controls := c.mu.controls
 	c.mu.controls = nil
-	c.mu.removalReason = reason
+	c.mu.tearingDown = true
 	c.mu.Unlock()
 
 	for control := range controls {
 		control.cancelServe()
 	}
+
+	var pendingTerminal []zx.Channel
 	for control := range controls {
-		<-control.doneChannel
+		pending := <-control.doneChannel
+		if pending.Handle().IsValid() {
+			pendingTerminal = append(pendingTerminal, pending)
+		}
+	}
+
+	return pendingTerminal
+}
+
+func sendControlTerminationReason(pending []zx.Channel, reason admin.InterfaceRemovedReason) {
+	for _, c := range pending {
+		eventProxy := admin.ControlEventProxy{Channel: c}
+		if err := eventProxy.OnInterfaceRemoved(reason); err != nil {
+			_ = syslog.WarnTf(controlName, "failed to send interface close reason %s: %s", reason, err)
+		}
+		// Close the channel iff the event proxy hasn't done it already.
+		if channel := eventProxy.Channel; channel.Handle().IsValid() {
+			if err := channel.Close(); err != nil {
+				_ = syslog.ErrorTf(controlName, "channel.Close() = %s", err)
+			}
+		}
 	}
 }
 
@@ -560,7 +582,7 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 		defer ifs.adminControls.mu.Unlock()
 
 		// Do not add more connections to an interface that is tearing down.
-		if ifs.adminControls.mu.removalReason != 0 {
+		if ifs.adminControls.mu.tearingDown {
 			if err := request.Channel.Close(); err != nil {
 				_ = syslog.ErrorTf(controlName, "request.channel.Close() = %s", err)
 			}
@@ -572,7 +594,10 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 			ns:          ifs.ns,
 			nicid:       ifs.nicid,
 			cancelServe: cancel,
-			doneChannel: make(chan struct{}),
+			// We need a buffer in this channel to accommodate for the Remove
+			// call, which buffers the request channel here before removing the
+			// interface.
+			doneChannel: make(chan zx.Channel, 1),
 			isStrongRef: strong,
 		}
 
@@ -590,16 +615,7 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 	go func() {
 		defer cancel()
 		defer close(impl.doneChannel)
-
 		requestChannel := request.Channel
-		defer func() {
-			if !requestChannel.Handle().IsValid() {
-				return
-			}
-			if err := requestChannel.Close(); err != nil {
-				_ = syslog.ErrorTf(controlName, "requestChannel.Close() = %s", err)
-			}
-		}()
 
 		component.Serve(ctx, &admin.ControlWithCtxStub{Impl: impl}, requestChannel, component.ServeOptions{
 			Concurrent:       false,
@@ -615,61 +631,62 @@ func (ifs *ifState) addAdminConnection(request admin.ControlWithCtxInterfaceRequ
 			ifs.adminControls.mu.Lock()
 			defer ifs.adminControls.mu.Unlock()
 			wasCanceled := errors.Is(ctx.Err(), context.Canceled)
-			if wasCanceled {
-				reason := func() admin.InterfaceRemovedReason {
-					if impl.syncRemoval {
-						return admin.InterfaceRemovedReasonUser
-					} else {
-						return ifs.adminControls.mu.removalReason
-					}
 
-				}()
-
-				if reason == 0 {
-					panic("serve context canceled without storing a reason")
+			if keepInterface := func() bool {
+				// Always proceed with removal if this was a synchronous remove
+				// request.
+				if impl.syncRemoval {
+					return false
 				}
-				eventProxy := admin.ControlEventProxy{Channel: requestChannel}
-				if err := eventProxy.OnInterfaceRemoved(reason); err != nil {
-					_ = syslog.WarnTf(controlName, "failed to send interface close reason %s: %s", reason, err)
-				}
-				// Take the channel back from the proxy, since the proxy *may* have closed
-				// the channel, in which case we want to prevent a double close on
-				// the deferred cleanup.
-				requestChannel = eventProxy.Channel
-			}
 
-			delete(ifs.adminControls.mu.controls, impl)
-
-			// Always proceed with removal if this was a synchronous remove
-			// request.
-			if !impl.syncRemoval {
 				// Don't consider destroying if not a strong ref.
 				//
-				// Note that the implementation can change from a strong to a weak ref if
-				// Detach is called, which is how we allow interfaces to leak.
+				// Note that the implementation can change from a strong to a
+				// weak ref if Detach is called, which is how we allow
+				// interfaces to leak.
 				//
-				// This is also how we prevent destruction from interfaces created with
-				// the legacy API, since they never have strong refs.
+				// This is also how we prevent destruction from interfaces
+				// created with the legacy API, since they never have strong
+				// refs.
 				if !impl.isStrongRef {
-					return nil
+					return true
 				}
-				ifs.adminControls.mu.strongRefCount--
 
-				// If serving was canceled, that means that removal happened due to
-				// outside cancelation already.
+				ifs.adminControls.mu.strongRefCount--
+				// If serving was canceled, that means that removal happened due
+				// to outside cancelation already.
 				if wasCanceled {
-					return nil
+					return true
 				}
+
 				// Don't destroy if there are any strong refs left.
 				if ifs.adminControls.mu.strongRefCount != 0 {
-					return nil
+					return true
 				}
+
+				return false
+			}(); keepInterface {
+				if wasCanceled {
+					// If we were canceled, pass the request channel along so
+					// it'll receive the epitaph later.
+					impl.doneChannel <- requestChannel
+				} else {
+					delete(ifs.adminControls.mu.controls, impl)
+					if err := requestChannel.Close(); err != nil {
+						_ = syslog.ErrorTf(controlName, "requestChannel.Close() = %s", err)
+					}
+				}
+				return nil
 			}
 
 			// We're good to remove this interface.
 			// Prevent new connections while we're holding the collection lock,
 			// avoiding races between here and removing the interface below.
-			ifs.adminControls.mu.removalReason = admin.InterfaceRemovedReasonUser
+			ifs.adminControls.mu.tearingDown = true
+
+			// Stash the requestChannel in our finalization channel so the
+			// terminal event is sent later.
+			impl.doneChannel <- requestChannel
 
 			nicInfo, ok := impl.ns.stack.NICInfo()[impl.nicid]
 			if !ok {

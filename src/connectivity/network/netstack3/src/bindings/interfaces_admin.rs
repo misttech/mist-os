@@ -336,20 +336,30 @@ async fn run_netdevice_interface_control<
     .fuse();
     futures::pin_mut!(link_state_fut);
     futures::pin_mut!(interface_control_fut);
-    futures::select! {
-        o = device_stopped_fut => o.expect("event was orphaned"),
-        () = link_state_fut => {},
-        () = interface_control_fut => {},
+    let cleanup_iface_control = futures::select! {
+        o = device_stopped_fut => {
+            o.expect("event was orphaned");
+            None
+        },
+        () = link_state_fut => None,
+        cleanup = interface_control_fut => cleanup,
     };
-    if !interface_control_fut.is_terminated() {
+    let cleanup_iface_control = if !interface_control_fut.is_terminated() {
         // Cancel interface control and drive it to completion, allowing it to terminate each
         // control handle.
         interface_control_stop_sender
             .send(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed)
             .expect("failed to cancel interface control");
-        interface_control_fut.await;
-    }
+        interface_control_fut.await
+    } else {
+        cleanup_iface_control
+    };
     remove_interface(ctx, id).await;
+
+    // Run the cleanup only after the interface is completely removed.
+    if let Some(cleanup_iface_control) = cleanup_iface_control {
+        cleanup_iface_control();
+    }
 }
 
 /// Runs a worker to watch the given status_stream and update the interface state accordingly.
@@ -406,7 +416,11 @@ async fn run_link_state_watcher<
     }
 }
 
-/// Runs a worker to serve incoming `fuchsia.net.interfaces.admin/Control` handles.
+/// Runs a worker to serve incoming `fuchsia.net.interfaces.admin/Control`
+/// handles.
+///
+/// Returns a function that must be called after the interface has been removed
+/// to notify all clients of removal.
 pub(crate) async fn run_interface_control(
     ctx: NetstackContext,
     id: BindingId,
@@ -415,7 +429,7 @@ pub(crate) async fn run_interface_control(
     >,
     control_receiver: futures::channel::mpsc::Receiver<OwnedControlHandle>,
     removable: bool,
-) {
+) -> Option<impl FnOnce() -> ()> {
     // An event indicating that the individual control request streams should stop.
     let cancel_request_streams = async_utils::event::Event::new();
     // A struct to retain per-handle state of the individual request streams in `control_receiver`.
@@ -526,8 +540,10 @@ pub(crate) async fn run_interface_control(
     // Cancel the active request streams, and drive the remaining `ControlRequestStreams` to
     // completion, allowing each handle to send termination events.
     assert!(cancel_request_streams.signal(), "expected the event to be unsignaled");
-    if !stream_of_fut.is_terminated() {
-        stream_of_fut
+    let cleanup_fn = if !stream_of_fut.is_terminated() {
+        // Accumulate all the control handles first. We can't return
+        // `stream_of_fut` because it's borrowing from stack variables.
+        let control_handles = stream_of_fut
             .map(|fold_result| match fold_result {
                 async_utils::fold::FoldResult::StreamEnded(ReqStreamState {
                     owns_interface: _,
@@ -540,7 +556,10 @@ pub(crate) async fn run_interface_control(
             // Append the client that requested that the interface be removed
             // (if there is one) so it receives the terminal event too.
             .chain(futures::stream::iter(removal_requester))
-            .for_each(|control_handle| {
+            .collect::<Vec<_>>()
+            .await;
+        Some(move || {
+            control_handles.into_iter().for_each(|control_handle| {
                 control_handle.send_on_interface_removed(remove_reason).unwrap_or_else(|e| {
                     log::log!(
                         util::fidl_err_log_level(&e),
@@ -549,10 +568,11 @@ pub(crate) async fn run_interface_control(
                         id
                     )
                 });
-                futures::future::ready(())
-            })
-            .await;
-    }
+            });
+        })
+    } else {
+        None
+    };
     // Cancel the `AddressStateProvider` workers and drive them to completion.
     let address_state_providers = {
         let mut ctx = ctx.lock().await;
@@ -575,6 +595,7 @@ pub(crate) async fn run_interface_control(
         )
     };
     address_state_providers.collect::<()>().await;
+    cleanup_fn
 }
 
 enum ControlRequestResult {
@@ -1286,7 +1307,7 @@ mod tests {
         futures::pin_mut!(event_receiver);
         futures::pin_mut!(interface_control_fut);
         let event = futures::select!(
-            () = interface_control_fut => panic!("interface control unexpectedly ended"),
+            _cleanup = interface_control_fut => panic!("interface control unexpectedly ended"),
             event = event_receiver.next() => event
         );
         assert_matches!(event, Some(InterfaceEvent::Changed {
@@ -1300,7 +1321,9 @@ mod tests {
 
         // Drop the control handle and expect interface control to exit
         drop(control_client_end);
-        interface_control_fut.await;
+        if let Some(cleanup) = interface_control_fut.await {
+            cleanup();
+        }
 
         // Expect that the event receiver has closed, and that it does not
         // contain, an `AddressRemoved` event, which would indicate the address

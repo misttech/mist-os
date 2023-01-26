@@ -2167,3 +2167,51 @@ async fn no_remove_loopback<N: Netstack>(name: &str) {
     // channel is still open.
     assert_eq!(control.get_id().await.expect("get id"), id);
 }
+
+#[netstack_test]
+async fn epitaph_is_sent_after_interface_removal<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+    let ep = sandbox.create_endpoint(name).await.expect("create endpoint");
+
+    let (device, mut port_id) = ep.get_netdevice().await.expect("get netdevice");
+    let installer = realm
+        .connect_to_protocol::<finterfaces_admin::InstallerMarker>()
+        .expect("connect to protocol");
+    let device_control = {
+        let (control, server_end) =
+            fidl::endpoints::create_proxy::<finterfaces_admin::DeviceControlMarker>()
+                .expect("create proxy");
+        installer.install_device(device, server_end).expect("install device");
+        control
+    };
+
+    // Remove and reinstall the interface from the same port on the same device
+    // multiple times to race observing the epitaph with adding the new
+    // interface. If the epitaph is sent early, creating the interface will fail
+    // with `PortAlreadyBound`.
+    for _ in 0..10 {
+        let (control, server_end) =
+            fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
+                .expect("create endpoints");
+        device_control
+            .create_interface(
+                &mut port_id,
+                server_end,
+                finterfaces_admin::Options {
+                    name: Some("testif".to_string()),
+                    ..finterfaces_admin::Options::EMPTY
+                },
+            )
+            .expect("create interface");
+
+        control.remove().await.expect("remove completes").expect("remove succeeds");
+
+        assert_matches!(
+            control.wait_termination().await,
+            fidl_fuchsia_net_interfaces_ext::admin::TerminalError::Terminal(
+                finterfaces_admin::InterfaceRemovedReason::User
+            )
+        );
+    }
+}

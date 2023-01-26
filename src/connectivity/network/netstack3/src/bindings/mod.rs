@@ -633,13 +633,16 @@ impl Netstack {
         control_receiver: futures::channel::mpsc::Receiver<interfaces_admin::OwnedControlHandle>,
         removable: bool,
     ) -> fuchsia_async::Task<()> {
-        fuchsia_async::Task::spawn(interfaces_admin::run_interface_control(
-            self.ctx.clone(),
-            id,
-            stop_receiver,
-            control_receiver,
-            removable,
-        ))
+        fuchsia_async::Task::spawn(
+            interfaces_admin::run_interface_control(
+                self.ctx.clone(),
+                id,
+                stop_receiver,
+                control_receiver,
+                removable,
+            )
+            .map(|f| f.map(|f| f()).unwrap_or(())),
+        )
     }
 
     async fn add_loopback(
