@@ -9,27 +9,60 @@ The `ffx profile memory` command evaluates how much memory is used by VMOs
 ([Virtual Memory Objects][vmo]) in a Fuchsia system. Unlike Linux's `ps` command,
 this command evaluates all VMOs whether they are mapped or not.
 
-Under the hood, the `ffx profile memory` command uses the `memory_monitor` component
-to capture the memory information of all VMOs in the system.
+Below is an example of a process's memory usage captured by `ffx profile memory`:
 
-In Fuchsia, memory can be shared between processes because multiple processes can have handles to the same VMO.
-In some cases it is useful to distinguish between memory that is shared and not shared. `ffx profile memory` does this
-by reporting the memory usage of a process in 3 distinct (but overlapping) categories: *Private*, *Scaled*, and *Total*.
-* *Private* memory is the total size of VMOs exclusively retained (directly or indirectly via children VMOs) by the process.
-* *Scaled* memory is the total size of VMOs retained (directly or indirectly via children VMOs) by several processes.
-The cost of each VMO is shared evenly among all its retaining processes. For example, A 500 KiB shared between 5 processed will add 100 KiB to each of the 5 processes.
-* *Total* memory is the total size of VMOs retained (exclusively or not, directly or not) by the process.
+```none {:.devsite-disable-click-to-copy}
+Process name: core.cm
+Process koid: 26387
+Private:      268 KiB
+PSS:          650.72 KiB (Proportional Set Size)
+Total:        4.73 MiB (Private + Shared unscaled)
+                              Private       Scaled        Total
+    [scudo]                    60 KiB       60 KiB       60 KiB
+    [data]                     56 KiB       56 KiB       56 KiB
+    [relro]                    56 KiB       56 KiB       56 KiB
+    bss:blob-e243d9eb          56 KiB       56 KiB       56 KiB
+    [stacks]                   28 KiB       28 KiB       28 KiB
+    AllocatorRingBuffer         4 KiB        4 KiB        4 KiB
+    [libraries]                 4 KiB        4 KiB        4 KiB
+    stack: msg of 0x1000        4 KiB        4 KiB        4 KiB
+    [blobs]                       0 B   382.22 KiB     4.41 MiB     (shared)
+    vdso/next                     0 B        338 B       40 KiB     (shared)
+    vdso/stable                   0 B        170 B       20 KiB     (shared)
+```
 
-Some VMOs have names attached to them, and based on the name it's often possible to have an idea of what a VMO is used for.
-For example, if a VMO's name starts with "scudo" it is likely used by the scudo allocator.
-This allows `ffx profile memory` to categorize the VMOs of a given process into probable sources. The list of categories include:
-* *[scudo]*: aggregates the VMOs used by scudo, fuchsia's default memory allocator.
-* *[stacks]*: aggregates the VMOs used to store the stacks of the threads.
-* *[blobs]*: aggregates the VMOs handed out by blobfs. That may include child VMOs that have been modified.
-* *[relro]*: aggregates the VMOs containing the relocated read-only section of binaries.
-* *[data]*: aggregates the VMOs containing the data segment of binaries.
-* *[unnamed]*: aggregates the VMOs with empty names.
-VMOs with names that do not fall in any of the built-in categories are displayed in their own categories.
+In Fuchsia, memory can be shared among processes because multiple processes can have
+handles to the same VMO. Thus in some cases, it is useful to distinguish between private
+memory and shared memory. To help distinguish, `ffx profile memory` reports the memory
+usage of a process in 3 distinct, but overlapping, categories:
+
+* `Private` is the total size of VMOs and their [child VMOs][child-vmos]
+  that are retained exclusively by this process.
+* `Scaled` is the total size of VMOs and their child VMOs that are retained by several
+  processes. The cost of these VMOs is shared evenly among the retaining processes. For
+  example, 500 KiB shared by 5 processes will add 100 KiB to each of the 5 processes.
+* `Total` is the total size of all VMOs and their child VMOs that are retained by this
+  process, which include VMOs that are shared with other processes.
+
+Some VMOs have names attached to them. Based on the name, it's often possible to have
+an idea of what the VMO is used for. For example, if the name of a VMO starts with
+`scudo`, it is likely used by the [Scudo allocator][scudo]{:.external}. The names allow
+`ffx profile memory` to categorize the VMOs of a given process into probable sources.
+The list of categories include:
+
+* `[scudo]`: VMOs used by Scudo, Fuchsia's default memory allocator.
+* `[stacks]`: VMOs used to store the stacks of the process's threads.
+* `[blobs]`: VMOs handed out by blobFS. These may include child VMOs that have been
+   modified.
+* `[relro]`: VMOs containing the relocated read-only section of binaries.
+* `[data]`: VMOs containing the data segment of binaries.
+* `[unnamed]`: VMOs without names.
+
+VMOs with names that do not belong to any of the built-in categories are displayed as
+their own categories.
+
+Under the hood, the `ffx profile memory` command uses the `memory_monitor` component to
+capture the memory information of all VMOs in the system.
 
 ## Measure the memory usage over a time interval {:#measure-the-memory-usage-over-a-time-interval}
 
@@ -56,3 +89,5 @@ component, you can run the command with the `--debug-json` option.
 <!-- Reference links -->
 
 [vmo]: /docs/reference/kernel_objects/vm_object.md
+[child-vmos]: /docs/reference/syscalls/vmo_create_child.md
+[scudo]: https://llvm.org/docs/ScudoHardenedAllocator.html
