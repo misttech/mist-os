@@ -4,8 +4,28 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_library.gni")
+
+rustc_library("lib") {
+  name = "gtest_runner_lib"
+  edition = "2021"
+
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fuchsia-fs",
+    "//src/sys/test_runners:lib",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+  ]
+  sources = [
+    "src/lib.rs",
+    "src/parser.rs",
+  ]
+}
 
 common_deps = [
+  ":lib",
   "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
   "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
@@ -22,7 +42,6 @@ common_deps = [
   "//third_party/rust_crates:futures",
   "//third_party/rust_crates:lazy_static",
   "//third_party/rust_crates:rand",
-  "//third_party/rust_crates:serde",
   "//third_party/rust_crates:serde_json",
   "//third_party/rust_crates:thiserror",
   "//third_party/rust_crates:tracing",

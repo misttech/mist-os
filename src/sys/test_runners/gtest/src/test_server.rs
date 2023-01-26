@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Context as _, Error},
+    anyhow::Context as _,
     async_trait::async_trait,
     fidl::endpoints::Proxy,
     fidl_fuchsia_io as fio, fidl_fuchsia_process as fproc,
@@ -17,8 +17,8 @@ use {
         prelude::*,
         TryStreamExt,
     },
+    gtest_runner_lib::parser::*,
     lazy_static::lazy_static,
-    serde::{Deserialize, Serialize},
     std::{
         num::NonZeroUsize,
         str::from_utf8,
@@ -37,121 +37,7 @@ use {
     tracing::{debug, error, info, warn},
 };
 
-/// In `gtest_list_test` output, provides info about individual test cases.
-/// Example: For test FOO.Bar, this contains info about Bar.
-/// Please refer to documentation of `ListTestResult` for details.
-#[derive(Serialize, Deserialize, Debug)]
-struct IndividualTestInfo {
-    pub name: String,
-    pub file: String,
-    pub line: u64,
-}
-
-/// In `gtest_list_test` output, provides info about individual test suites.
-/// Example: For test FOO.Bar, this contains info about FOO.
-/// Please refer to documentation of `ListTestResult` for details.
-#[derive(Serialize, Deserialize, Debug)]
-struct TestSuiteResult {
-    pub tests: usize,
-    pub name: String,
-    pub testsuite: Vec<IndividualTestInfo>,
-}
-
-/// Structure of the output of `<test binary> --gtest_list_test`.
-///
-/// Sample json will look like
-/// ```
-/// {
-/// "tests": 6,
-/// "name": "AllTests",
-/// "testsuites": [
-///    {
-///      "name": "SampleTest1",
-///      "tests": 2,
-///      "testsuite": [
-///        {
-///          "name": "Test1",
-///          "file": "../../src/sys/test_runners/gtest/test_data/sample_tests.cc",
-///          "line": 7
-///        },
-///        {
-///          "name": "Test2",
-///          "file": "../../src/sys/test_runners/gtest/test_data/sample_tests.cc",
-///          "line": 9
-///        }
-///      ]
-///    },
-///  ]
-///}
-///```
-#[derive(Serialize, Deserialize, Debug)]
-struct ListTestResult {
-    pub tests: usize,
-    pub name: String,
-    pub testsuites: Vec<TestSuiteResult>,
-}
-
-/// Provides info about test case failure if any.
-#[derive(Serialize, Deserialize, Debug)]
-struct Failure {
-    pub failure: String,
-}
-
-/// Provides info about individual test executions.
-/// Example: For test FOO.Bar, this contains info about Bar.
-/// Please refer to documentation of `TestOutput` for details.
-#[derive(Serialize, Deserialize, Debug)]
-struct IndividualTestOutput {
-    pub name: String,
-    pub status: IndividualTestOutputStatus,
-    pub time: String,
-    pub failures: Option<Vec<Failure>>,
-    /// This field is not documented, so using String. We can use serde_enum_str to convert it to
-    /// enum, but that is not in our third party crates.
-    /// Most common values seen in the output are COMPLETED, SKIPPED, SUPPRESSED
-    pub result: String,
-}
-
-/// Describes whether a test was run or skipped.
-///
-/// Refer to [`TestSuiteOutput`] documentation for schema details.
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "UPPERCASE")]
-enum IndividualTestOutputStatus {
-    Run,
-    NotRun,
-}
-
-/// Provides info about individual test suites.
-/// Refer to [gtest documentation] for output structure.
-/// [gtest documentation]: https://github.com/google/googletest/blob/2002f267f05be6f41a3d458954414ba2bfa3ff1d/googletest/docs/advanced.md#generating-a-json-report
-#[derive(Serialize, Deserialize, Debug)]
-struct TestSuiteOutput {
-    pub name: String,
-    pub tests: usize,
-    pub failures: usize,
-    pub disabled: usize,
-    pub time: String,
-    pub testsuite: Vec<IndividualTestOutput>,
-}
-
-/// Provides info test and the its run result.
-/// Example: For test FOO.Bar, this contains info about FOO.
-/// Please refer to documentation of `TestSuiteOutput` for details.
-#[derive(Serialize, Deserialize, Debug)]
-struct TestOutput {
-    pub testsuites: Vec<TestSuiteOutput>,
-}
-
 const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
-
-/// Opens and reads file defined by `path` in `dir`.
-async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<String, Error> {
-    // Open the file in read-only mode.
-    let result_file_proxy =
-        fuchsia_fs::directory::open_file_no_describe(dir, path, fio::OpenFlags::RIGHT_READABLE)?;
-    return fuchsia_fs::file::read_to_string(&result_file_proxy).await.map_err(Into::into);
-}
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 pub struct TestServer {
@@ -646,28 +532,7 @@ async fn get_tests(
         }
     };
 
-    let test_list: ListTestResult =
-        serde_json::from_str(&result_str).map_err(EnumerationError::from)?;
-
-    let mut tests = Vec::<TestCaseInfo>::with_capacity(test_list.tests);
-
-    for suite in &test_list.testsuites {
-        for test in &suite.testsuite {
-            let name = format!("{}.{}", suite.name, test.name);
-            let enabled = is_test_case_enabled(&name);
-            tests.push(TestCaseInfo { name, enabled })
-        }
-    }
-
-    Ok(tests)
-}
-
-/// Returns `true` if the test case is disabled, based on its name. (This is apparently the only
-/// way that gtest tests can be disabled.)
-/// See
-/// https://github.com/google/googletest/blob/HEAD/googletest/docs/advanced.md#temporarily-disabling-tests
-fn is_test_case_enabled(case_name: &str) -> bool {
-    !case_name.contains("DISABLED_")
+    parse_test_cases(result_str)
 }
 
 /// Convenience wrapper around [`launch::launch_process`].
@@ -734,6 +599,7 @@ where
 mod tests {
     use {
         super::*,
+        anyhow::Error,
         assert_matches::assert_matches,
         fidl_fuchsia_test::{RunListenerMarker, RunOptions, SuiteMarker},
         pretty_assertions::assert_eq,
