@@ -94,13 +94,19 @@ class VectorView {
     data_ = other.data_;
   }
 
+  // Constructs a fidl::VectorView by unsafely borrowing other sequences.
+  //
   // |FromExternal| methods are the only way to reference data which is not
   // managed by an arena. Their usage is discouraged. The lifetime of the
   // referenced vector must be longer than the lifetime of the created
   // |VectorView|.
   //
-  // For example: std::vector<int32_t> my_vector = { 1, 2, 3 }; auto my_view =
-  //   fidl::VectorView<int32_t>::FromExternal(my_vector);
+  // For example:
+  //
+  //     std::vector<int32_t> my_vector = { 1, 2, 3 };
+  //     auto my_view =
+  //         fidl::VectorView<int32_t>::FromExternal(my_vector);
+  //
   static VectorView<T> FromExternal(std::vector<T>& from) { return VectorView<T>(from); }
   template <size_t size>
   static VectorView<T> FromExternal(std::array<T, size>& from) {

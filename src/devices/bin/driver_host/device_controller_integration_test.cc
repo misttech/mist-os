@@ -86,7 +86,7 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindSameDriver) {
 
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                  ->Bind(::fidl::StringView(libpath, len));
+                  ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -94,7 +94,7 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindSameDriver) {
   ASSERT_OK(call_status);
   call_status = ZX_OK;
   auto resp2 = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                   ->Bind(::fidl::StringView(libpath, len));
+                   ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp2.status());
   if (resp2.value().is_error()) {
     call_status = resp2.value().error_value();
@@ -120,7 +120,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindNoChildrenManualBind) {
   int len = snprintf(libpath, sizeof(libpath), "%s/%s", kDriverTestDir, kPassDriverName);
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                  ->Rebind(::fidl::StringView(libpath, len));
+                  ->Rebind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -207,7 +207,7 @@ TEST_F(DeviceControllerIntegrationTest, TestRebindChildrenManualBind) {
   // Do not open the child. Otherwise rebind will be stuck.
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(parent_channel))
-                  ->Rebind(::fidl::StringView(libpath, len));
+                  ->Rebind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -279,7 +279,7 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindDifferentDriver) {
 
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                  ->Bind(::fidl::StringView(libpath, len));
+                  ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -289,7 +289,7 @@ TEST_F(DeviceControllerIntegrationTest, TestDuplicateBindDifferentDriver) {
   call_status = ZX_OK;
   len = snprintf(libpath, sizeof(libpath), "%s/%s", kDriverTestDir, kFailDriverName);
   auto resp2 = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                   ->Bind(::fidl::StringView(libpath, len));
+                   ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp2.status());
   if (resp2.value().is_error()) {
     call_status = resp2.value().error_value();
@@ -317,7 +317,7 @@ TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBind) {
   int len = snprintf(libpath, sizeof(libpath), "%s/%s", kDriverTestDir, kPassDriverName);
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                  ->Bind(::fidl::StringView(libpath, len));
+                  ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -344,7 +344,7 @@ TEST_F(DeviceControllerIntegrationTest, AllTestsEnabledBindFail) {
   int len = snprintf(libpath, sizeof(libpath), "%s/%s", kDriverTestDir, kFailDriverName);
   zx_status_t call_status;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                  ->Bind(::fidl::StringView(libpath, len));
+                  ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -372,7 +372,7 @@ TEST_F(DeviceControllerIntegrationTest, SpecificTestEnabledBindFail) {
   int len = snprintf(libpath, sizeof(libpath), "%s/%s", kDriverTestDir, kFailDriverName);
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                  ->Bind(::fidl::StringView(libpath, len));
+                  ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -397,7 +397,7 @@ TEST_F(DeviceControllerIntegrationTest, DefaultTestsDisabledBind) {
   int len = snprintf(libpath, sizeof(libpath), "%s/%s", kDriverTestDir, kFailDriverName);
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                  ->Bind(::fidl::StringView(libpath, len));
+                  ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();
@@ -426,7 +426,7 @@ TEST_F(DeviceControllerIntegrationTest, SpecificTestDisabledBind) {
   int len = snprintf(libpath, sizeof(libpath), "%s/%s", kDriverTestDir, kFailDriverName);
   zx_status_t call_status = ZX_OK;
   auto resp = fidl::WireCall<fuchsia_device::Controller>(zx::unowned(dev_channel))
-                  ->Bind(::fidl::StringView(libpath, len));
+                  ->Bind(::fidl::StringView::FromExternal(libpath, len));
   ASSERT_OK(resp.status());
   if (resp.value().is_error()) {
     call_status = resp.value().error_value();

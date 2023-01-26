@@ -93,7 +93,7 @@ TEST(Table, Builder) {
   EXPECT_FALSE(table.HasUnknownData());
 }
 
-TEST(Table, BuilderArena) {
+TEST(Table, BuilderStringBufferField) {
   namespace test = test_types;
 
   // A buffer to store string contents.
@@ -110,6 +110,20 @@ TEST(Table, BuilderArena) {
 
   // Make sure the table contains what was passed into the builder, not what's now in the buffer.
   ASSERT_EQ("hello", table.s().get());
+}
+
+TEST(Table, BuilderStringLiteralField) {
+  namespace test = test_types;
+
+  static constexpr const char kLiteral[] = "hello";
+
+  // Build a table containing that string literal.
+  // The contents should be borrowed instead of copied to the arena.
+  fidl::Arena arena;
+  auto table = test::wire::SampleTable::Builder(arena).s(kLiteral).Build();
+
+  ASSERT_EQ(kLiteral, table.s().get());
+  ASSERT_EQ(static_cast<const char*>(kLiteral), table.s().begin());
 }
 
 TEST(Table, TableVectorOfStruct) {

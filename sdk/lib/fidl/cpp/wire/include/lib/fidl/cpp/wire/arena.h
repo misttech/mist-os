@@ -32,20 +32,22 @@ namespace fidl {
 //
 class AnyArena {
  public:
-  // Allocates and default constructs an instance of T. Used by
-  // |fidl::ObjectView|.
-  // If T has a constructor that takes an |AnyArena&| followed by the supplied
-  // arguments then this arena will be passed.
+  // Allocates and constructs an instance of T. Used by |fidl::ObjectView|.
+  //
+  // If T can be directly constructed from |Args|, then those args are
+  // forwarded. Otherwise, this arena will be passed as the first parameter,
+  // followed by |args|. The latter is useful for e.g. object view of a
+  // string view, where we'd like to reuse the same arena for the string.
   template <typename T, typename... Args>
   T* Allocate(Args&&... args) {
     uint8_t* buf = Allocate(
         sizeof(T), 1, std::is_trivially_destructible<T>::value ? nullptr : ObjectDestructor<T>);
-    if constexpr (std::is_constructible_v<T, AnyArena&, Args...>) {
-      // Call the object constructor with this arena as its first argumeent.
-      return new (buf) T(*this, std::forward<Args>(args)...);
-    } else {
+    if constexpr (std::is_constructible_v<T, Args...>) {
       // Call the object constructor.
       return new (buf) T(std::forward<Args>(args)...);
+    } else {
+      // Call the object constructor with this arena as its first argument.
+      return new (buf) T(*this, std::forward<Args>(args)...);
     }
   }
 

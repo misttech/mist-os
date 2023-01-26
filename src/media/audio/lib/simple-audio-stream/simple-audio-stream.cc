@@ -585,8 +585,8 @@ void SimpleAudioStream::GetProperties(
     stream_properties.unique_id().data_[i] = unique_id_.data[i];
   }
 
-  fidl::StringView product(prod_name_, strlen(prod_name_));
-  fidl::StringView manufacturer(mfr_name_, strlen(mfr_name_));
+  auto product = fidl::StringView::FromExternal(prod_name_, strlen(prod_name_));
+  auto manufacturer = fidl::StringView::FromExternal(mfr_name_, strlen(mfr_name_));
 
   stream_properties.set_is_input(is_input())
       .set_can_mute(cur_gain_state_.can_mute)
@@ -594,8 +594,8 @@ void SimpleAudioStream::GetProperties(
       .set_min_gain_db(cur_gain_state_.min_gain)
       .set_max_gain_db(cur_gain_state_.max_gain)
       .set_gain_step_db(cur_gain_state_.gain_step)
-      .set_product(allocator, std::move(product))
-      .set_manufacturer(allocator, std::move(manufacturer))
+      .set_product(allocator, product)
+      .set_manufacturer(allocator, manufacturer)
       .set_clock_domain(clock_domain_);
 
   if (pd_flags_ & AUDIO_PDNF_CAN_NOTIFY) {

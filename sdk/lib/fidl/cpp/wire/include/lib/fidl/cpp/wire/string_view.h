@@ -34,19 +34,28 @@ class StringView final : private VectorView<const char> {
   //     fidl::StringView view("hello");
   //     view.size() == 5;
   //
-  template <size_t N>
-  constexpr StringView(const char (&literal)[N], uint64_t size = N - 1)
-      : VectorView(static_cast<const char*>(literal), size) {
+  // |literal| must have static storage duration. If you need to borrow from a
+  // char array, use |fidl::StringView::FromExternal|.
+  template <
+      size_t N, typename T,
+      typename = std::enable_if_t<std::is_const_v<T> && std::is_same_v<std::remove_cv_t<T>, char>>>
+  // Disable `explicit` requirements because we want implicit conversions from string literals.
+  // NOLINTNEXTLINE
+  constexpr StringView(T (&literal)[N]) : VectorView(static_cast<const char*>(literal), N - 1) {
     static_assert(N > 0, "String should not be empty");
   }
 
-  // These methods are the only way to reference data which is not managed by a Arena.
+  // Constructs a fidl::StringView by unsafely borrowing other strings.
+  //
+  // These methods are the only way to reference data which is not managed by an |Arena|.
   // Their usage is discouraged. The lifetime of the referenced string must be longer than the
   // lifetime of the created StringView.
   //
   // For example:
-  // std::string foo = path + "/foo";
-  // fidl::StringView foo_view(foo);
+  //
+  //     std::string foo = path + "/foo";
+  //     auto foo_view = fidl::StringView::FromExternal(foo);
+  //
   static StringView FromExternal(std::string_view from) { return StringView(from); }
   static StringView FromExternal(const char* data, size_t size) { return StringView(data, size); }
 

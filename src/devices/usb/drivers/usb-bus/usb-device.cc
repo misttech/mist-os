@@ -758,7 +758,7 @@ void UsbDevice::GetStringDescriptor(GetStringDescriptorRequestView request,
   size_t actual = 0;
   auto status = UsbGetStringDescriptor(request->desc_id, request->lang_id, &request->lang_id,
                                        reinterpret_cast<uint8_t*>(buffer), sizeof(buffer), &actual);
-  completer.Reply(status, fidl::StringView(buffer, actual), request->lang_id);
+  completer.Reply(status, fidl::StringView::FromExternal(buffer, actual), request->lang_id);
 }
 
 void UsbDevice::SetInterface(SetInterfaceRequestView request,

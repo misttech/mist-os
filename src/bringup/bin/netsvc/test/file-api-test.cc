@@ -75,7 +75,7 @@ class FakeSysinfo : public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
   }
 
   void GetBoardName(GetBoardNameCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK, fidl::StringView{board_, sizeof(board_)});
+    completer.Reply(ZX_OK, fidl::StringView::FromExternal(board_, sizeof(board_)));
   }
 
   void GetBoardRevision(GetBoardRevisionCompleter::Sync& completer) override {
@@ -83,7 +83,7 @@ class FakeSysinfo : public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
   }
 
   void GetBootloaderVendor(GetBootloaderVendorCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK, fidl::StringView{vendor_, sizeof(vendor_)});
+    completer.Reply(ZX_OK, fidl::StringView::FromExternal(vendor_, sizeof(vendor_)));
   }
 
   void GetInterruptControllerInfo(GetInterruptControllerInfoCompleter::Sync& completer) override {

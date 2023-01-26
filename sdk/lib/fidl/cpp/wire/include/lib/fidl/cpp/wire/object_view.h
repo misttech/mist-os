@@ -39,13 +39,17 @@ class ObjectView final {
   // Initialize an ObjectView that contains null.
   ObjectView(std::nullptr_t) {}  // NOLINT
 
-  // These methods are the only way to reference data which is not managed by a Arena.
+  // Constructs a fidl::ObjectView by unsafely borrowing other objects.
+  //
+  // These methods are the only way to reference data which is not managed by an |Arena|.
   // Their usage is discouraged. The lifetime of the referenced object must be longer than the
   // lifetime of the created ObjectView.
   //
   // For example:
-  //   Foo foo;
-  //   auto foo_view = fidl::ObjectView<Foo>::FromExternal(&foo);
+  //
+  //     Foo foo;
+  //     auto foo_view = fidl::ObjectView<Foo>::FromExternal(&foo);
+  //
   static ObjectView<T> FromExternal(T* from) { return ObjectView<T>(from); }
 
   template <typename U = T, typename = std::enable_if_t<!std::is_void<U>::value>>

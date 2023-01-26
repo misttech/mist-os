@@ -142,7 +142,7 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
   for (auto& device : args->device_list) {
     std::vector<uint8_t> metadata(device.metadata, device.metadata + device.metadata_size);
     const fidl::WireResult result = client->CreateDevice({
-        .name = device.name,
+        .name = fidl::StringView::FromExternal(device.name),
         .metadata = fidl::VectorView<uint8_t>::FromExternal(metadata),
         .vid = device.vid,
         .pid = device.pid,

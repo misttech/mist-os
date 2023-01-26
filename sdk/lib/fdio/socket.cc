@@ -87,7 +87,8 @@ struct base_socket : public remote {
           return Errno(fdio_status_to_errno(provider.error_value()));
         }
         struct ifreq* ifr = va_arg(va, struct ifreq*);
-        fidl::StringView name(ifr->ifr_name, strnlen(ifr->ifr_name, sizeof(ifr->ifr_name) - 1));
+        auto name = fidl::StringView::FromExternal(
+            ifr->ifr_name, strnlen(ifr->ifr_name, sizeof(ifr->ifr_name) - 1));
         auto response = provider->InterfaceNameToIndex(name);
         zx_status_t status = response.status();
         if (status != ZX_OK) {
@@ -114,7 +115,8 @@ struct base_socket : public remote {
           return Errno(fdio_status_to_errno(provider.error_value()));
         }
         struct ifreq* ifr = va_arg(va, struct ifreq*);
-        fidl::StringView name(ifr->ifr_name, strnlen(ifr->ifr_name, sizeof(ifr->ifr_name) - 1));
+        auto name = fidl::StringView::FromExternal(
+            ifr->ifr_name, strnlen(ifr->ifr_name, sizeof(ifr->ifr_name) - 1));
         auto response = provider->InterfaceNameToFlags(name);
         zx_status_t status = response.status();
         if (status != ZX_OK) {
