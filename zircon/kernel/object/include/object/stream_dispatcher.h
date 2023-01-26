@@ -22,6 +22,7 @@ class StreamDispatcher final : public SoloDispatcher<StreamDispatcher, ZX_DEFAUL
   static constexpr uint32_t kModeRead = (1u << 0);
   static constexpr uint32_t kModeWrite = (1u << 1);
   static constexpr uint32_t kModeAppend = (1u << 2);
+  static constexpr uint32_t kCanResizeVmo = (1u << 3);
 
   static zx_status_t parse_create_syscall_flags(uint32_t flags, uint32_t* out_flags,
                                                 zx_rights_t* out_required_vmo_rights);
@@ -41,8 +42,8 @@ class StreamDispatcher final : public SoloDispatcher<StreamDispatcher, ZX_DEFAUL
   zx_status_t AppendVector(VmAspace* current_aspace, user_in_iovec_t user_data, size_t* out_actual);
   zx_status_t Seek(zx_stream_seek_origin_t whence, int64_t offset, zx_off_t* out_seek);
   zx_status_t SetAppendMode(bool value);
-  bool IsInAppendMode();
-
+  bool IsInAppendMode() const;
+  bool CanResizeVmo() const;
   void GetInfo(zx_info_stream_t* info) const;
 
  private:

@@ -40,9 +40,20 @@ zx_status_t sys_stream_create(uint32_t options, zx_handle_t vmo_handle, zx_off_t
 
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<VmObjectDispatcher> vmo;
-  status = up->handle_table().GetDispatcherWithRights(*up, vmo_handle, desired_vmo_rights, &vmo);
+  zx_rights_t actual_vmo_rights = ZX_RIGHT_NONE;
+  status = up->handle_table().GetDispatcherWithRights(*up, vmo_handle, desired_vmo_rights, &vmo,
+                                                      &actual_vmo_rights);
   if (status != ZX_OK)
     return status;
+
+  // Remember whether this stream can resize the underlying VMO when required. Note that it might be
+  // possible for stream writes / appends to proceed by manipulating only the content size, without
+  // having to change the VMO size. This flag will be checked only for stream operations that would
+  // require manipulating the VMO size, more specifically when expanding the VMO size if the
+  // requested content size needs to surpass the current VMO size.
+  if (actual_vmo_rights & ZX_RIGHT_RESIZE) {
+    stream_options |= StreamDispatcher::kCanResizeVmo;
+  }
 
   KernelHandle<StreamDispatcher> new_handle;
   zx_rights_t rights;

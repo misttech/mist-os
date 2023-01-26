@@ -256,7 +256,7 @@ uint64_t VmObjectDispatcher::GetContentSize() const {
   return content_size_mgr_->GetContentSize();
 }
 
-zx_status_t VmObjectDispatcher::ExpandIfNecessary(uint64_t requested_vmo_size,
+zx_status_t VmObjectDispatcher::ExpandIfNecessary(uint64_t requested_vmo_size, bool can_resize_vmo,
                                                   uint64_t* out_actual) {
   canary_.Assert();
 
@@ -270,6 +270,9 @@ zx_status_t VmObjectDispatcher::ExpandIfNecessary(uint64_t requested_vmo_size,
   }
 
   if (required_vmo_size > current_vmo_size) {
+    if (!can_resize_vmo) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
     zx_status_t status = vmo_->Resize(required_vmo_size);
     if (status != ZX_OK) {
       // Resizing failed but the rest of the current VMO size can be used.

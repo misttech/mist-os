@@ -312,6 +312,8 @@ zx_status_t StreamDispatcher::AppendVector(VmAspace* current_aspace, user_in_iov
     return ZX_OK;
   }
 
+  const bool can_resize_vmo = CanResizeVmo();
+
   size_t length = 0u;
   uint64_t offset = 0u;
   ContentSizeManager::Operation op;
@@ -333,7 +335,7 @@ zx_status_t StreamDispatcher::AppendVector(VmAspace* current_aspace, user_in_iov
     offset = new_content_size - total_capacity;
 
     uint64_t vmo_size = 0u;
-    status = vmo_->ExpandIfNecessary(new_content_size, &vmo_size);
+    status = vmo_->ExpandIfNecessary(new_content_size, can_resize_vmo, &vmo_size);
     if (status != ZX_OK) {
       if (vmo_size <= offset) {
         // Unable to expand to requested size and cannot even perform partial write.
@@ -426,7 +428,7 @@ zx_status_t StreamDispatcher::SetAppendMode(bool value) {
   return ZX_OK;
 }
 
-bool StreamDispatcher::IsInAppendMode() {
+bool StreamDispatcher::IsInAppendMode() const {
   Guard<CriticalMutex> guard{get_lock()};
   return options_ & kModeAppend;
 }
@@ -452,6 +454,11 @@ void StreamDispatcher::GetInfo(zx_info_stream_t* info) const {
   info->content_size = vmo_->content_size_manager()->GetContentSize();
 }
 
+bool StreamDispatcher::CanResizeVmo() const {
+  Guard<CriticalMutex> guard{get_lock()};
+  return options_ & kCanResizeVmo;
+}
+
 zx_status_t StreamDispatcher::CreateWriteOpAndExpandVmo(
     size_t total_capacity, zx_off_t offset, uint64_t* out_length,
     ktl::optional<uint64_t>* out_prev_content_size, ContentSizeManager::Operation* out_op) {
@@ -459,6 +466,7 @@ zx_status_t StreamDispatcher::CreateWriteOpAndExpandVmo(
   DEBUG_ASSERT(out_length);
 
   zx_status_t status = ZX_OK;
+  const bool can_resize_vmo = CanResizeVmo();
 
   {
     Guard<Mutex> content_size_guard{vmo_->content_size_manager()->lock()};
@@ -472,7 +480,7 @@ zx_status_t StreamDispatcher::CreateWriteOpAndExpandVmo(
                                                    out_prev_content_size, out_op);
 
     uint64_t vmo_size = 0u;
-    status = vmo_->ExpandIfNecessary(requested_content_size, &vmo_size);
+    status = vmo_->ExpandIfNecessary(requested_content_size, can_resize_vmo, &vmo_size);
     if (status != ZX_OK) {
       if (vmo_size <= offset) {
         // Unable to expand to requested size and cannot even perform partial write.

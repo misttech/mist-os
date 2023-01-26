@@ -84,12 +84,14 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   zx_status_t SetContentSize(uint64_t);
   uint64_t GetContentSize() const;
 
-  // Expands the VMO to a requested size, if the VMO is smaller than that size.
-  // Note that this will not modify the content size.
+  // Tries to expand the VMO to a requested (byte-aligned) size, if the VMO is smaller than that
+  // size. Whether the VMO can be expanded is controlled by |can_resize_vmo|. Note that this will
+  // not modify the content size.
   //
   // Returns the actual size of the VMO in |out_actual| after attempting to expand. This value is
   // set, even in the case of a failure.
-  zx_status_t ExpandIfNecessary(uint64_t requested_vmo_size, uint64_t* out_actual);
+  zx_status_t ExpandIfNecessary(uint64_t requested_vmo_size, bool can_resize_vmo,
+                                uint64_t* out_actual);
 
   const fbl::RefPtr<VmObject>& vmo() const { return vmo_; }
   zx_koid_t pager_koid() const { return pager_koid_; }

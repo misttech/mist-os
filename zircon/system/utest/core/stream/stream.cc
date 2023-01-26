@@ -1321,4 +1321,61 @@ TEST(StreamTestCase, RaceWriteResizeVecLarger) {
   }
 }
 
+// Tests that ZX_RIGHT_RESIZE is required on the VMO that the stream is created against for the
+// stream to be able to expand the VMO.
+TEST(StreamTestCase, ExpandVmoResizeRight) {
+  // Create a resizable VMO.
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), ZX_VMO_RESIZABLE, &vmo));
+
+  // The VMO handle has the resize right.
+  zx_info_handle_basic_t info;
+  ASSERT_OK(vmo.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
+  EXPECT_EQ(info.rights & ZX_RIGHT_RESIZE, ZX_RIGHT_RESIZE);
+
+  // Create a duplicate handle without the resize right.
+  zx::vmo vmo_no_resize;
+  ASSERT_OK(vmo.duplicate(info.rights & ~ZX_RIGHT_RESIZE, &vmo_no_resize));
+
+  // Create streams against both the handles.
+  const size_t seek = zx_system_get_page_size() - 1;
+  zx::stream stream, stream_no_resize;
+  ASSERT_OK(zx::stream::create(ZX_STREAM_MODE_WRITE, vmo, seek, &stream));
+  ASSERT_OK(zx::stream::create(ZX_STREAM_MODE_WRITE, vmo_no_resize, seek, &stream_no_resize));
+
+  char buffer[] = "012345678";
+  zx_iovec_t vec = {
+      .buffer = buffer,
+      .capacity = sizeof(buffer),
+  };
+
+  // Should be able to write to the current VMO size without the resize right.
+  size_t actual;
+  ASSERT_OK(stream_no_resize.writev(0, &vec, 1, &actual));
+  EXPECT_EQ(1u, actual);
+
+  // Should not be able to write any further as that would require expanding the VMO.
+  actual = 0;
+  ASSERT_EQ(ZX_ERR_NO_SPACE, stream_no_resize.writev(0, &vec, 1, &actual));
+  EXPECT_EQ(0u, actual);
+
+  // Verify that the VMO has not been resized.
+  uint64_t vmo_size;
+  ASSERT_OK(vmo.get_size(&vmo_size));
+  EXPECT_EQ(zx_system_get_page_size(), vmo_size);
+
+  // Should be able to expand the VMO with the resize right.
+  ASSERT_OK(stream.writev(0, &vec, 1, &actual));
+  EXPECT_EQ(10u, actual);
+
+  // Verify new VMO size.
+  ASSERT_OK(vmo.get_size(&vmo_size));
+  EXPECT_EQ(zx_system_get_page_size() * 2, vmo_size);
+
+  // Verify written contents.
+  char data[sizeof(buffer)];
+  ASSERT_OK(vmo.read(data, seek, sizeof(buffer)));
+  EXPECT_STREQ(buffer, data);
+}
+
 }  // namespace
