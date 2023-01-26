@@ -109,6 +109,12 @@ template("fuchsia_test_package") {
       test_specs = invoker.test_specs
     }
 
+    # test packages won't be configured by assembly tools, so we can check their config earlier
+    _validate_structured_config = true
+    if (defined(invoker.validate_structured_config)) {
+      _validate_structured_config = invoker.validate_structured_config
+    }
+
     test_deps = []
     foreach(test, invoker.test_components) {
       test_target_name = get_label_info(test, "name")
@@ -193,8 +199,7 @@ template("fuchsia_test_package") {
       deps += test_deps
       testonly = true
 
-      # test packages won't be configured by assembly tools, so we can check their config earlier
-      validate_structured_config = true
+      validate_structured_config = _validate_structured_config
     }
   } else {
     group(target_name) {
