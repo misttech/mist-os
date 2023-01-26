@@ -19,6 +19,13 @@
 
 class StreamDispatcher final : public SoloDispatcher<StreamDispatcher, ZX_DEFAULT_STREAM_RIGHTS> {
  public:
+  static constexpr uint32_t kModeRead = (1u << 0);
+  static constexpr uint32_t kModeWrite = (1u << 1);
+  static constexpr uint32_t kModeAppend = (1u << 2);
+
+  static zx_status_t parse_create_syscall_flags(uint32_t flags, uint32_t* out_flags,
+                                                zx_rights_t* out_required_vmo_rights);
+
   static zx_status_t Create(uint32_t options, fbl::RefPtr<VmObjectDispatcher> vmo, zx_off_t seek,
                             KernelHandle<StreamDispatcher>* handle, zx_rights_t* rights);
   ~StreamDispatcher();

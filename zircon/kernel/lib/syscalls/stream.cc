@@ -30,24 +30,23 @@ zx_status_t sys_stream_create(uint32_t options, zx_handle_t vmo_handle, zx_off_t
   if ((options & ~ZX_STREAM_CREATE_MASK) != 0)
     return ZX_ERR_INVALID_ARGS;
 
-  zx_rights_t vmo_rights = ZX_RIGHT_NONE;
-  if (options & ZX_STREAM_MODE_READ) {
-    vmo_rights |= ZX_RIGHT_READ;
-  }
-  if (options & ZX_STREAM_MODE_WRITE) {
-    vmo_rights |= ZX_RIGHT_WRITE;
+  uint32_t stream_options = 0;
+  zx_rights_t desired_vmo_rights = ZX_RIGHT_NONE;
+  zx_status_t status =
+      StreamDispatcher::parse_create_syscall_flags(options, &stream_options, &desired_vmo_rights);
+  if (status != ZX_OK) {
+    return status;
   }
 
   auto up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<VmObjectDispatcher> vmo;
-  zx_status_t status =
-      up->handle_table().GetDispatcherWithRights(*up, vmo_handle, vmo_rights, &vmo);
+  status = up->handle_table().GetDispatcherWithRights(*up, vmo_handle, desired_vmo_rights, &vmo);
   if (status != ZX_OK)
     return status;
 
   KernelHandle<StreamDispatcher> new_handle;
   zx_rights_t rights;
-  status = StreamDispatcher::Create(options, ktl::move(vmo), seek, &new_handle, &rights);
+  status = StreamDispatcher::Create(stream_options, ktl::move(vmo), seek, &new_handle, &rights);
   if (status != ZX_OK)
     return status;
   return out_stream->make(ktl::move(new_handle), rights);

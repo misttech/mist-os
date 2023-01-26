@@ -22,6 +22,35 @@ KCOUNTER(dispatcher_stream_create_count, "dispatcher.stream.create")
 KCOUNTER(dispatcher_stream_destroy_count, "dispatcher.stream.destroy")
 
 // static
+zx_status_t StreamDispatcher::parse_create_syscall_flags(uint32_t flags, uint32_t* out_flags,
+                                                         zx_rights_t* out_required_vmo_rights) {
+  uint32_t res = 0;
+  zx_rights_t required_vmo_rights = ZX_RIGHT_NONE;
+  if (flags & ZX_STREAM_MODE_READ) {
+    res |= kModeRead;
+    required_vmo_rights |= ZX_RIGHT_READ;
+    flags &= ~ZX_STREAM_MODE_READ;
+  }
+  if (flags & ZX_STREAM_MODE_WRITE) {
+    res |= kModeWrite;
+    required_vmo_rights |= ZX_RIGHT_WRITE;
+    flags &= ~ZX_STREAM_MODE_WRITE;
+  }
+  if (flags & ZX_STREAM_MODE_APPEND) {
+    res |= kModeAppend;
+    flags &= ~ZX_STREAM_MODE_APPEND;
+  }
+
+  if (flags) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  *out_flags = res;
+  *out_required_vmo_rights = required_vmo_rights;
+  return ZX_OK;
+}
+
+// static
 zx_status_t StreamDispatcher::Create(uint32_t options, fbl::RefPtr<VmObjectDispatcher> vmo,
                                      zx_off_t seek, KernelHandle<StreamDispatcher>* handle,
                                      zx_rights_t* rights) {
@@ -33,10 +62,10 @@ zx_status_t StreamDispatcher::Create(uint32_t options, fbl::RefPtr<VmObjectDispa
 
   zx_rights_t new_rights = default_rights();
 
-  if (options & ZX_STREAM_MODE_READ) {
+  if (options & kModeRead) {
     new_rights |= ZX_RIGHT_READ;
   }
-  if (options & ZX_STREAM_MODE_WRITE) {
+  if (options & kModeWrite) {
     new_rights |= ZX_RIGHT_WRITE;
   }
 
@@ -393,13 +422,13 @@ zx_status_t StreamDispatcher::Seek(zx_stream_seek_origin_t whence, int64_t offse
 
 zx_status_t StreamDispatcher::SetAppendMode(bool value) {
   Guard<CriticalMutex> guard{get_lock()};
-  options_ = (options_ & ~ZX_STREAM_MODE_APPEND) | (value ? ZX_STREAM_MODE_APPEND : 0);
+  options_ = (options_ & ~kModeAppend) | (value ? kModeAppend : 0);
   return ZX_OK;
 }
 
 bool StreamDispatcher::IsInAppendMode() {
   Guard<CriticalMutex> guard{get_lock()};
-  return options_ & ZX_STREAM_MODE_APPEND;
+  return options_ & kModeAppend;
 }
 
 void StreamDispatcher::GetInfo(zx_info_stream_t* info) const {
@@ -408,7 +437,17 @@ void StreamDispatcher::GetInfo(zx_info_stream_t* info) const {
   Guard<CriticalMutex> options_guard{get_lock()};
   Guard<Mutex> seek_guard{&seek_lock_};
 
-  info->options = options_;
+  info->options = 0;
+  if (options_ & kModeRead) {
+    info->options |= ZX_STREAM_MODE_READ;
+  }
+  if (options_ & kModeWrite) {
+    info->options |= ZX_STREAM_MODE_WRITE;
+  }
+  if (options_ & kModeAppend) {
+    info->options |= ZX_STREAM_MODE_APPEND;
+  }
+
   info->seek = seek_;
   info->content_size = vmo_->content_size_manager()->GetContentSize();
 }
