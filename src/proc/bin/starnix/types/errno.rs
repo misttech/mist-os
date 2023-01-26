@@ -317,7 +317,7 @@ macro_rules! errno {
 ///
 /// Use `errno!` instead if you want an unwrapped, but still tagged, `Errno`.
 macro_rules! error {
-    ($($args:tt)*) => { Err(errno!($($args)*)) };
+    ($($args:tt)*) => { Err(crate::types::errno!($($args)*)) };
 }
 
 /// `errno_from_code` returns a `Err` containing an `Errno` struct with the given error code and is
