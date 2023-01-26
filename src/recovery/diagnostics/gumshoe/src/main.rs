@@ -12,6 +12,8 @@ use crate::handlebars_utils::TemplateEngine;
 use crate::responder::ResponderImpl;
 use crate::webserver::{WebServer, WebServerImpl};
 use anyhow::Error;
+use fidl_fuchsia_hwinfo::ProductInfo;
+use fuchsia_component::client::connect_to_protocol;
 use futures::lock::Mutex;
 use glob::glob;
 use handlebars::Handlebars;
@@ -20,6 +22,12 @@ use std::vec::Vec;
 
 const LISTENING_PORT: u16 = 8080;
 const TEMPLATE_GLOB_PATH: Option<&str> = Some("/pkg/templates/*.hbs.html");
+
+/// Retrieves ProductInfo from HWInfo FIDL.
+async fn get_product_info() -> Result<ProductInfo, Error> {
+    let product = connect_to_protocol::<fidl_fuchsia_hwinfo::ProductMarker>()?;
+    Ok(product.get_info().await?)
+}
 
 /// Send gumshoe on a stakeout. While on a stakeout, gumshoe responds
 /// to HTTP requests on their webserver's listening port. Returns the
@@ -45,8 +53,14 @@ async fn stakeout(
         )?;
     }
 
-    // Gather stable device data (SerialNumber, Factory Info, etc) used when rendering templates.
-    let boxed_device_info = Box::new(DeviceInfoImpl::new());
+    let maybe_product_info = match get_product_info().await {
+        Ok(product_info) => Some(product_info),
+        Err(e) => {
+            eprintln!("Error getting product info: {:?}", e);
+            None
+        }
+    };
+    let boxed_device_info = Box::new(DeviceInfoImpl::new(maybe_product_info));
 
     // Construct a responder for generating HTTP responses from HTTP requests.
     let responder_impl = ResponderImpl::new(template_engine, boxed_device_info);

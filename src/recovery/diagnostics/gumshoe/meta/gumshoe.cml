@@ -10,6 +10,9 @@
     use: [
         {
             protocol: [
+                // To retrieve Product info.
+                "fuchsia.hwinfo.Product",
+
                 // To open and accept sockets for our Web-based UI.
                 "fuchsia.posix.socket.Provider",
             ],

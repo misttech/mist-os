@@ -2,7 +2,11 @@
 
 <h1>Device Info</h1>
 
+<h2>Product</h2>
 <ul>
-  <li>{{name}}</li>
+{{#each product_info}}
+    <li>{{@key}}: {{#if this}}"{{this}}"{{else}}UNDEFINED{{/if}}</li>
+{{/each}}
 </ul>
+
 {{/chrome}}

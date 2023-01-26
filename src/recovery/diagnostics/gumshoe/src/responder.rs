@@ -124,7 +124,7 @@ mod tests {
 
         // Instance our responder-under-test.
         let responder =
-            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::new()));
+            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::new(None)));
 
         // Create a "garbage" test request for our responder-under-test to handle.
         let garbage_request = hyper::Request::builder()
@@ -154,7 +154,7 @@ mod tests {
 
         // Instance our responder-under-test.
         let responder =
-            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::new()));
+            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::new(None)));
 
         // Create a "index" test request for our responder-under-test to handle.
         let index_request = hyper::Request::builder()
@@ -184,7 +184,7 @@ mod tests {
 
         // Create responder-under-test with mocked handlebars and empty DeviceInfo.
         let responder =
-            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::new()));
+            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::new(None)));
 
         // Create a "info" test request for our responder-under-test to handle.
         let info_request = hyper::Request::builder()
@@ -206,7 +206,7 @@ mod tests {
     fn accessible_static_resource_found() -> std::result::Result<(), anyhow::Error> {
         let responder = ResponderImpl::new(
             Box::new(MockTemplateEngine::new()),
-            Box::new(DeviceInfoImpl::new()),
+            Box::new(DeviceInfoImpl::new(None)),
         );
 
         let info_request = hyper::Request::builder()
@@ -238,7 +238,7 @@ mod tests {
             .returning(|_, _| Ok(RENDERED_TEMPLATE_CONTENT.to_string()));
 
         let responder =
-            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::new()));
+            ResponderImpl::new(Box::new(template_engine), Box::new(DeviceInfoImpl::new(None)));
 
         let info_request = hyper::Request::builder()
             .uri(ILLEGAL_STATIC_URI)
