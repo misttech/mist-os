@@ -114,8 +114,8 @@ using GfxEvent = fuchsia::ui::gfx::Event;
 using component_testing::ChildRef;
 using component_testing::ConfigValue;
 using component_testing::DirectoryContents;
-using component_testing::LocalComponent;
 using component_testing::LocalComponentHandles;
+using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -322,48 +322,57 @@ InjectSwipeParams GetDownwardSwipeParams() {
 
 bool CompareDouble(double f0, double f1, double epsilon) { return std::abs(f0 - f1) <= epsilon; }
 
-// This component implements the test.touch.ResponseListener protocol
-// and the interface for a RealmBuilder LocalComponent. A LocalComponent
-// is a component that is implemented here in the test, as opposed to elsewhere
-// in the system. When it's inserted to the realm, it will act like a proper
-// component. This is accomplished, in part, because the realm_builder
-// library creates the necessary plumbing. It creates a manifest for the component
-// and routes all capabilities to and from it.
-class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListener,
-                               public LocalComponent {
+class ResponseState {
  public:
-  explicit ResponseListenerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-  // |fuchsia::ui::test::input::TouchInputListener|
-  void ReportTouchInput(
-      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request) override {
-    events_received_.push_back(std::move(request));
-  }
-
-  // |LocalComponent::Start|
-  // When the component framework requests for this component to start, this
-  // method will be invoked by the realm_builder library.
-  void Start(std::unique_ptr<LocalComponentHandles> local_handles) override {
-    // When this component starts, add a binding to the test.touch.ResponseListener
-    // protocol to this component's outgoing directory.
-    FX_CHECK(local_handles->outgoing()->AddPublicService(
-                 fidl::InterfaceRequestHandler<fuchsia::ui::test::input::TouchInputListener>(
-                     [this](auto request) {
-                       bindings_.AddBinding(this, std::move(request), dispatcher_);
-                     })) == ZX_OK);
-    local_handles_.emplace_back(std::move(local_handles));
-  }
-
   const std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>&
   events_received() {
     return events_received_;
   }
 
  private:
-  async_dispatcher_t* dispatcher_ = nullptr;
-  std::vector<std::unique_ptr<LocalComponentHandles>> local_handles_;
-  fidl::BindingSet<fuchsia::ui::test::input::TouchInputListener> bindings_;
+  friend class ResponseListenerServer;
   std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest> events_received_;
+};
+
+// This component implements the test.touch.ResponseListener protocol
+// and the interface for a RealmBuilder LocalComponentImpl. A LocalComponentImpl
+// is a component that is implemented here in the test, as opposed to elsewhere
+// in the system. When it's inserted to the realm, it will act like a proper
+// component. This is accomplished, in part, because the realm_builder
+// library creates the necessary plumbing. It creates a manifest for the component
+// and routes all capabilities to and from it.
+class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListener,
+                               public LocalComponentImpl {
+ public:
+  explicit ResponseListenerServer(async_dispatcher_t* dispatcher,
+                                  std::weak_ptr<ResponseState> state)
+      : dispatcher_(dispatcher), state_(std::move(state)) {}
+
+  // |fuchsia::ui::test::input::TouchInputListener|
+  void ReportTouchInput(
+      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request) override {
+    if (auto s = state_.lock()) {
+      s->events_received_.push_back(std::move(request));
+    }
+  }
+
+  // |LocalComponentImpl::Start|
+  // When the component framework requests for this component to start, this
+  // method will be invoked by the realm_builder library.
+  void OnStart() override {
+    // When this component starts, add a binding to the test.touch.ResponseListener
+    // protocol to this component's outgoing directory.
+    FX_CHECK(outgoing()->AddPublicService(
+                 fidl::InterfaceRequestHandler<fuchsia::ui::test::input::TouchInputListener>(
+                     [this](auto request) {
+                       bindings_.AddBinding(this, std::move(request), dispatcher_);
+                     })) == ZX_OK);
+  }
+
+ private:
+  async_dispatcher_t* dispatcher_ = nullptr;
+  fidl::BindingSet<fuchsia::ui::test::input::TouchInputListener> bindings_;
+  std::weak_ptr<ResponseState> state_;
 };
 
 template <typename... Ts>
@@ -409,8 +418,9 @@ class TouchInputBase : public ui_testing::PortableUITest,
   // next to the base ones added.
   virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
 
-  bool LastEventReceivedMatches(float expected_x, float expected_y, std::string component_name) {
-    const auto& events_received = response_listener_->events_received();
+  bool LastEventReceivedMatches(float expected_x, float expected_y,
+                                const std::string& component_name) {
+    const auto& events_received = response_state_->events_received();
     if (events_received.empty()) {
       return false;
     }
@@ -498,8 +508,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
 
   fuchsia::sys::ComponentControllerPtr& client_component() { return client_component_; }
 
-  ResponseListenerServer* response_listener() { return response_listener_.get(); }
-
   // Override test-ui-stack parameters.
   bool use_scene_manager() override { return std::get<0>(this->GetParam()).use_scene_manager; }
 
@@ -509,12 +517,16 @@ class TouchInputBase : public ui_testing::PortableUITest,
 
   float device_pixel_ratio() override { return 1.f; }
 
+  std::shared_ptr<ResponseState> response_state() const { return response_state_; }
+
  private:
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
-    response_listener_ = std::make_unique<ResponseListenerServer>(dispatcher());
-    realm_builder()->AddLocalChild(kMockResponseListener, response_listener_.get());
+    realm_builder()->AddLocalChild(kMockResponseListener,
+                                   [d = dispatcher(), s = response_state_]() {
+                                     return std::make_unique<ResponseListenerServer>(d, s);
+                                   });
 
     realm_builder()->AddRoute({.capabilities = {Protocol{fuchsia::ui::scenic::Scenic::Name_}},
                                .source = kTestUIStackRef,
@@ -531,7 +543,7 @@ class TouchInputBase : public ui_testing::PortableUITest,
     }
   }
 
-  std::unique_ptr<ResponseListenerServer> response_listener_;
+  std::shared_ptr<ResponseState> response_state_ = std::make_shared<ResponseState>();
 
   fuchsia::ui::scenic::ScenicPtr scenic_;
   uint32_t display_width_ = 0;
@@ -623,12 +635,11 @@ TEST_P(FlutterSwipeTest, SwipeTest) {
 
   //  Client sends a response for 1 Down and |swipe_length| Move PointerEventPhase events.
   RunLoopUntil([this] {
-    return response_listener()->events_received().size() >=
-           static_cast<uint32_t>(kMoveEventCount + 1);
+    return response_state()->events_received().size() >= static_cast<uint32_t>(kMoveEventCount + 1);
   });
 
-  ASSERT_EQ(response_listener()->events_received().size(), expected_events.size());
-  AssertSwipeEvents(response_listener()->events_received(), expected_events);
+  ASSERT_EQ(response_state()->events_received().size(), expected_events.size());
+  AssertSwipeEvents(response_state()->events_received(), expected_events);
 }
 
 template <typename... Ts>
@@ -724,13 +735,12 @@ TEST_P(CppSwipeTest, CppClientSwipeTest) {
 
   //  Client sends a response for 1 Down and |swipe_length| Move PointerEventPhase events.
   RunLoopUntil([this] {
-    FX_LOGS(INFO) << "Events received = " << response_listener()->events_received().size();
+    FX_LOGS(INFO) << "Events received = " << response_state()->events_received().size();
     FX_LOGS(INFO) << "Events expected = " << kMoveEventCount + 1;
-    return response_listener()->events_received().size() >=
-           static_cast<uint32_t>(kMoveEventCount + 1);
+    return response_state()->events_received().size() >= static_cast<uint32_t>(kMoveEventCount + 1);
   });
 
-  const auto& actual_events = response_listener()->events_received();
+  const auto& actual_events = response_state()->events_received();
   ASSERT_EQ(actual_events.size(), expected_events.size());
   AssertSwipeEvents(actual_events, expected_events);
 }
