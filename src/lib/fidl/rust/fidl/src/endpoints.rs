@@ -131,6 +131,9 @@ pub trait ControlHandle {
     // TODO(fxbug.dev/81036): Fix behavior or above docs.
     fn shutdown_with_epitaph(&self, status: zx_status::Status);
 
+    /// Returns true if the server has received the `PEER_CLOSED` signal.
+    fn is_closed(&self) -> bool;
+
     /// Returns a future that completes when the server receives the
     /// `PEER_CLOSED` signal.
     fn on_closed<'a>(&'a self) -> OnSignals<'a>;

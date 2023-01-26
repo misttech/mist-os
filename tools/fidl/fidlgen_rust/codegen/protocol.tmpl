@@ -784,6 +784,10 @@ impl fidl::endpoints::ControlHandle for {{ $protocol.Name }}ControlHandle {
         self.inner.shutdown_with_epitaph(status)
     }
 
+    fn is_closed(&self) -> bool {
+        self.inner.channel().is_closed()
+    }
+
     fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
         self.inner.channel().on_closed()
     }

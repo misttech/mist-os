@@ -266,6 +266,10 @@ impl fidl::endpoints::ControlHandle for ChildControlHandle {
         self.inner.shutdown_with_epitaph(status)
     }
 
+    fn is_closed(&self) -> bool {
+        self.inner.channel().is_closed()
+    }
+
     fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
         self.inner.channel().on_closed()
     }
@@ -805,6 +809,10 @@ impl fidl::endpoints::ControlHandle for ParentControlHandle {
 
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
+    }
+
+    fn is_closed(&self) -> bool {
+        self.inner.channel().is_closed()
     }
 
     fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {

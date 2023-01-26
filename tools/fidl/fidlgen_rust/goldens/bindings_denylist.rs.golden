@@ -383,6 +383,10 @@ impl fidl::endpoints::ControlHandle for AllowedControlHandle {
         self.inner.shutdown_with_epitaph(status)
     }
 
+    fn is_closed(&self) -> bool {
+        self.inner.channel().is_closed()
+    }
+
     fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
         self.inner.channel().on_closed()
     }
@@ -1001,6 +1005,10 @@ impl fidl::endpoints::ControlHandle for DenyEachBindingControlHandle {
 
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
+    }
+
+    fn is_closed(&self) -> bool {
+        self.inner.channel().is_closed()
     }
 
     fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
@@ -1791,6 +1799,10 @@ impl fidl::endpoints::ControlHandle for ImportsSameNameContextControlHandle {
 
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
+    }
+
+    fn is_closed(&self) -> bool {
+        self.inner.channel().is_closed()
     }
 
     fn on_closed<'a>(&'a self) -> fidl::OnSignals<'a> {
