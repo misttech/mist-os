@@ -5,7 +5,7 @@
 #include "src/devices/usb/drivers/usb-bus/usb-device.h"
 
 #include <fidl/fuchsia.hardware.usb.device/cpp/wire.h>
-#include <lib/fake_ddk/fake_ddk.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/function.h>
 
 #include <thread>
@@ -15,6 +15,7 @@
 #include <zxtest/zxtest.h>
 
 #include "lib/ddk/driver.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/lib/utf_conversion/utf_conversion.h"
 
 namespace usb_bus {
@@ -43,11 +44,6 @@ constexpr size_t kRequestSize = 272;
 const char16_t* kStringDescriptors[][2] = {{u"Fuchsia", u"Fucsia"}, {u"Device", u"Dispositivo"}};
 
 constexpr usb_speed_t kDeviceSpeed = MakeConstant<usb_speed_t, 4>("slow");
-
-class Binder : public fake_ddk::Bind {
- public:
-  bool get_remove_called() { return remove_called_; }
-};
 
 class FakeHci : public ddk::UsbHciProtocol<FakeHci> {
  public:
@@ -253,29 +249,27 @@ class DeviceTest : public zxtest::Test {
     });
   }
 
-  auto& get_fidl() {
-    if (!fidl_.is_valid()) {
-      fidl_ =
-          fidl::WireSyncClient<fuchsia_hardware_usb_device::Device>(std::move(ddk_.FidlClient()));
-    }
-    return fidl_;
-  }
+  auto& get_fidl() { return fidl_; }
 
   auto& get_device() { return *device_; }
 
   void SetUp() override {
-    auto device = fbl::MakeRefCounted<UsbDevice>(fake_ddk::kFakeParent,
-                                                 ddk::UsbHciProtocolClient(hci_.proto()), kDeviceId,
-                                                 kHubId, kDeviceSpeed, timer_);
+    auto device =
+        fbl::MakeRefCounted<UsbDevice>(root_.get(), ddk::UsbHciProtocolClient(hci_.proto()),
+                                       kDeviceId, kHubId, kDeviceSpeed, timer_);
     ASSERT_OK(device->Init());
     device_ = device.get();
+    loop_.StartThread();
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_usb_device::Device>();
+    ASSERT_OK(endpoints.status_value());
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), device_);
+    fidl_.Bind(std::move(endpoints->client));
   }
 
   void TearDown() override {
-    device_async_remove(fake_ddk::kFakeDevice);
-    ddk_.WaitUntilRemove();
-    ASSERT_TRUE(ddk_.get_remove_called());
-    device_->DdkRelease();
+    loop_.Shutdown();
+    device_->DdkAsyncRemove();
+    mock_ddk::ReleaseFlaggedDevices(root_.get());
   }
 
   void CancelAll() { ASSERT_OK(device_->UsbCancelAll(1)); }
@@ -321,13 +315,15 @@ class DeviceTest : public zxtest::Test {
 
   void SetEmptyState(bool should_return_empty) { hci_.SetEmptyState(should_return_empty); }
 
+ protected:
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+
  private:
   fbl::RefPtr<FakeTimer> timer_;
   fidl::WireSyncClient<fuchsia_hardware_usb_device::Device> fidl_;
   FakeHci hci_;
-  Binder ddk_;
-  // UsbDevice context pointer owned by us through FakeDDK
-  // This is freed by calling DdkRelease in TearDown.
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  // UsbDevice context pointer owned by us through MockDdk
   UsbDevice* device_;
 };
 
@@ -853,7 +849,7 @@ class EvilFakeHci : public ddk::UsbHciProtocol<EvilFakeHci> {
   usb::BorrowedRequestQueue<void> pending_requests_;
 };
 
-TEST(DeviceTest, GetConfigurationDescriptorTooShortRejected) {
+TEST(EvilFakeHciDeviceTest, GetConfigurationDescriptorTooShortRejected) {
   // We expect this device to fail to initialize because wTotalLength is too
   // short -- 1 byte is shorter than the minimal config descriptor length, so
   // such a response is invalid.
@@ -863,14 +859,14 @@ TEST(DeviceTest, GetConfigurationDescriptorTooShortRejected) {
     return sync_completion_wait(completion, duration);
   });
 
-  auto device =
-      fbl::MakeRefCounted<UsbDevice>(fake_ddk::kFakeParent, ddk::UsbHciProtocolClient(hci.proto()),
-                                     kDeviceId, kHubId, kDeviceSpeed, timer);
+  std::shared_ptr<MockDevice> root = MockDevice::FakeRootParent();
+  auto device = fbl::MakeRefCounted<UsbDevice>(root.get(), ddk::UsbHciProtocolClient(hci.proto()),
+                                               kDeviceId, kHubId, kDeviceSpeed, timer);
   auto result = device->Init();
   ASSERT_EQ(result, ZX_ERR_IO);
 }
 
-TEST(DeviceTest, GetConfigurationDescriptorDifferentSizesAreRejected) {
+TEST(EvilFakeHciDeviceTest, GetConfigurationDescriptorDifferentSizesAreRejected) {
   // We expect this device to fail to initialize because when we request its
   // configuration descriptors, the wTotalSize value we get back changes between
   // the first (size-fetching) request and second (full descriptor-fetching) request.
@@ -880,9 +876,9 @@ TEST(DeviceTest, GetConfigurationDescriptorDifferentSizesAreRejected) {
     return sync_completion_wait(completion, duration);
   });
 
-  auto device =
-      fbl::MakeRefCounted<UsbDevice>(fake_ddk::kFakeParent, ddk::UsbHciProtocolClient(hci.proto()),
-                                     kDeviceId, kHubId, kDeviceSpeed, timer);
+  std::shared_ptr<MockDevice> root = MockDevice::FakeRootParent();
+  auto device = fbl::MakeRefCounted<UsbDevice>(root.get(), ddk::UsbHciProtocolClient(hci.proto()),
+                                               kDeviceId, kHubId, kDeviceSpeed, timer);
   auto result = device->Init();
   ASSERT_EQ(result, ZX_ERR_IO);
 }
