@@ -48,13 +48,17 @@ struct DebuglogTests {
 
     log->Write(DEBUGLOG_WARNING, 0, {msg, sizeof(msg)});
 
-    dlog_header* header = reinterpret_cast<dlog_header*>(log->data_);
+    // log->data_[0] is not necessarily aligned as a dlog_header would be so copy rather than
+    // access them directly.
+    dlog_header header{};
+    static_assert(sizeof(log->data_) >= sizeof(header));
+    memcpy(&header, log->data_, sizeof(header));
 
-    EXPECT_EQ(DEBUGLOG_WARNING, header->severity);
-    EXPECT_EQ(0, header->flags);
-    EXPECT_EQ(ZX_KOID_INVALID, header->pid);
-    EXPECT_NE(ZX_KOID_INVALID, header->tid);
-    ASSERT_EQ(12, header->datalen);
+    EXPECT_EQ(DEBUGLOG_WARNING, header.severity);
+    EXPECT_EQ(0, header.flags);
+    EXPECT_EQ(ZX_KOID_INVALID, header.pid);
+    EXPECT_NE(ZX_KOID_INVALID, header.tid);
+    ASSERT_EQ(12, header.datalen);
 
     uint8_t* msg_bytes = log->data_ + sizeof(dlog_header);
 
@@ -71,8 +75,9 @@ struct DebuglogTests {
     ASSERT_TRUE(ac.check(), "");
 
     char msg[] = "Hello World";
-    const size_t kTruncateTarget = 5;  // An unaligned length somewhere in the middle of msg.
-    const size_t pad = ALIGN4_TRUNC(DLOG_SIZE - sizeof(dlog_header) - kTruncateTarget);
+    const size_t kTruncateTarget =
+        kDLogHeaderFifoAlignment + 1;  // An unaligned length somewhere in the middle of msg.
+    const size_t pad = DLOG_ALIGN_TRUNC(DLOG_SIZE - sizeof(dlog_header) - kTruncateTarget);
 
     // We need to trigger some writes, but we don't care what we write, so we just need a buffer
     // large enough to be copied from. Doesn't much matter what's in it.
@@ -90,13 +95,17 @@ struct DebuglogTests {
 
     log->Write(DEBUGLOG_WARNING, 0, {msg, sizeof(msg)});
 
-    dlog_header* header = reinterpret_cast<dlog_header*>(log->data_ + pad);
+    // log->data_[pad] is not necessarily aligned as a dlog_header would be so copy rather than
+    // access them directly.
+    dlog_header header{};
+    static_assert(sizeof(log->data_) - pad >= sizeof(header));
+    memcpy(&header, log->data_ + pad, sizeof(header));
 
-    EXPECT_EQ(DEBUGLOG_WARNING, header->severity);
-    EXPECT_EQ(0, header->flags);
-    EXPECT_EQ(ZX_KOID_INVALID, header->pid);
-    EXPECT_NE(ZX_KOID_INVALID, header->tid);
-    ASSERT_EQ(sizeof(msg), header->datalen);
+    EXPECT_EQ(DEBUGLOG_WARNING, header.severity);
+    EXPECT_EQ(0, header.flags);
+    EXPECT_EQ(ZX_KOID_INVALID, header.pid);
+    EXPECT_NE(ZX_KOID_INVALID, header.tid);
+    ASSERT_EQ(sizeof(msg), header.datalen);
 
     uint8_t* msg_bytes = log->data_ + pad + sizeof(dlog_header);
 

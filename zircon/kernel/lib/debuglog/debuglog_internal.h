@@ -22,8 +22,11 @@
 #define DLOG_SIZE (128u * 1024u)
 #define DLOG_MASK (DLOG_SIZE - 1u)
 
-#define ALIGN4_TRUNC(n) ((n) & (~3))
-#define ALIGN4(n) ALIGN4_TRUNC(((n) + 3))
+// Make sure that when |dlog_header_t| is in the fifo, it's 4 byte aligned and that the first 4
+// bytes (the |preamble| field) don't wrap.
+static constexpr size_t kDLogHeaderFifoAlignment = 4;
+#define DLOG_ALIGN_TRUNC(n) ((n) & (~3))
+#define DLOG_ALIGN(n) DLOG_ALIGN_TRUNC(((n) + 3))
 
 #define DLOG_HDR_SET(fifosize, readsize) ((((readsize)&0xFFF) << 12) | ((fifosize)&0xFFF))
 #define DLOG_HDR_GET_FIFOLEN(n) ((n)&0xFFF)
@@ -240,7 +243,8 @@ class DLog {
   // return an error.
   bool shutdown_requested_ TA_GUARDED(lock_) = false;
 
-  uint8_t data_[DLOG_SIZE]{0};
+  // This array contains dlog_header_t object so make sure it's properly aligned.
+  alignas(kDLogHeaderFifoAlignment) uint8_t data_[DLOG_SIZE]{0};
 };
 
 #endif  // ZIRCON_KERNEL_LIB_DEBUGLOG_DEBUGLOG_INTERNAL_H_

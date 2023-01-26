@@ -190,10 +190,10 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
     return ZX_ERR_BAD_STATE;
   }
 
-  // Our size "on the wire" must be a multiple of 4, so we know that worst case
-  // there will be room for a header preamble skipping the last n bytes when the
-  // fifo wraps
-  size_t wiresize = sizeof(dlog_header) + ALIGN4(len);
+  // Our size "on the wire" must be a multiple of kDLogHeaderFifoAlignment, so
+  // we know that worst case there will be room for a header preamble skipping
+  // the last n bytes when the fifo wraps
+  size_t wiresize = sizeof(dlog_header) + DLOG_ALIGN(len);
 
   // Prepare the record header before taking the lock
   dlog_header_t hdr;
