@@ -219,7 +219,7 @@ impl Component {
 
         self.outgoing_dir.clone().open(
             self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
             0,
             Path::dot(),
             outgoing_dir.into(),
