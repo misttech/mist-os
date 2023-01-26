@@ -311,9 +311,6 @@ extern "C" {
     pub fn zxio_close(io: *mut zxio_t, should_wait: bool) -> zx_status_t;
 }
 extern "C" {
-    pub fn zxio_close_new_transitional(io: *mut zxio_t, should_wait: bool) -> zx_status_t;
-}
-extern "C" {
     pub fn zxio_release(io: *mut zxio_t, out_handle: *mut zx_handle_t) -> zx_status_t;
 }
 extern "C" {

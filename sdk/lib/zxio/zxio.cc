@@ -86,10 +86,6 @@ zx_status_t zxio_close(zxio_t* io, const bool should_wait) {
   return status;
 }
 
-zx_status_t zxio_close_new_transitional(zxio_t* io, const bool should_wait) {
-  return zxio_close(io, should_wait);
-}
-
 zx_status_t zxio_release(zxio_t* io, zx_handle_t* out_handle) {
   if (!zxio_is_valid(io)) {
     return ZX_ERR_BAD_HANDLE;

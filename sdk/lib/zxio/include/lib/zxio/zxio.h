@@ -122,7 +122,6 @@ zx_status_t zxio_create_with_type(zxio_storage_t* storage, zxio_object_type_t ty
 //
 // Always consumes |io|.
 ZXIO_EXPORT zx_status_t zxio_close(zxio_t* io, bool should_wait);
-ZXIO_EXPORT zx_status_t zxio_close_new_transitional(zxio_t* io, bool should_wait);
 
 // Extracts the underlying |zx_handle_t| for |io| if one exists. Does not
 // terminate the connection with the server.
