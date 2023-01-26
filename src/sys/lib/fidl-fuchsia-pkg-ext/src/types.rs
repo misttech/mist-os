@@ -84,12 +84,7 @@ impl TryFrom<&[u8]> for BlobId {
     type Error = BlobIdFromSliceError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        if bytes.len() != BLOB_ID_SIZE {
-            return Err(Self::Error::InvalidLength(bytes.len()));
-        }
-        let mut res = [0; BLOB_ID_SIZE];
-        res.copy_from_slice(&bytes[..]);
-        Ok(Self(res))
+        Ok(Self(bytes.try_into().map_err(|_| Self::Error::InvalidLength(bytes.len()))?))
     }
 }
 

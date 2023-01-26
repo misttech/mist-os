@@ -55,6 +55,9 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:hmac",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
@@ -71,6 +74,7 @@ rustc_binary("bin") {
 
   sources = [
     "src/base_resolver.rs",
+    "src/context_authenticator.rs",
     "src/main.rs",
     "src/pkg_cache_resolver.rs",
     "src/true_base_resolver.rs",

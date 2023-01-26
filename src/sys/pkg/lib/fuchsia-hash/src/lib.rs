@@ -58,6 +58,14 @@ impl From<Hash> for [u8; HASH_SIZE] {
     }
 }
 
+impl TryFrom<&[u8]> for Hash {
+    type Error = std::array::TryFromSliceError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        Ok(Self(bytes.try_into()?))
+    }
+}
+
 impl fmt::Display for Hash {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.write_hex(f)

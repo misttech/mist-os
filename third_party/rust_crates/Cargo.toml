@@ -72,6 +72,7 @@ crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
 crossbeam = "0.8.0"
 crossbeam-utils = "0.8.0"
+crypto-mac = { version = "0.11.1", features = ["std"] }
 cfg-if = "1.0.0"
 chacha20 = "0.8.1"
 csv = "1.0.7"

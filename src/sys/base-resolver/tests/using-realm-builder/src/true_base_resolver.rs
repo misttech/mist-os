@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    assert_matches::assert_matches,
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
@@ -274,4 +275,23 @@ async fn resolve_with_context_relative_url_package() {
     let (resolved, _) =
         env.resolve_with_context_package("sub-sub-package-url", context).await.unwrap();
     let () = sub_sub_pkg.verify_contents(&resolved).await.unwrap();
+}
+
+#[fuchsia::test]
+async fn manipulated_context_rejected() {
+    let sub_pkg = fuchsia_pkg_testing::PackageBuilder::new("sub-package").build().await.unwrap();
+    let super_pkg = fuchsia_pkg_testing::PackageBuilder::new("super-package")
+        .add_subpackage("sub-package-url", &sub_pkg)
+        .build()
+        .await
+        .unwrap();
+    let env = TestEnvBuilder::new().static_packages(&[&super_pkg]).await.build().await;
+    let (_, mut context) =
+        env.resolve_package("fuchsia-pkg://fuchsia.com/super-package/0").await.unwrap();
+    context.bytes[0] ^= context.bytes[0];
+
+    assert_matches!(
+        env.resolve_with_context_package("sub-package-url", context).await,
+        Err(fpkg::ResolveError::InvalidContext)
+    );
 }

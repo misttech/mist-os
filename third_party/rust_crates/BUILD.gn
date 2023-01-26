@@ -188,6 +188,10 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+group("crypto-mac") {
+  public_deps = [ ":crypto-mac-v0_11_1" ]
+}
+
 group("csv") {
   public_deps = [ ":csv-v1_1_3" ]
 }
@@ -3131,6 +3135,7 @@ rust_library("crypto-mac-v0_11_1") {
     "--edition=2018",
     "-Cmetadata=c61aae76717eb909",
     "-Cextra-filename=-c61aae76717eb909",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]

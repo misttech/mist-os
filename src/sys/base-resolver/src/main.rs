@@ -8,6 +8,7 @@ use {
 };
 
 mod base_resolver;
+mod context_authenticator;
 mod pkg_cache_resolver;
 mod true_base_resolver;
 
@@ -96,13 +97,16 @@ enum ResolverError {
 
     #[error("failed to read the superpackage's subpackage manifest")]
     ReadingSubpackageManifest(#[from] package_directory::SubpackagesError),
+
+    #[error("invalid context")]
+    InvalidContext(#[from] crate::context_authenticator::ContextAuthenticatorError),
 }
 
 impl From<&ResolverError> for fresolution::ResolverError {
     fn from(err: &ResolverError) -> fresolution::ResolverError {
         use {fresolution::ResolverError as ferror, ResolverError::*};
         match err {
-            InvalidUrl(_) | PackageHashNotSupported => ferror::InvalidArgs,
+            InvalidUrl(_) | PackageHashNotSupported | InvalidContext(_) => ferror::InvalidArgs,
             UnsupportedRepo | AbsoluteUrlWithReservedName => ferror::NotSupported,
             ComponentNotFound(_) => ferror::ManifestNotFound,
             PackageNotFound(_) => ferror::PackageNotFound,
@@ -160,6 +164,7 @@ impl From<&ResolverError> for fpkg::ResolveError {
             | PackageNotInBase(_)
             | SubpackageNotFound(_)
             | SubpackageNotInBase(_) => ferror::PackageNotFound,
+            InvalidContext(_) => ferror::InvalidContext,
         }
     }
 }

@@ -6,7 +6,6 @@ use {
     anyhow::{self, Context as _},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
-    fidl_fuchsia_pkg_ext as pkg,
     futures::{
         future::TryFutureExt as _,
         stream::{StreamExt as _, TryStreamExt as _},
@@ -27,6 +26,7 @@ pub(crate) async fn main() -> anyhow::Result<()> {
     )
     .await
     .context("determine base packages")?;
+    let authenticator = crate::context_authenticator::ContextAuthenticator::new();
 
     let mut service_fs = fuchsia_component::server::ServiceFs::new_local();
     service_fs.dir("svc").add_fidl_service(Services::PackageResolver);
@@ -35,11 +35,14 @@ pub(crate) async fn main() -> anyhow::Result<()> {
         .for_each_concurrent(None, |request| async {
             match request {
                 Services::PackageResolver(stream) => {
-                    serve_package_request_stream(stream, &base_packages, &blobfs)
-                        .unwrap_or_else(|e| {
-                            error!("failed to serve package resolver request: {:#}", e)
-                        })
-                        .await
+                    serve_package_request_stream(
+                        stream,
+                        &base_packages,
+                        authenticator.clone(),
+                        &blobfs,
+                    )
+                    .unwrap_or_else(|e| error!("failed to serve package resolver request: {:#}", e))
+                    .await
                 }
             }
         })
@@ -84,6 +87,7 @@ enum Services {
 async fn serve_package_request_stream(
     mut stream: fpkg::PackageResolverRequestStream,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    authenticator: crate::context_authenticator::ContextAuthenticator,
     blobfs: &blobfs::Client,
 ) -> anyhow::Result<()> {
     while let Some(request) =
@@ -93,17 +97,23 @@ async fn serve_package_request_stream(
             fpkg::PackageResolverRequest::Resolve { package_url, dir, responder } => {
                 let () = responder
                     .send(
-                        &mut resolve_package(&package_url, dir, base_packages, blobfs)
-                            .await
-                            .map_err(|e| {
-                                let fidl_err = (&e).into();
-                                error!(
-                                    "failed to resolve package {}: {:#}",
-                                    package_url,
-                                    anyhow::anyhow!(e)
-                                );
-                                fidl_err
-                            }),
+                        &mut resolve_package(
+                            &package_url,
+                            dir,
+                            base_packages,
+                            authenticator.clone(),
+                            blobfs,
+                        )
+                        .await
+                        .map_err(|e| {
+                            let fidl_err = (&e).into();
+                            error!(
+                                "failed to resolve package {}: {:#}",
+                                package_url,
+                                anyhow::anyhow!(e)
+                            );
+                            fidl_err
+                        }),
                     )
                     .context("sending fuchsia.pkg/PackageResolver.Resolve response")?;
             }
@@ -120,6 +130,7 @@ async fn serve_package_request_stream(
                             context,
                             dir,
                             base_packages,
+                            authenticator.clone(),
                             blobfs,
                         )
                         .await
@@ -154,6 +165,7 @@ async fn resolve_package_with_context(
     context: fpkg::ResolutionContext,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    authenticator: crate::context_authenticator::ContextAuthenticator,
     blobfs: &blobfs::Client,
 ) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
     match fuchsia_url::PackageUrl::parse(package_url)? {
@@ -168,12 +180,12 @@ async fn resolve_package_with_context(
                     Err(crate::ResolverError::PackageHashNotSupported)
                 }
                 fuchsia_url::AbsolutePackageUrl::Unpinned(url) => {
-                    resolve_package_impl(url, dir, base_packages, blobfs).await
+                    resolve_package_impl(url, dir, base_packages, authenticator, blobfs).await
                 }
             }
         }
         fuchsia_url::PackageUrl::Relative(url) => {
-            resolve_subpackage(url, context, dir, blobfs).await
+            resolve_subpackage(url, context, dir, authenticator, blobfs).await
         }
     }
 }
@@ -182,15 +194,17 @@ async fn resolve_package(
     package_url: &str,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    authenticator: crate::context_authenticator::ContextAuthenticator,
     blobfs: &blobfs::Client,
 ) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
-    resolve_package_impl(package_url.parse()?, dir, base_packages, blobfs).await
+    resolve_package_impl(package_url.parse()?, dir, base_packages, authenticator, blobfs).await
 }
 
 async fn resolve_package_impl(
     package_url: fuchsia_url::UnpinnedAbsolutePackageUrl,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    authenticator: crate::context_authenticator::ContextAuthenticator,
     blobfs: &blobfs::Client,
 ) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
     let hash = base_packages
@@ -206,29 +220,20 @@ async fn resolve_package_impl(
     )
     .await
     .map_err(crate::ResolverError::ServePackageDirectory)?;
-    Ok(pkg::ResolutionContext::from(pkg::BlobId::from(*hash)).into())
+    Ok(authenticator.create(hash))
 }
 
 async fn resolve_subpackage(
     package_url: fuchsia_url::RelativePackageUrl,
     context: fpkg::ResolutionContext,
     dir: ServerEnd<fio::DirectoryMarker>,
+    authenticator: crate::context_authenticator::ContextAuthenticator,
     blobfs: &blobfs::Client,
 ) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
-    let context = pkg::ResolutionContext::try_from(&context)
-        .map_err(|e| crate::ResolverError::ReadingContext(anyhow::anyhow!(e)))?;
-    let super_package = package_directory::RootDir::new(
-        blobfs.clone(),
-        context
-            .blob_id()
-            .ok_or_else(|| {
-                crate::ResolverError::RelativeUrlMissingContext(package_url.to_string())
-            })?
-            .clone()
-            .into(),
-    )
-    .await
-    .map_err(crate::ResolverError::CreatePackageDirectory)?;
+    let super_hash = authenticator.clone().authenticate(context)?;
+    let super_package = package_directory::RootDir::new(blobfs.clone(), super_hash)
+        .await
+        .map_err(crate::ResolverError::CreatePackageDirectory)?;
     let subpackage =
         *super_package.subpackages().await?.subpackages().get(&package_url).ok_or_else(|| {
             crate::ResolverError::SubpackageNotFound(anyhow::format_err!(
@@ -245,7 +250,7 @@ async fn resolve_subpackage(
     )
     .await
     .map_err(crate::ResolverError::ServePackageDirectory)?;
-    Ok(pkg::ResolutionContext::from(pkg::BlobId::from(*subpackage)).into())
+    Ok(authenticator.create(&subpackage))
 }
 
 #[cfg(test)]
@@ -263,6 +268,7 @@ mod tests {
                     "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                     [0; 32].into()
                 )]),
+                crate::context_authenticator::ContextAuthenticator::new(),
                 &blobfs::Client::new_test().0
             )
             .await,
@@ -282,6 +288,7 @@ mod tests {
                     "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                     [0; 32].into()
                 )]),
+                crate::context_authenticator::ContextAuthenticator::new(),
                 &blobfs::Client::new_test().0
             )
             .await,

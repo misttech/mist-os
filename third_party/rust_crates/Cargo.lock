@@ -1315,6 +1315,7 @@ dependencies = [
  "crossbeam",
  "crossbeam-utils 0.8.4",
  "crossterm",
+ "crypto-mac",
  "csv",
  "darling",
  "dashmap",
