@@ -1198,10 +1198,6 @@
                 "UnameTest.SetNames",
                 "UnameTest.UnshareUTS",
 
-                // unlink_test
-                "UnlinkTest.ParentDegradedPermissions",
-                "RmdirTest.CanRemoveWithTrailingSlashes",
-
                 // vfork_test
                 "VforkTest.ParentStopsUntilChildExits",
                 "VforkTest.ExecedChildExitDoesntUnstopParent",

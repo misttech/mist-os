@@ -55,6 +55,10 @@
                 "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/2",
                 "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/3",
                 "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.GetSockNamePartialLength/*",
+
+                // unlink_test
+                "UnlinkTest.ParentDegradedPermissions",
+                "RmdirTest.CanRemoveWithTrailingSlashes",
             ],
         },
         {
