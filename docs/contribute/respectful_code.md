@@ -25,7 +25,7 @@ Anything that a contributor would read while working on Fuchsia, including:
 ## Principles
 
 - Be respectful: Avoid bias and harm. Derogatory, ableist, or unnecessarily
-  gendered language are not necessary to describe how things work.
+  gendered language are not useful to describe how things work.
 - Respect culturally sensitive language: Some words may carry significant
   historical or political meanings. Be mindful of this and use
   alternatives.
@@ -69,7 +69,7 @@ understand for people with a different cultural context than you.
 * Instead of "this is the blind leading the blind," explain what you mean, like
   "the reference you point to is inaccurate because ..."
 
-## What if I am interfacing with something that violates this policy?
+## What if I encounter terminology that violates this policy?
 
 When implementing code, differing from the language in the specification 
 may interfere with the ability to understand the implementation. In these 
