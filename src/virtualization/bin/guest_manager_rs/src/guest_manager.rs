@@ -55,11 +55,11 @@ fn get_default_num_cpus() -> u8 {
 }
 
 macro_rules! send_checked {
-    ($responder:ident, $res:expr) => {
-        if let Err(err) = $responder.send($res) {
+    ($responder:ident $(, $res:expr)?) => {
+        if let Err(err) = $responder.send($($res)?) {
             tracing::warn!(%err, "Could not send reply")
-        }
-    };
+        };
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -119,15 +119,6 @@ impl fmt::Display for GuestNetworkState {
     }
 }
 
-enum GuestManagerStateUpdate {
-    Status(GuestStatus),
-    GuestDescriptor(GuestDescriptor),
-    Started(zx::Time),
-    Stopped(zx::Time),
-    Error(GuestError),
-    ClearError,
-}
-
 #[derive(Default)]
 struct HostNetworkState {
     has_bridge: bool,
@@ -184,6 +175,7 @@ impl GuestManager {
         let mut run_futures: FuturesUnordered<future::LocalBoxFuture<'_, Result<(), GuestError>>> =
             FuturesUnordered::new();
         run_futures.push(Box::pin(future::pending::<Result<(), GuestError>>()));
+        let mut pending_shutdowns = Vec::<GuestManagerForceShutdownResponder>::new();
 
         loop {
             select_biased! {
@@ -201,10 +193,19 @@ impl GuestManager {
                     // Any pending run future is now invalid.
                     run_futures.clear();
                     run_futures.push(Box::pin(future::pending::<Result<(), GuestError>>()));
+
+                    // Respond to any pending shutdowns
+                    pending_shutdowns.drain(..).for_each(|responder| {
+                        send_checked!(responder);
+                    });
                 }
                 run_result = run_futures.next() => {
                     let run_result = run_result.expect("Should never resolve to Poll::Ready(None)");
                     self.handle_guest_stopped(run_result);
+
+                    pending_shutdowns.drain(..).for_each(|responder| {
+                        send_checked!(responder);
+                    });
                 }
                 stream = request_streams.next() => {
                     connections.push(stream.ok_or(anyhow!(
@@ -265,17 +266,19 @@ impl GuestManager {
                                 Box::pin(GuestManager::send_run_request(lifecycle.clone())));
                         }
                         GuestManagerRequest::ForceShutdown { responder } => {
-                            // Check if the guest is running (see the is_guest_started function).
-                            // If it's not running, respond immediately and return. Otherwise update
-                            // the guest state.
-                            // TODO(fxbug.dev/115695): Remove this comment when done.
-
-                            if let Err(err) = lifecycle.stop().await {
-                                tracing::error!(%err, "failed to send Stop FIDL call");
+                            if !self.is_guest_started() {
+                                // Respond immediately if guest isn't started.
+                                send_checked!(responder);
+                                continue;
                             }
 
-                            // TODO(fxbug.dev/115695): Respond to the caller via the responder.
-                            unimplemented!();
+                            self.status = GuestStatus::Stopping;
+                            if let Err(err) = lifecycle.stop().await {
+                                tracing::error!(%err, "failed to send Stop FIDL call")
+                            }
+                            // Respond to this request when the shutdown completes.
+                            pending_shutdowns.push(responder);
+
                         }
                         GuestManagerRequest::Connect { controller, responder } => {
                             // If the guest is running (see the is_guest_started function), connect
@@ -291,6 +294,7 @@ impl GuestManager {
                                     tracing::warn!(%err, "Unable to query host network interface.");
                                     GuestNetworkState::FailedToQuery
                                 });
+
 
                             send_checked!(responder, self.guest_info(GuestManager::check_for_problems(network_state)));
                         }
@@ -621,6 +625,23 @@ mod tests {
                 self.handle_request(req.unwrap());
             }
         }
+
+        // Successfully handle requests as part of a Launch request.
+        async fn run_launch(&mut self) {
+            // Successfully handle a single vmm request, asserting that the request type matches the
+            // given pattern.
+            macro_rules! run_expect {
+                ($vmm:expr, $req_type:pat_param) => {
+                    let req = $vmm.next().await;
+                    assert!(matches!(req, $req_type));
+                    $vmm.handle_request(req);
+                };
+            }
+
+            run_expect!(self, GuestLifecycleRequest::Create { .. });
+            run_expect!(self, GuestLifecycleRequest::Bind { .. });
+            run_expect!(self, GuestLifecycleRequest::Run { .. });
+        }
     }
 
     // A test fixture to manage the state for a running GuestManager.
@@ -762,35 +783,52 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn vmm_component_crash() {
-        let mut executor = fasync::TestExecutor::new();
-        let mut manager = GuestManager::new("foo".to_string());
+    async fn vmm_component_crash() {
+        let mut tmpfile = NamedTempFile::new().expect("failed to create tempfile");
+        write!(tmpfile, "{{}}").expect("failed to write to tempfile");
+
+        let mut manager = GuestManager::new(tmpfile.path().to_str().unwrap().to_string());
         let (stream_tx, state_rx) = mpsc::unbounded::<GuestManagerRequestStream>();
 
         let (proxy, server) = create_proxy_and_stream::<GuestLifecycleMarker>()
             .expect("failed to create proxy/stream");
 
-        let run_fut = manager.run(Rc::new(proxy), state_rx);
+        let run_fut = manager.run(Rc::new(proxy), state_rx).fuse();
         futures::pin_mut!(run_fut);
-
-        // No connections.
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
+        let mut vmm = MockVmm::new(server);
 
         let (manager_proxy, manager_server) =
             create_proxy_and_stream::<GuestManagerMarker>().expect("failed to create proxy/stream");
+
+        // Launch Guest
+        let (guest_client_end, guest_server_end) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
         stream_tx.unbounded_send(manager_server).expect("stream should never close");
 
-        // There's now a connection sent via mpsc.
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
-
-        // TODO(fxbug.dev/115695): Call get_info and check for a NotStarted status.
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete")
+            }
+            result = join(manager_proxy.launch(GuestConfig::EMPTY, guest_server_end),
+                          vmm.run_launch()).fuse()
+                => {
+                    assert!(result.0.is_ok());
+                }
+        }
 
         // Dropping the server closes the connection. The status should change, and a new
         // connection should be established.
-        drop(server);
-        assert!(executor.run_until_stalled(&mut run_fut).is_pending());
+        drop(vmm);
+        let guest_info = select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            result = manager_proxy.get_info() => {
+                result.unwrap()
+            }
+        };
 
-        // TODO(fxbug.dev/115695): Call get_info and check for a VmmUnexpectedTermination status.
+        assert_eq!(guest_info.guest_status, Some(GuestStatus::VmmUnexpectedTermination));
     }
 
     #[fuchsia::test]
@@ -885,7 +923,7 @@ mod tests {
         let (guest_client_end2, guest_server_end2) =
             fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
 
-        // Lanuch Guest and fail to start the VMM
+        // Launch Guest and fail to start the VMM
         let launch_fut = join(manager_proxy.launch(GuestConfig::EMPTY, guest_server_end1), async {
             match manager.vmm.borrow_mut().next().await {
                 GuestLifecycleRequest::Create { guest_config, responder } => {
@@ -1023,22 +1061,140 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn force_shutdown_non_running_guest() {
-        // Call force shutdown on a guest that isn't running, and ensure the state doesn't change.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn force_shutdown_non_running_guest() {
+        let manager = ManagerFixture::new_with_defaults();
+        let init_state = manager.manager().status;
+
+        let manager_proxy = manager.new_proxy();
+        let run_fut = manager.run().fuse();
+        futures::pin_mut!(run_fut);
+
+        // Run shutdown.
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = manager.run_vmm().fuse() => {
+                panic!("vmm should not complete");
+            }
+            result = manager_proxy.force_shutdown().fuse() => {
+                assert!(result.is_ok());
+            }
+        };
+
+        // Get info and check state hasn't changed
+        let guest_info = select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            info = manager_proxy.get_info().fuse() => {
+                info.unwrap()
+            }
+        };
+
+        assert_eq!(init_state, guest_info.guest_status.unwrap());
     }
 
     #[fuchsia::test]
-    fn force_shutdown_guest() {
-        // Launch a guest, check the state, force shutdown, and ensure the state channged to
-        // a stop state.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn force_shutdown_guest() {
+        let manager = ManagerFixture::new_with_defaults();
+
+        let (guest_client_end, guest_server_end) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+
+        let manager_proxy = manager.new_proxy();
+        let run_fut = manager.run().fuse();
+        let vmm_fut = manager.run_vmm().fuse();
+        futures::pin_mut!(run_fut);
+        futures::pin_mut!(vmm_fut);
+
+        // Lanuch Guest
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = vmm_fut => {
+                panic!("vmm should not complete");
+            }
+            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end).fuse() => {
+                assert!(result.is_ok());
+            }
+        }
+
+        // Future returning guest info before and after a shutdown.
+        let chain_fut = manager_proxy
+            .get_info()
+            .then(|pre_shutdown| async {
+                assert!(manager_proxy.force_shutdown().await.is_ok());
+                pre_shutdown
+            })
+            .then(|pre_shutdown| async { (pre_shutdown, manager_proxy.get_info().await) });
+        futures::pin_mut!(chain_fut);
+
+        let (pre_shutdown, post_shutdown) = select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = vmm_fut => {
+                panic!("vmm should not complete");
+            }
+            infos = chain_fut => {
+                (infos.0.unwrap(), infos.1.unwrap())
+            }
+        };
+
+        assert!(pre_shutdown.uptime.unwrap() < post_shutdown.uptime.unwrap());
+        assert_eq!(pre_shutdown.guest_status, Some(GuestStatus::Running));
+        assert_eq!(post_shutdown.guest_status, Some(GuestStatus::Stopped));
     }
 
     #[fuchsia::test]
-    fn guest_initiated_clean_shutdown() {
-        // Launch guest, respond via the run callback, ensure the guest state becomes stopped.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn guest_initiated_clean_shutdown() {
+        let manager = ManagerFixture::new_with_defaults();
+
+        let (guest_client_end, guest_server_end) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+
+        let manager_proxy = manager.new_proxy();
+        let run_fut = manager.run().fuse();
+        let mut vmm = manager.vmm.borrow_mut();
+        futures::pin_mut!(run_fut);
+
+        // Lanuch Guest
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            result = join(manager_proxy.launch(GuestConfig::EMPTY, guest_server_end),
+                          vmm.run_launch()).fuse()
+                => {
+                    assert!(result.0.is_ok());
+                }
+        }
+
+        // Check that guest is running, respond via lifecycle callback and check again to
+        // confirm guest has stopped.
+        let chain_fut = manager_proxy
+            .get_info()
+            .then(|pre_shutdown| async {
+                assert_eq!(vmm.state, VmmState::Running);
+                vmm.stop();
+                pre_shutdown
+            })
+            .then(|pre_shutdown| async { (pre_shutdown, manager_proxy.get_info().await) });
+        futures::pin_mut!(chain_fut);
+
+        let (pre_shutdown, post_shutdown) = select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            infos = chain_fut => {
+                (infos.0.unwrap(), infos.1.unwrap())
+            }
+        };
+
+        assert_eq!(pre_shutdown.guest_status, Some(GuestStatus::Running));
+        assert_eq!(post_shutdown.guest_status, Some(GuestStatus::Stopped));
     }
 
     #[fuchsia::test]
