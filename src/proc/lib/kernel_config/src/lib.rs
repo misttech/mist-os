@@ -31,7 +31,7 @@ pub struct KernelStartInfo {
 pub fn generate_kernel_config(
     kernels_dir: &vfs::directory::immutable::Simple,
     kernels_dir_name: &str,
-    component_start_info: &mut frunner::ComponentStartInfo,
+    mut component_start_info: frunner::ComponentStartInfo,
 ) -> Result<KernelStartInfo, Error> {
     // The name of the directory as seen by the starnix_kernel.
     const CONFIG_DIRECTORY: &str = "galaxy_config";
@@ -62,7 +62,7 @@ pub fn generate_kernel_config(
     let numbered_handles = vec![pkg_handle_info, outgoing_dir_handle_info];
 
     // Create a new configuration directory for the starnix_kernel instance.
-    let kernel_name = generate_kernel_config_directory(kernels_dir, component_start_info)?;
+    let kernel_name = generate_kernel_config_directory(kernels_dir, &mut component_start_info)?;
 
     let args = fcomponent::CreateChildArgs {
         dynamic_offers: Some(vec![fdecl::Offer::Directory(fdecl::OfferDirectory {

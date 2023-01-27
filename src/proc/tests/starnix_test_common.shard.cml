@@ -23,10 +23,16 @@
         {
             name: "runners",
             durability: "single_run",
+            allowed_offers: "static_and_dynamic",
         },
     ],
     capabilities: [
         { protocol: "fuchsia.test.Suite" },
+        {
+            directory: "kernels",
+            rights: [ "r*" ],
+            path: "/kernels",
+        },
     ],
     use: [
         {

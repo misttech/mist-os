@@ -5,61 +5,64 @@
 use {
     crate::gtest::*,
     crate::helpers::*,
-    anyhow::{Context, Error},
+    anyhow::{anyhow, Context, Error},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as frunner,
-    fidl_fuchsia_data as fdata,
     fidl_fuchsia_test::{self as ftest},
     futures::prelude::stream,
     futures::{StreamExt, TryStreamExt},
-    rand::Rng,
-    runner::component::ComponentNamespace,
 };
 
 /// Handles a single `ftest::SuiteRequestStream`.
 ///
 /// # Parameters
-/// - `test_url`: The URL for the test component to run.
-/// - `program`: The program data associated with the runner request for the test component.
-/// - `namespace`: The incoming namespace to provide to the test component.
+/// - `kernels_dir`: The root directory for the starnix_kernel instance's configuration.
+/// - `start_info`: The start info to use when running the test component.
 /// - `stream`: The request stream to handle.
 pub async fn handle_suite_requests(
-    test_url: &str,
-    program: Option<fdata::Dictionary>,
-    namespace: ComponentNamespace,
+    kernels_dir: &vfs::directory::immutable::Simple,
+    mut start_info: frunner::ComponentStartInfo,
     mut stream: ftest::SuiteRequestStream,
 ) -> Result<(), Error> {
-    let test_type = test_type(&program.as_ref().expect("No program."));
+    let test_type = test_type(start_info.program.as_ref().unwrap());
     while let Some(event) = stream.try_next().await? {
-        let mut program = program.clone();
-        let kernel_name = format!("starnix-kernel-{}", rand::thread_rng().gen::<u64>());
-        let (starnix_kernel, realm) = instantiate_kernel_in_realm(&namespace, &kernel_name).await?;
+        let mut test_start_info = clone_start_info(&mut start_info)?;
+        // The kernel start info is largely the same as that of the test component. The main difference
+        // is that the kernel_start_info does not contain the outgoing directory of the test component.
+        let kernel_start_info = clone_start_info(&mut start_info)?;
+
+        // Instantiates a starnix_kernel instance in the test component's realm. Running the kernel
+        // in the test realm allows coverage data to be collected for the runner itself, during the
+        // execution of the test.
+        let (starnix_kernel, realm, kernel_name) =
+            instantiate_kernel_in_realm(kernels_dir, kernel_start_info).await?;
 
         match event {
             ftest::SuiteRequest::GetTests { iterator, .. } => {
                 let stream = iterator.into_stream()?;
 
                 if test_type.is_gtest_like() {
-                    handle_case_iterator_for_gtests(
-                        test_url,
-                        program,
-                        &namespace,
-                        starnix_kernel,
+                    handle_case_iterator_for_gtests(test_start_info, &starnix_kernel, stream)
+                        .await?;
+                } else {
+                    handle_case_iterator(
+                        test_start_info
+                            .resolved_url
+                            .as_ref()
+                            .ok_or(anyhow!("Missing resolved URL"))?,
                         stream,
-                        &test_type,
                     )
                     .await?;
-                } else {
-                    handle_case_iterator(test_url, stream).await?;
                 }
             }
             ftest::SuiteRequest::Run { tests, options, listener, .. } => {
                 // Replace tests with program arguments if they were passed in.
+                let mut program =
+                    test_start_info.program.clone().ok_or(anyhow!("Missing program."))?;
                 if let Some(test_args) = options.arguments {
-                    if let Some(program) = &mut program {
-                        replace_program_args(test_args, program);
-                    }
+                    replace_program_args(test_args, &mut program);
                 }
+                test_start_info.program = Some(program);
 
                 let run_listener_proxy =
                     listener.into_proxy().context("Can't convert run listener channel to proxy")?;
@@ -69,12 +72,12 @@ pub async fn handle_suite_requests(
                     tests
                         .map(Ok)
                         .try_for_each_concurrent(num_parallel as usize, |test| {
+                            let t_start_info = clone_start_info(&mut test_start_info)
+                                .expect("Failed start info clone");
                             run_gtest_case(
                                 test,
-                                test_url,
-                                program.clone(),
+                                t_start_info,
                                 &run_listener_proxy,
-                                &namespace,
                                 &starnix_kernel,
                                 &test_type,
                             )
@@ -84,10 +87,8 @@ pub async fn handle_suite_requests(
                     if !tests.is_empty() {
                         run_test_case(
                             tests.get(0).unwrap().clone(),
-                            test_url,
-                            program,
+                            test_start_info,
                             &run_listener_proxy,
-                            &namespace,
                             &starnix_kernel,
                         )
                         .await?;
@@ -100,7 +101,7 @@ pub async fn handle_suite_requests(
 
         realm
             .destroy_child(&mut fdecl::ChildRef {
-                name: kernel_name.to_string(),
+                name: kernel_name,
                 collection: Some(RUNNERS_COLLECTION.into()),
             })
             .await?
@@ -124,14 +125,13 @@ pub async fn handle_suite_requests(
 /// - `starnix_kernel`: The instance of the starnix kernel that will run the test component.
 async fn run_test_case(
     test: ftest::Invocation,
-    test_url: &str,
-    program: Option<fdata::Dictionary>,
+    mut start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
-    namespace: &ComponentNamespace,
     starnix_kernel: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
+    start_info.numbered_handles = numbered_handles;
 
     run_listener_proxy.on_test_case_started(
         test,
@@ -143,8 +143,7 @@ async fn run_test_case(
         case_listener,
     )?;
 
-    let component_controller =
-        start_test_component(test_url, program, namespace, numbered_handles, starnix_kernel)?;
+    let component_controller = start_test_component(start_info, starnix_kernel)?;
 
     let result = read_result(component_controller.take_event_stream()).await;
     case_listener_proxy.finished(result)?;
@@ -185,7 +184,6 @@ mod tests {
         fidl::endpoints::{create_request_stream, ClientEnd},
         fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::TryStreamExt,
-        std::convert::TryFrom,
     };
 
     /// Returns a `ftest::CaseIteratorProxy` that is served by `super::handle_case_iterator`.
@@ -286,10 +284,11 @@ mod tests {
                     tag: Some("".to_string()),
                     ..ftest::Invocation::EMPTY
                 },
-                "",
-                None,
+                frunner::ComponentStartInfo {
+                    ns: Some(vec![]),
+                    ..frunner::ComponentStartInfo::EMPTY
+                },
                 &run_listener.into_proxy().expect("Couldn't create proxy."),
-                &ComponentNamespace::try_from(vec![]).expect(""),
                 &starnix_kernel,
             )
             .await;

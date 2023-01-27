@@ -14,9 +14,7 @@ use {
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
     futures::io::AsyncReadExt,
     futures::TryStreamExt,
-    runner::component::ComponentNamespace,
     rust_measure_tape_for_case::Measurable as _,
-    std::convert::TryInto,
     std::num::NonZeroUsize,
     test_runners_lib::elf::{KernelError, SuiteServerError},
     test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter},
@@ -71,13 +69,11 @@ pub fn test_type(program: &fdata::Dictionary) -> TestType {
 /// Runs the test component with `--gunit_list_tests` and returns the parsed test cases from stdout
 /// in response to `ftest::CaseIteratorRequest::GetNext`.
 pub async fn handle_case_iterator_for_gtests(
-    test_url: &str,
-    mut program: Option<fdata::Dictionary>,
-    namespace: &ComponentNamespace,
-    starnix_kernel: frunner::ComponentRunnerProxy,
+    mut start_info: frunner::ComponentStartInfo,
+    starnix_kernel: &frunner::ComponentRunnerProxy,
     mut stream: ftest::CaseIteratorRequestStream,
-    test_type: &TestType,
 ) -> Result<(), Error> {
+    let test_type = test_type(start_info.program.as_ref().unwrap());
     let list_tests_arg = match test_type {
         TestType::Gtest => "--gtest_list_tests",
         TestType::Gunit => "--gunit_list_tests",
@@ -94,21 +90,14 @@ pub async fn handle_case_iterator_for_gtests(
 
     let (_component_controller, component_controller_server_end) =
         create_proxy::<frunner::ComponentControllerMarker>()?;
-    let ns = Some(ComponentNamespace::try_into(namespace.clone())?);
     let numbered_handles = Some(vec![stdout_handle_info]);
-    let (outgoing_dir, _outgoing_dir_server) = zx::Channel::create();
+    start_info.numbered_handles = numbered_handles;
 
     // Replace the program args with `gunit_list_tests`.
-    replace_program_args(vec![list_tests_arg.to_string()], program.as_mut().expect("No program."));
-    let start_info = frunner::ComponentStartInfo {
-        resolved_url: Some(test_url.to_string()),
-        program,
-        ns,
-        outgoing_dir: Some(outgoing_dir.into()),
-        runtime_dir: None,
-        numbered_handles,
-        ..frunner::ComponentStartInfo::EMPTY
-    };
+    replace_program_args(vec![list_tests_arg.to_string()], start_info.program.as_mut().unwrap());
+
+    let (outgoing_dir, _outgoing_dir_server) = zx::Channel::create();
+    start_info.outgoing_dir = Some(outgoing_dir.into());
 
     starnix_kernel.start(start_info, component_controller_server_end)?;
 
@@ -148,24 +137,23 @@ pub async fn handle_case_iterator_for_gtests(
 /// stdout logs are filtered before they're reported to the test framework.
 ///
 /// # Parameters
-/// - `tests`: The tests that are to be run. Each test executes an independent run of the test
-/// component.
-/// - `test_url`: The URL of the test component.
-/// - `program`: The program data associated with the runner request for the test component.
-/// - `run_listener_proxy`: The listener proxy for the test run.
-/// - `namespace`: The incoming namespace to provide to the test component.
+/// - `test`: The test invocation to run.
+/// - `start_info`: The component start info of the test to run.
+/// - `run_listener_proxy`: The proxy used to communicate results of the test run to the test
+///                         framework.
+/// - `starnix_kernel`: The kernel in which to run the test component.
+/// - `test_type`: The type of test to run, used to determine which arguments to pass to the test.
 pub async fn run_gtest_case(
     test: ftest::Invocation,
-    test_url: &str,
-    mut program: Option<fdata::Dictionary>,
+    mut start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
-    namespace: &ComponentNamespace,
     starnix_kernel: &frunner::ComponentRunnerProxy,
     test_type: &TestType,
 ) -> Result<(), Error> {
     // Start a starnix kernel.
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
+    start_info.numbered_handles = numbered_handles;
 
     // Create additional sockets to filter the test's stdout logs before reporting them to
     // the test framework.
@@ -194,12 +182,11 @@ pub async fn run_gtest_case(
     // Update program arguments to only run the test case.
     append_program_args(
         vec![format!("{test_filter_arg}={test_name}")],
-        program.as_mut().expect("No program."),
+        &mut start_info.program.as_mut().unwrap(),
     );
 
     // Start the test component.
-    let component_controller =
-        start_test_component(test_url, program, namespace, numbered_handles, &starnix_kernel)?;
+    let component_controller = start_test_component(start_info, &starnix_kernel)?;
 
     // Filter stdout logs to reduce spam.
     let test_framework_stdout = fasync::Socket::from_socket(test_framework_stdout)

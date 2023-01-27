@@ -4,7 +4,7 @@
 
 use {
     anyhow::{anyhow, Error},
-    fidl::endpoints::create_proxy,
+    fidl::endpoints::{create_proxy, Proxy},
     fidl::HandleBased,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -13,6 +13,7 @@ use {
     fuchsia_component::client as fclient,
     fuchsia_runtime as fruntime, fuchsia_zircon as zx,
     futures::StreamExt,
+    kernel_config::generate_kernel_config,
     runner::component::ComponentNamespace,
 };
 
@@ -30,40 +31,75 @@ pub fn append_program_args(new_args: Vec<String>, program: &mut fdata::Dictionar
     update_program_args(new_args, program, true);
 }
 
+/// Clones relevant fields of `start_info`. `&mut` is required to clone the `ns` field, but the
+/// `start_info` is not modified.
+///
+/// The `outgoing_dir` of the result will be present, but unusable.
+pub fn clone_start_info(
+    start_info: &mut frunner::ComponentStartInfo,
+) -> Result<frunner::ComponentStartInfo, Error> {
+    let ns = ComponentNamespace::try_from(start_info.ns.take().unwrap())?;
+    // Reset the namespace of the start_info, since it was moved out above.
+    start_info.ns = Some(ns.clone().try_into()?);
+
+    let (outgoing_dir, _outgoing_dir_server) = zx::Channel::create();
+
+    Ok(frunner::ComponentStartInfo {
+        resolved_url: start_info.resolved_url.clone(),
+        program: start_info.program.clone(),
+        ns: Some(ns.try_into()?),
+        outgoing_dir: Some(outgoing_dir.into()),
+        runtime_dir: None,
+        numbered_handles: Some(vec![]),
+        encoded_config: None,
+        break_on_start: None,
+        ..frunner::ComponentStartInfo::EMPTY
+    })
+}
+
 /// Instantiates a starnix kernel in the realm of the given namespace.
 ///
 /// # Parameters
-///   - `namespace`: The namespace in which to fetch the realm to instantiate the runner in.
-///   - `runner_name`: The name of the runner child.
+///   - `kernels_dir`: The top-level directory where kernel configurations are stored.
+///   - `start_info`: The component start info used to create the configuration for the
+///                   starnix_kernel that will run the test.
 ///
 /// Returns a proxy to the instantiated runner as well as to the realm in which the runner is
 /// instantiated.
 pub async fn instantiate_kernel_in_realm(
-    namespace: &ComponentNamespace,
-    runner_name: &str,
-) -> Result<(frunner::ComponentRunnerProxy, fcomponent::RealmProxy), Error> {
+    kernels_dir: &vfs::directory::immutable::Simple,
+    mut start_info: frunner::ComponentStartInfo,
+) -> Result<(frunner::ComponentRunnerProxy, fcomponent::RealmProxy, String), Error> {
+    const KERNELS_DIR_NAME: &str = "kernels";
+
     let runner_url = "galaxy#meta/starnix_kernel.cm";
 
-    let realm = get_realm(namespace)?;
+    // Grab the realm from the component's namespace.
+    let realm =
+        get_realm(start_info.ns.as_mut().ok_or(anyhow!("Couldn't get realm from namespace"))?)?;
+
+    let kernel_start_info = generate_kernel_config(kernels_dir, KERNELS_DIR_NAME, start_info)?;
+
     realm
         .create_child(
             &mut fdecl::CollectionRef { name: RUNNERS_COLLECTION.into() },
             fdecl::Child {
-                name: Some(runner_name.to_string()),
+                name: Some(kernel_start_info.name.clone()),
                 url: Some(runner_url.to_string()),
                 startup: Some(fdecl::StartupMode::Lazy),
                 ..fdecl::Child::EMPTY
             },
-            fcomponent::CreateChildArgs::EMPTY,
+            kernel_start_info.args,
         )
         .await?
         .map_err(|e| anyhow::anyhow!("failed to create runner child: {:?}", e))?;
-    let runner_outgoing = open_exposed_directory(&realm, &runner_name, RUNNERS_COLLECTION).await?;
+    let runner_outgoing =
+        open_exposed_directory(&realm, &kernel_start_info.name, RUNNERS_COLLECTION).await?;
     let starnix_kernel = fclient::connect_to_protocol_at_dir_root::<frunner::ComponentRunnerMarker>(
         &runner_outgoing,
     )?;
 
-    Ok((starnix_kernel, realm))
+    Ok((starnix_kernel, realm, kernel_start_info.name))
 }
 
 /// Returns numbered handles with their respective stdout and stderr clients.
@@ -91,26 +127,11 @@ pub fn create_numbered_handles() -> (Option<Vec<fprocess::HandleInfo>>, zx::Sock
 
 /// Starts the test component and returns its proxy.
 pub fn start_test_component(
-    test_url: &str,
-    program: Option<fdata::Dictionary>,
-    namespace: &ComponentNamespace,
-    numbered_handles: Option<Vec<fprocess::HandleInfo>>,
+    start_info: frunner::ComponentStartInfo,
     starnix_kernel: &frunner::ComponentRunnerProxy,
 ) -> Result<frunner::ComponentControllerProxy, Error> {
     let (component_controller, component_controller_server_end) =
         create_proxy::<frunner::ComponentControllerMarker>()?;
-    let ns = Some(ComponentNamespace::try_into(namespace.clone())?);
-    let (outgoing_dir, _outgoing_dir) = zx::Channel::create();
-
-    let start_info = frunner::ComponentStartInfo {
-        resolved_url: Some(test_url.to_string()),
-        program,
-        ns,
-        outgoing_dir: Some(outgoing_dir.into()),
-        runtime_dir: None,
-        numbered_handles,
-        ..frunner::ComponentStartInfo::EMPTY
-    };
 
     starnix_kernel.start(start_info, component_controller_server_end)?;
 
@@ -178,15 +199,26 @@ fn update_program_args(mut new_args: Vec<String>, program: &mut fdata::Dictionar
     };
 }
 
-fn get_realm(namespace: &ComponentNamespace) -> Result<fcomponent::RealmProxy, Error> {
+fn get_realm(
+    namespace: &mut Vec<frunner::ComponentNamespaceEntry>,
+) -> Result<fcomponent::RealmProxy, Error> {
     namespace
-        .items()
-        .iter()
-        .flat_map(|(s, d)| {
-            if s == "/svc" {
-                Some(fuchsia_component::client::connect_to_protocol_at_dir_root::<
+        .iter_mut()
+        .flat_map(|entry| {
+            if entry.path.as_ref().unwrap() == "/svc" {
+                let directory = entry
+                    .directory
+                    .take()
+                    .unwrap()
+                    .into_proxy()
+                    .expect("Failed to grab directory proxy.");
+                let r = Some(fuchsia_component::client::connect_to_protocol_at_dir_root::<
                     fcomponent::RealmMarker,
-                >(&d))
+                >(&directory));
+
+                let dir_channel: zx::Channel = directory.into_channel().expect("").into();
+                entry.directory = Some(dir_channel.into());
+                r
             } else {
                 None
             }

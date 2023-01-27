@@ -211,7 +211,7 @@ pub async fn create_child_component(
 /// the init task completes).
 async fn create_new_kernel(
     kernels_dir: &vfs::directory::immutable::Simple,
-    mut component_start_info: frunner::ComponentStartInfo,
+    component_start_info: frunner::ComponentStartInfo,
     controller: ServerEnd<frunner::ComponentControllerMarker>,
 ) -> Result<(), Error> {
     // The name of the directory capability that is being offered to the starnix_kernel.
@@ -220,7 +220,7 @@ async fn create_new_kernel(
     const KERNEL_URL: &str = "starnix_kernel#meta/starnix_kernel.cm";
 
     let kernel_start_info =
-        generate_kernel_config(kernels_dir, KERNEL_DIRECTORY, &mut component_start_info)?;
+        generate_kernel_config(kernels_dir, KERNEL_DIRECTORY, component_start_info)?;
 
     // Create a new instance of starnix_kernel in the kernel collection. Offer the directory that
     // contains all the configuration information for the galaxy that it is running.
