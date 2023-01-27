@@ -4,7 +4,7 @@
 
 use crate::event;
 use crate::message::action_fuse::ActionFuse;
-use crate::message::base::{filter, group, Audience, MessageEvent, MessengerType, Status};
+use crate::message::base::{filter, Audience, MessageEvent, MessengerType, Status};
 use crate::message::receptor::Receptor;
 use crate::policy;
 use crate::tests::message_utils::verify_payload;
@@ -1002,72 +1002,6 @@ async fn test_broker_filter_combined_all() {
 }
 
 #[fuchsia::test(allow_stalls = false)]
-async fn test_group_message() {
-    // Prepare a message hub with a sender and multiple targets.
-    let delegate = test::MessageHub::create();
-
-    // Messenger to send message.
-    let (messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
-    // Receptors for messages.
-    let target_address_1 = crate::Address::Test(1);
-    let (_, mut receptor_1) =
-        delegate.create(MessengerType::Addressable(target_address_1)).await.unwrap();
-    let target_address_2 = crate::Address::Test(2);
-    let (_, mut receptor_2) =
-        delegate.create(MessengerType::Addressable(target_address_2)).await.unwrap();
-    let (_, mut receptor_3) = delegate.create(MessengerType::Unbound).await.unwrap();
-
-    let audience = Audience::Group(
-        group::Builder::new()
-            .add(Audience::Address(target_address_1))
-            .add(Audience::Address(target_address_2))
-            .build(),
-    );
-    // Send message targeting both receptors.
-    messenger.message(ORIGINAL.clone(), audience).ack();
-    // Receptors should both receive the message.
-    verify_payload(ORIGINAL.clone(), &mut receptor_1, None).await;
-    verify_payload(ORIGINAL.clone(), &mut receptor_2, None).await;
-
-    // Broadcast and ensure the untargeted receptor gets that message next
-    messenger.message(BROADCAST.clone(), Audience::Broadcast).ack();
-    verify_payload(BROADCAST.clone(), &mut receptor_3, None).await;
-}
-
-#[fuchsia::test(allow_stalls = false)]
-async fn test_group_message_redundant_targets() {
-    // Prepare a message hub with a sender, broker, and target.
-    let delegate = test::MessageHub::create();
-
-    // Messenger to send broadcast message and targeted message.
-    let (messenger, _) = delegate.create(MessengerType::Unbound).await.unwrap();
-    // Receptors for messages.
-    let target_address = crate::Address::Test(1);
-    let (_, mut receptor) = delegate
-        .create(MessengerType::Addressable(target_address))
-        .await
-        .expect("messenger should be created");
-    // Create audience with multiple references to same messenger.
-    let audience = Audience::Group(
-        group::Builder::new()
-            .add(Audience::Address(target_address))
-            .add(Audience::Messenger(receptor.get_signature()))
-            .add(Audience::Broadcast)
-            .build(),
-    );
-
-    // Send Original message.
-    messenger.message(ORIGINAL.clone(), audience.clone()).ack();
-    // Receptor should receive message.
-    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
-
-    // Send Reply message.
-    messenger.message(REPLY.clone(), audience).ack();
-    // Receptor should receive Reply message and not another Original message.
-    verify_payload(REPLY.clone(), &mut receptor, None).await;
-}
-
-#[fuchsia::test(allow_stalls = false)]
 async fn test_audience_matching() {
     let target_audience = Audience::Address(crate::Address::Test(1));
     // An audience should contain itself.
@@ -1075,50 +1009,8 @@ async fn test_audience_matching() {
     // An audience with only broadcast should not match.
     #[allow(clippy::bool_assert_comparison)]
     {
-        let audience = Audience::Group(group::Builder::new().add(Audience::Broadcast).build());
+        let audience = Audience::Broadcast;
         assert_eq!(audience.contains(&target_audience), false);
-    }
-    // An audience group with the target audience should match.
-    {
-        let audience = Audience::Group(group::Builder::new().add(target_audience.clone()).build());
-        assert!(audience.contains(&target_audience));
-    }
-    // An audience group with the target audience nested should match.
-    {
-        let audience = Audience::Group(
-            group::Builder::new()
-                .add(Audience::Group(group::Builder::new().add(target_audience.clone()).build()))
-                .build(),
-        );
-        assert!(audience.contains(&target_audience));
-    }
-    // An a subset should be contained within a superset and a superset should
-    // not be contained in a subset.
-    {
-        let target_audience_2 = Audience::Address(crate::Address::Test(2));
-        let target_audience_3 = Audience::Address(crate::Address::Test(3));
-
-        let audience_subset = Audience::Group(
-            group::Builder::new()
-                .add(target_audience.clone())
-                .add(target_audience_2.clone())
-                .build(),
-        );
-
-        let audience_set = Audience::Group(
-            group::Builder::new()
-                .add(target_audience)
-                .add(target_audience_2)
-                .add(target_audience_3)
-                .build(),
-        );
-
-        assert!(audience_set.contains(&audience_subset));
-
-        #[allow(clippy::bool_assert_comparison)]
-        {
-            assert_eq!(audience_subset.contains(&audience_set), false);
-        }
     }
 }
 

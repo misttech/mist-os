@@ -393,13 +393,6 @@ impl MessageHub {
                     return_set.extend(messengers);
                 }
             }
-            Audience::Group(group) => {
-                for audience in &group.audiences {
-                    let resolved_audience = self.resolve_audience(sender_id, audience)?;
-                    return_set.extend(resolved_audience.0);
-                    delivery_required |= resolved_audience.1;
-                }
-            }
             Audience::Messenger(signature) => {
                 delivery_required = true;
                 match signature {

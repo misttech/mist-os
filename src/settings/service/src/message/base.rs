@@ -99,8 +99,6 @@ pub enum Status {
 pub enum Audience {
     // All non-broker messengers outside of the sender.
     Broadcast,
-    // An Audience Group.
-    Group(group::Group),
     // The messenger at the specified address.
     Address(crate::Address),
     // The messenger with the specified signature.
@@ -118,9 +116,6 @@ impl Audience {
         match self {
             Audience::Broadcast => false,
             Audience::Role(_) => false,
-            Audience::Group(group) => {
-                group.audiences.iter().any(|audience| audience.requires_delivery())
-            }
             Audience::Address(_) | Audience::Messenger(_) => true,
         }
     }
@@ -130,58 +125,10 @@ impl Audience {
     }
 
     pub fn flatten(&self) -> HashSet<Audience> {
-        match self {
-            Audience::Group(group) => {
-                group.audiences.iter().flat_map(|audience| audience.flatten()).collect()
-            }
-            _ => [self.clone()].into(),
-        }
+        [self.clone()].into()
     }
 }
 
-pub mod group {
-    use super::Audience;
-    #[derive(Clone, Debug, PartialEq, Hash, Eq)]
-    pub struct Group {
-        pub audiences: Vec<Audience>,
-    }
-
-    impl Group {
-        pub fn contains(&self, audience: &Audience) -> bool {
-            for target in &self.audiences {
-                if target == audience {
-                    return true;
-                } else if let Audience::Group(group) = target {
-                    if group.contains(audience) {
-                        return true;
-                    }
-                }
-            }
-            false
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) struct Builder {
-        audiences: Vec<Audience>,
-    }
-
-    #[cfg(test)]
-    impl Builder {
-        pub(crate) fn new() -> Self {
-            Self { audiences: vec![] }
-        }
-
-        pub(crate) fn add(mut self, audience: Audience) -> Self {
-            self.audiences.push(audience);
-            self
-        }
-
-        pub(crate) fn build(self) -> Group {
-            Group { audiences: self.audiences }
-        }
-    }
-}
 /// An identifier that can be used to send messages directly to a Messenger.
 /// Included with Message instances.
 #[derive(Copy, Clone, Debug, PartialEq, Hash, Eq)]
