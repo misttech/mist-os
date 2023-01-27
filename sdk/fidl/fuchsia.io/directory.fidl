@@ -236,7 +236,8 @@ protocol Directory1 {
     /// calling read multiple times on a file, directories have a seek
     /// offset which is updated on subsequent calls to ReadDirents.
     /// Each call to ReadDirents will only return whole dirent structures,
-    /// they will not get split across ReadDirent calls.
+    /// they will not get split across ReadDirent calls. When the seek
+    /// offset reaches the end, `dirents` will be empty.
     ///
     /// These dirents are of the form:
     /// ```
@@ -255,10 +256,6 @@ protocol Directory1 {
     ///
     /// This method does not require any rights, since one could always probe for
     /// directory contents by triggering name conflicts during file creation.
-    // TODO(smklein): Convert to a vector of variable-length objects, when
-    // llcpp arrives.
-    // TODO(smklein): Get rid of "max_bytes".
-    // TODO(smklein): Document the behavior when the seek pointer reaches the end of the directory.
     @selector("fuchsia.io1/Directory.ReadDirents")
     ReadDirents(struct {
         max_bytes uint64;
