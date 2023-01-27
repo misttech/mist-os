@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::{config::TaggedPersist, constants, file_handler},
+    crate::{
+        config::{ServiceName, Tag, TagConfig},
+        constants, file_handler,
+    },
     anyhow::Error,
     fidl_fuchsia_diagnostics_persist::{
         DataPersistenceRequest, DataPersistenceRequestStream, PersistResult,
@@ -31,16 +34,16 @@ const ERROR_DESCRIPTION_KEY: &str = "description";
 
 pub struct PersistServer {
     // Service name that this persist server is hosting.
-    service_name: String,
+    service_name: ServiceName,
     // Mapping from a string tag to an archive reader
     // configured to fetch a specific set of selectors.
-    fetchers: HashMap<String, Fetcher>,
+    fetchers: HashMap<Tag, Fetcher>,
 }
 
 impl PersistServer {
     pub fn create(
-        service_name: String,
-        tags: HashMap<String, TaggedPersist>,
+        service_name: ServiceName,
+        tags: HashMap<Tag, TagConfig>,
     ) -> Result<PersistServer, Error> {
         let mut persisters = HashMap::new();
         for (tag, entry) in tags.into_iter() {
@@ -64,7 +67,7 @@ impl PersistServer {
             .fetchers
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<HashMap<String, Fetcher>>();
+            .collect::<HashMap<Tag, Fetcher>>();
 
         let unique_service_name =
             format!("{}-{}", constants::PERSIST_SERVICE_NAME_PREFIX, self.service_name);
@@ -77,7 +80,7 @@ impl PersistServer {
                     while let Some(Ok(DataPersistenceRequest::Persist { tag, responder, .. })) =
                         stream.next().await
                     {
-                        match fetchers.get_mut(&tag) {
+                        match fetchers.get_mut(tag.as_str()) {
                             None => {
                                 warn!("Tag '{}' was requested but is not configured", tag);
                                 let _ = responder.send(PersistResult::BadName);
@@ -88,7 +91,7 @@ impl PersistServer {
                                         responder.send(PersistResult::Queued).unwrap_or_else(|err| warn!("Failed to notify client that work was queued: {}", err));
                                     }
                                     Err(e) => {
-                                        fetchers.remove(&tag);
+                                        fetchers.remove(tag.as_str());
                                         warn!("Fetcher removed because queuing tasks is now failing: {:?}", e);
                                     }
                                 }
@@ -233,8 +236,8 @@ struct FetcherArgs {
     source: InspectFetcher,
     backoff: zx::Duration,
     max_save_length: usize,
-    service_name: String,
-    tag: String,
+    service_name: ServiceName,
+    tag: Tag,
 }
 
 fn utc_now() -> i64 {

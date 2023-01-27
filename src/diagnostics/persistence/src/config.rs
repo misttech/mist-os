@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::ops::Deref;
+use std::{borrow::Borrow, fmt::Display};
+
 use {
     anyhow::{bail, Error},
     glob::glob,
@@ -12,10 +15,11 @@ use {
 };
 
 /// The outer map is service_name; the inner is tag.
-pub(crate) type Config = HashMap<String, HashMap<String, TaggedPersist>>;
+pub(crate) type Config = HashMap<ServiceName, HashMap<Tag, TagConfig>>;
 
 /// Schema for config-file entries. Each config file is a JSON array of these.
 #[derive(Deserialize, Default, Debug, PartialEq)]
+#[cfg_attr(test, derive(Clone))]
 #[serde(deny_unknown_fields)]
 pub struct TaggedPersist {
     /// The Inspect data defined here will be published under this tag.
@@ -35,30 +39,119 @@ pub struct TaggedPersist {
     pub min_seconds_between_fetch: i64,
 }
 
-const CONFIG_GLOB: &str = "/config/data/*.persist";
+/// Configuration for a single tag for a single service.
+///
+/// See [`TaggedPersist`] for the meaning of corresponding fields.
+#[derive(Debug, Eq, PartialEq)]
+pub struct TagConfig {
+    pub selectors: Vec<String>,
+    pub max_bytes: usize,
+    pub min_seconds_between_fetch: i64,
+}
+
+/// Wrapper class for a valid tag name.
+///
+/// This is a witness class that can only be constructed from a `String` that
+/// matches [`NAME_PATTERN`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct Tag(String);
+
+/// Wrapper class for a valid service name.
+///
+/// This is a witness class that can only be constructed from a `String` that
+/// matches [`NAME_PATTERN`].
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct ServiceName(String);
+
+/// A regular expression corresponding to a valid tag or service name.
+pub const NAME_PATTERN: &'static str = r"^[a-z][a-z-]*$";
 
 lazy_static! {
-    static ref NAME_VALIDATOR: Regex = Regex::new(r"^[a-z][a-z-]*$").unwrap();
+    static ref NAME_VALIDATOR: Regex = Regex::new(NAME_PATTERN).unwrap();
 }
 
-fn validate_name(tag: &str) -> Result<(), Error> {
-    if !NAME_VALIDATOR.is_match(tag) {
-        bail!("Invalid tag {} must match [a-z][a-z-]*", tag);
+impl Tag {
+    pub fn new(tag: String) -> Result<Self, Error> {
+        if !NAME_VALIDATOR.is_match(&tag) {
+            bail!("Invalid tag {} must match [a-z][a-z-]*", tag);
+        }
+        Ok(Self(tag))
     }
-    Ok(())
 }
+
+impl ServiceName {
+    pub fn new(name: String) -> Result<Self, Error> {
+        if !NAME_VALIDATOR.is_match(&name) {
+            bail!("Invalid service name {} must match [a-z][a-z-]*", name);
+        }
+        Ok(Self(name))
+    }
+}
+
+/// Allow `Tag` to be treated like a `&str` for display, etc.
+impl Deref for Tag {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        let Self(tag) = self;
+        tag
+    }
+}
+
+/// Allow `ServiceName` to be treated like a `&str` for display, etc.
+impl Deref for ServiceName {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        let Self(tag) = self;
+        tag
+    }
+}
+
+/// Allow treating `Tag` as a `&str` for, e.g., HashMap indexing operations.
+impl Borrow<str> for Tag {
+    fn borrow(&self) -> &str {
+        &*self
+    }
+}
+
+/// Allow treating `ServiceName` as a `&str` for, e.g., HashMap indexing
+/// operations.
+impl Borrow<str> for ServiceName {
+    fn borrow(&self) -> &str {
+        &*self
+    }
+}
+
+impl Display for Tag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(name) = self;
+        name.fmt(f)
+    }
+}
+
+impl Display for ServiceName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(name) = self;
+        name.fmt(f)
+    }
+}
+
+const CONFIG_GLOB: &str = "/config/data/*.persist";
 
 pub fn try_insert_items(config: &mut Config, config_text: &str) -> Result<(), Error> {
     let items = serde_json5::from_str::<Vec<TaggedPersist>>(config_text)?;
     for item in items.into_iter() {
-        validate_name(&item.tag)?;
-        validate_name(&item.service_name)?;
-        if let Some(tagged_persist) = config
-            .entry(item.service_name.clone())
+        let TaggedPersist { tag, service_name, selectors, max_bytes, min_seconds_between_fetch } =
+            item;
+        let tag = Tag::new(tag)?;
+        let name = ServiceName::new(service_name)?;
+        if let Some(existing) = config
+            .entry(name.clone())
             .or_insert_with(|| HashMap::new())
-            .insert(item.tag.clone(), item)
+            .insert(tag, TagConfig { selectors, max_bytes, min_seconds_between_fetch })
         {
-            bail!("Duplicate TaggedPersist found: {:?}", tagged_persist);
+            bail!("Duplicate TagConfig found: {:?}", existing);
         }
     }
     Ok(())
@@ -75,6 +168,20 @@ pub fn load_configuration_files() -> Result<Config, Error> {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    impl From<TaggedPersist> for TagConfig {
+        fn from(
+            TaggedPersist {
+                tag: _,
+                service_name: _,
+                selectors,
+                max_bytes,
+                min_seconds_between_fetch,
+            }: TaggedPersist,
+        ) -> Self {
+            Self { selectors, max_bytes, min_seconds_between_fetch }
+        }
+    }
 
     #[fuchsia::test]
     fn verify_insert_logic() {
@@ -118,11 +225,11 @@ mod test {
         assert_eq!(config.len(), 2);
         let service_a = config.get("serv-a").unwrap();
         assert_eq!(service_a.len(), 1);
-        assert_eq!(service_a.get("tag-a"), Some(&persist_aa));
+        assert_eq!(service_a.get("tag-a"), Some(&persist_aa.clone().into()));
         let service_b = config.get("serv-b").unwrap();
         assert_eq!(service_b.len(), 2);
-        assert_eq!(service_b.get("tag-a"), Some(&persist_ba));
-        assert_eq!(service_b.get("tag-b"), Some(&persist_bb));
+        assert_eq!(service_b.get("tag-a"), Some(&persist_ba.clone().into()));
+        assert_eq!(service_b.get("tag-b"), Some(&persist_bb.clone().into()));
 
         assert!(try_insert_items(&mut config, bad_tag).is_err());
         assert!(try_insert_items(&mut config, bad_serv).is_err());
