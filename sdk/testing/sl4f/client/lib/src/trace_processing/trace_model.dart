@@ -334,14 +334,15 @@ class FlowEvent extends Event {
   /// The phase of the [FlowEvent].
   FlowEventPhase phase;
 
-  /// The enclosing duration that the [FlowEvent] belongs to.  This field will
-  /// never be null, as [FlowEvent]s without enclosing durations are considered
-  /// to be malformed.
+  /// The enclosing duration that the [FlowEvent] belongs to.  This field should
+  /// not usually be null, because [FlowEvent]s without enclosing durations are
+  /// considered to be malformed.  However, it may be null if the trace is
+  /// malformed or while the trace is being imported.
   ///
   /// In the case of a Chrome trace, this field stores the "bound"
   /// [DurationEvent], which may be either the enclosing duration or the next
   /// duration, depending on the defined binding point.
-  DurationEvent enclosingDuration;
+  DurationEvent? enclosingDuration;
 
   /// The previous flow event in the flow sequence.  Will be null for begin flow
   /// events, and will never be null for step and end flow events.

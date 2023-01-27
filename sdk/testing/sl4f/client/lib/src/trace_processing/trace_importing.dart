@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert';
 import 'dart:io';
@@ -92,8 +91,8 @@ String _asStringId(dynamic object) {
 
 /// A helper class to group events by their "track" ((pid, tid) pairs).
 class _TrackKey {
-  int pid;
-  int tid;
+  int? pid;
+  int? tid;
 
   _TrackKey(this.pid, this.tid);
 
@@ -118,11 +117,11 @@ class _TrackKey {
 
 /// A helper struct to group flow events.
 class _FlowKey {
-  String category;
-  String name;
-  String id;
+  String? category;
+  String? name;
+  String? id;
   // Only used for 'local' flow ids.
-  int pid;
+  int? pid;
 
   _FlowKey.fromTraceEvent(Map<String, dynamic> traceEvent) {
     name = traceEvent['name'];
@@ -175,10 +174,10 @@ class _FlowKey {
 
 /// A helper struct to group async events.
 class _AsyncKey {
-  int pid;
-  String category;
-  String name;
-  int id;
+  int? pid;
+  String? category;
+  String? name;
+  int? id;
 
   _AsyncKey.fromTraceEvent(Map<String, dynamic> traceEvent) {
     pid = traceEvent['pid'];
@@ -240,10 +239,8 @@ class _AsyncKey {
 }
 
 Map<String, dynamic> _combineArgs(
-    Map<String, dynamic> args1, Map<String, dynamic> args2) {
-  if (args1 == null) {
-    return args2;
-  } else if (args2 == null) {
+    Map<String, dynamic> args1, Map<String, dynamic>? args2) {
+  if (args2 == null) {
     return args1;
   }
   return {...args1, ...args2};
@@ -307,14 +304,14 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
   // TODO(fxbug.dev/41309): Support nested async events.  In the meantime, just drop them.
   int droppedNestedAsyncEventCounter = 0;
 
-  final Map<int, String> pidToName = {};
-  final Map<int, String> tidToName = {};
+  final Map<int?, String?> pidToName = {};
+  final Map<int?, String?> tidToName = {};
 
   // Process the raw trace events into our model's [Event] representation.
   for (final traceEvent in extendedTraceEvents) {
     _checkTraceEvent(traceEvent);
-    final int pid = traceEvent['pid'];
-    final int tid = traceEvent['tid'].toInt();
+    final int? pid = traceEvent['pid'];
+    final int? tid = traceEvent['tid'].toInt();
 
     final trackKey = _TrackKey(pid, tid);
     final durationStack =
@@ -324,10 +321,10 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
     if (phase == 'X') {
       final durationEvent = DurationEvent.fromJson(traceEvent);
       if (unboundFlowEvents.containsKey(trackKey)) {
-        for (final flowEvent in unboundFlowEvents[trackKey]) {
+        for (final flowEvent in unboundFlowEvents[trackKey]!) {
           flowEvent.enclosingDuration = durationEvent;
         }
-        unboundFlowEvents[trackKey].clear();
+        unboundFlowEvents[trackKey]!.clear();
       }
       addToDurationStack(durationEvent, durationStack);
       resultEvents.add(durationEvent);
@@ -335,10 +332,10 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
       final durationEvent = DurationEvent.fromJson(traceEvent);
 
       if (unboundFlowEvents.containsKey(trackKey)) {
-        for (final flowEvent in unboundFlowEvents[trackKey]) {
+        for (final flowEvent in unboundFlowEvents[trackKey]!) {
           flowEvent.enclosingDuration = durationEvent;
         }
-        unboundFlowEvents[trackKey].clear();
+        unboundFlowEvents[trackKey]!.clear();
       }
       addToDurationStack(durationEvent, durationStack);
     } else if (phase == 'E') {
@@ -355,7 +352,7 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
       durationStack.removeLast();
     } else if (phase == 'b') {
       final asyncKey = _AsyncKey.fromTraceEvent(traceEvent);
-      final asyncEvent = AsyncEvent.fromJson(asyncKey.id, traceEvent);
+      final asyncEvent = AsyncEvent.fromJson(asyncKey.id!, traceEvent);
       liveAsyncEvents[asyncKey] = asyncEvent;
     } else if (phase == 'e') {
       final asyncKey = _AsyncKey.fromTraceEvent(traceEvent);
@@ -374,7 +371,7 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
     } else if (phase == 'i' || phase == 'I') {
       resultEvents.add(InstantEvent.fromJson(traceEvent));
     } else if (phase == 's' || phase == 't' || phase == 'f') {
-      String bindingPoint;
+      String? bindingPoint;
 
       if (traceEvent.containsKey('bp')) {
         if (traceEvent['bp'] == 'e') {
@@ -391,7 +388,7 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
 
       final flowKey = _FlowKey.fromTraceEvent(traceEvent);
 
-      FlowEvent previousFlow;
+      FlowEvent? previousFlow;
       if (phase == 's') {
         if (liveFlows.containsKey(flowKey)) {
           droppedFlowEventCounter++;
@@ -413,9 +410,9 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
           bindingPoint == 'enclosing' ? durationStack.last : null;
 
       final flowEvent =
-          FlowEvent.fromJson(flowKey.id, enclosingDuration, traceEvent);
+          FlowEvent.fromJson(flowKey.id!, enclosingDuration, traceEvent);
       if (bindingPoint == 'enclosing') {
-        enclosingDuration.childFlows.add(flowEvent);
+        enclosingDuration!.childFlows.add(flowEvent);
       } else {
         unboundFlowEvents
             .putIfAbsent(trackKey, () => <FlowEvent>[])
@@ -485,8 +482,9 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
           'Encountered unknown phase $phase from $traceEvent');
     }
   }
-  final liveDurationEventsCount =
-      durationStacks.values.map((ds) => ds.length).fold(0, (a, b) => a + b);
+  final liveDurationEventsCount = durationStacks.values
+      .map((ds) => ds.length)
+      .fold(0, (int a, int b) => a + b);
   if (liveDurationEventsCount > 0) {
     print(
         'Warning, finished processing trace events with $liveDurationEventsCount in progress duration events');
@@ -540,20 +538,20 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
         throw FormatException(
             'Expected $systemTraceEvent to have field "ph" of type String');
       }
-      final String phase = systemTraceEvent['ph'];
+      final String? phase = systemTraceEvent['ph'];
       if (phase == 'p') {
         if (!(systemTraceEvent.containsKey('pid') &&
             systemTraceEvent['pid'] is int)) {
           throw FormatException(
               'Expected $systemTraceEvent to have field "pid" of type int');
         }
-        final int pid = systemTraceEvent['pid'];
+        final int? pid = systemTraceEvent['pid'];
         if (!(systemTraceEvent.containsKey('name') &&
             systemTraceEvent['name'] is String)) {
           throw FormatException(
               'Expected $systemTraceEvent to have field "name" of type String');
         }
-        final String name = systemTraceEvent['name'];
+        final String? name = systemTraceEvent['name'];
         pidToName[pid] = name;
       } else if (phase == 't') {
         if (!(systemTraceEvent.containsKey('pid') &&
@@ -567,13 +565,13 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
           throw FormatException(
               'Expected $systemTraceEvent to have field "tid" of type int or double');
         }
-        final int tid = systemTraceEvent['tid'].toInt();
+        final int? tid = systemTraceEvent['tid'].toInt();
         if (!(systemTraceEvent.containsKey('name') &&
             systemTraceEvent['name'] is String)) {
           throw FormatException(
               'Expected $systemTraceEvent to have field "name" of type String');
         }
-        final String name = systemTraceEvent['name'];
+        final String? name = systemTraceEvent['name'];
         tidToName[tid] = name;
       } else if (phase == 'k') {
         // CPU events are currently ignored.  It would be interesting to support
@@ -595,7 +593,7 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
     if (threadIndex == -1) {
       final thread = Thread(event.tid);
       if (tidToName.containsKey(event.tid)) {
-        thread.name = tidToName[event.tid];
+        thread.name = tidToName[event.tid]!;
       }
       process.threads.add(thread);
       threadIndex = process.threads.length - 1;
@@ -606,12 +604,12 @@ Model _createModelFromJson(Map<String, dynamic> rootObject) {
 
   final model = Model();
   for (final pid in processes.keys.toList()..sort()) {
-    final process = processes[pid];
+    final process = processes[pid]!;
     process.threads.sort((a, b) {
       return a.tid.compareTo(b.tid);
     });
     if (pidToName.containsKey(process.pid)) {
-      process.name = pidToName[process.pid];
+      process.name = pidToName[process.pid]!;
     }
     model.processes.add(process);
   }

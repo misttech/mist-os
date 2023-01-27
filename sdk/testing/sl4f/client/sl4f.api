@@ -9025,7 +9025,7 @@
               "isLate": false,
               "name": "enclosingDuration",
               "type": "VariableDeclarationImpl",
-              "varType": "DurationEvent"
+              "varType": "DurationEvent?"
             },
             "id": {
               "isConst": false,
