@@ -108,18 +108,6 @@ pub enum Audience {
 }
 
 impl Audience {
-    /// Indicates whether a message directed towards this `Audience` must match
-    /// to a messenger or if it's okay for the message to be delivered to no
-    /// one. For example, broadcasts are meant to be delivered to any
-    /// (potentially no) messenger.
-    pub fn requires_delivery(&self) -> bool {
-        match self {
-            Audience::Broadcast => false,
-            Audience::Role(_) => false,
-            Audience::Address(_) | Audience::Messenger(_) => true,
-        }
-    }
-
     pub fn contains(&self, audience: &Audience) -> bool {
         audience.flatten().is_subset(&self.flatten())
     }
