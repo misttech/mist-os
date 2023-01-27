@@ -116,8 +116,9 @@ TEST_F(WlanPhyImplDeviceTest, PhyGetSupportedMacRoles) {
   auto result = client_.buffer(test_arena_)->GetSupportedMacRoles();
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
-  EXPECT_EQ(result->value()->supported_mac_roles.count(), 1);
-  EXPECT_EQ(result->value()->supported_mac_roles.data()[0],
+  ASSERT_TRUE(result->value()->has_supported_mac_roles());
+  EXPECT_EQ(result->value()->supported_mac_roles().count(), 1);
+  EXPECT_EQ(result->value()->supported_mac_roles().data()[0],
             fuchsia_wlan_common::WlanMacRole::kClient);
 }
 
@@ -305,9 +306,9 @@ TEST_F(WlanPhyImplDeviceTest, GetCountry) {
   auto result = client_.buffer(test_arena_)->GetCountry();
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
-  auto& country = result->value()->country;
-  EXPECT_EQ('Z', country.alpha2().data()[0]);
-  EXPECT_EQ('Z', country.alpha2().data()[1]);
+  auto& country = result.value();
+  EXPECT_EQ('Z', country->alpha2().data()[0]);
+  EXPECT_EQ('Z', country->alpha2().data()[1]);
 }
 
 TEST_F(WlanPhyImplDeviceTest, SetCountry) {

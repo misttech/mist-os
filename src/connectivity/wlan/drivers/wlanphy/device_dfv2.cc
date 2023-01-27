@@ -118,14 +118,16 @@ void Device::GetSupportedMacRoles(GetSupportedMacRolesCompleter::Sync& completer
           completer.ReplyError(result->error_value());
           return;
         }
-
-        if (result->value()->supported_mac_roles.count() >
+        if (!result->value()->has_supported_mac_roles()) {
+          completer.ReplyError(ZX_ERR_UNAVAILABLE);
+        }
+        if (result->value()->supported_mac_roles().count() >
             fuchsia_wlan_common_MAX_SUPPORTED_MAC_ROLES) {
           completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
           return;
         }
 
-        completer.ReplySuccess(result->value()->supported_mac_roles);
+        completer.ReplySuccess(result->value()->supported_mac_roles());
       });
 }
 
@@ -253,12 +255,12 @@ void Device::GetCountry(GetCountryCompleter::Sync& completer) {
           completer.ReplyError(status);
           return;
         }
-        if (!result->value()->country.is_alpha2()) {
+        if (!result->value()->is_alpha2()) {
           lerror("only alpha2 format is supported");
           completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
           return;
         }
-        memcpy(resp.alpha2.data(), result->value()->country.alpha2().data(), WLANPHY_ALPHA2_LEN);
+        memcpy(resp.alpha2.data(), result->value()->alpha2().data(), WLANPHY_ALPHA2_LEN);
 
         completer.ReplySuccess(resp);
       });

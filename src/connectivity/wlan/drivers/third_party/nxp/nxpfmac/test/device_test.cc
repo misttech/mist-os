@@ -244,8 +244,8 @@ TEST_F(DeviceTest, GetCountry) {
   ASSERT_OK(get_result.status());
   ASSERT_TRUE(get_result.value().is_ok());
 
-  ASSERT_TRUE(get_result->value()->country.is_alpha2());
-  EXPECT_BYTES_EQ(set_request.alpha2().data(), get_result->value()->country.alpha2().data(),
+  ASSERT_TRUE(get_result->value()->is_alpha2());
+  EXPECT_BYTES_EQ(set_request.alpha2().data(), get_result->value()->alpha2().data(),
                   set_request.alpha2().size());
 }
 
@@ -288,8 +288,8 @@ TEST_F(DeviceTest, ClearCountry) {
   ASSERT_OK(get_result.status());
   ASSERT_TRUE(get_result.value().is_ok());
 
-  ASSERT_TRUE(get_result->value()->country.is_alpha2());
-  EXPECT_BYTES_EQ(set_request.alpha2().data(), get_result->value()->country.alpha2().data(),
+  ASSERT_TRUE(get_result->value()->is_alpha2());
+  EXPECT_BYTES_EQ(set_request.alpha2().data(), get_result->value()->alpha2().data(),
                   set_request.alpha2().size());
   // Clear country should reset it to WW
   fdf::Arena arena_for_clear(kArenaTag + 2);
@@ -300,8 +300,8 @@ TEST_F(DeviceTest, ClearCountry) {
   // Get should return WW
   get_result = wlanphy_client_.sync().buffer(arena_for_get)->GetCountry();
   ASSERT_OK(get_result.status());
-  ASSERT_TRUE(get_result->value()->country.is_alpha2());
-  EXPECT_BYTES_EQ("WW", get_result->value()->country.alpha2().data(), 2);
+  ASSERT_TRUE(get_result->value()->is_alpha2());
+  EXPECT_BYTES_EQ("WW", get_result->value()->alpha2().data(), 2);
 }
 
 TEST_F(DeviceTest, DeferredRxWork) {

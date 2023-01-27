@@ -113,7 +113,11 @@ class WlanphyDeviceTest : public ::zxtest::Test,
     auto supported_mac_roles =
         fidl::VectorView<fuchsia_wlan_common::wire::WlanMacRole>::FromExternal(
             supported_mac_roles_vec);
-    completer.buffer(arena).ReplySuccess(supported_mac_roles);
+    fidl::Arena fidl_arena;
+    auto builder =
+        fuchsia_wlan_phyimpl::wire::WlanPhyImplGetSupportedMacRolesResponse::Builder(fidl_arena);
+    builder.supported_mac_roles(supported_mac_roles);
+    completer.buffer(arena).ReplySuccess(builder.Build());
     test_completion_.Signal();
   }
   void CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
@@ -141,7 +145,7 @@ class WlanphyDeviceTest : public ::zxtest::Test,
   }
   void SetCountry(SetCountryRequestView request, fdf::Arena& arena,
                   SetCountryCompleter::Sync& completer) override {
-    country_ = request->country;
+    country_ = *request;
     completer.buffer(arena).ReplySuccess();
     test_completion_.Signal();
   }

@@ -75,7 +75,11 @@ void WlanPhyImplDevice::GetSupportedMacRoles(fdf::Arena& arena,
   auto reply_vector = fidl::VectorView<fuchsia_wlan_common::WlanMacRole>::FromExternal(
       supported_mac_roles_list, supported_mac_roles_count);
 
-  completer.buffer(arena).ReplySuccess(reply_vector);
+  fidl::Arena fidl_arena;
+  auto builder =
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplGetSupportedMacRolesResponse::Builder(fidl_arena);
+  builder.supported_mac_roles(reply_vector);
+  completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
 void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
@@ -188,13 +192,13 @@ void WlanPhyImplDevice::SetCountry(SetCountryRequestView request, fdf::Arena& ar
                                    SetCountryCompleter::Sync& completer) {
   wlan_phy_country_t country;
 
-  if (!request->country.is_alpha2()) {
+  if (!request->is_alpha2()) {
     IWL_ERR(this, "%s() only alpha2 format is supported\n", __func__);
     completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
-  memcpy(&country.alpha2[0], &request->country.alpha2()[0], WLANPHY_ALPHA2_LEN);
+  memcpy(&country.alpha2[0], request->alpha2().data(), WLANPHY_ALPHA2_LEN);
   zx_status_t status = phy_set_country(drvdata(), &country);
   if (status != ZX_OK) {
     IWL_ERR(this, "%s() failed set country: %s\n", __func__, zx_status_get_string(status));

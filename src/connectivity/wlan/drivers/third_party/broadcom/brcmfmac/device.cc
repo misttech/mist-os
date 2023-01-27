@@ -156,7 +156,11 @@ void Device::GetSupportedMacRoles(fdf::Arena& arena,
 
   auto reply_vector = fidl::VectorView<fuchsia_wlan_common::wire::WlanMacRole>::FromExternal(
       supported_mac_roles_list, supported_mac_roles_count);
-  completer.buffer(arena).ReplySuccess(reply_vector);
+  fidl::Arena fidl_arena;
+  auto builder =
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplGetSupportedMacRolesResponse::Builder(fidl_arena);
+  builder.supported_mac_roles(reply_vector);
+  completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
 void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena& arena,
@@ -341,12 +345,12 @@ void Device::SetCountry(SetCountryRequestView request, fdf::Arena& arena,
                         SetCountryCompleter::Sync& completer) {
   BRCMF_DBG(WLANPHY, "Setting country code dfv2");
   wlan_phy_country_t country;
-  if (!request->country.is_alpha2()) {
+  if (!request->is_alpha2()) {
     completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
     BRCMF_ERR("Device::SetCountry() Invalid input format of country code.");
     return;
   }
-  memcpy(&country.alpha2[0], &request->country.alpha2()[0], WLANPHY_ALPHA2_LEN);
+  memcpy(&country.alpha2[0], request->alpha2().data(), WLANPHY_ALPHA2_LEN);
   zx_status_t status = WlanInterface::SetCountry(brcmf_pub_.get(), &country);
   if (status != ZX_OK) {
     BRCMF_ERR("Device::SetCountry() Failed Set country : %s", zx_status_get_string(status));

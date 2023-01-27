@@ -211,7 +211,11 @@ void Device::GetSupportedMacRoles(fdf::Arena &arena,
 
   auto reply_vector = fidl::VectorView<fuchsia_wlan_common::wire::WlanMacRole>::FromExternal(
       supported_mac_roles_list, supported_mac_roles_count);
-  completer.buffer(arena).ReplySuccess(reply_vector);
+  fidl::Arena fidl_arena;
+  auto builder =
+      fuchsia_wlan_phyimpl::wire::WlanPhyImplGetSupportedMacRolesResponse::Builder(fidl_arena);
+  builder.supported_mac_roles(reply_vector);
+  completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
 void Device::CreateIface(CreateIfaceRequestView request, fdf::Arena &arena,
@@ -415,7 +419,7 @@ void Device::SetCountry(SetCountryRequestView request, fdf::Arena &arena,
                         SetCountryCompleter::Sync &completer) {
   char country[3] = {};
 
-  memcpy(country, request->country.alpha2().data_, 2);
+  memcpy(country, request->alpha2().data_, 2);
   zx_status_t status = SetCountryCodeInFw(country);
   if (status != ZX_OK) {
     NXPF_ERR("Failed to set country: %s in FW err: %s", country, zx_status_get_string(status));

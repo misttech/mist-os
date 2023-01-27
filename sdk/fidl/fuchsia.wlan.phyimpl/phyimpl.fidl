@@ -27,8 +27,8 @@ type WlanPhyCountry = flexible union {
 @transport("Driver")
 protocol WlanPhyImpl {
     /// MAC roles supported for ifaces on the physical device.
-    GetSupportedMacRoles() -> (struct {
-        supported_mac_roles
+    GetSupportedMacRoles() -> (table {
+        1: supported_mac_roles
                 vector<fuchsia.wlan.common.WlanMacRole>:fuchsia.wlan.common.MAX_SUPPORTED_MAC_ROLES;
     }) error zx.status;
 
@@ -63,9 +63,7 @@ protocol WlanPhyImpl {
     /// Set country with a WlanPhyCountry. \
     /// Some common error codes are: \
     /// ZX_ERR_NOT_FOUND: Specified country code not supported. PHY state is left unchanged.
-    SetCountry(struct {
-        country WlanPhyCountry;
-    }) -> () error zx.status;
+    SetCountry(WlanPhyCountry) -> () error zx.status;
 
     /// Set device to a world-safe country, i.e. a mode that conforms to all
     /// regulatory constraints globally. \
@@ -75,9 +73,7 @@ protocol WlanPhyImpl {
     /// Read currently configured country. Implementations are advised to read the
     /// country directly from the firmware, where possible. \
     /// Generally expected to succeed if the device is in a functional state.
-    GetCountry() -> (struct {
-        country WlanPhyCountry;
-    }) error zx.status;
+    GetCountry() -> (WlanPhyCountry) error zx.status;
 
     /// Set Power Save mode on device. In most implementations this
     /// likely to be set in Firmware. \

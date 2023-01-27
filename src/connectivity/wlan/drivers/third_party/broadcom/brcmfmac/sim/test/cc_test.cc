@@ -133,9 +133,9 @@ TEST_F(CountryCodeTest, GetCCode) {
     auto result = client_.sync().buffer(test_arena_)->GetCountry();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
-    auto& get_country_result = result->value()->country;
-    EXPECT_EQ(get_country_result.alpha2().data()[0], 'W');
-    EXPECT_EQ(get_country_result.alpha2().data()[1], 'W');
+    auto& get_country_result = result->value();
+    EXPECT_EQ(get_country_result->alpha2().data()[0], 'W');
+    EXPECT_EQ(get_country_result->alpha2().data()[1], 'W');
   }
 
   // Try again, just in case the first one was a default value.
@@ -145,9 +145,9 @@ TEST_F(CountryCodeTest, GetCCode) {
     auto result = client_.sync().buffer(test_arena_)->GetCountry();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
-    auto& get_country_result = result->value()->country;
-    EXPECT_EQ(get_country_result.alpha2().data()[0], 'U');
-    EXPECT_EQ(get_country_result.alpha2().data()[1], 'S');
+    auto& get_country_result = result->value();
+    EXPECT_EQ(get_country_result->alpha2().data()[0], 'U');
+    EXPECT_EQ(get_country_result->alpha2().data()[1], 'S');
   }
 }
 

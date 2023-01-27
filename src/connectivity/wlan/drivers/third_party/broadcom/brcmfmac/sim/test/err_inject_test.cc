@@ -47,9 +47,9 @@ void ErrInjTest::RunCountryTest(const std::vector<uint8_t>& input,
   auto result = client_.sync().buffer(test_arena_)->GetCountry();
   ASSERT_TRUE(result.ok());
   ASSERT_FALSE(result->is_error());
-  auto& actual_country = result->value()->country;
-  EXPECT_EQ(actual_country.alpha2().data()[0], expected_output[0]);
-  EXPECT_EQ(actual_country.alpha2().data()[1], expected_output[1]);
+  auto& actual_country = result->value();
+  EXPECT_EQ(actual_country->alpha2().data()[0], expected_output[0]);
+  EXPECT_EQ(actual_country->alpha2().data()[1], expected_output[1]);
 
   sim->sim_fw->err_inj_.DelErrInjIovar("country");
 }
