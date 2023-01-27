@@ -95,23 +95,14 @@ pub fn sys_clone3(
 }
 
 pub fn sys_vfork(current_task: &CurrentTask) -> Result<pid_t, Errno> {
-    let mut new_task: CurrentTask = current_task.clone_task(
-        CLONE_VFORK as u64,
-        Some(SIGCHLD),
-        UserRef::default(),
-        UserRef::default(),
-    )?;
-    let tid = new_task.id;
-
-    new_task.registers = current_task.registers;
-    new_task.registers.rax = 0;
-
-    let task_ref = new_task.task.clone(); // Keep reference for later waiting.
-
-    execute_task(new_task, |_| {});
-
-    task_ref.wait_for_execve()?;
-    Ok(tid)
+    do_clone(
+        current_task,
+        &clone_args {
+            flags: CLONE_VFORK as u64,
+            exit_signal: SIGCHLD.number() as u64,
+            ..Default::default()
+        },
+    )
 }
 
 fn read_c_string_vector(
