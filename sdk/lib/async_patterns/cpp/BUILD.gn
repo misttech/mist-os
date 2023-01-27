@@ -1,0 +1,30 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/sdk_source_set.gni")
+
+sdk_source_set("cpp") {
+  category = "internal"
+  sdk_name = "async_patterns_cpp"
+  include_base = "//sdk"
+
+  sources = [
+    "dispatcher_bound.h",
+    "internal/dispatcher_bound_storage.cc",
+    "internal/dispatcher_bound_storage.h",
+  ]
+
+  public_deps = [
+    "//sdk/lib/fit",
+    "//sdk/lib/stdcompat",
+    "//zircon/system/ulib/async",
+  ]
+
+  public_configs = [ "//sdk/config" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "tests" ]
+}
