@@ -327,7 +327,7 @@ impl MessageHub {
                         message.report_status(Status::Undeliverable).await;
                     }
 
-                    if audience.contains(&Audience::Broadcast) {
+                    if let Audience::Broadcast = audience {
                         // Broadcasts don't require any audience.
                         message.report_status(Status::Broadcasted).await;
                     }

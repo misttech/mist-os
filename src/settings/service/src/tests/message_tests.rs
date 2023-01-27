@@ -1005,12 +1005,12 @@ async fn test_broker_filter_combined_all() {
 async fn test_audience_matching() {
     let target_audience = Audience::Address(crate::Address::Test(1));
     // An audience should contain itself.
-    assert!(target_audience.contains(&target_audience));
+    assert!(target_audience == target_audience);
     // An audience with only broadcast should not match.
     #[allow(clippy::bool_assert_comparison)]
     {
         let audience = Audience::Broadcast;
-        assert_eq!(audience.contains(&target_audience), false);
+        assert_eq!(audience == target_audience, false);
     }
 }
 

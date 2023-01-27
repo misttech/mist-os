@@ -108,10 +108,6 @@ pub enum Audience {
 }
 
 impl Audience {
-    pub fn contains(&self, audience: &Audience) -> bool {
-        audience.flatten().is_subset(&self.flatten())
-    }
-
     pub fn flatten(&self) -> HashSet<Audience> {
         [self.clone()].into()
     }
@@ -238,7 +234,7 @@ pub mod filter {
                 let match_found = match condition {
                     Condition::Audience(audience) => matches!(
                             message.get_type(),
-                            MessageType::Origin(target) if target.contains(audience)),
+                            MessageType::Origin(target) if target == audience),
                     Condition::Custom(check_fn) => (check_fn)(message),
                     Condition::Filter(filter) => filter.matches(message),
                     Condition::Author(signature) => message.get_author().eq(signature),
