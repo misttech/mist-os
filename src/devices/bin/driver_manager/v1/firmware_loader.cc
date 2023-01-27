@@ -47,7 +47,7 @@ void FirmwareLoader::LoadFirmware(const fbl::RefPtr<Device>& dev, const char* dr
   }
 
   // This is done ahead of time as it is not thread-safe.
-  const Driver* driver = coordinator_->LibnameToDriver(driver_libname);
+  const Driver* driver = coordinator_->driver_loader().LibnameToDriver(driver_libname);
   fbl::unique_fd package_dir;
   if (driver != nullptr && driver->package_dir.is_valid()) {
     package_dir = driver->package_dir.duplicate();

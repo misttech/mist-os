@@ -114,6 +114,36 @@ bool driver_host_is_asan() {
   return is_asan;
 }
 
+zx::result<zx::vmo> DriverToVmo(const Driver& driver) {
+  // If we haven't cached the vmo, load it now and return it.
+  if (driver.dso_vmo == ZX_HANDLE_INVALID) {
+    zx::vmo vmo;
+    if (zx_status_t status = load_vmo(driver.libname.c_str(), &vmo); status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(std::move(vmo));
+  }
+
+  // Return a duplicate of the cached vmo.
+  zx::vmo vmo;
+  zx_rights_t rights =
+      ZX_RIGHTS_BASIC | ZX_RIGHTS_PROPERTY | ZX_RIGHT_READ | ZX_RIGHT_EXECUTE | ZX_RIGHT_MAP;
+  if (zx_status_t status = driver.dso_vmo.duplicate(rights, &vmo); status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(std::move(vmo));
+}
+
+zx::result<zx::vmo> LibnameToVmo(DriverLoader& driver_loader, const fbl::String& libname) {
+  const Driver* driver = driver_loader.LibnameToDriver(libname);
+  if (!driver) {
+    LOGF(ERROR, "Cannot find driver '%s'", libname.data());
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  return DriverToVmo(*driver);
+}
+
 // Create a stub device in a driver host.
 zx_status_t CreateStubDevice(const fbl::RefPtr<Device>& dev,
                              fidl::ServerEnd<fuchsia_device_manager::DeviceController> controller,
@@ -161,7 +191,7 @@ zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<Driver
   }
 
   fidl::Arena arena;
-  zx::result vmo_result = dev->coordinator->LibnameToVmo(dev->libname());
+  zx::result vmo_result = LibnameToVmo(dev->coordinator->driver_loader(), dev->libname());
   if (vmo_result.is_error()) {
     return vmo_result.error_value();
   }
@@ -222,26 +252,6 @@ zx_status_t CreateFidlProxyDevice(
 
   dev->Serve(std::move(coordinator_endpoints->server));
   return ZX_OK;
-}
-
-zx::result<zx::vmo> DriverToVmo(const Driver& driver) {
-  // If we haven't cached the vmo, load it now.
-  if (driver.dso_vmo == ZX_HANDLE_INVALID) {
-    zx::vmo vmo;
-    if (zx_status_t status = load_vmo(driver.libname.c_str(), &vmo); status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(std::move(vmo));
-  }
-
-  // If we have cached the vmo then duplicate it.
-  zx::vmo vmo;
-  zx_rights_t rights =
-      ZX_RIGHTS_BASIC | ZX_RIGHTS_PROPERTY | ZX_RIGHT_READ | ZX_RIGHT_EXECUTE | ZX_RIGHT_MAP;
-  if (zx_status_t status = driver.dso_vmo.duplicate(rights, &vmo); status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok(std::move(vmo));
 }
 
 // Binds the driver to the device by sending a request to driver_host.
@@ -363,20 +373,6 @@ void Coordinator::InitCoreDevices(std::string_view root_device_driver) {
   ZX_ASSERT_MSG(status == ZX_OK, "Failed to initialize the root device to devfs: %s",
                 zx_status_get_string(status));
   root_device_->devfs.publish();
-}
-
-const Driver* Coordinator::LibnameToDriver(std::string_view libname) const {
-  return driver_loader_.LibnameToDriver(libname);
-}
-
-zx::result<zx::vmo> Coordinator::LibnameToVmo(const fbl::String& libname) const {
-  const Driver* driver = LibnameToDriver(libname);
-  if (!driver) {
-    LOGF(ERROR, "Cannot find driver '%s'", libname.data());
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
-  return DriverToVmo(*driver);
 }
 
 zx_status_t Coordinator::NewDriverHost(const char* name, fbl::RefPtr<DriverHost>* out) {
