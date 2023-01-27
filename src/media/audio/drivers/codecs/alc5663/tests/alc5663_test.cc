@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
@@ -34,18 +35,14 @@ class FakeAlc5663 {
     kReady,
   };
 
-  FakeAlc5663()
+  FakeAlc5663(async_dispatcher_t* dispatcher)
       : fake_i2c_([this](uint16_t addr) { return OnRead(addr); },
                   [this](uint16_t addr, uint16_t data) { OnWrite(addr, data); }),
-        loop_(&kAsyncLoopConfigNeverAttachToThread),
-        outgoing_(loop_.dispatcher()) {
+        outgoing_(dispatcher) {
     // Setup some register defaults.
     registers_.resize(kNumRegisters);
     registers_.at(VendorIdReg::kAddress) = VendorIdReg::kVendorRealtek;
-    loop_.StartThread();
   }
-
-  ~FakeAlc5663() { loop_.Shutdown(); }
 
   // Install an override allowing a custom callback to be issued when a given
   // I2C bus address is accessed.
@@ -105,7 +102,6 @@ class FakeAlc5663 {
     WriteRegister(addr, val.data);
   }
 
-  async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
   component::OutgoingDirectory& outgoing() { return outgoing_; }
 
  private:
@@ -143,7 +139,6 @@ class FakeAlc5663 {
   std::unordered_map<uint16_t, std::function<uint16_t()>> read_overrides_;
   std::unordered_map<uint16_t, std::function<void(uint16_t)>> write_overrides_;
 
-  async::Loop loop_;
   component::OutgoingDirectory outgoing_;
 };
 
@@ -284,14 +279,14 @@ struct FakeAlc5663Hardware {
 };
 
 // Set up the fake DDK instance `ddk` to export the given I2C protocol.
-FakeAlc5663Hardware CreateFakeAlc5663() {
+FakeAlc5663Hardware CreateFakeAlc5663(async_dispatcher_t* dispatcher) {
   FakeAlc5663Hardware result{};
 
   // Create the fake DDK.
   result.fake_parent = MockDevice::FakeRootParent();
 
   // Create the fake hardware device.
-  result.codec = std::make_unique<FakeAlc5663>();
+  result.codec = std::make_unique<FakeAlc5663>(dispatcher);
 
   // The driver will attempt to bind to the device on an I2C bus.
   //
@@ -301,8 +296,7 @@ FakeAlc5663Hardware CreateFakeAlc5663() {
   auto* proto = result.codec->GetProto();
 
   auto service_result = result.codec->outgoing().AddService<fuchsia_hardware_i2c::Service>(
-      fuchsia_hardware_i2c::Service::InstanceHandler(
-          {.device = proto->bind_handler(result.codec->dispatcher())}));
+      fuchsia_hardware_i2c::Service::InstanceHandler({.device = proto->bind_handler(dispatcher)}));
   ZX_ASSERT(service_result.is_ok());
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -381,12 +375,14 @@ TEST(CalculatePll, InputClockTooLow) {
   EXPECT_EQ(CalculatePllParams(1, INT_MAX, &result), ZX_ERR_OUT_OF_RANGE);
 }
 
-TEST(Alc5663, BindUnbind) {
-  FakeAlc5663Hardware hardware = CreateFakeAlc5663();
+class Alc5663 : public zxtest::Test, public loop_fixture::RealLoop {};
+
+TEST_F(Alc5663, BindUnbind) {
+  FakeAlc5663Hardware hardware = CreateFakeAlc5663(dispatcher());
 
   // Create device.
   Alc5663Device* device;
-  ASSERT_OK(Alc5663Device::Bind(hardware.parent, &device));
+  PerformBlockingWork([&] { ASSERT_OK(Alc5663Device::Bind(hardware.parent, &device)); });
   EXPECT_EQ(hardware.fake_parent->child_count(), 1);
 
   // Ensure the device was reset.
@@ -399,23 +395,24 @@ TEST(Alc5663, BindUnbind) {
   EXPECT_EQ(hardware.fake_parent->child_count(), 0);
 }
 
-TEST(Alc5663, InvalidVendor) {
-  FakeAlc5663Hardware hardware = CreateFakeAlc5663();
+TEST_F(Alc5663, InvalidVendor) {
+  FakeAlc5663Hardware hardware = CreateFakeAlc5663(dispatcher());
 
   // Setup override to return invalid vendor.
   hardware.codec->InstallReadOverride(VendorIdReg::kAddress, []() { return 0xbad; });
 
   // Create device.
   Alc5663Device* device;
-  EXPECT_EQ(Alc5663Device::Bind(hardware.parent, &device), ZX_ERR_NOT_SUPPORTED);
+  PerformBlockingWork(
+      [&] { EXPECT_EQ(Alc5663Device::Bind(hardware.parent, &device), ZX_ERR_NOT_SUPPORTED); });
 }
 
-TEST(Alc5663, CheckClocksConfigured) {
-  FakeAlc5663Hardware hardware = CreateFakeAlc5663();
+TEST_F(Alc5663, CheckClocksConfigured) {
+  FakeAlc5663Hardware hardware = CreateFakeAlc5663(dispatcher());
 
   // Create device.
   Alc5663Device* device;
-  ASSERT_OK(Alc5663Device::Bind(hardware.parent, &device));
+  PerformBlockingWork([&] { ASSERT_OK(Alc5663Device::Bind(hardware.parent, &device)); });
 
   // Fetch configured clock information.
   //
@@ -442,12 +439,12 @@ TEST(Alc5663, CheckClocksConfigured) {
   EXPECT_EQ(hardware.fake_parent->child_count(), 0);
 }
 
-TEST(Alc5663, CheckOutputsEnabled) {
-  FakeAlc5663Hardware hardware = CreateFakeAlc5663();
+TEST_F(Alc5663, CheckOutputsEnabled) {
+  FakeAlc5663Hardware hardware = CreateFakeAlc5663(dispatcher());
 
   // Create device.
   Alc5663Device* device;
-  ASSERT_OK(Alc5663Device::Bind(hardware.parent, &device));
+  PerformBlockingWork([&] { ASSERT_OK(Alc5663Device::Bind(hardware.parent, &device)); });
 
   // Without a full model of the hardware, it is hard to test if output is correctly
   // configured. Instead, we simply test that a small set of output-related registers

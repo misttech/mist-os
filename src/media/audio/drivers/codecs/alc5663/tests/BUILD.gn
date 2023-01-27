@@ -23,6 +23,7 @@ test("alc5663-test") {
     "//src/media/audio/drivers/codecs/alc5663:shared",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/zxtest",
   ]
 }
