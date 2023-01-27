@@ -142,7 +142,7 @@ class Coordinator : public CompositeManagerBridge,
   zx_status_t AddNodeGroup(const fbl::RefPtr<Device>& dev, std::string_view name,
                            fuchsia_device_manager::wire::NodeGroupDescriptor group_desc);
 
-  zx_status_t LibnameToVmo(const fbl::String& libname, zx::vmo* out_vmo) const;
+  zx::result<zx::vmo> LibnameToVmo(const fbl::String& libname) const;
   const Driver* LibnameToDriver(std::string_view libname) const;
 
   zx_status_t MakeVisible(const fbl::RefPtr<Device>& dev);

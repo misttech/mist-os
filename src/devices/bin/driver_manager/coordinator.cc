@@ -161,10 +161,11 @@ zx_status_t CreateProxyDevice(const fbl::RefPtr<Device>& dev, fbl::RefPtr<Driver
   }
 
   fidl::Arena arena;
-  zx::vmo vmo;
-  if (auto status = dev->coordinator->LibnameToVmo(dev->libname(), &vmo); status != ZX_OK) {
-    return status;
+  zx::result vmo_result = dev->coordinator->LibnameToVmo(dev->libname());
+  if (vmo_result.is_error()) {
+    return vmo_result.error_value();
   }
+  zx::vmo vmo = std::move(vmo_result.value());
 
   auto driver_path = fidl::StringView::FromExternal(dev->libname().data(), dev->libname().size());
 
@@ -223,12 +224,11 @@ zx_status_t CreateFidlProxyDevice(
   return ZX_OK;
 }
 
-zx::result<zx::vmo> DriverToVmo(const Driver* driver) {
+zx::result<zx::vmo> DriverToVmo(const Driver& driver) {
   // If we haven't cached the vmo, load it now.
-  if (driver->dso_vmo == ZX_HANDLE_INVALID) {
+  if (driver.dso_vmo == ZX_HANDLE_INVALID) {
     zx::vmo vmo;
-    zx_status_t status = load_vmo(driver->libname.c_str(), &vmo);
-    if (status != ZX_OK) {
+    if (zx_status_t status = load_vmo(driver.libname.c_str(), &vmo); status != ZX_OK) {
       return zx::error(status);
     }
     return zx::ok(std::move(vmo));
@@ -236,25 +236,24 @@ zx::result<zx::vmo> DriverToVmo(const Driver* driver) {
 
   // If we have cached the vmo then duplicate it.
   zx::vmo vmo;
-  zx_status_t status = driver->dso_vmo.duplicate(
-      ZX_RIGHTS_BASIC | ZX_RIGHTS_PROPERTY | ZX_RIGHT_READ | ZX_RIGHT_EXECUTE | ZX_RIGHT_MAP, &vmo);
-  if (status != ZX_OK) {
+  zx_rights_t rights =
+      ZX_RIGHTS_BASIC | ZX_RIGHTS_PROPERTY | ZX_RIGHT_READ | ZX_RIGHT_EXECUTE | ZX_RIGHT_MAP;
+  if (zx_status_t status = driver.dso_vmo.duplicate(rights, &vmo); status != ZX_OK) {
     return zx::error(status);
   }
   return zx::ok(std::move(vmo));
 }
 
 // Binds the driver to the device by sending a request to driver_host.
-zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev, const Driver* driver) {
+zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev, const Driver& driver) {
   auto vmo = DriverToVmo(driver);
   if (vmo.is_error()) {
     return vmo.error_value();
   }
 
-  const char* libname = driver->libname.c_str();
   dev->flags |= DEV_CTX_BOUND;
   dev->device_controller()
-      ->BindDriver(fidl::StringView::FromExternal(libname), std::move(*vmo))
+      ->BindDriver(fidl::StringView::FromExternal(driver.libname.c_str()), std::move(*vmo))
       .ThenExactlyOnce([dev](fidl::WireUnownedResult<fdm::DeviceController::BindDriver>& result) {
         if (result.is_peer_closed()) {
           // TODO(fxbug.dev/56208): If we're closed from the driver host we only log a warning,
@@ -370,19 +369,14 @@ const Driver* Coordinator::LibnameToDriver(std::string_view libname) const {
   return driver_loader_.LibnameToDriver(libname);
 }
 
-zx_status_t Coordinator::LibnameToVmo(const fbl::String& libname, zx::vmo* out_vmo) const {
-  const Driver* drv = LibnameToDriver(libname);
-  if (drv == nullptr) {
+zx::result<zx::vmo> Coordinator::LibnameToVmo(const fbl::String& libname) const {
+  const Driver* driver = LibnameToDriver(libname);
+  if (!driver) {
     LOGF(ERROR, "Cannot find driver '%s'", libname.data());
-    return ZX_ERR_NOT_FOUND;
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  zx::result result = DriverToVmo(drv);
-  if (result.is_error()) {
-    return result.error_value();
-  }
-  *out_vmo = std::move(*result);
-  return ZX_OK;
+  return DriverToVmo(*driver);
 }
 
 zx_status_t Coordinator::NewDriverHost(const char* name, fbl::RefPtr<DriverHost>* out) {
@@ -658,10 +652,17 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
     return CreateAndStartDFv2Component(matched_driver.v2(), dev);
   }
 
-  auto drv = matched_driver.v1();
-  if (!driver_host_is_asan() && drv->flags & ZIRCON_DRIVER_NOTE_FLAG_ASAN) {
-    LOGF(ERROR, "%s (%s) requires ASAN, but we are not in an ASAN environment", drv->libname.data(),
-         drv->name.data());
+  if (!matched_driver.v1()) {
+    zx::result path = dev->GetTopologicalPath();
+    LOGF(ERROR, "Trying to match device '%s' but received a null driver",
+         path.is_ok() ? path.value().c_str() : "<bad_path>");
+    return ZX_ERR_INTERNAL;
+  }
+  const Driver& driver = *matched_driver.v1();
+
+  if (!driver_host_is_asan() && driver.flags & ZIRCON_DRIVER_NOTE_FLAG_ASAN) {
+    LOGF(ERROR, "%s (%s) requires ASAN, but we are not in an ASAN environment",
+         driver.libname.data(), driver.name.data());
     return ZX_ERR_BAD_STATE;
   }
 
@@ -680,7 +681,7 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
       LOGF(ERROR, "Cannot bind to device '%s', it has no driver_host", dev->name().data());
       return ZX_ERR_BAD_STATE;
     }
-    return BindDriverToDevice(dev, drv);
+    return BindDriverToDevice(dev, driver);
   }
 
   // If we've gotten this far, we need to prepare a proxy because the driver is going to be bound in
@@ -699,14 +700,14 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
     if (status != ZX_OK) {
       return status;
     }
-    status = BindDriverToDevice(fidl_proxy, drv);
+    status = BindDriverToDevice(fidl_proxy, driver);
   } else {
     VLOGF(1, "Preparing Banjo proxy for %s", dev->name().data());
     status = PrepareProxy(dev, nullptr /* target_driver_host */);
     if (status != ZX_OK) {
       return status;
     }
-    status = BindDriverToDevice(dev->proxy(), drv);
+    status = BindDriverToDevice(dev->proxy(), driver);
   }
   // TODO(swetland): arrange to mark us unbound when the proxy (or its driver_host) goes away
   if ((status == ZX_OK) && !(dev->flags & DEV_CTX_MULTI_BIND)) {
