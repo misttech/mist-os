@@ -375,6 +375,7 @@ mkdir -p "${FX_CACHE_DIR}"
 
 track-command-execution "${metric_name}" "$@" &
 declare -r start_time="$SECONDS"
+export PATH="${PREBUILT_ALL_PATHS}:${PATH}"
 "${command_path[@]}" "$@"
 declare -r retval=$?
 declare -r end_time="$SECONDS"

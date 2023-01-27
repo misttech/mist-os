@@ -131,7 +131,7 @@ function fx-error {
 }
 
 function fx-gn {
-  PATH="${PREBUILT_PYTHON3_DIR}/bin:${PATH}" "${PREBUILT_GN}" "$@"
+  "${PREBUILT_GN}" "$@"
 }
 
 function fx-is-bringup {
@@ -789,7 +789,7 @@ function fx-run-ninja {
   # rbe_wrapper is used to auto-start/stop a proxy process for the duration of
   # the build, so that RBE-enabled build actions can operate through the proxy.
   #
-  local newpath="${PREBUILT_PYTHON3_DIR}/bin:${PATH}"
+  local newpath="${PREBUILT_ALL_PATHS}:${PATH}"
   local rbe_wrapper=()
   if fx-rbe-enabled ; then rbe_wrapper=("${RBE_WRAPPER[@]}") ; fi
 

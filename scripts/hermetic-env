@@ -75,8 +75,8 @@ if [[ "${script_dir}" != "${fuchsia_dir}"* ]]; then
 fi
 
 export FUCHSIA_DIR="${fuchsia_dir}"
-declare -r prebuilt_sh="${fuchsia_dir}/tools/devshell/lib/prebuilt.sh"
-source "${prebuilt_sh}" || exit $?
+declare -r platform_sh="${fuchsia_dir}/tools/devshell/lib/platform.sh"
+source "${platform_sh}" || exit $?
 
 if [[ "${PATH#${PREBUILT_ALL_PATHS}}" == "${PATH}" ]]; then
   # Prebuilts have not been added to the path
