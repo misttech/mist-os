@@ -5,8 +5,9 @@ library fuchsia.driver.framework;
 
 /// Represents a bind rule condition.
 type Condition = strict enum {
-    ACCEPT = 0;
-    REJECT = 1;
+    UNKNOWN = 0;
+    ACCEPT = 1;
+    REJECT = 2;
 };
 
 /// Represents a bind rule in a node group node.
@@ -15,8 +16,8 @@ type BindRule = struct {
     key NodePropertyKey;
 
     /// Condition for evaluating the property values in
-    /// the matching process. The values are accepted or
-    /// rejected based on the condition.
+    /// the matching process. The values must be ACCEPT
+    /// or REJECT.
     condition Condition;
 
     /// A list of property values. Must not be empty. The property

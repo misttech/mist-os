@@ -322,6 +322,10 @@ fn match_node(
                     || node_prop_values.values.contains(&Symbol::BoolValue(false))
             }
             fdf::Condition::Reject => !dev_prop_contains_value,
+            fdf::Condition::Unknown => {
+                log::error!("Invalid condition type in bind rules.");
+                return false;
+            }
         };
 
         if !evaluate_condition {

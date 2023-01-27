@@ -151,6 +151,8 @@ zx::result<ddk::NodeGroupBindRule> ConvertFidlBindRule(
     case fuchsia_driver_framework::Condition::kReject:
       condition = DEVICE_BIND_RULE_CONDITION_REJECT;
       break;
+    case fuchsia_driver_framework::Condition::kUnknown:
+      return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   return zx::ok(ddk::NodeGroupBindRule(key, condition, values));
