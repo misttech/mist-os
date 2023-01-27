@@ -3,32 +3,32 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
 
 #include <thread>
 
 #include <zxtest/zxtest.h>
 
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-virtual-bus/usb-virtual-bus.h"
 
 namespace usb_virtual_bus {
 
 TEST(VirtualBusUnitTest, DdkLifecycle) {
-  fake_ddk::Bind ddk;
+  auto fake_parent = MockDevice::FakeRootParent();
 
-  auto bus = new UsbVirtualBus(fake_ddk::kFakeParent);
+  auto bus = new UsbVirtualBus(fake_parent.get());
   ASSERT_NOT_NULL(bus);
 
   ASSERT_OK(bus->DdkAdd("usb-virtual-bus"));
-  ASSERT_OK(ddk.WaitUntilInitComplete());
+  ASSERT_EQ(1, fake_parent->child_count());
+  auto* child = fake_parent->GetLatestChild();
 
-  bus->DdkAsyncRemove();
-  // Check that unbind has replied.
-  ASSERT_OK(ddk.WaitUntilRemove());
-  ASSERT_TRUE(ddk.Ok());
+  child->InitOp();
+  ASSERT_OK(child->WaitUntilInitReplyCalled());
+  EXPECT_TRUE(child->InitReplyCalled());
 
-  // This will join with the device thread and delete the bus object.
-  bus->DdkRelease();
+  device_async_remove(bus->zxdev());
+  mock_ddk::ReleaseFlaggedDevices(fake_parent.get());
 }
 
 class FakeDci : public ddk::UsbDciInterfaceProtocol<FakeDci> {
@@ -67,13 +67,18 @@ class FakeDci : public ddk::UsbDciInterfaceProtocol<FakeDci> {
 
 // Tests unbinding the usb virtual bus while a control request is in progress.
 TEST(VirtualBusUnitTest, UnbindDuringControlRequest) {
-  fake_ddk::Bind ddk;
+  auto fake_parent = MockDevice::FakeRootParent();
 
-  auto bus = new UsbVirtualBus(fake_ddk::kFakeParent);
+  auto bus = new UsbVirtualBus(fake_parent.get());
   ASSERT_NOT_NULL(bus);
 
   ASSERT_OK(bus->DdkAdd("usb-virtual-bus"));
-  ASSERT_OK(ddk.WaitUntilInitComplete());
+  ASSERT_EQ(1, fake_parent->child_count());
+  auto* child = fake_parent->GetLatestChild();
+
+  child->InitOp();
+  ASSERT_OK(child->WaitUntilInitReplyCalled());
+  EXPECT_TRUE(child->InitReplyCalled());
 
   // This needs to be true, otherwise requests will fail to be queued.
   bus->SetConnected(true);
@@ -108,7 +113,7 @@ TEST(VirtualBusUnitTest, UnbindDuringControlRequest) {
 
   // Request the device begin unbinding.
   // This should wake up the worker thread, which will block until the control request completes.
-  bus->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  child->UnbindOp();
 
   fake_dci.CompleteControlRequest();
 
@@ -117,11 +122,8 @@ TEST(VirtualBusUnitTest, UnbindDuringControlRequest) {
   req_thread.join();
 
   // Check that unbind has replied.
-  ASSERT_OK(ddk.WaitUntilRemove());
-  ASSERT_TRUE(ddk.Ok());
-
-  // This will join with the device thread and delete the bus object.
-  bus->DdkRelease();
+  EXPECT_EQ(ZX_OK, child->WaitUntilUnbindReplyCalled());
+  EXPECT_TRUE(child->UnbindReplyCalled());
 }
 
 }  // namespace usb_virtual_bus
