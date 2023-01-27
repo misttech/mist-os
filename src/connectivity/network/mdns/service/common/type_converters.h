@@ -7,6 +7,7 @@
 
 #include <fuchsia/net/mdns/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/utf-utils/utf-utils.h>
 
 #include "lib/fidl/cpp/type_converter.h"
 #include "src/connectivity/network/mdns/service/common/mdns_names.h"
@@ -82,7 +83,10 @@ struct TypeConverter<fuchsia::net::mdns::PublicationCause, mdns::PublicationCaus
 template <>
 struct TypeConverter<std::string, std::vector<uint8_t>> {
   static std::string Convert(const std::vector<uint8_t>& value) {
-    return std::string(value.begin(), value.end());
+    if(utfutils_is_valid_utf8(reinterpret_cast<const char *>(value.data()), value.size())) {
+      return std::string(value.begin(), value.end());
+    }
+    return std::string();
   }
 };
 
