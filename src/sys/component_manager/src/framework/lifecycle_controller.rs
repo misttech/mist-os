@@ -8,7 +8,7 @@ use {
     crate::model::{
         actions::{ActionSet, StopAction},
         component::{ComponentInstance, StartReason, WeakComponentInstance},
-        error::ModelError,
+        error::{ModelError, StartActionError},
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         model::Model,
         storage::admin_protocol::StorageAdmin,
@@ -79,12 +79,9 @@ impl LifecycleController {
         let moniker =
             join_monikers(scope_moniker, &moniker).map_err(|_| fsys::StartError::BadMoniker)?;
         let instance = self.model.find(&moniker).await.ok_or(fsys::StartError::InstanceNotFound)?;
-        instance.start(&StartReason::Debug).await.map(|_| ()).map_err(|e| match e {
-            ModelError::ResolveActionError { err } => err.into(),
-            error => {
-                warn!(%moniker, %error, "failed to start instance");
-                fsys::StartError::Internal
-            }
+        instance.start(&StartReason::Debug).await.map(|_| ()).map_err(|error| {
+            warn!(%moniker, %error, "failed to start instance");
+            error.into()
         })?;
         instance.scope_to_runtime(binder.into_channel()).await;
         Ok(())
@@ -490,10 +487,11 @@ mod deprecated {
     ) -> Result<fsys::StartResult, fcomponent::Error> {
         let moniker = join_monikers(scope_moniker, &moniker)?;
         let component = model.find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
-        let res = component.start(&StartReason::Debug).await.map_err(|e: ModelError| {
-            warn!("LifecycleController could not start {}: {:?}", moniker, e);
-            fcomponent::Error::InstanceCannotStart
-        })?;
+        let res =
+            component.start(&StartReason::Debug).await.map_err(|error: StartActionError| {
+                warn!(%moniker, ?error, "LifecycleController could not start instance");
+                fcomponent::Error::InstanceCannotStart
+            })?;
         Ok(res)
     }
 

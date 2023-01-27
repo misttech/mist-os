@@ -8,7 +8,7 @@ use {
         model::{
             actions::{ActionSet, ShutdownAction, StartAction, StopAction},
             component::{ComponentInstance, InstanceState, StartReason},
-            error::ModelError,
+            error::{ModelError, StartActionError},
             events::registry::EventSubscription,
             hooks::{Event, EventType, Hook, HooksRegistration},
             model::Model,
@@ -462,9 +462,11 @@ async fn reboot_on_terminate_disabled() {
 
     let res =
         test.model.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await;
-    assert_matches!(res, Err(ModelError::PolicyError {
-        err: PolicyError::Unsupported {
-            policy, moniker
+    assert_matches!(res, Err(ModelError::StartActionError {
+        err: StartActionError::RebootOnTerminateForbidden {
+            err: PolicyError::Unsupported {
+                policy, moniker
+            }
         }
     }) if &policy == "reboot_on_terminate" && moniker == AbsoluteMoniker::try_from(vec!["system"]).unwrap());
 }
@@ -492,9 +494,11 @@ async fn reboot_on_terminate_disallowed() {
 
     let res =
         test.model.start_instance(&vec!["system"].try_into().unwrap(), &StartReason::Debug).await;
-    assert_matches!(res, Err(ModelError::PolicyError {
-        err: PolicyError::ChildPolicyDisallowed {
-            policy, moniker
+    assert_matches!(res, Err(ModelError::StartActionError {
+        err: StartActionError::RebootOnTerminateForbidden {
+            err: PolicyError::ChildPolicyDisallowed {
+                policy, moniker
+            }
         }
     }) if &policy == "reboot_on_terminate" && moniker == AbsoluteMoniker::try_from(vec!["system"]).unwrap());
 }

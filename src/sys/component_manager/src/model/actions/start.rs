@@ -8,7 +8,7 @@ use {
         component::{
             ComponentInstance, ExecutionState, InstanceState, Package, Runtime, StartReason,
         },
-        error::{ModelError, StructuredConfigError},
+        error::{StartActionError, StructuredConfigError},
         hooks::{Event, EventPayload, RuntimeInfo},
         namespace::IncomingNamespace,
     },
@@ -41,7 +41,7 @@ impl StartAction {
 
 #[async_trait]
 impl Action for StartAction {
-    type Output = Result<fsys::StartResult, ModelError>;
+    type Output = Result<fsys::StartResult, StartActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_start(component, &self.start_reason).await
     }
@@ -61,7 +61,7 @@ struct StartContext {
 async fn do_start(
     component: &Arc<ComponentInstance>,
     start_reason: &StartReason,
-) -> Result<fsys::StartResult, ModelError> {
+) -> Result<fsys::StartResult, StartActionError> {
     // Pre-flight check: if the component is already started, or was shut down, return now. Note
     // that `start` also performs this check before scheduling the action here. We do it again
     // while the action is registered to avoid the risk of dispatching the Started event twice.
@@ -78,9 +78,9 @@ async fn do_start(
         let component_info = component.resolve().await?;
 
         // Find the runner to use.
-        let runner = component.resolve_runner().await.map_err(|error| {
-            warn!("Failed to resolve runner for `{}`. A runner must be registered in a component's environment before being referenced. https://fuchsia.dev/go/components/runners#register. {} ", component.abs_moniker, error);
-            error
+        let runner = component.resolve_runner().await.map_err(|err| {
+            warn!(moniker = %component.abs_moniker, %err, "Failed to resolve runner. A runner must be registered in a component's environment before being referenced. https://fuchsia.dev/go/components/runners#register");
+            StartActionError::ResolveRunnerFailed { err: Box::new(err) }
         })?;
 
         // Generate the Runtime which will be set in the Execution.
@@ -175,7 +175,7 @@ async fn do_start(
 async fn configure_component_runtime(
     component: &Arc<ComponentInstance>,
     mut pending_runtime: Runtime,
-) -> Result<fsys::StartResult, ModelError> {
+) -> Result<fsys::StartResult, StartActionError> {
     let state = component.lock_state().await;
     let mut execution = component.lock_execution().await;
 
@@ -196,15 +196,15 @@ pub fn should_return_early(
     component: &InstanceState,
     execution: &ExecutionState,
     abs_moniker: &AbsoluteMoniker,
-) -> Option<Result<fsys::StartResult, ModelError>> {
+) -> Option<Result<fsys::StartResult, StartActionError>> {
     match component {
         InstanceState::New | InstanceState::Unresolved | InstanceState::Resolved(_) => {}
         InstanceState::Destroyed => {
-            return Some(Err(ModelError::instance_destroyed(abs_moniker.clone())));
+            return Some(Err(StartActionError::InstanceDestroyed { moniker: abs_moniker.clone() }));
         }
     }
     if execution.is_shut_down() {
-        Some(Err(ModelError::instance_shut_down(abs_moniker.clone())))
+        Some(Err(StartActionError::InstanceShutDown { moniker: abs_moniker.clone() }))
     } else if execution.runtime.is_some() {
         Some(Ok(fsys::StartResult::AlreadyStarted))
     } else {
@@ -229,11 +229,14 @@ async fn make_execution_runtime(
         ServerEnd<fcrunner::ComponentControllerMarker>,
         zx::EventPair,
     ),
-    ModelError,
+    StartActionError,
 > {
+    // TODO(https://fxbug.dev/120713): Consider moving this check to ComponentInstance::add_child
     match component.on_terminate {
         fdecl::OnTerminate::Reboot => {
-            checker.reboot_on_terminate_allowed(&component.abs_moniker)?;
+            checker
+                .reboot_on_terminate_allowed(&component.abs_moniker)
+                .map_err(|err| StartActionError::RebootOnTerminateForbidden { err })?;
         }
         fdecl::OnTerminate::None => {}
     }
@@ -242,7 +245,10 @@ async fn make_execution_runtime(
     let (outgoing_dir_client, outgoing_dir_server) = zx::Channel::create();
     let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
     let mut namespace = IncomingNamespace::new(package);
-    let ns = namespace.populate(component.as_weak(), decl).await?;
+    let ns = namespace
+        .populate(component.as_weak(), decl)
+        .await
+        .map_err(|e| StartActionError::NamespacePopulateError { err: Box::new(e) })?;
 
     let (controller_client, controller_server) =
         endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>()
@@ -278,7 +284,7 @@ async fn make_execution_runtime(
         runtime_dir_client,
         Some(controller),
         start_reason,
-    )?;
+    );
     let numbered_handles = component.numbered_handles.lock().await.take();
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
     let start_info = fcrunner::ComponentStartInfo {
@@ -307,7 +313,7 @@ mod tests {
                 ComponentInstance, ExecutionState, InstanceState, ResolvedInstanceState, Runtime,
                 StartReason,
             },
-            error::ModelError,
+            error::{ModelError, StartActionError},
             hooks::{Event, EventType, Hook, HooksRegistration},
             testing::{
                 test_helpers::{self, ActionsTest},
@@ -357,7 +363,7 @@ mod tests {
             .await;
 
         match ActionSet::register(child.clone(), StartAction::new(StartReason::Debug)).await {
-            Err(ModelError::InstanceShutDown { moniker: m }) => {
+            Err(StartActionError::InstanceShutDown { moniker: m }) => {
                 assert_eq!(AbsoluteMoniker::try_from(vec![TEST_CHILD_NAME]).unwrap(), m);
             }
             e => panic!("Unexpected result from component start: {:?}", e),
@@ -487,7 +493,7 @@ mod tests {
         assert!(should_return_early(&InstanceState::Unresolved, &es, &m).is_none());
         assert_matches!(
             should_return_early(&InstanceState::Destroyed, &es, &m),
-            Some(Err(ModelError::InstanceDestroyed { moniker: _ }))
+            Some(Err(StartActionError::InstanceDestroyed { moniker: _ }))
         );
         let (_, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
         let decl = ComponentDeclBuilder::new().add_lazy_child("bar").build();
@@ -506,8 +512,7 @@ mod tests {
         // Check for already_started:
         {
             let mut es = ExecutionState::new();
-            es.runtime =
-                Some(Runtime::start_from(None, None, None, None, StartReason::Debug).unwrap());
+            es.runtime = Some(Runtime::start_from(None, None, None, None, StartReason::Debug));
             assert!(!es.is_shut_down());
             assert_matches!(
                 should_return_early(&InstanceState::New, &es, &m),
@@ -521,7 +526,7 @@ mod tests {
         assert!(execution.is_shut_down());
         assert_matches!(
             should_return_early(&InstanceState::New, &execution, &m),
-            Some(Err(ModelError::InstanceShutDown { moniker: _ }))
+            Some(Err(StartActionError::InstanceShutDown { moniker: _ }))
         );
     }
 

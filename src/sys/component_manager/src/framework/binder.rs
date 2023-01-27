@@ -85,7 +85,7 @@ impl CapabilityProvider for BinderCapabilityProvider {
                         source.scope_to_runtime(server_end).await;
                     }
                     Err(err) => {
-                        report_routing_failure_to_target(target, err, server_end).await;
+                        report_routing_failure_to_target(target, err.into(), server_end).await;
                     }
                 }
             })

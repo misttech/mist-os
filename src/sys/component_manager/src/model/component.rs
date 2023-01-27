@@ -12,7 +12,7 @@ use {
         environment::Environment,
         error::{
             AddChildError, AddDynamicChildError, DiscoverActionError, DynamicOfferError,
-            ModelError, OpenExposedDirError, RebootError, ResolveActionError,
+            ModelError, OpenExposedDirError, RebootError, ResolveActionError, StartActionError,
             StructuredConfigError,
         },
         exposed_dir::ExposedDir,
@@ -1039,7 +1039,7 @@ impl ComponentInstance {
     pub async fn start(
         self: &Arc<Self>,
         reason: &StartReason,
-    ) -> Result<fsys::StartResult, ModelError> {
+    ) -> Result<fsys::StartResult, StartActionError> {
         // Skip starting a component instance that was already started. It's important to bail out
         // here so we don't waste time starting eager children more than once.
         {
@@ -1062,7 +1062,9 @@ impl ComponentInstance {
                     })
                     .collect(),
                 InstanceState::Destroyed => {
-                    return Err(ModelError::instance_destroyed(self.abs_moniker.clone()));
+                    return Err(StartActionError::InstanceDestroyed {
+                        moniker: self.abs_moniker.clone(),
+                    });
                 }
                 InstanceState::New | InstanceState::Unresolved => {
                     panic!("start: not resolved")
@@ -1070,7 +1072,7 @@ impl ComponentInstance {
             }
         };
         Self::start_eager_children_recursive(eager_children).await.or_else(|e| match e {
-            ModelError::InstanceShutDown { .. } => Ok(()),
+            StartActionError::InstanceShutDown { .. } => Ok(()),
             _ => Err(e),
         })?;
         Ok(fsys::StartResult::Started)
@@ -1080,7 +1082,7 @@ impl ComponentInstance {
     // This function recursively calls `start`, so it returns a BoxFuture,
     fn start_eager_children_recursive<'a>(
         instances_to_bind: Vec<Arc<ComponentInstance>>,
-    ) -> BoxFuture<'a, Result<(), ModelError>> {
+    ) -> BoxFuture<'a, Result<(), StartActionError>> {
         let f = async move {
             let futures: Vec<_> = instances_to_bind
                 .iter()
@@ -1870,9 +1872,9 @@ impl Runtime {
         runtime_dir: Option<fio::DirectoryProxy>,
         controller: Option<fcrunner::ComponentControllerProxy>,
         start_reason: StartReason,
-    ) -> Result<Self, ModelError> {
+    ) -> Self {
         let timestamp = zx::Time::get_monotonic();
-        Ok(Runtime {
+        Runtime {
             namespace,
             outgoing_dir,
             runtime_dir,
@@ -1881,7 +1883,7 @@ impl Runtime {
             exit_listener: None,
             binder_server_ends: vec![],
             start_reason,
-        })
+        }
     }
 
     /// If the Runtime has a controller this creates a background context which

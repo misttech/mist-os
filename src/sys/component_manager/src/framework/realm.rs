@@ -207,15 +207,9 @@ impl RealmCapabilityHost {
     ) -> Result<(), fcomponent::Error> {
         match Self::get_child(component, child.clone()).await? {
             Some(child) => {
-                child.start(&start_reason).await.map_err(|e| match e {
-                    ModelError::ResolveActionError { err: error, .. } => {
-                        debug!(%error, "failed to resolve child");
-                        fcomponent::Error::InstanceCannotResolve
-                    }
-                    error => {
-                        error!(%error, "start() failed");
-                        fcomponent::Error::Internal
-                    }
+                child.start(&start_reason).await.map_err(|error| {
+                    debug!(%error, moniker=%child.abs_moniker, "failed to start component instance");
+                    error.into()
                 })?;
             }
             None => {

@@ -19,7 +19,7 @@ use {
         model::{
             actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction},
             component::StartReason,
-            error::{ModelError, ResolveActionError},
+            error::{ModelError, ResolveActionError, StartActionError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             routing::{RouteRequest, RouteSource, RoutingError},
             testing::{routing_test_helpers::*, test_helpers::*},
@@ -1911,15 +1911,21 @@ async fn use_runner_from_environment_not_found() {
         .await;
 
     // Bind "b". We expect it to fail because routing failed.
+    let err = universe.start_instance(&vec!["b"].try_into().unwrap()).await.unwrap_err();
+    let err = match err {
+        ModelError::StartActionError { err: StartActionError::ResolveRunnerFailed { err } } => err,
+        err => panic!("Unexpected error trying to start b: {}", err),
+    };
+
     assert_matches!(
-        universe.start_instance(&vec!["b"].try_into().unwrap()).await,
-        Err(ModelError::RoutingError {
+        *err,
+        ModelError::RoutingError {
             err: RoutingError::UseFromEnvironmentNotFound {
                 moniker,
                 capability_type,
                 capability_name,
             }
-        })
+        }
         if moniker == AbsoluteMoniker::try_from(vec!["b"]).unwrap() &&
         capability_type == "runner" &&
         capability_name == "hobbit");

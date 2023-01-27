@@ -128,7 +128,7 @@ pub mod tests {
                 ActionNotifier, ShutdownAction,
             },
             component::{Component, StartReason},
-            error::{DiscoverActionError, ResolveActionError},
+            error::{DiscoverActionError, ResolveActionError, StartActionError},
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::{
@@ -473,7 +473,7 @@ pub mod tests {
             ActionKey::Start,
             // The mocked action must return a result, even though the result is not used
             // by the Destroy action.
-            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, ModelError>,
+            Ok(fsys::StartResult::Started) as Result<fsys::StartResult, StartActionError>,
         )
         .await;
     }

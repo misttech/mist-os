@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::StartReason,
-        error::ModelError,
+        error::{ModelError, StartActionError},
         routing::{route_and_open_capability, OpenOptions, OpenStorageOptions},
         testing::routing_test_helpers::*,
     },
@@ -571,12 +571,20 @@ async fn use_restricted_storage_start_failure() {
         .await
         .expect("start /parent_consumer failed");
 
-    let child_bind_result = test
+    let err = test
         .start_instance(&AbsoluteMoniker::parse_str("/parent_consumer/child_consumer").unwrap())
-        .await;
+        .await
+        .unwrap_err();
+    let err = match err {
+        ModelError::StartActionError { err: StartActionError::NamespacePopulateError { err } } => {
+            err
+        }
+        err => panic!("Unexpected error trying to start child consumer: {}", err),
+    };
+
     assert!(matches!(
-        child_bind_result,
-        Err(ModelError::RoutingError { err: RoutingError::ComponentNotInIdIndex { moniker: _ } })
+        *err,
+        ModelError::RoutingError { err: RoutingError::ComponentNotInIdIndex { moniker: _ } }
     ));
 }
 

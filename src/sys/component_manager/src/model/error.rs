@@ -116,11 +116,6 @@ pub enum ModelError {
         #[from]
         err: ComponentIdIndexError,
     },
-    #[error("structured config error: {}", err)]
-    StructuredConfigError {
-        #[from]
-        err: StructuredConfigError,
-    },
     #[error("timed out after {:?}", duration)]
     Timeout { duration: zx::Duration },
     #[error("error with discover action: {err}")]
@@ -132,6 +127,11 @@ pub enum ModelError {
     ResolveActionError {
         #[from]
         err: ResolveActionError,
+    },
+    #[error("error with start action: {err}")]
+    StartActionError {
+        #[from]
+        err: StartActionError,
     },
 }
 
@@ -183,6 +183,7 @@ impl ModelError {
         match self {
             ModelError::RoutingError { err } => err.as_zx_status(),
             ModelError::PolicyError { err } => err.as_zx_status(),
+            ModelError::StartActionError { err } => err.as_zx_status(),
             ModelError::ComponentInstanceError {
                 err: ComponentInstanceError::InstanceNotFound { .. },
             } => zx::Status::NOT_FOUND,
@@ -477,6 +478,78 @@ impl Into<fsys::StartError> for ResolveActionError {
             | ResolveActionError::DiscoverActionError { .. }
             | ResolveActionError::AbiCompatibilityError { .. }
             | ResolveActionError::PackageDirProxyCreateError { .. } => fsys::StartError::Internal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum StartActionError {
+    #[error("instance {moniker} was shut down")]
+    InstanceShutDown { moniker: AbsoluteMoniker },
+    #[error("instance {moniker} was destroyed")]
+    InstanceDestroyed { moniker: AbsoluteMoniker },
+    #[error("failed to resolve component: {}", err)]
+    ResolveActionError {
+        #[from]
+        err: ResolveActionError,
+    },
+    #[error("failed to resolve runner: {}", err)]
+    ResolveRunnerFailed {
+        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+        #[source]
+        err: Box<ModelError>,
+    },
+    #[error("reboot on terminate forbidden: {}", err)]
+    RebootOnTerminateForbidden {
+        #[source]
+        err: PolicyError,
+    },
+    #[error("failed to populate namespace: {}", err)]
+    NamespacePopulateError {
+        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+        #[source]
+        err: Box<ModelError>,
+    },
+    #[error("structured config error: {}", err)]
+    StructuredConfigError {
+        #[from]
+        err: StructuredConfigError,
+    },
+}
+
+impl StartActionError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::RebootOnTerminateForbidden { err } => err.as_zx_status(),
+            Self::ResolveRunnerFailed { err } => err.as_zx_status(),
+            Self::InstanceDestroyed { .. } | Self::InstanceShutDown { .. } => zx::Status::NOT_FOUND,
+            Self::NamespacePopulateError { err } => err.as_zx_status(),
+            _ => zx::Status::INTERNAL,
+        }
+    }
+}
+
+// This is implemented for fuchsia.sys2.LifecycleController protocol.
+impl Into<fsys::StartError> for StartActionError {
+    fn into(self) -> fsys::StartError {
+        match self {
+            StartActionError::ResolveActionError { err } => err.into(),
+            StartActionError::InstanceDestroyed { .. } => fsys::StartError::InstanceNotFound,
+            StartActionError::InstanceShutDown { .. } => fsys::StartError::InstanceNotFound,
+            _ => fsys::StartError::Internal,
+        }
+    }
+}
+
+// This is implemented for fuchsia.component.Realm protocol.
+impl Into<fcomponent::Error> for StartActionError {
+    fn into(self) -> fcomponent::Error {
+        match self {
+            StartActionError::ResolveActionError { .. } => fcomponent::Error::InstanceCannotResolve,
+            StartActionError::RebootOnTerminateForbidden { .. } => fcomponent::Error::AccessDenied,
+            StartActionError::InstanceShutDown { .. } => fcomponent::Error::InstanceDied,
+            StartActionError::InstanceDestroyed { .. } => fcomponent::Error::InstanceDied,
+            _ => fcomponent::Error::InstanceCannotStart,
         }
     }
 }
