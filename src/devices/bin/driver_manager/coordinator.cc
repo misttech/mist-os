@@ -117,11 +117,7 @@ bool driver_host_is_asan() {
 zx::result<zx::vmo> DriverToVmo(const Driver& driver) {
   // If we haven't cached the vmo, load it now and return it.
   if (driver.dso_vmo == ZX_HANDLE_INVALID) {
-    zx::vmo vmo;
-    if (zx_status_t status = load_vmo(driver.libname.c_str(), &vmo); status != ZX_OK) {
-      return zx::error(status);
-    }
-    return zx::ok(std::move(vmo));
+    return load_vmo(driver.libname.c_str());
   }
 
   // Return a duplicate of the cached vmo.

@@ -175,37 +175,38 @@ zx_status_t load_driver_vmo(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_
   return status;
 }
 
-zx_status_t load_vmo(std::string_view libname_view, zx::vmo* out_vmo) {
+zx::result<zx::vmo> load_vmo(std::string_view libname_view) {
   std::string libname(libname_view);
-  int fd = -1;
-  zx_status_t r = fdio_open_fd(libname.c_str(),
-                               static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable |
-                                                     fio::wire::OpenFlags::kRightExecutable),
-                               &fd);
-  if (r != ZX_OK) {
-    LOGF(ERROR, "Cannot open driver '%s': %d", libname.c_str(), r);
-    return ZX_ERR_IO;
+  fbl::unique_fd fd;
+  constexpr uint32_t file_rights = static_cast<uint32_t>(fio::wire::OpenFlags::kRightReadable |
+                                                         fio::wire::OpenFlags::kRightExecutable);
+  if (zx_status_t status = fdio_open_fd(libname.c_str(), file_rights, fd.reset_and_get_address());
+      status != ZX_OK) {
+    LOGF(ERROR, "Cannot open driver '%s': %d", libname.c_str(), status);
+    return zx::error(ZX_ERR_IO);
   }
+
   zx::vmo vmo;
-  r = fdio_get_vmo_exec(fd, vmo.reset_and_get_address());
-  close(fd);
-  if (r != ZX_OK) {
+  if (zx_status_t status = fdio_get_vmo_exec(fd.get(), vmo.reset_and_get_address());
+      status != ZX_OK) {
     LOGF(ERROR, "Cannot get driver VMO '%s'", libname.c_str());
-    return r;
+    return zx::error(status);
   }
-  const char* vmo_name = strrchr(libname.c_str(), '/');
-  if (vmo_name != nullptr) {
-    ++vmo_name;
-  } else {
-    vmo_name = libname.c_str();
+
+  // Libname is either a URL or a filesystem path.
+  // Set the vmo_name to the final part of the path, i.e the characters after the last slash '/'.
+  const char* vmo_name = libname.c_str();
+  size_t last_slash = libname.rfind('/');
+  if (last_slash != std::string::npos) {
+    vmo_name = &libname[last_slash + 1];
   }
-  r = vmo.set_property(ZX_PROP_NAME, vmo_name, strlen(vmo_name));
-  if (r != ZX_OK) {
+
+  if (zx_status_t status = vmo.set_property(ZX_PROP_NAME, vmo_name, strlen(vmo_name));
+      status != ZX_OK) {
     LOGF(ERROR, "Cannot set name on driver VMO to '%s'", libname.c_str());
-    return r;
+    return zx::error(status);
   }
-  *out_vmo = std::move(vmo);
-  return r;
+  return zx::ok(std::move(vmo));
 }
 
 void load_driver(fidl::WireSyncClient<fuchsia_boot::Arguments>* boot_args, const char* path,
