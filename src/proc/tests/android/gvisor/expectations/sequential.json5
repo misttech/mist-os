@@ -30,7 +30,6 @@
                 "RawSocketTest.ReceiveTClass",
                 "RawSocketTest.ReceiveTTL",
                 "RawSocketTest.ReceiveHopLimit",
-                "AllInetTests/RawSocketTest.PollWritableImmediately/*",
                 "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
 
                 // socket_ipv4_udp_unbound_loopback_test

@@ -1970,41 +1970,41 @@ struct socket_with_event {
   explicit socket_with_event(typename T::Storage& zxio_storage)
       : client_(zxio_storage.client), event_(zxio_storage.event) {}
 
-  void wait_begin(uint32_t events, zx_handle_t* handle, zx_signals_t* out_signals) {
+  void wait_begin(zxio_signals_t zxio_signals, zx_handle_t* handle, zx_signals_t* out_signals) {
     *handle = event_.get();
 
     zx_signals_t signals = ZX_EVENTPAIR_PEER_CLOSED | fsocket::wire::kSignalDatagramError;
-    if (events & POLLIN) {
+    if (zxio_signals & ZXIO_SIGNAL_READABLE) {
       signals |=
           fsocket::wire::kSignalDatagramIncoming | fsocket::wire::kSignalDatagramShutdownRead;
     }
-    if (events & POLLOUT) {
+    if (zxio_signals & ZXIO_SIGNAL_WRITABLE) {
       signals |=
           fsocket::wire::kSignalDatagramOutgoing | fsocket::wire::kSignalDatagramShutdownWrite;
     }
-    if (events & POLLRDHUP) {
+    if (zxio_signals & ZXIO_SIGNAL_READ_DISABLED) {
       signals |= fsocket::wire::kSignalDatagramShutdownRead;
     }
     *out_signals = signals;
   }
 
-  void wait_end(zx_signals_t signals, uint32_t* out_events) {
-    uint32_t events = 0;
+  void wait_end(zx_signals_t signals, zxio_signals_t* out_zxio_signals) {
+    zxio_signals_t zxio_signals = 0;
     if (signals & (ZX_EVENTPAIR_PEER_CLOSED | fsocket::wire::kSignalDatagramIncoming |
                    fsocket::wire::kSignalDatagramShutdownRead)) {
-      events |= POLLIN;
+      zxio_signals |= ZXIO_SIGNAL_READABLE;
     }
     if (signals & (ZX_EVENTPAIR_PEER_CLOSED | fsocket::wire::kSignalDatagramOutgoing |
                    fsocket::wire::kSignalDatagramShutdownWrite)) {
-      events |= POLLOUT;
+      zxio_signals |= ZXIO_SIGNAL_WRITABLE;
     }
     if (signals & (ZX_EVENTPAIR_PEER_CLOSED | fsocket::wire::kSignalDatagramError)) {
-      events |= POLLERR;
+      zxio_signals |= ZXIO_SIGNAL_ERROR;
     }
     if (signals & (ZX_EVENTPAIR_PEER_CLOSED | fsocket::wire::kSignalDatagramShutdownRead)) {
-      events |= POLLRDHUP;
+      zxio_signals |= ZXIO_SIGNAL_READ_DISABLED;
     }
-    *out_events = events;
+    *out_zxio_signals = zxio_signals;
   }
 
   zx_status_t recvmsg(struct msghdr* msg, int flags, size_t* out_actual, int16_t* out_code) {
@@ -2254,13 +2254,14 @@ static constexpr zxio_ops_t zxio_synchronous_datagram_socket_ops = []() {
   ops.shutdown = [](zxio_t* io, zxio_shutdown_options_t options, int16_t* out_code) {
     return network_socket(zxio_synchronous_datagram_socket(io).client).shutdown(options, out_code);
   };
-  ops.wait_begin = [](zxio_t* io, uint32_t events, zx_handle_t* handle, zx_signals_t* out_signals) {
+  ops.wait_begin = [](zxio_t* io, zxio_signals_t zxio_signals, zx_handle_t* handle,
+                      zx_signals_t* out_signals) {
     return socket_with_event<SynchronousDatagramSocket>(zxio_synchronous_datagram_socket(io))
-        .wait_begin(events, handle, out_signals);
+        .wait_begin(zxio_signals, handle, out_signals);
   };
-  ops.wait_end = [](zxio_t* io, zx_signals_t zx_signals, uint32_t* out_events) {
+  ops.wait_end = [](zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
     return socket_with_event<SynchronousDatagramSocket>(zxio_synchronous_datagram_socket(io))
-        .wait_end(zx_signals, out_events);
+        .wait_end(zx_signals, out_zxio_signals);
   };
   return ops;
 }();
@@ -2278,20 +2279,6 @@ zx_status_t zxio_synchronous_datagram_socket_init(
 }
 
 namespace {
-
-uint32_t zxio_signals_to_events(zx_signals_t signals) {
-  uint32_t events = 0;
-  if (signals & ZXIO_SIGNAL_PEER_CLOSED) {
-    events |= POLLIN | POLLOUT | POLLERR | POLLHUP | POLLRDHUP;
-  }
-  if (signals & ZXIO_SIGNAL_WRITE_DISABLED) {
-    events |= POLLHUP | POLLOUT;
-  }
-  if (signals & ZXIO_SIGNAL_READ_DISABLED) {
-    events |= POLLRDHUP | POLLIN;
-  }
-  return events;
-}
 
 template <typename Client,
           typename = std::enable_if_t<
@@ -2377,21 +2364,19 @@ struct datagram_socket
   explicit datagram_socket(zxio_datagram_socket_t& datagram_socket)
       : socket_with_zx_socket(datagram_socket.client), datagram_socket_(datagram_socket) {}
 
-  void wait_begin(uint32_t events, zx_handle_t* handle, zx_signals_t* out_signals) {
-    zxio_signals_t signals = ZXIO_SIGNAL_PEER_CLOSED;
-    zxio_wait_begin_inner(&datagram_socket_.pipe.io, events, signals, handle, out_signals);
+  void wait_begin(zxio_signals_t zxio_signals, zx_handle_t* handle, zx_signals_t* out_signals) {
+    zxio_signals |= ZXIO_SIGNAL_PEER_CLOSED;
+    zxio_wait_begin(&datagram_socket_.pipe.io, zxio_signals, handle, out_signals);
     *out_signals |= fsocket::wire::kSignalDatagramError;
   }
 
-  void wait_end(zx_signals_t zx_signals, uint32_t* out_events) {
-    zxio_signals_t signals;
-    uint32_t events;
-    zxio_wait_end_inner(&datagram_socket_.pipe.io, zx_signals, &events, &signals);
-    events |= zxio_signals_to_events(signals);
+  void wait_end(zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
+    zxio_signals_t zxio_signals;
+    zxio_wait_end(&datagram_socket_.pipe.io, zx_signals, &zxio_signals);
     if (zx_signals & fsocket::wire::kSignalDatagramError) {
-      events |= POLLERR;
+      zxio_signals |= ZXIO_SIGNAL_ERROR;
     }
-    *out_events = events;
+    *out_zxio_signals = zxio_signals;
   }
 
   std::optional<ErrOrOutCode> GetZxSocketReadError(zx_status_t status) override {
@@ -2823,8 +2808,8 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
   explicit stream_socket(zxio_stream_socket_t& stream_socket)
       : socket_with_zx_socket(stream_socket.client), stream_socket_(stream_socket) {}
 
-  void wait_begin(uint32_t events, zx_handle_t* handle, zx_signals_t* out_signals) {
-    zxio_signals_t signals = ZXIO_SIGNAL_PEER_CLOSED;
+  void wait_begin(zxio_signals_t zxio_signals, zx_handle_t* handle, zx_signals_t* out_signals) {
+    zxio_signals_t pipe_signals = ZXIO_SIGNAL_PEER_CLOSED;
 
     auto [state, has_error] = GetState();
     switch (state) {
@@ -2837,41 +2822,49 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
       case zxio_stream_socket_state_t::LISTENING:
         break;
       case zxio_stream_socket_state_t::CONNECTING:
-        if (events & POLLIN) {
-          signals |= ZXIO_SIGNAL_READABLE;
+        if (zxio_signals & ZXIO_SIGNAL_READABLE) {
+          pipe_signals |= ZXIO_SIGNAL_READABLE;
         }
         break;
       case zxio_stream_socket_state_t::CONNECTED:
-        zxio_wait_begin_inner(&stream_socket_.pipe.io, events, signals, handle, out_signals);
+        if (zxio_signals & ZXIO_SIGNAL_READABLE) {
+          pipe_signals |= ZXIO_SIGNAL_READABLE | ZXIO_SIGNAL_READ_DISABLED;
+        }
+        if (zxio_signals & ZXIO_SIGNAL_WRITABLE) {
+          pipe_signals |= ZXIO_SIGNAL_WRITABLE | ZXIO_SIGNAL_WRITE_DISABLED;
+        }
+        if (zxio_signals & ZXIO_SIGNAL_READ_DISABLED) {
+          pipe_signals |= ZXIO_SIGNAL_READ_DISABLED;
+        }
+        zxio_wait_begin(&stream_socket_.pipe.io, pipe_signals, handle, out_signals);
         return;
     }
 
-    if (events & POLLOUT) {
-      signals |= ZXIO_SIGNAL_WRITE_DISABLED;
+    if (zxio_signals & ZXIO_SIGNAL_WRITABLE) {
+      pipe_signals |= ZXIO_SIGNAL_WRITE_DISABLED;
     }
-    if (events & (POLLIN | POLLRDHUP)) {
-      signals |= ZXIO_SIGNAL_READ_DISABLED;
+    if (zxio_signals & (ZXIO_SIGNAL_READABLE | ZXIO_SIGNAL_READ_DISABLED)) {
+      pipe_signals |= ZXIO_SIGNAL_READ_DISABLED;
     }
 
     zx_signals_t zx_signals = ZX_SIGNAL_NONE;
-    zxio_wait_begin(&stream_socket_.pipe.io, signals, handle, &zx_signals);
+    zxio_wait_begin(&stream_socket_.pipe.io, pipe_signals, handle, &zx_signals);
 
-    if (events & POLLOUT) {
+    if (zxio_signals & ZXIO_SIGNAL_WRITABLE) {
       // signal when connect() operation is finished.
       zx_signals |= fsocket::wire::kSignalStreamConnected;
     }
-    if (events & POLLIN) {
+    if (zxio_signals & ZXIO_SIGNAL_READABLE) {
       // signal when a listening socket gets an incoming connection.
       zx_signals |= fsocket::wire::kSignalStreamIncoming;
     }
     *out_signals = zx_signals;
   }
 
-  void wait_end(zx_signals_t zx_signals, uint32_t* out_events) {
-    zxio_signals_t signals = ZXIO_SIGNAL_NONE;
-    uint32_t events = 0;
+  void wait_end(zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
+    zxio_signals_t zxio_signals = ZXIO_SIGNAL_NONE;
 
-    bool use_inner;
+    bool use_pipe;
     {
       std::lock_guard lock(stream_socket_.state_lock);
       auto [state, has_error] = StateLocked();
@@ -2879,37 +2872,57 @@ struct stream_socket : public socket_with_zx_socket<fidl::WireSyncClient<fsocket
         case zxio_stream_socket_state_t::UNCONNECTED:
           ZX_ASSERT_MSG(zx_signals == ZX_SIGNAL_NONE, "zx_signals=%s on unconnected socket",
                         std::bitset<sizeof(zx_signals)>(zx_signals).to_string().c_str());
-          *out_events = POLLOUT | POLLHUP;
+          *out_zxio_signals = ZXIO_SIGNAL_WRITABLE | ZXIO_SIGNAL_PEER_CLOSED;
+          use_pipe = false;
           return;
 
         case zxio_stream_socket_state_t::LISTENING:
           if (zx_signals & fsocket::wire::kSignalStreamIncoming) {
-            events |= POLLIN;
+            zxio_signals |= ZXIO_SIGNAL_READABLE;
           }
-          use_inner = false;
+          use_pipe = false;
           break;
         case zxio_stream_socket_state_t::CONNECTING:
           if (zx_signals & fsocket::wire::kSignalStreamConnected) {
             stream_socket_.state = zxio_stream_socket_state_t::CONNECTED;
-            events |= POLLOUT;
+            zxio_signals |= ZXIO_SIGNAL_WRITABLE;
           }
           zx_signals &= ~fsocket::wire::kSignalStreamConnected;
-          use_inner = false;
+          use_pipe = false;
           break;
         case zxio_stream_socket_state_t::CONNECTED:
-          use_inner = true;
+          use_pipe = true;
           break;
       }
     }
 
-    if (use_inner) {
-      zxio_wait_end_inner(&stream_socket_.pipe.io, zx_signals, &events, &signals);
-    } else {
-      zxio_wait_end(&stream_socket_.pipe.io, zx_signals, &signals);
+    zxio_signals_t pipe_signals = ZXIO_SIGNAL_NONE;
+    zxio_wait_end(&stream_socket_.pipe.io, zx_signals, &pipe_signals);
+    if (use_pipe) {
+      zxio_signals |= pipe_signals;
+      if (zxio_signals & (ZXIO_SIGNAL_PEER_CLOSED | ZXIO_SIGNAL_READ_DISABLED)) {
+        zxio_signals |= ZXIO_SIGNAL_READABLE;
+      }
+      if (zxio_signals & ZXIO_SIGNAL_WRITE_DISABLED) {
+        zxio_signals |= ZXIO_SIGNAL_WRITABLE;
+      }
+      if (zxio_signals & ZXIO_SIGNAL_PEER_CLOSED) {
+        zxio_signals |= ZXIO_SIGNAL_READ_DISABLED;
+      }
     }
 
-    events |= zxio_signals_to_events(signals);
-    *out_events = events;
+    if (pipe_signals & ZXIO_SIGNAL_PEER_CLOSED) {
+      zxio_signals |= ZXIO_SIGNAL_READABLE | ZXIO_SIGNAL_WRITABLE | ZXIO_SIGNAL_ERROR |
+                      ZXIO_SIGNAL_PEER_CLOSED | ZXIO_SIGNAL_READ_DISABLED;
+    }
+    if (pipe_signals & ZXIO_SIGNAL_WRITE_DISABLED) {
+      zxio_signals |= ZXIO_SIGNAL_PEER_CLOSED | ZXIO_SIGNAL_WRITABLE;
+    }
+    if (pipe_signals & ZXIO_SIGNAL_READ_DISABLED) {
+      zxio_signals |= ZXIO_SIGNAL_READ_DISABLED | ZXIO_SIGNAL_READABLE;
+    }
+
+    *out_zxio_signals = zxio_signals;
   }
 
   zx_status_t recvmsg(struct msghdr* msg, int flags, size_t* out_actual, int16_t* out_code) {
@@ -3456,12 +3469,13 @@ static constexpr zxio_ops_t zxio_raw_socket_ops = []() {
     return socket_with_event<RawSocket>(zxio_raw_socket(io))
         .sendmsg(msg, flags, out_actual, out_code);
   };
-  ops.wait_begin = [](zxio_t* io, uint32_t events, zx_handle_t* handle, zx_signals_t* out_signals) {
+  ops.wait_begin = [](zxio_t* io, zxio_signals_t zxio_signals, zx_handle_t* handle,
+                      zx_signals_t* out_signals) {
     return socket_with_event<RawSocket>(zxio_raw_socket(io))
-        .wait_begin(events, handle, out_signals);
+        .wait_begin(zxio_signals, handle, out_signals);
   };
-  ops.wait_end = [](zxio_t* io, zx_signals_t zx_signals, uint32_t* out_events) {
-    return socket_with_event<RawSocket>(zxio_raw_socket(io)).wait_end(zx_signals, out_events);
+  ops.wait_end = [](zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
+    return socket_with_event<RawSocket>(zxio_raw_socket(io)).wait_end(zx_signals, out_zxio_signals);
   };
   ops.shutdown = [](zxio_t* io, zxio_shutdown_options_t options, int16_t* out_code) {
     return network_socket(zxio_raw_socket(io).client).shutdown((options), out_code);
@@ -3637,12 +3651,14 @@ static constexpr zxio_ops_t zxio_packet_socket_ops = []() {
     return socket_with_event<PacketSocket>(zxio_packet_socket(io))
         .sendmsg(msg, flags, out_actual, out_code);
   };
-  ops.wait_begin = [](zxio_t* io, uint32_t events, zx_handle_t* handle, zx_signals_t* out_signals) {
+  ops.wait_begin = [](zxio_t* io, zxio_signals_t zxio_signals, zx_handle_t* handle,
+                      zx_signals_t* out_signals) {
     return socket_with_event<PacketSocket>(zxio_packet_socket(io))
-        .wait_begin(events, handle, out_signals);
+        .wait_begin(zxio_signals, handle, out_signals);
   };
-  ops.wait_end = [](zxio_t* io, zx_signals_t zx_signals, uint32_t* out_events) {
-    return socket_with_event<PacketSocket>(zxio_packet_socket(io)).wait_end(zx_signals, out_events);
+  ops.wait_end = [](zxio_t* io, zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
+    return socket_with_event<PacketSocket>(zxio_packet_socket(io))
+        .wait_end(zx_signals, out_zxio_signals);
   };
   return ops;
 }();

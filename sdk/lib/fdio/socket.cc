@@ -242,14 +242,6 @@ struct base_socket : public remote {
     return zxio_sendmsg(&zxio_storage().io, msg, flags, out_actual, out_code);
   }
 
-  void wait_begin(uint32_t events, zx_handle_t* handle, zx_signals_t* out_signals) override {
-    zxio_wait_begin(&zxio_storage().io, events, handle, out_signals);
-  }
-
-  void wait_end(zx_signals_t signals, uint32_t* out_events) override {
-    zxio_wait_end(&zxio_storage().io, signals, out_events);
-  }
-
  protected:
   friend class fbl::internal::MakeRefCountedHelper<base_socket>;
   friend class fbl::RefPtr<base_socket>;
