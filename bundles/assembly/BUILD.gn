@@ -75,7 +75,6 @@ assembly_input_bundle("common_bringup") {
     "//src/bringup/bin/debuglog:bootfs",
     "//src/bringup/bin/device-name-provider:bootfs",
     "//src/bringup/bin/dlog:bootfs",
-    "//src/bringup/bin/netsvc:bootfs",
     "//src/bringup/bin/waitfor:bootfs",
     "//src/power/power-manager:bootfs",
     "//src/power/shutdown-shim:bootfs",
@@ -86,6 +85,7 @@ assembly_input_bundle("common_bringup") {
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
     "//src/bringup/bin/miscsvc:package",
+    "//src/bringup/bin/netsvc:package",
     "//src/bringup/bin/ptysvc:package",
     "//src/bringup/bin/pwrbtn-monitor:package",
     "//src/bringup/bin/sysinfo:package",

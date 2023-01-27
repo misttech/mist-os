@@ -2,21 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
-import("//build/dist/component_manifest_resources.gni")
 import("//build/test.gni")
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":meta",
-    ":netsvc",
-  ]
-}
-
-component_manifest_resources("meta") {
-  sources = [ "meta/netsvc.cml" ]
-}
 
 declare_args() {
   netsvc_extra_defines = []
@@ -26,13 +13,18 @@ config("netsvc_config") {
   defines = netsvc_extra_defines
 }
 
+fuchsia_component("component") {
+  component_name = "netsvc"
+  manifest = "meta/netsvc.cml"
+  deps = [ ":netsvc" ]
+}
+
+fuchsia_package("package") {
+  package_name = "netsvc"
+  deps = [ ":component" ]
+}
+
 executable("netsvc") {
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
   sources = [
     "debug-command.cc",
     "netsvc.cc",

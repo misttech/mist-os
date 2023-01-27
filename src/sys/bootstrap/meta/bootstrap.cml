@@ -60,7 +60,7 @@
         },
         {
             name: "netsvc",
-            url: "fuchsia-boot:///#meta/netsvc.cm",
+            url: "fuchsia-boot:///netsvc#meta/netsvc.cm",
             startup: "eager",
         },
         {
@@ -222,10 +222,7 @@
         {
             protocol: "fuchsia.tracing.controller.Controller",
             from: "parent",
-            to: [
-                "#console-launcher",
-                "#netsvc",
-            ],
+            to: [ "#console-launcher" ],
             availability: "optional",
         },
 
