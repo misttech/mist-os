@@ -203,7 +203,7 @@ source_set("test-data") {
   public = [ "test-data.h" ]
 }
 
-template("load_test_lib") {
+template("loader_test_lib") {
   loadable_module(target_name) {
     visibility = [ ":*" ]
     testonly = true
@@ -241,24 +241,37 @@ template("load_test_lib") {
   }
 }
 
-load_test_lib("elfldltl-test-ret24") {
+loader_test_lib("elfldltl-test-ret24") {
   sources = [ "ret24.cc" ]
   ldflags = [ "-Wl,-e,Return24" ]
 }
 
-foreach(data_size,
-        [
-          0,
-          65536,
-        ]) {
-  load_test_lib("elfldltest-no-execute-data-$data_size") {
+loader_test_sizes = [
+  {
+    data = 0
+    bss = 1
+  },
+  {
+    data = 65536
+    bss = 1
+  },
+  {
+    data = 0
+    bss = 65536
+  },
+]
+foreach(sizes, loader_test_sizes) {
+  loader_test_lib("elfldltest-no-execute-data-${sizes.data}-bss-${sizes.bss}") {
     sources = [ "no-x-segment.cc" ]
-    defines = [ "DATA_SIZE=$data_size" ]
+    defines = [
+      "DATA_SIZE=${sizes.data}",
+      "BSS_SIZE=${sizes.bss}",
+    ]
     ldflags = [ "-Wl,-e,test_data" ]
   }
 }
 
-load_test_lib("elfldltl-test-symbolic") {
+loader_test_lib("elfldltl-test-symbolic") {
   sources = [ "symbolic.cc" ]
 
   # TODO(fxbug.dev/117866): clang will still perform interprocedural
@@ -269,17 +282,14 @@ load_test_lib("elfldltl-test-symbolic") {
   }
 }
 
-load_test_data_deps = [
+loader_test_data_deps = [
   "elfldltl-test-ret24",
   "elfldltl-test-symbolic",
 ]
 
-foreach(data_size,
-        [
-          0,
-          65536,
-        ]) {
-  load_test_data_deps += [ "elfldltest-no-execute-data-$data_size" ]
+foreach(sizes, loader_test_sizes) {
+  loader_test_data_deps +=
+      [ "elfldltest-no-execute-data-${sizes.data}-bss-${sizes.bss}" ]
 }
 
 if (is_host && is_elf) {
@@ -287,7 +297,7 @@ if (is_host && is_elf) {
     deps = []
     sources = []
 
-    foreach(lib, load_test_data_deps) {
+    foreach(lib, loader_test_data_deps) {
       deps += [ ":$lib" ]
       sources += [ "$root_out_dir/$lib.so" ]
     }
@@ -301,7 +311,7 @@ if (is_host && is_elf) {
     testonly = true
 
     deps = []
-    foreach(lib, load_test_data_deps) {
+    foreach(lib, loader_test_data_deps) {
       deps += [ ":$lib" ]
     }
   }
@@ -318,6 +328,7 @@ source_set("loader-tests") {
     ":test-utils",
     "..",
     "//sdk/lib/stdcompat",
+    "//third_party/googletest:gmock",
     "//zircon/system/ulib/fbl",
   ]
 

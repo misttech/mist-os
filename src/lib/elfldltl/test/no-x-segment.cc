@@ -17,7 +17,7 @@
 #endif
 
 const int rodata = 5;
-int bss;
+int bss[BSS_SIZE];
 
 CONSTINIT auto data = []() constexpr {
   std::array<int, DATA_SIZE + 2> ret{18};
@@ -25,4 +25,4 @@ CONSTINIT auto data = []() constexpr {
   return ret;
 }();
 
-extern "C" CONSTINIT const TestData test_data{&rodata, &data.front(), &bss};
+extern "C" CONSTINIT const TestData test_data{&rodata, &data.front(), bss};

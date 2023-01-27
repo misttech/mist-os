@@ -192,6 +192,15 @@ class VmarLoader {
 
       // Then map zero-fill data, if any.
       if (zero_size > 0) {
+        if constexpr (PartialPage == PartialPagePolicy::kZeroInVmo) {
+          // MapWritable<ZeroInVmo=true> will have rounded up its true mapping
+          // size and zeroed the trailing partial page.  So skip over that true
+          // mapping size to the first page that's entirely zero-fill.
+          map_size = (map_size + page_size() - 1) & -page_size();
+        } else {
+          // This should have been rounded down earlier.
+          ZX_DEBUG_ASSERT((map_size & (page_size() - 1)) == 0);
+        }
         const uintptr_t zero_fill_vmar_offset = vmar_offset + map_size;
         zx_status_t status =
             MapZeroFill(zero_fill_vmar_offset, base_name, zero_size, num_zero_segments);

@@ -16,6 +16,7 @@
 #include <vector>
 
 #include <fbl/unique_fd.h>
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #ifdef __Fuchsia__
@@ -248,6 +249,22 @@ TYPED_TEST(ElfldltlLoaderTests, LargeDataSegment) {
 
   *data->data = 1;
   data->data[kLargeDataCount - 1] = 9;
+  *data->bss = 2;
+  int* rodata = const_cast<int*>(data->rodata);
+  EXPECT_DEATH(*rodata = 3, "");
+}
+
+TYPED_TEST(ElfldltlLoaderTests, LargeBssSegment) {
+  this->Load(kNoXSegmentLargeBss);
+
+  TestData* data = this->template entry<TestData>();
+  EXPECT_EQ(*data->rodata, 5);
+  EXPECT_EQ(*data->data, 18);
+  EXPECT_EQ(data->data[kSmallDataCount - 1], 1);
+  cpp20::span bss(data->bss, kLargeBssCount);
+  EXPECT_THAT(bss, testing::Each(testing::Eq(0)));
+
+  *data->data = 1;
   *data->bss = 2;
   int* rodata = const_cast<int*>(data->rodata);
   EXPECT_DEATH(*rodata = 3, "");
