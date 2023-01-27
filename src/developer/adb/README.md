@@ -71,7 +71,7 @@ To get started with adb on Fuchsia -
 * Download the stock adb client from [Android
   SDK](https://developer.android.com/studio/command-line/adb) onto the development host or use
   prebuilt adb client from Fuchsia tree
-  [//prebuilt/starnix/internal/android-image-amd64/adb](//prebuilt/starnix/internal/android-image-amd64/adb).
+  [//prebuilt/starnix/internal/android-image-amd64/bin/adb](/prebuilt/starnix/internal/android-image-amd64/bin/adb).
 
 ### Using adb shell
 
