@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {argh::FromArgs, ffx_core::ffx_command, fidl_fuchsia_dash as fdash, std::str::FromStr};
+use {argh::FromArgs, component_debug::explore::DashNamespaceLayout, ffx_core::ffx_command};
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
@@ -69,21 +69,4 @@ pub struct ExploreComponentCommand {
     /// nested: nests all instance directories under subdirs (default)
     /// namespace: sets the instance namespace as the root (works better for tools)
     pub ns_layout: Option<DashNamespaceLayout>,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct DashNamespaceLayout(pub fdash::DashNamespaceLayout);
-
-impl FromStr for DashNamespaceLayout {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "nested" => Ok(DashNamespaceLayout(fdash::DashNamespaceLayout::NestAllInstanceDirs)),
-            "namespace" => {
-                Ok(DashNamespaceLayout(fdash::DashNamespaceLayout::InstanceNamespaceIsRoot))
-            }
-            _ => Err("Unknown namespace layout (supported values: nested, namespace)".to_string()),
-        }
-    }
 }

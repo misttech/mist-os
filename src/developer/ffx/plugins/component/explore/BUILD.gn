@@ -10,19 +10,14 @@ ffx_plugin("ffx_component_explore") {
   deps = [
     "//sdk/fidl/fuchsia.dash:fuchsia.dash_rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//src/sys/lib/component_debug",
-    "//third_party/rust_crates:atty",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:termion",
+    "//src/sys/lib/moniker",
   ]
 
   args_sources = [ "src/args.rs" ]
-  args_deps = [ "//sdk/fidl/fuchsia.dash:fuchsia.dash_rust" ]
+  args_deps = [ "//src/sys/lib/component_debug" ]
 
   sources = [ "src/lib.rs" ]
 }
