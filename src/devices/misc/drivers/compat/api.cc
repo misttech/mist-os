@@ -124,14 +124,6 @@ __EXPORT zx_status_t device_add_metadata(zx_device_t* dev, uint32_t type, const 
 
 __EXPORT zx_status_t device_add_composite(zx_device_t* dev, const char* name,
                                           const composite_device_desc_t* comp_desc) {
-  // TODO(fxbug.dev/103658): In DFv2 we need to support vendor specific touchpads,
-  // which use composite drivers. We cannot create a DFv1 style composite for this,
-  // otherwise the DFv2 driver will not bind.
-  // This is not a great solution, but it is the simplest solution for now.
-  if (std::string("acpi-H015-composite") == name) {
-    FDF_LOGL(WARNING, dev->logger(), "DFv2 Compat shim refusing to create touchpad composite");
-    return ZX_OK;
-  }
   return dev->AddComposite(name, comp_desc);
 }
 

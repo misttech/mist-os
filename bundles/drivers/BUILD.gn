@@ -18,7 +18,7 @@ group("bootstrap") {
 
 kernel_cmdline("disable.drivers_for_dfv2") {
   # da7219 is disabled in favor of da7219-dfv2.
-  args = [ "devmgr.disabled-drivers=fuchsia-boot:///#meta/da7219.cm,fuchsia-boot:///#meta/i2c-hid-dfv2.cm" ]
+  args = [ "devmgr.disabled-drivers=fuchsia-boot:///#meta/da7219.cm" ]
 }
 
 group("bootstrap-dfv2") {
