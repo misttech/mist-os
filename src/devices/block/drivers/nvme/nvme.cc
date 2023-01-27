@@ -229,11 +229,6 @@ static void PopulateControllerInspect(const IdentifyController& identify,
   auto model_number = std::string(identify.model_number, sizeof(identify.model_number));
   auto serial_number = std::string(identify.serial_number, sizeof(identify.serial_number));
   auto firmware_rev = std::string(identify.firmware_rev, sizeof(identify.firmware_rev));
-  // Some vendors don't pad the strings with spaces (0x20). Null-terminate strings to avoid printing
-  // illegal characters.
-  model_number = std::string(model_number.c_str());
-  serial_number = std::string(serial_number.c_str());
-  firmware_rev = std::string(firmware_rev.c_str());
   zxlogf(INFO, "Model number:  '%s'", model_number.c_str());
   zxlogf(INFO, "Serial number: '%s'", serial_number.c_str());
   zxlogf(INFO, "Firmware rev.: '%s'", firmware_rev.c_str());
