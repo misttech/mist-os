@@ -19,7 +19,7 @@ use packet_formats::icmp::ndp::{
 use rand::Rng as _;
 
 use crate::{
-    context::{RngContext, TimerContext},
+    context::{RngContext, TimerContext, TimerHandler},
     ip::IpDeviceIdContext,
 };
 
@@ -116,7 +116,9 @@ impl<C: RsNonSyncContext<SC::DeviceId>, SC: Ipv6DeviceRsContext<C> + Ipv6LayerRs
 }
 
 /// An implementation of Router Solicitation.
-pub(crate) trait RsHandler<C>: IpDeviceIdContext<Ipv6> {
+pub(crate) trait RsHandler<C>:
+    IpDeviceIdContext<Ipv6> + TimerHandler<C, RsTimerId<Self::DeviceId>>
+{
     /// Starts router solicitation.
     fn start_router_solicitation(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
 
@@ -124,10 +126,6 @@ pub(crate) trait RsHandler<C>: IpDeviceIdContext<Ipv6> {
     ///
     /// Does nothing if router solicitaiton is not being performed
     fn stop_router_solicitation(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
-
-    /// Handles a timer.
-    // TODO: Replace this with a `TimerHandler` bound.
-    fn handle_timer(&mut self, ctx: &mut C, id: RsTimerId<Self::DeviceId>);
 }
 
 impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> RsHandler<C> for SC {
@@ -157,7 +155,11 @@ impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> RsHandler<C> for SC {
     fn stop_router_solicitation(&mut self, ctx: &mut C, device_id: &Self::DeviceId) {
         let _: Option<C::Instant> = ctx.cancel_timer(RsTimerId { device_id: device_id.clone() });
     }
+}
 
+impl<C: RsNonSyncContext<SC::DeviceId>, SC: RsContext<C>> TimerHandler<C, RsTimerId<SC::DeviceId>>
+    for SC
+{
     fn handle_timer(&mut self, ctx: &mut C, RsTimerId { device_id }: RsTimerId<SC::DeviceId>) {
         do_router_solicitation(self, ctx, &device_id)
     }
@@ -389,7 +391,7 @@ mod tests {
             non_sync_ctx.timer_ctx().assert_timers_installed([(RS_TIMER_ID, now..=now + duration)]);
 
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, RsHandler::handle_timer),
+                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
                 Some(RS_TIMER_ID)
             );
             let frames = sync_ctx.frames();
