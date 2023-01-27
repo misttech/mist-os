@@ -105,7 +105,7 @@ mod tests {
     fn authentication_fails() {
         let authenticator = ContextAuthenticator::from_secret([0u8; SECRET_LEN]);
         let mut context = authenticator.clone().create(&hash());
-        context.bytes[0] ^= context.bytes[0];
+        context.bytes[0] = !context.bytes[0];
         assert_matches!(
             authenticator.authenticate(context),
             Err(ContextAuthenticatorError::AuthenticationFailed(_))

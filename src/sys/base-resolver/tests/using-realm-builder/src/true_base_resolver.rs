@@ -288,7 +288,7 @@ async fn manipulated_context_rejected() {
     let env = TestEnvBuilder::new().static_packages(&[&super_pkg]).await.build().await;
     let (_, mut context) =
         env.resolve_package("fuchsia-pkg://fuchsia.com/super-package/0").await.unwrap();
-    context.bytes[0] ^= context.bytes[0];
+    context.bytes[0] = !context.bytes[0];
 
     assert_matches!(
         env.resolve_with_context_package("sub-package-url", context).await,
