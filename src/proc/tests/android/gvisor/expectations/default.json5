@@ -1306,6 +1306,12 @@
                 // TODO(fxbug.dev/105339): Re-enable once flake is resolved.
                 "Waiters/WaitSpecificChildTest.MultipleForkOutOfOrder/*",
 
+                // TODO(fxbug.dev/120705): Re-enable once flake is resolved.
+                "SharedPrivate/PrivateAndSharedFutexTest.Wait_BitsetTimeout/*",
+
+                // TODO(fxbug.dev/120707): Re-enable once flake is resolved.
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecTooLarge/*",
+
                 // These tests are flaky.
                 "FcntlTest.SetFdO_ASYNC",
                 "UnameTest.Sanity",
