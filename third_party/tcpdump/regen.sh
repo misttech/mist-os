@@ -3,9 +3,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source "$FUCHSIA_DIR"/tools/devshell/lib/vars.sh
-source "$FUCHSIA_DIR"/tools/devshell/lib/prebuilt.sh
-
 set -euxo pipefail
 
 readonly REPO_DIR="$FUCHSIA_DIR/third_party/tcpdump"

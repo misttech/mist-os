@@ -6,7 +6,6 @@
 # A script to regenerate config.h files for Fuchsia.
 
 source "$FUCHSIA_DIR"/tools/devshell/lib/vars.sh
-source "$FUCHSIA_DIR"/tools/devshell/lib/platform.sh
 
 set -euxo pipefail
 
