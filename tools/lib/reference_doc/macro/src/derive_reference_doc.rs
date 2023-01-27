@@ -318,7 +318,7 @@ fn get_json_type_string_from_ty_string(ty_string: &str) -> Option<&str> {
     let number_types = &[
         "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "usize", "f32", "f64",
     ];
-    let map_types = &["Map", "BTreeMap", "HashMap"];
+    let map_types = &["Map", "BTreeMap", "HashMap", "IndexMap"];
     if ty_string == "String" {
         Some("string")
     } else if ty_string == "bool" {

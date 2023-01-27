@@ -14,6 +14,7 @@ use {
     crate::error::Error,
     cml_macro::{CheckedVec, OneOrMany, Reference},
     fidl_fuchsia_io as fio,
+    indexmap::IndexMap,
     json5format::{FormatOptions, PathOption},
     lazy_static::lazy_static,
     maplit::{hashmap, hashset},
@@ -1033,7 +1034,7 @@ pub struct Document {
     /// framework enforces no schema for this section, but third parties may expect their facets to
     /// adhere to a particular schema.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub facets: Option<Map<String, Value>>,
+    pub facets: Option<IndexMap<String, Value>>,
 
     /// The configuration schema as defined by a component. Each key represents a single field
     /// in the schema.
@@ -1233,13 +1234,17 @@ impl Document {
         Ok(())
     }
 
-    fn merge_maps(
-        self_map: &mut Map<String, Value>,
-        include_map: &Map<String, Value>,
+    fn merge_maps<'s, Source, Dest>(
+        self_map: &mut Dest,
+        include_map: Source,
         outer_key: &str,
         include_path: &path::Path,
-    ) -> Result<(), Error> {
-        for (key, value) in include_map.iter() {
+    ) -> Result<(), Error>
+    where
+        Source: IntoIterator<Item = (&'s String, &'s Value)>,
+        Dest: ValueMap,
+    {
+        for (key, value) in include_map {
             match self_map.get_mut(key) {
                 None => {
                     // Key not present in self map, insert it from include map.
@@ -1308,10 +1313,10 @@ impl Document {
             return Ok(());
         }
         if let None = self.facets {
-            self.facets = Some(Map::default());
+            self.facets = Some(Default::default());
         }
         let my_facets = self.facets.as_mut().unwrap();
-        let other_facets = other.facets.as_mut().unwrap();
+        let other_facets = other.facets.as_ref().unwrap();
 
         Self::merge_maps(my_facets, other_facets, "facets", include_path)
     }
@@ -1442,6 +1447,32 @@ impl Document {
                 })
             })
             .unwrap_or_default()
+    }
+}
+
+/// Trait that allows us to merge `serde_json::Map`s into `indexmap::IndexMap`s and vice versa.
+trait ValueMap {
+    fn get_mut(&mut self, key: &str) -> Option<&mut Value>;
+    fn insert(&mut self, key: String, val: Value);
+}
+
+impl ValueMap for Map<String, Value> {
+    fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
+        self.get_mut(key)
+    }
+
+    fn insert(&mut self, key: String, val: Value) {
+        self.insert(key, val);
+    }
+}
+
+impl ValueMap for IndexMap<String, Value> {
+    fn get_mut(&mut self, key: &str) -> Option<&mut Value> {
+        self.get_mut(key)
+    }
+
+    fn insert(&mut self, key: String, val: Value) {
+        self.insert(key, val);
     }
 }
 
@@ -1851,7 +1882,7 @@ pub struct Program {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runner: Option<Name>,
     #[serde(flatten)]
-    pub info: Map<String, Value>,
+    pub info: IndexMap<String, Value>,
 }
 
 impl<'de> de::Deserialize<'de> for Program {
@@ -1878,7 +1909,7 @@ impl<'de> de::Deserialize<'de> for Program {
             where
                 A: de::MapAccess<'de>,
             {
-                let mut info = Map::new();
+                let mut info = IndexMap::new();
                 let mut runner = None;
                 while let Some(e) = map.next_entry::<String, Value>()? {
                     let (k, v) = e;

@@ -13,6 +13,7 @@ use {
     },
     cm_types::{self as cm, Name},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    indexmap::IndexMap,
     serde_json::{Map, Value},
     sha2::{Digest, Sha256},
     std::collections::{BTreeMap, BTreeSet},
@@ -103,7 +104,7 @@ fn value_to_dictionary_value(value: Value) -> Result<Option<Box<fdata::Dictionar
                 let objs = arr
                     .into_iter()
                     .map(|v| v.as_object().unwrap().clone())
-                    .map(|v| dictionary_from_nested_map(v))
+                    .map(|v| dictionary_from_nested_map(v.into_iter().collect()))
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Some(Box::new(fdata::DictionaryValue::ObjVec(objs))))
             } else {
@@ -153,7 +154,7 @@ fn value_to_dictionary_value(value: Value) -> Result<Option<Box<fdata::Dictionar
 ///   "lifecycle.nested.foo": "bar"
 /// }
 /// ```
-fn dictionary_from_nested_map(map: Map<String, Value>) -> Result<fdata::Dictionary, Error> {
+fn dictionary_from_nested_map(map: IndexMap<String, Value>) -> Result<fdata::Dictionary, Error> {
     fn key_value_to_entries(
         key: String,
         value: Value,

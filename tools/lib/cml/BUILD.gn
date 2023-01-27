@@ -17,6 +17,7 @@ rustc_library("cml") {
     "//src/lib/fidl/rust/fidl",
     "//src/sys/lib/cm_json",
     "//src/sys/lib/cm_types",
+    "//third_party/rust_crates:indexmap",
     "//third_party/rust_crates:json5format",
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:maplit",

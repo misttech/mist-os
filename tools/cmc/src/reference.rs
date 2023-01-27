@@ -107,23 +107,29 @@ fn get_package_targets(package_manifest: &str) -> Vec<String> {
 }
 
 fn get_program_binary(component_manifest: &ComponentManifest) -> Option<String> {
-    let program = match component_manifest {
+    match component_manifest {
         ComponentManifest::Cml(document) => match &document.program {
-            Some(program) => &program.info,
-            None => {
-                return None;
-            }
+            Some(program) => match program.info.get("binary") {
+                Some(binary) => match binary.as_str() {
+                    Some(value) => Some(value.to_owned()),
+                    None => None,
+                },
+                None => None,
+            },
+            None => None,
         },
         ComponentManifest::Cmx(body) => match body.get("program") {
             Some(program) => match program.as_object() {
-                Some(program) => program,
-                None => {
-                    return None;
-                }
+                Some(program) => match program.get("binary") {
+                    Some(binary) => match binary.as_str() {
+                        Some(value) => Some(value.to_owned()),
+                        None => None,
+                    },
+                    None => None,
+                },
+                None => None,
             },
-            None => {
-                return None;
-            }
+            None => None,
         },
         ComponentManifest::Cm(decl) => {
             let entries = match &decl.program {
@@ -147,16 +153,9 @@ fn get_program_binary(component_manifest: &ComponentManifest) -> Option<String> 
                     }
                 }
             }
-            return None;
-        }
-    };
 
-    match program.get("binary") {
-        Some(binary) => match binary.as_str() {
-            Some(value) => Some(value.to_owned()),
-            None => None,
-        },
-        None => None,
+            None
+        }
     }
 }
 
