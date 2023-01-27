@@ -9,6 +9,7 @@ pub mod development_support_config;
 pub mod diagnostics_config;
 pub mod identity_config;
 pub mod input_config;
+pub mod starnix_config;
 
 /// Platform configuration options.  These are the options that pertain to the
 /// platform itself, not anything provided by the product.
@@ -61,6 +62,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the connectivity area.
     #[serde(default)]
     pub connectivity: connectivity_config::PlatformConnectivityConfig,
+
+    /// Platform configuration options for the starnix area.
+    #[serde(default)]
+    pub starnix: starnix_config::PlatformStarnixConfig,
 }
 
 /// The platform's base service level.

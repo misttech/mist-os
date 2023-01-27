@@ -36,6 +36,8 @@ platform_aib_names = [
   "wlan_contemporary_privacy_only_support",
   "wlan_fullmac_support",
   "wlan_softmac_support",
+
+  "starnix_support",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)

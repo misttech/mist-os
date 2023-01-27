@@ -9,6 +9,7 @@ PLATFORM_AIB_NAMES = [
     "common_bringup",
     "common_minimal",
     "common_minimal_userdebug",
+    "starnix_support",
     "emulator_support",
     "omaha_client",
     "kernel_args_user",

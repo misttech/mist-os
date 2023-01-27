@@ -26,6 +26,7 @@ mod example;
 mod identity;
 mod input;
 mod session;
+mod starnix;
 mod swd;
 
 /// ffx config flag for enabling configuring the assembly+structured config example.
@@ -149,6 +150,13 @@ pub fn define_configuration(
         &mut builder,
     )
     .context("Configuring the 'diagnostics' subsystem")?;
+
+    starnix::StarnixSubsystem::define_configuration(
+        &context,
+        &config.platform.starnix,
+        &mut builder,
+    )
+    .context("Configuring the starnix subsystem")?;
 
     Ok(builder.build())
 }

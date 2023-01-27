@@ -333,6 +333,21 @@ assembly_input_bundle("common_minimal_userdebug") {
   ]
 }
 
+# Core starnix support.
+assembly_input_bundle("starnix_support") {
+  base_packages = [ "//src/proc/bin/starnix_manager:starnix_package" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        core = [ rebase_path(
+                "//src/proc/bin/starnix_manager/meta/starnix_manager.core_shard.cml",
+                root_build_dir) ]
+      }
+    },
+  ]
+}
+
 # This is the "emulator support" bundle, which provides the kernel that can be
 # booted by an emulator, and which knows how to then boot the Fuchsia kernel
 # itself (Zircon).

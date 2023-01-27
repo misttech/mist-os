@@ -23,6 +23,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/identity.rs",
     "src/subsystems/input.rs",
     "src/subsystems/session.rs",
+    "src/subsystems/starnix.rs",
     "src/subsystems/swd.rs",
   ]
   deps = [
