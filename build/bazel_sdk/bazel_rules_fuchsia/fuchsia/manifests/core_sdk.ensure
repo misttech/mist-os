@@ -1,0 +1,5 @@
+$ResolvedVersions core_sdk.resolved
+$VerifiedPlatform linux-amd64 mac-amd64
+fuchsia/sdk/core/${os=linux}-${arch} version:11.20230126.1.1
+fuchsia/sdk/core/${os=mac}-amd64 version:11.20230126.1.1
+

@@ -1,0 +1,16 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("//fuchsia/private:debug_info.bzl", "print_debug_info")
+
+# A target that will dump debug information about the Fuchsia
+# Bazel SDK and tools that it is using.
+#
+# Note: this command relies on the existence of a fuchsia_clang repository being
+# registered in your WORKSPACE file.
+#
+# bazel run @rules_fuchsia//:debug_info
+print_debug_info(
+    name = "debug_info",
+)

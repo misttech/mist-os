@@ -1,0 +1,56 @@
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Constraints and platforms for Fuchsia.
+
+load("@bazel_skylib//lib:selects.bzl", "selects")
+
+# The version of the Fuchsia toolchain. Specific to particular local builds of
+# Fuchsia or particular versions of the IDK.
+constraint_setting(
+    name = "version",
+    visibility = ["//visibility:public"],
+)
+
+# CPU based configurations
+
+selects.config_setting_group(
+    name = "cpu_arm64",
+    match_any = [
+        ":cpu_arm64_flag",
+        ":cpu_arm64_platform",
+    ],
+)
+
+selects.config_setting_group(
+    name = "cpu_x64",
+    match_any = [
+        ":cpu_x64_flag",
+        ":cpu_x64_platform",
+    ],
+)
+
+config_setting(
+    name = "cpu_arm64_flag",
+    values = {"cpu": "aarch64"},
+)
+
+config_setting(
+    name = "cpu_x64_flag",
+    values = {"cpu": "x64"},
+)
+
+config_setting(
+    name = "cpu_arm64_platform",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+    ],
+)
+
+config_setting(
+    name = "cpu_x64_platform",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+    ],
+)

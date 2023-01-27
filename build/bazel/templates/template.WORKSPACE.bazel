@@ -115,15 +115,10 @@ go_wrap_sdk(
 go_rules_dependencies()
 go_register_toolchains()
 
-# Create @rules_fuchsia and @rules_fuchsia_experimental
+# Create @rules_fuchsia
 local_repository(
     name = "rules_fuchsia",
-    path = "third_party/sdk-integration/bazel_rules_fuchsia",
-)
-
-local_repository(
-    name = "rules_fuchsia_experimental",
-    path = "third_party/sdk-integration/bazel_rules_fuchsia_experimental",
+    path = "build/bazel_sdk/bazel_rules_fuchsia",
 )
 
 # buildifier: disable=load-on-top

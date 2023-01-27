@@ -1,0 +1,16 @@
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+exports_files(
+    glob([
+        "*.bzl",
+    ]),
+    visibility = ["//:__subpackages__"],
+)
+
+filegroup(
+    name = "all_starlark_files",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//:__subpackages__"],
+)

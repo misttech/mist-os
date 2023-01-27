@@ -1,0 +1,132 @@
+# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Tools supporting Fuchsia Bazel rules.
+
+load("@rules_python//python:defs.bzl", "py_binary")
+
+package(default_visibility = ["//visibility:public"])
+
+py_binary(
+    name = "unbuffer",
+    srcs = ["unbuffer.py"],
+    python_version = "PY3",
+)
+
+sh_binary(
+    name = "elf_strip",
+    srcs = ["elf_strip.sh"],
+)
+
+sh_binary(
+    name = "generate_symbols_dir",
+    srcs = ["generate_symbols_dir.sh"],
+)
+
+py_binary(
+    name = "publish_packages",
+    srcs = ["publish_packages.py"],
+    python_version = "PY3",
+)
+
+py_binary(
+    name = "rebase_product_config",
+    srcs = ["rebase_product_config.py"],
+    python_version = "PY3",
+)
+
+py_binary(
+    name = "add_parameters",
+    srcs = ["add_parameters.py"],
+    python_version = "PY3",
+)
+
+py_binary(
+    name = "rebase_package_manifest",
+    srcs = ["rebase_package_manifest.py"],
+    python_version = "PY3",
+)
+
+py_binary(
+    name = "add_base_pkgs",
+    srcs = ["add_base_pkgs.py"],
+    python_version = "PY3",
+)
+
+py_library(
+    name = "fuchsia_task_lib",
+    srcs = ["fuchsia_task_lib.py"],
+)
+
+py_binary(
+    name = "run_workflow",
+    srcs = ["run_workflow.py"],
+    python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
+)
+
+py_binary(
+    name = "fuchsia_shell_task",
+    srcs = ["fuchsia_shell_task.py"],
+    python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
+)
+
+py_binary(
+    name = "register_debug_symbols",
+    srcs = ["register_debug_symbols.py"],
+    python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
+)
+
+py_binary(
+    name = "register_driver",
+    srcs = ["register_driver.py"],
+    python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
+)
+
+py_binary(
+    name = "run_test_component",
+    srcs = ["run_test_component.py"],
+    python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
+)
+
+py_binary(
+    name = "run_component",
+    srcs = ["run_component.py"],
+    python_version = "PY3",
+)
+
+py_binary(
+    name = "clean_repo",
+    srcs = ["clean_repo.py"],
+    python_version = "PY3",
+    deps = [
+        ":fuchsia_task_lib",
+    ],
+)
+
+py_binary(
+    name = "development_status",
+    srcs = ["development_status.py"],
+    python_version = "PY3",
+    deps = [
+        ":fuchsia_task_lib",
+    ],
+)
+
+py_binary(
+    name = "detect_target",
+    srcs = ["detect_target.py"],
+    python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
+)
+
+py_binary(
+    name = "json_comparator",
+    srcs = ["json_comparator.py"],
+    python_version = "PY3",
+)

@@ -1,0 +1,43 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(":providers.bzl", "FuchsiaFsEmptyDataInfo")
+
+def _fuchsia_filesystem_empty_data_impl(ctx):
+    return [
+        FuchsiaFsEmptyDataInfo(
+            empty_data_name = ctx.attr.empty_data_name,
+        ),
+    ]
+
+fuchsia_filesystem_empty_data = rule(
+    doc = """Generates an empty data filesystem.""",
+    implementation = _fuchsia_filesystem_empty_data_impl,
+    provides = [FuchsiaFsEmptyDataInfo],
+    attrs = {
+        "empty_data_name": attr.string(
+            doc = "Name of filesystem",
+            default = "empty_data",
+        ),
+    },
+)
+
+def _fuchsia_filesystem_empty_minfs_impl(ctx):
+    return [
+        FuchsiaFsEmptyDataInfo(
+            empty_data_name = ctx.attr.empty_minfs_name,
+        ),
+    ]
+
+fuchsia_filesystem_empty_minfs = rule(
+    doc = """Generates an empty Minfs filesystem.""",
+    implementation = _fuchsia_filesystem_empty_minfs_impl,
+    provides = [FuchsiaFsEmptyDataInfo],
+    attrs = {
+        "empty_minfs_name": attr.string(
+            doc = "Name of filesystem",
+            default = "empty_data",
+        ),
+    },
+)
