@@ -87,12 +87,6 @@ void Mdns::Start(fuchsia::net::interfaces::WatcherPtr interfaces_watcher,
         if (state_ == State::kWaitingForInterfaces && transceiver_.HasInterfaces()) {
           OnInterfacesStarted(original_local_host_name_, perform_address_probe);
         }
-
-        if (state_ == State::kActive) {
-          for (const auto& agent : agents_) {
-            agent->OnLocalHostAddressesChanged();
-          }
-        }
       },
       [this](std::unique_ptr<DnsMessage> message, const ReplyAddress& reply_address) {
 #ifdef MDNS_TRACE

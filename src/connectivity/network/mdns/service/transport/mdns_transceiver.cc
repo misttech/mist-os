@@ -87,11 +87,8 @@ void MdnsTransceiver::LogTraffic() {
 std::vector<HostAddress> MdnsTransceiver::LocalHostAddresses() {
   std::vector<HostAddress> result;
 
-  for (auto& pair : interface_transceivers_by_address_) {
-    result.emplace_back(pair.first, pair.second->id(),
-                        zx::sec(mdns::DnsResource::kShortTimeToLive));
-  }
-
+  result.emplace_back(inet::IpAddress::kV6Loopback, 1, zx::sec(mdns::DnsResource::kShortTimeToLive));
+  result.emplace_back(inet::IpAddress::kV4Loopback, 1, zx::sec(mdns::DnsResource::kShortTimeToLive));
   return result;
 }
 
