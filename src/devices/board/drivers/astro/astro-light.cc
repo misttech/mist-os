@@ -35,7 +35,7 @@ zx_status_t Astro::LightInit() {
   // TODO(kpt): Insert the right parameters here.
   params.integration_time_us = 711'680;
   params.gain = 16;
-  params.polling_time_us = 100'000;
+  params.polling_time_us = 700'000;
   device_metadata_t metadata[] = {
       {
           .type = DEVICE_METADATA_PRIVATE,
