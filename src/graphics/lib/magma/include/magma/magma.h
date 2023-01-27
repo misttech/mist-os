@@ -38,6 +38,7 @@
 #include "magma/magma_common_defs.h"
 #include <stdint.h>
 
+// LINT.IfChange
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -595,4 +596,5 @@ MAGMA_EXPORT magma_status_t magma_virt_connection_get_image_info(
 }
 #endif
 
+// LINT.ThenChange(magma_common_defs.h:version)
 #endif // SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MAGMA_MAGMA_H_

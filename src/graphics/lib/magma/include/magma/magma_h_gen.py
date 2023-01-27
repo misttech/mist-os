@@ -117,6 +117,14 @@ def genformatoff():
     return '// clang-format off\n'
 
 
+def ifchange():
+    return '// LINT.IfChange'
+
+
+def thenchange():
+    return '// LINT.ThenChange(magma_common_defs.h:version)'
+
+
 def main():
     if (len(sys.argv) != 3):
         usage()
@@ -132,10 +140,12 @@ def main():
                     genformatoff(),
                     guards(True),
                     includes(),
+                    ifchange(),
                     externs(True),
                 ]
                 lines.extend(format_export(e) for e in magma['exports'])
                 lines.append(externs(False))
+                lines.append(thenchange())
                 lines.append(guards(False))
                 lines.append('')
                 dest.write('\n'.join(lines))

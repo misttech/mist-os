@@ -14,6 +14,12 @@ extern "C" {
 // This header is C, so clang-tidy shouldn't recommend using C++ features.
 // NOLINTBEGIN(modernize-use-using)
 
+// LINT.IfChange(version)
+// This version should be incremented whenever the Magma API changes.
+#define MAGMA_API_VERSION 1
+// LINT.ThenChange()
+
+// LINT.IfChange
 #if defined(__Fuchsia__)
 // The entrypoints should be exported from libmagma_client.a. ICDs should use a
 // version script to re-exporting magma entrypoints.
@@ -316,6 +322,7 @@ typedef struct magma_image_info {
   uint32_t unused;
 } magma_image_info_t;
 
+// LINT.ThenChange(version)
 // NOLINTEND(modernize-use-using)
 
 #if defined(__cplusplus)
