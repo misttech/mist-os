@@ -143,11 +143,11 @@ struct WlantapMacImpl : WlantapMac,
 
   void SetChannel(SetChannelRequestView request, fdf::Arena& arena,
                   SetChannelCompleter::Sync& completer) override {
-    if (!wlan::common::IsValidChan(request->chan)) {
+    if (!wlan::common::IsValidChan(request->channel())) {
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
-    listener_->WlantapMacSetChannel(request->chan);
+    listener_->WlantapMacSetChannel(request->channel());
     completer.buffer(arena).ReplySuccess();
   }
 

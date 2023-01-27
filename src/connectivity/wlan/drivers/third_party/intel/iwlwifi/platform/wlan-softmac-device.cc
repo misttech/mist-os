@@ -216,7 +216,7 @@ void WlanSoftmacDevice::SetChannel(SetChannelRequestView request, fdf::Arena& ar
 
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
 
-  if (!IsValidChannel(&request->chan)) {
+  if (!IsValidChannel(&request->channel())) {
     IWL_WARN(this, "%s() Invalid channel.\n", __func__);
     completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
@@ -225,9 +225,9 @@ void WlanSoftmacDevice::SetChannel(SetChannelRequestView request, fdf::Arena& ar
   // If the AP sta already exists, it probably was left from the previous association attempt.
   // Remove it first.
   wlan_channel_t channel = {
-      .primary = request->chan.primary,
-      .cbw = (channel_bandwidth_t)request->chan.cbw,
-      .secondary80 = request->chan.secondary80,
+      .primary = request->channel().primary,
+      .cbw = (channel_bandwidth_t)request->channel().cbw,
+      .secondary80 = request->channel().secondary80,
   };
 
   status = mac_set_channel(mvmvif_, &channel);

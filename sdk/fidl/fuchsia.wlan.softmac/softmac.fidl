@@ -303,41 +303,66 @@ protocol WlanSoftmac {
     // tables, this can beconsidered.
 
     /// Obtain information about the device and supported features
-    /// Safe to call at any time.
+    /// Safe to call when the softmac is not started.
     Query() -> (struct {
         resp WlanSoftmacInfo;
     }) error zx.status;
+
+    /// Query the underlying device for feature support related to station
+    /// discovery (e.g. scans and probes). Safe to call when the softmac is not
+    /// started.
     QueryDiscoverySupport() -> (struct {
         resp fuchsia.wlan.common.DiscoverySupport;
     }) error zx.status;
+
+    /// Query the underlying device for information related to how it implements
+    /// MAC-level functionality. Safe to call when the softmac is not started.
     QueryMacSublayerSupport() -> (struct {
         resp fuchsia.wlan.common.MacSublayerSupport;
     }) error zx.status;
+
+    /// Query the underlying device for features related to specific
+    /// security modes. Safe to call when the softmac is not started.
     QuerySecuritySupport() -> (struct {
         resp fuchsia.wlan.common.SecuritySupport;
     }) error zx.status;
+
+    /// Query the underlying device for features related to spectrum usage, e.g.
+    /// DFS. Safe to call when the softmac is not started.
     QuerySpectrumManagementSupport() -> (struct {
         resp fuchsia.wlan.common.SpectrumManagementSupport;
     }) error zx.status;
 
-    /// Start softmac running with ifc_virt
-    /// Callbacks on WlanSoftmacIfc protocol may be invoked from now until stop() is called.
+    /// Start a softmac on the underlying device, using the given ifc to pass
+    /// events upwards. Callbacks on ifc may be invoked from now until Stop()
+    /// is called.
+    ///
+    /// The returned sme_channel is the server endpoint of a wlan_mlme.fidl:MLME
+    /// protocol, the client end of which is held by SME. This channel is used for
+    /// SME <-> MLME communication.
+    ///
+    /// Except where noted, WlanSoftmac APIs may only be called while the softmac
+    /// is running after a successful call to Start().
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_ALREADY_BOUND: `Start` was already called on this softmac.
     Start(resource struct {
         ifc client_end:WlanSoftmacIfc;
     }) -> (resource struct {
         sme_channel zx.handle:CHANNEL;
     }) error zx.status;
 
-    /// Shut down a running softmac
-    /// Safe to call if the softmac is already stopped.
+    /// Shut down the softmac if it is running.
+    /// Safe to call when the softmac is not running.
     Stop() -> ();
 
-    /// Queue a packet for transmission. May return before a packet has actually been transmitted.
-    /// The driver may choose to take ownership of the given WlanTxPacket by setting enqueue_pending
-    /// to true, in which case the packet must be returned later via CompleteTx.
+    /// Queue a packet for transmission. May return before a packet has actually
+    /// been transmitted. This call does not take ownership of the buffer passed in
+    /// the WlanTxPacket.
     ///
-    /// Note: CompleteTx may be used to return the WlanTxPacket before transmission completes, but
-    /// MUST NOT be called from within the QueueTx implementation.
+    /// Errors result from a failure to queue the packet for transmission.
+    /// An OK result thus only indicates that the packet was queued, *not* that
+    /// it was successfully transmitted.
     QueueTx(struct {
         packet WlanTxPacket;
     }) -> (struct {
@@ -347,9 +372,15 @@ protocol WlanSoftmac {
         enqueue_pending bool;
     }) error zx.status;
 
-    // Set the radio channel
-    SetChannel(struct {
-        chan fuchsia.wlan.common.WlanChannel;
+    /// Set the primary radio channel, e.g. in response to a channel switch event.
+    /// If successful, this will trigger the channel switch immediately. This may
+    /// impact the transmission of any frames that are in-flight, and might also
+    /// interfere with an ongoing scan request.
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_NOT_SUPPORTED: The device cannot switch to the requested channel.
+    SetChannel(table {
+        1: channel fuchsia.wlan.common.WlanChannel;
     }) -> () error zx.status;
 
     // Configures a BSS which the STA is either joining or managing.
@@ -448,16 +479,20 @@ protocol WlanSoftmac {
     }) error zx.status;
 
     /// If supported, cancel the ongoing scan corresponding to `scan_id` in the
-    /// device driver, where `scan_id` is an identifier returned by `StartPassiveScan()`
-    /// or `StartActiveScan()`. The return value of this function indicates whether
-    /// a valid scan_id was passed and will be cancelled. The actual result of
-    /// cancellation should be indicated by the driver using
-    /// `fuchsia.wlan.softmac/WlanSoftmacIfc.ScanComplete()`.
+    /// device driver, where `scan_id` is an identifier returned by
+    /// `StartPassiveScan()` or `StartActiveScan()`. The return value of this
+    /// function indicates whether a valid scan_id was passed and will be
+    /// canceled. The actual result of cancellation should be indicated by the
+    /// driver using `fuchsia.hardware.wlan.softmac/WlanSoftmacIfc.ScanComplete()`.
     ///
     /// A device driver indicates support for `CancelScan()` using
     /// `fuchsia.wlan.common/ScanOffloadExtension.scan_cancel_supported`.
-    CancelScan(struct {
-        scan_id uint64;
+    ///
+    /// Common errors include: \
+    ///   ZX_ERR_NOT_FOUND: The given scan_id does not match an ongoing scan. \
+    ///   ZX_ERR_NOT_SUPPORTED: The device does not support scan cancellation.
+    CancelScan(table {
+        1: scan_id uint64;
     }) -> () error zx.status;
 
     /// Notifies change of WMM parameters for specified AC

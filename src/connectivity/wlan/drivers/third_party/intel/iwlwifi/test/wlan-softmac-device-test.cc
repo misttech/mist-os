@@ -544,7 +544,10 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
   }
 
   zx_status_t SetChannel(const fuchsia_wlan_common::wire::WlanChannel* channel) {
-    auto result = client_.buffer(test_arena_)->SetChannel(*channel);
+    fidl::Arena fidl_arena;
+    auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacSetChannelRequest::Builder(fidl_arena);
+    builder.channel(*channel);
+    auto result = client_.buffer(test_arena_)->SetChannel(builder.Build());
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       return result->error_value();

@@ -698,7 +698,10 @@ zx_status_t Device::SetChannel(wlan_channel_t channel) __TA_NO_THREAD_SAFETY_ANA
   snprintf(buf, sizeof(buf), "SetChannel: from %s to %s", common::ChanStr(current_channel).c_str(),
            common::ChanStr(new_channel).c_str());
 
-  auto result = client_.sync().buffer(*std::move(arena))->SetChannel(new_channel);
+  fidl::Arena fidl_arena;
+  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacSetChannelRequest::Builder(fidl_arena);
+  builder.channel(new_channel);
+  auto result = client_.sync().buffer(*std::move(arena))->SetChannel(builder.Build());
   if (!result.ok()) {
     errorf("%s failed (FIDL error %s)", buf, result.status_string());
     return result.status();
@@ -910,7 +913,11 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
     errorf("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
-  auto result = client_.sync().buffer(*std::move(arena))->CancelScan(scan_id);
+
+  fidl::Arena fidl_arena;
+  auto builder = fuchsia_wlan_softmac::wire::WlanSoftmacCancelScanRequest::Builder(fidl_arena);
+  builder.scan_id(scan_id);
+  auto result = client_.sync().buffer(*std::move(arena))->CancelScan(builder.Build());
   if (!result.ok()) {
     errorf("CancelScan Failed (FIDL error %s)", result.status_string());
   }
