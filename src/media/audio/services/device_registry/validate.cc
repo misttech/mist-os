@@ -317,7 +317,6 @@ zx_status_t ValidateSupportedFormats(
             << bytes;
         return ZX_ERR_INVALID_ARGS;
       }
-      // TODO(fxbug.dev/113423): Is it appropriate for AudioDeviceRegistry to enforce this?
       if (CountFormatMatches(sample_formats, fuchsia_hardware_audio::SampleFormat::kPcmUnsigned) &&
           bytes != 1) {
         FX_LOGS(WARNING)

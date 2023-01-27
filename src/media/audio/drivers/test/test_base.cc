@@ -10,6 +10,7 @@
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fdio/fdio.h>
+#include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
@@ -155,6 +156,7 @@ void TestBase::RequestFormats() {
                     EXPECT_FALSE(supported_formats.empty());
 
                     for (size_t i = 0; i < supported_formats.size(); ++i) {
+                      SCOPED_TRACE(testing::Message() << "supported_formats[" << i << "]");
                       ASSERT_TRUE(supported_formats[i].has_pcm_supported_formats());
                       auto& format_set = *supported_formats[i].mutable_pcm_supported_formats();
                       pcm_formats_.push_back(std::move(format_set));
@@ -213,10 +215,18 @@ void TestBase::ValidateGetFormats() {
       EXPECT_LE(channel_set.attributes().size(),
                 fuchsia::hardware::audio::MAX_COUNT_CHANNELS_IN_RING_BUFFER);
 
+      // Ensure each `ChannelSet` contains a unique number of channels.
+      for (size_t k = j + 1; k < format_set.channel_sets().size(); ++k) {
+        size_t other_channel_set_size = format_set.channel_sets()[k].attributes().size();
+        EXPECT_NE(channel_set.attributes().size(), other_channel_set_size)
+            << "same channel count as channel_set[" << k << "]: " << other_channel_set_size;
+      }
+
       for (size_t k = 0; k < channel_set.attributes().size(); ++k) {
         SCOPED_TRACE(testing::Message() << "attributes[" << k << "]");
         auto& attribs = channel_set.attributes()[k];
 
+        // Ensure channel_set.attributes are within the required range.
         if (attribs.has_min_frequency()) {
           EXPECT_LT(attribs.min_frequency(), fuchsia::media::MAX_PCM_FRAMES_PER_SECOND);
         }
@@ -230,9 +240,50 @@ void TestBase::ValidateGetFormats() {
       }
     }
 
+    // Ensure sample_formats are unique.
+    for (size_t j = 0; j < format_set.sample_formats().size(); ++j) {
+      for (size_t k = j + 1; k < format_set.sample_formats().size(); ++k) {
+        EXPECT_NE(static_cast<uint16_t>(fidl::ToUnderlying(format_set.sample_formats()[j])),
+                  static_cast<uint16_t>(fidl::ToUnderlying(format_set.sample_formats()[k])))
+            << "sample_formats[" << j << "] ("
+            << static_cast<uint16_t>(fidl::ToUnderlying(format_set.sample_formats()[j]))
+            << ") must not equal sample_formats[" << k << "] ("
+            << static_cast<uint16_t>(fidl::ToUnderlying(format_set.sample_formats()[k])) << ")";
+      }
+    }
+
+    // Ensure bytes_per_sample are unique and listed in ascending order.
+    for (size_t j = 0; j < format_set.bytes_per_sample().size() - 1; ++j) {
+      EXPECT_LT(static_cast<uint16_t>(format_set.bytes_per_sample()[j]),
+                static_cast<uint16_t>(format_set.bytes_per_sample()[j + 1]))
+          << "bytes_per_sample[" << j << "] ("
+          << static_cast<uint16_t>(format_set.bytes_per_sample()[j])
+          << ") must be less than bytes_per_sample[" << j + 1 << "] ("
+          << static_cast<uint16_t>(format_set.bytes_per_sample()[j + 1]) << ")";
+    }
+
+    // Ensure valid_bits_per_sample are unique and listed in ascending order.
+    for (size_t j = 0; j < format_set.valid_bits_per_sample().size() - 1; ++j) {
+      EXPECT_LT(static_cast<uint16_t>(format_set.valid_bits_per_sample()[j]),
+                static_cast<uint16_t>(format_set.valid_bits_per_sample()[j + 1]))
+          << "valid_bits_per_sample[" << j << "] ("
+          << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j])
+          << ") must be less than valid_bits_per_sample[" << j + 1 << "] ("
+          << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j + 1]) << ")";
+    }
+
     for (size_t j = 0; j < format_set.frame_rates().size(); ++j) {
       SCOPED_TRACE(testing::Message() << "frame_rates[" << j << "]");
 
+      // Ensure frame_rates are unique and listed in ascending order.
+      if (j < format_set.frame_rates().size() - 1) {
+        EXPECT_LT(format_set.frame_rates()[j], format_set.frame_rates()[j + 1])
+            << "frame_rates[" << j << "] (" << format_set.frame_rates()[j]
+            << ") must be less than frame_rates[" << j + 1 << "] ("
+            << format_set.frame_rates()[j + 1] << ")";
+      }
+
+      // Ensure frames_rates are within the required range.
       EXPECT_GE(format_set.frame_rates()[j], fuchsia::media::MIN_PCM_FRAMES_PER_SECOND);
       EXPECT_LE(format_set.frame_rates()[j], fuchsia::media::MAX_PCM_FRAMES_PER_SECOND);
     }
