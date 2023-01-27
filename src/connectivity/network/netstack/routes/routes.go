@@ -23,6 +23,14 @@ import (
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
+type IpProtoTag uint32
+
+const (
+	_ IpProtoTag = iota
+	IPv4
+	IPv6
+)
+
 type Action uint32
 
 const (

@@ -10,9 +10,11 @@ import (
 	"net"
 	"testing"
 
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	fidlnet "fidl/fuchsia/net"
+	fnetRoutes "fidl/fuchsia/net/routes"
 	"fidl/fuchsia/net/stack"
 
 	"github.com/google/go-cmp/cmp"
@@ -325,4 +327,330 @@ func TestBytesToAddressDroppingUnspecified(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestToInstalledRoute(t *testing.T) {
+	makeSubnet := func(address tcpip.Address, mask tcpip.AddressMask) tcpip.Subnet {
+		subnet, err := tcpip.NewSubnet(address, mask)
+		if err != nil {
+			t.Errorf("failed to create subnet from address %+v with mask %+v", address, mask)
+		}
+		return subnet
+	}
+
+	const (
+		interfaceId  = 1
+		metric       = 100
+		subnetV4Hex  = "\xC0\xA8\x00\x00"
+		maskV4Hex    = "\xFF\xFF\xFF\x00"
+		prefixLenV4  = 24
+		gatewayV4Hex = "\xC0\xA8\x00\x01"
+		subnetV6Hex  = "\xFE\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+		maskV6Hex    = "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\x00\x00\x00\x00"
+		prefixLenV6  = 64
+		gatewayV6Hex = "\xFE\x80\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+	)
+	// Note Golang slices can't be const.
+	subnetV4Bytes := [4]uint8{192, 168, 0, 0}
+	gatewayV4Bytes := [4]uint8{192, 168, 0, 1}
+	subnetV6Bytes := [16]uint8{254, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	gatewayV6Bytes := [16]uint8{254, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+
+	tests := []struct {
+		name           string
+		extendedRoute  routes.ExtendedRoute
+		installedRoute InstalledRoute
+	}{
+		{
+			name: "IPv4",
+			extendedRoute: routes.ExtendedRoute{
+				Route: tcpip.Route{
+					Destination: makeSubnet(
+						tcpip.Address(subnetV4Hex),
+						tcpip.AddressMask(maskV4Hex)),
+					Gateway: tcpip.Address(gatewayV4Hex),
+					NIC:     interfaceId,
+				},
+				Metric:                metric,
+				MetricTracksInterface: false,
+			},
+			installedRoute: InstalledRoute{
+				Version: routes.IPv4,
+				V4: fnetRoutes.InstalledRouteV4{
+					RoutePresent: true,
+					Route: fnetRoutes.RouteV4{
+						Destination: fidlnet.Ipv4AddressWithPrefix{
+							Addr: fidlnet.Ipv4Address{
+								Addr: subnetV4Bytes,
+							},
+							PrefixLen: prefixLenV4,
+						},
+						Action: fnetRoutes.RouteActionV4WithForward(fnetRoutes.RouteTargetV4{
+							OutboundInterface: interfaceId,
+							NextHop: &fidlnet.Ipv4Address{
+								Addr: gatewayV4Bytes,
+							},
+						}),
+						Properties: fnetRoutes.RoutePropertiesV4{
+							SpecifiedPropertiesPresent: true,
+							SpecifiedProperties: fnetRoutes.SpecifiedRouteProperties{
+								MetricPresent: true,
+								Metric:        fnetRoutes.SpecifiedMetricWithExplicitMetric(metric),
+							},
+						},
+					},
+					EffectivePropertiesPresent: true,
+					EffectiveProperties: fnetRoutes.EffectiveRouteProperties{
+						MetricPresent: true,
+						Metric:        metric,
+					},
+				},
+			},
+		},
+		{
+			name: "IPv4 NoGateway",
+			extendedRoute: routes.ExtendedRoute{
+				Route: tcpip.Route{
+					Destination: makeSubnet(
+						tcpip.Address(subnetV4Hex),
+						tcpip.AddressMask(maskV4Hex)),
+					NIC: interfaceId,
+				},
+				Metric:                metric,
+				MetricTracksInterface: false,
+			},
+			installedRoute: InstalledRoute{
+				Version: routes.IPv4,
+				V4: fnetRoutes.InstalledRouteV4{
+					RoutePresent: true,
+					Route: fnetRoutes.RouteV4{
+						Destination: fidlnet.Ipv4AddressWithPrefix{
+							Addr: fidlnet.Ipv4Address{
+								Addr: subnetV4Bytes,
+							},
+							PrefixLen: prefixLenV4,
+						},
+						Action: fnetRoutes.RouteActionV4WithForward(fnetRoutes.RouteTargetV4{
+							OutboundInterface: interfaceId,
+							NextHop:           nil,
+						}),
+						Properties: fnetRoutes.RoutePropertiesV4{
+							SpecifiedPropertiesPresent: true,
+							SpecifiedProperties: fnetRoutes.SpecifiedRouteProperties{
+								MetricPresent: true,
+								Metric:        fnetRoutes.SpecifiedMetricWithExplicitMetric(metric),
+							},
+						},
+					},
+					EffectivePropertiesPresent: true,
+					EffectiveProperties: fnetRoutes.EffectiveRouteProperties{
+						MetricPresent: true,
+						Metric:        metric,
+					},
+				},
+			},
+		},
+		{
+			name: "IPv4 Metric Tracks Interface",
+			extendedRoute: routes.ExtendedRoute{
+				Route: tcpip.Route{
+					Destination: makeSubnet(
+						tcpip.Address(subnetV4Hex),
+						tcpip.AddressMask(maskV4Hex)),
+					Gateway: tcpip.Address(gatewayV4Hex),
+					NIC:     interfaceId,
+				},
+				Metric:                metric,
+				MetricTracksInterface: true,
+			},
+			installedRoute: InstalledRoute{
+				Version: routes.IPv4,
+				V4: fnetRoutes.InstalledRouteV4{
+					RoutePresent: true,
+					Route: fnetRoutes.RouteV4{
+						Destination: fidlnet.Ipv4AddressWithPrefix{
+							Addr: fidlnet.Ipv4Address{
+								Addr: subnetV4Bytes,
+							},
+							PrefixLen: prefixLenV4,
+						},
+						Action: fnetRoutes.RouteActionV4WithForward(fnetRoutes.RouteTargetV4{
+							OutboundInterface: interfaceId,
+							NextHop: &fidlnet.Ipv4Address{
+								Addr: gatewayV4Bytes,
+							},
+						}),
+						Properties: fnetRoutes.RoutePropertiesV4{
+							SpecifiedPropertiesPresent: true,
+							SpecifiedProperties: fnetRoutes.SpecifiedRouteProperties{
+								MetricPresent: true,
+								Metric: fnetRoutes.SpecifiedMetricWithInheritedFromInterface(
+									fnetRoutes.Empty{},
+								),
+							},
+						},
+					},
+					EffectivePropertiesPresent: true,
+					EffectiveProperties: fnetRoutes.EffectiveRouteProperties{
+						MetricPresent: true,
+						Metric:        metric,
+					},
+				},
+			},
+		},
+		{
+			name: "IPv6",
+			extendedRoute: routes.ExtendedRoute{
+				Route: tcpip.Route{
+					Destination: makeSubnet(
+						tcpip.Address(subnetV6Hex),
+						tcpip.AddressMask(maskV6Hex)),
+					Gateway: tcpip.Address(gatewayV6Hex),
+					NIC:     interfaceId,
+				},
+				Metric:                metric,
+				MetricTracksInterface: false,
+			},
+			installedRoute: InstalledRoute{
+				Version: routes.IPv6,
+				V6: fnetRoutes.InstalledRouteV6{
+					RoutePresent: true,
+					Route: fnetRoutes.RouteV6{
+						Destination: fidlnet.Ipv6AddressWithPrefix{
+							Addr: fidlnet.Ipv6Address{
+								Addr: subnetV6Bytes,
+							},
+							PrefixLen: prefixLenV6,
+						},
+						Action: fnetRoutes.RouteActionV6WithForward(fnetRoutes.RouteTargetV6{
+							OutboundInterface: interfaceId,
+							NextHop: &fidlnet.Ipv6Address{
+								Addr: gatewayV6Bytes,
+							},
+						}),
+						Properties: fnetRoutes.RoutePropertiesV6{
+							SpecifiedPropertiesPresent: true,
+							SpecifiedProperties: fnetRoutes.SpecifiedRouteProperties{
+								MetricPresent: true,
+								Metric:        fnetRoutes.SpecifiedMetricWithExplicitMetric(metric),
+							},
+						},
+					},
+					EffectivePropertiesPresent: true,
+					EffectiveProperties: fnetRoutes.EffectiveRouteProperties{
+						MetricPresent: true,
+						Metric:        metric,
+					},
+				},
+			},
+		},
+		{
+			name: "IPv6 No Gateway",
+			extendedRoute: routes.ExtendedRoute{
+				Route: tcpip.Route{
+					Destination: makeSubnet(
+						tcpip.Address(subnetV6Hex),
+						tcpip.AddressMask(maskV6Hex)),
+					NIC: interfaceId,
+				},
+				Metric:                metric,
+				MetricTracksInterface: false,
+			},
+			installedRoute: InstalledRoute{
+				Version: routes.IPv6,
+				V6: fnetRoutes.InstalledRouteV6{
+					RoutePresent: true,
+					Route: fnetRoutes.RouteV6{
+						Destination: fidlnet.Ipv6AddressWithPrefix{
+							Addr: fidlnet.Ipv6Address{
+								Addr: subnetV6Bytes,
+							},
+							PrefixLen: prefixLenV6,
+						},
+						Action: fnetRoutes.RouteActionV6WithForward(fnetRoutes.RouteTargetV6{
+							OutboundInterface: interfaceId,
+							NextHop:           nil,
+						}),
+						Properties: fnetRoutes.RoutePropertiesV6{
+							SpecifiedPropertiesPresent: true,
+							SpecifiedProperties: fnetRoutes.SpecifiedRouteProperties{
+								MetricPresent: true,
+								Metric:        fnetRoutes.SpecifiedMetricWithExplicitMetric(metric),
+							},
+						},
+					},
+					EffectivePropertiesPresent: true,
+					EffectiveProperties: fnetRoutes.EffectiveRouteProperties{
+						MetricPresent: true,
+						Metric:        metric,
+					},
+				},
+			},
+		},
+		{
+			name: "IPv6 Metric Tracks Interface",
+			extendedRoute: routes.ExtendedRoute{
+				Route: tcpip.Route{
+					Destination: makeSubnet(
+						tcpip.Address(subnetV6Hex),
+						tcpip.AddressMask(maskV6Hex)),
+					Gateway: tcpip.Address(gatewayV6Hex),
+					NIC:     interfaceId,
+				},
+				Metric:                metric,
+				MetricTracksInterface: true,
+			},
+			installedRoute: InstalledRoute{
+				Version: routes.IPv6,
+				V6: fnetRoutes.InstalledRouteV6{
+					RoutePresent: true,
+					Route: fnetRoutes.RouteV6{
+						Destination: fidlnet.Ipv6AddressWithPrefix{
+							Addr: fidlnet.Ipv6Address{
+								Addr: subnetV6Bytes,
+							},
+							PrefixLen: prefixLenV6,
+						},
+						Action: fnetRoutes.RouteActionV6WithForward(fnetRoutes.RouteTargetV6{
+							OutboundInterface: interfaceId,
+							NextHop: &fidlnet.Ipv6Address{
+								Addr: gatewayV6Bytes,
+							},
+						}),
+						Properties: fnetRoutes.RoutePropertiesV6{
+							SpecifiedPropertiesPresent: true,
+							SpecifiedProperties: fnetRoutes.SpecifiedRouteProperties{
+								MetricPresent: true,
+								Metric: fnetRoutes.SpecifiedMetricWithInheritedFromInterface(
+									fnetRoutes.Empty{},
+								),
+							},
+						},
+					},
+					EffectivePropertiesPresent: true,
+					EffectiveProperties: fnetRoutes.EffectiveRouteProperties{
+						MetricPresent: true,
+						Metric:        metric,
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := ToInstalledRoute(test.extendedRoute)
+			// `==` checks that pointers point to the same address, whereas
+			// `cmp.Equal` checks the contents of those addresses.
+			if !cmp.Equal(got, test.installedRoute) {
+				t.Errorf(
+					"got ToInstalledRoute(%+v) = %+v, want %+v",
+					test.extendedRoute,
+					got,
+					test.installedRoute,
+				)
+			}
+		})
+	}
+
 }

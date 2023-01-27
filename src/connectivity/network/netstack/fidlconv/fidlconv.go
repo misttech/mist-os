@@ -14,8 +14,10 @@ import (
 	"fidl/fuchsia/net"
 	interfacesadmin "fidl/fuchsia/net/interfaces/admin"
 	"fidl/fuchsia/net/multicast/admin"
+	fnetRoutes "fidl/fuchsia/net/routes"
 	"fidl/fuchsia/net/stack"
 
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/network/ipv4"
@@ -313,5 +315,100 @@ func ToAddressRemovalReason(reason tcpipstack.AddressRemovalReason) interfacesad
 		panic("unexpected address removal due to invalidation")
 	default:
 		panic(fmt.Errorf("unknown address removal reason: %d", reason))
+	}
+}
+
+// A union type, abstracting over `InstalledRouteV4` and `InstalledRouteV6`.
+type InstalledRoute struct {
+	Version routes.IpProtoTag
+	V4      fnetRoutes.InstalledRouteV4
+	V6      fnetRoutes.InstalledRouteV6
+}
+
+// Converts the given `ExtendedRoute` into an `InstalledRoute`.
+// Panics if the given route is neither IPv4 nor IPv6, or if the route's
+// destination & gateway are different IP versions.
+func ToInstalledRoute(route routes.ExtendedRoute) InstalledRoute {
+	var specifiedMetric fnetRoutes.SpecifiedMetric
+	if route.MetricTracksInterface {
+		specifiedMetric.SetInheritedFromInterface(fnetRoutes.Empty{})
+	} else {
+		specifiedMetric.SetExplicitMetric(uint32(route.Metric))
+	}
+	var specifiedProperties fnetRoutes.SpecifiedRouteProperties
+	specifiedProperties.SetMetric(specifiedMetric)
+	var effectiveProperties fnetRoutes.EffectiveRouteProperties
+	effectiveProperties.SetMetric(uint32(route.Metric))
+
+	dst := ToNetIpAddress(route.Route.Destination.ID())
+
+	switch dst.Which() {
+	case net.IpAddressIpv4:
+		destination := net.Ipv4AddressWithPrefix{
+			Addr:      dst.Ipv4,
+			PrefixLen: uint8(route.Route.Destination.Prefix()),
+		}
+		target := fnetRoutes.RouteTargetV4{
+			OutboundInterface: uint64(route.Route.NIC),
+		}
+		if len(route.Route.Gateway) != 0 {
+			gateway := ToNetIpAddress(route.Route.Gateway)
+			if gateway.Which() != net.IpAddressIpv4 {
+				panic(fmt.Sprintf(
+					"Route with IPv4 Destination and non-IPv4 Gateway: %s",
+					route.Route,
+				))
+			}
+			target.NextHop = &gateway.Ipv4
+		}
+
+		var properties fnetRoutes.RoutePropertiesV4
+		properties.SetSpecifiedProperties(specifiedProperties)
+		innerRoute := fnetRoutes.RouteV4{
+			Destination: destination,
+			Action:      fnetRoutes.RouteActionV4WithForward(target),
+			Properties:  properties,
+		}
+		var installedRoute fnetRoutes.InstalledRouteV4
+		installedRoute.SetRoute(innerRoute)
+		installedRoute.SetEffectiveProperties(effectiveProperties)
+		return InstalledRoute{
+			Version: routes.IPv4,
+			V4:      installedRoute,
+		}
+	case net.IpAddressIpv6:
+		destination := net.Ipv6AddressWithPrefix{
+			Addr:      dst.Ipv6,
+			PrefixLen: uint8(route.Route.Destination.Prefix()),
+		}
+		target := fnetRoutes.RouteTargetV6{
+			OutboundInterface: uint64(route.Route.NIC),
+		}
+		if len(route.Route.Gateway) != 0 {
+			gateway := ToNetIpAddress(route.Route.Gateway)
+			if gateway.Which() != net.IpAddressIpv6 {
+				panic(fmt.Sprintf(
+					"Route with IPv6 Destination and non-IPv6 Gateway: %s",
+					route.Route,
+				))
+			}
+			target.NextHop = &gateway.Ipv6
+		}
+		var properties fnetRoutes.RoutePropertiesV6
+		properties.SetSpecifiedProperties(specifiedProperties)
+		innerRoute := fnetRoutes.RouteV6{
+			Destination: destination,
+			Action:      fnetRoutes.RouteActionV6WithForward(target),
+			Properties:  properties,
+		}
+		var installedRoute fnetRoutes.InstalledRouteV6
+		installedRoute.SetRoute(innerRoute)
+		installedRoute.SetEffectiveProperties(effectiveProperties)
+		return InstalledRoute{
+			Version: routes.IPv6,
+			V6:      installedRoute,
+		}
+	default:
+		panic(fmt.Sprintf("invalid IP protocol for address: I_ipAddressTag=%d", dst.I_ipAddressTag))
 	}
 }
