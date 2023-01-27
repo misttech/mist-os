@@ -9,6 +9,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -34,6 +35,31 @@ func init() {
 	flag.StringVar(&successString, "success-str", "", "string that - if read - indicates success")
 }
 
+// TODO(fxbug.dev/116559): Revisit as this is a workaround for a possibly lower-level bug.
+type socketReader struct {
+	ctx     context.Context
+	r       net.Conn
+	timeout time.Duration
+}
+
+func (s *socketReader) Read(p []byte) (int, error) {
+	for {
+		if err := s.r.SetReadDeadline(time.Now().Add(s.timeout)); err != nil {
+			return 0, err
+		}
+		n, err := s.r.Read(p)
+		var netErr net.Error
+		if errors.As(err, &netErr) {
+			// If the error was due to an IO timeout, try reading again.
+			if netErr.Timeout() {
+				logger.Debugf(s.ctx, "%s", netErr)
+				continue
+			}
+		}
+		return n, err
+	}
+}
+
 func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
 	if socketPath == "" {
 		flag.Usage()
@@ -52,7 +78,7 @@ func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
 	}
 	defer socket.Close()
 
-	socketTee := io.TeeReader(socket, stdout)
+	socketTee := io.TeeReader(&socketReader{ctx, socket, 10 * time.Second}, stdout)
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
