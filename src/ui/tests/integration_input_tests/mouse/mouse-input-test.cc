@@ -705,15 +705,28 @@ class ChromiumInputTest : public MouseInputBase {
                          /* movement_x = */ 0, /* movement_y = */ 0);
       SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 0, /* movement_y = */ 0);
 
-      RunLoopWithTimeoutOrUntil(
-          [this] {
-            return mouse_state_->SizeOfEvents() > 0 &&
-                   mouse_state_->LastEvent().phase() ==
-                       fuchsia::ui::test::input::MouseEventPhase::UP;
-          },
-          kFirstEventRetryInterval);
-      if (mouse_state_->SizeOfEvents() > 0 &&
-          mouse_state_->LastEvent().phase() == fuchsia::ui::test::input::MouseEventPhase::UP) {
+      auto wait_until_last_event_phase_or_timeout =
+          [this](fuchsia::ui::test::input::MouseEventPhase event_phase) {
+            return RunLoopWithTimeoutOrUntil(
+                [this, event_phase] {
+                  return mouse_state_->SizeOfEvents() > 0 &&
+                         mouse_state_->LastEvent().phase() == event_phase;
+                },
+                kFirstEventRetryInterval);
+          };
+
+      bool got_mouse_up =
+          wait_until_last_event_phase_or_timeout(fuchsia::ui::test::input::MouseEventPhase::UP);
+
+      if (got_mouse_up) {
+        // There is an issue we found in retry that the mouse up we got may
+        // come from previous retry loop, then EnsureMouseIsReadyAndGetPosition
+        // exit and the down-up event caught by test body, and break the test
+        // expectation. Here we inject 1 more wheel event, because wheel event
+        // only injected once, wheel we receive the wheel event, we know all
+        // events from EnsureMouseIsReadyAndGetPosition are processed.
+        SimulateMouseScroll(/* pressed_buttons = */ {}, /* scroll_x = */ 0, /* scroll_y = */ 1);
+        wait_until_last_event_phase_or_timeout(fuchsia::ui::test::input::MouseEventPhase::WHEEL);
         Position p;
         p.x = mouse_state_->LastEvent().local_x();
         p.y = mouse_state_->LastEvent().local_y();
