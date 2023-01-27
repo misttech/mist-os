@@ -102,7 +102,7 @@ async fn assert_open_root_directory(
 ) {
     let package_root = &source.dir;
 
-    let success_flags = vec![
+    let success_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
         fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -116,10 +116,10 @@ async fn assert_open_root_directory(
     let child_paths = generate_valid_directory_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
     let all_flag_mode_and_child_paths =
-        product3(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
 
     let success_flags_modes_and_child_paths =
-        product3(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
+        itertools::iproduct!(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
@@ -156,56 +156,6 @@ fn filter_out_contradictory_open_parameters(
     Some((flag, mode, child_path))
 }
 
-fn product<I, J, IT, JT>(xs: I, ys: J) -> impl Iterator<Item = (IT, JT)> + Clone
-where
-    I: IntoIterator<Item = IT>,
-    <I as IntoIterator>::IntoIter: Clone,
-    IT: Clone,
-    J: IntoIterator<Item = JT>,
-    <J as IntoIterator>::IntoIter: Clone,
-{
-    xs.into_iter().cartesian_product(ys)
-}
-
-#[test]
-fn test_product() {
-    assert_eq!(
-        product(["a", "b"], [0, 1]).collect::<Vec<_>>(),
-        [("a", 0), ("a", 1), ("b", 0), ("b", 1)]
-    )
-}
-
-fn product3<I, J, K, IT, JT, KT>(xs: I, ys: J, zs: K) -> impl Iterator<Item = (IT, JT, KT)> + Clone
-where
-    I: IntoIterator<Item = IT>,
-    <I as IntoIterator>::IntoIter: Clone,
-    IT: Clone,
-    J: IntoIterator<Item = JT>,
-    <J as IntoIterator>::IntoIter: Clone,
-    JT: Clone,
-    K: IntoIterator<Item = KT>,
-    <K as IntoIterator>::IntoIter: Clone,
-{
-    product(xs, ys).cartesian_product(zs).map(|((x, y), z)| (x, y, z))
-}
-#[test]
-
-fn test_product3() {
-    assert_eq!(
-        product3(["a", "b"], [0, 1], ["x", "y"]).collect::<Vec<_>>(),
-        [
-            ("a", 0, "x"),
-            ("a", 0, "y"),
-            ("a", 1, "x"),
-            ("a", 1, "y"),
-            ("b", 0, "x"),
-            ("b", 0, "y"),
-            ("b", 1, "x"),
-            ("b", 1, "y")
-        ]
-    )
-}
-
 async fn assert_open_success<V, Fut>(
     package_root: &fio::DirectoryProxy,
     parent_path: &str,
@@ -234,7 +184,7 @@ async fn assert_open_content_directory(
 ) {
     let package_root = &source.dir;
 
-    let success_flags = vec![
+    let success_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
         fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -247,10 +197,10 @@ async fn assert_open_content_directory(
     let child_paths = generate_valid_directory_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
     let all_flag_mode_and_child_paths =
-        product3(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
 
     let success_flags_modes_and_child_paths =
-        product3(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
+        itertools::iproduct!(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
@@ -313,7 +263,7 @@ async fn assert_open_content_file(
 ) {
     let package_root = &source.dir;
 
-    let success_flags = vec![
+    let success_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
         fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -325,7 +275,7 @@ async fn assert_open_content_file(
         fio::OpenFlags::NOT_DIRECTORY,
     ];
 
-    let success_modes = vec![
+    let success_modes = [
         0,
         fio::MODE_TYPE_DIRECTORY,
         fio::MODE_TYPE_BLOCK_DEVICE,
@@ -336,10 +286,10 @@ async fn assert_open_content_file(
     let child_paths = generate_valid_file_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
     let all_flag_mode_and_child_paths =
-        product3(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
 
     let success_flags_modes_and_child_paths =
-        product3(success_flags, success_modes, child_paths.iter().map(String::as_str))
+        itertools::iproduct!(success_flags, success_modes, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
@@ -365,7 +315,7 @@ async fn assert_open_meta_as_directory_and_file(
 ) {
     let package_root = &source.dir;
 
-    let base_directory_success_flags = vec![
+    let base_directory_success_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
         fio::OpenFlags::DIRECTORY,
@@ -374,6 +324,7 @@ async fn assert_open_meta_as_directory_and_file(
         fio::OpenFlags::POSIX_WRITABLE,
         fio::OpenFlags::POSIX_EXECUTABLE,
     ];
+    let modes = [0, fio::MODE_TYPE_DIRECTORY, fio::MODE_TYPE_BLOCK_DEVICE, fio::MODE_TYPE_SERVICE];
 
     // To open "meta" as a directory:
     //  1. mode cannot be MODE_TYPE_FILE
@@ -381,43 +332,44 @@ async fn assert_open_meta_as_directory_and_file(
     //    a. MODE_TYPE_DIRECTORY is set
     //    b. OPEN_FLAG_DIRECTORY is set
     //    c. OPEN_FLAG_NODE_REFERENCE is set
-    let directory_flags_and_modes =
-        product(base_directory_success_flags.clone(), [fio::MODE_TYPE_DIRECTORY])
-            .chain(product(
-                base_directory_success_flags.clone().into_iter().filter_map(|f| {
-                    if f.intersects(fio::OpenFlags::NOT_DIRECTORY) {
-                        // "OPEN_FLAG_DIRECTORY and OPEN_FLAG_NOT_DIRECTORY are mutually exclusive"
-                        None
-                    } else {
-                        Some(f | fio::OpenFlags::DIRECTORY)
-                    }
-                }),
-                [0, fio::MODE_TYPE_DIRECTORY, fio::MODE_TYPE_BLOCK_DEVICE, fio::MODE_TYPE_SERVICE],
-            ))
-            .chain(product(
-                base_directory_success_flags
-                    .clone()
-                    .into_iter()
-                    .map(|f| f | fio::OpenFlags::NODE_REFERENCE),
-                [0, fio::MODE_TYPE_DIRECTORY, fio::MODE_TYPE_BLOCK_DEVICE, fio::MODE_TYPE_SERVICE],
-            ));
+    let directory_flags_and_modes = itertools::iproduct!(
+        base_directory_success_flags.iter().copied(),
+        [fio::MODE_TYPE_DIRECTORY].into_iter()
+    )
+    .chain(itertools::iproduct!(
+        base_directory_success_flags.iter().copied().filter_map(|f| {
+            if f.intersects(fio::OpenFlags::NOT_DIRECTORY) {
+                // "OPEN_FLAG_DIRECTORY and OPEN_FLAG_NOT_DIRECTORY are mutually exclusive"
+                None
+            } else {
+                Some(f | fio::OpenFlags::DIRECTORY)
+            }
+        }),
+        modes.iter().copied()
+    ))
+    .chain(itertools::iproduct!(
+        base_directory_success_flags.iter().copied().map(|f| f | fio::OpenFlags::NODE_REFERENCE),
+        modes.iter().copied()
+    ));
 
     let directory_child_paths = generate_valid_directory_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
 
     let directory_only_child_paths = generate_valid_directory_only_paths(child_base_path);
     let all_flag_mode_and_child_paths =
-        product3(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
 
-    let directory_flags_modes_and_child_paths =
-        product(directory_flags_and_modes, directory_child_paths.iter().map(String::as_str))
-            .map(|((flag, mode), path)| (flag, mode, path))
-            .chain(product3(
-                base_directory_success_flags,
-                [0, fio::MODE_TYPE_DIRECTORY, fio::MODE_TYPE_BLOCK_DEVICE, fio::MODE_TYPE_SERVICE],
-                directory_only_child_paths.iter().map(String::as_str),
-            ))
-            .filter_map(filter_out_contradictory_open_parameters);
+    let directory_flags_modes_and_child_paths = itertools::iproduct!(
+        directory_flags_and_modes,
+        directory_child_paths.iter().map(String::as_str)
+    )
+    .map(|((flag, mode), path)| (flag, mode, path))
+    .chain(itertools::iproduct!(
+        base_directory_success_flags,
+        modes.iter().copied(),
+        directory_only_child_paths.iter().map(String::as_str)
+    ))
+    .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
         parent_path,
@@ -432,7 +384,7 @@ async fn assert_open_meta_as_directory_and_file(
     //    a. MODE_TYPE_DIRECTORY is set
     //    b. OPEN_FLAG_DIRECTORY is set
     //    c. OPEN_FLAG_NODE_REFERENCE is set
-    let base_file_flags = vec![
+    let base_file_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
         fio::OpenFlags::DESCRIBE,
@@ -441,21 +393,21 @@ async fn assert_open_meta_as_directory_and_file(
         fio::OpenFlags::NOT_DIRECTORY,
     ];
 
-    let file_flags_and_modes = product(
+    let file_flags_and_modes = itertools::iproduct!(
         base_file_flags
             .iter()
             .copied()
             .chain([fio::OpenFlags::DIRECTORY, fio::OpenFlags::NODE_REFERENCE]),
-        [fio::MODE_TYPE_FILE],
+        [fio::MODE_TYPE_FILE]
     )
-    .chain(product(
+    .chain(itertools::iproduct!(
         base_file_flags.iter().copied(),
-        [0, fio::MODE_TYPE_BLOCK_DEVICE, fio::MODE_TYPE_SERVICE],
+        [0, fio::MODE_TYPE_BLOCK_DEVICE, fio::MODE_TYPE_SERVICE]
     ));
     let file_child_paths = generate_valid_file_paths(child_base_path);
 
     let file_flags_modes_and_child_paths =
-        product(file_flags_and_modes, file_child_paths.iter().map(String::as_str))
+        itertools::iproduct!(file_flags_and_modes, file_child_paths.iter().map(String::as_str))
             .map(|((flag, mode), path)| (flag, mode, path))
             .filter_map(filter_out_contradictory_open_parameters);
 
@@ -488,7 +440,7 @@ async fn assert_open_meta_subdirectory(
 ) {
     let package_root = &source.dir;
 
-    let success_flags = vec![
+    let success_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
         fio::OpenFlags::DIRECTORY,
@@ -502,10 +454,10 @@ async fn assert_open_meta_subdirectory(
 
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
     let all_flag_mode_and_child_paths =
-        product3(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
 
     let success_flags_modes_and_child_paths =
-        product3(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
+        itertools::iproduct!(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
@@ -527,7 +479,7 @@ async fn assert_open_meta_subdirectory(
 async fn assert_open_meta_file(source: &PackageSource, parent_path: &str, child_base_path: &str) {
     let package_root = &source.dir;
 
-    let success_flags = vec![
+    let success_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
         fio::OpenFlags::NODE_REFERENCE,
@@ -541,10 +493,10 @@ async fn assert_open_meta_file(source: &PackageSource, parent_path: &str, child_
 
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
     let all_flag_mode_and_child_paths =
-        product3(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
 
     let success_flags_modes_and_child_paths =
-        product3(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
+        itertools::iproduct!(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
