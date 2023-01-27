@@ -115,7 +115,9 @@ protocol Directory2 {
                 /// protocol (including [`Node`] itself for connector nodes, for
                 /// instance).
                 2: protocols @generated_name("NodeProtocols") table {
-                    1: directory @generated_name("DirectoryProtocol") struct {};
+                    1: directory
+                            @generated_name("DirectoryProtocolFlags")
+                            flexible bits : uint64 {};
                     2: file @generated_name("FileProtocolFlags") flexible bits : uint64 {
                         /// Opens the file in append mode, i.e. the connection
                         /// should seek to the end of the file before every
