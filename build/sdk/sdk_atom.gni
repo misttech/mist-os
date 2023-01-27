@@ -32,12 +32,13 @@ import("config.gni")
 #   category
 #     Describes the availability of the element.
 #     Possible values, from most restrictive to least restrictive:
-#       - excluded     : the atom may not be included in SDKs;
-#       - experimental : the atom is available with no quality guarantee;
-#       - internal     : the atom is exposed within the Fuchsia tree;
-#       - cts          : the atom may be used in the Fuchsia Compatibility Test Suite;
-#       - partner      : the atom may be used by select partners;
-#       - public       : the atom may be included in published SDKs.
+#       - excluded         : the atom may not be included in SDKs;
+#       - experimental     : the atom is available with no quality guarantee;
+#       - internal         : the atom is exposed within the Fuchsia tree;
+#       - cts              : the atom may be used in the Fuchsia Compatibility Test Suite;
+#       - partner_internal : the atom may be used by other atoms redistributed to select partners;
+#       - partner          : the atom may be used by select partners;
+#       - public           : the atom may be included in published SDKs.
 #
 #   meta
 #     Scope describing the element's metadata file.
