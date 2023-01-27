@@ -506,6 +506,14 @@ impl FileOps for RemoteDirectoryObject {
         }
         Ok(())
     }
+
+    fn to_handle(&self, _file: &FileHandle) -> Result<Option<zx::Handle>, Errno> {
+        self.zxio
+            .clone()
+            .and_then(Zxio::release)
+            .map(Some)
+            .map_err(|status| from_status_like_fdio!(status))
+    }
 }
 
 struct RemoteFileObject {
@@ -578,6 +586,15 @@ impl FileOps for RemoteFileObject {
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         zxio_query_events(&self.zxio)
     }
+
+    fn to_handle(&self, _file: &FileHandle) -> Result<Option<zx::Handle>, Errno> {
+        self.zxio
+            .as_ref()
+            .clone()
+            .and_then(Zxio::release)
+            .map(Some)
+            .map_err(|status| from_status_like_fdio!(status))
+    }
 }
 
 struct RemotePipeObject {
@@ -642,6 +659,15 @@ impl FileOps for RemotePipeObject {
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         zxio_query_events(&self.zxio)
+    }
+
+    fn to_handle(&self, _file: &FileHandle) -> Result<Option<zx::Handle>, Errno> {
+        self.zxio
+            .as_ref()
+            .clone()
+            .and_then(Zxio::release)
+            .map(Some)
+            .map_err(|status| from_status_like_fdio!(status))
     }
 }
 
@@ -757,6 +783,7 @@ mod test {
         let fd =
             new_remote_file(&kernel, pkg_channel.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(fd.node().is_dir());
+        assert!(fd.to_handle().expect("to_handle").is_some());
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -772,6 +799,7 @@ mod test {
         let fd = new_remote_file(&kernel, content_channel.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
         assert!(!fd.node().is_dir());
+        assert!(fd.to_handle().expect("to_handle").is_some());
     }
 
     #[::fuchsia::test]
@@ -780,5 +808,6 @@ mod test {
         let vmo = zx::Vmo::create(*PAGE_SIZE).expect("Vmo::create");
         let fd = new_remote_file(&kernel, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(!fd.node().is_dir());
+        assert!(fd.to_handle().expect("to_handle").is_some());
     }
 }

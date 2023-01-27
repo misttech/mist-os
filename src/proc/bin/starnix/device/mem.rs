@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::cprng_draw;
+use fuchsia_zircon::{self as zx, cprng_draw};
 
 use crate::auth::FsCred;
 use crate::device::DeviceOps;
@@ -50,6 +50,10 @@ impl FileOps for DevNull {
         _data: &[UserBuffer],
     ) -> Result<usize, Errno> {
         Ok(0)
+    }
+
+    fn to_handle(&self, _file: &FileHandle) -> Result<Option<zx::Handle>, Errno> {
+        Ok(None)
     }
 }
 

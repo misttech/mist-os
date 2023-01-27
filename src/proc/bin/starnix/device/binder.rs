@@ -2159,10 +2159,10 @@ impl BinderTask for RemoteBinderTask {
 
     fn add_file_with_flags(&self, file: FileHandle, _flags: FdFlags) -> Result<FdNumber, Errno> {
         let flags: fbinder::FileFlags = file.flags().into();
-        // TODO(qsr): The handle should be minted to proxy file here. For now, send an invalid
-        // handle that will be interpreted as an empty (/dev/null like) file.
+        // TODO(qsr): Bubble the error up when all fd can be wrapped into a handle.
+        let handle = file.to_handle().unwrap_or(None);
         let response = self.run_file_request(fbinder::FileRequest {
-            add_requests: Some(vec![fbinder::FileHandle { file: None, flags }]),
+            add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
             ..fbinder::FileRequest::EMPTY
         })?;
         if let Some(fds) = response.add_responses {

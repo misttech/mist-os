@@ -233,6 +233,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     ) -> Result<SyscallResult, Errno> {
         default_fcntl(current_task, file, cmd, arg)
     }
+
+    /// Return a handle that allows access to this file descritor through the zxio protocols.
+    ///
+    /// If None is returned, the file will act as if it was a fd to `/dev/null`.
+    fn to_handle(&self, _file: &FileHandle) -> Result<Option<zx::Handle>, Errno> {
+        error!(ENOENT)
+    }
 }
 
 /// Implements [`FileOps`] methods in a way that makes sense for non-seekable files.
@@ -849,6 +856,10 @@ impl FileObject {
         arg: u64,
     ) -> Result<SyscallResult, Errno> {
         self.ops().fcntl(self, current_task, cmd, arg)
+    }
+
+    pub fn to_handle(self: &Arc<Self>) -> Result<Option<zx::Handle>, Errno> {
+        self.ops().to_handle(self)
     }
 
     pub fn update_file_flags(&self, value: OpenFlags, mask: OpenFlags) {

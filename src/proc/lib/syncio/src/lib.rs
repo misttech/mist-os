@@ -277,6 +277,13 @@ impl Zxio {
         Ok(zxio)
     }
 
+    pub fn release(self) -> Result<zx::Handle, zx::Status> {
+        let mut handle = 0;
+        let status = unsafe { zxio::zxio_release(self.as_ptr(), &mut handle) };
+        zx::ok(status)?;
+        unsafe { Ok(zx::Handle::from_raw(handle)) }
+    }
+
     pub fn open(&self, flags: fio::OpenFlags, mode: u32, path: &str) -> Result<Self, zx::Status> {
         let zxio = Zxio::default();
         let status = unsafe {
