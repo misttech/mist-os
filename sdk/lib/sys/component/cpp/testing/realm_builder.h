@@ -67,8 +67,8 @@ class RealmRoot final {
   // auto echo = realm.Connect<test::placeholders::Echo>();
   // ```
   template <typename Interface>
-  fidl::InterfacePtr<Interface> Connect(
-      const std::string& interface_name = Interface::Name_) const {
+  fidl::InterfacePtr<Interface> Connect(const std::string& interface_name = Interface::Name_) const
+      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
     ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->Connect<Interface>(interface_name);
   }
@@ -77,30 +77,34 @@ class RealmRoot final {
   // method above for more details.
   template <typename Interface>
   fidl::SynchronousInterfacePtr<Interface> ConnectSync(
-      const std::string& interface_name = Interface::Name_) const {
+      const std::string& interface_name = Interface::Name_) const
+      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
     ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->ConnectSync<Interface>(interface_name);
   }
 
   // Connect to exposed directory of the root component.
   template <typename Interface>
-  zx_status_t Connect(fidl::InterfaceRequest<Interface> request) const {
+  zx_status_t Connect(fidl::InterfaceRequest<Interface> request) const
+      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
     ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->Connect<Interface>(std::move(request));
   }
 
   // Connect to an interface in the exposed directory using the supplied
   // channel.
-  zx_status_t Connect(const std::string& interface_name, zx::channel request) const;
+  zx_status_t Connect(const std::string& interface_name, zx::channel request) const
+      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead");
 
   // Return a handle to the exposed directory of the root component.
-  fidl::InterfaceHandle<fuchsia::io::Directory> CloneRoot() const {
+  fidl::InterfaceHandle<fuchsia::io::Directory> CloneRoot() const
+      ZX_DEPRECATED_SINCE(1, 11, "Use root() instead") {
     ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->CloneExposedDir();
   }
 
   // Get the child name of the root component.
-  std::string GetChildName() const;
+  std::string GetChildName() const ZX_DEPRECATED_SINCE(1, 11, "Use component() instead");
 
   // Returns a callback that returns |true| when realm teardown has completed
   // successfully. If realm teardown fails, it will trigger a panic.
