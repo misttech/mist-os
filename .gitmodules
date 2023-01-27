@@ -478,11 +478,6 @@
 	url = https://llvm.googlesource.com/scudo
 	name = scudo
 	ignore = all
-[submodule "third_party/sdk-integration"]
-	path = third_party/sdk-integration
-	url = https://fuchsia.googlesource.com/sdk-integration
-	name = third_party/sdk-integration
-	ignore = all
 [submodule "third_party/shaderc"]
 	path = third_party/shaderc
 	url = https://fuchsia.googlesource.com/third_party/shaderc
