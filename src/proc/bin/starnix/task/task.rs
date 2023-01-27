@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
+use fuchsia_zircon::{self as zx, AsHandleRef, Signals};
 use once_cell::sync::OnceCell;
 use std::cmp;
 use std::convert::TryFrom;
@@ -182,6 +182,11 @@ pub struct Task {
     /// This is necessary because credentials need to be read from operations on Node, and other
     /// locks may be taken at the time. No other lock may be held while this lock is taken.
     creds: RwLock<Credentials>,
+
+    /// For vfork and clone() with CLONE_VFORK, this is set when the task exits or calls execve().
+    /// It allows the calling task to block until the fork has been completed. Only populated
+    /// when created with the CLONE_VFORK flag.
+    vfork_event: Option<zx::Event>,
 }
 
 impl Task {
@@ -206,6 +211,7 @@ impl Task {
         abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
         abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
         exit_signal: Option<Signal>,
+        vfork_event: Option<zx::Event>,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -226,6 +232,7 @@ impl Task {
             exit_signal,
             command: RwLock::new(command),
             creds: RwLock::new(creds),
+            vfork_event,
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
                 signals: Default::default(),
@@ -308,6 +315,7 @@ impl Task {
             Arc::clone(&kernel.default_abstract_socket_namespace),
             Arc::clone(&kernel.default_abstract_vsock_namespace),
             None,
+            None,
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -342,7 +350,8 @@ impl Task {
             | CLONE_SETTLS
             | CLONE_PARENT_SETTID
             | CLONE_CHILD_CLEARTID
-            | CLONE_CHILD_SETTID) as u64;
+            | CLONE_CHILD_SETTID
+            | CLONE_VFORK) as u64;
 
         // CLONE_SETTLS is implemented by sys_clone.
 
@@ -413,6 +422,10 @@ impl Task {
             }
         };
 
+        // Only create the vfork event when the caller requested CLONE_VFORK.
+        let vfork_event =
+            if flags & (CLONE_VFORK as u64) != 0 { Some(zx::Event::create()) } else { None };
+
         let child = CurrentTask::new(Self::new(
             pid,
             command,
@@ -425,6 +438,7 @@ impl Task {
             self.abstract_socket_namespace.clone(),
             self.abstract_vsock_namespace.clone(),
             child_exit_signal,
+            vfork_event,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child
@@ -474,6 +488,27 @@ impl Task {
         }
 
         Ok(child)
+    }
+
+    /// Make sure the vfork event is signaled to unblock any waiters in case the task never
+    /// called execve().
+    pub fn signal_exit(&self) {
+        if let Some(event) = &self.vfork_event {
+            if let Err(status) = event.signal_handle(Signals::NONE, Signals::USER_0) {
+                log_warn!("Failed to set vfork signal {status}");
+            }
+        };
+    }
+
+    /// Blocks the caller until the task has exited or executed execve(). This is used to implement
+    /// vfork() and clone(... CLONE_VFORK, ...). The task musy have created with CLONE_EXECVE.
+    pub fn wait_for_execve(&self) -> Result<(), Errno> {
+        self.vfork_event
+            .as_ref()
+            .unwrap()
+            .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE)
+            .map_err(|status| from_status_like_fdio!(status))?;
+        Ok(())
     }
 
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
@@ -1135,8 +1170,8 @@ mod test {
     #[::fuchsia::test]
     fn test_clone_pid_and_parent_pid() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let thread =
-            current_task.clone_task_for_test((CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64, Some(SIGCHLD));
+        let thread = current_task
+            .clone_task_for_test((CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64, Some(SIGCHLD));
         assert_eq!(current_task.get_pid(), thread.get_pid());
         assert_ne!(current_task.get_tid(), thread.get_tid());
         assert_eq!(current_task.thread_group.leader, thread.thread_group.leader);

@@ -68,10 +68,31 @@ test("crash") {
   ]
 }
 
+# This syscall_test_exec_child is a helper binary used in some execve tests.
+# Using the exclude_toolchain_tags forces the build into a "novariant" variant
+# toolchain so we need that also.
+linux_toolchain = "//build/toolchain:linux_x64"
+if (is_linux) {
+  executable("syscall_test_exec_child") {
+    sources = [ "syscall_test_exec_child.cc" ]
+    exclude_toolchain_tags = [
+      "asan",
+      "coverage",
+    ]
+  }
+  resource("syscall_test_exec_child_resource") {
+    testonly = true
+    sources = [ "$root_out_dir/syscall_test_exec_child" ]
+    outputs = [ "data/tests/syscall_test_exec_child" ]
+    deps = [ ":syscall_test_exec_child" ]
+  }
+}
+
 starnix_linux_test_component("syscalls_test") {
   test_label = ":syscalls_test_bin"
   test_binary = "syscalls_test_bin"
   uses_expectations = true
+  deps = [ ":syscall_test_exec_child_resource($linux_toolchain)" ]
 }
 
 starnix_linux_test_component("crash_test") {

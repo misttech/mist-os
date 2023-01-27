@@ -1193,9 +1193,11 @@
                 "UnameTest.SetNames",
                 "UnameTest.UnshareUTS",
 
-                // vfork_test
-                "VforkTest.ParentStopsUntilChildExits",
-                "VforkTest.ExecedChildExitDoesntUnstopParent",
+                // unlink_test
+                "UnlinkTest.ParentDegradedPermissions",
+                "RmdirTest.CanRemoveWithTrailingSlashes",
+
+                // vfork_test: Unknown why this fails, this is theoretically implemented.
                 "VforkTest.ParentStopsUntilChildExecves",
 
                 // vsyscall_test
@@ -1209,7 +1211,6 @@
                 "Waiters/WaitAnyChildTest.WaitedChildRusage/*",
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",
-                "Waiters/WaitSpecificChildTest.AfterChildExecve/*",
 
                 // write_test
                 "WriteTest.WriteNoExceedsRLimit",

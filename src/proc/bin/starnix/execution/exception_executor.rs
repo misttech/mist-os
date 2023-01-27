@@ -40,7 +40,7 @@ where
             let exceptions = start_task_thread(&current_task)?;
             // Unwrap the error because if we don't, we'll panic anyway from destroying the task
             // without having previous called sys_exit(), and that will swallow the actual error.
-            match run_exception_loop(&mut current_task, exceptions) {
+            let run_result = match run_exception_loop(&mut current_task, exceptions) {
                 Err(error) => {
                     log_warn!(
                         current_task,
@@ -52,7 +52,9 @@ where
                     Ok(exit_status)
                 }
                 ok => ok,
-            }
+            };
+            current_task.signal_exit();
+            run_result
         }());
     });
 }

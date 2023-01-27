@@ -40,7 +40,13 @@ fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errn
         new_task.registers.fs_base = args.tls;
     }
 
+    let task_ref = new_task.task.clone(); // Keep reference for later waiting.
+
     execute_task(new_task, |_| {});
+
+    if args.flags & (CLONE_VFORK as u64) != 0 {
+        task_ref.wait_for_execve()?;
+    }
     Ok(tid)
 }
 
@@ -89,16 +95,22 @@ pub fn sys_clone3(
 }
 
 pub fn sys_vfork(current_task: &CurrentTask) -> Result<pid_t, Errno> {
-    not_implemented!(current_task, "vfork is not implemented. A normal fork is executed instead.");
-    let mut new_task =
-        current_task.clone_task(0, Some(SIGCHLD), UserRef::default(), UserRef::default())?;
+    let mut new_task: CurrentTask = current_task.clone_task(
+        CLONE_VFORK as u64,
+        Some(SIGCHLD),
+        UserRef::default(),
+        UserRef::default(),
+    )?;
     let tid = new_task.id;
 
     new_task.registers = current_task.registers;
     new_task.registers.rax = 0;
 
+    let task_ref = new_task.task.clone(); // Keep reference for later waiting.
+
     execute_task(new_task, |_| {});
-    // TODO: The process must wait for the child to run exec.
+
+    task_ref.wait_for_execve()?;
     Ok(tid)
 }
 
