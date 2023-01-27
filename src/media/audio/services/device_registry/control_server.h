@@ -69,7 +69,6 @@ class ControlServer
   // Static object count, for debugging purposes.
   static inline uint64_t count() { return count_; }
 
-  bool ControlledDeviceWasRemoved() const { return device_is_removed_; }
   bool ControlledDeviceReceivedError() const { return device_has_error_; }
 
  private:
@@ -97,9 +96,7 @@ class ControlServer
 
   fuchsia_audio_device::DelayInfo delay_info_;
 
-  bool device_is_removed_ = false;
   bool device_has_error_ = false;
-  bool received_device_dropped_ring_buffer_ = false;
 };
 
 }  // namespace media_audio

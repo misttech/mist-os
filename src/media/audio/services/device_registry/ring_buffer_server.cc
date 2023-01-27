@@ -44,7 +44,8 @@ RingBufferServer::~RingBufferServer() {
 
 // Called when the client drops the connection first.
 void RingBufferServer::OnShutdown(fidl::UnbindInfo info) {
-  if (!info.is_peer_closed() && !info.is_dispatcher_shutdown() && !info.is_user_initiated()) {
+  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  if (!info.is_peer_closed() && !info.is_user_initiated()) {
     ADR_WARN_OBJECT() << "shutdown with unexpected status: " << info;
   } else {
     ADR_LOG_OBJECT(kLogRingBufferServerResponses || kLogObjectLifetimes) << "with status: " << info;
@@ -57,15 +58,22 @@ void RingBufferServer::OnShutdown(fidl::UnbindInfo info) {
   }
 }
 
+void RingBufferServer::ClientDroppedControl() {
+  ADR_LOG_OBJECT(kLogObjectLifetimes);
+
+  Shutdown(ZX_ERR_PEER_CLOSED);
+  // Nothing else is needed: OnShutdown may call DropRingBuffer; our dtor will clear parent_.
+}
+
 // Called when the Device drops the RingBuffer FIDL.
 void RingBufferServer::DeviceDroppedRingBuffer() {
-  ADR_LOG_OBJECT(kLogRingBufferServerMethods);
+  ADR_LOG_OBJECT(kLogRingBufferServerMethods || kLogNotifyMethods);
 
   device_dropped_ring_buffer_ = true;
   Shutdown(ZX_ERR_PEER_CLOSED);
 
   // We don't explicitly clear our shared_ptr<Device> reference, to ensure we destruct first.
-  // Same for our parent -- we want to ensure we destruct before our parent ControlServer.
+  // Same for parent_ -- we want to ensure we destruct before our parent ControlServer.
 }
 
 // fuchsia.audio.device.RingBuffer implementation
@@ -137,7 +145,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
 }
 
 void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlCalls);
+  ADR_LOG_OBJECT(kLogRingBufferServerMethods);
 
   if (start_completer_) {
     ADR_WARN_OBJECT() << "previous `Start` request has not yet completed";
@@ -179,7 +187,7 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
 }
 
 void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlCalls);
+  ADR_LOG_OBJECT(kLogRingBufferServerMethods);
 
   if (stop_completer_) {
     ADR_WARN_OBJECT() << "previous `Stop` request has not yet completed";
@@ -219,7 +227,7 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
 }
 
 void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlCalls);
+  ADR_LOG_OBJECT(kLogRingBufferServerMethods);
 
   if (delay_info_completer_) {
     ADR_WARN_OBJECT() << "previous `WatchDelayInfo` request has not yet completed";
@@ -246,7 +254,7 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
 }
 
 void RingBufferServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info) {
-  ADR_LOG_OBJECT(kLogRingBufferFidlResponses);
+  ADR_LOG_OBJECT(kLogRingBufferFidlResponses || kLogNotifyMethods);
 
   if (!delay_info_completer_) {
     delay_info_update_ = delay_info;

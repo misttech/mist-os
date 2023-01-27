@@ -93,22 +93,22 @@ Device::~Device() {
 }
 
 // Invoked when the underlying driver disconnects its StreamConfig.
-// Consider eliminating 'is_dispatcher_shutdown' here.
-void Device::on_fidl_error(fidl::UnbindInfo error) {
-  if (!error.is_peer_closed() && !error.is_dispatcher_shutdown() && !error.is_user_initiated()) {
-    ADR_WARN_OBJECT() << error;
-    OnError(error.status());
+void Device::on_fidl_error(fidl::UnbindInfo info) {
+  ADR_LOG_OBJECT(kLogStreamConfigFidlResponses || kLogDeviceState) << "(StreamConfig)";
+  if (!info.is_peer_closed() && !info.is_user_initiated()) {
+    ADR_WARN_OBJECT() << "StreamConfig disconnected:" << info;
+    OnError(info.status());
   }
 
   ADR_LOG_OBJECT(kLogStreamConfigFidlResponses || kLogObjectLifetimes)
-      << "StreamConfig disconnected:" << error.FormatDescription();
+      << "StreamConfig disconnected:" << info.FormatDescription();
 
   OnRemoval();
 }
 
 // Invoked when the underlying driver disconnects its RingBuffer channel.
 // We had a RingBuffer FIDL connection, so device state should be Configured/Paused/Started.
-void Device::RingBufferErrorHandler::on_fidl_error(fidl::UnbindInfo error) {
+void Device::RingBufferErrorHandler::on_fidl_error(fidl::UnbindInfo info) {
   ADR_LOG_OBJECT(kLogRingBufferFidlResponses || kLogDeviceState) << "(RingBuffer)";
 
   if (device_->state_ == State::Error) {
@@ -117,13 +117,12 @@ void Device::RingBufferErrorHandler::on_fidl_error(fidl::UnbindInfo error) {
   }
 
   // If driver encountered a significant error, then move the entire Device to Error state.
-  // Consider eliminating 'is_dispatcher_shutdown' here.
-  if (!error.is_peer_closed() && !error.is_dispatcher_shutdown() && !error.is_user_initiated()) {
-    ADR_WARN_OBJECT() << "RingBuffer disconnected: " << error.FormatDescription();
-    device_->OnError(error.status());
+  if (!info.is_peer_closed() && !info.is_user_initiated()) {
+    ADR_WARN_OBJECT() << "RingBuffer disconnected: " << info.FormatDescription();
+    device_->OnError(info.status());
   } else {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses)
-        << "RingBuffer disconnected:" << error.FormatDescription();
+        << "RingBuffer disconnected:" << info.FormatDescription();
     device_->DeviceDroppedRingBuffer();
   }
 }
@@ -136,7 +135,6 @@ void Device::OnRemoval() {
   } else if (state_ != State::DeviceInitializing) {
     --initialized_count_;
 
-    DeviceDroppedRingBuffer();
     DropControl();  // Probably unneeded (Device is going away) but makes unwind "complete".
     ForEachObserver([](auto obs) { obs->DeviceIsRemoved(); });  // Our control is also an observer.
   }
@@ -170,7 +168,6 @@ void Device::OnError(zx_status_t error) {
   if (state_ != State::DeviceInitializing) {
     --initialized_count_;
 
-    DeviceDroppedRingBuffer();
     DropControl();
     ForEachObserver([](auto obs) { obs->DeviceHasError(); });
   }
@@ -251,10 +248,8 @@ bool Device::DropControl() {
     return false;
   }
 
-  control_notify->DeviceIsRemoved();
   control_notify_ = std::nullopt;
-  // We don't remove our ControlNotify from the observer list, we wait for it to self-invalidate.
-  LogObjectCounts();
+  // We don't remove our ControlNotify from the observer list: we wait for it to self-invalidate.
 
   SetState(State::DeviceInitialized);
   return true;
@@ -299,32 +294,26 @@ bool Device::AddObserver(std::shared_ptr<ObserverNotify> observer_to_add) {
 void Device::DeviceDroppedRingBuffer() {
   ADR_LOG_OBJECT(kLogDeviceState);
 
-  // The only reason this exists separately from DropRingBuffer is that eventually (future CL), we
-  // will notify RingBufferNotify of DeviceDroppedRingBuffer.
-
-  DropRingBufferInternal();
+  // This is distinct from DropRingBuffer in case we must notify our RingBuffer (via our Control).
+  // We do so if we have 1) a Control and 2) a driver_format_ (thus a client-configured RingBuffer).
+  if (auto notify = GetControlNotify(); notify && driver_format_) {
+    notify->DeviceDroppedRingBuffer();
+  }
+  DropRingBuffer();
 }
 
-// The client originated a RingBuffer drop. Drop the driver RingBuffer FIDL.
+// Whether client- or device-originated, reset any state associated with an active RingBuffer.
 void Device::DropRingBuffer() {
   ADR_LOG_OBJECT(kLogDeviceState);
 
-  DropRingBufferInternal();
-  ring_buffer_client_ = fidl::Client<fuchsia_hardware_audio::RingBuffer>();
-}
-
-// Whether client- or Device-originated, reset any state associated with an active RingBuffer.
-void Device::DropRingBufferInternal() {
-  ADR_LOG_OBJECT(kLogDeviceState);
-
-  // In next CL, we will notify ObserverNotify of DeviceWasRemoved.
-
-  if (state_ != State::CreatingRingBuffer && state_ != State::RingBufferStopped &&
-      state_ != State::RingBufferStarted) {
-    // Nothing to do here, we didn't have a configured ring buffer.
+  // If we've already cleaned out any state with the underlying driver RingBuffer, then we're done.
+  if (!ring_buffer_client_.is_valid()) {
     return;
   }
-  SetState(State::DeviceInitialized);
+
+  if (state_ != State::Error) {
+    SetState(State::DeviceInitialized);
+  }
 
   start_time_ = std::nullopt;  // We are not started.
 
@@ -333,6 +322,9 @@ void Device::DropRingBufferInternal() {
   ring_buffer_properties_ = std::nullopt;
 
   driver_format_ = std::nullopt;  // We are not configured.
+
+  // Clear our FIDL connection to the driver RingBuffer.
+  ring_buffer_client_ = fidl::Client<fuchsia_hardware_audio::RingBuffer>();
 }
 
 void Device::SetError(zx_status_t error) {
@@ -371,7 +363,6 @@ bool Device::LogResultError(const ResultT& result, const char* debug_context) {
   if (!result.is_ok()) {
     if (result.error_value().is_framework_error()) {
       if (result.error_value().framework_error().is_canceled() ||
-          result.error_value().framework_error().is_dispatcher_shutdown() ||
           result.error_value().framework_error().is_peer_closed()) {
         ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
             << debug_context << ": will take no action on "
@@ -398,8 +389,7 @@ bool Device::LogResultFrameworkError(const ResultT& result, const char* debug_co
     return true;
   }
   if (!result.is_ok()) {
-    if (result.error_value().is_canceled() || result.error_value().is_dispatcher_shutdown() ||
-        result.error_value().is_peer_closed()) {
+    if (result.error_value().is_canceled() || result.error_value().is_peer_closed()) {
       ADR_LOG_OBJECT(kLogStreamConfigFidlResponses) << debug_context << ": will take no action on "
                                                     << result.error_value().FormatDescription();
     } else {
@@ -789,7 +779,7 @@ bool Device::SetGain(fuchsia_hardware_audio::GainState& gain_state) {
 
   auto status = stream_config_->SetGain(std::move(gain_state));
   if (status.is_error()) {
-    if (status.error_value().is_canceled() || status.error_value().is_dispatcher_shutdown()) {
+    if (status.error_value().is_canceled()) {
       // These indicate that we are already shutting down, so they aren't error conditions.
       ADR_LOG_OBJECT(kLogStreamConfigFidlResponses)
           << "SetGain response will take no action on error "

@@ -51,28 +51,26 @@ ControlServer::~ControlServer() {
 
 // Called when the client shuts down first.
 void ControlServer::OnShutdown(fidl::UnbindInfo info) {
-  if (!info.is_peer_closed() && !info.is_dispatcher_shutdown() && !info.is_user_initiated()) {
+  ADR_LOG_OBJECT(kLogObjectLifetimes);
+  if (!info.is_peer_closed() && !info.is_user_initiated()) {
     ADR_WARN_OBJECT() << "shutdown with unexpected status: " << info;
   } else {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses || kLogObjectLifetimes) << "with status: " << info;
   }
 
-  if (!device_is_removed_) {
-    device_->DropRingBuffer();
-
-    // We don't explicitly clear our shared_ptr<Device> reference, to ensure we destruct first.
+  if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
+    ring_buffer->ClientDroppedControl();
+    ring_buffer_server_ = std::nullopt;
   }
 }
 
 // Called when Device drops its RingBuffer FIDL. Tell RingBufferServer and drop our reference.
 void ControlServer::DeviceDroppedRingBuffer() {
-  ADR_LOG_OBJECT(kLogControlServerMethods);
+  ADR_LOG_OBJECT(kLogControlServerMethods || kLogNotifyMethods);
 
   if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
     ring_buffer->DeviceDroppedRingBuffer();
     ring_buffer_server_ = std::nullopt;
-  } else {
-    ADR_WARN_OBJECT() << "ring_buffer_server_ has already dropped";
   }
 }
 
@@ -87,7 +85,12 @@ void ControlServer::DeviceHasError() {
 void ControlServer::DeviceIsRemoved() {
   ADR_LOG_OBJECT(kLogControlServerMethods);
 
-  device_is_removed_ = true;
+  if (auto ring_buffer = GetRingBufferServer(); ring_buffer) {
+    ring_buffer->ClientDroppedControl();
+    ring_buffer_server_ = std::nullopt;
+
+    // We don't explicitly clear our shared_ptr<Device> reference, to ensure we destruct first.
+  }
   Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
@@ -282,7 +285,7 @@ void ControlServer::PlugStateChanged(const fuchsia_audio_device::PlugState& new_
 // We receive delay values for the first time during the configuration process. Once we have these
 // values, we can calculate the required ring-buffer size and request the VMO.
 void ControlServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& delay_info) {
-  ADR_LOG_OBJECT(kLogControlServerResponses);
+  ADR_LOG_OBJECT(kLogControlServerResponses || kLogNotifyMethods);
 
   // Initialization is complete, so this represents a delay update. Eventually, notify watchers.
   if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {

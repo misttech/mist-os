@@ -403,10 +403,13 @@ void LogRingBufferFormat(const fuchsia_hardware_audio::Format& format) {
   }
 
   FX_LOGS(INFO) << "    pcm_format:";
-  FX_LOGS(INFO) << "        number_of_channels    " << format.pcm_format()->number_of_channels();
+  FX_LOGS(INFO) << "        number_of_channels    "
+                << static_cast<uint16_t>(format.pcm_format()->number_of_channels());
   FX_LOGS(INFO) << "        sample_format         " << format.pcm_format()->sample_format();
-  FX_LOGS(INFO) << "        bytes_per_sample      " << format.pcm_format()->bytes_per_sample();
-  FX_LOGS(INFO) << "        valid_bits_per_sample " << format.pcm_format()->valid_bits_per_sample();
+  FX_LOGS(INFO) << "        bytes_per_sample      "
+                << static_cast<uint16_t>(format.pcm_format()->bytes_per_sample());
+  FX_LOGS(INFO) << "        valid_bits_per_sample "
+                << static_cast<uint16_t>(format.pcm_format()->valid_bits_per_sample());
   FX_LOGS(INFO) << "        frame_rate            " << format.pcm_format()->frame_rate();
 }
 

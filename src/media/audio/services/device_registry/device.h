@@ -123,7 +123,7 @@ class Device : public std::enable_shared_from_this<Device>,
 
   // fidl::AsyncEventHandler<fuchsia_hardware_audio::StreamConfig> implementation,
   // called when the underlying driver disconnects its StreamConfig channel.
-  void on_fidl_error(fidl::UnbindInfo error) override;
+  void on_fidl_error(fidl::UnbindInfo info) override;
 
   // Needed when the underlying driver disconnects its RingBuffer channel.
   class RingBufferErrorHandler
@@ -131,7 +131,7 @@ class Device : public std::enable_shared_from_this<Device>,
    public:
     explicit RingBufferErrorHandler(Device* device) : device_(device) {}
     RingBufferErrorHandler() = default;
-    void on_fidl_error(fidl::UnbindInfo error) override;
+    void on_fidl_error(fidl::UnbindInfo info) override;
 
    private:
     Device* device_;
@@ -204,7 +204,6 @@ class Device : public std::enable_shared_from_this<Device>,
   void StopDeviceClockRecovery();
 
   void DeviceDroppedRingBuffer();
-  void DropRingBufferInternal();
 
   // Underlying function called by RetrieveSupportedFormats and GetCurrentlyPermittedFormats.
   void RetrieveFormats(fit::callback<void(std::vector<fuchsia_hardware_audio::SupportedFormats>)>

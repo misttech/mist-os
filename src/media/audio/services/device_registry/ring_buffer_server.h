@@ -27,6 +27,7 @@ class RingBufferServer
   void OnShutdown(fidl::UnbindInfo info) override;
   ~RingBufferServer() override;
   void DeviceDroppedRingBuffer();
+  void ClientDroppedControl();
 
   // fuchsia.audio.device.RingBuffer implementation
   void SetActiveChannels(SetActiveChannelsRequest& request,
