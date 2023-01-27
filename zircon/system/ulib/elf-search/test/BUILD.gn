@@ -28,14 +28,11 @@ test("elf-search") {
       configs -= fdio_config
     }
   }
-  sources = [
-    "elf-search-test.cc",
-    "elf.c",
-  ]
+  sources = [ "elf-search-test.cc" ]
   deps = [
     "//sdk/lib/fdio",
+    "//src/lib/elfldltl",
     "//zircon/system/ulib/elf-search",
-    "//zircon/system/ulib/elfload",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/test-utils",
     "//zircon/system/ulib/zx",

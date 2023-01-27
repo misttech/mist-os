@@ -5,11 +5,20 @@
 #include <elf-search.h>
 #include <elf.h>
 #include <inttypes.h>
+#include <lib/elfldltl/container.h>
+#include <lib/elfldltl/diagnostics.h>
+#include <lib/elfldltl/load.h>
+#include <lib/elfldltl/machine.h>
+#include <lib/elfldltl/vmar-loader.h>
+#include <lib/elfldltl/vmo.h>
+#include <lib/elfldltl/zircon.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/job.h>
 #include <lib/zx/port.h>
 #include <lib/zx/process.h>
 #include <lib/zx/time.h>
+#include <lib/zx/vmar.h>
+#include <lib/zx/vmo.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <zircon/status.h>
@@ -19,7 +28,6 @@
 #include <iterator>
 #include <string>
 
-#include <elf/elf.h>
 #include <fbl/vector.h>
 #include <test-utils/test-utils.h>
 #include <zxtest/zxtest.h>
@@ -127,6 +135,46 @@ void GetKoid(const zx::vmo& obj, zx_koid_t* out) {
   *out = info.koid;
 }
 
+zx_status_t LoadElf(const zx::vmar& vmar, const zx::vmo& vmo, uintptr_t& base, uintptr_t& entry) {
+  // Ignore any error details, but capture the zx_status_t of a SystemError.
+  // Tell the toolkit code to keep going after a SystemError if possible.  No
+  // other kinds of errors should be possible since those would indicate an
+  // invalid ELF image.
+  zx_status_t status = ZX_OK;
+  auto report = [&status](auto&&... args) -> bool {
+    auto check = [&status](auto arg) -> bool {
+      if constexpr (std::is_same_v<decltype(arg), elfldltl::ZirconError>) {
+        status = arg.status;
+        return true;
+      }
+      return false;
+    };
+    return (check(args) || ...);
+  };
+  auto diag = elfldltl::Diagnostics(report, elfldltl::DiagnosticsPanicFlags());
+
+  elfldltl::UnownedVmoFile file(vmo.borrow(), diag);
+  elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container> load_info;
+  elfldltl::RemoteVmarLoader loader{vmar};
+  if (auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
+          diag, file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>())) {
+    auto& [ehdr, phdrs_result] = *headers;
+    cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result.get();
+    if (elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())) &&
+        loader.Load(diag, load_info, vmo.borrow())) {
+      ZX_ASSERT(status == ZX_OK);
+      ZX_ASSERT(load_info.vaddr_start() == 0);
+      base = loader.load_bias();
+      entry = ehdr.entry + loader.load_bias();
+      std::move(loader).Commit();
+      return ZX_OK;
+    }
+  }
+
+  ZX_ASSERT(status != ZX_OK);
+  return status;
+}
+
 // TODO(jakehehrlich): Not all error cases are tested. Appropriate tests can be
 // sussed out by looking at coverage results.
 TEST(ElfSearchTest, ForEachModule) {
@@ -167,7 +215,7 @@ TEST(ElfSearchTest, ForEachModule) {
   springboard_t* sb =
       tu_launch_init(ZX_HANDLE_INVALID, "mod-test", 1, argv, 0, nullptr, 0, nullptr, nullptr);
   auto delete_sb = fit::defer([=] { tu_launch_abort(sb); });
-  zx_handle_t vmar = springboard_get_root_vmar_handle(sb);
+  zx::vmar vmar{springboard_get_root_vmar_handle(sb)};
 
   uintptr_t base, entry;
   for (auto& mod : mods) {
@@ -177,7 +225,7 @@ TEST(ElfSearchTest, ForEachModule) {
       EXPECT_OK(mods[3].vmo.write(&mod3_dyns, 0x1800, sizeof(mod3_dyns)));
       EXPECT_OK(mods[3].vmo.write(mod3_soname, 0x1901, strlen(mod3_soname) + 1));
     }
-    ASSERT_OK(elf_load_extra(vmar, mod.vmo.get(), &base, &entry), "Unable to load extra ELF");
+    ASSERT_OK(LoadElf(vmar, mod.vmo, base, entry), "Unable to load extra ELF");
   }
   zx::process process;
   EXPECT_NE(ZX_HANDLE_INVALID,

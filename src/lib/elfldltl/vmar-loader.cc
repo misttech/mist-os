@@ -42,7 +42,8 @@ void SetVmoName(zx::unowned_vmo vmo, std::string_view base_name, size_t n) {
   vmo_name[name_idx++] = ':';
 
   // Finally append the original VMO name, however much fits.
-  name_idx += base_name.copy(vmo_name.data(), vmo_name.size(), name_idx);
+  cpp20::span avail = vmo_name.subspan(name_idx);
+  name_idx += base_name.copy(avail.data(), avail.size());
   ZX_DEBUG_ASSERT(name_idx <= vmo_name.size());
 
   vmo->set_property(ZX_PROP_NAME, vmo_name.data(), vmo_name.size());
