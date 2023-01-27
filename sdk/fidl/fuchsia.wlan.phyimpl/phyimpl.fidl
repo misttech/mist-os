@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-/// Acronyms
-/// Iface:  Interface
-/// Phy:    Physical
-/// Mac:    Medium Access Control
-/// Sta:    Station
+/// Acronyms \
+/// Iface:  Interface \
+/// Phy:    Physical \
+/// Mac:    Medium Access Control \
+/// Sta:    Station \
 /// Addr:   Address
 library fuchsia.wlan.phyimpl;
 
@@ -32,10 +32,10 @@ protocol WlanPhyImpl {
                 vector<fuchsia.wlan.common.WlanMacRole>:fuchsia.wlan.common.MAX_SUPPORTED_MAC_ROLES;
     }) error zx.status;
 
-    /// Create a new interface with the specified role, returning the interface id.
-    /// Some common error codes are:
-    /// ZX_ERR_NO_RESOURCES: maximum number of interfaces have already been created
-    /// ZX_ERR_NOT_SUPPORTED: device does not support the specified role
+    /// Create a new interface with the specified role, returning the interface id. \
+    /// Some common error codes are: \
+    /// ZX_ERR_NO_RESOURCES: maximum number of interfaces have already been created. \
+    /// ZX_ERR_NOT_SUPPORTED: device does not support the specified role.
     CreateIface(resource table {
         /// The station role for this interface. A device may support multiple roles,
         /// but an interface is instantiated with a single role. This field is required.
@@ -51,44 +51,44 @@ protocol WlanPhyImpl {
         1: iface_id uint16;
     }) error zx.status;
 
-    /// Destroy the interface with the matching id.
-    /// Some common error codes are:
-    /// ZX_ERR_NOT_FOUND: Specified iface does not exist or has already been removed.
-    /// ZX_ERR_UNAVAILABLE: Device is busy and cannot be removed, try again later.
+    /// Destroy the interface with the matching id. \
+    /// Some common error codes are: \
+    /// ZX_ERR_NOT_FOUND: Specified iface does not exist or has already been removed. \
+    /// ZX_ERR_SHOULD_WAIT: Device is busy and cannot be removed, try again later.
     DestroyIface(table {
         /// This field is required.
         1: iface_id uint16;
     }) -> () error zx.status;
 
-    /// Set country with a WlanPhyCountry.
-    /// Some common error codes are:
+    /// Set country with a WlanPhyCountry. \
+    /// Some common error codes are: \
     /// ZX_ERR_NOT_FOUND: Specified country code not supported. PHY state is left unchanged.
     SetCountry(struct {
         country WlanPhyCountry;
     }) -> () error zx.status;
 
     /// Set device to a world-safe country, i.e. a mode that conforms to all
-    /// regulatory constraints globally.
+    /// regulatory constraints globally. \
     /// Generally expected to succeed if the device is in a functional state.
     ClearCountry() -> () error zx.status;
 
     /// Read currently configured country. Implementations are advised to read the
-    /// country directly from the firmware, where possible.
+    /// country directly from the firmware, where possible. \
     /// Generally expected to succeed if the device is in a functional state.
     GetCountry() -> (struct {
         country WlanPhyCountry;
     }) error zx.status;
 
-    /// Set Power Save mode On/Off on device. In most implementations this
-    /// likely to be set in Firmware.
-    /// Some common error codes are:
+    /// Set Power Save mode on device. In most implementations this
+    /// likely to be set in Firmware. \
+    /// Some common error codes are: \
     /// ZX_ERR_NOT_SUPPORTED: Specified Power Save mode not supported.
     SetPowerSaveMode(table {
         /// This field is required.
         1: ps_mode fuchsia.wlan.common.PowerSaveType;
     }) -> () error zx.status;
 
-    /// Get current Power Save Mode from device. In most implementation this
+    /// Get current Power Save mode from device. In most implementation this
     /// likely to be retrieved from Firmware.
     GetPowerSaveMode() -> (table {
         /// This field is required.
