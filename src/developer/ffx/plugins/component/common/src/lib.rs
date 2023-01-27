@@ -9,7 +9,6 @@ use {
 };
 
 pub mod format;
-pub mod query;
 pub mod rcs;
 
 /// Parses a string into an absolute component URL.

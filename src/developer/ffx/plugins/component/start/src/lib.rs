@@ -4,10 +4,9 @@
 
 use {
     anyhow::Result,
-    component_debug::lifecycle::start_instance,
+    component_debug::{lifecycle::start_instance, query::get_cml_moniker_from_query},
     ffx_component::{
         format::format_start_error,
-        query::get_cml_moniker_from_query,
         rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer},
     },
     ffx_component_start_args::ComponentStartCommand,

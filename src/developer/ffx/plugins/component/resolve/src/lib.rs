@@ -4,10 +4,9 @@
 
 use {
     anyhow::Result,
-    component_debug::lifecycle::resolve_instance,
+    component_debug::{lifecycle::resolve_instance, query::get_cml_moniker_from_query},
     ffx_component::{
         format::format_resolve_error,
-        query::get_cml_moniker_from_query,
         rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer},
     },
     ffx_component_resolve_args::ComponentResolveCommand,

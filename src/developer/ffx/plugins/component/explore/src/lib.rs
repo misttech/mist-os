@@ -5,8 +5,9 @@
 use {
     anyhow::{anyhow, Error, Result},
     atty::Stream,
+    component_debug::query::get_cml_moniker_from_query,
     errors::{ffx_bail, ffx_error},
-    ffx_component::{query::get_cml_moniker_from_query, rcs::connect_to_realm_explorer},
+    ffx_component::rcs::connect_to_realm_explorer,
     ffx_component_explore_args::ExploreComponentCommand,
     ffx_core::ffx_plugin,
     fidl_fuchsia_dash::{DashNamespaceLayout, LauncherError, LauncherEvent, LauncherProxy},

@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result,
-    component_debug::list::get_all_cml_instances,
-    errors::ffx_bail,
+    crate::list::get_all_cml_instances,
+    anyhow::{bail, Result},
     fidl_fuchsia_sys2 as fsys,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
 };
@@ -67,10 +66,10 @@ pub async fn get_cml_moniker_from_query(
     if monikers.len() > 1 {
         let monikers: Vec<String> = monikers.into_iter().map(|m| m.to_string()).collect();
         let monikers = monikers.join("\n");
-        ffx_bail!("The query {:?} matches more than one component instance:\n{}\n\nTo avoid ambiguity, use one of the above monikers instead.\n", query, monikers);
+        bail!("The query {:?} matches more than one component instance:\n{}\n\nTo avoid ambiguity, use one of the above monikers instead.", query, monikers);
     }
     if monikers.is_empty() {
-        ffx_bail!("No matching component instance found for query {:?}. Use `ffx component list` to find the correct component instance.\n", query);
+        bail!("No matching component instance found for query {:?}.", query);
     }
     let moniker = monikers.remove(0);
     Ok(moniker)

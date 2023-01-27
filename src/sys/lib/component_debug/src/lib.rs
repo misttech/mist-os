@@ -11,6 +11,7 @@ pub mod io;
 pub mod lifecycle;
 pub mod list;
 pub mod path;
+pub mod query;
 pub mod show;
 pub mod storage;
 

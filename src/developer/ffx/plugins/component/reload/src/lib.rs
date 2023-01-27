@@ -4,10 +4,12 @@
 
 use {
     anyhow::Result,
-    component_debug::lifecycle::{resolve_instance, start_instance, unresolve_instance},
+    component_debug::{
+        lifecycle::{resolve_instance, start_instance, unresolve_instance},
+        query::get_cml_moniker_from_query,
+    },
     ffx_component::{
         format::{format_action_error, format_resolve_error, format_start_error},
-        query::get_cml_moniker_from_query,
         rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer},
     },
     ffx_component_reload_args::ReloadComponentCommand,

@@ -15,6 +15,7 @@ ffx_plugin("ffx_component_explore") {
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/sys/lib/component_debug",
     "//third_party/rust_crates:atty",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:termion",

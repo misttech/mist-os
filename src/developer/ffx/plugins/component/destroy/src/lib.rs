@@ -4,11 +4,12 @@
 
 use {
     anyhow::Result,
-    component_debug::lifecycle::destroy_instance_in_collection,
+    component_debug::{
+        lifecycle::destroy_instance_in_collection, query::get_cml_moniker_from_query,
+    },
     errors::ffx_error,
     ffx_component::{
         format::format_destroy_error,
-        query::get_cml_moniker_from_query,
         rcs::{connect_to_lifecycle_controller, connect_to_realm_explorer},
     },
     ffx_component_destroy_args::DestroyComponentCommand,

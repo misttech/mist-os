@@ -4,11 +4,13 @@
 
 use {
     anyhow::Result,
-    component_debug::doctor::{create_tables, validate_routes},
-    errors::ffx_bail,
-    ffx_component::{
+    component_debug::{
+        doctor::{create_tables, validate_routes},
         query::get_cml_moniker_from_query,
-        rcs::{connect_to_realm_explorer, connect_to_realm_query, connect_to_route_validator},
+    },
+    errors::ffx_bail,
+    ffx_component::rcs::{
+        connect_to_realm_explorer, connect_to_realm_query, connect_to_route_validator,
     },
     ffx_component_doctor_args::DoctorCommand,
     ffx_core::ffx_plugin,
