@@ -16,6 +16,7 @@
 #include "src/devices/lib/acpi/mock/mock-acpi.h"
 #include "src/devices/mcu/drivers/chromiumos-ec-core/chromiumos_ec_core.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "zircon/system/ulib/async-loop/testing/include/lib/async-loop/testing/cpp/real_loop.h"
 namespace chromiumos_ec_core {
 
 template <typename T>
@@ -55,7 +56,9 @@ class FakeEcDevice : public fidl::testing::WireTestBase<fuchsia_hardware_google_
   std::string board_;
 };
 
-class ChromiumosEcTestBase : public inspect::InspectTestHelper, public zxtest::Test {
+class ChromiumosEcTestBase : public inspect::InspectTestHelper,
+                             public zxtest::Test,
+                             public loop_fixture::RealLoop {
  public:
   void SetUp() override;
   void InitDevice();
@@ -64,11 +67,10 @@ class ChromiumosEcTestBase : public inspect::InspectTestHelper, public zxtest::T
 
  protected:
   std::shared_ptr<zx_device> fake_root_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   FakeEcDevice fake_ec_;
   acpi::mock::Device fake_acpi_;
   ChromiumosEcCore* device_;
-  component::OutgoingDirectory outgoing_{component::OutgoingDirectory(loop_.dispatcher())};
+  component::OutgoingDirectory outgoing_{component::OutgoingDirectory(dispatcher())};
 
   sync_completion_t ec_shutdown_;
   sync_completion_t acpi_shutdown_;

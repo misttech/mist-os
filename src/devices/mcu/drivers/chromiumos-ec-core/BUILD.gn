@@ -62,6 +62,7 @@ source_set("test-common") {
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/lib/acpi/mock:mock-acpi",
     "//src/devices/testing/mock-ddk",
+    "//zircon/system/ulib/async-loop/testing:async-loop-testing",
     "//zircon/system/ulib/zxtest",
   ]
 

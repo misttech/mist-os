@@ -18,7 +18,6 @@ namespace chromiumos_ec_core {
 
 void ChromiumosEcTestBase::SetUp() {
   fake_root_ = MockDevice::FakeRootParent();
-  ASSERT_OK(loop_.StartThread("chromiumos-ec-core-test"));
   fake_acpi_.SetInstallNotifyHandler(
       [this](acpi::mock::Device::InstallNotifyHandlerRequestView request, auto& completer) {
         ASSERT_FALSE(handler_.is_valid());
@@ -32,7 +31,7 @@ void ChromiumosEcTestBase::InitDevice() {
   ASSERT_OK(device_->Bind());
 
   auto ec_connector = [this](fidl::ServerEnd<fuchsia_hardware_google_ec::Device> server) {
-    ec_binding_ = fidl::BindServer(loop_.dispatcher(), std::move(server), &fake_ec_,
+    ec_binding_ = fidl::BindServer(dispatcher(), std::move(server), &fake_ec_,
                                    [this](FakeEcDevice*, fidl::UnbindInfo,
                                           fidl::ServerEnd<fuchsia_hardware_google_ec::Device>) {
                                      sync_completion_signal(&ec_shutdown_);
@@ -51,7 +50,7 @@ void ChromiumosEcTestBase::InitDevice() {
                              std::move(endpoints->client));
 
   auto acpi_connector = [this](fidl::ServerEnd<fuchsia_hardware_acpi::Device> server) {
-    acpi_binding_ = fidl::BindServer(loop_.dispatcher(), std::move(server), &fake_acpi_,
+    acpi_binding_ = fidl::BindServer(dispatcher(), std::move(server), &fake_acpi_,
                                      [this](acpi::mock::Device*, fidl::UnbindInfo,
                                             fidl::ServerEnd<fuchsia_hardware_acpi::Device>) {
                                        sync_completion_signal(&acpi_shutdown_);
@@ -69,7 +68,8 @@ void ChromiumosEcTestBase::InitDevice() {
   fake_root_->AddFidlService(fuchsia_hardware_acpi::Service::Name, std::move(endpoints->client));
 
   device_->zxdev()->InitOp();
-  ASSERT_OK(device_->zxdev()->WaitUntilInitReplyCalled(zx::time::infinite()));
+  PerformBlockingWork(
+      [&] { ASSERT_OK(device_->zxdev()->WaitUntilInitReplyCalled(zx::time::infinite())); });
   initialised_ = true;
 }
 
@@ -85,12 +85,11 @@ void ChromiumosEcTestBase::TearDown() {
     ec_binding_->Close(ZX_ERR_CANCELED);
   }
   if (ec_binding_) {
-    sync_completion_wait(&ec_shutdown_, ZX_TIME_INFINITE);
+    PerformBlockingWork([&] { sync_completion_wait(&ec_shutdown_, ZX_TIME_INFINITE); });
   }
   if (acpi_binding_) {
-    sync_completion_wait(&acpi_shutdown_, ZX_TIME_INFINITE);
+    PerformBlockingWork([&] { sync_completion_wait(&acpi_shutdown_, ZX_TIME_INFINITE); });
   }
-  loop_.Shutdown();
 }
 
 void FakeEcDevice::NotImplemented_(const std::string& name, fidl::CompleterBase& completer) {

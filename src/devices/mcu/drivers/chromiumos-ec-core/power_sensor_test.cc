@@ -15,6 +15,7 @@
 #include <zxtest/zxtest.h>
 
 #include "chromiumos-platform-ec/ec_commands.h"
+#include "fidl/fuchsia.hardware.power.sensor/cpp/markers.h"
 #include "src/devices/mcu/drivers/chromiumos-ec-core/chromiumos_ec_core.h"
 #include "src/devices/mcu/drivers/chromiumos-ec-core/fake_device.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
@@ -25,8 +26,6 @@ class ChromiumosEcPowerSensorTest : public ChromiumosEcTestBase {
  public:
   void SetUp() override {
     ChromiumosEcTestBase::SetUp();
-    ASSERT_OK(loop_.StartThread("cros-ec-power-sensor-test-fidl"));
-
     fake_ec_.SetBoard(kAtlasBoardName);
 
     fake_ec_.AddCommand(EC_CMD_ADC_READ, 0,
@@ -40,13 +39,14 @@ class ChromiumosEcPowerSensorTest : public ChromiumosEcTestBase {
     // Initialise the power-sensor device.
     zx_device* powersensor_dev = ChromiumosEcTestBase::device_->zxdev()->GetLatestChild();
     powersensor_dev->InitOp();
-    ASSERT_OK(powersensor_dev->WaitUntilInitReplyCalled(zx::time::infinite()));
+    PerformBlockingWork(
+        [&] { ASSERT_OK(powersensor_dev->WaitUntilInitReplyCalled(zx::time::infinite())); });
     device_ = powersensor_dev->GetDeviceContext<CrOsEcPowerSensorDevice>();
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_power_sensor::Device>();
     ASSERT_OK(endpoints.status_value());
 
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), device_);
+    fidl::BindServer(dispatcher(), std::move(endpoints->server), device_);
     client_.Bind(std::move(endpoints->client));
   }
 
@@ -85,33 +85,40 @@ class ChromiumosEcPowerSensorTest : public ChromiumosEcTestBase {
   int32_t power_ = 15'000'000;
   CrOsEcPowerSensorDevice* device_;
   fidl::WireSyncClient<fuchsia_hardware_power_sensor::Device> client_;
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 TEST_F(ChromiumosEcPowerSensorTest, PowerInfo) {
-  auto result = client_->GetPowerWatts();
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_ok());
-  EXPECT_EQ(result->value()->power, 15.0f);
+  PerformBlockingWork([&] {
+    auto result = client_->GetPowerWatts();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->power, 15.0f);
+  });
 
   SetPower(20'500'000);
-  auto result2 = client_->GetPowerWatts();
-  ASSERT_TRUE(result2.ok());
-  ASSERT_TRUE(result2->is_ok());
-  EXPECT_EQ(result2->value()->power, 20.5f);
+  PerformBlockingWork([&] {
+    auto result = client_->GetPowerWatts();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->power, 20.5f);
+  });
 
   SetPower(-1);
-  auto result3 = client_->GetPowerWatts();
-  ASSERT_TRUE(result3.ok());
-  ASSERT_TRUE(result3->is_error());
-  EXPECT_EQ(result3->error_value(), ZX_ERR_INTERNAL);
+  PerformBlockingWork([&] {
+    auto result = client_->GetPowerWatts();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    EXPECT_EQ(result->error_value(), ZX_ERR_INTERNAL);
+  });
 }
 
 TEST_F(ChromiumosEcPowerSensorTest, VoltageInfo) {
-  auto result = client_->GetVoltageVolts();
-  ASSERT_TRUE(result.ok());
-  ASSERT_TRUE(result->is_error());
-  EXPECT_EQ(result->error_value(), ZX_ERR_NOT_SUPPORTED);
+  PerformBlockingWork([&] {
+    auto result = client_->GetVoltageVolts();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    EXPECT_EQ(result->error_value(), ZX_ERR_NOT_SUPPORTED);
+  });
 }
 
 }  // namespace chromiumos_ec_core::power_sensor

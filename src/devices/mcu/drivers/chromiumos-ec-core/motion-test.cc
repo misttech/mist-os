@@ -83,7 +83,8 @@ class ChromiumosEcMotionTest : public ChromiumosEcTestBase {
     // Initialise the motion device.
     zx_device* motion_dev = device_->zxdev()->GetLatestChild();
     motion_dev->InitOp();
-    ASSERT_OK(motion_dev->WaitUntilInitReplyCalled(zx::time::infinite()));
+    PerformBlockingWork(
+        [&] { ASSERT_OK(motion_dev->WaitUntilInitReplyCalled(zx::time::infinite())); });
     motion_dev_ = motion_dev->GetDeviceContext<AcpiCrOsEcMotionDevice>();
   }
   void MotionsenseCommand(const ec_params_motion_sense* cmd,
@@ -218,6 +219,7 @@ TEST_F(ChromiumosEcMotionTest, FifoAvoidsDeadlocks) {
       .ops = &ops,
       .ctx = this,
   };
+
   std::atomic_bool running = true;
   std::thread thr([this, &running]() {
     while (running.load()) {
@@ -227,9 +229,9 @@ TEST_F(ChromiumosEcMotionTest, FifoAvoidsDeadlocks) {
   });
 
   for (size_t i = 0; i < 10; i++) {
-    ASSERT_OK(motion_dev_->HidbusStart(&proto));
+    PerformBlockingWork([&] { ASSERT_OK(motion_dev_->HidbusStart(&proto)); });
     zx::nanosleep(zx::deadline_after(zx::msec(50)));
-    motion_dev_->HidbusStop();
+    PerformBlockingWork([&] { motion_dev_->HidbusStop(); });
     zx::nanosleep(zx::deadline_after(zx::msec(50)));
   }
 
