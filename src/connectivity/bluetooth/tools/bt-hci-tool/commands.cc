@@ -314,7 +314,6 @@ bool HandleWriteLocalName(const CommandData* cmd_data, const fxl::CommandLine& c
   // Use ContiguousBuffer instead of constructing LocalName view in case of invalid view being
   // created when name is not large enough for the view
   auto name_buf = emboss::support::ReadOnlyContiguousBuffer(&name);
-
   local_name.CopyFrom(name_buf, name_size);
 
   auto id = SendCompleteCommand(cmd_data, std::move(write_name), std::move(complete_cb));
