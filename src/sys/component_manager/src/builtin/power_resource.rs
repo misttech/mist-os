@@ -81,15 +81,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn power_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_power_resource() -> Result<Resource, Error> {
         let power_resource_provider = connect_to_protocol::<fkernel::PowerResourceMarker>()?;
         let power_resource_handle = power_resource_provider.get().await?;
@@ -112,20 +103,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn fail_with_no_power_resource() -> Result<(), Error> {
-        if power_resource_available() {
-            return Ok(());
-        }
-        assert!(!PowerResource::new(Resource::from(zx::Handle::invalid())).is_ok());
-        Ok(())
-    }
-
-    #[fasync::run_singlethreaded(test)]
     async fn kind_type_is_power() -> Result<(), Error> {
-        if !power_resource_available() {
-            return Ok(());
-        }
-
         let power_resource_provider = serve_power_resource().await?;
         let power_resource: Resource = power_resource_provider.get().await?;
         let resource_info = power_resource.info()?;
@@ -137,10 +115,6 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn can_connect_to_power_service() -> Result<(), Error> {
-        if !power_resource_available() {
-            return Ok(());
-        }
-
         let power_resource = PowerResource::new(get_power_resource().await?).unwrap();
         let hooks = Hooks::new();
         hooks.install(power_resource.hooks()).await;

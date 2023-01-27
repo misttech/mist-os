@@ -82,15 +82,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn ioport_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_ioport_resource() -> Result<Resource, Error> {
         let ioport_resource_provider = connect_to_protocol::<fkernel::IoportResourceMarker>()?;
         let ioport_resource_handle = ioport_resource_provider.get().await?;
@@ -113,9 +104,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn fail_with_no_ioport_resource() -> Result<(), Error> {
-        if ioport_resource_available() {
-            return Ok(());
-        }
         let (_, stream) =
             fidl::endpoints::create_proxy_and_stream::<fkernel::IoportResourceMarker>()?;
         assert!(!IoportResource::new(Resource::from(zx::Handle::invalid()))
@@ -127,10 +115,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn kind_type_is_ioport() -> Result<(), Error> {
-        if !ioport_resource_available() {
-            return Ok(());
-        }
-
         let ioport_resource_provider = serve_ioport_resource().await?;
         let ioport_resource: Resource = ioport_resource_provider.get().await?;
         let resource_info = ioport_resource.info()?;
@@ -142,10 +126,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_ioport_service() -> Result<(), Error> {
-        if !ioport_resource_available() {
-            return Ok(());
-        }
-
         let ioport_resource = IoportResource::new(get_ioport_resource().await?);
         let hooks = Hooks::new();
         hooks.install(ioport_resource.hooks()).await;

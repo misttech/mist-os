@@ -434,20 +434,6 @@ mod tests {
         Ok(handle)
     }
 
-    // It is not possible to test this process launcher service, which uses the process_builder
-    // crate, except in an environment where zx_process_start is allowed (generally, when the test
-    // process runs in the root job). We return early from the tests otherwise.
-    fn expect_access_denied() -> bool {
-        // This is somewhat fragile but intentionally so, so that this will fail if the binary
-        // names change and get updated properly.
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => true,
-            Some("/pkg/bin/component_manager_boot_env_test") => false,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn serve_launcher(
     ) -> Result<(fproc::LauncherProxy, Arc<ProcessLauncher>, TaskScope), Error> {
         let process_launcher = Arc::new(ProcessLauncher::new());
@@ -573,10 +559,6 @@ mod tests {
         launcher.add_args(&mut test_args_bytes.into_iter())?;
 
         let (status, process) = launcher.launch(&mut launch_info).await?;
-        if expect_access_denied() {
-            assert_eq!(zx::Status::from_raw(status), zx::Status::ACCESS_DENIED);
-            return Ok(());
-        }
         zx::Status::ok(status).context("Failed to launch test util process")?;
         let process = process.expect("Status was OK but no process returned");
         check_process_running(&process)?;
@@ -600,10 +582,6 @@ mod tests {
         launcher.add_environs(&mut test_env_bytes.into_iter())?;
 
         let (status, process) = launcher.launch(&mut launch_info).await?;
-        if expect_access_denied() {
-            assert_eq!(zx::Status::from_raw(status), zx::Status::ACCESS_DENIED);
-            return Ok(());
-        }
         zx::Status::ok(status).context("Failed to launch test util process")?;
         let process = process.expect("Status was OK but no process returned");
         check_process_running(&process)?;
@@ -644,10 +622,6 @@ mod tests {
         launcher.add_names(&mut name_infos.iter_mut())?;
 
         let (status, process) = launcher.launch(&mut launch_info).await?;
-        if expect_access_denied() {
-            assert_eq!(zx::Status::from_raw(status), zx::Status::ACCESS_DENIED);
-            return Ok(());
-        }
         zx::Status::ok(status).context("Failed to launch test util process")?;
         let process = process.expect("Status was OK but no process returned");
         check_process_running(&process)?;
@@ -670,10 +644,6 @@ mod tests {
         launcher.add_args(&mut test_args_bytes.into_iter())?;
 
         let (status, start_data) = launcher.create_without_starting(&mut launch_info).await?;
-        if expect_access_denied() {
-            assert_eq!(zx::Status::from_raw(status), zx::Status::ACCESS_DENIED);
-            return Ok(());
-        }
         zx::Status::ok(status).context("Failed to launch test util process")?;
         let start_data = start_data.expect("Status was OK but no ProcessStartData returned");
 

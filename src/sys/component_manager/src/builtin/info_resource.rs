@@ -79,15 +79,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn info_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_info_resource() -> Result<Resource, Error> {
         let info_resource_provider = connect_to_protocol::<fkernel::InfoResourceMarker>()?;
         let info_resource_handle = info_resource_provider.get().await?;
@@ -110,20 +101,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_info_resource() -> Result<(), Error> {
-        if info_resource_available() {
-            return Ok(());
-        }
-        assert!(!InfoResource::new(Resource::from(zx::Handle::invalid())).is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn base_type_is_info() -> Result<(), Error> {
-        if !info_resource_available() {
-            return Ok(());
-        }
-
         let info_resource_provider = serve_info_resource().await?;
         let info_resource: Resource = info_resource_provider.get().await?;
         let resource_info = info_resource.info()?;
@@ -135,10 +113,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_info_service() -> Result<(), Error> {
-        if !info_resource_available() {
-            return Ok(());
-        }
-
         let info_resource = InfoResource::new(get_info_resource().await?).unwrap();
         let hooks = Hooks::new();
         hooks.install(info_resource.hooks()).await;

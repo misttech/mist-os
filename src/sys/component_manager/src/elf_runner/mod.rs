@@ -626,7 +626,6 @@ mod tests {
         },
         anyhow::Error,
         assert_matches::assert_matches,
-        fdio,
         fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd},
         fidl_fuchsia_component as fcomp, fidl_fuchsia_component_runner as fcrunner,
         fidl_fuchsia_data as fdata,
@@ -646,7 +645,6 @@ mod tests {
         scoped_task,
         std::{
             convert::TryFrom,
-            ffi::CString,
             sync::{Arc, Mutex},
             task::Poll,
         },
@@ -654,20 +652,6 @@ mod tests {
 
     fn new_elf_runner_for_test(config: &RuntimeConfig) -> Arc<ElfRunner> {
         Arc::new(ElfRunner::new(&config, None, CrashRecords::new()))
-    }
-
-    // Rust's test harness does not allow passing through arbitrary arguments, so to get coverage
-    // for the different LibraryOpts configurations (which would normally be set based on
-    // arguments) we switch based on the test binary name.
-    fn should_use_builtin_process_launcher() -> bool {
-        // This is somewhat fragile but intentionally so, so that this will fail if the binary
-        // names change and get updated properly.
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
     }
 
     fn hello_world_startinfo(
@@ -777,26 +761,11 @@ mod tests {
         }
     }
 
-    fn create_dummy_process(
-        job: &scoped_task::Scoped<Job>,
-        raw_path: &str,
-        name_for_builtin: &str,
-    ) -> Process {
-        if !should_use_builtin_process_launcher() {
-            scoped_task::spawn(
-                job,
-                fdio::SpawnOptions::CLONE_ALL,
-                &CString::new(raw_path).expect("could not make cstring"),
-                &[&CString::new(raw_path).expect("could not make cstring")],
-            )
-            .expect("failed to spawn process")
-            .into_inner()
-        } else {
-            let (process, _vmar) = job
-                .create_child_process(zx::ProcessOptions::empty(), name_for_builtin.as_bytes())
-                .expect("could not create process");
-            process
-        }
+    fn create_dummy_process(job: &scoped_task::Scoped<Job>, name_for_builtin: &str) -> Process {
+        let (process, _vmar) = job
+            .create_child_process(zx::ProcessOptions::empty(), name_for_builtin.as_bytes())
+            .expect("could not create process");
+        process
     }
 
     fn make_default_elf_component(
@@ -804,7 +773,7 @@ mod tests {
         critical: bool,
     ) -> (Job, ElfComponent) {
         let job = scoped_task::create_child_job().expect("failed to make child job");
-        let dummy_process = create_dummy_process(&job, "/pkg/bin/run_indefinitely", "dummy");
+        let dummy_process = create_dummy_process(&job, "dummy");
         let job_copy = Job::from(
             job.as_handle_ref()
                 .duplicate(zx::Rights::SAME_RIGHTS)
@@ -944,10 +913,7 @@ mod tests {
             fasync::Channel::from_channel(runtime_dir_client).unwrap(),
         );
 
-        let config = RuntimeConfig {
-            use_builtin_process_launcher: should_use_builtin_process_launcher(),
-            ..Default::default()
-        };
+        let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
         let runner = new_elf_runner_for_test(&config);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::downgrade(&Arc::new(config)),
@@ -982,44 +948,6 @@ mod tests {
         // Wait for the process to exit so the test doesn't pagefault due to an invalid stdout
         // handle.
         controller.on_closed().await.expect("failed waiting for channel to close");
-        Ok(())
-    }
-
-    // This test checks that starting a component fails if we use the wrong built-in process
-    // launcher setting for the test environment. This helps ensure that the test above isn't
-    // succeeding for an unexpected reason, e.g. that it isn't using a fuchsia.process.Launcher
-    // from the test's namespace instead of serving and using a built-in one.
-    #[fuchsia::test]
-    async fn hello_world_fail_test() -> Result<(), Error> {
-        let (_runtime_dir_client, runtime_dir_server) = zx::Channel::create();
-        let start_info = hello_world_startinfo(Some(ServerEnd::new(runtime_dir_server)));
-
-        // Note that value of should_use... is negated
-        let config = RuntimeConfig {
-            use_builtin_process_launcher: !should_use_builtin_process_launcher(),
-            ..Default::default()
-        };
-        let runner = new_elf_runner_for_test(&config);
-        let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
-            Arc::downgrade(&Arc::new(config)),
-            AbsoluteMoniker::root(),
-        ));
-        let (client_controller, server_controller) =
-            create_proxy::<fcrunner::ComponentControllerMarker>()
-                .expect("could not create component controller endpoints");
-
-        runner.start(start_info, server_controller).await;
-        let mut event_stream = client_controller.take_event_stream();
-        for _ in 0..2 {
-            let event = event_stream.try_next().await;
-            match event {
-                Ok(Some(fcrunner::ComponentControllerEvent::OnPublishDiagnostics { .. })) => {}
-                Err(fidl::Error::ClientChannelClosed { .. }) => {
-                    break;
-                }
-                other => panic!("Expected channel closed error, got {:?}", other),
-            }
-        }
         Ok(())
     }
 
@@ -1265,10 +1193,7 @@ mod tests {
         let start_info = lifecycle_startinfo_mark_vmo_exec(None);
 
         // Config does not allowlist any monikers to have access to the job policy.
-        let config = RuntimeConfig {
-            use_builtin_process_launcher: should_use_builtin_process_launcher(),
-            ..Default::default()
-        };
+        let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
         let runner = new_elf_runner_for_test(&config);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::downgrade(&Arc::new(config)),
@@ -1305,7 +1230,7 @@ mod tests {
                 },
                 ..Default::default()
             },
-            use_builtin_process_launcher: should_use_builtin_process_launcher(),
+            use_builtin_process_launcher: true,
             ..Default::default()
         });
         let runner = new_elf_runner_for_test(&config);
@@ -1343,10 +1268,7 @@ mod tests {
         let start_info = hello_world_startinfo_main_process_critical(None);
 
         // Config does not allowlist any monikers to be marked as critical
-        let config = RuntimeConfig {
-            use_builtin_process_launcher: should_use_builtin_process_launcher(),
-            ..Default::default()
-        };
+        let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
         let runner = new_elf_runner_for_test(&config);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::downgrade(&Arc::new(config)),
@@ -1380,7 +1302,7 @@ mod tests {
         // Config does not allowlist any monikers to be marked as critical without being
         // allowlisted, so make sure we permit this one.
         let config = Arc::new(RuntimeConfig {
-            use_builtin_process_launcher: should_use_builtin_process_launcher(),
+            use_builtin_process_launcher: true,
             security_policy: SecurityPolicy {
                 job_policy: JobPolicyAllowlists {
                     main_process_critical: vec![AllowlistEntryBuilder::new().build()],
@@ -1476,10 +1398,7 @@ mod tests {
                 ns,
             );
 
-            let config = RuntimeConfig {
-                use_builtin_process_launcher: should_use_builtin_process_launcher(),
-                ..Default::default()
-            };
+            let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
 
             let runner = new_elf_runner_for_test(&config);
             let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
@@ -1542,10 +1461,7 @@ mod tests {
             fasync::Channel::from_channel(runtime_dir_client).unwrap(),
         );
 
-        let config = RuntimeConfig {
-            use_builtin_process_launcher: should_use_builtin_process_launcher(),
-            ..Default::default()
-        };
+        let config = RuntimeConfig { use_builtin_process_launcher: true, ..Default::default() };
         let runner = new_elf_runner_for_test(&config);
         let runner = runner.get_scoped_runner(ScopedPolicyChecker::new(
             Arc::downgrade(&Arc::new(config)),

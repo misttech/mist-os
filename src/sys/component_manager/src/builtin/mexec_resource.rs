@@ -81,15 +81,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn mexec_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_mexec_resource() -> Result<Resource, Error> {
         let mexec_resource_provider = connect_to_protocol::<fkernel::MexecResourceMarker>()?;
         let mexec_resource_handle = mexec_resource_provider.get().await?;
@@ -112,20 +103,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_mexec_resource() -> Result<(), Error> {
-        if mexec_resource_available() {
-            return Ok(());
-        }
-        assert!(!MexecResource::new(Resource::from(zx::Handle::invalid())).is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn kind_type_is_mexec() -> Result<(), Error> {
-        if !mexec_resource_available() {
-            return Ok(());
-        }
-
         let mexec_resource_provider = serve_mexec_resource().await?;
         let mexec_resource: Resource = mexec_resource_provider.get().await?;
         let resource_info = mexec_resource.info()?;
@@ -137,10 +115,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_mexec_service() -> Result<(), Error> {
-        if !mexec_resource_available() {
-            return Ok(());
-        }
-
         let mexec_resource = MexecResource::new(get_mexec_resource().await?).unwrap();
         let hooks = Hooks::new();
         hooks.install(mexec_resource.hooks()).await;

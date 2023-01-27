@@ -81,15 +81,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn debug_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_debug_resource() -> Result<Resource, Error> {
         let debug_resource_provider = connect_to_protocol::<fkernel::DebugResourceMarker>()?;
         let debug_resource_handle = debug_resource_provider.get().await?;
@@ -112,20 +103,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_debug_resource() -> Result<(), Error> {
-        if debug_resource_available() {
-            return Ok(());
-        }
-        assert!(!DebugResource::new(Resource::from(zx::Handle::invalid())).is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn base_type_is_debug() -> Result<(), Error> {
-        if !debug_resource_available() {
-            return Ok(());
-        }
-
         let debug_resource_provider = serve_debug_resource().await?;
         let debug_resource: Resource = debug_resource_provider.get().await?;
         let resource_info = debug_resource.info()?;
@@ -137,10 +115,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_debug_service() -> Result<(), Error> {
-        if !debug_resource_available() {
-            return Ok(());
-        }
-
         let debug_resource = DebugResource::new(get_debug_resource().await?).unwrap();
         let hooks = Hooks::new();
         hooks.install(debug_resource.hooks()).await;

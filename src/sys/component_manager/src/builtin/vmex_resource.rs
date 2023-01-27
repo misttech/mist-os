@@ -79,15 +79,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn vmex_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_vmex_resource() -> Result<Resource, Error> {
         let vmex_resource_provider = connect_to_protocol::<fkernel::VmexResourceMarker>()?;
         let vmex_resource_handle = vmex_resource_provider.get().await?;
@@ -110,20 +101,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_vmex_resource() -> Result<(), Error> {
-        if vmex_resource_available() {
-            return Ok(());
-        }
-        assert!(!VmexResource::new(Resource::from(zx::Handle::invalid())).is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn base_type_is_vmex() -> Result<(), Error> {
-        if !vmex_resource_available() {
-            return Ok(());
-        }
-
         let vmex_resource_provider = serve_vmex_resource().await?;
         let vmex_resource: Resource = vmex_resource_provider.get().await?;
         let resource_info = vmex_resource.info()?;
@@ -135,10 +113,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_vmex_service() -> Result<(), Error> {
-        if !vmex_resource_available() {
-            return Ok(());
-        }
-
         let vmex_resource = VmexResource::new(get_vmex_resource().await?).unwrap();
         let hooks = Hooks::new();
         hooks.install(vmex_resource.hooks()).await;

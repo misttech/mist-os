@@ -73,10 +73,24 @@ fuchsia_package("elf-test-ambient-exec-runner") {
   deps = [ ":elf-test-ambient-exec-runner-component" ]
 }
 
+# Identical to elf-test-runner-component, just with the create raw processes job policy.
+fuchsia_component("elf-test-create-raw-processes-runner-component") {
+  testonly = true
+  component_name = "elf-test-create-raw-processes-runner"
+  manifest = "meta/elf_test_create_raw_processes_runner.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("elf-test-create-raw-processes-runner") {
+  testonly = true
+  deps = [ ":elf-test-create-raw-processes-runner-component" ]
+}
+
 group("elf") {
   testonly = true
   deps = [
     ":elf-test-ambient-exec-runner",
+    ":elf-test-create-raw-processes-runner",
     ":elf-test-runner",
   ]
 }

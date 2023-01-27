@@ -166,15 +166,6 @@ mod tests {
         fuchsia_component::client::connect_to_protocol, zx::DurationNum as _,
     };
 
-    fn root_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_root_resource() -> Result<Resource, Error> {
         let root_resource_provider = connect_to_protocol::<fboot::RootResourceMarker>()?;
         let root_resource_handle = root_resource_provider.get().await?;
@@ -202,10 +193,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn get_mem_stats() -> Result<(), Error> {
-        if !root_resource_available() {
-            return Ok(());
-        }
-
         let kernel_stats_provider = serve_kernel_stats(OnError::Panic).await?;
         let mem_stats = kernel_stats_provider.get_memory_stats().await?;
 
@@ -217,10 +204,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn get_mem_stats_extended() -> Result<(), Error> {
-        if !root_resource_available() {
-            return Ok(());
-        }
-
         let kernel_stats_provider = serve_kernel_stats(OnError::Panic).await?;
         let mem_stats_extended = kernel_stats_provider.get_memory_stats_extended().await?;
 
@@ -232,10 +215,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn get_cpu_stats() -> Result<(), Error> {
-        if !root_resource_available() {
-            return Ok(());
-        }
-
         let kernel_stats_provider = serve_kernel_stats(OnError::Panic).await?;
         let cpu_stats = kernel_stats_provider.get_cpu_stats().await?;
         let actual_num_cpus = cpu_stats.actual_num_cpus;
@@ -258,10 +237,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn get_cpu_load_invalid_duration() {
-        if !root_resource_available() {
-            return;
-        }
-
         let kernel_stats_provider = serve_kernel_stats(OnError::Ignore).await.unwrap();
 
         // The server should close the channel when it receives an invalid argument
@@ -273,10 +248,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn get_cpu_load() -> Result<(), Error> {
-        if !root_resource_available() {
-            return Ok(());
-        }
-
         let kernel_stats_provider = serve_kernel_stats(OnError::Panic).await?;
         let cpu_loads = kernel_stats_provider.get_cpu_load(1.seconds().into_nanos()).await?;
 

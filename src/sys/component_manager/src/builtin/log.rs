@@ -114,15 +114,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn root_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_root_resource() -> Result<zx::Resource, Error> {
         let root_resource_provider = connect_to_protocol::<fboot::RootResourceMarker>()?;
         let root_resource_handle = root_resource_provider.get().await?;
@@ -131,9 +122,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn has_correct_rights_for_read_only() -> Result<(), Error> {
-        if !root_resource_available() {
-            return Ok(());
-        }
         let resource = get_root_resource().await?;
         let read_only_log = ReadOnlyLog::new(resource);
         let (proxy, stream) =
@@ -153,9 +141,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_read_only() -> Result<(), Error> {
-        if !root_resource_available() {
-            return Ok(());
-        }
         let resource = get_root_resource().await?;
         let read_only_log = ReadOnlyLog::new(resource);
         let hooks = Hooks::new();

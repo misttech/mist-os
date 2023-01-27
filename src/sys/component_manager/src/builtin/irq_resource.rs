@@ -78,15 +78,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn irq_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_irq_resource() -> Result<Resource, Error> {
         let irq_resource_provider = connect_to_protocol::<fkernel::IrqResourceMarker>()?;
         let irq_resource_handle = irq_resource_provider.get().await?;
@@ -109,9 +100,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn fail_with_no_irq_resource() -> Result<(), Error> {
-        if irq_resource_available() {
-            return Ok(());
-        }
         let (_, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::IrqResourceMarker>()?;
         assert!(!IrqResource::new(Resource::from(zx::Handle::invalid()))
             .serve(stream)
@@ -122,10 +110,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn kind_type_is_irq() -> Result<(), Error> {
-        if !irq_resource_available() {
-            return Ok(());
-        }
-
         let irq_resource_provider = serve_irq_resource().await?;
         let irq_resource: Resource = irq_resource_provider.get().await?;
         let resource_info = irq_resource.info()?;
@@ -137,10 +121,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_irq_service() -> Result<(), Error> {
-        if !irq_resource_available() {
-            return Ok(());
-        }
-
         let irq_resource = IrqResource::new(get_irq_resource().await?);
         let hooks = Hooks::new();
         hooks.install(irq_resource.hooks()).await;

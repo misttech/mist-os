@@ -78,15 +78,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn mmio_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_mmio_resource() -> Result<Resource, Error> {
         let mmio_resource_provider = connect_to_protocol::<fkernel::MmioResourceMarker>()?;
         let mmio_resource_handle = mmio_resource_provider.get().await?;
@@ -108,25 +99,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_mmio_resource() -> Result<(), Error> {
-        if mmio_resource_available() {
-            return Ok(());
-        }
-        let (_, stream) =
-            fidl::endpoints::create_proxy_and_stream::<fkernel::MmioResourceMarker>()?;
-        assert!(!MmioResource::new(Resource::from(zx::Handle::invalid()))
-            .serve(stream)
-            .await
-            .is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn kind_type_is_mmio() -> Result<(), Error> {
-        if !mmio_resource_available() {
-            return Ok(());
-        }
-
         let mmio_resource_provider = serve_mmio_resource().await?;
         let mmio_resource: Resource = mmio_resource_provider.get().await?;
         let resource_info = mmio_resource.info()?;
@@ -138,10 +111,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_mmio_service() -> Result<(), Error> {
-        if !mmio_resource_available() {
-            return Ok(());
-        }
-
         let mmio_resource = MmioResource::new(get_mmio_resource().await?);
         let hooks = Hooks::new();
         hooks.install(mmio_resource.hooks()).await;

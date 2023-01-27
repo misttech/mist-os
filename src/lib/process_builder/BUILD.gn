@@ -56,23 +56,6 @@ rustc_library("process_builder") {
   ]
 }
 
-rustc_binary("root_job_test_runner") {
-  testonly = true
-  edition = "2021"
-  source_root = "root_job_test_runner/main.rs"
-
-  deps = [
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//src/lib/fdio/rust:fdio",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:anyhow",
-  ]
-
-  sources = [ "root_job_test_runner/main.rs" ]
-}
-
 fidl("test-util-fidl") {
   testonly = true
   name = "test.processbuilder"
@@ -123,7 +106,6 @@ fuchsia_unittest_package("process-builder-tests") {
   manifest = "meta/process_builder_tests.cml"
   deps = [
     ":process_builder_test",
-    ":root_job_test_runner",
     ":static_pie_test_util",
     ":test_util",
     "//src/sys/testing/elftest",

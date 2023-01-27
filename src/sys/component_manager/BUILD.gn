@@ -11,8 +11,12 @@ import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
 import("//tools/fidl/measure-tape/measure_tape.gni")
 
-template("component_manager") {
-  _deps = [
+rustc_library("lib") {
+  name = "component_manager"
+  with_unit_tests = true
+  edition = "2021"
+
+  deps = [
     ":measure_tape_for_events",
     ":measure_tape_for_instance_info",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
@@ -81,7 +85,8 @@ template("component_manager") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
-  _sources = [
+
+  sources = [
     "src/bootfs.rs",
     "src/builtin/arguments.rs",
     "src/builtin/capability.rs",
@@ -186,93 +191,56 @@ template("component_manager") {
     "src/model/routing_fns.rs",
     "src/model/storage/admin_protocol.rs",
     "src/model/storage/mod.rs",
+    "src/model/testing/echo_service.rs",
+    "src/model/testing/mocks.rs",
+    "src/model/testing/mod.rs",
+    "src/model/testing/out_dir.rs",
+    "src/model/testing/routing_test_helpers.rs",
+    "src/model/testing/test_helpers.rs",
+    "src/model/testing/test_hook.rs",
+    "src/model/tests/availability.rs",
+    "src/model/tests/lifecycle.rs",
+    "src/model/tests/mod.rs",
+    "src/model/tests/policy.rs",
+    "src/model/tests/rights.rs",
+    "src/model/tests/routing.rs",
+    "src/model/tests/storage.rs",
+    "src/model/tests/storage_admin.rs",
     "src/root_stop_notifier.rs",
     "src/startup.rs",
   ]
 
-  if (defined(invoker.is_test) && invoker.is_test) {
-    rustc_test(target_name) {
-      edition = "2021"
-      sources = _sources
-      deps = _deps
+  test_deps = [
+    "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.component.config:fuchsia.component.config_rust",
+    "//src/lib/diagnostics/hierarchy/rust",
+    "//src/lib/diagnostics/log/message/rust",
+    "//src/lib/fuchsia",
+    "//src/lib/process_builder:test-util-fidl_rust",
+    "//src/lib/scoped_task",
+    "//src/sys/lib/cm_rust/testing",
+    "//src/sys/lib/component_id_index",
+    "//src/sys/lib/library_loader",
+    "//src/sys/lib/routing/testing:routing_test_helpers",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:byteorder",
+    "//third_party/rust_crates:paste",
+    "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:zerocopy",
+  ]
 
-      sources += [
-        "src/model/testing/echo_service.rs",
-        "src/model/testing/mocks.rs",
-        "src/model/testing/mod.rs",
-        "src/model/testing/out_dir.rs",
-        "src/model/testing/routing_test_helpers.rs",
-        "src/model/testing/test_helpers.rs",
-        "src/model/testing/test_hook.rs",
-        "src/model/tests/availability.rs",
-        "src/model/tests/lifecycle.rs",
-        "src/model/tests/mod.rs",
-        "src/model/tests/policy.rs",
-        "src/model/tests/rights.rs",
-        "src/model/tests/routing.rs",
-        "src/model/tests/storage.rs",
-        "src/model/tests/storage_admin.rs",
-      ]
-
-      # Test-only deps. Prefer adding deps used only in tests here instead of
-      # above, which has the benefit of keeping unneeded deps out of the production
-      # binary and allows depending on 'testonly' targets.
-      deps += [
-        "//examples/components/routing/fidl:echo_rust",
-        "//sdk/fidl/fuchsia.component.config:fuchsia.component.config_rust",
-        "//src/lib/diagnostics/hierarchy/rust",
-        "//src/lib/diagnostics/log/message/rust",
-        "//src/lib/fuchsia",
-        "//src/lib/process_builder:test-util-fidl_rust",
-        "//src/lib/scoped_task",
-        "//src/sys/lib/cm_rust/testing",
-        "//src/sys/lib/component_id_index",
-        "//src/sys/lib/library_loader",
-        "//src/sys/lib/routing/testing:routing_test_helpers",
-        "//third_party/rust_crates:assert_matches",
-        "//third_party/rust_crates:assert_matches",
-        "//third_party/rust_crates:byteorder",
-        "//third_party/rust_crates:paste",
-        "//third_party/rust_crates:pretty_assertions",
-        "//third_party/rust_crates:serde_json",
-        "//third_party/rust_crates:tempfile",
-        "//third_party/rust_crates:test-case",
-        "//third_party/rust_crates:zerocopy",
-      ]
-    }
-  } else {
-    not_needed([ "invoker" ])
-    rustc_library(target_name) {
-      name = "component_manager_lib"
-      edition = "2021"
-
-      sources = _sources
-      deps = _deps
-
-      assert_no_deps = [
-        # component_manager should not depend on json5
-        "//third_party/rust_crates:serde_json5",
-        # TODO(fxbug.dev/119607): remove dep on regex (there are still
-        # transitive deps)
-        #"//third_party/rust_crates:regex",
-      ]
-
-      # Only for internal use.
-      visibility = [
-        "//src/session/*",
-        "//src/sys/component_manager/*",
-      ]
-    }
-  }
-}
-
-component_manager("lib") {
-}
-component_manager("component_manager_test") {
-  is_test = true
-}
-component_manager("component_manager_boot_env_test") {
-  is_test = true
+  # component_manager should not depend on json5
+  assert_no_deps = [
+    # component_manager should not depend on json5
+    "//third_party/rust_crates:serde_json5",
+    # TODO(fxbug.dev/119607): remove dep on regex (there are still
+    # transitive deps)
+    #"//third_party/rust_crates:regex",
+  ]
 }
 
 rustc_binary("bin") {
@@ -319,30 +287,19 @@ fuchsia_component("component-manager-realm-builder-debug-cmp") {
   manifest = "meta/component_manager_debug.cml"
 }
 
-fuchsia_component("component-manager-tests-cmp") {
-  testonly = true
-  deps = [
-    ":component_manager_test",
-    "//src/lib/process_builder:test_util",
-  ]
-  component_name = "component_manager_tests"
-  manifest = "meta/component_manager_tests.cml"
-}
-
 resource("component_manager_tests_invalid_manifest") {
   sources = [ "meta/component_manager_tests.invalid_cm" ]
   outputs = [ "meta/{{source_file_part}}" ]
 }
 
-fuchsia_component("component-manager-boot-env-tests-cmp") {
+fuchsia_component("component-manager-tests-cmp") {
   testonly = true
   deps = [
-    ":component_manager_boot_env_test",
-    "//src/lib/process_builder:root_job_test_runner",
+    ":lib_test",
     "//src/lib/process_builder:test_util",
   ]
-  component_name = "component_manager_boot_env_tests"
-  manifest = "meta/component_manager_boot_env_tests.cml"
+  component_name = "component_manager_tests"
+  manifest = "meta/component_manager_tests.cml"
 }
 
 fuchsia_test_package("component-manager-tests") {
@@ -352,10 +309,7 @@ fuchsia_test_package("component-manager-tests") {
       max_severity = "ERROR"
     }
   }
-  test_components = [
-    ":component-manager-tests-cmp",
-    ":component-manager-boot-env-tests-cmp",
-  ]
+  test_components = [ ":component-manager-tests-cmp" ]
   deps = [
     ":component_manager_tests_invalid_manifest",
     "src/elf_runner/tests/lifecycle:run-indefinitely",

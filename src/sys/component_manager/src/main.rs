@@ -9,7 +9,7 @@ use {
     ::cm_logger::klog,
     ::routing::config::RuntimeConfig,
     anyhow::Error,
-    component_manager_lib::{
+    component_manager::{
         bootfs::BootfsSvc,
         builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder},
         startup,

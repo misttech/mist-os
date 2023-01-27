@@ -82,15 +82,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn hypervisor_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_hypervisor_resource() -> Result<Resource, Error> {
         let hypervisor_resource_provider =
             connect_to_protocol::<fkernel::HypervisorResourceMarker>()?;
@@ -118,20 +109,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_hypervisor_resource() -> Result<(), Error> {
-        if hypervisor_resource_available() {
-            return Ok(());
-        }
-        assert!(!HypervisorResource::new(Resource::from(zx::Handle::invalid())).is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn kind_type_is_hypervisor() -> Result<(), Error> {
-        if !hypervisor_resource_available() {
-            return Ok(());
-        }
-
         let hypervisor_resource_provider = serve_hypervisor_resource().await?;
         let hypervisor_resource: Resource = hypervisor_resource_provider.get().await?;
         let resource_info = hypervisor_resource.info()?;
@@ -143,10 +121,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_hypervisor_service() -> Result<(), Error> {
-        if !hypervisor_resource_available() {
-            return Ok(());
-        }
-
         let hypervisor_resource =
             HypervisorResource::new(get_hypervisor_resource().await?).unwrap();
         let hooks = Hooks::new();

@@ -6,9 +6,7 @@
 /// resolves components that are encoded in a meta.far. This test is fully
 /// hermetic.
 use {
-    component_manager_lib::{
-        bootfs::BootfsSvc, builtin::fuchsia_boot_resolver::FuchsiaBootResolver,
-    },
+    component_manager::{bootfs::BootfsSvc, builtin::fuchsia_boot_resolver::FuchsiaBootResolver},
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_io as fio,
     fuchsia_async as fasync, fuchsia_fs,
 };

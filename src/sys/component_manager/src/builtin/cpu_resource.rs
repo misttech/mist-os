@@ -79,15 +79,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn cpu_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_cpu_resource() -> Result<Resource, Error> {
         let cpu_resource_provider = connect_to_protocol::<fkernel::CpuResourceMarker>()?;
         let cpu_resource_handle = cpu_resource_provider.get().await?;
@@ -110,20 +101,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_cpu_resource() -> Result<(), Error> {
-        if cpu_resource_available() {
-            return Ok(());
-        }
-        assert!(!CpuResource::new(Resource::from(zx::Handle::invalid())).is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn base_type_is_cpu() -> Result<(), Error> {
-        if !cpu_resource_available() {
-            return Ok(());
-        }
-
         let cpu_resource_provider = serve_cpu_resource().await?;
         let cpu_resource: Resource = cpu_resource_provider.get().await?;
         let resource_info = cpu_resource.info()?;
@@ -135,10 +113,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_cpu_service() -> Result<(), Error> {
-        if !cpu_resource_available() {
-            return Ok(());
-        }
-
         let cpu_resource = CpuResource::new(get_cpu_resource().await?).unwrap();
         let hooks = Hooks::new();
         hooks.install(cpu_resource.hooks()).await;

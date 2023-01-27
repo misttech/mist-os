@@ -78,15 +78,6 @@ mod tests {
         std::{path::PathBuf, sync::Weak},
     };
 
-    fn smc_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_smc_resource() -> Result<Resource, Error> {
         let smc_resource_provider = connect_to_protocol::<fkernel::SmcResourceMarker>()?;
         let smc_resource_handle = smc_resource_provider.get().await?;
@@ -108,24 +99,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_smc_resource() -> Result<(), Error> {
-        if smc_resource_available() {
-            return Ok(());
-        }
-        let (_, stream) = fidl::endpoints::create_proxy_and_stream::<fkernel::SmcResourceMarker>()?;
-        assert!(!SmcResource::new(Resource::from(zx::Handle::invalid()))
-            .serve(stream)
-            .await
-            .is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn kind_type_is_smc() -> Result<(), Error> {
-        if !smc_resource_available() {
-            return Ok(());
-        }
-
         let smc_resource_provider = serve_smc_resource().await?;
         let smc_resource: Resource = smc_resource_provider.get().await?;
         let resource_info = smc_resource.info()?;
@@ -137,10 +111,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_smc_service() -> Result<(), Error> {
-        if !smc_resource_available() {
-            return Ok(());
-        }
-
         let smc_resource = SmcResource::new(get_smc_resource().await?);
         let hooks = Hooks::new();
         hooks.install(smc_resource.hooks()).await;

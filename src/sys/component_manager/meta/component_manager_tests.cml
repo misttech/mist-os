@@ -3,17 +3,34 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/test_runners/rust/default.shard.cml",
+        "//src/sys/test_runners/elf/create_raw_processes.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
         "inspect/client.shard.cml",
+        "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/component_manager_test",
+        binary: "bin/component_manager_lib_test",
     },
     use: [
         {
-            protocol: [ "fuchsia.process.Launcher" ],
+            protocol: [
+                "fuchsia.boot.RootResource",
+                "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.EnergyInfoResource",
+                "fuchsia.kernel.HypervisorResource",
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.IrqResource",
+                "fuchsia.kernel.MexecResource",
+                "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.PowerResource",
+                "fuchsia.kernel.RootJob",
+                "fuchsia.kernel.SmcResource",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.process.Launcher",
+            ],
         },
     ],
 }

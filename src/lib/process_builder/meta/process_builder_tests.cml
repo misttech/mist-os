@@ -3,19 +3,14 @@
 // found in the LICENSE file.
 {
     include: [
-        "sys/testing/elf_test_runner.shard.cml",
+        "//src/sys/test_runners/elf/create_raw_processes.shard.cml",
 
         // Needed for fuchsia.kernel.RootJob
         "sys/testing/system-test.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "bin/root_job_test_runner",
-        args: [
-            "/pkg/bin/process_builder_lib_test",
-            "-Zunstable-options",
-            "--force-run-in-process",
-        ],
+        binary: "bin/process_builder_lib_test",
     },
     use: [
         {

@@ -82,15 +82,6 @@ mod tests {
         std::sync::Weak,
     };
 
-    fn energy_info_resource_available() -> bool {
-        let bin = std::env::args().next();
-        match bin.as_ref().map(String::as_ref) {
-            Some("/pkg/bin/component_manager_test") => false,
-            Some("/pkg/bin/component_manager_boot_env_test") => true,
-            _ => panic!("Unexpected test binary name {:?}", bin),
-        }
-    }
-
     async fn get_energy_info_resource() -> Result<Resource, Error> {
         let energy_info_resource_provider =
             connect_to_protocol::<fkernel::EnergyInfoResourceMarker>()?;
@@ -118,20 +109,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn fail_with_no_energy_info_resource() -> Result<(), Error> {
-        if energy_info_resource_available() {
-            return Ok(());
-        }
-        assert!(!EnergyInfoResource::new(Resource::from(zx::Handle::invalid())).is_ok());
-        Ok(())
-    }
-
-    #[fuchsia::test]
     async fn kind_type_is_energy_info() -> Result<(), Error> {
-        if !energy_info_resource_available() {
-            return Ok(());
-        }
-
         let energy_info_resource_provider = serve_energy_info_resource().await?;
         let energy_info_resource: Resource = energy_info_resource_provider.get().await?;
         let resource_info = energy_info_resource.info()?;
@@ -143,10 +121,6 @@ mod tests {
 
     #[fuchsia::test]
     async fn can_connect_to_energy_info_service() -> Result<(), Error> {
-        if !energy_info_resource_available() {
-            return Ok(());
-        }
-
         let energy_info_resource =
             EnergyInfoResource::new(get_energy_info_resource().await?).unwrap();
         let hooks = Hooks::new();
