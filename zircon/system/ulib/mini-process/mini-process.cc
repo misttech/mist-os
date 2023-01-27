@@ -3,14 +3,20 @@
 // found in the LICENSE file.
 
 #include <dlfcn.h>
+#include <lib/elfldltl/container.h>
+#include <lib/elfldltl/diagnostics.h>
+#include <lib/elfldltl/load.h>
 #include <lib/elfldltl/machine.h>
+#include <lib/elfldltl/vmar-loader.h>
+#include <lib/elfldltl/vmo.h>
+#include <lib/elfldltl/zircon.h>
+#include <lib/zx/vmo.h>
 #include <stdint.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 
-#include <elfload/elfload.h>
 #include <mini-process/mini-process.h>
 
 #include "subprocess.h"
@@ -104,28 +110,51 @@ exit:
 __EXPORT
 zx_status_t mini_process_load_vdso(zx_handle_t process, zx_handle_t vmar, uintptr_t* base,
                                    uintptr_t* entry) {
-  // This is not thread-safe.  It steals the startup handle, so it's not
-  // compatible with also using launchpad (which also needs to steal the
-  // startup handle).
-  static zx_handle_t vdso_vmo = ZX_HANDLE_INVALID;
-  if (vdso_vmo == ZX_HANDLE_INVALID) {
-    vdso_vmo = zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 0));
-    if (vdso_vmo == ZX_HANDLE_INVALID) {
-      return ZX_ERR_INTERNAL;
+  // This steals the startup handle, so it's not compatible with anything else
+  // that also needs to steal the startup handle.
+  static const zx::vmo vdso_vmo{zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 0))};
+  ZX_ASSERT(vdso_vmo);
+
+  // Ignore any error details, but capture the zx_status_t of a SystemError.
+  // Tell the toolkit code to keep going after a SystemError if possible.  No
+  // other kinds of errors should be possible since those would indicate an
+  // invalid vDSO image.
+  zx_status_t status = ZX_OK;
+  auto report = [&status](auto&&... args) -> bool {
+    auto check = [&status](auto arg) -> bool {
+      if constexpr (std::is_same_v<decltype(arg), elfldltl::ZirconError>) {
+        status = arg.status;
+        return true;
+      }
+      return false;
+    };
+    return (check(args) || ...);
+  };
+  auto diag = elfldltl::Diagnostics(report, elfldltl::DiagnosticsPanicFlags());
+
+  elfldltl::UnownedVmoFile file(vdso_vmo.borrow(), diag);
+  elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container> load_info;
+  elfldltl::RemoteVmarLoader loader{*zx::unowned_vmar{vmar}};
+  if (auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
+          diag, file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>())) {
+    auto& [ehdr, phdrs_result] = *headers;
+    cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result.get();
+    if (elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())) &&
+        loader.Load(diag, load_info, vdso_vmo.borrow())) {
+      ZX_ASSERT(status == ZX_OK);
+      ZX_ASSERT(load_info.vaddr_start() == 0);
+      if (base) {
+        *base = loader.load_bias();
+      }
+      if (entry) {
+        *entry = ehdr.entry + loader.load_bias();
+      }
+      std::move(loader).Commit();
+      return ZX_OK;
     }
   }
 
-  elf_load_header_t header;
-  uintptr_t phoff;
-  zx_status_t status = elf_load_prepare(vdso_vmo, NULL, 0, &header, &phoff);
-  if (status == ZX_OK) {
-    elf_phdr_t phdrs[header.e_phnum];
-    status = elf_load_read_phdrs(vdso_vmo, phdrs, phoff, header.e_phnum);
-    if (status == ZX_OK) {
-      status = elf_load_map_segments(vmar, &header, phdrs, vdso_vmo, NULL, base, entry);
-    }
-  }
-
+  ZX_ASSERT(status != ZX_OK);
   return status;
 }
 

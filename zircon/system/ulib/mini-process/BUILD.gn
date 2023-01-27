@@ -14,7 +14,7 @@ zx_library("mini-process") {
   deps = [
     ":subprocess",
     "//src/lib/elfldltl",
-    "//zircon/system/ulib/elfload",
+    "//zircon/system/ulib/zx",
   ]
 }
 
