@@ -73,13 +73,13 @@ class Runner {
 
   // Fuzzing workflows corresponding to methods in `fuchsia.fuzzer.Controller`.
   virtual ZxPromise<Artifact> Fuzz() = 0;
-  virtual ZxPromise<FuzzResult> Execute(std::vector<Input> inputs) = 0;
+  ZxPromise<FuzzResult> TryOne(Input input);
   virtual ZxPromise<Input> Minimize(Input input) = 0;
   virtual ZxPromise<Input> Cleanse(Input input) = 0;
   virtual ZxPromise<> Merge() = 0;
 
-  // Like |Execute| above, but takes a single |input|.
-  ZxPromise<FuzzResult> Execute(Input input);
+  // Like `TryOne` above, but takes multiple `input`s.
+  virtual ZxPromise<FuzzResult> TryEach(std::vector<Input> inputs) = 0;
 
   // Creates a |Status| object representing all attached processes.
   virtual Status CollectStatus() = 0;
@@ -88,7 +88,7 @@ class Runner {
   virtual ZxPromise<> Stop() = 0;
 
  protected:
-  // Represents a single fuzzing workflow, e.g. |Execute|, |Minimize|, etc. It holds a pointer to
+  // Represents a single fuzzing workflow, e.g. |TryOne|, |Minimize|, etc. It holds a pointer to
   // the object that created it, but this is safe: it cannot outlive the object it is a part of.
   // It should be used in the normal way, e.g. using |wrap_with|.
   class Workflow final {

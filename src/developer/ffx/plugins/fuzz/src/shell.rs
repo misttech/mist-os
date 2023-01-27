@@ -1059,7 +1059,7 @@ mod tests {
         script.add(&mut test, "try deadbeef");
         test.output_matches("Trying an input of 4 bytes...");
         fuzzer.set_result(Err(zx::Status::INTERNAL));
-        test.output_includes("failed to execute command: `fuchsia.fuzzer.Controller/Execute` returned: ZX_ERR_INTERNAL");
+        test.output_includes("failed to execute command: `fuchsia.fuzzer.Controller/TryOne` returned: ZX_ERR_INTERNAL");
         script.run(&mut test).await?;
         test.verify_output()?;
 

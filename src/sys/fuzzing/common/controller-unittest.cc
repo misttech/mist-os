@@ -293,15 +293,15 @@ TEST_F(ControllerTest, Fuzz) {
   RunUntilIdle();
 }
 
-TEST_F(ControllerTest, ExecuteAndGetResults) {
+TEST_F(ControllerTest, TryOneAndGetResults) {
   ControllerPtr controller;
   Bind(controller.NewRequest());
   Input input({0xde, 0xad, 0xbe, 0xef});
 
   runner()->set_error(ZX_ERR_WRONG_TYPE);
   ZxBridge<FuzzResult> bridge1;
-  controller->Execute(AsyncSocketWrite(executor(), input.Duplicate()),
-                      ZxBind<FuzzResult>(std::move(bridge1.completer)));
+  controller->TryOne(AsyncSocketWrite(executor(), input.Duplicate()),
+                     ZxBind<FuzzResult>(std::move(bridge1.completer)));
   FUZZING_EXPECT_ERROR(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)),
                        ZX_ERR_WRONG_TYPE);
   RunUntilIdle();
@@ -309,8 +309,8 @@ TEST_F(ControllerTest, ExecuteAndGetResults) {
   runner()->set_error(ZX_OK);
   runner()->set_result(FuzzResult::OOM);
   ZxBridge<FuzzResult> bridge2;
-  controller->Execute(AsyncSocketWrite(executor(), input.Duplicate()),
-                      ZxBind<FuzzResult>(std::move(bridge2.completer)));
+  controller->TryOne(AsyncSocketWrite(executor(), input.Duplicate()),
+                     ZxBind<FuzzResult>(std::move(bridge2.completer)));
   FUZZING_EXPECT_OK(bridge2.consumer.promise(), FuzzResult::OOM);
   RunUntilIdle();
 

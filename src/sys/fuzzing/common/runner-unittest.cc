@@ -296,25 +296,25 @@ void RunnerTest::FuzzUntilTime() {
   EXPECT_GE(elapsed, zx::msec(100));
 }
 
-void RunnerTest::ExecuteNoError() {
+void RunnerTest::TryOneNoError() {
   Configure(MakeOptions());
   Input input({0x01});
-  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), FuzzResult::NO_ERRORS);
+  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), FuzzResult::NO_ERRORS);
   FUZZING_EXPECT_OK(RunOne(), std::move(input));
   RunUntilIdle();
 }
 
-void RunnerTest::ExecuteWithError() {
+void RunnerTest::TryOneWithError() {
   Configure(MakeOptions());
   Input input({0x02});
   FuzzResult fuzz_result;
-  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), &fuzz_result);
+  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), &fuzz_result);
   FUZZING_EXPECT_OK(RunOne(FuzzResult::BAD_MALLOC), std::move(input));
   RunUntilIdle();
   EXPECT_TRUE(fuzz_result == FuzzResult::BAD_MALLOC || fuzz_result == FuzzResult::OOM);
 }
 
-void RunnerTest::ExecuteWithLeak() {
+void RunnerTest::TryOneWithLeak() {
   auto options = MakeOptions();
   options->set_detect_leaks(true);
   Configure(options);
@@ -322,7 +322,7 @@ void RunnerTest::ExecuteWithLeak() {
   // Simulate a suspected leak, followed by an LSan exit. The leak detection heuristics only run
   // full leak detection when a leak is suspected based on mismatched allocations.
   SetLeak(true);
-  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), FuzzResult::LEAK);
+  FUZZING_EXPECT_OK(runner()->TryOne(input.Duplicate()), FuzzResult::LEAK);
   FUZZING_EXPECT_OK(RunOne(), input.Duplicate());
   FUZZING_EXPECT_OK(RunOne(FuzzResult::LEAK), std::move(input));
   RunUntilIdle();

@@ -156,13 +156,11 @@ impl<O: OutputSink> FuzzCtl<O> {
             return Ok(());
         }
 
-        // Execute
+        // TryOne
         if data_paths.num_files != 0 {
             while let Ok(input_pair) = data_paths.take_test_input() {
-                let artifact = controller
-                    .execute(input_pair)
-                    .await
-                    .context("failed to execute fuzzer input")?;
+                let artifact =
+                    controller.try_one(input_pair).await.context("failed to try fuzzer input")?;
                 if artifact.result != FuzzResult::NoErrors {
                     break;
                 }
@@ -708,7 +706,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_run_libfuzzer_execute_one() -> Result<()> {
+    async fn test_run_libfuzzer_try_one() -> Result<()> {
         let (mut test, fuzz_ctl, _task) = perform_setup()?;
         let fake = test.controller();
 
@@ -725,7 +723,7 @@ mod tests {
             format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
             format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
             "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/Execute".to_string(),
+            "fuchsia.fuzzer.Controller/TryOne".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 
@@ -733,7 +731,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_run_libfuzzer_execute_multiple() -> Result<()> {
+    async fn test_run_libfuzzer_try_multiple() -> Result<()> {
         let (mut test, fuzz_ctl, _task) = perform_setup()?;
         let fake = test.controller();
 
@@ -751,8 +749,8 @@ mod tests {
             format!("fuchsia.fuzzer.Manager/Connect({})", TEST_URL),
             format!("fuchsia.fuzzer.Manager/GetOutput({}, Stderr)", TEST_URL),
             "fuchsia.fuzzer.Controller/Configure".to_string(),
-            "fuchsia.fuzzer.Controller/Execute".to_string(),
-            "fuchsia.fuzzer.Controller/Execute".to_string(),
+            "fuchsia.fuzzer.Controller/TryOne".to_string(),
+            "fuchsia.fuzzer.Controller/TryOne".to_string(),
         ];
         assert_eq!(test.requests(), requests);
 

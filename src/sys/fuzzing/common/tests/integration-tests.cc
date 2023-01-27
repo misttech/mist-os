@@ -105,8 +105,8 @@ void EngineIntegrationTest::Crash() {
 
   Input input("FUZZ");
   ZxBridge<FuzzResult> bridge1;
-  controller->Execute(AsyncSocketWrite(executor(), input.Duplicate()),
-                      ZxBind<FuzzResult>(std::move(bridge1.completer)));
+  controller->TryOne(AsyncSocketWrite(executor(), input.Duplicate()),
+                     ZxBind<FuzzResult>(std::move(bridge1.completer)));
   FUZZING_EXPECT_OK(bridge1.consumer.promise(), FuzzResult::CRASH);
 
   Bridge<Status> bridge2;

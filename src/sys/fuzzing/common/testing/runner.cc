@@ -113,7 +113,7 @@ ZxPromise<Artifact> FakeRunner::Fuzz() {
       .wrap_with(workflow_);
 }
 
-ZxPromise<FuzzResult> FakeRunner::Execute(std::vector<Input> inputs) {
+ZxPromise<FuzzResult> FakeRunner::TryEach(std::vector<Input> inputs) {
   return Run()
       .and_then([this, inputs = std::move(inputs)](const Artifact& artifact) {
         for (const auto& input : inputs) {

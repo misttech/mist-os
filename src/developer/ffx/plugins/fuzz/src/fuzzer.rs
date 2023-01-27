@@ -167,7 +167,7 @@ impl<O: OutputSink> Fuzzer<O> {
 
     /// Runs the fuzzer in a loop to generate and test new inputs.
     ///
-    /// The fuzzer will continuously generate new inputs and execute them until one of four
+    /// The fuzzer will continuously generate new inputs and tries them until one of four
     /// conditions are met:
     ///   * The number of inputs tested exceeds the configured number of `runs`.
     ///   * The configured amount of `time` has elapsed.
@@ -214,7 +214,7 @@ impl<O: OutputSink> Fuzzer<O> {
         let input_pair = InputPair::try_from_str(test_input, &self.writer)
             .context("failed to get input to try")?;
         self.writer.println(format!("Trying an input of {} bytes...", input_pair.len()));
-        let artifact = self.controller.execute(input_pair).await?;
+        let artifact = self.controller.try_one(input_pair).await?;
         if artifact.status != zx::Status::OK {
             return Ok(artifact.status);
         }

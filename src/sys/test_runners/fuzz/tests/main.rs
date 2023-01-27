@@ -302,15 +302,15 @@ async fn test_fuzz_until_runs() -> Result<()> {
 }
 
 #[fuchsia::test]
-async fn test_execute_no_errors() -> Result<()> {
+async fn test_try_one_no_errors() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
         let input = "NoErrors";
         let (mut tx, mut fidl_input) =
             make_fidl_input(input).context("failed to make FIDL input")?;
-        let results = join!(tx.write_all(input.as_bytes()), controller.execute(&mut fidl_input));
+        let results = join!(tx.write_all(input.as_bytes()), controller.try_one(&mut fidl_input));
         results.0.context("failed to send input")?;
-        let response = results.1.context(controller_name("Execute"))?;
+        let response = results.1.context(controller_name("TryOne"))?;
         let result = response.map_err(|e| zx::Status::from_raw(e)).context("received error")?;
         compare(&result, FuzzResult::NoErrors)
     };
@@ -318,15 +318,15 @@ async fn test_execute_no_errors() -> Result<()> {
 }
 
 #[fuchsia::test]
-async fn test_execute_crash() -> Result<()> {
+async fn test_try_one_crash() -> Result<()> {
     let (fuzz_manager, controller, log_task) = setup().await;
     let test = || async move {
         let input = "CRASH";
         let (mut tx, mut fidl_input) =
             make_fidl_input(input).context("failed to make FIDL input")?;
-        let results = join!(tx.write_all(input.as_bytes()), controller.execute(&mut fidl_input));
+        let results = join!(tx.write_all(input.as_bytes()), controller.try_one(&mut fidl_input));
         results.0.context("failed to send input")?;
-        let response = results.1.context(controller_name("Execute"))?;
+        let response = results.1.context(controller_name("TryOne"))?;
         let result = response.map_err(|e| zx::Status::from_raw(e)).context("received error")?;
         compare(&result, FuzzResult::Crash)
     };

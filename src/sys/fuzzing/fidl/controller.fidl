@@ -12,7 +12,7 @@ using zx;
 /// indefinite period of time. Fuzzing itself is the most notable example, as the fuzzing engine may
 /// continuously generate new inputs until an error is found. This workflow is represented by the
 /// `Fuzz` method below. Other long-running workflowsthat monitor or return a `Result` include
-/// `Execute`, `Cleanse`, and `Minimize`.
+/// `TryOne`, `Cleanse`, and `Minimize`.
 ///
 /// Each result is typically associated with a specific fuzzer `Input` that is either supplied to or
 /// returned from a long-running workflow.
@@ -100,7 +100,7 @@ protocol Controller {
     /// call to this method, the fuzzer should assume the default values for `Options`.
     ///
     /// Returns ZX_OK if the options were set.
-    /// Returns ZX_ERR_BAD_STATE if a long-running call such as.Execute, Cleanse, Minimize, Fuzz, or
+    /// Returns ZX_ERR_BAD_STATE if a long-running call such as.TryOne, Cleanse, Minimize, Fuzz, or
     /// Merge is in progress.
     Configure(struct {
         options Options;
@@ -175,7 +175,7 @@ protocol Controller {
 
     /// Returns the result of running the target with a single `test_input`.
     /// Returns an error if transferring the input fails; see `Input` for details.
-    Execute(resource struct {
+    TryOne(resource struct {
         test_input Input;
     }) -> (struct {
         result Result;

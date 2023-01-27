@@ -46,7 +46,7 @@ class LibFuzzerRunner : public Runner {
   Input GetDictionaryAsInput() const override;
 
   ZxPromise<Artifact> Fuzz() override;
-  ZxPromise<FuzzResult> Execute(std::vector<Input> input) override;
+  ZxPromise<FuzzResult> TryEach(std::vector<Input> inputs) override;
   ZxPromise<Input> Minimize(Input input) override;
   ZxPromise<Input> Cleanse(Input input) override;
   ZxPromise<> Merge() override;

@@ -252,8 +252,8 @@ pub async fn serve_controller(
                 let status = fake.get_status();
                 responder.send(status)?;
             }
-            Some(Ok(fuzz::ControllerRequest::Execute { test_input, responder })) => {
-                test.record("fuchsia.fuzzer.Controller/Execute");
+            Some(Ok(fuzz::ControllerRequest::TryOne { test_input, responder })) => {
+                test.record("fuchsia.fuzzer.Controller/TryOne");
                 fake.receive_input(test_input).await?;
                 match fake.get_result() {
                     Ok(fuzz_result) => {

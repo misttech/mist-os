@@ -94,9 +94,9 @@ class RunnerTest : public AsyncTest {
   //////////////////////////////////////
   // Unit tests, organized by fuzzing workflow.
 
-  void ExecuteNoError();
-  void ExecuteWithError();
-  void ExecuteWithLeak();
+  void TryOneNoError();
+  void TryOneWithError();
+  void TryOneWithLeak();
 
   void MinimizeNoError();
   void MinimizeEmpty();

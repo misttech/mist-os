@@ -49,7 +49,7 @@ class ControllerImpl : public Controller {
   void AddMonitor(fidl::InterfaceHandle<Monitor> monitor, AddMonitorCallback callback) override;
 
   void Fuzz(FuzzCallback callback) override;
-  void Execute(FidlInput fidl_input, ExecuteCallback callback) override;
+  void TryOne(FidlInput fidl_input, TryOneCallback callback) override;
   void Minimize(FidlInput fidl_input, MinimizeCallback callback) override;
   void Cleanse(FidlInput fidl_input, CleanseCallback callback) override;
   void Merge(MergeCallback callback) override;

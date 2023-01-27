@@ -122,7 +122,7 @@ ZxPromise<Artifact> RealmFuzzerRunner::Fuzz() {
   return FuzzInputs(/* backlog= */ options_->mutation_depth()).wrap_with(workflow_);
 }
 
-ZxPromise<FuzzResult> RealmFuzzerRunner::Execute(std::vector<Input> inputs) {
+ZxPromise<FuzzResult> RealmFuzzerRunner::TryEach(std::vector<Input> inputs) {
   return fpromise::make_promise([this, inputs = std::move(inputs)]() mutable -> ZxResult<> {
            for (auto& input : inputs) {
              if (auto status = generated_sender_.Send(std::move(input)); status != ZX_OK) {

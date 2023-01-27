@@ -160,12 +160,12 @@ void ControllerImpl::Fuzz(FuzzCallback callback) {
   executor_->schedule_task(std::move(task));
 }
 
-void ControllerImpl::Execute(FidlInput fidl_input, ExecuteCallback callback) {
+void ControllerImpl::TryOne(FidlInput fidl_input, TryOneCallback callback) {
   auto task = Initialize()
                   .and_then(AsyncSocketRead(executor_, std::move(fidl_input)))
                   .and_then([this](Input& received) {
                     artifact_ = Artifact(FuzzResult::NO_ERRORS, received.Duplicate());
-                    return runner_->Execute(std::move(received));
+                    return runner_->TryOne(std::move(received));
                   })
                   .then([this, callback = std::move(callback)](ZxResult<FuzzResult>& result) {
                     if (result.is_ok()) {

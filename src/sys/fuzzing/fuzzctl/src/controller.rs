@@ -206,29 +206,29 @@ impl<O: OutputSink> Controller<O> {
         }
     }
 
-    /// Executes the fuzzer once using the given input.
+    /// Tries running the fuzzer once using the given input.
     ///
     /// Returns an error if:
     ///   * Converting the input to an `Input`/`fuchsia.fuzzer.Input` pair fails.
     ///   * Communicating with the fuzzer fails.
     ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
     ///
-    pub async fn execute(&self, input_pair: InputPair) -> Result<Artifact> {
+    pub async fn try_one(&self, input_pair: InputPair) -> Result<Artifact> {
         let (mut fidl_input, input) = input_pair.as_tuple();
         let fidl_fut = || async move {
-            let result = match self.proxy.execute(&mut fidl_input).await {
+            let result = match self.proxy.try_one(&mut fidl_input).await {
                 Err(fidl::Error::ClientChannelClosed { status, .. })
                     if status == zx::Status::PEER_CLOSED =>
                 {
                     return Ok(Artifact::canceled())
                 }
-                Err(e) => bail!("`fuchsia.fuzzer.Controller/Execute` failed: {:?}", e),
+                Err(e) => bail!("`fuchsia.fuzzer.Controller/TryOne` failed: {:?}", e),
                 Ok(result) => result.map_err(|raw| zx::Status::from_raw(raw)),
             };
             match result {
                 Err(zx::Status::BAD_STATE) => bail!("another long-running workflow is in progress"),
                 Err(status) => {
-                    bail!("`fuchsia.fuzzer.Controller/Execute` returned: ZX_ERR_{}", status)
+                    bail!("`fuchsia.fuzzer.Controller/TryOne` returned: ZX_ERR_{}", status)
                 }
                 Ok(result) => Ok(Artifact::from_result(result)),
             }
@@ -238,7 +238,7 @@ impl<O: OutputSink> Controller<O> {
 
     /// Runs the fuzzer in a loop to generate and test new inputs.
     ///
-    /// The fuzzer will continuously generate new inputs and execute them until one of four
+    /// The fuzzer will continuously generate new inputs and tries them until one of four
     /// conditions are met:
     ///   * The number of inputs tested exceeds the configured number of `runs`.
     ///   * The configured amount of `max_total_time` has elapsed.
@@ -593,25 +593,25 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_execute() -> Result<()> {
+    async fn test_try_one() -> Result<()> {
         let test = Test::try_new()?;
         let (fake, proxy, _task) = perform_test_setup(&test)?;
         let controller = Controller::new(proxy, test.writer());
 
         let input_pair = InputPair::try_from_data(b"foo".to_vec())?;
-        let artifact = controller.execute(input_pair).await?;
+        let artifact = controller.try_one(input_pair).await?;
         assert_eq!(artifact.status, zx::Status::OK);
         assert_eq!(artifact.result, FuzzResult::NoErrors);
 
         fake.set_result(Ok(FuzzResult::Crash));
         let input_pair = InputPair::try_from_data(b"bar".to_vec())?;
-        let artifact = controller.execute(input_pair).await?;
+        let artifact = controller.try_one(input_pair).await?;
         assert_eq!(artifact.status, zx::Status::OK);
         assert_eq!(artifact.result, FuzzResult::Crash);
 
         fake.cancel();
         let input_pair = InputPair::try_from_data(b"baz".to_vec())?;
-        let artifact = controller.execute(input_pair).await?;
+        let artifact = controller.try_one(input_pair).await?;
         assert_eq!(artifact.status, zx::Status::CANCELED);
 
         Ok(())

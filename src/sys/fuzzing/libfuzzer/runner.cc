@@ -226,7 +226,7 @@ ZxPromise<Artifact> LibFuzzerRunner::Fuzz() {
       .wrap_with(workflow_);
 }
 
-ZxPromise<FuzzResult> LibFuzzerRunner::Execute(std::vector<Input> inputs) {
+ZxPromise<FuzzResult> LibFuzzerRunner::TryEach(std::vector<Input> inputs) {
   // Write the inputs out to storage for libFuzzer.
   std::filesystem::remove_all(kTempCorpusPath);
   CreateDirectory(kTempCorpusPath);

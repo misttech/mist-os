@@ -182,19 +182,19 @@ zx_status_t Engine::RunTest(ComponentContextPtr context, RunnerPtr runner) {
   // called as part of a gTest as well as by the elf_test_runner.
   zx_status_t exitcode = ZX_ERR_NEXT;
   auto task = runner->Configure(options)
-                  .and_then([runner, corpus = std::move(corpus_), execute = ZxFuture<FuzzResult>(),
+                  .and_then([runner, corpus = std::move(corpus_), fut = ZxFuture<FuzzResult>(),
                              attempts = 0U](Context& context) mutable -> ZxResult<FuzzResult> {
                     while (attempts < kFuzzerTestRetries) {
-                      if (!execute) {
-                        execute = runner->Execute(std::move(corpus));
+                      if (!fut) {
+                        fut = runner->TryEach(std::move(corpus));
                       }
-                      if (!execute(context)) {
+                      if (!fut(context)) {
                         return fpromise::pending();
                       }
-                      if (execute.is_ok()) {
-                        return fpromise::ok(execute.take_value());
+                      if (fut.is_ok()) {
+                        return fpromise::ok(fut.take_value());
                       }
-                      if (auto status = execute.take_error(); status != ZX_ERR_IO_INVALID) {
+                      if (auto status = fut.take_error(); status != ZX_ERR_IO_INVALID) {
                         return fpromise::error(status);
                       }
                       attempts++;

@@ -12,9 +12,9 @@
 // These tests do not include any intentional crashes and may be run in a normal test environment.
 // See also runner-fatal-unittest.inc.
 
-TEST_F(RUNNER_TEST, ExecuteNoError) { ExecuteNoError(); }
-TEST_F(RUNNER_TEST, ExecuteWithError) { ExecuteWithError(); }
-TEST_F(RUNNER_TEST, ExecuteWithLeak) { ExecuteWithLeak(); }
+TEST_F(RUNNER_TEST, TryOneNoError) { TryOneNoError(); }
+TEST_F(RUNNER_TEST, TryOneWithError) { TryOneWithError(); }
+TEST_F(RUNNER_TEST, TryOneWithLeak) { TryOneWithLeak(); }
 TEST_F(RUNNER_TEST, MinimizeNoError) { MinimizeNoError(); }
 TEST_F(RUNNER_TEST, CleanseNoReplacement) { CleanseNoReplacement(); }
 TEST_F(RUNNER_TEST, CleanseAlreadyClean) { CleanseAlreadyClean(); }

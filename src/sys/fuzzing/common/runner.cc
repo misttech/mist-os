@@ -30,10 +30,10 @@ ZxPromise<> Runner::Workflow::Start() {
   });
 }
 
-ZxPromise<FuzzResult> Runner::Execute(Input input) {
+ZxPromise<FuzzResult> Runner::TryOne(Input input) {
   std::vector<Input> inputs;
   inputs.emplace_back(std::move(input));
-  return Execute(std::move(inputs));
+  return TryEach(std::move(inputs));
 }
 
 ZxPromise<> Runner::Workflow::Stop() {
