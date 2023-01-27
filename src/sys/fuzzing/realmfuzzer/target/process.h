@@ -5,7 +5,6 @@
 #ifndef SRC_SYS_FUZZING_REALMFUZZER_TARGET_PROCESS_H_
 #define SRC_SYS_FUZZING_REALMFUZZER_TARGET_PROCESS_H_
 
-#include <fuchsia/debugdata/cpp/fidl.h>
 #include <fuchsia/fuzzer/cpp/fidl.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/zx/time.h>
