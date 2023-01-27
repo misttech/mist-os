@@ -78,10 +78,25 @@ fuchsia_component("driver_test_realm_component") {
   ]
 }
 
+fuchsia_component_manifest("manifest") {
+  testonly = true
+  component_name = "driver_manager_test"
+  manifest = "meta/driver_manager_test.cml"
+}
+
+fuchsia_structured_config_values("test_config") {
+  testonly = true
+  cm_label = ":manifest"
+  values = {
+    set_root_driver_host_critical = false
+  }
+}
+
 fuchsia_component("driver_manager_test") {
   testonly = true
-  manifest = "meta/driver_manager_test.cml"
+  cm_label = ":manifest"
   deps = [
+    ":test_config",
     "//src/devices/bin/driver_host:driver_host",
     "//src/devices/bin/driver_manager",
   ]

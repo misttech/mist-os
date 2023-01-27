@@ -158,6 +158,8 @@ int main(int argc, char** argv) {
   auto boot_args = fidl::WireSyncClient<fuchsia_boot::Arguments>{std::move(*args_result)};
   auto driver_manager_params = GetDriverManagerParams(boot_args);
 
+  auto config = driver_manager_config::Config::TakeFromStartupHandle();
+
   if (driver_manager_params.verbose) {
     fx_logger_t* logger = fx_log_get_logger();
     if (logger) {
@@ -167,10 +169,10 @@ int main(int argc, char** argv) {
   if (driver_manager_params.use_dfv2) {
     return RunDfv2(driver_manager_params, std::move(boot_args));
   }
-  return RunDfv1(driver_manager_params, std::move(boot_args));
+  return RunDfv1(driver_manager_params, std::move(config), std::move(boot_args));
 }
 
-int RunDfv1(DriverManagerParams driver_manager_params,
+int RunDfv1(DriverManagerParams driver_manager_params, driver_manager_config::Config dm_config,
             fidl::WireSyncClient<fuchsia_boot::Arguments> boot_args) {
   std::string root_driver = "fuchsia-boot:///#driver/platform-bus.so";
   if (!driver_manager_params.root_driver.empty()) {
@@ -194,6 +196,9 @@ int RunDfv1(DriverManagerParams driver_manager_params,
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   InspectManager inspect_manager(loop.dispatcher());
+
+  inspect::Node config_node = inspect_manager.root_node().CreateChild("config");
+  dm_config.RecordInspect(&config_node);
 
   CoordinatorConfig config;
   SystemInstance system_instance;
@@ -305,6 +310,16 @@ int RunDfv1(DriverManagerParams driver_manager_params,
   }
 
   coordinator.LoadV1Drivers(root_driver);
+
+  if (dm_config.set_root_driver_host_critical()) {
+    // Set root driver host as critical so the system reboots if it crashes. It houses an escrow for
+    // BTI handles and if we lose that we must reboot.
+    status = root_job->set_critical(0, *coordinator.root_device()->proxy()->host()->proc());
+    if (status != ZX_OK) {
+      LOGF(ERROR, "Failed to set root driver host as critical: %s", zx_status_get_string(status));
+      return status;
+    }
+  }
 
   // TODO(https://fxbug.dev/99076) Remove this when this issue is fixed.
   LOGF(INFO, "Drivers loaded and published");

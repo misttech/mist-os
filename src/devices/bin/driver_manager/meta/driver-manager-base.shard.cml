@@ -103,4 +103,10 @@
             from: "self",
         },
     ],
+    config: {
+        set_root_driver_host_critical: {
+            type: "bool",
+            default: false,
+        },
+    },
 }
