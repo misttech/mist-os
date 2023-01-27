@@ -20,8 +20,8 @@ use {
 const MAX_NUMBER_OF_STARTUP_TIME_TRACKED_COMPONENTS: usize = 75;
 
 lazy_static! {
-    static ref MONIKER: inspect::StringReference<'static> = "moniker".into();
-    static ref START_TIME: inspect::StringReference<'static> = "time".into();
+    static ref MONIKER: inspect::StringReference = "moniker".into();
+    static ref START_TIME: inspect::StringReference = "time".into();
 }
 
 /// Allows to track startup times of components that start early in the boot process (the first

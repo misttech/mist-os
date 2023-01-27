@@ -17,7 +17,7 @@ use crate::peer::calls::types::Direction;
 use crate::peer::service_level_connection::SlcState;
 
 lazy_static! {
-    static ref PEER_ID: inspect::StringReference<'static> = "peer_id".into();
+    static ref PEER_ID: inspect::StringReference = "peer_id".into();
 }
 
 #[derive(Default, Debug)]

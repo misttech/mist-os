@@ -217,7 +217,7 @@ impl InternalBss {
     }
 }
 impl WriteInspect for InternalBss {
-    fn write_inspect<'b>(&self, writer: &InspectNode, key: impl Into<StringReference<'b>>) {
+    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
         inspect_insert!(writer, var key: {
             ssid_hash: self.hasher.hash_ssid(&self.saved_network_info.network_id.ssid),
             bssid_hash: self.hasher.hash_mac_addr(&self.scanned_bss.bssid.0),

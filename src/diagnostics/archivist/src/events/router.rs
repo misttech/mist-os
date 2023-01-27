@@ -24,8 +24,8 @@ use tracing::{debug, error};
 const RECENT_EVENT_LIMIT: usize = 200;
 
 lazy_static! {
-    static ref EVENT: StringReference<'static> = "event".into();
-    static ref MONIKER: StringReference<'static> = "moniker".into();
+    static ref EVENT: StringReference = "event".into();
+    static ref MONIKER: StringReference = "moniker".into();
 }
 
 pub struct RouterOptions {

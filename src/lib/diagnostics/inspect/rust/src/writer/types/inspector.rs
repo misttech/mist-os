@@ -349,7 +349,9 @@ mod tests {
     fn no_op() {
         let inspector = Inspector::new(InspectorConfig::default().size(4096));
         // Make the VMO full.
-        let nodes = (0..127).map(|_| inspector.root().create_child("test")).collect::<Vec<Node>>();
+        let nodes = (0..84)
+            .map(|i| inspector.root().create_child(format!("test-{}", i)))
+            .collect::<Vec<Node>>();
 
         assert!(nodes.iter().all(|node| node.is_valid()));
         let no_op_node = inspector.root().create_child("no-op-child");

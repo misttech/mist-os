@@ -392,8 +392,8 @@ impl SamplerConfig {
         let weak_self = Arc::downgrade(self);
 
         lazy_static::lazy_static! {
-            static ref SELECTOR_STRING : inspect::StringReference<'static> = "selector".into();
-            static ref UPLOAD_COUNT_STRING : inspect::StringReference<'static> = "upload_count".into();
+            static ref SELECTOR_STRING : inspect::StringReference = "selector".into();
+            static ref UPLOAD_COUNT_STRING : inspect::StringReference = "upload_count".into();
         }
 
         let mut locked_node = self.inspect_node.lock().unwrap();

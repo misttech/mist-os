@@ -52,7 +52,7 @@ enum Property {
     IntArray(IntArrayProperty),
     UintArray(UintArrayProperty),
     DoubleArray(DoubleArrayProperty),
-    StringArray(StringArrayProperty<'static>),
+    StringArray(StringArrayProperty),
     IntLinearHistogram(IntLinearHistogramProperty),
     UintLinearHistogram(UintLinearHistogramProperty),
     DoubleLinearHistogram(DoubleLinearHistogramProperty),
@@ -229,7 +229,7 @@ impl Actor {
                 slots,
                 value_type,
             }) => {
-                let name: StringReference<'static> = name.into();
+                let name: StringReference = name.into();
                 self.properties.insert(
                     id,
                     match value_type {
@@ -243,7 +243,7 @@ impl Actor {
                             self.find_parent(parent)?.create_double_array(name, slots as usize),
                         ),
                         ValueType::String => Property::StringArray({
-                            let array: StringArrayProperty<'static> =
+                            let array: StringArrayProperty =
                                 self.find_parent(parent)?.create_string_array(name, slots as usize);
                             array
                         }),
@@ -256,7 +256,7 @@ impl Actor {
                     (Property::UintArray(p), Value::UintT(v)) => p.set(index as usize, v),
                     (Property::DoubleArray(p), Value::DoubleT(v)) => p.set(index as usize, v),
                     (Property::StringArray(p), Value::StringT(v)) => {
-                        let v: StringReference<'static> = v.into();
+                        let v: StringReference = v.into();
                         p.set(index as usize, v);
                     }
                     unexpected => {

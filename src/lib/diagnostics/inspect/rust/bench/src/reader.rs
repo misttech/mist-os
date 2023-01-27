@@ -151,7 +151,7 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
     let task = fasync::Task::local(tree_server_fut);
 
     lazy_static! {
-        static ref NAME: StringReference<'static> = "i".into();
+        static ref NAME: StringReference = "i".into();
     }
     let mut nodes = vec![];
     if filled_size > 0 {

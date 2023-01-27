@@ -78,7 +78,7 @@ where
     W: Watch<V>,
 {
     /// Creates an `Inspectable` wrapping `value`. Exports `value` via Inspect.
-    pub fn new<'b>(value: V, node: &Node, name: impl Into<StringReference<'b>>) -> Self {
+    pub fn new(value: V, node: &Node, name: impl Into<StringReference>) -> Self {
         let watcher = W::new(&value, node, name);
         Self { value, watcher }
     }
@@ -114,7 +114,7 @@ where
 pub trait Watch<V> {
     /// Used by [`Inspectable::new()`][Inspectable::new] to create a `Watch`er that exports via
     /// Inspect the [`Inspectable`][Inspectable]'s wrapped `value`.
-    fn new<'b>(value: &V, node: &Node, name: impl Into<StringReference<'b>>) -> Self;
+    fn new(value: &V, node: &Node, name: impl Into<StringReference>) -> Self;
 
     /// Called by [`InspectableGuard`][InspectableGuard] when the guard is dropped, letting the
     /// `Watch`er update its state with the updated `value`.
@@ -176,7 +176,7 @@ impl<V> Watch<V> for InspectableLenWatcher
 where
     V: Len,
 {
-    fn new<'b>(value: &V, node: &Node, name: impl Into<StringReference<'b>>) -> Self {
+    fn new(value: &V, node: &Node, name: impl Into<StringReference>) -> Self {
         Self { len: node.create_uint(name, value.len() as u64) }
     }
 
@@ -211,7 +211,7 @@ impl<V> Watch<V> for InspectableDebugStringWatcher
 where
     V: std::fmt::Debug,
 {
-    fn new<'b>(value: &V, node: &Node, name: impl Into<StringReference<'b>>) -> Self {
+    fn new(value: &V, node: &Node, name: impl Into<StringReference>) -> Self {
         Self { debug_string: node.create_string(name, format!("{:?}", value)) }
     }
 
@@ -231,7 +231,7 @@ pub struct InspectableU64Watcher {
 }
 
 impl Watch<u64> for InspectableU64Watcher {
-    fn new<'b>(value: &u64, node: &Node, name: impl Into<StringReference<'b>>) -> Self {
+    fn new(value: &u64, node: &Node, name: impl Into<StringReference>) -> Self {
         Self { uint_property: node.create_uint(name, *value) }
     }
 
@@ -249,7 +249,7 @@ pub struct InspectableBoolWatcher {
 }
 
 impl Watch<bool> for InspectableBoolWatcher {
-    fn new<'b>(value: &bool, node: &Node, name: impl Into<StringReference<'b>>) -> Self {
+    fn new(value: &bool, node: &Node, name: impl Into<StringReference>) -> Self {
         Self { bool_property: node.create_bool(name, *value) }
     }
 
@@ -272,7 +272,7 @@ mod test {
         i: IntProperty,
     }
     impl Watch<i64> for InspectableIntWatcher {
-        fn new<'b>(value: &i64, node: &Node, name: impl Into<StringReference<'b>>) -> Self {
+        fn new(value: &i64, node: &Node, name: impl Into<StringReference>) -> Self {
             Self { i: node.create_int(name, *value) }
         }
         fn watch(&mut self, value: &i64) {

@@ -65,9 +65,9 @@ impl SafeOp for f64 {
 macro_rules! locked_state_metric_fns {
     ($name:ident, $type:ident) => {
         paste::paste! {
-            pub fn [<create_ $name _metric>]<'b>(
+            pub fn [<create_ $name _metric>](
                 &mut self,
-                name: impl Into<StringReference<'b>>,
+                name: impl Into<StringReference>,
                 value: $type,
                 parent_index: u32,
             ) -> Result<Block<Container>, Error> {
@@ -100,9 +100,9 @@ macro_rules! locked_state_metric_fns {
 macro_rules! metric_fns {
     ($name:ident, $type:ident) => {
         paste::paste! {
-            fn [<create_ $name _metric>]<'b>(
+            fn [<create_ $name _metric>](
                 &mut self,
-                name: impl Into<StringReference<'b>>,
+                name: impl Into<StringReference>,
                 value: $type,
                 parent_index: u32,
             ) -> Result<Block<Container>, Error> {
@@ -147,9 +147,9 @@ macro_rules! metric_fns {
 macro_rules! locked_state_array_fns {
     ($name:ident, $type:ident, $value:ident) => {
         paste::paste! {
-            pub fn [<create_ $name _array>]<'b>(
+            pub fn [<create_ $name _array>](
                 &mut self,
-                name: impl Into<StringReference<'b>>,
+                name: impl Into<StringReference>,
                 slots: usize,
                 array_format: ArrayFormat,
                 parent_index: u32,
@@ -181,9 +181,9 @@ macro_rules! locked_state_array_fns {
 macro_rules! arithmetic_array_fns {
     ($name:ident, $type:ident, $value:ident) => {
         paste::paste! {
-            pub fn [<create_ $name _array>]<'b>(
+            pub fn [<create_ $name _array>](
                 &mut self,
-                name: impl Into<StringReference<'b>>,
+                name: impl Into<StringReference>,
                 slots: usize,
                 array_format: ArrayFormat,
                 parent_index: u32,
@@ -395,14 +395,14 @@ impl<'a> LockedStateGuard<'a> {
     }
 
     /// Returns a reference to the lazy callbacks map.
-    pub fn callbacks(&self) -> &HashMap<String, LazyNodeContextFnArc> {
+    pub fn callbacks(&self) -> &HashMap<StringReference, LazyNodeContextFnArc> {
         &self.inner_lock.callbacks
     }
 
     /// Allocate a NODE block with the given |name| and |parent_index|.
-    pub fn create_node<'b>(
+    pub fn create_node(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
         self.inner_lock.create_node(name, parent_index)
@@ -410,9 +410,9 @@ impl<'a> LockedStateGuard<'a> {
 
     /// Allocate a LINK block with the given |name| and |parent_index| and keep track
     /// of the callback that will fill it.
-    pub fn create_lazy_node<'b, F>(
+    pub fn create_lazy_node<F>(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         parent_index: u32,
         disposition: LinkNodeDisposition,
         callback: F,
@@ -433,9 +433,9 @@ impl<'a> LockedStateGuard<'a> {
     }
 
     /// Allocate a PROPERTY block with the given |name|, |value| and |parent_index|.
-    pub fn create_property<'b>(
+    pub fn create_property(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         value: &[u8],
         format: PropertyFormat,
         parent_index: u32,
@@ -449,9 +449,9 @@ impl<'a> LockedStateGuard<'a> {
 
     /// Allocate a STRING_REFERENCE block and necessary EXTENTs.
     #[cfg(test)]
-    pub fn get_or_create_string_reference<'b>(
+    pub fn get_or_create_string_reference(
         &mut self,
-        value: impl Into<StringReference<'b>>,
+        value: impl Into<StringReference>,
     ) -> Result<Block<Container>, Error> {
         self.inner_lock.get_or_create_string_reference(value)
     }
@@ -477,9 +477,9 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.set_property(block_index, value)
     }
 
-    pub fn create_bool<'b>(
+    pub fn create_bool(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         value: bool,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -503,9 +503,9 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.clear_array(block_index, start_slot_index)
     }
 
-    pub fn create_string_array<'b>(
+    pub fn create_string_array(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -516,24 +516,24 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.get_array_size(block_index)
     }
 
-    pub fn set_array_string_slot<'b>(
+    pub fn set_array_string_slot(
         &mut self,
         block_index: u32,
         slot_index: usize,
-        value: impl Into<StringReference<'b>>,
+        value: impl Into<StringReference>,
     ) -> Result<(), Error> {
         self.inner_lock.set_array_string_slot(block_index, slot_index, value)
     }
 
     #[cfg(test)]
-    pub fn allocate_link<'b>(
+    pub fn allocate_link(
         &mut self,
-        name: impl Into<StringReference<'b>>,
-        content: &str,
+        name: impl Into<StringReference>,
+        content: impl Into<StringReference>,
         disposition: LinkNodeDisposition,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
-        self.inner_lock.allocate_link(name, content, disposition, parent_index)
+        self.inner_lock.allocate_link(name, content.into(), disposition, parent_index)
     }
 
     #[cfg(test)]
@@ -562,11 +562,11 @@ struct InnerState {
     next_unique_link_id: AtomicU64,
     transaction_count: usize,
 
-    // associates a reference ID with it's block index
-    string_reference_ids: HashMap<usize, u32>,
+    // associates a reference with it's block index
+    string_reference_block_indexes: HashMap<StringReference, u32>,
 
     #[derivative(Debug = "ignore")]
-    callbacks: HashMap<String, LazyNodeContextFnArc>,
+    callbacks: HashMap<StringReference, LazyNodeContextFnArc>,
 }
 
 #[cfg(target_os = "fuchsia")]
@@ -579,7 +579,7 @@ impl InnerState {
             next_unique_link_id: AtomicU64::new(0),
             callbacks: HashMap::new(),
             transaction_count: 0,
-            string_reference_ids: HashMap::new(),
+            string_reference_block_indexes: HashMap::new(),
         }
     }
 
@@ -611,16 +611,16 @@ impl InnerState {
             next_unique_link_id: AtomicU64::new(0),
             callbacks: HashMap::new(),
             transaction_count: 0,
-            string_reference_ids: HashMap::new(),
+            string_reference_block_indexes: HashMap::new(),
         }
     }
 }
 
 impl InnerState {
     /// Allocate a NODE block with the given |name| and |parent_index|.
-    fn create_node<'b>(
+    fn create_node(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
         let (block, name_block) =
@@ -631,9 +631,9 @@ impl InnerState {
 
     /// Allocate a LINK block with the given |name| and |parent_index| and keep track
     /// of the callback that will fill it.
-    fn create_lazy_node<'b, F>(
+    fn create_lazy_node<F>(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         parent_index: u32,
         disposition: LinkNodeDisposition,
         callback: F,
@@ -642,8 +642,8 @@ impl InnerState {
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
         let converted = name.into();
-        let content = self.unique_link_name(converted.data());
-        let link = self.allocate_link(&converted, &content, disposition, parent_index)?;
+        let content: StringReference = self.unique_link_name(&converted).into();
+        let link = self.allocate_link(&converted, content.clone(), disposition, parent_index)?;
         self.callbacks.insert(content, Arc::from(callback));
         Ok(link)
     }
@@ -652,7 +652,7 @@ impl InnerState {
     fn free_lazy_node(&mut self, index: u32) -> Result<(), Error> {
         let block = self.heap.get_block(index)?;
         let content_block = self.heap.get_block(block.link_content_index()?)?;
-        let content = self.load_key_string(content_block.index())?;
+        let content = self.load_key_string(content_block.index())?.into();
         self.delete_value(block)?;
         // Free the name or string reference block used for content.
         match content_block.block_type() {
@@ -673,10 +673,10 @@ impl InnerState {
         format!("{}-{}", prefix, id)
     }
 
-    pub(crate) fn allocate_link<'b>(
+    pub(crate) fn allocate_link(
         &mut self,
-        name: impl Into<StringReference<'b>>,
-        content: &str,
+        name: impl Into<StringReference>,
+        content: StringReference,
         disposition: LinkNodeDisposition,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -709,9 +709,9 @@ impl InnerState {
     }
 
     /// Allocate a PROPERTY block with the given |name|, |value| and |parent_index|.
-    fn create_property<'b>(
+    fn create_property(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         value: &[u8],
         format: PropertyFormat,
         parent_index: u32,
@@ -729,19 +729,19 @@ impl InnerState {
 
     /// Get or allocate a STRING_REFERENCE block with the given |value|.
     /// When a new string reference is created, its reference count is set to zero.
-    fn get_or_create_string_reference<'b>(
+    fn get_or_create_string_reference(
         &mut self,
-        value: impl Into<StringReference<'b>>,
+        value: impl Into<StringReference>,
     ) -> Result<Block<Container>, Error> {
         let string_reference = value.into();
-        match self.string_reference_ids.get(&string_reference.id()) {
+        match self.string_reference_block_indexes.get(&string_reference) {
             None => {
                 let block = self.heap.allocate_block(utils::block_size_for_payload(
-                    string_reference.data().len() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
+                    string_reference.len() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
                 ))?;
                 block.become_string_reference()?;
-                self.write_string_reference_payload(&block, string_reference.data())?;
-                self.string_reference_ids.insert(string_reference.id(), block.index());
+                self.write_string_reference_payload(&block, &string_reference)?;
+                self.string_reference_block_indexes.insert(string_reference, block.index());
                 Ok(block)
             }
 
@@ -799,11 +799,13 @@ impl InnerState {
         let block_index = block.index();
         self.heap.free_block(block)?;
 
-        let to_remove =
-            self.string_reference_ids.iter().find(|(_, vmo_index)| **vmo_index == block_index);
-        if let Some((id, _)) = to_remove {
-            let id = *id;
-            self.string_reference_ids.remove(&id);
+        let to_remove = self
+            .string_reference_block_indexes
+            .iter()
+            .find(|(_, vmo_index)| **vmo_index == block_index);
+        if let Some((reference, _)) = to_remove {
+            let reference = reference.clone();
+            self.string_reference_block_indexes.remove(&reference);
         }
 
         if first_extent == 0 {
@@ -889,9 +891,9 @@ impl InnerState {
         Ok(())
     }
 
-    fn create_bool<'b>(
+    fn create_bool(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         value: bool,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -915,9 +917,9 @@ impl InnerState {
     arithmetic_array_fns!(uint, u64, UintValue);
     arithmetic_array_fns!(double, f64, DoubleValue);
 
-    fn create_string_array<'b>(
+    fn create_string_array(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -943,11 +945,11 @@ impl InnerState {
         block.array_slots().map_err(|e| Error::VmoFormat(e))
     }
 
-    fn set_array_string_slot<'b>(
+    fn set_array_string_slot(
         &mut self,
         block_index: u32,
         slot_index: usize,
-        value: impl Into<StringReference<'b>>,
+        value: impl Into<StringReference>,
     ) -> Result<(), Error> {
         let block = self.heap.get_block(block_index)?;
         if block.array_slots()? <= slot_index {
@@ -955,7 +957,7 @@ impl InnerState {
         }
 
         let value = value.into();
-        let reference_index = if value.data() != "" {
+        let reference_index = if !value.is_empty() {
             let reference = self.get_or_create_string_reference(value)?;
             reference.increment_string_reference_count()?;
             reference.index()
@@ -997,9 +999,9 @@ impl InnerState {
         Ok(())
     }
 
-    fn allocate_reserved_value<'b>(
+    fn allocate_reserved_value(
         &mut self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         parent_index: u32,
         block_size: usize,
     ) -> Result<(Block<Container>, Block<Container>), Error> {
@@ -1475,23 +1477,23 @@ mod tests {
                 collected.push(state.create_node(&sf, 0).unwrap());
             }
 
-            assert!(state.inner_lock.string_reference_ids.get(&(&sf).id()).is_some());
+            assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_some());
 
             assert_eq!(state.stats().allocated_blocks, 102);
             let sf_block = state.heap().get_block(collected[0].name_index().unwrap()).unwrap();
             assert_eq!(sf_block.string_reference_count().unwrap(), 100);
 
             collected.iter().for_each(|b| {
-                assert!(state.inner_lock.string_reference_ids.get(&(&sf).id()).is_some());
+                assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_some());
                 assert!(state.free_value(b.index()).is_ok())
             });
 
-            assert!(state.inner_lock.string_reference_ids.get(&(&sf).id()).is_none());
+            assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_none());
 
             let node = state.create_node(&sf, 0).unwrap();
-            assert!(state.inner_lock.string_reference_ids.get(&(&sf).id()).is_some());
+            assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_some());
             assert!(state.free_value(node.index()).is_ok());
-            assert!(state.inner_lock.string_reference_ids.get(&(&sf).id()).is_none());
+            assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_none());
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
@@ -1675,10 +1677,10 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
             let array = state.create_string_array("array", 2, 0).unwrap();
 
-            let abc = StringReference::new("abc");
-            let def = StringReference::new("def");
-            let cba = StringReference::new("cba");
-            let fed = StringReference::new("fed");
+            let abc = StringReference::from("abc");
+            let def = StringReference::from("def");
+            let cba = StringReference::from("cba");
+            let fed = StringReference::from("fed");
 
             state.set_array_string_slot(array.index(), 0, &abc).unwrap();
             state.set_array_string_slot(array.index(), 1, &def).unwrap();
@@ -1998,15 +2000,17 @@ mod tests {
             assert_eq!(state.stats().allocated_blocks, 4);
             assert_eq!(block1.order(), 0);
 
+            // no allocation!
             let block2 = state.get_or_create_string_reference("abcd123456789").unwrap();
             assert_eq!(block2.order(), 1);
-            assert_eq!(state.stats().allocated_blocks, 5);
+            assert_eq!(block0_name.index(), block2.index());
+            assert_eq!(state.stats().allocated_blocks, 4);
 
-            let block3 = state.create_node("abcd123456789", 0).unwrap();
+            let block3 = state.create_node("abcd12345678", 0).unwrap();
             let block3_name = state.heap().get_block(block3.name_index().unwrap()).unwrap();
             assert_eq!(block3_name.order(), 1);
             assert_eq!(block3.order(), 0);
-            assert_eq!(state.stats().allocated_blocks, 7);
+            assert_eq!(state.stats().allocated_blocks, 6);
 
             let mut long_name = "".to_string();
             for _ in 0..3000 {
@@ -2017,16 +2021,17 @@ mod tests {
             let block4_name = state.heap().get_block(block4.name_index().unwrap()).unwrap();
             assert_eq!(block4_name.order(), 7);
             assert!(block4_name.next_extent().unwrap() != 0);
-            assert_eq!(state.stats().allocated_blocks, 10);
+            assert_eq!(state.stats().allocated_blocks, 9);
 
             assert!(state.maybe_free_string_reference(block1).is_ok());
             assert_eq!(state.stats().deallocated_blocks, 1);
             assert!(state.maybe_free_string_reference(block2).is_ok());
-            assert_eq!(state.stats().deallocated_blocks, 2);
+            // no deallocation because same ref as block2 is held in block0_name
+            assert_eq!(state.stats().deallocated_blocks, 1);
             assert!(state.free_value(block3.index()).is_ok());
-            assert_eq!(state.stats().deallocated_blocks, 4);
+            assert_eq!(state.stats().deallocated_blocks, 3);
             assert!(state.free_value(block4.index()).is_ok());
-            assert_eq!(state.stats().deallocated_blocks, 7);
+            assert_eq!(state.stats().deallocated_blocks, 6);
         }
 
         // Current expected layout of VMO:
@@ -2126,8 +2131,8 @@ mod tests {
                 .unwrap();
 
             // Verify the callback was properly saved.
-            assert!(state_guard.callbacks().get("link-name-0").is_some());
-            let callback = state_guard.callbacks().get("link-name-0").unwrap();
+            assert!(state_guard.callbacks().get(&"link-name-0".into()).is_some());
+            let callback = state_guard.callbacks().get(&"link-name-0".into()).unwrap();
             match callback().await {
                 Ok(inspector) => {
                     let hierarchy =
@@ -2180,7 +2185,7 @@ mod tests {
             assert!(state_guard.free_lazy_node(block.index()).is_ok());
 
             // Verify the callback was cleared on free link.
-            assert!(state_guard.callbacks().get("link-name-0").is_none());
+            assert!(state_guard.callbacks().get(&"link-name-0".into()).is_none());
         }
         let snapshot = Snapshot::try_from(state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();

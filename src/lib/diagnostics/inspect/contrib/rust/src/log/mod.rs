@@ -29,7 +29,7 @@ use fuchsia_inspect::Node;
 use lazy_static::lazy_static;
 
 lazy_static! {
-    pub static ref TIME_KEY: StringReference<'static> = "@time".into();
+    pub static ref TIME_KEY: StringReference = "@time".into();
 }
 
 /// Trait for writing to a node in bounded lists.
@@ -37,7 +37,7 @@ pub trait WriteInspect {
     /// Write a *single* value (property or child node) to |node| with the specified |key|.
     /// If multiple properties need to be written, consider creating a single child
     /// node with those properties.
-    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<StringReference<'a>>);
+    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>);
 }
 
 /// Macro to log a new entry to a bounded list node with the specified key-value pairs. Each value
@@ -147,7 +147,7 @@ macro_rules! inspect_insert {
     }};
 
     (@internal $node_writer:expr, $key:expr => $($rest:tt)+) => {{
-        let key: $crate::log::StringReference<'_> = $key.into();
+        let key: $crate::log::StringReference = $key.into();
         inspect_insert!(@internal $node_writer, var key: $($rest)+);
     }};
 
@@ -208,12 +208,12 @@ macro_rules! make_inspect_loggable {
         use $crate::inspect_insert;
         use fuchsia_inspect::{Node, StringReference};
         struct WriteInspectClosure<F>(F);
-        impl<F> WriteInspect for WriteInspectClosure<F> where F: Fn(&Node, StringReference<'_>) {
-            fn write_inspect<'a>(&self, writer: &Node, key: impl Into<StringReference<'a>>) {
+        impl<F> WriteInspect for WriteInspectClosure<F> where F: Fn(&Node, StringReference) {
+            fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
                 self.0(writer, key.into());
             }
         }
-        let f = WriteInspectClosure(move |writer: &Node, key: StringReference<'_>| {
+        let f = WriteInspectClosure(move |writer: &Node, key: StringReference| {
             let child = writer.create_child(key);
             inspect_insert!(child, $($args)+);
             writer.record(child);
@@ -511,7 +511,7 @@ mod tests {
         let (inspector, mut node) = inspector_and_list_node();
 
         lazy_static! {
-            static ref FOO: StringReference<'static> = "foo".into();
+            static ref FOO: StringReference = "foo".into();
         };
 
         inspect_log!(node, &*FOO => "foo_1");

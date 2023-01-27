@@ -11,36 +11,36 @@ pub(super) const ARENA_LOG_ROOT: &'static str = "gestures_event_log";
 // using `StringReference`s.
 lazy_static::lazy_static! {
     // Event types.
-    pub(super) static ref TOUCHPAD_EVENT_NODE: StringReference<'static> = "touchpad_event".into();
-    pub(super) static ref KEY_EVENT_NODE: StringReference<'static> = "key_event".into();
-    pub(super) static ref MISMATCH_EVENT_NODE: StringReference<'static> = "mismatch_event".into();
-    pub(super) static ref GESTURE_START_NODE: StringReference<'static> = "gesture_start".into();
-    pub(super) static ref GESTURE_END_NODE: StringReference<'static> = "gesture_end".into();
+    pub(super) static ref TOUCHPAD_EVENT_NODE: StringReference = "touchpad_event".into();
+    pub(super) static ref KEY_EVENT_NODE: StringReference = "key_event".into();
+    pub(super) static ref MISMATCH_EVENT_NODE: StringReference = "mismatch_event".into();
+    pub(super) static ref GESTURE_START_NODE: StringReference = "gesture_start".into();
+    pub(super) static ref GESTURE_END_NODE: StringReference = "gesture_end".into();
 
     // Device-event properties. Common to `TOUCHPAD_EVENT_NODE` and `KEY_EVENT_NODE`.
-    pub(super) static ref EVENT_TIME_PROP: StringReference<'static> = "driver_monotonic_nanos".into();
-    pub(super) static ref ENTRY_LATENCY_PROP: StringReference<'static> = "entry_latency_micros".into();
+    pub(super) static ref EVENT_TIME_PROP: StringReference = "driver_monotonic_nanos".into();
+    pub(super) static ref ENTRY_LATENCY_PROP: StringReference = "entry_latency_micros".into();
 
     // Touchpad-specific properties.
-    pub(super) static ref PRESSED_BUTTONS_PROP: StringReference<'static> = "pressed_buttons".into();
-    pub(super) static ref CONTACT_STATE_PROP: StringReference<'static> = "contacts".into();
-    pub(super) static ref PALM_CONTACT_STATE_PROP: StringReference<'static> = "filtered_palm_contacts".into();
-    pub(super) static ref X_POS_PROP: StringReference<'static> = "pos_x_mm".into();
-    pub(super) static ref Y_POS_PROP: StringReference<'static> = "pos_y_mm".into();
-    pub(super) static ref WIDTH_PROP: StringReference<'static> = "width_mm".into();
-    pub(super) static ref HEIGHT_PROP: StringReference<'static> = "height_mm".into();
+    pub(super) static ref PRESSED_BUTTONS_PROP: StringReference = "pressed_buttons".into();
+    pub(super) static ref CONTACT_STATE_PROP: StringReference = "contacts".into();
+    pub(super) static ref PALM_CONTACT_STATE_PROP: StringReference = "filtered_palm_contacts".into();
+    pub(super) static ref X_POS_PROP: StringReference = "pos_x_mm".into();
+    pub(super) static ref Y_POS_PROP: StringReference = "pos_y_mm".into();
+    pub(super) static ref WIDTH_PROP: StringReference = "width_mm".into();
+    pub(super) static ref HEIGHT_PROP: StringReference = "height_mm".into();
 
     // Reason properties. Shared between `MISMATCH_EVENT_NODE`s, and
     // `GESTURE_END_NODE`s.
-    pub(super) static ref REASON_PROP: StringReference<'static> = "reason".into();
-    pub(super) static ref CONTENDER_PROP: StringReference<'static> = "contender".into();
-    pub(super) static ref CRITERION_PROP: StringReference<'static> = "criterion".into();
-    pub(super) static ref ACTUAL_VALUE_PROP: StringReference<'static> = "actual".into();
-    pub(super) static ref MIN_VALUE_PROP: StringReference<'static> = "min_allowed".into();
-    pub(super) static ref MAX_VALUE_PROP: StringReference<'static> = "max_allowed".into();
+    pub(super) static ref REASON_PROP: StringReference = "reason".into();
+    pub(super) static ref CONTENDER_PROP: StringReference = "contender".into();
+    pub(super) static ref CRITERION_PROP: StringReference = "criterion".into();
+    pub(super) static ref ACTUAL_VALUE_PROP: StringReference = "actual".into();
+    pub(super) static ref MIN_VALUE_PROP: StringReference = "min_allowed".into();
+    pub(super) static ref MAX_VALUE_PROP: StringReference = "max_allowed".into();
 
     // Properties shared by gesture start and gesture end events.
-    pub(super) static ref NAME_PROP: StringReference<'static> = "gesture_name".into();
+    pub(super) static ref NAME_PROP: StringReference = "gesture_name".into();
 
     // Gesture start properties.
     //
@@ -48,8 +48,8 @@ lazy_static::lazy_static! {
     // * These latencies are relative to touchpad event which started the contest.
     // * The latency as the delta between the driver timestamps for the relevant
     //   touchpad events. Monotonic time duration might differ.
-    pub(super) static ref TIME_LATENCY_PROP: StringReference<'static> = "latency_micros".into();
-    pub(super) static ref EVENT_LATENCY_PROP: StringReference<'static> = "latency_event_count".into();
+    pub(super) static ref TIME_LATENCY_PROP: StringReference = "latency_micros".into();
+    pub(super) static ref EVENT_LATENCY_PROP: StringReference = "latency_event_count".into();
 
     // Gesture end properties.
     //
@@ -63,8 +63,8 @@ lazy_static::lazy_static! {
     // * The time duration is measured as the delta between the driver timestamps
     //   for the touchpad events which triggered the start and end of the gesture.
     //   Monotonic time duration might differ.
-    pub(super) static ref TIME_DURATION_PROP: StringReference<'static> = "duration_micros".into();
-    pub(super) static ref EVENT_DURATION_PROP: StringReference<'static> = "event_count".into();
+    pub(super) static ref TIME_DURATION_PROP: StringReference = "duration_micros".into();
+    pub(super) static ref EVENT_DURATION_PROP: StringReference = "event_count".into();
 }
 
 // Example JSON dump of inspect tree generated by `gesture_arena`, from a unit test:

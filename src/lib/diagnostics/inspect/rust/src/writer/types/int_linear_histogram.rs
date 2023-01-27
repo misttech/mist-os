@@ -23,8 +23,8 @@ pub struct IntLinearHistogramProperty {
 }
 
 impl IntLinearHistogramProperty {
-    pub(crate) fn new<'b>(
-        name: impl Into<StringReference<'b>>,
+    pub(crate) fn new(
+        name: impl Into<StringReference>,
         params: LinearHistogramParams<i64>,
         parent: &Node,
     ) -> Self {

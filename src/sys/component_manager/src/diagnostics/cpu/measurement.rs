@@ -19,11 +19,11 @@ use {
 };
 
 lazy_static! {
-    static ref TIMESTAMP: inspect::StringReference<'static> = "timestamp".into();
-    static ref CPU_TIME: inspect::StringReference<'static> = "cpu_time".into();
-    static ref QUEUE_TIME: inspect::StringReference<'static> = "queue_time".into();
-    static ref SAMPLES: inspect::StringReference<'static> = "@samples".into();
-    static ref SAMPLE_INDEXES: Vec<inspect::StringReference<'static>> =
+    static ref TIMESTAMP: inspect::StringReference = "timestamp".into();
+    static ref CPU_TIME: inspect::StringReference = "cpu_time".into();
+    static ref QUEUE_TIME: inspect::StringReference = "queue_time".into();
+    static ref SAMPLES: inspect::StringReference = "@samples".into();
+    static ref SAMPLE_INDEXES: Vec<inspect::StringReference> =
         (0..COMPONENT_CPU_MAX_SAMPLES).map(|x| x.to_string().into()).collect();
 }
 

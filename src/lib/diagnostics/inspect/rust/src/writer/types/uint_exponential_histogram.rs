@@ -24,8 +24,8 @@ pub struct UintExponentialHistogramProperty {
 }
 
 impl UintExponentialHistogramProperty {
-    pub(crate) fn new<'b>(
-        name: impl Into<StringReference<'b>>,
+    pub(crate) fn new(
+        name: impl Into<StringReference>,
         params: ExponentialHistogramParams<u64>,
         parent: &Node,
     ) -> Self {

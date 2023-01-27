@@ -16,7 +16,7 @@ use {
 pub struct InspectBytes<T: AsRef<[u8]>>(pub T);
 
 impl<T: AsRef<[u8]>> WriteInspect for InspectBytes<T> {
-    fn write_inspect<'a>(&self, writer: &Node, key: impl Into<StringReference<'a>>) {
+    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
         writer.record_bytes(key, self.0.as_ref());
     }
 }
@@ -43,7 +43,7 @@ impl<'a, T> WriteInspect for InspectList<'a, T>
 where
     T: WriteInspect,
 {
-    fn write_inspect<'b>(&self, writer: &Node, key: impl Into<StringReference<'b>>) {
+    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
         let child = writer.create_child(key);
         for (i, val) in self.0.iter().enumerate() {
             val.write_inspect(&child, &i.to_string());
@@ -81,7 +81,7 @@ impl<'a, T, F> WriteInspect for InspectListClosure<'a, T, F>
 where
     F: Fn(&Node, &str, &T),
 {
-    fn write_inspect<'b>(&self, writer: &Node, key: impl Into<StringReference<'b>>) {
+    fn write_inspect(&self, writer: &Node, key: impl Into<StringReference>) {
         let child = writer.create_child(key);
         for (i, val) in self.0.iter().enumerate() {
             self.1(&child, &i.to_string(), val);

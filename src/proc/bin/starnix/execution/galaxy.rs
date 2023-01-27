@@ -59,10 +59,10 @@ impl std::ops::Deref for ConfigWrapper {
 }
 
 lazy_static::lazy_static! {
-    static ref COMMAND: inspect::StringReference<'static> = "command".into();
-    static ref PPID: inspect::StringReference<'static> = "ppid".into();
-    static ref TASKS: inspect::StringReference<'static> = "tasks".into();
-    static ref STOPPED: inspect::StringReference<'static> = "stopped".into();
+    static ref COMMAND: inspect::StringReference = "command".into();
+    static ref PPID: inspect::StringReference = "ppid".into();
+    static ref TASKS: inspect::StringReference = "tasks".into();
+    static ref STOPPED: inspect::StringReference = "stopped".into();
 }
 
 /// Returns the configuration object for the galaxy being run by this `starnix_kernel`.
@@ -404,9 +404,9 @@ fn create_galaxy_inspect(kernel: Arc<Kernel>, parent: &inspect::Node) {
     });
 }
 
-fn record_task_command_to_node<'a>(
+fn record_task_command_to_node(
     task: &Arc<Task>,
-    name: impl Into<inspect::StringReference<'a>>,
+    name: impl Into<inspect::StringReference>,
     node: &inspect::Node,
 ) {
     match task.command().to_str() {

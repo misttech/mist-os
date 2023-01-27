@@ -722,7 +722,7 @@ mod tests {
     async fn siblings_with_same_name() {
         let inspector = Inspector::default();
 
-        let foo: StringReference<'static> = "foo".into();
+        let foo: StringReference = "foo".into();
 
         inspector.root().record_int("foo", 0);
         inspector.root().record_int("foo", 1);

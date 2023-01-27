@@ -466,8 +466,7 @@ a value. The callback function is invoked when the property value is read.
 
 * {Rust}
 
-  You can use `fuchsia_inspect::StringReference` to reduce the memory footprint
-  of an Inspect hierarchy that has a lot of repeated data. For instance,
+  String names are automatically de-duplicated in Rust Inspect. For example,
 
   ```rust
   use fuchsia_inspect::Inspector;
@@ -478,32 +477,10 @@ a value. The callback function is invoked when the property value is read.
   }
   ```
 
-  Will generate 100 copies of `"child"`.
-
-  Alternatively,
-
-  ```rust
-  use fuchsia_inspect::{Inspector, StringReference}
-
-  lazy_static! {
-    static ref CHILD: StringReference<'static> = "child".into();
-  }
-
-  let inspector = Inspector::default();
-  for _ in 0..100 {
-    inspector.root().record_child(&*CHILD);
-  }
-  ```
-
   Will generate only 1 copy of `"child"` which is referenced 100 times.
 
   This saves 16 bytes for each child node, and has a cost of 32 bytes
   for the shared data. The net result is a savings of 1568 bytes.
-
-  This pattern is recommended anytime a global constant key would be used.
-
-  Note: It isn't necessary for the `StringReference` to be static.
-  It can also take a `String`, owning it.
 
 ## Viewing Inspect Data {#view-inspect-data}
 

@@ -52,7 +52,7 @@ macro_rules! maybe_return {
 const MAX_INSPECT_SIZE : usize = 2 * 1024 * 1024 /* 2MB */;
 
 lazy_static! {
-    static ref AGGREGATE_SAMPLES: inspect::StringReference<'static> = "@aggregated".into();
+    static ref AGGREGATE_SAMPLES: inspect::StringReference = "@aggregated".into();
 }
 
 /// Provides stats for all components running in the system.

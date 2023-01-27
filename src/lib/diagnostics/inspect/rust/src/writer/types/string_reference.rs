@@ -2,84 +2,72 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{
-    borrow::Cow,
-    sync::atomic::{AtomicUsize, Ordering},
-};
-
-/// This is the generator for StringReference ID's.
-static NEXT_STRING_REFERENCE_ID: AtomicUsize = AtomicUsize::new(0);
+use std::borrow::Cow;
+use std::ops::Deref;
+use std::sync::Arc;
 
 /// StringReference is a type that can be constructed and passed into
 /// the Inspect API as a name of a Node. If this is done, only one
 /// reference counted instance of the string will be allocated per
 /// Inspector. They can be safely used with LazyNodes.
-pub struct StringReference<'a> {
-    // The canonical data referred to by this instance.
-    data: Cow<'a, str>,
+///
+/// StringReference dereferences into a `&str` for convenience.
+#[derive(Hash, Eq, PartialEq, Debug, Clone)]
+pub struct StringReference(Arc<str>);
 
-    // The identifier used by state to locate this reference.
-    reference_id: usize,
-}
+impl Deref for StringReference {
+    type Target = str;
 
-impl<'a> StringReference<'a> {
-    /// Construct a StringReference with non-owned data.
-    pub fn new(data: &'a str) -> Self {
-        Self {
-            data: Cow::Borrowed(data),
-            reference_id: NEXT_STRING_REFERENCE_ID.fetch_add(1, Ordering::SeqCst),
-        }
-    }
-
-    /// Construct a StringReference with owned data. For internal use. To construct
-    /// an owning StringReference with the public API, use from(String).
-    fn new_owned(data: String) -> Self {
-        Self {
-            data: Cow::Owned(data),
-            reference_id: NEXT_STRING_REFERENCE_ID.fetch_add(1, Ordering::SeqCst),
-        }
-    }
-
-    /// Access a read-only reference to the data in a StringReference.
-    pub(crate) fn data(&self) -> &str {
-        &self.data
-    }
-
-    /// Get the ID of this StringReference for State. Note that this is not
-    /// necessarily equivalent to the block index of the StringReference in the VMO.
-    pub(crate) fn id(&self) -> usize {
-        self.reference_id
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
     }
 }
 
-impl<'a> From<&'a StringReference<'a>> for StringReference<'a> {
-    fn from(sf: &'a StringReference<'a>) -> Self {
-        Self { data: Cow::Borrowed(sf.data()), reference_id: sf.reference_id }
+impl AsRef<str> for StringReference {
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
     }
 }
 
-impl<'a> From<&'a str> for StringReference<'a> {
-    fn from(data: &'a str) -> Self {
-        StringReference::new(data)
+/// Internally clones itself without allocation or copy
+impl From<&'_ StringReference> for StringReference {
+    fn from(sref: &'_ StringReference) -> Self {
+        sref.clone()
     }
 }
 
-impl<'a> From<&'a String> for StringReference<'a> {
-    fn from(data: &'a String) -> Self {
-        StringReference::new(data)
-    }
-}
-
-/// This trait allows the construction of a StringReference that owns its data.
-impl From<String> for StringReference<'_> {
+/// Consumes the input without allocation or copy
+impl From<String> for StringReference {
     fn from(data: String) -> Self {
-        StringReference::new_owned(data)
+        StringReference(Arc::from(data.into_boxed_str()))
     }
 }
 
-impl<'a> From<Cow<'a, str>> for StringReference<'a> {
-    fn from(data: Cow<'a, str>) -> StringReference<'a> {
-        StringReference::new_owned(data.into_owned())
+/// Consumes the input without allocation or copy
+impl From<Arc<str>> for StringReference {
+    fn from(data: Arc<str>) -> Self {
+        StringReference(data)
+    }
+}
+
+/// Allocates an `Arc<String>` from `data`
+impl From<&String> for StringReference {
+    fn from(data: &String) -> Self {
+        StringReference(Arc::from(data.as_ref()))
+    }
+}
+
+/// Allocates an `Arc<String>` from `data`
+impl From<&str> for StringReference {
+    fn from(data: &str) -> Self {
+        StringReference(data.into())
+    }
+}
+
+/// Allocates an `Arc<String>` from `data`
+impl From<Cow<'_, str>> for StringReference {
+    fn from(data: Cow<'_, str>) -> Self {
+        StringReference(data.as_ref().into())
     }
 }
 
@@ -93,9 +81,9 @@ mod tests {
     #[fuchsia::test]
     fn string_references_as_names() {
         lazy_static! {
-            static ref FOO: StringReference<'static> = "foo".into();
-            static ref BAR: StringReference<'static> = "bar".into();
-            static ref BAZ: StringReference<'static> = "baz".into();
+            static ref FOO: StringReference = "foo".into();
+            static ref BAR: StringReference = String::from("bar").into();
+            static ref BAZ: StringReference = String::from("baz").into();
         };
 
         let inspector = Inspector::default();
@@ -154,7 +142,7 @@ mod tests {
 
         assert_eq!(
             inspector.state().unwrap().try_lock().unwrap().stats().allocated_blocks,
-            pre_loop_count + 300 /* the int blocks */ + 300 /* individual blocks for "abcd" */
+            pre_loop_count + 300 /* the int blocks */ + 1 /* individual block for "abcd" */
         );
         assert_eq!(
             inspector.state().unwrap().try_lock().unwrap().stats().deallocated_blocks,

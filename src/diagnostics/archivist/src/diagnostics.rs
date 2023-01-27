@@ -18,28 +18,28 @@ use std::{
 };
 
 lazy_static! {
-    static ref BATCH_ITERATOR : StringReference<'static> = "batch_iterator".into();
-    static ref BATCH_ITERATOR_CONNECTIONS : StringReference<'static> = "batch_iterator_connections".into();
-    static ref COMPONENT_TIME_USEC : StringReference<'static> = "component_time_usec".into();
-    static ref COMPONENT_TIMEOUTS_COUNT : StringReference<'static> = "component_timeouts_count".into();
-    static ref CONNECTIONS_OPENED : StringReference<'static> = "connections_opened".into();
-    static ref CONNECTIONS_CLOSED : StringReference<'static> = "connections_closed".into();
-    static ref DURATION_SECONDS : StringReference<'static> = "duration_seconds".into();
-    static ref GET_NEXT : StringReference<'static> = "get_next".into();
-    static ref LONGEST_PROCESSING_TIMES : StringReference<'static> = "longest_processing_times".into();
-    static ref MAX_SNAPSHOT_SIZE_BYTES : StringReference<'static> = "max_snapshot_sizes_bytes".into();
-    static ref READER_SERVERS_CONSTRUCTED : StringReference<'static> = "reader_servers_constructed".into();
-    static ref READER_SERVERS_DESTROYED : StringReference<'static> = "reader_servers_destroyed".into();
-    static ref REQUESTS : StringReference<'static> = "requests".into();
-    static ref RESPONSES : StringReference<'static> = "responses".into();
-    static ref RESULT_COUNT : StringReference<'static> = "result_count".into();
-    static ref RESULT_ERRORS : StringReference<'static> = "result_errors".into();
-    static ref SCHEMA_TRUNCATION_COUNT : StringReference<'static> = "schema_truncation_count".into();
-    static ref SNAPSHOT_SCHEMA_TRUNCATION_PERCENTAGE : StringReference<'static> =
+    static ref BATCH_ITERATOR : StringReference = "batch_iterator".into();
+    static ref BATCH_ITERATOR_CONNECTIONS : StringReference = "batch_iterator_connections".into();
+    static ref COMPONENT_TIME_USEC : StringReference = "component_time_usec".into();
+    static ref COMPONENT_TIMEOUTS_COUNT : StringReference = "component_timeouts_count".into();
+    static ref CONNECTIONS_OPENED : StringReference = "connections_opened".into();
+    static ref CONNECTIONS_CLOSED : StringReference = "connections_closed".into();
+    static ref DURATION_SECONDS : StringReference = "duration_seconds".into();
+    static ref GET_NEXT : StringReference = "get_next".into();
+    static ref LONGEST_PROCESSING_TIMES : StringReference = "longest_processing_times".into();
+    static ref MAX_SNAPSHOT_SIZE_BYTES : StringReference = "max_snapshot_sizes_bytes".into();
+    static ref READER_SERVERS_CONSTRUCTED : StringReference = "reader_servers_constructed".into();
+    static ref READER_SERVERS_DESTROYED : StringReference = "reader_servers_destroyed".into();
+    static ref REQUESTS : StringReference = "requests".into();
+    static ref RESPONSES : StringReference = "responses".into();
+    static ref RESULT_COUNT : StringReference = "result_count".into();
+    static ref RESULT_ERRORS : StringReference = "result_errors".into();
+    static ref SCHEMA_TRUNCATION_COUNT : StringReference = "schema_truncation_count".into();
+    static ref SNAPSHOT_SCHEMA_TRUNCATION_PERCENTAGE : StringReference =
         "snapshot_schema_truncation_percentage".into();
-    static ref TIME_USEC : StringReference<'static> = "time_usec".into();
-    static ref TERMINAL_RESPONSES : StringReference<'static> = "terminal_responses".into();
-    static ref TIME : StringReference<'static> = "@time".into();
+    static ref TIME_USEC : StringReference = "time_usec".into();
+    static ref TERMINAL_RESPONSES : StringReference = "terminal_responses".into();
+    static ref TIME : StringReference = "@time".into();
 
     // Exponential histograms for time in microseconds contains power-of-two intervals
     static ref TIME_USEC_PARAMS : ExponentialHistogramParams<u64> = ExponentialHistogramParams {

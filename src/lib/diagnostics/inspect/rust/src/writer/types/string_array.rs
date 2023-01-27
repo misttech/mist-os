@@ -2,24 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::marker::PhantomData;
-
 use crate::writer::{
     private::InspectTypeInternal, ArrayProperty, Inner, InnerValueType, InspectType, State,
     StringReference,
 };
 
 #[derive(Debug, PartialEq, Eq, Default)]
-pub struct StringArrayProperty<'a> {
+pub struct StringArrayProperty {
     inner: Inner<InnerValueType>,
-    phantom: PhantomData<&'a ()>,
 }
 
-impl InspectType for StringArrayProperty<'_> {}
+impl InspectType for StringArrayProperty {}
 
-impl InspectTypeInternal for StringArrayProperty<'_> {
+impl InspectTypeInternal for StringArrayProperty {
     fn new(state: State, block_index: u32) -> Self {
-        Self { inner: Inner::new(state, block_index), phantom: PhantomData }
+        Self { inner: Inner::new(state, block_index) }
     }
 
     fn is_valid(&self) -> bool {
@@ -27,7 +24,7 @@ impl InspectTypeInternal for StringArrayProperty<'_> {
     }
 
     fn new_no_op() -> Self {
-        Self { inner: Inner::None, phantom: PhantomData }
+        Self { inner: Inner::None }
     }
 
     fn state(&self) -> Option<State> {
@@ -39,8 +36,8 @@ impl InspectTypeInternal for StringArrayProperty<'_> {
     }
 }
 
-impl<'a> ArrayProperty for StringArrayProperty<'a> {
-    type Type = StringReference<'a>;
+impl ArrayProperty for StringArrayProperty {
+    type Type = StringReference;
 
     fn set(&self, index: usize, value: impl Into<Self::Type>) {
         if let Some(ref inner_ref) = self.inner.inner_ref() {
@@ -65,7 +62,7 @@ impl<'a> ArrayProperty for StringArrayProperty<'a> {
     }
 }
 
-impl Drop for StringArrayProperty<'_> {
+impl Drop for StringArrayProperty {
     fn drop(&mut self) {
         self.clear();
     }
@@ -79,7 +76,7 @@ mod tests {
     use crate::writer::Length;
     use crate::Inspector;
 
-    impl StringArrayProperty<'_> {
+    impl StringArrayProperty {
         pub fn load_string_slot(&self, slot: usize) -> Option<String> {
             self.inner.inner_ref().and_then(|inner_ref| {
                 inner_ref

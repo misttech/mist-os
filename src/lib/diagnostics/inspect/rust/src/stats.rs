@@ -87,7 +87,7 @@ fn write_stats(state: &State, node: &super::Node) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assert_data_tree;
+    use crate::{assert_data_tree, assert_json_diff, hierarchy::DiagnosticsHierarchy};
     use inspect_format::constants;
 
     #[fuchsia::test]
@@ -104,7 +104,7 @@ mod tests {
             }
             .boxed()
         });
-        assert_data_tree!(inspector, root: {
+        assert_json_diff!(inspector, root: {
             foo: {
                 a: 1u64,
             },
@@ -122,7 +122,7 @@ mod tests {
                 current_size: 4096u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
                 total_dynamic_children: 2u64,
-                allocated_blocks: 23u64,
+                allocated_blocks: 22u64,
                 deallocated_blocks: 0u64,
                 failed_allocations: 0u64,
             }
@@ -141,7 +141,7 @@ mod tests {
                 current_size: 61440u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
                 total_dynamic_children: 2u64,
-                allocated_blocks: 325u64,
+                allocated_blocks: 324u64,
                 // 2 blocks are deallocated because of the "drop" int block and its
                 // STRING_REFERENCE
                 deallocated_blocks: 2u64,
@@ -158,7 +158,7 @@ mod tests {
                 current_size: 262144u64,
                 maximum_size: constants::DEFAULT_VMO_SIZE_BYTES as u64,
                 total_dynamic_children: 2u64,
-                allocated_blocks: 681u64,
+                allocated_blocks: 680u64,
                 // 2 additional blocks are deallocated because of the failed allocation
                 deallocated_blocks: 4u64,
                 failed_allocations: 1u64,

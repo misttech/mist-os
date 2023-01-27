@@ -24,7 +24,7 @@ impl Watch<Arc<RepositoryConfig>> for InspectableRepositoryConfigWatcher {
     fn new<'a>(
         config: &Arc<RepositoryConfig>,
         node: &inspect::Node,
-        name: impl Into<StringReference<'a>>,
+        name: impl Into<StringReference>,
     ) -> Self {
         let repo_config_node = node.create_child(name);
         let mut ret = Self {

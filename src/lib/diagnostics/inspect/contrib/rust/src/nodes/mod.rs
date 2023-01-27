@@ -18,31 +18,31 @@ use fuchsia_zircon as zx;
 /// fuchsia_async executor set up, otherwise they will panic.
 pub trait NodeExt {
     /// Creates a new property holding the current monotonic timestamp.
-    fn create_time<'b>(&self, name: impl Into<StringReference<'b>>) -> TimeProperty;
+    fn create_time(&self, name: impl Into<StringReference>) -> TimeProperty;
 
     /// Creates a new property holding the given timestamp.
     fn create_time_at<'b>(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         timestamp: zx::Time,
     ) -> TimeProperty;
 
     /// Records a new property holding the current monotonic timestamp.
-    fn record_time<'b>(&self, name: impl Into<StringReference<'b>>);
+    fn record_time(&self, name: impl Into<StringReference>);
 }
 
 impl NodeExt for Node {
     ///# Panics
     ///
     /// Panics if the caller did not set up a fuchsia_async executor
-    fn create_time<'b>(&self, name: impl Into<StringReference<'b>>) -> TimeProperty {
+    fn create_time(&self, name: impl Into<StringReference>) -> TimeProperty {
         let now = fuchsia_async::Time::now().into();
         self.create_time_at(name, now)
     }
 
     fn create_time_at<'b>(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         timestamp: zx::Time,
     ) -> TimeProperty {
         TimeProperty { inner: self.create_int(name, timestamp.into_nanos()) }
@@ -51,7 +51,7 @@ impl NodeExt for Node {
     ///# Panics
     ///
     /// Panics if the caller did not set up a fuchsia_async executor
-    fn record_time<'b>(&self, name: impl Into<StringReference<'b>>) {
+    fn record_time(&self, name: impl Into<StringReference>) {
         let now: zx::Time = fuchsia_async::Time::now().into();
         self.record_int(name, now.into_nanos());
     }

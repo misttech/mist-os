@@ -42,7 +42,7 @@ impl Node {
 
     /// Add a child to this node.
     #[must_use]
-    pub fn create_child<'b>(&self, name: impl Into<StringReference<'b>>) -> Node {
+    pub fn create_child(&self, name: impl Into<StringReference>) -> Node {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -57,7 +57,7 @@ impl Node {
     }
 
     /// Creates and keeps track of a child with the given `name`.
-    pub fn record_child<'b, F>(&self, name: impl Into<StringReference<'b>>, initialize: F)
+    pub fn record_child<F>(&self, name: impl Into<StringReference>, initialize: F)
     where
         F: FnOnce(&Node),
     {
@@ -104,7 +104,7 @@ impl Node {
 
     /// Creates a new `IntProperty` with the given `name` and `value`.
     #[must_use]
-    pub fn create_int<'b>(&self, name: impl Into<StringReference<'b>>, value: i64) -> IntProperty {
+    pub fn create_int(&self, name: impl Into<StringReference>, value: i64) -> IntProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -121,18 +121,14 @@ impl Node {
     }
 
     /// Records a new `IntProperty` with the given `name` and `value`.
-    pub fn record_int<'b>(&self, name: impl Into<StringReference<'b>>, value: i64) {
+    pub fn record_int(&self, name: impl Into<StringReference>, value: i64) {
         let property = self.create_int(name, value);
         self.record(property);
     }
 
     /// Creates a new `UintProperty` with the given `name` and `value`.
     #[must_use]
-    pub fn create_uint<'b>(
-        &self,
-        name: impl Into<StringReference<'b>>,
-        value: u64,
-    ) -> UintProperty {
+    pub fn create_uint(&self, name: impl Into<StringReference>, value: u64) -> UintProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -149,18 +145,14 @@ impl Node {
     }
 
     /// Records a new `UintProperty` with the given `name` and `value`.
-    pub fn record_uint<'b>(&self, name: impl Into<StringReference<'b>>, value: u64) {
+    pub fn record_uint(&self, name: impl Into<StringReference>, value: u64) {
         let property = self.create_uint(name, value);
         self.record(property);
     }
 
     /// Creates a new `DoubleProperty` with the given `name` and `value`.
     #[must_use]
-    pub fn create_double<'b>(
-        &self,
-        name: impl Into<StringReference<'b>>,
-        value: f64,
-    ) -> DoubleProperty {
+    pub fn create_double(&self, name: impl Into<StringReference>, value: f64) -> DoubleProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -177,18 +169,18 @@ impl Node {
     }
 
     /// Records a new `DoubleProperty` with the given `name` and `value`.
-    pub fn record_double<'b>(&self, name: impl Into<StringReference<'b>>, value: f64) {
+    pub fn record_double(&self, name: impl Into<StringReference>, value: f64) {
         let property = self.create_double(name, value);
         self.record(property);
     }
 
     /// Creates a new `StringArrayProperty` with the given `name` and `slots`.
     #[must_use]
-    pub fn create_string_array<'a, 'b>(
+    pub fn create_string_array(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
-    ) -> StringArrayProperty<'a> {
+    ) -> StringArrayProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -206,18 +198,18 @@ impl Node {
 
     /// Creates a new `IntArrayProperty` with the given `name` and `slots`.
     #[must_use]
-    pub fn create_int_array<'b>(
+    pub fn create_int_array(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
     ) -> IntArrayProperty {
         self.create_int_array_internal(name, slots, ArrayFormat::Default)
     }
 
     #[must_use]
-    pub(crate) fn create_int_array_internal<'b>(
+    pub(crate) fn create_int_array_internal(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
         format: ArrayFormat,
     ) -> IntArrayProperty {
@@ -238,18 +230,18 @@ impl Node {
 
     /// Creates a new `UintArrayProperty` with the given `name` and `slots`.
     #[must_use]
-    pub fn create_uint_array<'b>(
+    pub fn create_uint_array(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
     ) -> UintArrayProperty {
         self.create_uint_array_internal(name, slots, ArrayFormat::Default)
     }
 
     #[must_use]
-    pub(crate) fn create_uint_array_internal<'b>(
+    pub(crate) fn create_uint_array_internal(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
         format: ArrayFormat,
     ) -> UintArrayProperty {
@@ -270,18 +262,18 @@ impl Node {
 
     /// Creates a new `DoubleArrayProperty` with the given `name` and `slots`.
     #[must_use]
-    pub fn create_double_array<'b>(
+    pub fn create_double_array(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
     ) -> DoubleArrayProperty {
         self.create_double_array_internal(name, slots, ArrayFormat::Default)
     }
 
     #[must_use]
-    pub(crate) fn create_double_array_internal<'b>(
+    pub(crate) fn create_double_array_internal(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         slots: usize,
         format: ArrayFormat,
     ) -> DoubleArrayProperty {
@@ -302,9 +294,9 @@ impl Node {
 
     /// Creates a new `IntLinearHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_int_linear_histogram<'b>(
+    pub fn create_int_linear_histogram(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         params: LinearHistogramParams<i64>,
     ) -> IntLinearHistogramProperty {
         IntLinearHistogramProperty::new(name, params, &self)
@@ -312,9 +304,9 @@ impl Node {
 
     /// Creates a new `UintLinearHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_uint_linear_histogram<'b>(
+    pub fn create_uint_linear_histogram(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         params: LinearHistogramParams<u64>,
     ) -> UintLinearHistogramProperty {
         UintLinearHistogramProperty::new(name, params, &self)
@@ -322,9 +314,9 @@ impl Node {
 
     /// Creates a new `DoubleLinearHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_double_linear_histogram<'b>(
+    pub fn create_double_linear_histogram(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         params: LinearHistogramParams<f64>,
     ) -> DoubleLinearHistogramProperty {
         DoubleLinearHistogramProperty::new(name, params, &self)
@@ -332,9 +324,9 @@ impl Node {
 
     /// Creates a new `IntExponentialHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_int_exponential_histogram<'b>(
+    pub fn create_int_exponential_histogram(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         params: ExponentialHistogramParams<i64>,
     ) -> IntExponentialHistogramProperty {
         IntExponentialHistogramProperty::new(name, params, &self)
@@ -342,9 +334,9 @@ impl Node {
 
     /// Creates a new `UintExponentialHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_uint_exponential_histogram<'b>(
+    pub fn create_uint_exponential_histogram(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         params: ExponentialHistogramParams<u64>,
     ) -> UintExponentialHistogramProperty {
         UintExponentialHistogramProperty::new(name, params, &self)
@@ -352,9 +344,9 @@ impl Node {
 
     /// Creates a new `DoubleExponentialHistogramProperty` with the given `name` and `params`.
     #[must_use]
-    pub fn create_double_exponential_histogram<'b>(
+    pub fn create_double_exponential_histogram(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         params: ExponentialHistogramParams<f64>,
     ) -> DoubleExponentialHistogramProperty {
         DoubleExponentialHistogramProperty::new(name, params, &self)
@@ -362,11 +354,7 @@ impl Node {
 
     /// Creates a new lazy child with the given `name` and `callback`.
     #[must_use]
-    pub fn create_lazy_child<'b, F>(
-        &self,
-        name: impl Into<StringReference<'b>>,
-        callback: F,
-    ) -> LazyNode
+    pub fn create_lazy_child<F>(&self, name: impl Into<StringReference>, callback: F) -> LazyNode
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
@@ -391,7 +379,7 @@ impl Node {
     }
 
     /// Records a new lazy child with the given `name` and `callback`.
-    pub fn record_lazy_child<'b, F>(&self, name: impl Into<StringReference<'b>>, callback: F)
+    pub fn record_lazy_child<F>(&self, name: impl Into<StringReference>, callback: F)
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
@@ -401,11 +389,7 @@ impl Node {
 
     /// Creates a new inline lazy node with the given `name` and `callback`.
     #[must_use]
-    pub fn create_lazy_values<'b, F>(
-        &self,
-        name: impl Into<StringReference<'b>>,
-        callback: F,
-    ) -> LazyNode
+    pub fn create_lazy_values<F>(&self, name: impl Into<StringReference>, callback: F) -> LazyNode
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
@@ -430,7 +414,7 @@ impl Node {
     }
 
     /// Records a new inline lazy node with the given `name` and `callback`.
-    pub fn record_lazy_values<'b, F>(&self, name: impl Into<StringReference<'b>>, callback: F)
+    pub fn record_lazy_values<F>(&self, name: impl Into<StringReference>, callback: F)
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
@@ -440,9 +424,9 @@ impl Node {
 
     /// Add a string property to this node.
     #[must_use]
-    pub fn create_string<'b>(
+    pub fn create_string(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         value: impl AsRef<str>,
     ) -> StringProperty {
         self.inner
@@ -466,16 +450,16 @@ impl Node {
     }
 
     /// Creates and saves a string property for the lifetime of the node.
-    pub fn record_string<'b>(&self, name: impl Into<StringReference<'b>>, value: impl AsRef<str>) {
+    pub fn record_string(&self, name: impl Into<StringReference>, value: impl AsRef<str>) {
         let property = self.create_string(name, value);
         self.record(property);
     }
 
     /// Add a byte vector property to this node.
     #[must_use]
-    pub fn create_bytes<'b>(
+    pub fn create_bytes(
         &self,
-        name: impl Into<StringReference<'b>>,
+        name: impl Into<StringReference>,
         value: impl AsRef<[u8]>,
     ) -> BytesProperty {
         self.inner
@@ -499,18 +483,14 @@ impl Node {
     }
 
     /// Creates and saves a bytes property for the lifetime of the node.
-    pub fn record_bytes<'b>(&self, name: impl Into<StringReference<'b>>, value: impl AsRef<[u8]>) {
+    pub fn record_bytes(&self, name: impl Into<StringReference>, value: impl AsRef<[u8]>) {
         let property = self.create_bytes(name, value);
         self.record(property);
     }
 
     /// Add a bool property to this node.
     #[must_use]
-    pub fn create_bool<'b>(
-        &self,
-        name: impl Into<StringReference<'b>>,
-        value: bool,
-    ) -> BoolProperty {
+    pub fn create_bool(&self, name: impl Into<StringReference>, value: bool) -> BoolProperty {
         self.inner
             .inner_ref()
             .and_then(|inner_ref| {
@@ -525,7 +505,7 @@ impl Node {
     }
 
     /// Creates and saves a bool property for the lifetime of the node.
-    pub fn record_bool<'b>(&self, name: impl Into<StringReference<'b>>, value: bool) {
+    pub fn record_bool(&self, name: impl Into<StringReference>, value: bool) {
         let property = self.create_bool(name, value);
         self.record(property);
     }
@@ -909,8 +889,7 @@ mod tests {
         inspector.root().record_child("child", |node| {
             node.record_int("my_int", 1i64);
 
-            let arr: crate::StringArrayProperty<'static> =
-                node.create_string_array("my_string_array", 1);
+            let arr: crate::StringArrayProperty = node.create_string_array("my_string_array", 1);
             arr.set(0, "test");
             node.record(arr);
         });
