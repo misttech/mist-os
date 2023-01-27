@@ -294,7 +294,7 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
                                            sizeof(*wlan_softmac_info_.supported_phys_list)));
   wlan_softmac_info_.band_caps_list = static_cast<wlan_softmac_band_capability_t*>(
       calloc(fuchsia_wlan_common_MAX_BANDS, sizeof(*wlan_softmac_info_.band_caps_list)));
-  if ((status = ConvertWlanSoftmacInfo(result->value()->info, &wlan_softmac_info_)) != ZX_OK) {
+  if ((status = ConvertWlanSoftmacInfo(result->value()->resp, &wlan_softmac_info_)) != ZX_OK) {
     errorf("WlanSoftmacInfo conversion failed (%s)", zx_status_get_string(status));
     return status;
   }

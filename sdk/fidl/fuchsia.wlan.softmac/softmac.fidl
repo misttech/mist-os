@@ -296,12 +296,17 @@ type WlanSoftmacStartActiveScanRequest = table {
 @discoverable
 @transport("Driver")
 protocol WlanSoftmac {
+
+    // TODO(fxbug.dev/87050): the need to nest query response within a struct {} is no longer
+    // necessary. However if the response is a struct, then ReplySuccess() expects each field to be
+    // passed individually, which makes the code harder to read. Once all Query responses switch to
+    // tables, this can beconsidered.
+
     /// Obtain information about the device and supported features
     /// Safe to call at any time.
     Query() -> (struct {
-        info WlanSoftmacInfo;
+        resp WlanSoftmacInfo;
     }) error zx.status;
-
     QueryDiscoverySupport() -> (struct {
         resp fuchsia.wlan.common.DiscoverySupport;
     }) error zx.status;
@@ -316,7 +321,7 @@ protocol WlanSoftmac {
     }) error zx.status;
 
     /// Start softmac running with ifc_virt
-    /// Callbacks on ifc may be invoked from now until stop() is called
+    /// Callbacks on WlanSoftmacIfc protocol may be invoked from now until stop() is called.
     Start(resource struct {
         ifc client_end:WlanSoftmacIfc;
     }) -> (resource struct {
