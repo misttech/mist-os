@@ -2,11 +2,6 @@
     platform: {
         feature_set_level: "bringup",
         build_type: "eng",
-
-        // TODO(fxbug.dev/118809): soft transition, remove.
-        diagnostics: {
-            archivist: "bringup",
-        },
     },
 
     // The bringup product can't specify anything in base/cache packages, as it

@@ -25,21 +25,7 @@ default_config = {
   serve_unattributed_logs = false
 }
 
-bringup_config = {
-  forward_variables_from(default_config, "*")
-
-  bind_services = []
-}
-
 # LINT.ThenChange(/src/lib/assembly/platform_configuration/src/subsystems/diagnostics.rs)
-
-low_mem_default_config = {
-  forward_variables_from(default_config, "*")
-
-  num_threads = 2
-  logs_max_cached_original_bytes = 2097152
-  maximum_concurrent_snapshots_per_reader = 2
-}
 
 embedded_config = {
   forward_variables_from(default_config, "*")
@@ -56,16 +42,4 @@ without_attribution_config = {
   forward_variables_from(embedded_config, "*")
   enable_event_source = false
   serve_unattributed_logs = true
-}
-
-no_detect_config = {
-  forward_variables_from(default_config, "*")
-
-  bind_services -= [ "fuchsia.component.DetectBinder" ]
-}
-
-no_service_config = {
-  forward_variables_from(default_config, "*")
-
-  bind_services = []
 }

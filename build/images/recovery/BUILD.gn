@@ -236,9 +236,6 @@ if (is_fuchsia) {
     platform = {
       build_type = "user"
       feature_set_level = "bringup"
-      diagnostics = {
-        archivist = "default-service"
-      }
     }
     product = {
     }

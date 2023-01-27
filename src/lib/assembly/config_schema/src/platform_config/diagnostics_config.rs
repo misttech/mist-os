@@ -9,17 +9,16 @@ use serde::{Deserialize, Serialize};
 #[serde(deny_unknown_fields)]
 pub struct DiagnosticsConfig {
     #[serde(default)]
-    pub archivist: ArchivistConfig,
+    pub archivist: Option<ArchivistConfig>,
 }
 
 /// Diagnostics configuration options for the archivist configuration area.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ArchivistConfig {
     NoDetectService,
     NoService,
     Bringup,
-    #[default]
     DefaultService,
     #[serde(rename = "low-mem-default-service-config")]
     LowMem,
@@ -83,7 +82,7 @@ mod tests {
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
-        assert!(config.diagnostics.is_none());
+        assert!(config.diagnostics.archivist.is_none());
     }
 
     #[test]
@@ -92,15 +91,12 @@ mod tests {
         {
           build_type: "eng",
           feature_set_level: "minimal",
-          "diagnostics": {}
+          diagnostics: {}
         }
     "#;
 
         let mut cursor = std::io::Cursor::new(json5);
         let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(
-            config.diagnostics,
-            Some(DiagnosticsConfig { archivist: ArchivistConfig::DefaultService })
-        );
+        assert_eq!(config.diagnostics, DiagnosticsConfig { archivist: None });
     }
 }

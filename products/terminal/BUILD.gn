@@ -17,9 +17,6 @@ product_assembly_configuration("terminal") {
         "touchscreen",
       ]
     }
-    diagnostics = {
-      archivist = "default-service"
-    }
   }
   product = {
   }

@@ -1,10 +1,7 @@
 {
     "platform": {
         "feature_set_level": "bringup",
-        "build_type": "eng",
-        "diagnostics": {
-            "archivist": "default-service"
-        }
+        "build_type": "eng"
     },
     "product": {}
 }

@@ -57,7 +57,7 @@ pub struct PlatformConfig {
 
     /// Platform configuration options for the diagnostics area.
     #[serde(default)]
-    pub diagnostics: Option<diagnostics_config::DiagnosticsConfig>,
+    pub diagnostics: diagnostics_config::DiagnosticsConfig,
 
     /// Platform configuration options for the connectivity area.
     #[serde(default)]

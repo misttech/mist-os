@@ -204,21 +204,6 @@ fuchsia_component("archivist-without-attribution-component") {
   deps = [ ":bin" ]
 }
 
-fuchsia_structured_config_values("default-service-config") {
-  cm_label = ":root-manifest"
-  values = default_config
-}
-
-fuchsia_structured_config_values("bringup-config") {
-  cm_label = ":root-manifest"
-  values = bringup_config
-}
-
-fuchsia_structured_config_values("low-mem-default-service-config") {
-  cm_label = ":root-manifest"
-  values = low_mem_default_config
-}
-
 fuchsia_structured_config_values("without-attribution-config") {
   cm_label = ":archivist-without-attribution-manifest"
   values = without_attribution_config
@@ -231,16 +216,6 @@ fuchsia_structured_config_values("archivist-embedded-config") {
 
 fuchsia_structured_config_rust_lib("archivist-config") {
   cm_label = ":root-manifest"
-}
-
-fuchsia_structured_config_values("no-detect-service-config") {
-  cm_label = ":root-manifest"
-  values = no_detect_config
-}
-
-fuchsia_structured_config_values("no-service-config") {
-  cm_label = ":root-manifest"
-  values = no_service_config
 }
 
 group("bootfs") {
