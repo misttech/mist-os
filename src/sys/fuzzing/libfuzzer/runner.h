@@ -39,21 +39,20 @@ class LibFuzzerRunner : public Runner {
 
   // |Runner| methods.
   void OverrideDefaults(Options* options) override;
+  ZxPromise<> Configure(const OptionsPtr& options) override;
   __WARN_UNUSED_RESULT zx_status_t AddToCorpus(CorpusType corpus_type, Input input) override;
   std::vector<Input> GetCorpus(CorpusType corpus_type) override;
   __WARN_UNUSED_RESULT zx_status_t ParseDictionary(const Input& input) override;
   Input GetDictionaryAsInput() const override;
 
-  ZxPromise<> Configure(const OptionsPtr& options) override;
+  ZxPromise<Artifact> Fuzz() override;
   ZxPromise<FuzzResult> Execute(std::vector<Input> input) override;
   ZxPromise<Input> Minimize(Input input) override;
   ZxPromise<Input> Cleanse(Input input) override;
-  ZxPromise<Artifact> Fuzz() override;
   ZxPromise<> Merge() override;
 
-  ZxPromise<> Stop() override;
-
   Status CollectStatus() override;
+  ZxPromise<> Stop() override;
 
  private:
   explicit LibFuzzerRunner(ExecutorPtr executor);

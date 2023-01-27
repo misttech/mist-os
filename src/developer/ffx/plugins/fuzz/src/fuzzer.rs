@@ -165,30 +165,6 @@ impl<O: OutputSink> Fuzzer<O> {
         Ok(())
     }
 
-    /// Executes the fuzzer once using the given input.
-    ///
-    /// Writes the result of execution to this object's internal `Writer`.
-    ///
-    /// Returns `ZX_ERR_CANCELED` if the workflow was interrupted by a call to
-    /// `fuchsia.fuzzer.Controller/Stop`, or `ZX_OK` if it ran to completion.
-    ///
-    /// Returns an error if:
-    ///   * Converting the input to an `Input`/`fuchsia.fuzzer.Input` pair fails.
-    ///   * Communicating with the fuzzer fails.
-    ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
-    ///
-    pub async fn try_one<S: AsRef<str>>(&self, test_input: S) -> Result<zx::Status> {
-        let input_pair = InputPair::try_from_str(test_input, &self.writer)
-            .context("failed to get input to try")?;
-        self.writer.println(format!("Trying an input of {} bytes...", input_pair.len()));
-        let artifact = self.controller.execute(input_pair).await?;
-        if artifact.status != zx::Status::OK {
-            return Ok(artifact.status);
-        }
-        self.writer.println(get_try_result(&artifact.result));
-        Ok(zx::Status::OK)
-    }
-
     /// Runs the fuzzer in a loop to generate and test new inputs.
     ///
     /// The fuzzer will continuously generate new inputs and execute them until one of four
@@ -219,6 +195,30 @@ impl<O: OutputSink> Fuzzer<O> {
         if let Some(path) = artifact.path {
             self.writer.println(format!("Input saved to '{}'", path.to_string_lossy()));
         }
+        Ok(zx::Status::OK)
+    }
+
+    /// Executes the fuzzer once using the given input.
+    ///
+    /// Writes the result of execution to this object's internal `Writer`.
+    ///
+    /// Returns `ZX_ERR_CANCELED` if the workflow was interrupted by a call to
+    /// `fuchsia.fuzzer.Controller/Stop`, or `ZX_OK` if it ran to completion.
+    ///
+    /// Returns an error if:
+    ///   * Converting the input to an `Input`/`fuchsia.fuzzer.Input` pair fails.
+    ///   * Communicating with the fuzzer fails.
+    ///   * The fuzzer returns an error, e.g. it is already performing another workflow.
+    ///
+    pub async fn try_one<S: AsRef<str>>(&self, test_input: S) -> Result<zx::Status> {
+        let input_pair = InputPair::try_from_str(test_input, &self.writer)
+            .context("failed to get input to try")?;
+        self.writer.println(format!("Trying an input of {} bytes...", input_pair.len()));
+        let artifact = self.controller.execute(input_pair).await?;
+        if artifact.status != zx::Status::OK {
+            return Ok(artifact.status);
+        }
+        self.writer.println(get_try_result(&artifact.result));
         Ok(zx::Status::OK)
     }
 
@@ -505,39 +505,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_try() -> Result<()> {
-        async fn test_try_one(
-            fake: &FakeController,
-            fuzzer: &Fuzzer<BufferSink>,
-            input_data: &[u8],
-            result: FuzzResult,
-            test: &mut Test,
-        ) -> Result<()> {
-            let test_input = hex::encode(input_data);
-            fake.set_result(Ok(result));
-            let status = fuzzer.try_one(test_input).await?;
-            assert_eq!(status, zx::Status::OK);
-            test.output_matches(format!("Trying an input of {} bytes...", input_data.len()));
-            test.output_matches(get_try_result(&result));
-            let received_input = fake.get_received_input();
-            assert_eq!(received_input, input_data);
-            Ok(())
-        }
-
-        let mut test = Test::try_new()?;
-        let (fake, fuzzer, _task) = perform_test_setup(&test)?;
-        test_try_one(&fake, &fuzzer, b"no errors", FuzzResult::NoErrors, &mut test).await?;
-        test_try_one(&fake, &fuzzer, b"bad malloc", FuzzResult::BadMalloc, &mut test).await?;
-        test_try_one(&fake, &fuzzer, b"crash", FuzzResult::Crash, &mut test).await?;
-        test_try_one(&fake, &fuzzer, b"death", FuzzResult::Death, &mut test).await?;
-        test_try_one(&fake, &fuzzer, b"exit", FuzzResult::Exit, &mut test).await?;
-        test_try_one(&fake, &fuzzer, b"leak", FuzzResult::Leak, &mut test).await?;
-        test_try_one(&fake, &fuzzer, b"oom", FuzzResult::Oom, &mut test).await?;
-        test_try_one(&fake, &fuzzer, b"timeout", FuzzResult::Timeout, &mut test).await?;
-        test.verify_output()
-    }
-
-    #[fuchsia::test]
     async fn test_run() -> Result<()> {
         async fn test_run_once(
             fake: &FakeController,
@@ -602,6 +569,39 @@ mod tests {
         let msg = format!("{}", result.unwrap_err());
         assert!(msg.contains("workflow timed out"));
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_try() -> Result<()> {
+        async fn test_try_one(
+            fake: &FakeController,
+            fuzzer: &Fuzzer<BufferSink>,
+            input_data: &[u8],
+            result: FuzzResult,
+            test: &mut Test,
+        ) -> Result<()> {
+            let test_input = hex::encode(input_data);
+            fake.set_result(Ok(result));
+            let status = fuzzer.try_one(test_input).await?;
+            assert_eq!(status, zx::Status::OK);
+            test.output_matches(format!("Trying an input of {} bytes...", input_data.len()));
+            test.output_matches(get_try_result(&result));
+            let received_input = fake.get_received_input();
+            assert_eq!(received_input, input_data);
+            Ok(())
+        }
+
+        let mut test = Test::try_new()?;
+        let (fake, fuzzer, _task) = perform_test_setup(&test)?;
+        test_try_one(&fake, &fuzzer, b"no errors", FuzzResult::NoErrors, &mut test).await?;
+        test_try_one(&fake, &fuzzer, b"bad malloc", FuzzResult::BadMalloc, &mut test).await?;
+        test_try_one(&fake, &fuzzer, b"crash", FuzzResult::Crash, &mut test).await?;
+        test_try_one(&fake, &fuzzer, b"death", FuzzResult::Death, &mut test).await?;
+        test_try_one(&fake, &fuzzer, b"exit", FuzzResult::Exit, &mut test).await?;
+        test_try_one(&fake, &fuzzer, b"leak", FuzzResult::Leak, &mut test).await?;
+        test_try_one(&fake, &fuzzer, b"oom", FuzzResult::Oom, &mut test).await?;
+        test_try_one(&fake, &fuzzer, b"timeout", FuzzResult::Timeout, &mut test).await?;
+        test.verify_output()
     }
 
     #[fuchsia::test]

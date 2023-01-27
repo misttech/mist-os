@@ -52,8 +52,8 @@ pub enum FuzzSubcommand {
     Get(GetSubcommand),
     Set(SetSubcommand),
     Add(AddSubcommand),
-    Try(TrySubcommand),
     Run(RunSubcommand),
+    Try(TrySubcommand),
     Cleanse(CleanseSubcommand),
     Minimize(MinimizeSubcommand),
     Merge(MergeSubcommand),
@@ -80,8 +80,8 @@ pub enum FuzzShellSubcommand {
     Get(GetShellSubcommand),
     Set(SetShellSubcommand),
     Add(AddShellSubcommand),
-    Try(TryShellSubcommand),
     Run(RunShellSubcommand),
+    Try(TryShellSubcommand),
     Cleanse(CleanseShellSubcommand),
     Minimize(MinimizeShellSubcommand),
     Merge(MergeShellSubcommand),
@@ -118,8 +118,8 @@ impl FuzzCommand {
             FuzzSubcommand::Get(cmd) => (cmd.quiet, FuzzShellSubcommand::Get(cmd.into())),
             FuzzSubcommand::Set(cmd) => (cmd.quiet, FuzzShellSubcommand::Set(cmd.into())),
             FuzzSubcommand::Add(cmd) => (cmd.quiet, FuzzShellSubcommand::Add(cmd.into())),
-            FuzzSubcommand::Try(cmd) => (cmd.quiet, FuzzShellSubcommand::Try(cmd.into())),
             FuzzSubcommand::Run(cmd) => (cmd.quiet, FuzzShellSubcommand::Run(cmd.into())),
+            FuzzSubcommand::Try(cmd) => (cmd.quiet, FuzzShellSubcommand::Try(cmd.into())),
             FuzzSubcommand::Cleanse(cmd) => (cmd.quiet, FuzzShellSubcommand::Cleanse(cmd.into())),
             FuzzSubcommand::Minimize(cmd) => (cmd.quiet, FuzzShellSubcommand::Minimize(cmd.into())),
             FuzzSubcommand::Merge(cmd) => (cmd.quiet, FuzzShellSubcommand::Merge(cmd.into())),
@@ -425,24 +425,6 @@ impl Autocomplete for AddShellSubcommand {
     const OPTION_TYPES: &'static [(&'static str, Option<ParameterType>)] = &[("--seed", None)];
 }
 
-/// Command to try a test input using the fuzzer.
-///
-/// This is a long-running workflow and may take an indefinite amount of time to complete.
-#[valid_when(FuzzerState::Idle)]
-#[derive_subcommand]
-#[derive(Clone, Debug, FromArgs, PartialEq)]
-#[argh(subcommand, name = "try", description = "Tests a specific input with a fuzzer.")]
-pub struct TryShellSubcommand {
-    /// input to execute; may be a filename or hex string
-    #[argh(positional)]
-    pub input: String,
-}
-
-impl Autocomplete for TryShellSubcommand {
-    const POSITIONAL_TYPES: &'static [ParameterType] = &[ParameterType::Input];
-    const OPTION_TYPES: &'static [(&'static str, Option<ParameterType>)] = &[];
-}
-
 /// Command to generate and test inputs using the fuzzer.
 ///
 /// This is a long-running workflow and may take an indefinite amount of time to complete.
@@ -464,6 +446,24 @@ impl Autocomplete for RunShellSubcommand {
     const POSITIONAL_TYPES: &'static [ParameterType] = &[];
     const OPTION_TYPES: &'static [(&'static str, Option<ParameterType>)] =
         &[("--runs", Some(ParameterType::Any)), ("--time", Some(ParameterType::Any))];
+}
+
+/// Command to try a test input using the fuzzer.
+///
+/// This is a long-running workflow and may take an indefinite amount of time to complete.
+#[valid_when(FuzzerState::Idle)]
+#[derive_subcommand]
+#[derive(Clone, Debug, FromArgs, PartialEq)]
+#[argh(subcommand, name = "try", description = "Tests a specific input with a fuzzer.")]
+pub struct TryShellSubcommand {
+    /// input to execute; may be a filename or hex string
+    #[argh(positional)]
+    pub input: String,
+}
+
+impl Autocomplete for TryShellSubcommand {
+    const POSITIONAL_TYPES: &'static [ParameterType] = &[ParameterType::Input];
+    const OPTION_TYPES: &'static [(&'static str, Option<ParameterType>)] = &[];
 }
 
 /// Command to try and clear bytes from a given input without changing the fuzzer error it causes.

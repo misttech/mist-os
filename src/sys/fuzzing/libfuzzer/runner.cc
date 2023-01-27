@@ -124,6 +124,14 @@ LibFuzzerRunner::LibFuzzerRunner(ExecutorPtr executor)
 
 void LibFuzzerRunner::OverrideDefaults(Options* options) { options->set_detect_exits(true); }
 
+ZxPromise<> LibFuzzerRunner::Configure(const OptionsPtr& options) {
+  return fpromise::make_promise([this, options]() -> ZxResult<> {
+           options_ = options;
+           return fpromise::ok();
+         })
+      .wrap_with(workflow_);
+}
+
 ///////////////////////////////////////////////////////////////
 // Corpus-related methods.
 
@@ -197,11 +205,24 @@ Input LibFuzzerRunner::GetDictionaryAsInput() const {
 ///////////////////////////////////////////////////////////////
 // Fuzzing workflows.
 
-ZxPromise<> LibFuzzerRunner::Configure(const OptionsPtr& options) {
-  return fpromise::make_promise([this, options]() -> ZxResult<> {
-           options_ = options;
+ZxPromise<Artifact> LibFuzzerRunner::Fuzz() {
+  return fpromise::make_promise([this]() -> ZxResult<> {
+           if (auto status = AddArgs(); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kLiveCorpusPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
+           if (auto status = process_.AddArg(kSeedCorpusPath); status != ZX_OK) {
+             return fpromise::error(status);
+           }
            return fpromise::ok();
          })
+      .and_then(RunAsync())
+      .and_then([this](Artifact& artifact) {
+        ReloadLiveCorpus();
+        return fpromise::ok(std::move(artifact));
+      })
       .wrap_with(workflow_);
 }
 
@@ -260,27 +281,6 @@ ZxPromise<FuzzResult> LibFuzzerRunner::Execute(std::vector<Input> inputs) {
              }
            }
          })
-      .wrap_with(workflow_);
-}
-
-ZxPromise<Artifact> LibFuzzerRunner::Fuzz() {
-  return fpromise::make_promise([this]() -> ZxResult<> {
-           if (auto status = AddArgs(); status != ZX_OK) {
-             return fpromise::error(status);
-           }
-           if (auto status = process_.AddArg(kLiveCorpusPath); status != ZX_OK) {
-             return fpromise::error(status);
-           }
-           if (auto status = process_.AddArg(kSeedCorpusPath); status != ZX_OK) {
-             return fpromise::error(status);
-           }
-           return fpromise::ok();
-         })
-      .and_then(RunAsync())
-      .and_then([this](Artifact& artifact) {
-        ReloadLiveCorpus();
-        return fpromise::ok(std::move(artifact));
-      })
       .wrap_with(workflow_);
 }
 
@@ -369,13 +369,6 @@ ZxPromise<> LibFuzzerRunner::Merge() {
       .wrap_with(workflow_);
 }
 
-ZxPromise<> LibFuzzerRunner::Stop() {
-  // TODO(fxbug.dev/87155): If libFuzzer-for-Fuchsia watches for something sent to stdin in order to
-  // call its |Fuzzer::StaticInterruptCallback|, we could ask libFuzzer to shut itself down. This
-  // would guarantee we get all of its output.
-  return process_.Kill().and_then(workflow_.Stop());
-}
-
 Status LibFuzzerRunner::CollectStatus() {
   // For libFuzzer, we return the most recently parsed status rather than point-in-time status.
   auto status = CopyStatus(status_);
@@ -393,6 +386,13 @@ Status LibFuzzerRunner::CollectStatus() {
   }
 
   return status;
+}
+
+ZxPromise<> LibFuzzerRunner::Stop() {
+  // TODO(fxbug.dev/87155): If libFuzzer-for-Fuchsia watches for something sent to stdin in order to
+  // call its |Fuzzer::StaticInterruptCallback|, we could ask libFuzzer to shut itself down. This
+  // would guarantee we get all of its output.
+  return process_.Kill().and_then(workflow_.Stop());
 }
 
 ///////////////////////////////////////////////////////////////

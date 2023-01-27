@@ -43,6 +43,14 @@ FakeRunner::FakeRunner(ExecutorPtr executor) : Runner(executor), workflow_(this)
   live_corpus_.emplace_back(Input());
 }
 
+ZxPromise<> FakeRunner::Configure(const OptionsPtr& options) {
+  return fpromise::make_promise([this, options]() -> ZxResult<> {
+           options_ = options;
+           return fpromise::ok();
+         })
+      .wrap_with(workflow_);
+}
+
 zx_status_t FakeRunner::AddToCorpus(CorpusType corpus_type, Input input) {
   auto* corpus = corpus_type == CorpusType::SEED ? &seed_corpus_ : &live_corpus_;
   corpus->emplace_back(std::move(input));
@@ -69,11 +77,39 @@ zx_status_t FakeRunner::ParseDictionary(const Input& input) {
 
 Input FakeRunner::GetDictionaryAsInput() const { return dictionary_.Duplicate(); }
 
-ZxPromise<> FakeRunner::Configure(const OptionsPtr& options) {
-  return fpromise::make_promise([this, options]() -> ZxResult<> {
-           options_ = options;
-           return fpromise::ok();
-         })
+ZxPromise<Artifact> FakeRunner::Fuzz() {
+  return Run()
+      .and_then([this](Artifact& artifact) {
+        if (artifact.fuzz_result() != FuzzResult::NO_ERRORS) {
+          return fpromise::ok(std::move(artifact));
+        }
+        // If no result was set up, sequentially increment each byte until it matches |kCrash|.
+        char input[kCrashLen + 1] = {0};
+        auto max_runs = options_->runs();
+        uint32_t runs = 1;
+        zx::duration elapsed(0);
+        status_.set_running(true);
+        status_.set_elapsed(elapsed.to_nsecs());
+        status_.set_runs(runs);
+        UpdateMonitors(UpdateReason::INIT);
+        for (; runs < max_runs || max_runs == 0; ++runs) {
+          inputs_.emplace_back(input);
+          auto prefix_len = get_prefix_len(input);
+          if (prefix_len == kCrashLen) {
+            return fpromise::ok(Artifact(FuzzResult::CRASH, Input(kCrash)));
+          }
+          input[prefix_len]++;
+          elapsed += zx::usec(10);
+          status_.set_elapsed(elapsed.to_nsecs());
+          status_.set_runs(runs);
+          if (runs % 10 == 0) {
+            UpdateMonitors(UpdateReason::PULSE);
+          }
+        }
+        status_.set_running(false);
+        UpdateMonitors(UpdateReason::DONE);
+        return fpromise::ok(Artifact(FuzzResult::NO_ERRORS, Input()));
+      })
       .wrap_with(workflow_);
 }
 
@@ -131,42 +167,6 @@ ZxPromise<Input> FakeRunner::Cleanse(Input input) {
       .wrap_with(workflow_);
 }
 
-ZxPromise<Artifact> FakeRunner::Fuzz() {
-  return Run()
-      .and_then([this](Artifact& artifact) {
-        if (artifact.fuzz_result() != FuzzResult::NO_ERRORS) {
-          return fpromise::ok(std::move(artifact));
-        }
-        // If no result was set up, sequentially increment each byte until it matches |kCrash|.
-        char input[kCrashLen + 1] = {0};
-        auto max_runs = options_->runs();
-        uint32_t runs = 1;
-        zx::duration elapsed(0);
-        status_.set_running(true);
-        status_.set_elapsed(elapsed.to_nsecs());
-        status_.set_runs(runs);
-        UpdateMonitors(UpdateReason::INIT);
-        for (; runs < max_runs || max_runs == 0; ++runs) {
-          inputs_.emplace_back(input);
-          auto prefix_len = get_prefix_len(input);
-          if (prefix_len == kCrashLen) {
-            return fpromise::ok(Artifact(FuzzResult::CRASH, Input(kCrash)));
-          }
-          input[prefix_len]++;
-          elapsed += zx::usec(10);
-          status_.set_elapsed(elapsed.to_nsecs());
-          status_.set_runs(runs);
-          if (runs % 10 == 0) {
-            UpdateMonitors(UpdateReason::PULSE);
-          }
-        }
-        status_.set_running(false);
-        UpdateMonitors(UpdateReason::DONE);
-        return fpromise::ok(Artifact(FuzzResult::NO_ERRORS, Input()));
-      })
-      .wrap_with(workflow_);
-}
-
 ZxPromise<> FakeRunner::Merge() {
   return Run()
       .and_then([this](Artifact& artifact) {
@@ -198,6 +198,17 @@ ZxPromise<> FakeRunner::Merge() {
       .wrap_with(workflow_);
 }
 
+ZxPromise<Artifact> FakeRunner::Run() {
+  return fpromise::make_promise([this]() -> ZxResult<Artifact> {
+    if (error_ != ZX_OK) {
+      return fpromise::error(error_);
+    }
+    return fpromise::ok(Artifact(result_, result_input_.Duplicate()));
+  });
+}
+
+Status FakeRunner::CollectStatus() { return CopyStatus(status_); }
+
 ZxPromise<> FakeRunner::Stop() {
   if (!completer_) {
     Bridge<> bridge;
@@ -217,17 +228,6 @@ Promise<> FakeRunner::AwaitStop() {
     consumer_ = std::move(bridge.consumer);
   }
   return consumer_.promise_or(fpromise::error());
-}
-
-Status FakeRunner::CollectStatus() { return CopyStatus(status_); }
-
-ZxPromise<Artifact> FakeRunner::Run() {
-  return fpromise::make_promise([this]() -> ZxResult<Artifact> {
-    if (error_ != ZX_OK) {
-      return fpromise::error(error_);
-    }
-    return fpromise::ok(Artifact(result_, result_input_.Duplicate()));
-  });
 }
 
 }  // namespace fuzzing

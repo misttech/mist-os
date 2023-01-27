@@ -50,6 +50,9 @@ class Runner {
   // Hook to allow runners to override default option values with runner-specific default values.
   virtual void OverrideDefaults(Options* options) {}
 
+  // Sets the options.
+  virtual ZxPromise<> Configure(const OptionsPtr& options) = 0;
+
   // Add an input to the specified corpus. Returns ZX_ERR_INVALID_ARGS if |corpus_type| is
   // unrecognized.
   virtual zx_status_t AddToCorpus(CorpusType corpus_type, Input input) = 0;
@@ -65,25 +68,24 @@ class Runner {
   // Returns the current dictionary serialized into an |Input|.
   virtual Input GetDictionaryAsInput() const = 0;
 
-  // Fuzzing workflows corresponding to methods in `fuchsia.fuzzer.Controller`.
-  virtual ZxPromise<> Configure(const OptionsPtr& options) = 0;
-  ZxPromise<FuzzResult> Execute(Input input);
-  virtual ZxPromise<Input> Minimize(Input input) = 0;
-  virtual ZxPromise<Input> Cleanse(Input input) = 0;
-  virtual ZxPromise<Artifact> Fuzz() = 0;
-  virtual ZxPromise<> Merge() = 0;
-
-  // Like |Execute| above, but takes multiple |inputs| instead of one.
-  virtual ZxPromise<FuzzResult> Execute(std::vector<Input> inputs) = 0;
-
-  // Cancels the current workflow.
-  virtual ZxPromise<> Stop() = 0;
-
   // Adds a subscriber for status updates.
   void AddMonitor(fidl::InterfaceHandle<Monitor> monitor);
 
+  // Fuzzing workflows corresponding to methods in `fuchsia.fuzzer.Controller`.
+  virtual ZxPromise<Artifact> Fuzz() = 0;
+  virtual ZxPromise<FuzzResult> Execute(std::vector<Input> inputs) = 0;
+  virtual ZxPromise<Input> Minimize(Input input) = 0;
+  virtual ZxPromise<Input> Cleanse(Input input) = 0;
+  virtual ZxPromise<> Merge() = 0;
+
+  // Like |Execute| above, but takes a single |input|.
+  ZxPromise<FuzzResult> Execute(Input input);
+
   // Creates a |Status| object representing all attached processes.
   virtual Status CollectStatus() = 0;
+
+  // Cancels the current workflow.
+  virtual ZxPromise<> Stop() = 0;
 
  protected:
   // Represents a single fuzzing workflow, e.g. |Execute|, |Minimize|, etc. It holds a pointer to

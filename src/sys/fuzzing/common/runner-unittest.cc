@@ -119,178 +119,6 @@ void RunnerTest::RunUntil(Promise<> promise, RunCallback run, Input input) {
 
 // Unit tests.
 
-void RunnerTest::ExecuteNoError() {
-  Configure(MakeOptions());
-  Input input({0x01});
-  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), FuzzResult::NO_ERRORS);
-  FUZZING_EXPECT_OK(RunOne(), std::move(input));
-  RunUntilIdle();
-}
-
-void RunnerTest::ExecuteWithError() {
-  Configure(MakeOptions());
-  Input input({0x02});
-  FuzzResult fuzz_result;
-  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), &fuzz_result);
-  FUZZING_EXPECT_OK(RunOne(FuzzResult::BAD_MALLOC), std::move(input));
-  RunUntilIdle();
-  EXPECT_TRUE(fuzz_result == FuzzResult::BAD_MALLOC || fuzz_result == FuzzResult::OOM);
-}
-
-void RunnerTest::ExecuteWithLeak() {
-  auto options = MakeOptions();
-  options->set_detect_leaks(true);
-  Configure(options);
-  Input input({0x03});
-  // Simulate a suspected leak, followed by an LSan exit. The leak detection heuristics only run
-  // full leak detection when a leak is suspected based on mismatched allocations.
-  SetLeak(true);
-  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), FuzzResult::LEAK);
-  FUZZING_EXPECT_OK(RunOne(), input.Duplicate());
-  FUZZING_EXPECT_OK(RunOne(FuzzResult::LEAK), std::move(input));
-  RunUntilIdle();
-}
-
-// Simulate no error on the original input.
-void RunnerTest::MinimizeNoError() {
-  Configure(MakeOptions());
-  Input input({0x04});
-  FUZZING_EXPECT_ERROR(runner()->Minimize(input.Duplicate()), ZX_ERR_INVALID_ARGS);
-  FUZZING_EXPECT_OK(RunOne(), std::move(input));
-  RunUntilIdle();
-}
-
-// Empty input should exit immediately.
-void RunnerTest::MinimizeEmpty() {
-  Configure(MakeOptions());
-  Input input;
-  FUZZING_EXPECT_OK(runner()->Minimize(input.Duplicate()), input.Duplicate());
-  FUZZING_EXPECT_OK(RunOne(FuzzResult::CRASH), std::move(input));
-  RunUntilIdle();
-}
-
-// 1-byte input should exit immediately.
-void RunnerTest::MinimizeOneByte() {
-  Configure(MakeOptions());
-  Input input({0x44});
-  FUZZING_EXPECT_OK(runner()->Minimize(input.Duplicate()), input.Duplicate());
-  FUZZING_EXPECT_OK(RunOne(FuzzResult::CRASH), std::move(input));
-  RunUntilIdle();
-}
-
-void RunnerTest::MinimizeReduceByTwo() {
-  auto options = MakeOptions();
-  constexpr size_t kRuns = 0x40;
-  options->set_runs(kRuns);
-  Configure(options);
-  Input input({0x51, 0x52, 0x53, 0x54, 0x55, 0x56});
-  Input minimized;
-  Barrier barrier;
-  auto task = runner()
-                  ->Minimize(input.Duplicate())
-                  .and_then([&minimized](Input& result) {
-                    minimized = std::move(result);
-                    return fpromise::ok();
-                  })
-                  .wrap_with(barrier);
-  FUZZING_EXPECT_OK(std::move(task));
-
-  // Crash until inputs are smaller than 4 bytes.
-  RunUntil(
-      barrier.sync(),
-      [this](const Result<Input>& result) {
-        return RunOne(result.value().size() > 3 ? FuzzResult::CRASH : FuzzResult::NO_ERRORS);
-      },
-      std::move(input));
-
-  EXPECT_LE(minimized.size(), 3U);
-}
-
-void RunnerTest::MinimizeNewError() {
-  auto options = MakeOptions();
-  options->set_run_limit(zx::msec(500).get());
-  Configure(options);
-  Input input({0x05, 0x15, 0x25, 0x35});
-  Input minimized;
-
-  // Simulate a crash on the original input, and a timeout on any smaller input.
-  SetFuzzResultHandler([](const Input& input) {
-    return input.size() > 3 ? FuzzResult::CRASH : FuzzResult::TIMEOUT;
-  });
-  Barrier barrier;
-  auto task = runner()
-                  ->Minimize(input.Duplicate())
-                  .and_then([&minimized](Input& result) {
-                    minimized = std::move(result);
-                    return fpromise::ok();
-                  })
-                  .wrap_with(barrier);
-  FUZZING_EXPECT_OK(std::move(task));
-  RunUntil(barrier.sync());
-  EXPECT_EQ(minimized, input);
-}
-
-void RunnerTest::CleanseNoReplacement() {
-  Configure(MakeOptions());
-  Input input({0x07, 0x17, 0x27});
-  Input cleansed;
-  FUZZING_EXPECT_OK(runner()->Cleanse(input.Duplicate()), &cleansed);
-
-  // Simulate no error after cleansing any byte.
-  for (size_t i = 0; i < input.size(); ++i) {
-    for (size_t j = 0; j < kNumReplacements; ++j) {
-      FUZZING_EXPECT_OK(RunOne(FuzzResult::NO_ERRORS));
-    }
-  }
-
-  RunUntilIdle();
-  EXPECT_EQ(cleansed, input);
-}
-
-void RunnerTest::CleanseAlreadyClean() {
-  Configure(MakeOptions());
-  Input input({' ', 0xff});
-  Input cleansed;
-  FUZZING_EXPECT_OK(runner()->Cleanse(input.Duplicate()), &cleansed);
-
-  // All bytes match replacements, so this should be done.
-  RunUntilIdle();
-  EXPECT_EQ(cleansed, input);
-}
-
-void RunnerTest::CleanseTwoBytes() {
-  Configure(MakeOptions());
-
-  Input input({0x08, 0x18, 0x28});
-  Input inputs[] = {
-      {0x20, 0x18, 0x28},  // 1st try.
-      {0xff, 0x18, 0x28},  //
-      {0x08, 0x20, 0x28},  //
-      {0x08, 0xff, 0x28},  //
-      {0x08, 0x18, 0x20},  //
-      {0x08, 0x18, 0xff},  // Error on 2nd replacement of 3rd byte.
-      {0x20, 0x18, 0xff},  // 2nd try. Error on 1st replacement of 1st byte.
-      {0x20, 0x20, 0xff},  //
-      {0x20, 0xff, 0xff},  //
-      {0x20, 0x20, 0xff},  // 3rd try. No errors.
-      {0x20, 0xff, 0xff},  //
-  };
-  SetFuzzResultHandler([](const Input& input) {
-    auto hex = input.ToHex();
-    return (hex == "081828" || hex == "0818ff" || hex == "2018ff") ? FuzzResult::DEATH
-                                                                   : FuzzResult::NO_ERRORS;
-  });
-
-  Input cleansed;
-  FUZZING_EXPECT_OK(runner()->Cleanse(std::move(input)), &cleansed);
-  for (auto& input : inputs) {
-    FUZZING_EXPECT_OK(RunOne(), std::move(input));
-  }
-
-  RunUntilIdle();
-  EXPECT_EQ(cleansed, Input({0x20, 0x18, 0xff}));
-}
-
 void RunnerTest::FuzzUntilError() {
   auto runner = this->runner();
   auto options = MakeOptions();
@@ -466,6 +294,178 @@ void RunnerTest::FuzzUntilTime() {
   EXPECT_EQ(artifact.fuzz_result(), FuzzResult::NO_ERRORS);
   auto elapsed = zx::clock::get_monotonic() - start;
   EXPECT_GE(elapsed, zx::msec(100));
+}
+
+void RunnerTest::ExecuteNoError() {
+  Configure(MakeOptions());
+  Input input({0x01});
+  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), FuzzResult::NO_ERRORS);
+  FUZZING_EXPECT_OK(RunOne(), std::move(input));
+  RunUntilIdle();
+}
+
+void RunnerTest::ExecuteWithError() {
+  Configure(MakeOptions());
+  Input input({0x02});
+  FuzzResult fuzz_result;
+  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), &fuzz_result);
+  FUZZING_EXPECT_OK(RunOne(FuzzResult::BAD_MALLOC), std::move(input));
+  RunUntilIdle();
+  EXPECT_TRUE(fuzz_result == FuzzResult::BAD_MALLOC || fuzz_result == FuzzResult::OOM);
+}
+
+void RunnerTest::ExecuteWithLeak() {
+  auto options = MakeOptions();
+  options->set_detect_leaks(true);
+  Configure(options);
+  Input input({0x03});
+  // Simulate a suspected leak, followed by an LSan exit. The leak detection heuristics only run
+  // full leak detection when a leak is suspected based on mismatched allocations.
+  SetLeak(true);
+  FUZZING_EXPECT_OK(runner()->Execute(input.Duplicate()), FuzzResult::LEAK);
+  FUZZING_EXPECT_OK(RunOne(), input.Duplicate());
+  FUZZING_EXPECT_OK(RunOne(FuzzResult::LEAK), std::move(input));
+  RunUntilIdle();
+}
+
+// Simulate no error on the original input.
+void RunnerTest::MinimizeNoError() {
+  Configure(MakeOptions());
+  Input input({0x04});
+  FUZZING_EXPECT_ERROR(runner()->Minimize(input.Duplicate()), ZX_ERR_INVALID_ARGS);
+  FUZZING_EXPECT_OK(RunOne(), std::move(input));
+  RunUntilIdle();
+}
+
+// Empty input should exit immediately.
+void RunnerTest::MinimizeEmpty() {
+  Configure(MakeOptions());
+  Input input;
+  FUZZING_EXPECT_OK(runner()->Minimize(input.Duplicate()), input.Duplicate());
+  FUZZING_EXPECT_OK(RunOne(FuzzResult::CRASH), std::move(input));
+  RunUntilIdle();
+}
+
+// 1-byte input should exit immediately.
+void RunnerTest::MinimizeOneByte() {
+  Configure(MakeOptions());
+  Input input({0x44});
+  FUZZING_EXPECT_OK(runner()->Minimize(input.Duplicate()), input.Duplicate());
+  FUZZING_EXPECT_OK(RunOne(FuzzResult::CRASH), std::move(input));
+  RunUntilIdle();
+}
+
+void RunnerTest::MinimizeReduceByTwo() {
+  auto options = MakeOptions();
+  constexpr size_t kRuns = 0x40;
+  options->set_runs(kRuns);
+  Configure(options);
+  Input input({0x51, 0x52, 0x53, 0x54, 0x55, 0x56});
+  Input minimized;
+  Barrier barrier;
+  auto task = runner()
+                  ->Minimize(input.Duplicate())
+                  .and_then([&minimized](Input& result) {
+                    minimized = std::move(result);
+                    return fpromise::ok();
+                  })
+                  .wrap_with(barrier);
+  FUZZING_EXPECT_OK(std::move(task));
+
+  // Crash until inputs are smaller than 4 bytes.
+  RunUntil(
+      barrier.sync(),
+      [this](const Result<Input>& result) {
+        return RunOne(result.value().size() > 3 ? FuzzResult::CRASH : FuzzResult::NO_ERRORS);
+      },
+      std::move(input));
+
+  EXPECT_LE(minimized.size(), 3U);
+}
+
+void RunnerTest::MinimizeNewError() {
+  auto options = MakeOptions();
+  options->set_run_limit(zx::msec(500).get());
+  Configure(options);
+  Input input({0x05, 0x15, 0x25, 0x35});
+  Input minimized;
+
+  // Simulate a crash on the original input, and a timeout on any smaller input.
+  SetFuzzResultHandler([](const Input& input) {
+    return input.size() > 3 ? FuzzResult::CRASH : FuzzResult::TIMEOUT;
+  });
+  Barrier barrier;
+  auto task = runner()
+                  ->Minimize(input.Duplicate())
+                  .and_then([&minimized](Input& result) {
+                    minimized = std::move(result);
+                    return fpromise::ok();
+                  })
+                  .wrap_with(barrier);
+  FUZZING_EXPECT_OK(std::move(task));
+  RunUntil(barrier.sync());
+  EXPECT_EQ(minimized, input);
+}
+
+void RunnerTest::CleanseNoReplacement() {
+  Configure(MakeOptions());
+  Input input({0x07, 0x17, 0x27});
+  Input cleansed;
+  FUZZING_EXPECT_OK(runner()->Cleanse(input.Duplicate()), &cleansed);
+
+  // Simulate no error after cleansing any byte.
+  for (size_t i = 0; i < input.size(); ++i) {
+    for (size_t j = 0; j < kNumReplacements; ++j) {
+      FUZZING_EXPECT_OK(RunOne(FuzzResult::NO_ERRORS));
+    }
+  }
+
+  RunUntilIdle();
+  EXPECT_EQ(cleansed, input);
+}
+
+void RunnerTest::CleanseAlreadyClean() {
+  Configure(MakeOptions());
+  Input input({' ', 0xff});
+  Input cleansed;
+  FUZZING_EXPECT_OK(runner()->Cleanse(input.Duplicate()), &cleansed);
+
+  // All bytes match replacements, so this should be done.
+  RunUntilIdle();
+  EXPECT_EQ(cleansed, input);
+}
+
+void RunnerTest::CleanseTwoBytes() {
+  Configure(MakeOptions());
+
+  Input input({0x08, 0x18, 0x28});
+  Input inputs[] = {
+      {0x20, 0x18, 0x28},  // 1st try.
+      {0xff, 0x18, 0x28},  //
+      {0x08, 0x20, 0x28},  //
+      {0x08, 0xff, 0x28},  //
+      {0x08, 0x18, 0x20},  //
+      {0x08, 0x18, 0xff},  // Error on 2nd replacement of 3rd byte.
+      {0x20, 0x18, 0xff},  // 2nd try. Error on 1st replacement of 1st byte.
+      {0x20, 0x20, 0xff},  //
+      {0x20, 0xff, 0xff},  //
+      {0x20, 0x20, 0xff},  // 3rd try. No errors.
+      {0x20, 0xff, 0xff},  //
+  };
+  SetFuzzResultHandler([](const Input& input) {
+    auto hex = input.ToHex();
+    return (hex == "081828" || hex == "0818ff" || hex == "2018ff") ? FuzzResult::DEATH
+                                                                   : FuzzResult::NO_ERRORS;
+  });
+
+  Input cleansed;
+  FUZZING_EXPECT_OK(runner()->Cleanse(std::move(input)), &cleansed);
+  for (auto& input : inputs) {
+    FUZZING_EXPECT_OK(RunOne(), std::move(input));
+  }
+
+  RunUntilIdle();
+  EXPECT_EQ(cleansed, Input({0x20, 0x18, 0xff}));
 }
 
 void RunnerTest::MergeSeedError(zx_status_t expected, uint64_t oom_limit) {

@@ -244,36 +244,6 @@ TEST_F(ControllerTest, ReadDictionary) {
   RunUntilIdle();
 }
 
-TEST_F(ControllerTest, GetStatus) {
-  ControllerPtr controller;
-  Bind(controller.NewRequest(dispatcher()));
-  Status result;
-
-  Status status;
-  status.set_running(true);
-  status.set_runs(42);
-  status.set_elapsed(zx::sec(15).get());
-  status.set_covered_pcs(5);
-  status.set_covered_features(10);
-  status.set_corpus_num_inputs(15);
-  status.set_corpus_total_size(25);
-  auto expected = CopyStatus(status);
-  runner()->set_status(std::move(status));
-
-  Bridge<Status> bridge;
-  controller->GetStatus(bridge.completer.bind());
-  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error()), &result);
-  RunUntilIdle();
-
-  EXPECT_EQ(result.running(), expected.running());
-  EXPECT_EQ(result.runs(), expected.runs());
-  EXPECT_EQ(result.elapsed(), expected.elapsed());
-  EXPECT_EQ(result.covered_pcs(), expected.covered_pcs());
-  EXPECT_EQ(result.covered_features(), expected.covered_features());
-  EXPECT_EQ(result.corpus_num_inputs(), expected.corpus_num_inputs());
-  EXPECT_EQ(result.corpus_total_size(), expected.corpus_total_size());
-}
-
 TEST_F(ControllerTest, AddMonitor) {
   ControllerPtr controller;
   Bind(controller.NewRequest());
@@ -296,6 +266,31 @@ TEST_F(ControllerTest, AddMonitor) {
   ASSERT_FALSE(monitor.empty());
   EXPECT_EQ(monitor.status().runs(), expected.runs());
   EXPECT_EQ(monitor.reason(), UpdateReason::PULSE);
+}
+
+TEST_F(ControllerTest, Fuzz) {
+  ControllerPtr controller;
+  Bind(controller.NewRequest());
+  Artifact artifact(FuzzResult::CRASH, {0xde, 0xad, 0xbe, 0xef});
+
+  runner()->set_error(ZX_ERR_WRONG_TYPE);
+  ZxBridge<FidlArtifact> bridge1;
+  controller->Fuzz(ZxBind<FidlArtifact>(std::move(bridge1.completer)));
+  FUZZING_EXPECT_ERROR(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)),
+                       ZX_ERR_WRONG_TYPE);
+  RunUntilIdle();
+
+  runner()->set_error(ZX_OK);
+  runner()->set_result(artifact.fuzz_result());
+  runner()->set_result_input(artifact.input());
+  ZxBridge<FidlArtifact> bridge2;
+  controller->Fuzz(ZxBind<FidlArtifact>(std::move(bridge2.completer)));
+  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED))
+                        .and_then([&](FidlArtifact& fidl_artifact) {
+                          return AsyncSocketRead(executor(), std::move(fidl_artifact));
+                        }),
+                    std::move(artifact));
+  RunUntilIdle();
 }
 
 TEST_F(ControllerTest, ExecuteAndGetResults) {
@@ -388,31 +383,6 @@ TEST_F(ControllerTest, Cleanse) {
   RunUntilIdle();
 }
 
-TEST_F(ControllerTest, Fuzz) {
-  ControllerPtr controller;
-  Bind(controller.NewRequest());
-  Artifact artifact(FuzzResult::CRASH, {0xde, 0xad, 0xbe, 0xef});
-
-  runner()->set_error(ZX_ERR_WRONG_TYPE);
-  ZxBridge<FidlArtifact> bridge1;
-  controller->Fuzz(ZxBind<FidlArtifact>(std::move(bridge1.completer)));
-  FUZZING_EXPECT_ERROR(bridge1.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED)),
-                       ZX_ERR_WRONG_TYPE);
-  RunUntilIdle();
-
-  runner()->set_error(ZX_OK);
-  runner()->set_result(artifact.fuzz_result());
-  runner()->set_result_input(artifact.input());
-  ZxBridge<FidlArtifact> bridge2;
-  controller->Fuzz(ZxBind<FidlArtifact>(std::move(bridge2.completer)));
-  FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error(ZX_ERR_CANCELED))
-                        .and_then([&](FidlArtifact& fidl_artifact) {
-                          return AsyncSocketRead(executor(), std::move(fidl_artifact));
-                        }),
-                    std::move(artifact));
-  RunUntilIdle();
-}
-
 TEST_F(ControllerTest, Merge) {
   ControllerPtr controller;
   Bind(controller.NewRequest(dispatcher()));
@@ -428,6 +398,36 @@ TEST_F(ControllerTest, Merge) {
   controller->Merge(bridge2.completer.bind());
   FUZZING_EXPECT_OK(bridge2.consumer.promise_or(fpromise::error()), ZX_OK);
   RunUntilIdle();
+}
+
+TEST_F(ControllerTest, GetStatus) {
+  ControllerPtr controller;
+  Bind(controller.NewRequest(dispatcher()));
+  Status result;
+
+  Status status;
+  status.set_running(true);
+  status.set_runs(42);
+  status.set_elapsed(zx::sec(15).get());
+  status.set_covered_pcs(5);
+  status.set_covered_features(10);
+  status.set_corpus_num_inputs(15);
+  status.set_corpus_total_size(25);
+  auto expected = CopyStatus(status);
+  runner()->set_status(std::move(status));
+
+  Bridge<Status> bridge;
+  controller->GetStatus(bridge.completer.bind());
+  FUZZING_EXPECT_OK(bridge.consumer.promise_or(fpromise::error()), &result);
+  RunUntilIdle();
+
+  EXPECT_EQ(result.running(), expected.running());
+  EXPECT_EQ(result.runs(), expected.runs());
+  EXPECT_EQ(result.elapsed(), expected.elapsed());
+  EXPECT_EQ(result.covered_pcs(), expected.covered_pcs());
+  EXPECT_EQ(result.covered_features(), expected.covered_features());
+  EXPECT_EQ(result.corpus_num_inputs(), expected.corpus_num_inputs());
+  EXPECT_EQ(result.corpus_total_size(), expected.corpus_total_size());
 }
 
 }  // namespace

@@ -47,14 +47,15 @@ class ControllerImpl : public Controller {
   void WriteDictionary(FidlInput dictionary, WriteDictionaryCallback callback) override;
   void ReadDictionary(ReadDictionaryCallback callback) override;
   void AddMonitor(fidl::InterfaceHandle<Monitor> monitor, AddMonitorCallback callback) override;
-  void GetStatus(GetStatusCallback callback) override;
-  void GetResults(GetResultsCallback callback) override;
 
+  void Fuzz(FuzzCallback callback) override;
   void Execute(FidlInput fidl_input, ExecuteCallback callback) override;
   void Minimize(FidlInput fidl_input, MinimizeCallback callback) override;
   void Cleanse(FidlInput fidl_input, CleanseCallback callback) override;
-  void Fuzz(FuzzCallback callback) override;
   void Merge(MergeCallback callback) override;
+
+  void GetStatus(GetStatusCallback callback) override;
+  void GetResults(GetResultsCallback callback) override;
 
   // Cancels any workflow being executed by this object's runner.
   void Stop();

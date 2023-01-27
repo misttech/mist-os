@@ -118,6 +118,10 @@ Input RealmFuzzerRunner::GetDictionaryAsInput() const { return mutagen_.dictiona
 ///////////////////////////////////////////////////////////////
 // Asynchronous workflows.
 
+ZxPromise<Artifact> RealmFuzzerRunner::Fuzz() {
+  return FuzzInputs(/* backlog= */ options_->mutation_depth()).wrap_with(workflow_);
+}
+
 ZxPromise<FuzzResult> RealmFuzzerRunner::Execute(std::vector<Input> inputs) {
   return fpromise::make_promise([this, inputs = std::move(inputs)]() mutable -> ZxResult<> {
            for (auto& input : inputs) {
@@ -306,10 +310,6 @@ ZxPromise<Input> RealmFuzzerRunner::Cleanse(Input input) {
       .wrap_with(workflow_);
 }
 
-ZxPromise<Artifact> RealmFuzzerRunner::Fuzz() {
-  return FuzzInputs(/* backlog= */ options_->mutation_depth()).wrap_with(workflow_);
-}
-
 ZxPromise<> RealmFuzzerRunner::Merge() {
   // First, accumulate the coverage from testing all the elements of the seed corpus.
   auto collect_errors = std::make_shared<std::vector<Input>>();
@@ -370,11 +370,6 @@ ZxPromise<> RealmFuzzerRunner::Merge() {
       .wrap_with(workflow_);
 }
 
-ZxPromise<> RealmFuzzerRunner::Stop() {
-  stopped_ = true;
-  return workflow_.Stop();
-}
-
 Status RealmFuzzerRunner::CollectStatus() {
   Status status;
   status.set_running(!stopped_);
@@ -408,6 +403,11 @@ Status RealmFuzzerRunner::CollectStatus() {
   status.set_process_stats(std::move(all_stats));
 
   return status;
+}
+
+ZxPromise<> RealmFuzzerRunner::Stop() {
+  stopped_ = true;
+  return workflow_.Stop();
 }
 
 ///////////////////////////////////////////////////////////////

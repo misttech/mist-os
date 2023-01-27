@@ -145,9 +145,19 @@ void ControllerImpl::AddMonitor(fidl::InterfaceHandle<Monitor> monitor,
   callback();
 }
 
-void ControllerImpl::GetResults(GetResultsCallback callback) {
-  const auto& input = artifact_.input();
-  callback(artifact_.fuzz_result(), AsyncSocketWrite(executor_, input.Duplicate()));
+void ControllerImpl::Fuzz(FuzzCallback callback) {
+  auto task = Initialize()
+                  .and_then(runner_->Fuzz())
+                  .and_then([this](Artifact& artifact) {
+                    artifact_ = artifact.Duplicate();
+                    return fpromise::ok(AsyncSocketWrite(executor_, std::move(artifact)));
+                  })
+                  .then([this, callback = std::move(callback)](ZxResult<FidlArtifact>& result) {
+                    callback(std::move(result));
+                    Finish();
+                  })
+                  .wrap_with(scope_);
+  executor_->schedule_task(std::move(task));
 }
 
 void ControllerImpl::Execute(FidlInput fidl_input, ExecuteCallback callback) {
@@ -203,21 +213,6 @@ void ControllerImpl::Cleanse(FidlInput fidl_input, CleanseCallback callback) {
   executor_->schedule_task(std::move(task));
 }
 
-void ControllerImpl::Fuzz(FuzzCallback callback) {
-  auto task = Initialize()
-                  .and_then(runner_->Fuzz())
-                  .and_then([this](Artifact& artifact) {
-                    artifact_ = artifact.Duplicate();
-                    return fpromise::ok(AsyncSocketWrite(executor_, std::move(artifact)));
-                  })
-                  .then([this, callback = std::move(callback)](ZxResult<FidlArtifact>& result) {
-                    callback(std::move(result));
-                    Finish();
-                  })
-                  .wrap_with(scope_);
-  executor_->schedule_task(std::move(task));
-}
-
 void ControllerImpl::Merge(MergeCallback callback) {
   auto task = Initialize()
                   .and_then(runner_->Merge())
@@ -226,6 +221,11 @@ void ControllerImpl::Merge(MergeCallback callback) {
                     Finish();
                   });
   executor_->schedule_task(std::move(task));
+}
+
+void ControllerImpl::GetResults(GetResultsCallback callback) {
+  const auto& input = artifact_.input();
+  callback(artifact_.fuzz_result(), AsyncSocketWrite(executor_, input.Duplicate()));
 }
 
 void ControllerImpl::Stop() {
