@@ -51,7 +51,7 @@ fuchsia_test_package("tests") {
   deps = [
     ":integration-test-component",
     "//src/bringup/bin/device-name-provider",
-    "//src/bringup/bin/device-name-provider:device-name-provider-component",
+    "//src/bringup/bin/device-name-provider:component",
     "//src/devices/block/drivers/core",
     "//src/devices/block/drivers/gpt",
     "//src/devices/block/drivers/ramdisk",

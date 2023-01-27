@@ -2,25 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
-import("//build/dist/component_manifest_resources.gni")
 import("//build/zbi/kernel_cmdline.gni")
-
-bootfs_files_for_assembly("bootfs") {
-  deps = [
-    ":device-name-provider",
-    ":meta",
-  ]
-}
 
 group("tests") {
   testonly = true
   deps = [ "tests" ]
-}
-
-component_manifest_resources("meta") {
-  sources = [ "meta/device-name-provider.cml" ]
 }
 
 source_set("args") {
@@ -33,12 +20,6 @@ source_set("args") {
 }
 
 executable("device-name-provider") {
-  if (is_fuchsia) {
-    fdio_config = [ "//build/config/fuchsia:fdio_config" ]
-    if (configs + fdio_config - fdio_config != configs) {
-      configs -= fdio_config
-    }
-  }
   sources = [ "device-name-provider.cc" ]
   deps = [
     ":args",
@@ -54,12 +35,15 @@ executable("device-name-provider") {
   ]
 }
 
-# This component only exists to be included in the integration tests.
-fuchsia_component("device-name-provider-component") {
+fuchsia_component("component") {
   component_name = "device-name-provider"
-  testonly = true
   manifest = "meta/device-name-provider.cml"
   deps = [ ":device-name-provider" ]
+}
+
+fuchsia_package("package") {
+  package_name = "device-name-provider"
+  deps = [ ":component" ]
 }
 
 # command line package to be included for new-style nodename generation.

@@ -9,7 +9,7 @@
         },
         {
             name: "device_name_provider",
-            url: "fuchsia-boot:///#meta/device-name-provider.cm",
+            url: "fuchsia-boot:///device-name-provider#meta/device-name-provider.cm",
         },
         {
             name: "driver_manager",

@@ -52,7 +52,7 @@ fuchsia_test_component("netsvc-integration-test") {
   manifest = "meta/netsvc-integration-test.cml"
   deps = [
     ":bin",
-    "//src/bringup/bin/device-name-provider:device-name-provider-component",
+    "//src/bringup/bin/device-name-provider:component",
     "//src/bringup/bin/netsvc:test-component",
 
     # netemul-sandbox-v2 is used to create hermetic test realms.
