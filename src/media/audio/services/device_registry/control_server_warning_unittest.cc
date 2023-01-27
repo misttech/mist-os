@@ -5,9 +5,12 @@
 #include <fidl/fuchsia.audio.device/cpp/common_types.h>
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.audio/cpp/common_types.h>
+#include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 #include <zircon/errors.h>
+
+#include <string>
 
 #include <gtest/gtest.h>
 
@@ -16,6 +19,9 @@
 #include "src/media/audio/services/device_registry/control_server.h"
 
 namespace media_audio {
+namespace {
+
+using Control = fuchsia_audio_device::Control;
 
 class ControlServerWarningTest : public AudioDeviceRegistryServerTestBase,
                                  public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
@@ -123,8 +129,7 @@ void ControlServerWarningTest::TestSetGainBadState(
       ->SetGain({{
           .target_state = bad_state,
       }})
-      .Then([&received_callback,
-             expected_error](fidl::Result<fuchsia_audio_device::Control::SetGain>& result) {
+      .Then([&received_callback, expected_error](fidl::Result<Control::SetGain>& result) {
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
@@ -216,8 +221,7 @@ void ControlServerWarningTest::TestCreateRingBufferBadOptions(
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
-      .Then([&received_callback, expected_error](
-                fidl::Result<fuchsia_audio_device::Control::CreateRingBuffer>& result) {
+      .Then([&received_callback, expected_error](fidl::Result<Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
@@ -399,16 +403,52 @@ TEST_F(ControlServerWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes
           .ring_buffer_server =
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::Control::CreateRingBuffer>& result) {
-        // Currently we receive no callback; the call exits before emitting the response.
+      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
+        received_callback = true;
+
+        if (result.is_ok()) {
+          FX_LOGS(ERROR) << "RingBufferProperties";
+          FX_LOGS(ERROR) << "    valid_bits_per_sample: "
+                         << static_cast<int16_t>(
+                                result->properties()->valid_bits_per_sample().value_or(-1));
+          FX_LOGS(ERROR) << "    turn_on_delay:         "
+                         << result->properties()->turn_on_delay().value_or(-1);
+          FX_LOGS(ERROR) << "fuchsia.audio.RingBuffer";
+          FX_LOGS(ERROR) << "    buffer";
+          FX_LOGS(ERROR) << "        vmo:               0x" << std::hex
+                         << result->ring_buffer()->buffer()->vmo().get() << " (handle)";
+          FX_LOGS(ERROR) << "        size:              0x" << std::hex
+                         << result->ring_buffer()->buffer()->size();
+          FX_LOGS(ERROR) << "    format";
+          FX_LOGS(ERROR) << "        sample_type:       "
+                         << fidl::ToUnderlying(*result->ring_buffer()->format()->sample_type());
+          FX_LOGS(ERROR) << "        channel_count:     "
+                         << *result->ring_buffer()->format()->channel_count();
+          FX_LOGS(ERROR) << "        frames_per_second: "
+                         << *result->ring_buffer()->format()->frames_per_second();
+          FX_LOGS(ERROR)
+              << "        channel_layout:    "
+              << (result->ring_buffer()->format()->channel_layout().has_value()
+                      ? std::to_string(fidl::ToUnderlying(
+                            result->ring_buffer()->format()->channel_layout()->config().value()))
+                      : "NONE");
+          FX_LOGS(ERROR) << "    producer_bytes:        0x" << std::hex
+                         << *result->ring_buffer()->producer_bytes();
+          FX_LOGS(ERROR) << "    consumer_bytes:        0x" << std::hex
+                         << *result->ring_buffer()->consumer_bytes();
+          FX_LOGS(ERROR) << "    reference_clock:       0x" << std::hex
+                         << result->ring_buffer()->reference_clock()->get() << " (handle)";
+          FX_LOGS(ERROR) << "    ref_clock_domain:      "
+                         << (result->ring_buffer()->reference_clock_domain().has_value()
+                                 ? std::to_string(*result->ring_buffer()->reference_clock_domain())
+                                 : "NONE");
+        }
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreateRingBufferError::kBadRingBufferOption)
             << result.error_value().FormatDescription();
-        received_callback = true;
       });
 
   RunLoopUntilIdle();
@@ -439,8 +479,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferMissingRingBufferServerEnd) {
               .ring_buffer_min_bytes = 8192,
           }},
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
@@ -478,8 +517,7 @@ TEST_F(ControlServerWarningTest, CreateRingBufferBadRingBufferServerEnd) {
           }},
           .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_framework_error())
             << result.error_value().FormatDescription();
@@ -501,4 +539,5 @@ TEST_F(ControlServerWarningTest, CreateRingBufferBadRingBufferServerEnd) {
 // TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
 //     unhealthy before CreateRingBuffer. Expect Obs/Ctl to drop, Reg/WatchRemoved.
 
+}  // namespace
 }  // namespace media_audio

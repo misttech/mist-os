@@ -13,6 +13,8 @@
 namespace media_audio {
 namespace {
 
+using Provider = fuchsia_audio_device::Provider;
+
 // These tests rely upon a single, already-created Provider.
 class ProviderServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
@@ -30,7 +32,7 @@ TEST_F(ProviderServerWarningTest, MissingDeviceName) {
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config_client = std::move(stream_config_client_end),
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error());
@@ -59,7 +61,7 @@ TEST_F(ProviderServerWarningTest, EmptyDeviceName) {
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config_client = std::move(stream_config_client_end),
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error());
@@ -87,7 +89,7 @@ TEST_F(ProviderServerWarningTest, MissingDeviceType) {
           .device_name = "Test device name",
           .stream_config_client = std::move(stream_config_client_end),
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error());
@@ -111,7 +113,7 @@ TEST_F(ProviderServerWarningTest, MissingStreamConfig) {
           .device_name = "Test device name",
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error());
@@ -136,7 +138,7 @@ TEST_F(ProviderServerWarningTest, InvalidStreamConfig) {
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config_client = fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(),
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_framework_error());

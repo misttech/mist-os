@@ -14,6 +14,9 @@
 
 namespace media_audio {
 namespace {
+
+using Registry = fuchsia_audio_device::Registry;
+
 class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 // If the required 'id' field is not set, we should fail.
@@ -32,8 +35,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingToken) {
           .observer_server =
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
+      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::RegistryCreateObserverError::kInvalidTokenId);
@@ -60,8 +62,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
           .observer_server =
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
+      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::RegistryCreateObserverError::kDeviceNotFound);
@@ -85,7 +86,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
 
   std::optional<TokenId> id;
   registry->client()->WatchDevicesAdded().Then(
-      [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -105,8 +106,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverMissingObserver) {
       ->CreateObserver({{
           .token_id = *id,
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
+      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_error() && result.error_value().is_domain_error());
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::RegistryCreateObserverError::kInvalidObserver);
@@ -130,7 +130,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
 
   std::optional<TokenId> id;
   registry->client()->WatchDevicesAdded().Then(
-      [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -151,8 +151,7 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadObserver) {
           .token_id = *id,
           .observer_server = fidl::ServerEnd<fuchsia_audio_device::Observer>(zx::channel()),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
+      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_error() && result.error_value().is_framework_error());
         EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS);
         received_callback = true;

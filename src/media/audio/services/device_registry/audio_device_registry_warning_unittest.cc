@@ -12,6 +12,7 @@
 #include "src/media/audio/services/device_registry/testing/fake_audio_driver.h"
 
 namespace media_audio {
+namespace {
 
 class AudioDeviceRegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
@@ -68,4 +69,5 @@ TEST_F(AudioDeviceRegistryServerWarningTest, FindDeviceByTokenIdRemoved) {
             AudioDeviceRegistry::DevicePresence::Unknown);
 }
 
+}  // namespace
 }  // namespace media_audio

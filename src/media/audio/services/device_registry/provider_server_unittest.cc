@@ -14,6 +14,9 @@
 namespace media_audio {
 namespace {
 
+using Provider = fuchsia_audio_device::Provider;
+using Registry = fuchsia_audio_device::Registry;
+
 class ProviderServerTest : public AudioDeviceRegistryServerTestBase {};
 
 TEST_F(ProviderServerTest, CleanClientDrop) {
@@ -45,7 +48,7 @@ TEST_F(ProviderServerTest, AddDeviceThatOutlivesProvider) {
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config_client = std::move(stream_config_client_end),
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         EXPECT_TRUE(result.is_ok());
         received_callback = true;
       });
@@ -76,7 +79,7 @@ TEST_F(ProviderServerTest, ProviderCanOutliveDevice) {
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config_client = std::move(stream_config_client_end),
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         EXPECT_TRUE(result.is_ok());
         received_callback = true;
       });
@@ -112,7 +115,7 @@ TEST_F(ProviderServerTest, ProviderAddThenWatch) {
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config_client = std::move(stream_config_client_end),
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         EXPECT_TRUE(result.is_ok());
         received_callback = true;
       });
@@ -124,8 +127,7 @@ TEST_F(ProviderServerTest, ProviderAddThenWatch) {
 
   std::optional<TokenId> added_device;
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&added_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -143,8 +145,7 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
 
   std::optional<TokenId> added_device;
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&added_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -169,7 +170,7 @@ TEST_F(ProviderServerTest, WatchThenProviderAdd) {
           .device_type = fuchsia_audio_device::DeviceType::kOutput,
           .stream_config_client = std::move(stream_config_client_end),
       }})
-      .Then([&received_callback](fidl::Result<fuchsia_audio_device::Provider::AddDevice>& result) {
+      .Then([&received_callback](fidl::Result<Provider::AddDevice>& result) {
         EXPECT_TRUE(result.is_ok());
         received_callback = true;
       });

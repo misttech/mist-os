@@ -13,6 +13,9 @@
 namespace media_audio {
 namespace {
 
+using ControlCreator = fuchsia_audio_device::ControlCreator;
+using Registry = fuchsia_audio_device::Registry;
+
 class ControlCreatorServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 TEST_F(ControlCreatorServerWarningTest, MissingId) {
@@ -30,8 +33,7 @@ TEST_F(ControlCreatorServerWarningTest, MissingId) {
           // Missing token_id
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error());
@@ -60,8 +62,7 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
 
   std::optional<TokenId> added_device_id;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device_id](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -82,8 +83,7 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
           .token_id = *added_device_id - 1,  // Bad token_id
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error());
@@ -112,8 +112,7 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
 
   std::optional<TokenId> added_device_id;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device_id](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -134,8 +133,7 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
           .token_id = *added_device_id,
           // Missing server_end
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error());
@@ -165,8 +163,7 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
     ASSERT_EQ(RegistryServer::count(), 1u);
 
     registry->client()->WatchDevicesAdded().Then(
-        [&added_device_id](
-            fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+        [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok());
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
@@ -188,8 +185,7 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
           .token_id = *added_device_id,
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(),  // Bad server_end
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_framework_error());
@@ -217,8 +213,7 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
     ASSERT_EQ(RegistryServer::count(), 1u);
 
     registry->client()->WatchDevicesAdded().Then(
-        [&added_device_id](
-            fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+        [&added_device_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok());
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
@@ -240,8 +235,7 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
           .token_id = *added_device_id,
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end1)),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_ok());
       });
@@ -259,8 +253,7 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
           .token_id = *added_device_id,
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end2)),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) mutable {
+      .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error());

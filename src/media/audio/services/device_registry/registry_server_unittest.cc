@@ -18,6 +18,8 @@
 namespace media_audio {
 namespace {
 
+using Registry = fuchsia_audio_device::Registry;
+
 class RegistryServerTest : public AudioDeviceRegistryServerTestBase {};
 
 TEST_F(RegistryServerTest, CleanClientDrop) {
@@ -49,8 +51,7 @@ TEST_F(RegistryServerTest, DeviceAddThenRegistryCreate) {
 
   std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -70,8 +71,7 @@ TEST_F(RegistryServerTest, WatchAddsThenDeviceAdd) {
 
   std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -105,8 +105,7 @@ TEST_F(RegistryServerTest, DeviceAddThenWatchAdds) {
 
   std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -131,8 +130,7 @@ TEST_F(RegistryServerTest, WatchRemovesThenDeviceRemove) {
 
   std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -144,8 +142,7 @@ TEST_F(RegistryServerTest, WatchRemovesThenDeviceRemove) {
 
   std::optional<uint64_t> removed_device;
   registry->client()->WatchDeviceRemoved().Then(
-      [&removed_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDeviceRemoved>& result) mutable {
+      [&removed_device](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->token_id());
         removed_device = *result->token_id();
@@ -174,8 +171,7 @@ TEST_F(RegistryServerTest, DeviceRemoveThenWatchRemoves) {
 
   std::optional<TokenId> added_device;
   registry->client()->WatchDevicesAdded().Then(
-      [&added_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&added_device](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -191,8 +187,7 @@ TEST_F(RegistryServerTest, DeviceRemoveThenWatchRemoves) {
 
   std::optional<uint64_t> removed_device;
   registry->client()->WatchDeviceRemoved().Then(
-      [&removed_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDeviceRemoved>& result) mutable {
+      [&removed_device](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->token_id());
         removed_device = *result->token_id();
@@ -220,14 +215,12 @@ TEST_F(RegistryServerTest, DeviceAddRemoveThenWatches) {
 
   bool received_add_response = false, received_remove_response = false;
   registry->client()->WatchDevicesAdded().Then(
-      [&received_add_response](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&received_add_response](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         received_add_response = true;
         FAIL() << "Unexpected WatchDevicesAdded response";
       });
   registry->client()->WatchDeviceRemoved().Then(
-      [&received_remove_response](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDeviceRemoved>& result) mutable {
+      [&received_remove_response](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
         received_remove_response = true;
         FAIL() << "Unexpected WatchDeviceRemoved response";
       });
@@ -250,7 +243,7 @@ TEST_F(RegistryServerTest, DeviceRemoveAddThenWatches) {
 
   std::optional<TokenId> first_id;
   registry->client()->WatchDevicesAdded().Then(
-      [&first_id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&first_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -273,8 +266,7 @@ TEST_F(RegistryServerTest, DeviceRemoveAddThenWatches) {
 
   std::optional<uint64_t> removed_device;
   registry->client()->WatchDeviceRemoved().Then(
-      [&removed_device](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDeviceRemoved>& result) mutable {
+      [&removed_device](fidl::Result<Registry::WatchDeviceRemoved>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->token_id());
         removed_device = *result->token_id();
@@ -285,8 +277,7 @@ TEST_F(RegistryServerTest, DeviceRemoveAddThenWatches) {
 
   std::optional<TokenId> second_id;
   registry->client()->WatchDevicesAdded().Then(
-      [&second_id](
-          fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&second_id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -311,7 +302,7 @@ TEST_F(RegistryServerTest, CreateObserver) {
 
   std::optional<TokenId> id;
   registry->client()->WatchDevicesAdded().Then(
-      [&id](fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
+      [&id](fidl::Result<Registry::WatchDevicesAdded>& result) mutable {
         ASSERT_TRUE(result.is_ok());
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
@@ -333,8 +324,7 @@ TEST_F(RegistryServerTest, CreateObserver) {
           .observer_server =
               fidl::ServerEnd<fuchsia_audio_device::Observer>(std::move(observer_server_end)),
       }})
-      .Then([&received_callback](
-                fidl::Result<fuchsia_audio_device::Registry::CreateObserver>& result) {
+      .Then([&received_callback](fidl::Result<Registry::CreateObserver>& result) {
         EXPECT_TRUE(result.is_ok());
         received_callback = true;
       });

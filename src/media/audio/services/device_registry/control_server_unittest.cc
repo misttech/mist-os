@@ -17,7 +17,7 @@
 namespace media_audio {
 namespace {
 
-namespace fidl_adr = fuchsia_audio_device;
+using Control = fuchsia_audio_device::Control;
 
 class ControlServerTest : public AudioDeviceRegistryServerTestBase {
  protected:
@@ -29,17 +29,18 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
                                                          std::move(client_end), dispatcher());
 
     adr_service_->AddDevice(Device::Create(
-        adr_service_, dispatcher(), "Test output name", fidl_adr::DeviceType::kOutput,
+        adr_service_, dispatcher(), "Test output name", fuchsia_audio_device::DeviceType::kOutput,
         fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(fake_driver->Enable())));
     RunLoopUntilIdle();
     return fake_driver;
   }
 
   std::optional<TokenId> WaitForAddedDeviceTokenId(
-      fidl::Client<fidl_adr::Registry>& registry_client) {
+      fidl::Client<fuchsia_audio_device::Registry>& registry_client) {
     std::optional<TokenId> added_device_id;
     registry_client->WatchDevicesAdded().Then(
-        [&added_device_id](fidl::Result<fidl_adr::Registry::WatchDevicesAdded>& result) mutable {
+        [&added_device_id](
+            fidl::Result<fuchsia_audio_device::Registry::WatchDevicesAdded>& result) mutable {
           ASSERT_TRUE(result.is_ok());
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
@@ -51,20 +52,23 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
   }
 
   // Obtain a control via ControlCreator/Create (not the synthetic CreateTestControlServer method).
-  fidl::Client<fidl_adr::Control> ConnectToControl(
-      fidl::Client<fidl_adr::ControlCreator>& control_creator_client, TokenId token_id) {
+  fidl::Client<fuchsia_audio_device::Control> ConnectToControl(
+      fidl::Client<fuchsia_audio_device::ControlCreator>& control_creator_client,
+      TokenId token_id) {
     auto [control_client_end, control_server_end] =
-        CreateNaturalAsyncClientOrDie<fidl_adr::Control>();
-    auto control_client = fidl::Client<fidl_adr::Control>(
-        fidl::ClientEnd<fidl_adr::Control>(std::move(control_client_end)), dispatcher(),
+        CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Control>();
+    auto control_client = fidl::Client<fuchsia_audio_device::Control>(
+        fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(control_client_end)), dispatcher(),
         control_fidl_handler_.get());
     bool received_callback = false;
     control_creator_client
         ->Create({{
             .token_id = token_id,
-            .control_server = fidl::ServerEnd<fidl_adr::Control>(std::move(control_server_end)),
+            .control_server =
+                fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(control_server_end)),
         }})
-        .Then([&received_callback](fidl::Result<fidl_adr::ControlCreator::Create>& result) {
+        .Then([&received_callback](
+                  fidl::Result<fuchsia_audio_device::ControlCreator::Create>& result) {
           ASSERT_TRUE(result.is_ok());
           received_callback = true;
         });
@@ -81,7 +85,7 @@ TEST_F(ControlServerTest, CleanClientDrop) {
   RunLoopUntilIdle();
   ASSERT_EQ(ControlServer::count(), 1u);
 
-  control->client() = fidl::Client<fidl_adr::Control>();
+  control->client() = fidl::Client<fuchsia_audio_device::Control>();
 
   // If Control client doesn't drop cleanly, ControlServer will emit a WARNING, causing a failure.
 }
@@ -113,7 +117,7 @@ TEST_F(ControlServerTest, BasicClose) {
 
   RunLoopUntilIdle();
   EXPECT_TRUE(control_client.is_valid());
-  control_client = fidl::Client<fidl_adr::Control>();
+  control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
 TEST_F(ControlServerTest, ControlCreatorServerShutdownDoesNotAffectControl) {
@@ -134,7 +138,7 @@ TEST_F(ControlServerTest, ControlCreatorServerShutdownDoesNotAffectControl) {
 
   EXPECT_TRUE(control_client.is_valid());
   EXPECT_EQ(ControlServer::count(), 1u);
-  control_client = fidl::Client<fidl_adr::Control>();
+  control_client = fidl::Client<fuchsia_audio_device::Control>();
 }
 
 TEST_F(ControlServerTest, SetGain) {
@@ -153,9 +157,9 @@ TEST_F(ControlServerTest, SetGain) {
 
   control->client()
       ->SetGain({{
-          .target_state = fidl_adr::GainState{{.gain_db = -1.0f}},
+          .target_state = fuchsia_audio_device::GainState{{.gain_db = -1.0f}},
       }})
-      .Then([&received_callback](fidl::Result<fidl_adr::Control::SetGain>& result) {
+      .Then([&received_callback](fidl::Result<Control::SetGain>& result) {
         EXPECT_TRUE(result.is_ok());
         received_callback = true;
       });
@@ -190,7 +194,7 @@ TEST_F(ControlServerTest, ClientRingBufferDropDoesNotAffectControl) {
 
     control->client()
         ->CreateRingBuffer({{
-            .options = fidl_adr::RingBufferOptions{{
+            .options = fuchsia_audio_device::RingBufferOptions{{
                 .format = fuchsia_audio::Format{{
                     .sample_type = fuchsia_audio::SampleType::kInt16,
                     .channel_count = 2,
@@ -198,10 +202,10 @@ TEST_F(ControlServerTest, ClientRingBufferDropDoesNotAffectControl) {
                 }},
                 .ring_buffer_min_bytes = 2000,
             }},
-            .ring_buffer_server =
-                fidl::ServerEnd<fidl_adr::RingBuffer>(std::move(ring_buffer_server_end)),
+            .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
+                std::move(ring_buffer_server_end)),
         }})
-        .Then([&received_callback](fidl::Result<fidl_adr::Control::CreateRingBuffer>& result) {
+        .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
           received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         });
@@ -209,7 +213,7 @@ TEST_F(ControlServerTest, ClientRingBufferDropDoesNotAffectControl) {
     EXPECT_TRUE(received_callback);
 
     // Let our RingBuffer client connection drop.
-    ring_buffer_client = fidl::Client<fidl_adr::RingBuffer>();
+    ring_buffer_client = fidl::Client<fuchsia_audio_device::RingBuffer>();
   }
 
   // Wait for the RingBufferServer to destruct.
@@ -244,7 +248,7 @@ TEST_F(ControlServerTest, DriverRingBufferDropDoesNotAffectControl) {
 
   control->client()
       ->CreateRingBuffer({{
-          .options = fidl_adr::RingBufferOptions{{
+          .options = fuchsia_audio_device::RingBufferOptions{{
               .format = fuchsia_audio::Format{{
                   .sample_type = fuchsia_audio::SampleType::kInt16,
                   .channel_count = 2,
@@ -253,9 +257,9 @@ TEST_F(ControlServerTest, DriverRingBufferDropDoesNotAffectControl) {
               .ring_buffer_min_bytes = 2000,
           }},
           .ring_buffer_server =
-              fidl::ServerEnd<fidl_adr::RingBuffer>(std::move(ring_buffer_server_end)),
+              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
-      .Then([&received_callback](fidl::Result<fidl_adr::Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
       });
@@ -298,7 +302,7 @@ TEST_F(ControlServerTest, StreamConfigDropCausesCleanControlServerShutdown) {
 
   control->client()
       ->CreateRingBuffer({{
-          .options = fidl_adr::RingBufferOptions{{
+          .options = fuchsia_audio_device::RingBufferOptions{{
               .format = fuchsia_audio::Format{{
                   .sample_type = fuchsia_audio::SampleType::kInt16,
                   .channel_count = 2,
@@ -307,9 +311,9 @@ TEST_F(ControlServerTest, StreamConfigDropCausesCleanControlServerShutdown) {
               .ring_buffer_min_bytes = 2000,
           }},
           .ring_buffer_server =
-              fidl::ServerEnd<fidl_adr::RingBuffer>(std::move(ring_buffer_server_end)),
+              fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
-      .Then([&received_callback](fidl::Result<fidl_adr::Control::CreateRingBuffer>& result) {
+      .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
       });
