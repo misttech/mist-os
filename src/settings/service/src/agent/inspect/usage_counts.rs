@@ -135,13 +135,10 @@ impl SettingTypeUsageInspectAgent {
         if let Ok((HandlerPayload::Request(request), client)) =
             HandlerPayload::try_from_with_client(event)
         {
-            for target in client.get_audience().flatten() {
-                if let service::message::Audience::Address(service::Address::Handler(
-                    setting_type,
-                )) = target
-                {
-                    self.record_usage(setting_type, &request);
-                }
+            if let service::message::Audience::Address(service::Address::Handler(setting_type)) =
+                client.get_audience()
+            {
+                self.record_usage(setting_type, &request);
             }
         }
     }

@@ -9,7 +9,6 @@ use crate::message::messenger::MessengerClient;
 use crate::message::receptor::Receptor;
 use futures::channel::mpsc::UnboundedSender;
 use futures::channel::oneshot::Sender;
-use std::collections::HashSet;
 use std::fmt::Debug;
 use std::hash::Hash;
 use thiserror::Error;
@@ -105,12 +104,6 @@ pub enum Audience {
     Messenger(Signature),
     // A messenger who belongs to the specified role.
     Role(crate::Role),
-}
-
-impl Audience {
-    pub fn flatten(&self) -> HashSet<Audience> {
-        [self.clone()].into()
-    }
 }
 
 /// An identifier that can be used to send messages directly to a Messenger.

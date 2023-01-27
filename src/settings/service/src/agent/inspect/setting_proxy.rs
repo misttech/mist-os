@@ -293,18 +293,15 @@ impl SettingProxyInspectAgent {
         if let Ok((HandlerPayload::Request(request), mut client)) =
             HandlerPayload::try_from_with_client(event)
         {
-            for target in client.get_audience().flatten() {
-                if let service::message::Audience::Address(service::Address::Handler(
-                    setting_type,
-                )) = target
-                {
-                    // A Listen request will always send a Get request. We can always get the Get's
-                    // response. However, Listen will return the Get's response only when it is
-                    // considered updated. Therefore, we ignore Listen response.
-                    if request != Request::Listen {
-                        let count = self.record_request(setting_type, request);
-                        return Some((setting_type, count, client.spawn_observer()));
-                    }
+            if let service::message::Audience::Address(service::Address::Handler(setting_type)) =
+                client.get_audience()
+            {
+                // A Listen request will always send a Get request. We can always get the Get's
+                // response. However, Listen will return the Get's response only when it is
+                // considered updated. Therefore, we ignore Listen response.
+                if request != Request::Listen {
+                    let count = self.record_request(setting_type, request);
+                    return Some((setting_type, count, client.spawn_observer()));
                 }
             }
         }
