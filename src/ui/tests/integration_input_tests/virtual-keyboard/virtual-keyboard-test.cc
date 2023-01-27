@@ -70,8 +70,8 @@ using GfxEvent = fuchsia::ui::gfx::Event;
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
 using component_testing::Directory;
-using component_testing::LocalComponent;
 using component_testing::LocalComponentHandles;
+using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -156,38 +156,47 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest() {
   return configs;
 }
 
-// This component implements the interface for a RealmBuilder
-// LocalComponent and the test.virtualkeyboard.InputPositionListener
-// protocol.
-class InputPositionListenerServer : public InputPositionListener, public LocalComponent {
+class InputPositionState {
  public:
-  explicit InputPositionListenerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-  // |test::virtualkeyboard::InputPositionListener|
-  void Notify(test::virtualkeyboard::BoundingBox bounding_box) override {
-    input_position_ = std::move(bounding_box);
-  }
-
-  // |LocalComponent::Start|
-  void Start(std::unique_ptr<LocalComponentHandles> local_handles) override {
-    // When this component starts, add a binding to the test.touch.ResponseListener
-    // protocol to this component's outgoing directory.
-    FX_CHECK(local_handles->outgoing()->AddPublicService(
-                 fidl::InterfaceRequestHandler<InputPositionListener>([this](auto request) {
-                   bindings_.AddBinding(this, std::move(request), dispatcher_);
-                 })) == ZX_OK);
-    local_handle_ = std::move(local_handles);
-  }
-
   const std::optional<test::virtualkeyboard::BoundingBox>& input_position() const {
     return input_position_;
   }
 
  private:
+  friend class InputPositionListenerServer;
+  std::optional<test::virtualkeyboard::BoundingBox> input_position_{};
+};
+
+// This component implements the interface for a RealmBuilder
+// LocalComponent and the test.virtualkeyboard.InputPositionListener
+// protocol.
+class InputPositionListenerServer : public InputPositionListener, public LocalComponentImpl {
+ public:
+  explicit InputPositionListenerServer(async_dispatcher_t* dispatcher,
+                                       std::weak_ptr<InputPositionState> state)
+      : dispatcher_(dispatcher), state_(std::move(state)) {}
+
+  // |test::virtualkeyboard::InputPositionListener|
+  void Notify(test::virtualkeyboard::BoundingBox bounding_box) override {
+    if (auto s = state_.lock()) {
+      s->input_position_ = bounding_box;
+    }
+  }
+
+  // |LocalComponentImpl::OnStart|
+  void OnStart() override {
+    // When this component starts, add a binding to the test.touch.ResponseListener
+    // protocol to this component's outgoing directory.
+    FX_CHECK(outgoing()->AddPublicService(
+                 fidl::InterfaceRequestHandler<InputPositionListener>([this](auto request) {
+                   bindings_.AddBinding(this, std::move(request), dispatcher_);
+                 })) == ZX_OK);
+  }
+
+ private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  std::unique_ptr<LocalComponentHandles> local_handle_;
-  std::optional<test::virtualkeyboard::BoundingBox> input_position_;
   fidl::BindingSet<InputPositionListener> bindings_;
+  std::weak_ptr<InputPositionState> state_;
 };
 
 class VirtualKeyboardBase : public gtest::RealLoopFixture,
@@ -297,7 +306,7 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
     FX_LOGS(INFO) << "*** Tap injected, count: " << injection_count_;
   }
 
-  InputPositionListenerServer* response_listener() { return response_listener_.get(); }
+  std::shared_ptr<InputPositionState> input_position_state() const { return input_position_state_; }
 
   // Guaranteed to be initialized after SetUp().
   uint32_t display_width() const { return *display_width_; }
@@ -311,8 +320,9 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
                   const std::vector<Route>& routes) {
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
-    response_listener_ = std::make_unique<InputPositionListenerServer>(dispatcher());
-    realm_->AddLocalChild(kResponseListener, response_listener_.get());
+    realm_->AddLocalChild(kResponseListener, [d = dispatcher(), s = input_position_state()]() {
+      return std::make_unique<InputPositionListenerServer>(d, s);
+    });
 
     for (const auto& [name, component] : components) {
       realm_->AddChild(name, component);
@@ -334,11 +344,12 @@ class VirtualKeyboardBase : public gtest::RealLoopFixture,
   // Exposed services directory for the realm owned by `ui_test_manager_`.
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
 
+  std::shared_ptr<InputPositionState> input_position_state_ =
+      std::make_shared<InputPositionState>();
+
   // Configured by the test fixture, and attached as a subrealm to ui test
   // manager's realm.
   std::unique_ptr<Realm> realm_;
-
-  std::unique_ptr<InputPositionListenerServer> response_listener_;
 
   int injection_count_ = 0;
 
@@ -533,10 +544,10 @@ TEST_P(WebEngineTest, ShowAndHideKeyboard) {
   is_keyboard_visible.reset();
 
   FX_LOGS(INFO) << "Getting input box position";
-  RunLoopUntil([this]() { return response_listener()->input_position().has_value(); });
+  RunLoopUntil([this]() { return input_position_state()->input_position().has_value(); });
 
   FX_LOGS(INFO) << "Tapping _inside_ input box";
-  auto input_pos = *response_listener()->input_position();
+  auto input_pos = *input_position_state()->input_position();
   int32_t input_center_x_local = (input_pos.x0 + input_pos.x1) / 2;
   int32_t input_center_y_local = (input_pos.y0 + input_pos.y1) / 2;
   TryInject(input_center_x_local, input_center_y_local);
