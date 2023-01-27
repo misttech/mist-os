@@ -28,6 +28,7 @@ rustc_library("component_debug") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:prettytable-rs",
     "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:textwrap",
     "//third_party/rust_crates:thiserror",
   ]
 
@@ -53,6 +54,7 @@ rustc_library("component_debug") {
   sources = [
     "src/capability.rs",
     "src/copy.rs",
+    "src/doctor.rs",
     "src/io.rs",
     "src/lib.rs",
     "src/lifecycle.rs",
