@@ -48,7 +48,8 @@ class SharedMemory final {
   ~SharedMemory();
 
   uint8_t* data() { return data_; }
-  size_t size() { return size_; }
+  size_t size() const { return size_; }
+  size_t capacity() const { return mapped_size_; }
 
   // Resets this object, then creates a VMO of at least |capacity| bytes, maps it. The size of the
   // shared memory is recorded in the buffer itself, making it compatible with |Resize| and |Write|.
