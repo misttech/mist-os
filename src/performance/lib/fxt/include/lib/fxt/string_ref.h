@@ -39,15 +39,23 @@ template <>
 class StringRef<RefType::kInline> {
   enum Convert { kConvert };
 
+  static constexpr size_t constexpr_strnlen(char const* string, size_t count) {
+    const char* cursor = string;
+    while (count-- && *cursor != '\0') {
+      ++cursor;
+    }
+    return cursor - string;
+  }
+
  public:
   static constexpr size_t kMaxStringLength = InternedString::kMaxStringLength;
 
   template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
   constexpr StringRef(const T& value) : StringRef{kConvert, value} {}
 
-  explicit StringRef(const char* string, size_t size = kMaxStringLength)
+  explicit constexpr StringRef(const char* string, size_t size = kMaxStringLength)
       : string_{string},
-        size_{strnlen(string, size < kMaxStringLength ? size : kMaxStringLength)} {}
+        size_{constexpr_strnlen(string, size < kMaxStringLength ? size : kMaxStringLength)} {}
 
   constexpr StringRef(const StringRef&) = default;
   constexpr StringRef& operator=(const StringRef&) = default;
@@ -61,7 +69,13 @@ class StringRef<RefType::kInline> {
     res.WriteBytes(string_, size_);
   }
 
+  constexpr const char* string() const { return string_; }
   constexpr size_t size() const { return size_; }
+
+  constexpr bool operator==(const StringRef& other) const {
+    return string() == other.string() && size() == other.size();
+  }
+  constexpr bool operator!=(const StringRef& other) const { return !(*this == other); }
 
  private:
   constexpr StringRef(Convert, const StringRef& value)
@@ -72,9 +86,9 @@ class StringRef<RefType::kInline> {
 };
 
 #if __cplusplus >= 201703L
-StringRef(const char*)->StringRef<RefType::kInline>;
+StringRef(const char*) -> StringRef<RefType::kInline>;
 
-StringRef(const char*, size_t)->StringRef<RefType::kInline>;
+StringRef(const char*, size_t) -> StringRef<RefType::kInline>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kInline> = true>
 StringRef(const T&) -> StringRef<RefType::kInline>;
@@ -102,6 +116,11 @@ class StringRef<RefType::kId> {
   template <typename Reservation>
   constexpr void Write(Reservation& res) const {}
 
+  constexpr uint16_t id() const { return id_; }
+
+  constexpr bool operator==(const StringRef& other) const { return id() == other.id(); }
+  constexpr bool operator!=(const StringRef& other) const { return !(*this == other); }
+
  private:
   constexpr StringRef(Convert, const StringRef& value) : id_{value.id_} {}
 
@@ -109,9 +128,9 @@ class StringRef<RefType::kId> {
 };
 
 #if __cplusplus >= 201703L
-StringRef(uint16_t)->StringRef<RefType::kId>;
+StringRef(uint16_t) -> StringRef<RefType::kId>;
 
-StringRef(const InternedString&)->StringRef<RefType::kId>;
+StringRef(const InternedString&) -> StringRef<RefType::kId>;
 
 template <typename T, EnableIfConvertibleToStringRef<T, RefType::kId> = true>
 StringRef(const T&) -> StringRef<RefType::kId>;

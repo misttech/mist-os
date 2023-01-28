@@ -51,9 +51,16 @@ class Argument<ArgumentType::kNull, name_type> {
     name_.Write(res);
   }
 
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr std::nullptr_t value() const { return nullptr; }
+
+  constexpr bool operator==(const Argument& other) const { return name() == other.name(); }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
+
  private:
   StringRef<name_type> name_;
 };
+
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>) -> Argument<ArgumentType::kNull, name_type>;
@@ -69,10 +76,10 @@ template <RefType name_type>
 class Argument<ArgumentType::kBool, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  constexpr Argument(T&& name, bool val)
-      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, bool value)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, value} {}
 
-  constexpr Argument(StringRef<name_type> name, bool val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, bool value) : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
@@ -81,7 +88,7 @@ class Argument<ArgumentType::kBool, name_type> {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
   constexpr uint64_t Header() const {
-    return BoolArgumentFields::Value::Make(val_) |
+    return BoolArgumentFields::Value::Make(value_) |
            ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kBool)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
@@ -93,10 +100,19 @@ class Argument<ArgumentType::kBool, name_type> {
     name_.Write(res);
   }
 
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr bool value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
+
  private:
   StringRef<name_type> name_;
-  bool val_;
+  bool value_;
 };
+
 #if __cplusplus >= 201703L
 template <RefType name_type>
 Argument(StringRef<name_type>, bool) -> Argument<ArgumentType::kBool, name_type>;
@@ -112,10 +128,10 @@ template <RefType name_type>
 class Argument<ArgumentType::kInt32, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  constexpr Argument(T&& name, int32_t val)
-      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, int32_t value)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, value} {}
 
-  constexpr Argument(StringRef<name_type> name, int32_t val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, int32_t value) : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
@@ -124,7 +140,7 @@ class Argument<ArgumentType::kInt32, name_type> {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
   constexpr uint64_t Header() const {
-    return Int32ArgumentFields::Value::Make(val_) |
+    return Int32ArgumentFields::Value::Make(value_) |
            ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kInt32)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
@@ -136,9 +152,17 @@ class Argument<ArgumentType::kInt32, name_type> {
     name_.Write(res);
   }
 
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr int32_t value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
+
  private:
   StringRef<name_type> name_;
-  int32_t val_;
+  int32_t value_;
 };
 #if __cplusplus >= 201703L
 template <RefType name_type>
@@ -155,10 +179,10 @@ template <RefType name_type>
 class Argument<ArgumentType::kUint32, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  constexpr Argument(T&& name, uint32_t val)
-      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, uint32_t value)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, value} {}
 
-  constexpr Argument(StringRef<name_type> name, uint32_t val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, uint32_t value) : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
@@ -167,7 +191,7 @@ class Argument<ArgumentType::kUint32, name_type> {
     return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize();
   }
   constexpr uint64_t Header() const {
-    return Uint32ArgumentFields::Value::Make(val_) |
+    return Uint32ArgumentFields::Value::Make(value_) |
            ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kUint32)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
@@ -179,9 +203,17 @@ class Argument<ArgumentType::kUint32, name_type> {
     name_.Write(res);
   }
 
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr uint32_t value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
+
  private:
   StringRef<name_type> name_;
-  uint32_t val_;
+  uint32_t value_;
 };
 #if __cplusplus >= 201703L
 template <RefType name_type>
@@ -198,10 +230,10 @@ template <RefType name_type>
 class Argument<ArgumentType::kInt64, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  constexpr Argument(T&& name, int64_t val)
-      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, int64_t value)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, value} {}
 
-  constexpr Argument(StringRef<name_type> name, int64_t val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, int64_t value) : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
@@ -219,12 +251,20 @@ class Argument<ArgumentType::kInt64, name_type> {
   constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
-    res.WriteWord(val_);
+    res.WriteWord(value_);
   }
+
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr int64_t value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
 
  private:
   StringRef<name_type> name_;
-  int64_t val_;
+  int64_t value_;
 };
 #if __cplusplus >= 201703L
 template <RefType name_type>
@@ -241,10 +281,10 @@ template <RefType name_type>
 class Argument<ArgumentType::kUint64, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  constexpr Argument(T&& name, uint64_t val)
-      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, uint64_t value)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, value} {}
 
-  constexpr Argument(StringRef<name_type> name, uint64_t val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, uint64_t value) : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
@@ -262,12 +302,20 @@ class Argument<ArgumentType::kUint64, name_type> {
   constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
-    res.WriteWord(val_);
+    res.WriteWord(value_);
   }
+
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr uint64_t value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
 
  private:
   StringRef<name_type> name_;
-  uint64_t val_;
+  uint64_t value_;
 };
 #if __cplusplus >= 201703L
 template <RefType name_type>
@@ -284,10 +332,10 @@ template <RefType name_type>
 class Argument<ArgumentType::kDouble, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  constexpr Argument(T&& name, double val)
-      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, double value)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, value} {}
 
-  constexpr Argument(StringRef<name_type> name, double val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, double value) : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
@@ -305,12 +353,20 @@ class Argument<ArgumentType::kDouble, name_type> {
   constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
-    res.WriteBytes(&val_, 8);
+    res.WriteBytes(&value_, 8);
   }
+
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr double value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
 
  private:
   StringRef<name_type> name_;
-  double val_;
+  double value_;
 };
 #if __cplusplus >= 201703L
 template <RefType name_type>
@@ -327,10 +383,10 @@ template <RefType name_type>
 class Argument<ArgumentType::kPointer, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  constexpr Argument(T&& name, Pointer val)
-      : Argument{StringRef<name_type>{std::forward<T>(name)}, val} {}
+  constexpr Argument(T&& name, Pointer value)
+      : Argument{StringRef<name_type>{std::forward<T>(name)}, value} {}
 
-  constexpr Argument(StringRef<name_type> name, Pointer val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, Pointer value) : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
@@ -348,12 +404,20 @@ class Argument<ArgumentType::kPointer, name_type> {
   constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
-    res.WriteWord(val_.ptr);
+    res.WriteWord(value_.ptr);
   }
+
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr Pointer value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
 
  private:
   StringRef<name_type> name_;
-  Pointer val_;
+  Pointer value_;
 };
 
 #if __cplusplus >= 201703L
@@ -371,9 +435,9 @@ template <RefType name_type>
 class Argument<ArgumentType::kKoid, name_type> {
  public:
   template <typename T, EnableIfConvertibleToStringRef<T, name_type> = true>
-  constexpr Argument(T&& name, Koid val) : name_{std::forward<T>(name)}, val_{val} {}
+  constexpr Argument(T&& name, Koid value) : name_{std::forward<T>(name)}, value_{value} {}
 
-  constexpr Argument(StringRef<name_type> name, Koid val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, Koid value) : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
@@ -391,12 +455,20 @@ class Argument<ArgumentType::kKoid, name_type> {
   constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
-    res.WriteWord(val_.koid);
+    res.WriteWord(value_.koid);
   }
+
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr Koid value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
 
  private:
   StringRef<name_type> name_;
-  Koid val_;
+  Koid value_;
 };
 #if __cplusplus >= 201703L
 template <RefType name_type>
@@ -414,20 +486,21 @@ class Argument<ArgumentType::kString, name_type, val_type> {
  public:
   template <typename T, typename U, EnableIfConvertibleToStringRef<T, name_type> = true,
             EnableIfConvertibleToStringRef<U, val_type> = true>
-  constexpr Argument(T&& name, U&& val)
-      : name_{std::forward<T>(name)}, val_{std::forward<U>(val)} {}
+  constexpr Argument(T&& name, U&& value)
+      : name_{std::forward<T>(name)}, value_{std::forward<U>(value)} {}
 
-  constexpr Argument(StringRef<name_type> name, StringRef<val_type> val) : name_(name), val_(val) {}
+  constexpr Argument(StringRef<name_type> name, StringRef<val_type> value)
+      : name_(name), value_(value) {}
 
   constexpr Argument(const Argument&) = default;
   constexpr Argument& operator=(const Argument&) = default;
 
   constexpr WordSize PayloadSize() const {
-    return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + val_.PayloadSize();
+    return WordSize::FromBytes(sizeof(ArgumentHeader)) + name_.PayloadSize() + value_.PayloadSize();
   }
 
   constexpr uint64_t Header() const {
-    return StringArgumentFields::Index::Make(val_.HeaderEntry()) |
+    return StringArgumentFields::Index::Make(value_.HeaderEntry()) |
            ArgumentFields::Type::Make(ToUnderlyingType(ArgumentType::kString)) |
            ArgumentFields::ArgumentSize::Make(PayloadSize().SizeInWords()) |
            ArgumentFields::NameRef::Make(name_.HeaderEntry());
@@ -437,42 +510,158 @@ class Argument<ArgumentType::kString, name_type, val_type> {
   constexpr void Write(Reservation& res) const {
     res.WriteWord(Header());
     name_.Write(res);
-    val_.Write(res);
+    value_.Write(res);
   }
+
+  constexpr StringRef<name_type> name() const { return name_; }
+  constexpr StringRef<val_type> value() const { return value_; }
+
+  constexpr bool operator==(const Argument& other) const {
+    return name() == other.name() && value() == other.value();
+  }
+  constexpr bool operator!=(const Argument& other) const { return !(*this == other); }
 
  private:
   StringRef<name_type> name_;
-  StringRef<val_type> val_;
+  StringRef<val_type> value_;
 };
 #if __cplusplus >= 201703L
 Argument(StringRef<RefType::kInline>, StringRef<RefType::kId>)
-    ->Argument<ArgumentType::kString, RefType::kInline, RefType::kId>;
+    -> Argument<ArgumentType::kString, RefType::kInline, RefType::kId>;
 
 Argument(StringRef<RefType::kId>, StringRef<RefType::kId>)
-    ->Argument<ArgumentType::kString, RefType::kId, RefType::kId>;
+    -> Argument<ArgumentType::kString, RefType::kId, RefType::kId>;
 
 Argument(StringRef<RefType::kInline>, StringRef<RefType::kInline>)
-    ->Argument<ArgumentType::kString, RefType::kInline, RefType::kInline>;
+    -> Argument<ArgumentType::kString, RefType::kInline, RefType::kInline>;
 
 Argument(StringRef<RefType::kId>, StringRef<RefType::kInline>)
-    ->Argument<ArgumentType::kString, RefType::kId, RefType::kInline>;
+    -> Argument<ArgumentType::kString, RefType::kId, RefType::kInline>;
 
 template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kInline> = true,
           EnableIfConvertibleToStringRef<U, RefType::kId> = true>
-Argument(T&& name, U&& val) -> Argument<ArgumentType::kString, RefType::kInline, RefType::kId>;
+Argument(T&& name, U&& value) -> Argument<ArgumentType::kString, RefType::kInline, RefType::kId>;
 
 template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kId> = true,
           EnableIfConvertibleToStringRef<U, RefType::kId> = true>
-Argument(T&& name, U&& val) -> Argument<ArgumentType::kString, RefType::kId, RefType::kId>;
+Argument(T&& name, U&& value) -> Argument<ArgumentType::kString, RefType::kId, RefType::kId>;
 
 template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kInline> = true,
           EnableIfConvertibleToStringRef<U, RefType::kInline> = true>
-Argument(T&& name, U&& val) -> Argument<ArgumentType::kString, RefType::kInline, RefType::kInline>;
+Argument(T&& name, U&& value)
+    -> Argument<ArgumentType::kString, RefType::kInline, RefType::kInline>;
 
 template <typename T, typename U, EnableIfConvertibleToStringRef<T, RefType::kId> = true,
           EnableIfConvertibleToStringRef<U, RefType::kInline> = true>
-Argument(T&& name, U&& val) -> Argument<ArgumentType::kString, RefType::kId, RefType::kInline>;
+Argument(T&& name, U&& value) -> Argument<ArgumentType::kString, RefType::kId, RefType::kInline>;
 #endif
+
+// Builds an instance of Argument from the given parameters. Each overload uses explicit
+// instantiations of StringRef to avoid limitations in type deduction from convertible types. Since
+// no type deduction occurs, implicit parameter conversions are considered.
+constexpr Argument<ArgumentType::kNull, RefType::kId> MakeArgument(StringRef<RefType::kId> name) {
+  return Argument{name};
+}
+constexpr Argument<ArgumentType::kNull, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name) {
+  return Argument{name};
+}
+constexpr Argument<ArgumentType::kBool, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                   bool value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kBool, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, bool value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kInt32, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                    int32_t value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kInt32, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, int32_t value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kUint32, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                     uint32_t value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kUint32, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, uint32_t value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kInt64, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                    int64_t value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kInt64, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, int64_t value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kUint64, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                     uint64_t value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kUint64, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, uint64_t value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kDouble, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                     double value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kDouble, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, double value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kPointer, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                      Pointer value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kPointer, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, Pointer value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kKoid, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                   Koid value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kKoid, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, Koid value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kString, RefType::kId, RefType::kId> MakeArgument(
+    StringRef<RefType::kId> name, StringRef<RefType::kId> value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kString, RefType::kId, RefType::kInline> MakeArgument(
+    StringRef<RefType::kId> name, StringRef<RefType::kInline> value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kString, RefType::kInline, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, StringRef<RefType::kInline> value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kString, RefType::kInline, RefType::kId> MakeArgument(
+    StringRef<RefType::kInline> name, StringRef<RefType::kId> value) {
+  return {name, value};
+}
+constexpr Argument<ArgumentType::kString, RefType::kId, RefType::kInline> MakeArgument(
+    StringRef<RefType::kId> name, const char* value) {
+  return {name, StringRef{value}};
+}
+constexpr Argument<ArgumentType::kString, RefType::kInline, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, const char* value) {
+  return {name, StringRef{value}};
+}
+constexpr Argument<ArgumentType::kString, RefType::kId, RefType::kInline> MakeArgument(
+    StringRef<RefType::kId> name, const char* value, size_t size) {
+  return {name, StringRef{value, size}};
+}
+constexpr Argument<ArgumentType::kString, RefType::kInline, RefType::kInline> MakeArgument(
+    StringRef<RefType::kInline> name, const char* value, size_t size) {
+  return {name, StringRef{value, size}};
+}
 
 }  // namespace fxt
 

@@ -22,6 +22,7 @@ library_headers("headers") {
     "lib/fxt/serializer.h",
     "lib/fxt/string_ref.h",
     "lib/fxt/thread_ref.h",
+    "lib/fxt/trace_base.h",
     "lib/fxt/writer_internal.h",
   ]
   public_deps = [
@@ -61,6 +62,7 @@ executable("fxt_tests_app") {
     "interned_string_tests.cc",
     "macro_tests.cc",
     "serializer_test.cc",
+    "trace_base_tests.cc",
   ]
   deps = [
     ":fxt",
