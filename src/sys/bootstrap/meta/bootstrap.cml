@@ -77,7 +77,7 @@
         },
         {
             name: "shutdown_shim",
-            url: "fuchsia-boot:///#meta/shutdown-shim.cm",
+            url: "fuchsia-boot:///shutdown-shim#meta/shutdown-shim.cm",
         },
         {
             name: "svchost",
