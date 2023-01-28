@@ -143,8 +143,10 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
     realm_->AddChild(kA11yManager, kA11yManagerUrl);
 
     // Add a test view provider.
-    test_view_.emplace(dispatcher(), /* content = */ ui_testing::TestView::ContentType::DEFAULT);
-    realm_->AddLocalChild(kViewProvider, &(*test_view_));
+    realm_->AddLocalChild(kViewProvider, [d = dispatcher(), a = test_view_access_]() {
+      return std::make_unique<ui_testing::GfxTestView>(
+          d, /* content = */ ui_testing::TestView::ContentType::DEFAULT, a);
+    });
 
     // Add the a11y view registry proxy.
     a11y_view_registry_proxy_.emplace(dispatcher());
@@ -192,8 +194,8 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
  protected:
   std::optional<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
+  std::shared_ptr<ui_testing::TestViewAccess> test_view_access_;
   std::optional<Realm> realm_;
-  std::optional<ui_testing::GfxTestView> test_view_;
   std::optional<AccessibilityViewRegistryProxy> a11y_view_registry_proxy_;
 };
 

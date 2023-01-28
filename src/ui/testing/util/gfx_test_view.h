@@ -10,7 +10,10 @@
 #include <lib/ui/scenic/cpp/session.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 
+#include <memory>
 #include <optional>
+
+#include <src/lib/fxl/memory/weak_ptr.h>
 
 #include "src/ui/testing/util/test_view.h"
 
@@ -18,8 +21,9 @@ namespace ui_testing {
 
 class GfxTestView : public TestView {
  public:
-  explicit GfxTestView(async_dispatcher_t* dispatcher, ContentType content_type)
-      : TestView(dispatcher, content_type) {}
+  explicit GfxTestView(async_dispatcher_t* dispatcher, ContentType content_type,
+                       std::weak_ptr<TestViewAccess> access)
+      : TestView(dispatcher, content_type, std::move(access)) {}
   ~GfxTestView() override = default;
 
   // |fuchsia::ui::app::ViewProvider|

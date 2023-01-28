@@ -74,9 +74,11 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
     FX_LOGS(INFO) << "Building realm";
     realm_ = std::make_unique<component_testing::Realm>(ui_test_manager_->AddSubrealm());
 
+    test_view_access_ = std::make_shared<ui_testing::FlatlandTestViewAccess>();
     // Add a test view provider.
-    test_view_ = std::make_unique<ui_testing::FlatlandTestView>(dispatcher(), /* content = */ T);
-    realm_->AddLocalChild(kViewProvider, test_view_.get());
+    realm_->AddLocalChild(kViewProvider, [d = dispatcher(), a = test_view_access_]() {
+      return std::make_unique<ui_testing::FlatlandTestView>(d, /* content = */ T, a);
+    });
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                            .source = ChildRef{kViewProvider},
                            .targets = {ParentRef()}});
@@ -84,11 +86,13 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
                            .source = ParentRef(),
                            .targets = {ChildRef{kViewProvider}}});
 
+    nested_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
     // Create another FlatlandTestView that can be nested inside test_view_ if desired
     // (by calling NestChildView()).
-    nested_view_ = std::make_unique<ui_testing::FlatlandTestView>(
-        dispatcher(), /* content = */ ui_testing::TestView::ContentType::DEFAULT);
-    realm_->AddLocalChild(kNestedViewProvider, nested_view_.get());
+    realm_->AddLocalChild(kNestedViewProvider, [d = dispatcher(), a = nested_view_access_]() {
+      return std::make_unique<ui_testing::FlatlandTestView>(
+          d, /* content = */ ui_testing::TestView::ContentType::DEFAULT, a);
+    });
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                            .source = ChildRef{kNestedViewProvider},
                            .targets = {ChildRef{kViewProvider}}});
@@ -146,7 +150,11 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
     // happen if the a11y manager has correctly inserted its view.
     FX_LOGS(INFO) << "Waiting for client view to render";
     RunLoopUntil([this]() {
-      auto test_view_ref_koid = test_view_->GetViewRefKoid();
+      // Wait until view access is possible.
+      if (!test_view_access_->HasView()) {
+        return false;
+      }
+      auto test_view_ref_koid = test_view_access_->view()->GetViewRefKoid();
       return test_view_ref_koid.has_value() &&
              ui_test_manager_->ViewIsRendering(*test_view_ref_koid);
     });
@@ -169,8 +177,8 @@ class FlatlandAccessibilityViewTest : public gtest::RealLoopFixture {
   std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
   std::unique_ptr<component_testing::Realm> realm_;
-  std::unique_ptr<ui_testing::FlatlandTestView> test_view_;
-  std::unique_ptr<ui_testing::FlatlandTestView> nested_view_;
+  std::shared_ptr<ui_testing::FlatlandTestViewAccess> test_view_access_;
+  std::shared_ptr<ui_testing::TestViewAccess> nested_view_access_;
   std::unique_ptr<a11y::FlatlandAccessibilityView> a11y_view_;
   fuchsia::ui::composition::FlatlandDisplayPtr flatland_display_;
 
@@ -285,7 +293,8 @@ TEST_F(PlainBackgroundTest, TestHighlight) {
   const float right_f = static_cast<float>(display_width_) * 3 / 4;
   const float bottom_f = static_cast<float>(display_height_) * 3 / 4;
   a11y_view_->DrawHighlight({left_f, top_f}, {right_f, bottom_f},
-                            test_view_->GetViewRefKoid().value(), [this]() { QuitLoop(); });
+                            test_view_access_->view()->GetViewRefKoid().value(),
+                            [this]() { QuitLoop(); });
   RunLoop();
 
   auto data = ui_test_manager_->TakeScreenshot();
@@ -410,7 +419,8 @@ TEST_F(PlainBackgroundTest, TestClearHighlight) {
   const float top = static_cast<float>(display_height_) * 3 / 8;
   const float right = static_cast<float>(display_width_) * 5 / 8;
   const float bottom = static_cast<float>(display_height_) * 5 / 8;
-  a11y_view_->DrawHighlight({left, top}, {right, bottom}, test_view_->GetViewRefKoid().value(),
+  a11y_view_->DrawHighlight({left, top}, {right, bottom},
+                            test_view_access_->view()->GetViewRefKoid().value(),
                             [this]() { QuitLoop(); });
   RunLoop();
 
@@ -445,11 +455,13 @@ TEST_F(PlainBackgroundTest, MultipleCallsDontCrash) {
   const float top = static_cast<float>(display_height_) * 1 / 4;
   const float right = static_cast<float>(display_width_) * 3 / 4;
   const float bottom = static_cast<float>(display_height_) * 3 / 4;
-  a11y_view_->DrawHighlight({left, top}, {right, bottom}, test_view_->GetViewRefKoid().value(),
+  a11y_view_->DrawHighlight({left, top}, {right, bottom},
+                            test_view_access_->view()->GetViewRefKoid().value(),
                             [this]() { QuitLoop(); });
   RunLoop();
 
-  a11y_view_->DrawHighlight({left, top}, {right, bottom}, test_view_->GetViewRefKoid().value(),
+  a11y_view_->DrawHighlight({left, top}, {right, bottom},
+                            test_view_access_->view()->GetViewRefKoid().value(),
                             [this]() { QuitLoop(); });
   RunLoop();
 
@@ -463,20 +475,24 @@ TEST_F(PlainBackgroundTest, MultipleCallsDontCrash) {
 // Make sure that DrawHighlight() correctly translates coordinates when they are
 // given in the coordinate space of a nested View that doesn't cover the whole screen.
 TEST_F(PlainBackgroundTest, TranslatesCoordinatesFromNestedChildView) {
-  test_view_->NestChildView();
+  test_view_access_->flatland_view()->NestChildView();
 
   FX_LOGS(INFO) << "Waiting for nested view to render";
   RunLoopUntil([this]() {
-    auto test_view_ref_koid = nested_view_->GetViewRefKoid();
+    if (!nested_view_access_->HasView()) {
+      return false;
+    }
+    auto test_view_ref_koid = nested_view_access_->view()->GetViewRefKoid();
     return test_view_ref_koid.has_value() && ui_test_manager_->ViewIsRendering(*test_view_ref_koid);
   });
 
   // Draw a highlight from the upper left corner to the lower right corner of nested_view.
   const float left = 0.;
   const float top = 0.;
-  const float right = static_cast<float>(nested_view_->width());
-  const float bottom = static_cast<float>(nested_view_->height());
-  a11y_view_->DrawHighlight({left, top}, {right, bottom}, nested_view_->GetViewRefKoid().value(),
+  const float right = static_cast<float>(nested_view_access_->view()->width());
+  const float bottom = static_cast<float>(nested_view_access_->view()->height());
+  a11y_view_->DrawHighlight({left, top}, {right, bottom},
+                            nested_view_access_->view()->GetViewRefKoid().value(),
                             [this]() { QuitLoop(); });
   RunLoop();
 
@@ -506,7 +522,8 @@ TEST_F(PlainBackgroundTest, TestHighlightWithMagnification) {
   const float right_f = static_cast<float>(display_width_) * 5 / 8;
   const float bottom_f = static_cast<float>(display_height_) * 5 / 8;
   a11y_view_->DrawHighlight({left_f, top_f}, {right_f, bottom_f},
-                            test_view_->GetViewRefKoid().value(), [this]() { QuitLoop(); });
+                            test_view_access_->view()->GetViewRefKoid().value(),
+                            [this]() { QuitLoop(); });
   RunLoop();
 
   auto data = ui_test_manager_->TakeScreenshot();

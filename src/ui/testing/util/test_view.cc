@@ -14,12 +14,13 @@
 
 namespace ui_testing {
 
-void TestView::Start(std::unique_ptr<component_testing::LocalComponentHandles> mock_handles) {
-  FX_CHECK(mock_handles->outgoing()->AddPublicService(
+void TestViewAccess::SetTestView(const fxl::WeakPtr<TestView>& view) { test_view_ = view; }
+
+void TestView::OnStart() {
+  FX_CHECK(outgoing()->AddPublicService(
                fidl::InterfaceRequestHandler<fuchsia::ui::app::ViewProvider>([this](auto request) {
                  view_provider_bindings_.AddBinding(this, std::move(request), dispatcher_);
                })) == ZX_OK);
-  mock_handles_ = std::move(mock_handles);
 }
 
 void TestView::DrawContent() {

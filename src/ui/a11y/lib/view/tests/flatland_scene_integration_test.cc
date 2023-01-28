@@ -22,8 +22,6 @@ namespace accessibility_test {
 namespace {
 
 using component_testing::ChildRef;
-using component_testing::LocalComponent;
-using component_testing::LocalComponentHandles;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -56,10 +54,12 @@ class AccessibilitySceneTest
     FX_LOGS(INFO) << "AccessibilitySceneTest: Building realm";
     realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
 
+    test_view_access_ = std::make_unique<ui_testing::FlatlandTestViewAccess>();
     // Add a test view provider.
-    test_view_ = std::make_unique<ui_testing::FlatlandTestView>(
-        dispatcher(), /* content = */ ui_testing::TestView::ContentType::DEFAULT);
-    realm_->AddLocalChild(kViewProvider, test_view_.get());
+    realm_->AddLocalChild(kViewProvider, [d = dispatcher(), a = test_view_access_]() {
+      return std::make_unique<ui_testing::FlatlandTestView>(
+          d, /* content = */ ui_testing::TestView::ContentType::DEFAULT, a);
+    });
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                            .source = ChildRef{kViewProvider},
                            .targets = {ParentRef()}});
@@ -73,8 +73,8 @@ class AccessibilitySceneTest
  protected:
   std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
+  std::shared_ptr<ui_testing::TestViewAccess> test_view_access_;
   std::unique_ptr<Realm> realm_;
-  std::unique_ptr<ui_testing::TestView> test_view_;
 };
 
 // Run test with both the real and fake a11y components, because other tests

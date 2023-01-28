@@ -19,7 +19,7 @@ namespace ui_testing {
 void GfxTestView::CreateViewWithViewRef(zx::eventpair token,
                                         fuchsia::ui::views::ViewRefControl view_ref_control,
                                         fuchsia::ui::views::ViewRef view_ref) {
-  scenic_ = mock_handles_->svc().Connect<fuchsia::ui::scenic::Scenic>();
+  scenic_ = svc().Connect<fuchsia::ui::scenic::Scenic>();
 
   // Set up scenic session.
   fuchsia::ui::scenic::SessionEndpoints endpoints;

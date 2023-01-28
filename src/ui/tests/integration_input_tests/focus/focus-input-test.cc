@@ -98,15 +98,27 @@ class FocusInputTest : public gtest::RealLoopFixture,
     auto config = GetParam();
 
     // Add a test view provider.
+    component_testing::LocalComponentFactory test_view;
+
+    test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
     if (config.use_flatland) {
-      test_view_ = std::make_unique<ui_testing::FlatlandTestView>(
-          dispatcher(), ui_testing::TestView::ContentType::COORDINATE_GRID);
+      // Lifetime note:
+      // dispatcher() is a pointer to the base class dispatcher loop. The
+      // closure below lives until realm_ is torn down. Since
+      // dispatcher() is cleaned up after realm_, `d` should outlive this
+      // closure.
+      test_view = [d = dispatcher(), a = test_view_access_]() {
+        return std::make_unique<ui_testing::FlatlandTestView>(
+            d, ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+      };
     } else {
-      test_view_ = std::make_unique<ui_testing::GfxTestView>(
-          dispatcher(), ui_testing::TestView::ContentType::COORDINATE_GRID);
+      test_view = [d = dispatcher(), a = test_view_access_]() {
+        return std::make_unique<ui_testing::GfxTestView>(
+            d, ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+      };
     }
 
-    realm_->AddLocalChild(kViewProvider, test_view_.get());
+    realm_->AddLocalChild(kViewProvider, std::move(test_view));
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                            .source = ChildRef{kViewProvider},
                            .targets = {ParentRef()}});
@@ -134,12 +146,11 @@ class FocusInputTest : public gtest::RealLoopFixture,
   // Exposed services directory for the realm owned by `ui_test_manager_`.
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
 
+  std::shared_ptr<ui_testing::TestViewAccess> test_view_access_;
+
   // Configured by the test fixture, and attached as a subrealm to ui test
   // manager's realm.
   std::unique_ptr<Realm> realm_;
-
-  // Presents trivial content to the scene.
-  std::unique_ptr<ui_testing::TestView> test_view_;
 };
 
 INSTANTIATE_TEST_SUITE_P(FocusInputTestWithParams, FocusInputTest,

@@ -16,8 +16,14 @@ namespace ui_testing {
 using fuchsia::ui::composition::ContentId;
 using fuchsia::ui::composition::TransformId;
 
+FlatlandTestView* FlatlandTestViewAccess::flatland_view() const {
+  FX_CHECK(HasView());
+  // We know that `view` is a FlatlandTestView here.
+  return static_cast<FlatlandTestView*>(view());
+}
+
 void FlatlandTestView::CreateView2(fuchsia::ui::app::CreateView2Args args) {
-  flatland_ = mock_handles_->svc().Connect<fuchsia::ui::composition::Flatland>();
+  flatland_ = svc().Connect<fuchsia::ui::composition::Flatland>();
   flatland_.set_error_handler([](zx_status_t status) {
     FX_LOGS(ERROR) << "Error from fuchsia::ui::composition::Flatland: "
                    << zx_status_get_string(status);
@@ -56,7 +62,7 @@ void FlatlandTestView::NestChildView() {
 
   child_view_is_nested = true;
 
-  auto child_view_provider = mock_handles_->svc().Connect<fuchsia::ui::app::ViewProvider>();
+  auto child_view_provider = svc().Connect<fuchsia::ui::app::ViewProvider>();
 
   auto [child_view_token, child_viewport_token] = scenic::ViewCreationTokenPair::New();
 

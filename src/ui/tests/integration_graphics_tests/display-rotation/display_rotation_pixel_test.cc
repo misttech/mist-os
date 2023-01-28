@@ -71,7 +71,6 @@ std::vector<ui_testing::UITestRealm::Config> UIConfigurationsToTest(
 }  // namespace
 
 using component_testing::ChildRef;
-using component_testing::Directory;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -81,7 +80,8 @@ using component_testing::Route;
 // 'config/data/display_rotation' correctly.
 class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
  protected:
-  DisplayRotationPixelTestBase(ui_testing::UITestRealm::Config config) : config_(config) {}
+  explicit DisplayRotationPixelTestBase(ui_testing::UITestRealm::Config config)
+      : config_(std::move(config)) {}
 
   // |testing::Test|
   void SetUp() override {
@@ -91,16 +91,24 @@ class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
     FX_LOGS(INFO) << "Building realm";
     realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
 
-    // Add a test view provider.
+    test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
+
+    component_testing::LocalComponentFactory test_view;
+    // Add a test view provider. Make either a gfx test view or flatland test view depending
+    // on the config parameters.
     if (config_.use_flatland) {
-      test_view_ = std::make_unique<ui_testing::FlatlandTestView>(
-          dispatcher(), /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID);
+      test_view = [d = dispatcher(), a = test_view_access_]() {
+        return std::make_unique<ui_testing::FlatlandTestView>(
+            d, /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+      };
     } else {
-      test_view_ = std::make_unique<ui_testing::GfxTestView>(
-          dispatcher(), /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID);
+      test_view = [d = dispatcher(), a = test_view_access_]() {
+        return std::make_unique<ui_testing::GfxTestView>(
+            d, /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+      };
     }
 
-    realm_->AddLocalChild(kViewProvider, test_view_.get());
+    realm_->AddLocalChild(kViewProvider, std::move(test_view));
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                            .source = ChildRef{kViewProvider},
                            .targets = {ParentRef()}});
@@ -180,7 +188,7 @@ class DisplayRotationPixelTestBase : public gtest::RealLoopFixture {
 
   uint64_t display_height_ = 0.f;
   uint64_t display_width_ = 0.f;
-  std::unique_ptr<ui_testing::TestView> test_view_;
+  std::shared_ptr<ui_testing::TestViewAccess> test_view_access_;
 
  private:
   ui_testing::UITestRealm::Config config_;
@@ -228,9 +236,9 @@ TEST_P(LandscapeModeTest, ValidContentTest) {
   ASSERT_EQ(data.width(), display_width_);
   ASSERT_EQ(data.height(), display_height_);
 
-  EXPECT_EQ(test_view_->width(),
+  EXPECT_EQ(test_view_access_->view()->width(),
             static_cast<uint64_t>(static_cast<float>(data.width()) / scale_factor));
-  EXPECT_EQ(test_view_->height(),
+  EXPECT_EQ(test_view_access_->view()->height(),
             static_cast<uint64_t>(static_cast<float>(data.height()) / scale_factor));
 
   // The content of the screenshot should be independent of the display's orientation.
@@ -281,9 +289,9 @@ TEST_P(PortraitModeTest, ValidContentTest) {
   ASSERT_EQ(data.width(), display_height_);
   ASSERT_EQ(data.height(), display_width_);
 
-  EXPECT_EQ(test_view_->width(),
+  EXPECT_EQ(test_view_access_->view()->width(),
             static_cast<uint64_t>(static_cast<float>(data.width()) / scale_factor));
-  EXPECT_EQ(test_view_->height(),
+  EXPECT_EQ(test_view_access_->view()->height(),
             static_cast<uint64_t>(static_cast<float>(data.height()) / scale_factor));
 
   // The content of the screenshot should be independent of the display's orientation.

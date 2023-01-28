@@ -74,27 +74,35 @@ class PresentationTest : public gtest::RealLoopFixture,
   // |testing::Test|
   void SetUp() override {
     ui_test_manager_ = std::make_unique<ui_testing::UITestManager>(GetParam());
-    auto ui_stack_config = GetParam();
+    auto config = GetParam();
 
     // Build realm.
     FX_LOGS(INFO) << "Building realm";
     realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
 
-    // Add a test view provider.
-    if (ui_stack_config.use_flatland) {
-      test_view_ = std::make_unique<ui_testing::FlatlandTestView>(
-          dispatcher(), /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID);
+    test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
+
+    component_testing::LocalComponentFactory test_view;
+    // Add a test view provider. Make either a gfx test view or flatland test view depending
+    // on the config parameters.
+    if (config.use_flatland) {
+      test_view = [d = dispatcher(), a = test_view_access_]() {
+        return std::make_unique<ui_testing::FlatlandTestView>(
+            d, /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+      };
     } else {
-      test_view_ = std::make_unique<ui_testing::GfxTestView>(
-          dispatcher(), /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID);
+      test_view = [d = dispatcher(), a = test_view_access_]() {
+        return std::make_unique<ui_testing::GfxTestView>(
+            d, /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+      };
     }
 
-    realm_->AddLocalChild(kViewProvider, test_view_.get());
+    realm_->AddLocalChild(kViewProvider, std::move(test_view));
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                            .source = ChildRef{kViewProvider},
                            .targets = {ParentRef()}});
 
-    for (const auto& protocol : ui_stack_config.ui_to_client_services) {
+    for (const auto& protocol : config.ui_to_client_services) {
       realm_->AddRoute(Route{.capabilities = {Protocol{protocol}},
                              .source = ParentRef(),
                              .targets = {ChildRef{kViewProvider}}});
@@ -112,9 +120,8 @@ class PresentationTest : public gtest::RealLoopFixture,
 
   std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
+  std::shared_ptr<ui_testing::TestViewAccess> test_view_access_;
   std::unique_ptr<Realm> realm_;
-
-  std::unique_ptr<ui_testing::TestView> test_view_;
 };
 
 INSTANTIATE_TEST_SUITE_P(PresentationTestWithParams, PresentationTest,

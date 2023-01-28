@@ -101,17 +101,24 @@ class DisplayPixelRatioTest
     FX_LOGS(INFO) << "Building realm";
     realm_ = std::make_unique<Realm>(ui_test_manager_->AddSubrealm());
 
+    test_view_access_ = std::make_shared<ui_testing::TestViewAccess>();
+
+    component_testing::LocalComponentFactory test_view;
     // Add a test view provider. Make either a gfx test view or flatland test view depending
     // on the config parameters.
     if (config.use_flatland) {
-      test_view_ = std::make_unique<ui_testing::FlatlandTestView>(
-          dispatcher(), /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID);
+      test_view = [d = dispatcher(), a = test_view_access_]() {
+        return std::make_unique<ui_testing::FlatlandTestView>(
+            d, /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+      };
     } else {
-      test_view_ = std::make_unique<ui_testing::GfxTestView>(
-          dispatcher(), /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID);
+      test_view = [d = dispatcher(), a = test_view_access_]() {
+        return std::make_unique<ui_testing::GfxTestView>(
+            d, /* content = */ ui_testing::TestView::ContentType::COORDINATE_GRID, a);
+      };
     }
 
-    realm_->AddLocalChild(kViewProvider, test_view_.get());
+    realm_->AddLocalChild(kViewProvider, std::move(test_view));
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                            .source = ChildRef{kViewProvider},
                            .targets = {ParentRef()}});
@@ -142,7 +149,8 @@ class DisplayPixelRatioTest
 
   ui_testing::Screenshot TakeScreenshot() { return ui_test_manager_->TakeScreenshot(); }
 
-  std::unique_ptr<ui_testing::TestView> test_view_;
+  std::shared_ptr<ui_testing::TestViewAccess> test_view_access_;
+
   double display_width_ = 0;
   double display_height_ = 0;
 
@@ -178,8 +186,8 @@ TEST_P(DisplayPixelRatioTest, TestScale) {
     EXPECT_NEAR(ClientViewScaleFactor(), expected_dpr, kEpsilon);
   }
 
-  EXPECT_NEAR(display_width_ / test_view_->width(), expected_dpr, kEpsilon);
-  EXPECT_NEAR(display_height_ / test_view_->height(), expected_dpr, kEpsilon);
+  EXPECT_NEAR(display_width_ / test_view_access_->view()->width(), expected_dpr, kEpsilon);
+  EXPECT_NEAR(display_height_ / test_view_access_->view()->height(), expected_dpr, kEpsilon);
 
   // The drawn content should cover the screen's display.
   auto data = TakeScreenshot();

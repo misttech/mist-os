@@ -8,17 +8,31 @@
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/views/cpp/fidl.h>
 
+#include <memory>
 #include <optional>
+
+#include <src/lib/fxl/memory/weak_ptr.h>
 
 #include "fuchsia/ui/app/cpp/fidl.h"
 #include "src/ui/testing/util/test_view.h"
 
 namespace ui_testing {
 
+class FlatlandTestView;
+
+class FlatlandTestViewAccess : public TestViewAccess {
+ public:
+  ~FlatlandTestViewAccess() override = default;
+
+  // Call HasView before this to ensure a view is available.
+  FlatlandTestView* flatland_view() const override;
+};
+
 class FlatlandTestView : public TestView {
  public:
-  explicit FlatlandTestView(async_dispatcher_t* dispatcher, ContentType content_type)
-      : TestView(dispatcher, content_type) {}
+  explicit FlatlandTestView(async_dispatcher_t* dispatcher, ContentType content_type,
+                            std::weak_ptr<TestViewAccess> access)
+      : TestView(dispatcher, content_type, std::move(access)) {}
   ~FlatlandTestView() override = default;
 
   // |fuchsia::ui::app::ViewProvider|

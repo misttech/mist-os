@@ -14,9 +14,47 @@
 
 #include <optional>
 
+#include <src/lib/fxl/memory/weak_ptr.h>
+
 namespace ui_testing {
 
-class TestView : public fuchsia::ui::app::ViewProvider, public component_testing::LocalComponent {
+class TestView;
+
+class FlatlandTestView;
+
+// Used to open up access to TestView internals, since LocalComponentImpl (and thus TestView) is not
+// accessible directly to the test fixture.
+class TestViewAccess {
+ public:
+  virtual ~TestViewAccess() = default;
+
+  // Must be called by TestView as soon as practical.
+  virtual void SetTestView(const fxl::WeakPtr<TestView>& view);
+
+  // Check that view access is possible. Since view creation is lazy, access may
+  // not be initially possible for a while.
+  bool HasView() const { return test_view_.get() != nullptr; }
+
+  // Since view component creation may be lazy, check first whether HasView()
+  // returns true before calling this.
+  TestView* view() const {
+    FX_CHECK(test_view_.get() != nullptr) << "Use HasView() here first";
+    return test_view_.get();
+  }
+
+  // Allows access to the view as a Flatland view. Not elegant, but easy to do,
+  // and should be OK for test code.
+  virtual FlatlandTestView* flatland_view() const {
+    FX_CHECK(false) << "Not a flatland view";
+    return nullptr;
+  }
+
+ protected:
+  fxl::WeakPtr<TestView> test_view_{};
+};
+
+class TestView : public fuchsia::ui::app::ViewProvider,
+                 public component_testing::LocalComponentImpl {
  public:
   enum class ContentType {
     // Draws a green rect in the view.
@@ -36,12 +74,20 @@ class TestView : public fuchsia::ui::app::ViewProvider, public component_testing
     COORDINATE_GRID = 1,
   };
 
-  explicit TestView(async_dispatcher_t* dispatcher, ContentType content_type)
-      : dispatcher_(dispatcher), content_type_(content_type) {}
+  TestView(async_dispatcher_t* dispatcher, ContentType content_type,
+           std::weak_ptr<TestViewAccess> access)
+      : dispatcher_(dispatcher),
+        content_type_(content_type),
+        access_(std::move(access)),
+        weak_ptr_factory_(this) {
+    if (auto a = access_.lock()) {
+      a->SetTestView(weak_ptr_factory_.GetWeakPtr());
+    }
+  }
   ~TestView() override = default;
 
-  // |component_testing::LocalComponent|
-  void Start(std::unique_ptr<component_testing::LocalComponentHandles> mock_handles) override;
+  // |component_testing::LocalComponentImpl|
+  void OnStart() override;
 
   const std::optional<fuchsia::ui::views::ViewRef>& view_ref() { return view_ref_; }
   std::optional<zx_koid_t> GetViewRefKoid();
@@ -78,9 +124,10 @@ class TestView : public fuchsia::ui::app::ViewProvider, public component_testing
 
   async_dispatcher_t* dispatcher_ = nullptr;
   std::optional<ContentType> content_type_;
-  std::unique_ptr<component_testing::LocalComponentHandles> mock_handles_;
+  std::weak_ptr<TestViewAccess> access_;
   fidl::BindingSet<fuchsia::ui::app::ViewProvider> view_provider_bindings_;
   std::optional<fuchsia::ui::views::ViewRef> view_ref_;
+  fxl::WeakPtrFactory<TestView> weak_ptr_factory_;  // Keep last.
 };
 
 }  // namespace ui_testing
