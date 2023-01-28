@@ -4,7 +4,7 @@
 
 //! fuchsia.IO UTIL-ity library
 
-use {fidl_fuchsia_io as fio};
+use fidl_fuchsia_io as fio;
 
 pub mod directory;
 pub mod file;
@@ -23,6 +23,16 @@ pub fn canonicalize_path(path: &str) -> &str {
         return &path[1..];
     }
     path
+}
+
+pub trait DefaultForFxbug120673Transition {
+    fn default() -> Self;
+}
+
+impl DefaultForFxbug120673Transition for u32 {
+    fn default() -> Self {
+        0
+    }
 }
 
 #[cfg(test)]
