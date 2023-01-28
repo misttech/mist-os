@@ -70,7 +70,6 @@ group("assembly") {
 assembly_input_bundle("common_bringup") {
   bootfs_files_labels = [
     "//src/bringup:bootfs",
-    "//src/bringup/bin/console:bootfs",
     "//src/bringup/bin/console-launcher:bootfs",
     "//src/bringup/bin/debuglog:bootfs",
     "//src/bringup/bin/dlog:bootfs",
@@ -83,6 +82,7 @@ assembly_input_bundle("common_bringup") {
   ]
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
+    "//src/bringup/bin/console:package",
     "//src/bringup/bin/device-name-provider:package",
     "//src/bringup/bin/miscsvc:package",
     "//src/bringup/bin/netsvc:package",

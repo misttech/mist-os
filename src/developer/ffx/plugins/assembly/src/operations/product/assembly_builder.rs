@@ -456,7 +456,7 @@ impl ImageAssemblyConfigBuilder {
             mut system,
             boot_args,
             mut bootfs_files,
-            bootfs_packages,
+            mut bootfs_packages,
             bootfs_structured_config,
             config_data,
             kernel_path,
@@ -487,9 +487,11 @@ impl ImageAssemblyConfigBuilder {
             // Only process configs that have component entries for structured config.
             if !config.components.is_empty() {
                 // get the manifest for this package name, returning the set from which it was removed
-                if let Some((manifest, source_package_set)) =
-                    remove_package_from_sets(&package, [&mut base, &mut cache, &mut system])
-                        .with_context(|| format!("removing {package} for repackaging"))?
+                if let Some((manifest, source_package_set)) = remove_package_from_sets(
+                    &package,
+                    [&mut base, &mut cache, &mut system, &mut bootfs_packages],
+                )
+                .with_context(|| format!("removing {package} for repackaging"))?
                 {
                     let outdir = outdir.join("repackaged").join(&package);
                     let mut repackager = Repackager::new(manifest, outdir)

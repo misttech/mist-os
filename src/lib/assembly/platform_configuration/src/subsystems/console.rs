@@ -57,7 +57,7 @@ impl DefineSubsystemConfiguration<Vec<String>> for ConsoleSubsystemConfig {
             BASE_CONSOLE_DENIED_TAGS.iter().map(|s| s.to_string()).collect();
 
         builder
-            .bootfs()
+            .package("console")
             .component("meta/console.cm")?
             .field("allowed_log_tags", allowed_log_tags)?
             .field("denied_log_tags", denied_log_tags)?;
