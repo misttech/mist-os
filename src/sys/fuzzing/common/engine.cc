@@ -159,8 +159,7 @@ zx_status_t Engine::RunFuzzer(ComponentContextPtr context, RunnerPtr runner,
     }
   }
   ControllerProviderImpl provider(context->executor());
-  provider.SetRunner(std::move(runner));
-  auto task = provider.Serve(url, context->TakeChannel(0));
+  auto task = provider.Serve(std::move(runner), url, context->TakeChannel(0));
   context->ScheduleTask(std::move(task));
   return context->Run();
 }

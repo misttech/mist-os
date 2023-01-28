@@ -32,18 +32,21 @@ void ControllerProviderImpl::Stop() { controller_.Stop(); }
 ///////////////////////////////////////////////////////////////
 // Run-related methods
 
-void ControllerProviderImpl::SetRunner(RunnerPtr runner) {
+Promise<> ControllerProviderImpl::Serve(RunnerPtr runner, const std::string& url,
+                                        zx::channel channel) {
   FX_CHECK(runner);
-  controller_.SetRunner(std::move(runner));
-}
-
-Promise<> ControllerProviderImpl::Serve(const std::string& url, zx::channel channel) {
   FX_CHECK(channel);
-  registrar_.Bind(std::move(channel));
-  auto provider = binding_.NewBinding();
   Bridge<> bridge;
-  registrar_->Register(url, std::move(provider), bridge.completer.bind());
-  return bridge.consumer.promise_or(fpromise::error());
+  return fpromise::make_promise([this, runner, url = std::string(url), channel = std::move(channel),
+                                 completer = std::move(bridge.completer)]() mutable -> Result<> {
+           auto provider = binding_.NewBinding();
+           controller_.SetRunner(std::move(runner));
+           registrar_.Bind(std::move(channel));
+           registrar_->Register(url, std::move(provider), completer.bind());
+           return fpromise::ok();
+         })
+      .and_then(bridge.consumer.promise_or(fpromise::error()))
+      .wrap_with(scope_);
 }
 
 }  // namespace fuzzing

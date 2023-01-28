@@ -32,17 +32,15 @@ class ControllerProviderImpl final : public ControllerProvider {
   void Connect(fidl::InterfaceRequest<Controller> request, ConnectCallback callback) override;
   void Stop() override;
 
-  // Sets the runner.
-  void SetRunner(RunnerPtr runner);
-
-  // Promises to register with the fuzz-registrar as being able to fulfill requests to connect to
-  // this object's |Controller|. Except for unit tests, callers should prefer |Run|.
-  Promise<> Serve(const std::string& url, zx::channel channel);
+  // Returns a promise to register a controller for the given `runner` under the given `url`, using
+  // the given `channel` to the fuzz-registry.
+  Promise<> Serve(RunnerPtr runner, const std::string& url, zx::channel channel);
 
  private:
   fidl::Binding<ControllerProvider> binding_;
   ControllerImpl controller_;
   RegistrarPtr registrar_;
+  Scope scope_;
 
   FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(ControllerProviderImpl);
 };
