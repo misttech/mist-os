@@ -116,7 +116,7 @@ pub async fn serve_scanning_loop(
     location_sensor_updater: impl ScanResultUpdate,
     mut scan_request_channel: mpsc::Receiver<ApiScanRequest>,
 ) -> Result<(), Error> {
-    let mut queue = queue::RequestQueue::new();
+    let mut queue = queue::RequestQueue::new(telemetry_sender.clone());
     let mut location_sensor_updates = FuturesUnordered::new();
     // Use `Fuse::terminated()` to create an already-terminated future
     // which may be instantiated later.
@@ -139,7 +139,7 @@ pub async fn serve_scanning_loop(
             request = scan_request_channel.next() => {
                 match request {
                     Some(ApiScanRequest::Scan(reason, ssids, channels, responder)) => {
-                        queue.add_request(reason, ssids, channels, responder);
+                        queue.add_request(reason, ssids, channels, responder, zx::Time::get_monotonic());
                         // Check if there's an ongoing scan, otherwise take one from the queue
                         if ongoing_scan.is_terminated() {
                             ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
@@ -162,7 +162,7 @@ pub async fn serve_scanning_loop(
                     );
                 }
                 // Send scan results to requesters
-                queue.handle_completed_sme_scan(completed_sme_request, scan_results);
+                queue.handle_completed_sme_scan(completed_sme_request, scan_results, zx::Time::get_monotonic());
                 // Get the next (if any) request from the queue
                 ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
             },

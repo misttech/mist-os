@@ -4,8 +4,14 @@
 
 use {
     super::ScanReason,
-    crate::client::types::{self, Ssid},
-    fidl_fuchsia_wlan_sme as fidl_sme,
+    crate::{
+        client::types::{self, Ssid},
+        telemetry::{
+            TelemetryEvent::{ScanQueueStatistics, ScanRequestFulfillmentTime},
+            TelemetrySender,
+        },
+    },
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     futures::channel::oneshot,
     lazy_static::lazy_static,
     log::warn,
@@ -20,6 +26,7 @@ struct QueuedRequest {
     ssids: Vec<Ssid>,
     channels: Vec<types::WlanChan>,
     responder: oneshot::Sender<Result<Vec<types::ScanResult>, types::ScanError>>,
+    received_at: zx::Time,
 }
 
 impl QueuedRequest {
@@ -70,11 +77,12 @@ impl QueuedRequest {
 
 pub struct RequestQueue {
     queue: Vec<QueuedRequest>,
+    telemetry_sender: TelemetrySender,
 }
 
 impl RequestQueue {
-    pub fn new() -> Self {
-        Self { queue: vec![] }
+    pub fn new(telemetry_sender: TelemetrySender) -> Self {
+        Self { queue: vec![], telemetry_sender }
     }
 
     /// Adds a new request to the queue
@@ -84,8 +92,10 @@ impl RequestQueue {
         ssids: Vec<Ssid>,
         channels: Vec<types::WlanChan>,
         responder: oneshot::Sender<Result<Vec<types::ScanResult>, types::ScanError>>,
+        current_time: zx::Time,
     ) {
-        self.queue.push(QueuedRequest { reason, ssids, channels, responder })
+        let req = QueuedRequest { reason, ssids, channels, responder, received_at: current_time };
+        self.queue.push(req)
     }
 
     /// Selects the highest priority request in the queue
@@ -123,20 +133,37 @@ impl RequestQueue {
         &mut self,
         sme_request: fidl_sme::ScanRequest,
         result: Result<Vec<types::ScanResult>, types::ScanError>,
+        current_time: zx::Time,
     ) {
+        let initial_queue_len = self.queue.len();
         let mut unfulfilled_requests = vec![];
         // Ideally we'd use `drain_filter` here: https://github.com/rust-lang/rust/issues/43244,
         // but it hasn't yet landed in stable (and doesn't have an ETA to do so).
         for req in self.queue.drain(..) {
             if req.can_be_fulfilled_by(&sme_request) {
+                // Send the results to this requester
                 if let Err(_) = req.responder.send(result.clone()) {
                     warn!("Failed to send scan results to requester, receiving end was dropped. Request reason: {:?}, ssid count: {}, channel count: {}", req.reason, req.ssids.len(), req.channels.len());
                 };
+                // Record metrics about scan request fulfillment time
+                let req_duration = current_time - req.received_at;
+                self.telemetry_sender.send(ScanRequestFulfillmentTime {
+                    duration: req_duration,
+                    reason: req.reason,
+                });
             } else {
                 unfulfilled_requests.push(req)
             }
         }
-        self.queue = unfulfilled_requests
+        self.queue = unfulfilled_requests;
+
+        // Record metrics about queue fulfillment
+        let final_queue_len = self.queue.len();
+        let fulfilled_count = initial_queue_len - final_queue_len;
+        self.telemetry_sender.send(ScanQueueStatistics {
+            fulfilled_requests: fulfilled_count,
+            remaining_requests: final_queue_len,
+        })
     }
 }
 
@@ -144,8 +171,13 @@ impl RequestQueue {
 mod tests {
     use {
         super::*,
-        crate::util::testing::{generate_channel, generate_random_channel, generate_ssid},
+        crate::{
+            telemetry::TelemetryEvent,
+            util::testing::{generate_channel, generate_random_channel, generate_ssid},
+        },
+        futures::channel::mpsc,
         test_case::test_case,
+        wlan_common::assert_variant,
     };
 
     lazy_static! {
@@ -163,16 +195,26 @@ mod tests {
         fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {})
     }
 
+    fn setup_queue() -> (RequestQueue, mpsc::Receiver<TelemetryEvent>) {
+        let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let telemetry_sender = TelemetrySender::new(telemetry_sender);
+        let queue = RequestQueue::new(telemetry_sender);
+        (queue, telemetry_receiver)
+    }
+
     #[fuchsia::test]
     fn add_request() {
-        let mut queue = RequestQueue::new();
+        let (mut queue, _telemetry_receiver) = setup_queue();
 
-        queue.add_request(ScanReason::NetworkSelection, vec![], vec![], oneshot::channel().0);
+        let time = zx::Time::get_monotonic();
+        queue.add_request(ScanReason::NetworkSelection, vec![], vec![], oneshot::channel().0, time);
         assert_eq!(queue.queue.len(), 1);
         assert_eq!(queue.queue[0].reason, ScanReason::NetworkSelection);
         assert_eq!(queue.queue[0].ssids, Vec::<Ssid>::new());
         assert_eq!(queue.queue[0].channels, Vec::<types::WlanChan>::new());
+        assert_eq!(queue.queue[0].received_at, time);
 
+        let time = zx::Time::get_monotonic();
         let ssids = vec![generate_ssid("foo"), generate_ssid("bar")];
         let channels = vec![types::WlanChan::new(3, types::Cbw::Cbw20)];
         queue.add_request(
@@ -180,28 +222,32 @@ mod tests {
             ssids.clone(),
             channels.clone(),
             oneshot::channel().0,
+            time,
         );
         assert_eq!(queue.queue.len(), 2);
         assert_eq!(queue.queue[1].reason, ScanReason::BssSelectionAugmentation);
         assert_eq!(queue.queue[1].ssids, ssids.clone());
         assert_eq!(queue.queue[1].channels, channels.clone());
+        assert_eq!(queue.queue[1].received_at, time);
     }
 
     #[fuchsia::test]
     fn highest_priority_request_is_first_request_in_queue() {
-        let mut queue = RequestQueue::new();
+        let (mut queue, _telemetry_receiver) = setup_queue();
         queue.queue = vec![
             QueuedRequest {
                 reason: ScanReason::BssSelectionAugmentation,
                 ssids: vec![generate_ssid("foo"), generate_ssid("bar")],
                 channels: vec![generate_random_channel(), generate_random_channel()],
                 responder: oneshot::channel().0,
+                received_at: zx::Time::ZERO,
             },
             QueuedRequest {
                 reason: ScanReason::NetworkSelection,
                 ssids: vec![],
                 channels: vec![generate_random_channel()],
                 responder: oneshot::channel().0,
+                received_at: zx::Time::ZERO,
             },
         ];
 
@@ -224,7 +270,7 @@ mod tests {
         channels: Vec<types::WlanChan>,
         expected_sme_request: fidl_sme::ScanRequest,
     ) {
-        let queue = RequestQueue::new();
+        let (queue, _telemetry_receiver) = setup_queue();
         let req = queue.generate_combined_sme_request((ssids, channels));
         assert_eq!(req, expected_sme_request);
     }
@@ -233,7 +279,7 @@ mod tests {
     fn get_next_sme_request_trivial_test() {
         // A trivial test of get_next_sme_request(), since its functionality is fully tested
         // by tests for select_highest_priority_request() and generate_combined_sme_request()
-        let queue = RequestQueue::new();
+        let (queue, _telemetry_receiver) = setup_queue();
         assert_eq!(queue.get_next_sme_request(), None);
     }
 
@@ -256,12 +302,14 @@ mod tests {
             ssids: vec![],
             channels: vec![],
             responder: oneshot::channel().0,
+            received_at: zx::Time::ZERO,
         };
         let req_with_only_wildcard_ssid = QueuedRequest {
             reason: ScanReason::BssSelectionAugmentation,
             ssids: vec![WILDCARD_SSID.clone()],
             channels: vec![],
             responder: oneshot::channel().0,
+            received_at: zx::Time::ZERO,
         };
 
         assert_eq!(matches, req_without_ssids.ssids_match(&sme_request));
@@ -288,6 +336,7 @@ mod tests {
             ssids: vec![generate_ssid("foo"), generate_ssid(&WILDCARD_STR)],
             channels: vec![],
             responder: oneshot::channel().0,
+            received_at: zx::Time::ZERO,
         };
 
         assert_eq!(matches, req_with_ssids.ssids_match(&sme_request));
@@ -310,6 +359,7 @@ mod tests {
             ssids: vec![generate_ssid("foo"), generate_ssid(&WILDCARD_STR)],
             channels: req_channels.iter().map(|c| generate_channel(*c)).collect(),
             responder: oneshot::channel().0,
+            received_at: zx::Time::ZERO,
         };
 
         assert_eq!(matches, req.channels_match(&sme_request));
@@ -317,6 +367,7 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_completed_sme_scan() {
+        let initial_time = zx::Time::from_nanos(123);
         let sme_req = passive_sme_req();
 
         // Generate two requests, one which matches the passive sme_req and one which doesn't
@@ -326,6 +377,7 @@ mod tests {
             ssids: vec![],
             channels: vec![],
             responder: matching_sender,
+            received_at: initial_time,
         };
         let (non_matching_sender, mut non_matching_receiver) = oneshot::channel();
         let non_matching_req = QueuedRequest {
@@ -333,16 +385,42 @@ mod tests {
             ssids: vec![generate_ssid("foo")],
             channels: vec![],
             responder: non_matching_sender,
+            received_at: zx::Time::get_monotonic(), // this value is unused, so set it "randomly"
         };
 
-        let mut queue = RequestQueue::new();
+        // Set up the queue
+        let (mut queue, mut telemetry_receiver) = setup_queue();
         queue.queue.push(matching_req);
         queue.queue.push(non_matching_req);
 
-        let scan_results = Err(types::ScanError::GeneralError);
-        queue.handle_completed_sme_scan(sme_req, scan_results.clone());
+        // Advance mock time
+        let scan_duration = zx::Duration::from_seconds(6);
 
+        let scan_results = Err(types::ScanError::GeneralError);
+        queue.handle_completed_sme_scan(
+            sme_req,
+            scan_results.clone(),
+            initial_time + scan_duration,
+        );
+
+        // Check the results were sent to the matching request
         assert_eq!(matching_receiver.try_recv(), Ok(Some(scan_results)));
         assert_eq!(non_matching_receiver.try_recv(), Ok(None));
+        // The matching request was removed from the queue
+        assert_eq!(queue.queue.len(), 1);
+        // The request fulfillment time was recorded
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, ScanRequestFulfillmentTime {
+                duration,
+                reason: ScanReason::BssSelectionAugmentation
+            } => assert_eq!(duration, scan_duration));
+        });
+        // The request fulfillment count was recorded
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, ScanQueueStatistics {
+                fulfilled_requests: 1,
+                remaining_requests: 1,
+            });
+        });
     }
 }

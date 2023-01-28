@@ -246,6 +246,16 @@ pub enum TelemetryEvent {
     ScanDefect(ScanIssue),
     /// Notify telemetry that the AP failed to start.
     ApStartFailure,
+    /// Record scan fulfillment time
+    ScanRequestFulfillmentTime {
+        duration: zx::Duration,
+        reason: client::scan::ScanReason,
+    },
+    /// Record scan queue length upon scan completion
+    ScanQueueStatistics {
+        fulfilled_requests: usize,
+        remaining_requests: usize,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -1184,6 +1194,14 @@ impl Telemetry {
             }
             TelemetryEvent::ApStartFailure => {
                 self.stats_logger.log_ap_start_failure().await;
+            }
+            TelemetryEvent::ScanRequestFulfillmentTime { duration, reason } => {
+                self.stats_logger.log_scan_request_fulfillment_time(duration, reason).await;
+            }
+            TelemetryEvent::ScanQueueStatistics { fulfilled_requests, remaining_requests } => {
+                self.stats_logger
+                    .log_scan_queue_statistics(fulfilled_requests, remaining_requests)
+                    .await;
             }
         }
     }
@@ -2598,6 +2616,89 @@ impl StatsLogger {
             metrics::AP_START_FAILURE_METRIC_ID,
             1,
             &[]
+        )
+    }
+
+    async fn log_scan_request_fulfillment_time(
+        &mut self,
+        duration: zx::Duration,
+        reason: client::scan::ScanReason,
+    ) {
+        let fulfillment_time_dim = {
+            use metrics::ConnectivityWlanMetricDimensionScanFulfillmentTime::*;
+            match duration.into_millis() {
+                ..=0_000 => Unknown,
+                1..=1_000 => LessThanOneSecond,
+                1_001..=2_000 => LessThanTwoSeconds,
+                2_001..=3_000 => LessThanThreeSeconds,
+                3_001..=5_000 => LessThanFiveSeconds,
+                5_001..=8_000 => LessThanEightSeconds,
+                8_001..=13_000 => LessThanThirteenSeconds,
+                13_001..=21_000 => LessThanTwentyOneSeconds,
+                21_001..=34_000 => LessThanThirtyFourSeconds,
+                34_001..=55_000 => LessThanFiftyFiveSeconds,
+                55_001.. => MoreThanFiftyFiveSeconds,
+            }
+        };
+        let reason_dim = {
+            use client::scan::ScanReason;
+            use metrics::ConnectivityWlanMetricDimensionScanReason::*;
+            match reason {
+                ScanReason::ClientRequest => ClientRequest,
+                ScanReason::NetworkSelection => NetworkSelection,
+                ScanReason::BssSelection => BssSelection,
+                ScanReason::BssSelectionAugmentation => BssSelectionAugmentation,
+            }
+        };
+        log_cobalt_1dot1!(
+            self.cobalt_1dot1_proxy,
+            log_occurrence,
+            metrics::SUCCESSFUL_SCAN_REQUEST_FULFILLMENT_TIME_METRIC_ID,
+            1,
+            &[fulfillment_time_dim as u32, reason_dim as u32],
+        )
+    }
+
+    async fn log_scan_queue_statistics(
+        &mut self,
+        fulfilled_requests: usize,
+        remaining_requests: usize,
+    ) {
+        let fulfilled_requests_dim = {
+            use metrics::ConnectivityWlanMetricDimensionScanRequestsFulfilled::*;
+            match fulfilled_requests {
+                0 => Zero,
+                1 => One,
+                2 => Two,
+                3 => Three,
+                4 => Four,
+                5..=9 => FiveToNine,
+                10.. => TenOrMore,
+                // `usize` does not have a fixed maximum, so `_` is necessary to match exhaustively
+                _ => Unknown,
+            }
+        };
+        let remaining_requests_dim = {
+            use metrics::ConnectivityWlanMetricDimensionScanRequestsRemaining::*;
+            match remaining_requests {
+                0 => Zero,
+                1 => One,
+                2 => Two,
+                3 => Three,
+                4 => Four,
+                5..=9 => FiveToNine,
+                10..=14 => TenToFourteen,
+                15.. => FifteenOrMore,
+                // `usize` does not have a fixed maximum, so `_` is necessary to match exhaustively
+                _ => Unknown,
+            }
+        };
+        log_cobalt_1dot1!(
+            self.cobalt_1dot1_proxy,
+            log_occurrence,
+            metrics::SCAN_QUEUE_STATISTICS_AFTER_COMPLETED_SCAN_METRIC_ID,
+            1,
+            &[fulfilled_requests_dim as u32, remaining_requests_dim as u32],
         )
     }
 
@@ -6087,6 +6188,61 @@ mod tests {
         test_helper.drain_cobalt_events(&mut test_fut);
         let logged_metrics = test_helper.get_logged_metrics(metrics::AP_START_FAILURE_METRIC_ID);
         assert_eq!(logged_metrics.len(), 1);
+    }
+
+    #[fuchsia::test]
+    fn test_log_scan_request_fulfillment_time() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send a scan fulfillment duration
+        let duration = zx::Duration::from_seconds(15);
+        test_helper.telemetry_sender.send(TelemetryEvent::ScanRequestFulfillmentTime {
+            duration: duration,
+            reason: client::scan::ScanReason::ClientRequest,
+        });
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Expect that Cobalt has been notified of the scan fulfillment metric
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics = test_helper
+            .get_logged_metrics(metrics::SUCCESSFUL_SCAN_REQUEST_FULFILLMENT_TIME_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![
+                metrics::ConnectivityWlanMetricDimensionScanFulfillmentTime::LessThanTwentyOneSeconds as u32,
+                metrics::ConnectivityWlanMetricDimensionScanReason::ClientRequest as u32
+            ]
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_log_scan_queue_statistics() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send a scan queue report
+        test_helper.telemetry_sender.send(TelemetryEvent::ScanQueueStatistics {
+            fulfilled_requests: 4,
+            remaining_requests: 12,
+        });
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Expect that Cobalt has been notified of the scan queue metrics
+        test_helper.drain_cobalt_events(&mut test_fut);
+        let logged_metrics = test_helper
+            .get_logged_metrics(metrics::SCAN_QUEUE_STATISTICS_AFTER_COMPLETED_SCAN_METRIC_ID);
+        assert_eq!(logged_metrics.len(), 1);
+        assert_eq!(
+            logged_metrics[0].event_codes,
+            vec![
+                metrics::ConnectivityWlanMetricDimensionScanRequestsFulfilled::Four as u32,
+                metrics::ConnectivityWlanMetricDimensionScanRequestsRemaining::TenToFourteen as u32
+            ]
+        );
     }
 
     struct TestHelper {
