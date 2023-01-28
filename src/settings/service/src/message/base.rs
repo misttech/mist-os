@@ -62,15 +62,6 @@ pub enum MessageEvent {
     Status(Status),
 }
 
-/// This mod contains the default type definitions for the MessageHub's type
-/// parameters when not specified.
-pub mod default {
-    /// `Address` provides a [`Address`] definition for message hubs not needing
-    /// an address.
-    #[derive(PartialEq, Copy, Clone, Debug, Eq, Hash)]
-    pub enum Address {}
-}
-
 #[derive(Error, Debug, Clone)]
 pub enum MessageError {
     #[error("Address conflig:{address:?} already exists")]
