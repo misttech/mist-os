@@ -43,4 +43,10 @@ CLOSED_SERVER_TEST(ReceiveOneWayNoPayloadFromPeerClosedChannel) {
   WAIT_UNTIL([this] { return reporter().received_one_way_no_payload(); });
 }
 
+CLOSED_SERVER_TEST(ServerTearsDownWhenPeerClosed) {
+  client_end().reset();
+  WAIT_UNTIL([this] { return reporter().teardown_reason().has_value(); });
+  EXPECT_TEARDOWN_REASON(fidl_serversuite::TeardownReason::kChannelPeerClosed);
+}
+
 }  // namespace server_suite

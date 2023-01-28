@@ -211,6 +211,10 @@ func (*runnerImpl) IsTestEnabled(_ fidl.Context, test serversuite.Test) (bool, e
 			// TODO(fxbug.dev/99738): Go bindings should reject V1 wire format.
 			return false
 
+		case serversuite.TestServerTearsDownWhenPeerClosed:
+			// TODO(fxbug.dev/120781): Report PEER_CLOSED through WillTeardown.
+			return false
+
 		case serversuite.TestEventSendingDoNotReportPeerClosed, serversuite.TestReplySendingDoNotReportPeerClosed:
 			// TODO(fxbug.dev/113160): Peer-closed errors should be
 			// hidden from one-way calls.
