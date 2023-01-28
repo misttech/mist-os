@@ -1165,6 +1165,285 @@ TEST_F(FlatlandTouchIntegrationTest, ChildCreatedUsingCreateView_DoesNotGetInput
   EXPECT_EQ(parent_events.size(), 1u);
 }
 
+// Creates a view tree of the form
+// root_view
+//    |
+// parent_view
+//    |
+// child_view
+// Parent and child each have a view ref, and the parent positions its hit region and its child like
+// so:
+// ------------------------------------
+// |                |                 |
+// |       A        |        B        |
+// |                |                 |
+// |----------------------------------|
+// |                |                 |
+// |       C        |        D        |
+// |                |                 |
+// |----------------------------------|
+// where parent view occupies A, B, C, D,
+// and child view occupies A and C (the left-side half of the parent view),
+// and the parent view positions a hit region over C and D, which *covers* the child view.
+//
+// The hit tests expected are:
+// - hit test in A should reach the child, due to the default hit region for the child.
+// - hit test in B should reach the parent, due to the default hit region for the parent.
+// - hit test in C and D should reach the parent, due to the parent's explicit hit region.
+TEST_F(FlatlandTouchIntegrationTest, SetHitRegion_CapturesTouch) {
+  fuchsia::ui::composition::FlatlandPtr parent_session;
+  fuchsia::ui::pointer::TouchSourcePtr parent_touch_source;
+  parent_touch_source.set_error_handler([](zx_status_t status) {
+    FAIL("Parent touch source closed with status: %s", zx_status_get_string(status));
+  });
+
+  // Create the parent view and attach it to |root_session_|. Register for input events.
+  {
+    auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
+    parent_session = realm_->Connect<fuchsia::ui::composition::Flatland>();
+
+    ViewBoundProtocols protocols;
+    protocols.set_touch_source(parent_touch_source.NewRequest());
+    auto identity = scenic::NewViewIdentityOnCreation();
+    auto parent_view_ref = fidl::Clone(identity.view_ref);
+
+    TransformId kTransformId = {.value = 2};
+    ConnectChildView(root_session_, std::move(parent_token), FullscreenSize(), kTransformId,
+                     kRootContentId);
+
+    fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
+    parent_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
+                                parent_viewport_watcher.NewRequest());
+    parent_session->CreateTransform(kRootTransform);
+    parent_session->SetRootTransform(kRootTransform);
+
+    BlockingPresent(parent_session);
+    RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(parent_view_ref),
+                     DispatchPolicy::TOP_HIT_AND_ANCESTORS_IN_TARGET);
+  }
+
+  fuchsia::ui::composition::FlatlandPtr child_session;
+  fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
+  child_touch_source.set_error_handler([](zx_status_t status) {
+    FAIL("Child touch source closed with status: %s", zx_status_get_string(status));
+  });
+
+  // Create the child view and attach it to the |parent_session|. Register for input events.
+  {
+    auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
+    child_session = realm_->Connect<fuchsia::ui::composition::Flatland>();
+
+    ViewBoundProtocols protocols;
+    protocols.set_touch_source(child_touch_source.NewRequest());
+    auto identity = scenic::NewViewIdentityOnCreation();
+    auto parent_view_ref = fidl::Clone(identity.view_ref);
+
+    TransformId kTransformId = {.value = 2};
+    const fuchsia::math::SizeU kHalfWidthViewSize = {static_cast<uint32_t>(display_width_ / 2),
+                                                     static_cast<uint32_t>(display_height_)};
+    ConnectChildView(parent_session, std::move(parent_token), kHalfWidthViewSize, kTransformId,
+                     kRootContentId);
+
+    fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
+    child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
+                               parent_viewport_watcher.NewRequest());
+    child_session->CreateTransform(kRootTransform);
+    child_session->SetRootTransform(kRootTransform);
+
+    BlockingPresent(child_session);
+  }
+
+  // Finally, parent view adds its hit region on top of the child view.
+  {
+    TransformId kTransformId = {.value = 3};
+    parent_session->CreateTransform(kTransformId);
+    fuchsia::math::RectF region = {
+        .x = 0, .y = display_height_ / 2, .width = display_width_, .height = display_height_ / 2};
+    parent_session->SetHitRegions(kTransformId, {{.region = region}});
+    parent_session->AddChild(kRootTransform, kTransformId);
+    BlockingPresent(parent_session);
+  }
+
+  // Listen for input events.
+  std::vector<TouchEvent> parent_events;
+  StartWatchLoop(parent_touch_source, parent_events);
+  std::vector<TouchEvent> child_events;
+  StartWatchLoop(child_touch_source, child_events);
+
+  const float x_1q = display_width_ * 1 / 4;
+  const float x_3q = display_width_ * 3 / 4;
+  const float y_1q = display_height_ * 1 / 4;
+  const float y_3q = display_height_ * 3 / 4;
+
+  Inject(x_1q, y_1q, fupi_EventPhase::ADD);     // quadrant A
+  Inject(x_1q, y_1q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
+  RunLoopUntilIdle();
+  // One tap, both parent and child get two coordinate samples, plus a final interaction result that
+  // occurs only on gesture competition. We ignore the interaction result, as this test focuses on
+  // coordinates.
+  ASSERT_EQ(parent_events.size(), 3u);
+  ASSERT_EQ(child_events.size(), 3u);
+  {
+    const auto& vtvt = child_events[0].view_parameters().viewport_to_view_transform;
+    // Child view has half width of display. Pointer event is in middle of that view.
+    const float child_x = display_width_ / 4;
+    EXPECT_EQ_POINTER(child_events[0].pointer_sample(), vtvt, EventPhase::ADD, child_x, y_1q);
+  }
+
+  Inject(x_3q, y_1q, fupi_EventPhase::ADD);     // quadrant B
+  Inject(x_3q, y_1q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
+  RunLoopUntilIdle();
+  // Another tap, two more samples to just the parent. No competition, so the interaction result is
+  // immediate and dispatched with the samples.
+  ASSERT_EQ(parent_events.size(), 5u);
+  ASSERT_EQ(child_events.size(), 3u);
+  {
+    const auto& vtvt = parent_events[0].view_parameters().viewport_to_view_transform;
+    EXPECT_EQ_POINTER(parent_events[3].pointer_sample(), vtvt, EventPhase::ADD, x_3q, y_1q);
+  }
+
+  Inject(x_1q, y_3q, fupi_EventPhase::ADD);     // quadrant C
+  Inject(x_1q, y_3q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
+  Inject(x_3q, y_3q, fupi_EventPhase::ADD);     // quadrant D
+  Inject(x_3q, y_3q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
+  RunLoopUntilIdle();
+  // Two more taps, each with two samples: four more samples to just the parent. No competition, so
+  // the interaction result is immediate and dispatched with the samples.
+  ASSERT_EQ(parent_events.size(), 9u);
+  ASSERT_EQ(child_events.size(), 3u);
+  {
+    const auto& vtvt = parent_events[0].view_parameters().viewport_to_view_transform;
+    EXPECT_EQ_POINTER(parent_events[5].pointer_sample(), vtvt, EventPhase::ADD, x_1q, y_3q);
+    EXPECT_EQ_POINTER(parent_events[7].pointer_sample(), vtvt, EventPhase::ADD, x_3q, y_3q);
+  }
+}
+
+// Creates a view tree of the form
+// root_view
+//    |
+// parent_view
+//    |
+// child_view
+// Parent and child each have a view ref, and the parent positions its hit region and its child like
+// so:
+// ------------------------------------
+// |                |                 |
+// |       A        |        B        |
+// |                |                 |
+// |----------------------------------|
+// |                |                 |
+// |       C        |        D        |
+// |                |                 |
+// |----------------------------------|
+// where parent view occupies A, B, C, D,
+// and child view occupies A and C (the left-side half of the parent view),
+// and the parent view positions an infinite hit region that *covers* the child view.
+//
+// Then a hit test in every sector (A, B, C, D) should reach the parent.
+TEST_F(FlatlandTouchIntegrationTest, InfiniteHitRegion_CapturesTouch) {
+  fuchsia::ui::composition::FlatlandPtr parent_session;
+  fuchsia::ui::pointer::TouchSourcePtr parent_touch_source;
+  parent_touch_source.set_error_handler([](zx_status_t status) {
+    FAIL("Parent touch source closed with status: %s", zx_status_get_string(status));
+  });
+
+  // Create the parent view and attach it to |root_session_|. Register for input events.
+  {
+    auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
+    parent_session = realm_->Connect<fuchsia::ui::composition::Flatland>();
+
+    ViewBoundProtocols protocols;
+    protocols.set_touch_source(parent_touch_source.NewRequest());
+    auto identity = scenic::NewViewIdentityOnCreation();
+    auto parent_view_ref = fidl::Clone(identity.view_ref);
+
+    TransformId kTransformId = {.value = 2};
+    ConnectChildView(root_session_, std::move(parent_token), FullscreenSize(), kTransformId,
+                     kRootContentId);
+
+    fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
+    parent_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
+                                parent_viewport_watcher.NewRequest());
+    parent_session->CreateTransform(kRootTransform);
+    parent_session->SetRootTransform(kRootTransform);
+
+    BlockingPresent(parent_session);
+    RegisterInjector(fidl::Clone(root_view_ref_), fidl::Clone(parent_view_ref),
+                     DispatchPolicy::TOP_HIT_AND_ANCESTORS_IN_TARGET);
+  }
+
+  fuchsia::ui::composition::FlatlandPtr child_session;
+  fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
+  child_touch_source.set_error_handler([](zx_status_t status) {
+    FAIL("Child touch source closed with status: %s", zx_status_get_string(status));
+  });
+
+  // Create the child view and attach it to the |parent_session|. Register for input events.
+  {
+    auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
+    child_session = realm_->Connect<fuchsia::ui::composition::Flatland>();
+
+    ViewBoundProtocols protocols;
+    protocols.set_touch_source(child_touch_source.NewRequest());
+    auto identity = scenic::NewViewIdentityOnCreation();
+    auto parent_view_ref = fidl::Clone(identity.view_ref);
+
+    TransformId kTransformId = {.value = 2};
+    const fuchsia::math::SizeU kHalfWidthViewSize = {static_cast<uint32_t>(display_width_ / 2),
+                                                     static_cast<uint32_t>(display_height_)};
+    ConnectChildView(parent_session, std::move(parent_token), kHalfWidthViewSize, kTransformId,
+                     kRootContentId);
+
+    fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
+    child_session->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
+                               parent_viewport_watcher.NewRequest());
+    child_session->CreateTransform(kRootTransform);
+    child_session->SetRootTransform(kRootTransform);
+
+    BlockingPresent(child_session);
+  }
+
+  // Finally, parent view adds its infinite hit region on top of the child view.
+  {
+    TransformId kTransformId = {.value = 3};
+    parent_session->CreateTransform(kTransformId);
+    parent_session->SetInfiniteHitRegion(kTransformId,
+                                         fuchsia::ui::composition::HitTestInteraction::DEFAULT);
+    parent_session->AddChild(kRootTransform, kTransformId);
+    BlockingPresent(parent_session);
+  }
+
+  // Listen for input events.
+  std::vector<TouchEvent> parent_events;
+  StartWatchLoop(parent_touch_source, parent_events);
+  std::vector<TouchEvent> child_events;
+  StartWatchLoop(child_touch_source, child_events);
+
+  const float x_1q = display_width_ * 1 / 4;
+  const float x_3q = display_width_ * 3 / 4;
+  const float y_1q = display_height_ * 1 / 4;
+  const float y_3q = display_height_ * 3 / 4;
+
+  Inject(x_1q, y_1q, fupi_EventPhase::ADD);     // quadrant A
+  Inject(x_1q, y_1q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
+  Inject(x_3q, y_1q, fupi_EventPhase::ADD);     // quadrant B
+  Inject(x_3q, y_1q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
+  Inject(x_1q, y_3q, fupi_EventPhase::ADD);     // quadrant C
+  Inject(x_1q, y_3q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
+  Inject(x_3q, y_3q, fupi_EventPhase::ADD);     // quadrant D
+  Inject(x_3q, y_3q, fupi_EventPhase::REMOVE);  // ends pointer state machine cleanly
+  RunLoopUntilIdle();
+  ASSERT_EQ(parent_events.size(), 8u);  // No competition with child, so the interaction result is
+  ASSERT_EQ(child_events.size(), 0u);   // immediate and dispatched with the samples.
+  {
+    const auto& vtvt = parent_events[0].view_parameters().viewport_to_view_transform;
+    EXPECT_EQ_POINTER(parent_events[0].pointer_sample(), vtvt, EventPhase::ADD, x_1q, y_1q);
+    EXPECT_EQ_POINTER(parent_events[2].pointer_sample(), vtvt, EventPhase::ADD, x_3q, y_1q);
+    EXPECT_EQ_POINTER(parent_events[4].pointer_sample(), vtvt, EventPhase::ADD, x_1q, y_3q);
+    EXPECT_EQ_POINTER(parent_events[6].pointer_sample(), vtvt, EventPhase::ADD, x_3q, y_3q);
+  }
+}
+
 TEST_F(FlatlandTouchIntegrationTest, ExclusiveMode_TargetDisconnectedMidStream_ShouldCancelStream) {
   fuchsia::ui::composition::FlatlandPtr child_session;
   fuchsia::ui::pointer::TouchSourcePtr child_touch_source;
