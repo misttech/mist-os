@@ -60,7 +60,7 @@ TEST_F(BasemgrImplTest, StartsSessionWithConfig) {
   RunLoopUntil([&]() { return did_read_config; });
   loop().JoinThreads();
 
-  basemgr_impl_->Terminate();
+  basemgr_impl_->Stop();
   RunLoopUntil([&]() { return did_shut_down_; });
 }
 
@@ -90,7 +90,7 @@ TEST_F(BasemgrImplTest, LaunchSessionmgrFailsGivenUnreadableBuffer) {
   RunLoopUntil([&] { return error_handler_called; });
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, error_status);
 
-  basemgr_impl_->Terminate();
+  basemgr_impl_->Stop();
   RunLoopUntil([&]() { return did_shut_down_; });
 }
 
@@ -119,7 +119,7 @@ TEST_F(BasemgrImplTest, LaunchSessionmgrFailsGivenInvalidConfigJson) {
   RunLoopUntil([&] { return error_handler_called; });
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, error_status);
 
-  basemgr_impl_->Terminate();
+  basemgr_impl_->Stop();
   RunLoopUntil([&]() { return did_shut_down_; });
 }
 
@@ -147,7 +147,7 @@ TEST_F(BasemgrImplTest, LaunchSessionmgrReplacesExistingSession) {
 
   RunLoopUntil([&] { return sessionmgr.component()->launch_count() == 2; });
 
-  basemgr_impl_->Terminate();
+  basemgr_impl_->Stop();
   RunLoopUntil([&]() { return did_shut_down_; });
 }
 
@@ -175,7 +175,7 @@ TEST_F(BasemgrImplTest, WaitsForSessionmgrShutdown) {
 
   RunLoopUntil([&] { return sessionmgr.component()->launch_count() == 2; });
 
-  basemgr_impl_->Terminate();
+  basemgr_impl_->Stop();
   RunLoopUntil([&]() { return did_shut_down_sessionmgr; });
   // basemgr should not shut down until sessionmgr's component has actually
   // terminated.

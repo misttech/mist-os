@@ -95,8 +95,6 @@ BasemgrImpl::BasemgrImpl(modular::ModularConfigAccessor config_accessor,
       executor_(async_get_default_dispatcher()),
       use_flatland_(use_flatland),
       weak_factory_(this) {
-  outgoing_services_->AddPublicService<fuchsia::modular::Lifecycle>(
-      lifecycle_bindings_.GetHandler(this));
   outgoing_services_->AddPublicService(process_lifecycle_bindings_.GetHandler(this),
                                        "fuchsia.process.lifecycle.Lifecycle");
   outgoing_services_->AddPublicService(GetLauncherHandler(),
@@ -129,7 +127,7 @@ void BasemgrImpl::Start() {
   }
 }
 
-void BasemgrImpl::Shutdown() {
+void BasemgrImpl::Stop() {
   FX_LOGS(INFO) << "Shutting down basemgr.";
 
   // Prevent the shutdown sequence from running twice.
@@ -150,10 +148,6 @@ void BasemgrImpl::Shutdown() {
   auto shutdown = teardown_session_provider().and_then([this] { on_shutdown_(); });
   executor_.schedule_task(std::move(shutdown));
 }
-
-void BasemgrImpl::Terminate() { Shutdown(); }
-
-void BasemgrImpl::Stop() { Shutdown(); }
 
 void BasemgrImpl::CreateSessionProvider(const ModularConfigAccessor* const config_accessor) {
   FX_DCHECK(!session_provider_.get());

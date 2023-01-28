@@ -42,8 +42,7 @@ class LauncherImpl;
 // It has several high-level responsibilities:
 // 1) Initializes and owns the system's root view and presentation.
 // 2) Manages the lifecycle of sessions, represented as |sessionmgr| processes.
-class BasemgrImpl : public fuchsia::modular::Lifecycle,
-                    public fuchsia::process::lifecycle::Lifecycle {
+class BasemgrImpl : public fuchsia::process::lifecycle::Lifecycle {
  public:
   using SceneOwnerPtr =
       std::variant<fuchsia::ui::policy::PresenterPtr, fuchsia::session::scene::ManagerPtr>;
@@ -87,9 +86,6 @@ class BasemgrImpl : public fuchsia::modular::Lifecycle,
   // Starts a session using the configuration read from |config_accessor_|.
   void Start();
 
-  // |fuchsia::modular::Lifecycle|
-  void Terminate() override;
-
   // |fuchsia::process::lifecycle::Lifecycle|
   void Stop() override;
 
@@ -105,9 +101,6 @@ class BasemgrImpl : public fuchsia::modular::Lifecycle,
 
  private:
   using StartSessionResult = fpromise::result<void, zx_status_t>;
-
-  // Shuts down the session and session launcher component, if any are running.
-  void Shutdown();
 
   void RestartSession(fit::closure on_restart_complete);
 
@@ -158,7 +151,6 @@ class BasemgrImpl : public fuchsia::modular::Lifecycle,
   fit::function<void()> on_shutdown_;
 
   LauncherBindingSet session_launcher_bindings_;
-  fidl::BindingSet<fuchsia::modular::Lifecycle> lifecycle_bindings_;
   fidl::BindingSet<fuchsia::process::lifecycle::Lifecycle> process_lifecycle_bindings_;
 
   AsyncHolder<SessionProvider> session_provider_;

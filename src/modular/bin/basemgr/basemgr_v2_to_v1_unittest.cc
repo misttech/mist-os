@@ -59,7 +59,7 @@ TEST_F(BasemgrV2ToV1Test, EchoServerIsUsed) {
     FX_PLOGS(FATAL, status) << "FIDL request failed";
   }
 
-  basemgr_impl_->Terminate();
+  basemgr_impl_->Stop();
   RunLoopUntil([&]() { return did_shut_down_; });
 }
 

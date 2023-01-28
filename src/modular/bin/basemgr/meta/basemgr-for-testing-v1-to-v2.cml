@@ -17,8 +17,8 @@
         {
             protocol: [
                 "fuchsia.examples.Echo",
-                "fuchsia.modular.Lifecycle",
                 "fuchsia.modular.PuppetMaster",
+                "fuchsia.process.lifecycle.Lifecycle",
             ],
             from: "self",
         },

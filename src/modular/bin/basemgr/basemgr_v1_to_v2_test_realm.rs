@@ -5,7 +5,8 @@ use {
     anyhow::{Context as _, Error},
     component_events::{events::*, matcher::*},
     fidl::endpoints::ServerEnd,
-    fidl_fuchsia_io as fio, fidl_fuchsia_modular as modular, fidl_fuchsia_sys as fsys,
+    fidl_fuchsia_io as fio, fidl_fuchsia_modular as modular,
+    fidl_fuchsia_process_lifecycle as lifecycle, fidl_fuchsia_sys as fsys,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -138,7 +139,7 @@ async fn basemgr_v1_to_v2_test() -> Result<(), Error> {
             Route::new()
                 .capability(Capability::protocol::<fidl_fuchsia_examples::EchoMarker>())
                 .capability(Capability::protocol::<modular::PuppetMasterMarker>())
-                .capability(Capability::protocol::<modular::LifecycleMarker>())
+                .capability(Capability::protocol_by_name("fuchsia.process.lifecycle.Lifecycle"))
                 .from(&basemgr)
                 .to(&child_using_v1_services),
         )
@@ -170,7 +171,7 @@ async fn basemgr_v1_to_v2_test() -> Result<(), Error> {
     let _realm_instance = builder.build().await?;
 
     // After `child_using_v1_services` invokes the v1 services successfully, it
-    // then calls `terminate()` on basemgr (via the `modular::Lifecycle`
+    // then calls `stop()` on basemgr (via the `process::lifecycle::Lifecycle`
     // protocol). Wait for basemgr's `Stopped` event, and exit this test.
     info!("awaiting basemgr Stopped event");
     EventMatcher::ok()
@@ -201,10 +202,12 @@ async fn child_using_v1_services(handles: LocalComponentHandles) -> Result<(), E
 
     // Success! Tell basemgr to terminate, which should generate the `Stopped`
     // event needed to exit this test.
-    let modular_lifecycle: modular::LifecycleProxy = handles
-        .connect_to_protocol::<modular::LifecycleMarker>()
+    let lifecycle: lifecycle::LifecycleProxy = handles
+        .connect_to_named_protocol::<lifecycle::LifecycleMarker>(
+            "fuchsia.process.lifecycle.Lifecycle",
+        )
         .context("Failed to connect to Lifecycle service")?;
-    modular_lifecycle.terminate()?;
+    lifecycle.stop()?;
 
     Ok(())
 }
