@@ -708,7 +708,7 @@ impl FileObject {
                 &waiter,
                 events,
                 WaitCallback::none(),
-                WaitAsyncOptions::empty(),
+                WaitAsyncOptions::EDGE_TRIGGERED,
             );
             let result = op();
             if !is_partial(&result) {
