@@ -101,6 +101,10 @@ pub struct MetricConfig {
     /// the specified metric only once, the first time
     /// it becomes available to the sampler.
     pub upload_once: Option<bool>,
+    /// Optional project id. When present this project id will be used instead of the top-level
+    /// project id.
+    // TODO(fxbug.dev/120759): remove this when we support batching.
+    pub project_id: Option<u32>,
 }
 
 /// Configuration for a single FIRE metric template to map from an Inspect property
@@ -129,6 +133,10 @@ struct MetricTemplate {
     /// the specified metric only once, the first time
     /// it becomes available to the sampler.
     upload_once: Option<bool>,
+    /// Optional project id. When present this project id will be used instead of the top-level
+    /// project id.
+    // TODO(fxbug.dev/120759): remove this when we support batching.
+    project_id: Option<u32>,
 }
 
 /// Supported Cobalt Metric types
@@ -255,8 +263,14 @@ pub struct SamplerConfig {
 
 impl MetricConfig {
     fn from_template(template: MetricTemplate, component: &ComponentIdInfo) -> Result<Self, Error> {
-        let MetricTemplate { mut selectors, event_codes, metric_id, metric_type, upload_once } =
-            template;
+        let MetricTemplate {
+            mut selectors,
+            event_codes,
+            metric_id,
+            metric_type,
+            upload_once,
+            project_id,
+        } = template;
         let selectors = SelectorList(
             selectors
                 .iter_mut()
@@ -278,7 +292,7 @@ impl MetricConfig {
                 codes
             }
         };
-        Ok(MetricConfig { event_codes, selectors, metric_id, metric_type, upload_once })
+        Ok(MetricConfig { event_codes, selectors, metric_id, metric_type, upload_once, project_id })
     }
 
     fn insert_moniker(template: &str, moniker: &str) -> Result<String, Error> {
@@ -641,7 +655,8 @@ mod tests {
                 "selector": "bootstrap/archivist:root/all_archive_accessor:requests",
                 "metric_id": 1,
                 "metric_type": "Occurrence",
-                "event_codes": [0, 0]
+                "event_codes": [0, 0],
+                "project_id": 4
                 }
             ]
             }
@@ -744,6 +759,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["bootstrap/archivist:root/all_archive_accessor:requests"]
         );
+        assert_eq!(metric_6.project_id, Some(4));
         assert_eq!(
             metric_7_42
                 .selectors

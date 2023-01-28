@@ -122,7 +122,7 @@ use {
 /// An event to be logged to the cobalt logger. Events are generated first,
 /// then logged. (This permits unit-testing the code that generates events from
 /// Diagnostic data.)
-type EventToLog = MetricEvent;
+type EventToLog = (u32, MetricEvent);
 
 pub struct TaskCancellation {
     senders: Vec<oneshot::Sender<()>>,
@@ -376,7 +376,7 @@ pub struct ProjectSampler {
     metric_cache: HashMap<MetricCacheKey, Property>,
     /// Cobalt logger proxy using this ProjectSampler's project id. It's an Option so it doesn't
     /// have to be created for unit tests; it will always be Some() outside unit tests.
-    metrics_logger: Option<MetricEventLoggerProxy>,
+    metric_loggers: HashMap<u32, MetricEventLoggerProxy>,
     /// Map from moniker to relevant selectors.
     moniker_to_selector_map: HashMap<String, Vec<SelectorIndexes>>,
     /// The frequency with which we snapshot Inspect properties
@@ -386,6 +386,9 @@ pub struct ProjectSampler {
     /// It's an arc since a single project can have multiple samplers at
     /// different frequencies, but we want a single project to have one node.
     project_sampler_stats: Arc<ProjectSamplerStats>,
+    /// The id of the project.
+    /// Project ID that metrics are being sampled and forwarded on behalf of.
+    project_id: u32,
 }
 
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -452,8 +455,11 @@ impl ProjectSampler {
         project_sampler_stats.project_sampler_count.add(1);
         project_sampler_stats.metrics_configured.add(config.metrics.len() as u64);
 
-        let metrics_logger = {
-            let (metrics_logger_proxy, metrics_server_end) =
+        let mut metric_loggers = HashMap::new();
+        // TODO(fxbug.dev/120759): we should remove this once we support batching. There should be
+        // only one metric logger per ProjectSampler.
+        if project_id != 0 {
+            let (metric_logger_proxy, metrics_server_end) =
                 fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
             let mut project_spec = ProjectSpec::EMPTY;
             project_spec.customer_id = Some(customer_id);
@@ -462,10 +468,24 @@ impl ProjectSampler {
                 .create_metric_event_logger(project_spec, metrics_server_end)
                 .await?
                 .map_err(|e| format_err!("error response {:?}", e))?;
-            Some(metrics_logger_proxy)
-        };
+            metric_loggers.insert(project_id, metric_logger_proxy);
+        }
         let mut all_selectors = Vec::<String>::new();
         for metric in &config.metrics {
+            if let Some(metric_project_id) = metric.project_id {
+                if metric_loggers.get(&metric_project_id).is_none() {
+                    let (metric_logger_proxy, metrics_server_end) =
+                        fidl::endpoints::create_proxy().context("Failed to create endpoints")?;
+                    let mut project_spec = ProjectSpec::EMPTY;
+                    project_spec.customer_id = Some(customer_id);
+                    project_spec.project_id = Some(metric_project_id);
+                    metric_logger_factory
+                        .create_metric_event_logger(project_spec, metrics_server_end)
+                        .await?
+                        .map_err(|e| format_err!("error response {:?}", e))?;
+                    metric_loggers.insert(metric_project_id, metric_logger_proxy);
+                }
+            }
             for selector_opt in metric.selectors.iter() {
                 if let Some(selector) = selector_opt {
                     all_selectors.push(selector.selector_string.clone());
@@ -473,11 +493,12 @@ impl ProjectSampler {
             }
         }
         let mut project_sampler = ProjectSampler {
+            project_id,
             archive_reader: ArchiveReader::new(),
             moniker_to_selector_map: HashMap::new(),
             metrics: config.metrics.clone(),
             metric_cache: HashMap::new(),
-            metrics_logger,
+            metric_loggers,
             poll_rate_sec,
             project_sampler_stats,
         };
@@ -647,6 +668,7 @@ impl ProjectSampler {
         for index_info in selector_indexes.iter() {
             let SelectorIndexes { metric_index, selector_index } = index_info;
             let metric = &self.metrics[*metric_index];
+            let project_id = metric.project_id.unwrap_or(self.project_id);
             // It's fine if a selector has been removed and is None.
             if let Some(ParsedSelector { selector, selector_string, .. }) =
                 &metric.selectors[*selector_index]
@@ -683,7 +705,7 @@ impl ProjectSampler {
                             {
                                 parsed_selector.increment_upload_count();
                             }
-                            events_to_log.push(event);
+                            events_to_log.push((project_id, event));
                         }
                         if self.update_metric_selectors(index_info) {
                             snapshot_outcome = SnapshotOutcome::SelectorsChanged;
@@ -723,7 +745,7 @@ impl ProjectSampler {
         event_codes: Vec<u32>,
         metric_cache_key: MetricCacheKey,
         new_sample: &Property,
-    ) -> Result<Option<EventToLog>, Error> {
+    ) -> Result<Option<MetricEvent>, Error> {
         let previous_sample_opt: Option<&Property> = self.metric_cache.get(&metric_cache_key);
 
         if let Some(payload) = process_sample_for_data_type(
@@ -733,14 +755,14 @@ impl ProjectSampler {
             &metric_type,
         ) {
             self.maybe_update_cache(new_sample, &metric_type, metric_cache_key);
-            Ok(Some(EventToLog { metric_id, event_codes, payload }))
+            Ok(Some(MetricEvent { metric_id, event_codes, payload }))
         } else {
             Ok(None)
         }
     }
 
     async fn log_events(&mut self, events: Vec<EventToLog>) -> Result<(), Error> {
-        for event in events.into_iter() {
+        for (project_id, event) in events.into_iter() {
             let mut metric_events = vec![event];
             // Note: The MetricEvent vector can't be marked send because it
             // is a dyn object stream and rust can't confirm that it doesn't have handles. This
@@ -750,7 +772,8 @@ impl ProjectSampler {
             // across the await. So we have to split the creation of the future out from the await
             // on the future. :(
             let log_future = self
-                .metrics_logger
+                .metric_loggers
+                .get(&project_id)
                 .as_ref()
                 .unwrap()
                 .log_metric_events(&mut metric_events.iter_mut());
@@ -1159,12 +1182,14 @@ mod tests {
             moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
             metric_cache: HashMap::new(),
-            metrics_logger: None,
+            metric_loggers: HashMap::new(),
+            project_id: 1,
             poll_rate_sec: 3600,
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
         };
         let selector: String = "my/component:root/path\\/to:value".to_string();
         sampler.metrics.push(MetricConfig {
+            project_id: None,
             selectors: SelectorList(vec![sampler_config::parse_selector_for_test(&selector)]),
             metric_id: 1,
             // Occurrence type with a value of zero will not attempt to use any loggers.
@@ -1189,6 +1214,7 @@ mod tests {
         let selector_with_escaped_property: String =
             "my/component:root/path\\/to:value\\/with\\:escapes".to_string();
         sampler.metrics.push(MetricConfig {
+            project_id: None,
             selectors: SelectorList(vec![sampler_config::parse_selector_for_test(
                 &selector_with_escaped_property,
             )]),
@@ -1214,6 +1240,7 @@ mod tests {
 
         let selector_unfound: String = "my/component:root/path/to:value".to_string();
         sampler.metrics.push(MetricConfig {
+            project_id: None,
             selectors: SelectorList(vec![sampler_config::parse_selector_for_test(
                 &selector_unfound,
             )]),
@@ -1280,11 +1307,13 @@ mod tests {
             moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
             metric_cache: HashMap::new(),
-            metrics_logger: None,
+            metric_loggers: HashMap::new(),
+            project_id: 1,
             poll_rate_sec: 3600,
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
         };
         sampler.metrics.push(MetricConfig {
+            project_id: None,
             selectors: SelectorList(vec![sampler_config::parse_selector_for_test(
                 "my/component:root:value_one",
             )]),
@@ -1294,6 +1323,7 @@ mod tests {
             upload_once: Some(true),
         });
         sampler.metrics.push(MetricConfig {
+            project_id: None,
             selectors: SelectorList(vec![sampler_config::parse_selector_for_test(
                 "my/component:root:value_two",
             )]),
@@ -1825,7 +1855,8 @@ mod tests {
             moniker_to_selector_map: HashMap::new(),
             metrics: vec![],
             metric_cache: HashMap::new(),
-            metrics_logger: None,
+            metric_loggers: HashMap::new(),
+            project_id: 1,
             poll_rate_sec: 3600,
             project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
         };
@@ -1833,6 +1864,7 @@ mod tests {
         let metric_id = 1;
         let event_codes = vec![];
         sampler.metrics.push(MetricConfig {
+            project_id: None,
             selectors: SelectorList(vec![sampler_config::parse_selector_for_test(&selector)]),
             metric_id,
             metric_type: DataType::Occurrence,
@@ -1882,7 +1914,8 @@ mod tests {
             let events = events.expect(context);
             assert_eq!(events.len(), 1, "Events len not 1: {}: {}", context, events.len());
             let event = &events[0];
-            let EventToLog { payload, .. } = event;
+            let (project_id, MetricEvent { payload, .. }) = event;
+            assert_eq!(*project_id, 1);
             if let fidl_fuchsia_metrics::MetricEventPayload::Count(payload) = payload {
                 assert_eq!(
                     payload, &value,
@@ -1898,5 +1931,47 @@ mod tests {
         expect_one_metric_event_value(sampler.process_snapshot(file2_value3).await, 3, "second");
         expect_one_metric_event_value(sampler.process_snapshot(file1_value6).await, 2, "third");
         expect_one_metric_event_value(sampler.process_snapshot(file2_value8).await, 5, "fourth");
+    }
+
+    // TODO(fxbug.dev/120759): we should remove this once we support batching.
+    #[fuchsia::test]
+    async fn project_id_can_be_overwritten_by_the_metric_project_id() {
+        let mut sampler = ProjectSampler {
+            archive_reader: ArchiveReader::new(),
+            moniker_to_selector_map: HashMap::new(),
+            metrics: vec![],
+            metric_cache: HashMap::new(),
+            metric_loggers: HashMap::new(),
+            project_id: 1,
+            poll_rate_sec: 3600,
+            project_sampler_stats: Arc::new(ProjectSamplerStats::new()),
+        };
+        let selector: String = "my/component:root/branch:leaf".to_string();
+        let metric_id = 1;
+        let event_codes = vec![];
+        sampler.metrics.push(MetricConfig {
+            project_id: Some(2),
+            selectors: SelectorList(vec![sampler_config::parse_selector_for_test(&selector)]),
+            metric_id,
+            metric_type: DataType::Occurrence,
+            event_codes,
+            upload_once: Some(false),
+        });
+        sampler.rebuild_selector_data_structures();
+
+        let value = vec![Data::for_inspect(
+            "my/component",
+            Some(hierarchy! { root: {branch: {leaf: 4i32}}}),
+            0, /* timestamp */
+            "component-url",
+            "file1",
+            vec![], /* errors */
+        )];
+
+        let events = sampler.process_snapshot(value).await.expect("processed snapshot");
+        assert_eq!(events.len(), 1);
+        let event = &events[0];
+        let (project_id, MetricEvent { .. }) = event;
+        assert_eq!(*project_id, 2);
     }
 }
