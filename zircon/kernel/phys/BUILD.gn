@@ -526,6 +526,7 @@ if (toolchain_environment == "kernel.phys" ||
       "//sdk/lib/fit",
       "//src/lib/elfldltl",
       "//src/lib/zbitl",
+      "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/code-patching",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",

@@ -7,6 +7,7 @@
 #include "phys/elf-image.h"
 
 #include <inttypes.h>
+#include <lib/arch/cache.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/dynamic.h>
 #include <lib/elfldltl/link.h>
@@ -190,6 +191,14 @@ Allocation ElfImage::Load(bool in_place_ok) {
 
   // Hereafter image_ refers to the now-loaded image, not the original file.
   image_.set_image(image.data());
+
+  // Ensure that by the time we return, it's safe to jump into this code.
+  // Later relocation won't touch executable segments, so additional
+  // synchronization should not be required unless the image is copied
+  // elsewhere in physical memory.
+  ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
+  arch::GlobalCacheConsistencyContext cache;
+  cache.SyncRange(LoadAddress(), load_.vaddr_size());
 
   return image;
 }

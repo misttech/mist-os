@@ -459,9 +459,6 @@ if (current_toolchain != default_toolchain) {
       ":elf-physboot-test-zircon",
       "//zircon/system/utest/core:core-tests-standalone($default_toolchain)",
     ]
-
-    # TODO(fxbug.dev/120629): disabled in automation pending debugging
-    device_types = []
   }
 
   group("test") {
