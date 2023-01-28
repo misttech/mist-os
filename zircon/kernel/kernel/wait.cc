@@ -434,8 +434,9 @@ bool WaitQueue::IsEmpty() const {
 WaitQueue::~WaitQueue() {
   DEBUG_ASSERT_MAGIC_CHECK(this);
 
-  if (collection_.Count() != 0) {
-    panic("~WaitQueue() called on non-empty WaitQueue\n");
+  const uint32_t count = collection_.Count();
+  if (count != 0) {
+    panic("~WaitQueue() called on non-empty WaitQueue, count=%u, magic=0x%08x\n", count, magic_);
   }
 
   magic_ = 0;
