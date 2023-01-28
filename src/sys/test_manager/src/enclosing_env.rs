@@ -67,7 +67,7 @@ impl EnclosingEnvironment {
         hermetic_test_package_name: Arc<String>,
         other_allowed_packages: resolver::AllowedPackages,
     ) -> Result<Arc<Self>, Error> {
-        tracing::info!("Creating an environemnte");
+        tracing::info!("Creating an environment");
         let sys_env = connect_to_protocol::<fv1sys::EnvironmentMarker>()?;
         let (additional_svc_client, additional_svc_server) = fidl::endpoints::create_endpoints()?;
         let incoming_svc = Arc::new(incoming_svc);
