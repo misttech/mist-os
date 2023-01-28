@@ -14,7 +14,7 @@ if (use_bringup_assembly) {
 
       deps = [
         "//build/images/bringup",
-        "//build/images/tools:fastboot",
+        "//build/images/tools:fastboot($host_toolchain)",
       ]
       metadata = {
         images = [

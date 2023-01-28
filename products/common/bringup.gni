@@ -28,10 +28,7 @@ cache_package_labels = []
 legacy_cache_package_labels = []
 
 universe_package_labels = []
-legacy_universe_package_labels = [
-  # For flash workflows (remove when flash is only ffx-based).
-  "//build/images/tools:fastboot",
-]
+legacy_universe_package_labels = []
 
 host_labels = [
   "//tools/devshell:fx",

@@ -256,7 +256,7 @@ group("default-images") {
            "//build/images/flash:fastboot_manifest",
            "//build/images/flash:flash_script",
            "//build/images/flash:product_metadata",
-           "//build/images/tools:fastboot",
+           "//build/images/tools:fastboot($host_toolchain)",
          ]
 
   if (size_checker_input != {

@@ -112,7 +112,7 @@ foreach(firmware, firmware_prebuilts) {
 # Stores bootstrap partition information to assemble the flashing manifest.
 bootstrap_parts = []
 archive_bootstrap_parts = []
-flash_script_deps = [ "//build/images/tools:fastboot" ]
+flash_script_deps = [ "//build/images/tools:fastboot($host_toolchain)" ]
 
 foreach(file, bootstrap_files) {
   file_name = get_path_info(file.path, "file")
@@ -383,7 +383,7 @@ archive_args = [
   "--pre-erase-flash=${pre_erase_flash}",
   "--fastboot-path=fastboot.exe.$host_platform",
 ]
-archive_deps = [ "//build/images/tools:fastboot" ]
+archive_deps = [ "//build/images/tools:fastboot($host_toolchain)" ]
 
 # A list of partitions for the flash json manifest that will be
 # generated.  The first item should be the partition name and the
