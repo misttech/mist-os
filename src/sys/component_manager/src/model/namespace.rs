@@ -452,8 +452,11 @@ fn add_service_or_protocol_use(
         scope.spawn(async move { component.blocking_task_scope().add_task(task).await })
     };
 
-    let service_dir = svc_dirs.entry(capability_path.dirname.clone()).or_insert_with(|| {
-        make_dir_with_not_found_logging(capability_path.dirname.clone(), not_found_component_copy)
+    let service_dir = svc_dirs.entry(capability_path.dirname.clone().into()).or_insert_with(|| {
+        make_dir_with_not_found_logging(
+            capability_path.dirname.clone().into(),
+            not_found_component_copy,
+        )
     });
     // NOTE: UseEventStream is special, in that we can route a single stream from multiple
     // sources (merging them).

@@ -618,8 +618,8 @@ async fn get_realm(
     debug_data_decl.capabilities.push(cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
         name: "fuchsia.debugdata.Publisher".into(),
         source_path: Some(cm_rust::CapabilityPath {
-            dirname: String::from("/svc"),
-            basename: String::from("fuchsia.debugdata.Publisher"),
+            dirname: "/svc".into(),
+            basename: "fuchsia.debugdata.Publisher".into(),
         }),
     }));
     wrapper_realm.replace_component_decl(&debug_data, debug_data_decl).await?;
@@ -639,8 +639,8 @@ async fn get_realm(
         cm_rust::ResolverDecl {
             name: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
             source_path: Some(cm_rust::CapabilityPath {
-                dirname: String::from("/svc"),
-                basename: String::from("fuchsia.component.resolution.Resolver"),
+                dirname: "/svc".into(),
+                basename: "fuchsia.component.resolution.Resolver".into(),
             }),
         },
     ));

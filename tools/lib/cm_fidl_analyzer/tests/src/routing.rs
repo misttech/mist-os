@@ -360,7 +360,7 @@ impl RoutingTestForAnalyzer {
             | CheckUse::Service { path, expected_res, .. } => (
                 decl.exposes
                     .iter()
-                    .find(|&e| e.target_name().to_string() == path.basename)
+                    .find(|&e| e.target_name().to_string() == path.basename.as_str())
                     .cloned()
                     .ok_or(TestModelError::ExposeDeclNotFound),
                 expected_res,

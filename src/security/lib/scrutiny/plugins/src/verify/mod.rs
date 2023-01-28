@@ -208,7 +208,7 @@ mod tests {
         UseDirectoryDecl {
             source,
             source_name,
-            target_path: CapabilityPath { dirname: "".to_string(), basename: "".to_string() },
+            target_path: CapabilityPath { dirname: "".into(), basename: "".into() },
             rights,
             subdir: None,
             dependency_type: DependencyType::Strong,
@@ -243,10 +243,7 @@ mod tests {
         UseProtocolDecl {
             source,
             source_name,
-            target_path: CapabilityPath {
-                dirname: "/dir".to_string(),
-                basename: "svc".to_string(),
-            },
+            target_path: CapabilityPath { dirname: "/dir".into(), basename: "svc".into() },
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         }

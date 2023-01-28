@@ -466,13 +466,13 @@ impl RoutingTest {
             .into_iter()
             .filter_map(|u| match u {
                 UseDecl::Directory(d) => Some(d.target_path.to_string()),
-                UseDecl::Service(s) => Some(s.target_path.dirname),
-                UseDecl::Protocol(s) => Some(s.target_path.dirname),
+                UseDecl::Service(s) => Some(s.target_path.dirname.into()),
+                UseDecl::Protocol(s) => Some(s.target_path.dirname.into()),
                 UseDecl::Storage(s) => Some(s.target_path.to_string()),
                 UseDecl::Event(_) | UseDecl::EventStreamDeprecated(_) => None,
                 UseDecl::EventStream(s) => {
                     // TODO(fxbug.dev/81980): Route EventStream path
-                    Some(s.target_path.dirname)
+                    Some(s.target_path.dirname.into())
                 }
             })
             .collect();
@@ -1123,8 +1123,9 @@ pub mod capability_util {
         path: &CapabilityPath,
     ) -> T::Proxy {
         let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
-        let proxy = connect_to_named_protocol_at_dir_root::<T>(&dir_proxy, &path.basename)
-            .expect("failed to open service");
+        let proxy =
+            connect_to_named_protocol_at_dir_root::<T>(&dir_proxy, &path.basename.to_string())
+                .expect("failed to open service");
         add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
         proxy
     }
@@ -1219,7 +1220,7 @@ pub mod capability_util {
         let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
         let _file_proxy = fuchsia_fs::directory::open_file(
             &dir_proxy,
-            &path.basename,
+            &path.basename.to_string(),
             fio::OpenFlags::RIGHT_READABLE,
         )
         .await
@@ -1328,15 +1329,15 @@ pub mod capability_util {
         let dir_proxy = take_dir_from_namespace(namespace, &path.dirname).await;
         let realm_proxy = connect_to_named_protocol_at_dir_root::<fcomponent::RealmMarker>(
             &dir_proxy,
-            &path.basename,
+            &path.basename.to_string(),
         )
         .expect("failed to open realm service");
         let mut child_ref = fdecl::ChildRef { name: "my_child".to_string(), collection: None };
+
         let (_, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let res = realm_proxy.open_exposed_dir(&mut child_ref, server_end).await;
         // Check for side effects: realm service should have received the `open_exposed_dir` call.
         res.expect("failed to send fidl message").expect("failed to use realm service");
-
         let bind_url =
             format!("test:///{}_resolved", bind_calls.lock().await.last().expect("no bind call"));
         assert_eq!(bind_url, resolved_url);

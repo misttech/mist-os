@@ -882,8 +882,8 @@ mod deprecated {
                         .directory(DirectoryDecl {
                             name: "fs".into(),
                             source_path: Some(CapabilityPath {
-                                basename: "data".to_string(),
-                                dirname: "/fs".to_string(),
+                                basename: "data".into(),
+                                dirname: "/fs".into(),
                             }),
                             rights: Operations::all(),
                         })

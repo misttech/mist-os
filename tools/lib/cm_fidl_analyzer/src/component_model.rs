@@ -1197,8 +1197,8 @@ impl ComponentModelForAnalyzer {
             UseDecl::Protocol(p) => {
                 p.target_path
                     == CapabilityPath {
-                        dirname: "/svc".to_string(),
-                        basename: "fuchsia.sys2.EventSource".to_string(),
+                        dirname: "/svc".into(),
+                        basename: "fuchsia.sys2.EventSource".into(),
                     }
             }
             _ => false,

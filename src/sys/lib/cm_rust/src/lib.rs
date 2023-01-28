@@ -1517,9 +1517,9 @@ fidl_translations_symmetrical_enums!(
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CapabilityPath {
     /// The directory containing the last path element, e.g. `/svc/foo` in `/svc/foo/bar`.
-    pub dirname: String,
+    pub dirname: FlyStr,
     /// The last path element: e.g. `bar` in `/svc/foo/bar`.
-    pub basename: String,
+    pub basename: FlyStr,
 }
 
 impl CapabilityPath {
@@ -1541,8 +1541,8 @@ impl FromStr for CapabilityPath {
             .map_err(|_| Error::InvalidCapabilityPath { raw: path.to_string() })?;
         let idx = path.rfind('/').expect("path validation is wrong");
         Ok(CapabilityPath {
-            dirname: if idx == 0 { "/".to_string() } else { path[0..idx].to_string() },
-            basename: path[idx + 1..].to_string(),
+            dirname: if idx == 0 { "/".into() } else { path[0..idx].into() },
+            basename: path[idx + 1..].into(),
         })
     }
 }
@@ -3140,17 +3140,17 @@ mod tests {
     test_capability_path! {
         capability_path_one_part => {
             input = "/foo",
-            result = Ok(CapabilityPath{dirname: "/".to_string(), basename: "foo".to_string()}),
+            result = Ok(CapabilityPath{dirname: "/".into(), basename: "foo".into()}),
         },
         capability_path_two_parts => {
             input = "/foo/bar",
-            result = Ok(CapabilityPath{dirname: "/foo".to_string(), basename: "bar".to_string()}),
+            result = Ok(CapabilityPath{dirname: "/foo".into(), basename: "bar".into()}),
         },
         capability_path_many_parts => {
             input = "/foo/bar/long/path",
             result = Ok(CapabilityPath{
-                dirname: "/foo/bar/long".to_string(),
-                basename: "path".to_string()
+                dirname: "/foo/bar/long".into(),
+                basename: "path".into()
             }),
         },
         capability_path_invalid_empty_part => {

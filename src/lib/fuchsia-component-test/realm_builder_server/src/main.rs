@@ -3615,8 +3615,8 @@ mod tests {
                             cm_rust::ProtocolDecl {
                                 name: "fuchsia.examples.Hippo".into(),
                                 source_path: Some(cm_rust::CapabilityPath {
-                                    dirname: "/svc".to_owned(),
-                                    basename: "fuchsia.examples.Hippo".to_owned(),
+                                    dirname: "/svc".into(),
+                                    basename: "fuchsia.examples.Hippo".into(),
                                 }),
                             },
                         )],
@@ -3759,8 +3759,8 @@ mod tests {
                             cm_rust::ProtocolDecl {
                                 name: "fuchsia.examples.Echo".into(),
                                 source_path: Some(cm_rust::CapabilityPath {
-                                    dirname: "/svc".to_owned(),
-                                    basename: "fuchsia.examples.Echo".to_owned(),
+                                    dirname: "/svc".into(),
+                                    basename: "fuchsia.examples.Echo".into(),
                                 }),
                             },
                         )],
@@ -3768,8 +3768,8 @@ mod tests {
                             source: cm_rust::UseSource::Parent,
                             source_name: "fuchsia.examples.RandonNumberGenerator".into(),
                             target_path: cm_rust::CapabilityPath {
-                                dirname: "/svc".to_owned(),
-                                basename: "fuchsia.examples.RandonNumberGenerator".to_owned(),
+                                dirname: "/svc".into(),
+                                basename: "fuchsia.examples.RandonNumberGenerator".into(),
                             },
                             dependency_type: cm_rust::DependencyType::Strong,
                             availability: cm_rust::Availability::Required,

@@ -1091,8 +1091,8 @@ mod tests {
             source: UseSource::Parent,
             source_name: bredr::ProfileTestMarker::PROTOCOL_NAME.into(),
             target_path: CapabilityPath {
-                dirname: "/svc".to_string(),
-                basename: bredr::ProfileTestMarker::PROTOCOL_NAME.to_string(),
+                dirname: "/svc".into(),
+                basename: bredr::ProfileTestMarker::PROTOCOL_NAME.into(),
             },
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1161,8 +1161,8 @@ mod tests {
             source: UseSource::Parent,
             source_name: profile_test_name.clone(),
             target_path: CapabilityPath {
-                dirname: "/svc".to_string(),
-                basename: bredr::ProfileTestMarker::PROTOCOL_NAME.to_string(),
+                dirname: "/svc".into(),
+                basename: bredr::ProfileTestMarker::PROTOCOL_NAME.into(),
             },
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
