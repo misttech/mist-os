@@ -120,6 +120,8 @@ protocol Controller {
 type ProviderSpec = table {
     1: name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
     2: buffer_size_megabytes_hint uint32;
+    3: categories
+            vector<string:fuchsia.tracing.MAX_CATEGORY_NAME_LENGTH>:fuchsia.tracing.MAX_NUM_ENABLED_CATEGORIES;
 };
 
 /// Provides options for the trace.

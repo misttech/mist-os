@@ -53,7 +53,7 @@ class TraceManagerTest : public gtest::TestLoopFixture {
 
   static constexpr char kConfigFile[] = "/pkg/data/tracing.config";
 
-  static constexpr char kTestCategory[] = "test";
+  static constexpr char kTestUmbrellaCategory[] = "test_umbrella";
 
   static constexpr zx_koid_t kProvider1Pid = 1234;
   static constexpr char kProvider1Name[] = "test-provider1";

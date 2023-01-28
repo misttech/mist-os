@@ -89,7 +89,7 @@ TraceManagerTest::SessionState TraceManagerTest::GetSessionState() const {
 
 // static
 controller::TraceConfig TraceManagerTest::GetDefaultTraceConfig() {
-  std::vector<std::string> categories{kTestCategory};
+  std::vector<std::string> categories{kTestUmbrellaCategory};
   controller::TraceConfig config;
   config.set_categories(std::move(categories));
   config.set_buffer_size_megabytes_hint(kDefaultBufferSizeMegabytes);

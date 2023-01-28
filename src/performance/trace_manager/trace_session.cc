@@ -5,24 +5,24 @@
 #include "src/performance/trace_manager/trace_session.h"
 
 #include <lib/async/default.h>
-#include <lib/fidl/cpp/clone.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-engine/fields.h>
 
 #include <numeric>
+#include <unordered_set>
 
 #include "src/performance/trace_manager/util.h"
 
 namespace tracing {
 
-TraceSession::TraceSession(zx::socket destination, std::vector<std::string> categories,
+TraceSession::TraceSession(zx::socket destination, std::vector<std::string> enabled_categories,
                            size_t buffer_size_megabytes,
                            fuchsia::tracing::BufferingMode buffering_mode,
                            TraceProviderSpecMap&& provider_specs, zx::duration start_timeout,
                            zx::duration stop_timeout, fit::closure abort_handler,
                            AlertCallback alert_callback)
     : destination_(std::move(destination)),
-      categories_(std::move(categories)),
+      enabled_categories_(std::move(enabled_categories)),
       buffer_size_megabytes_(buffer_size_megabytes),
       buffering_mode_(buffering_mode),
       provider_specs_(std::move(provider_specs)),
@@ -39,40 +39,47 @@ TraceSession::~TraceSession() {
   destination_.reset();
 }
 
-void TraceSession::AddProvider(TraceProviderBundle* bundle) {
+void TraceSession::AddProvider(TraceProviderBundle* provider) {
   if (state_ == State::kTerminating) {
-    FX_VLOGS(1) << "Ignoring new provider " << *bundle << ", terminating";
+    FX_VLOGS(1) << "Ignoring new provider " << *provider << ", terminating";
     return;
   }
 
   size_t buffer_size_megabytes = buffer_size_megabytes_;
-  auto spec_iter = provider_specs_.find(bundle->name);
+  // Include at least the umbrella enabled categories.
+  std::unordered_set<std::string> provider_specific_categories(enabled_categories_->begin(),
+                                                               enabled_categories_->end());
+  auto spec_iter = provider_specs_.find(provider->name);
   if (spec_iter != provider_specs_.end()) {
     const TraceProviderSpec* spec = &spec_iter->second;
-    buffer_size_megabytes = spec->buffer_size_megabytes;
+    if (spec->buffer_size_megabytes) {
+      buffer_size_megabytes = spec->buffer_size_megabytes.value();
+    }
+    provider_specific_categories.insert(spec->categories.begin(), spec->categories.end());
   }
   uint64_t buffer_size = buffer_size_megabytes * 1024 * 1024;
 
-  FX_VLOGS(1) << "Adding provider " << *bundle << ", buffer size " << buffer_size_megabytes << "MB";
+  FX_VLOGS(1) << "Adding provider " << *provider << ", buffer size " << buffer_size_megabytes
+              << "MB";
 
-  tracees_.emplace_back(std::make_unique<Tracee>(this, bundle));
-  fidl::VectorPtr<std::string> categories_clone;
-  fidl::Clone(categories_, &categories_clone);
+  tracees_.emplace_back(std::make_unique<Tracee>(this, provider));
+  std::vector<std::string> categories_clone(provider_specific_categories.begin(),
+                                            provider_specific_categories.end());
   if (!tracees_.back()->Initialize(
           std::move(categories_clone), buffer_size, buffering_mode_,
-          [weak = weak_ptr_factory_.GetWeakPtr(), bundle]() {
+          [weak = weak_ptr_factory_.GetWeakPtr(), provider]() {
             if (weak) {
-              weak->OnProviderStarted(bundle);
+              weak->OnProviderStarted(provider);
             }
           },
-          [weak = weak_ptr_factory_.GetWeakPtr(), bundle](bool write_results) {
+          [weak = weak_ptr_factory_.GetWeakPtr(), provider](bool write_results) {
             if (weak) {
-              weak->OnProviderStopped(bundle, write_results);
+              weak->OnProviderStopped(provider, write_results);
             }
           },
-          [weak = weak_ptr_factory_.GetWeakPtr(), bundle]() {
+          [weak = weak_ptr_factory_.GetWeakPtr(), provider]() {
             if (weak) {
-              weak->OnProviderTerminated(bundle);
+              weak->OnProviderTerminated(provider);
             }
           },
           [weak = weak_ptr_factory_.GetWeakPtr()](const std::string& alert_name) {

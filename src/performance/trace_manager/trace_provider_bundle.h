@@ -35,7 +35,8 @@ struct TraceProviderBundle {
 };
 
 struct TraceProviderSpec {
-  uint32_t buffer_size_megabytes;
+  std::optional<uint32_t> buffer_size_megabytes;
+  std::vector<std::string> categories;
 };
 
 using TraceProviderSpecMap = std::map<std::string, TraceProviderSpec>;

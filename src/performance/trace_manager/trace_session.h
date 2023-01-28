@@ -162,7 +162,7 @@ class TraceSession : public fxl::RefCountedThreadSafe<TraceSession> {
 
   State state_ = State::kReady;
   zx::socket destination_;
-  fidl::VectorPtr<std::string> categories_;
+  fidl::VectorPtr<std::string> enabled_categories_;
   size_t buffer_size_megabytes_;
   fuchsia::tracing::BufferingMode buffering_mode_;
   TraceProviderSpecMap provider_specs_;

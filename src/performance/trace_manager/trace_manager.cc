@@ -105,7 +105,14 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
   TraceProviderSpecMap provider_specs;
   if (config.has_provider_specs()) {
     for (const auto& it : config.provider_specs()) {
-      provider_specs[it.name()] = TraceProviderSpec{it.buffer_size_megabytes_hint()};
+      TraceProviderSpec provider_spec;
+      if (it.has_buffer_size_megabytes_hint()) {
+        provider_spec.buffer_size_megabytes = it.buffer_size_megabytes_hint();
+      }
+      if (it.has_categories()) {
+        provider_spec.categories = it.categories();
+      }
+      provider_specs[it.name()] = provider_spec;
     }
   }
 
@@ -134,7 +141,9 @@ void TraceManager::InitializeTracing(controller::TraceConfig config, zx::socket 
   if (provider_specs.size() > 0) {
     FX_LOGS(INFO) << "Provider overrides:";
     for (const auto& it : provider_specs) {
-      FX_LOGS(INFO) << it.first << ": buffer size " << it.second.buffer_size_megabytes << " MB";
+      FX_LOGS(INFO) << it.first << ": buffer size "
+                    << it.second.buffer_size_megabytes.value_or(default_buffer_size_megabytes)
+                    << " MB";
     }
   }
 

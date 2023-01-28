@@ -84,6 +84,7 @@ class FakeProvider : public provider::Provider {
   int terminate_count() const { return terminate_count_; }
 
   void SendAlert(const char* alert_name);
+  const std::vector<std::string>& GetEnabledCategories() const { return enabled_categories_; }
 
   void SetKnownCategories(std::vector<fuchsia::tracing::KnownCategory> known_categories) {
     known_categories_ = std::move(known_categories);

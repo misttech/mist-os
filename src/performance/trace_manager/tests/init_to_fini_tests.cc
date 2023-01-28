@@ -4,6 +4,10 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <vector>
+
+#include <gmock/gmock.h>
+
 #include "src/performance/trace_manager/tests/trace_manager_test.h"
 
 namespace tracing {
@@ -62,7 +66,27 @@ TEST_F(TraceManagerTest, InitToFiniWithProviderAddedAfterSessionStarts) {
   ASSERT_TRUE(AddFakeProvider(kProvider1Pid, kProvider1Name, &provider1));
   EXPECT_EQ(fake_provider_bindings().size(), 1u);
 
-  ASSERT_TRUE(InitializeSession());
+  const std::string kDuplicatedCategory = "this_should_be_deduped";
+
+  fuchsia::tracing::controller::ProviderSpec provider1_spec;
+  provider1_spec.set_name(kProvider1Name);
+  provider1_spec.set_categories({"union", "sammamish", "washington", kDuplicatedCategory});
+  std::vector<fuchsia::tracing::controller::ProviderSpec> provider_specs;
+  provider_specs.push_back(std::move(provider1_spec));
+
+  fuchsia::tracing::controller::ProviderSpec provider2_spec;
+  provider2_spec.set_name(kProvider2Name);
+  provider2_spec.set_categories({"rainier", "baker", "stuart", kDuplicatedCategory});
+  provider_specs.push_back(std::move(provider2_spec));
+
+  auto trace_config = GetDefaultTraceConfig();
+  trace_config.mutable_categories()->push_back(kDuplicatedCategory);
+  trace_config.set_provider_specs(std::move(provider_specs));
+  ASSERT_TRUE(InitializeSession(std::move(trace_config)));
+
+  EXPECT_THAT(provider1->GetEnabledCategories(),
+              ::testing::UnorderedElementsAreArray(std::vector<std::string>{
+                  "union", "sammamish", "washington", kDuplicatedCategory, kTestUmbrellaCategory}));
 
   ASSERT_TRUE(StartSession());
   VerifyCounts(1, 0);
@@ -73,6 +97,9 @@ TEST_F(TraceManagerTest, InitToFiniWithProviderAddedAfterSessionStarts) {
 
   // Given the session a chance to start the new provider before we stop it.
   RunLoopUntilIdle();
+  EXPECT_THAT(provider2->GetEnabledCategories(),
+              ::testing::UnorderedElementsAreArray(std::vector<std::string>{
+                  "rainier", "baker", "stuart", kDuplicatedCategory, kTestUmbrellaCategory}));
   ASSERT_EQ(provider2->state(), FakeProvider::State::kStarting);
   provider2->MarkStarted();
   // Give TraceSession a chance to process the STARTED fifo packet.
