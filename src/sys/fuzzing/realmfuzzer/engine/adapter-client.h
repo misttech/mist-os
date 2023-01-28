@@ -53,9 +53,6 @@ class TargetAdapterClient final {
   void Disconnect();
 
  private:
-  // Connects to the target adapter if needed and returns a promise that completes when connected.
-  Promise<> Connect();
-
   fidl::InterfacePtr<TargetAdapter> ptr_;
   ExecutorPtr executor_;
   Scope scope_;

@@ -14,43 +14,28 @@ TargetAdapterClient::TargetAdapterClient(ExecutorPtr executor)
 
 void TargetAdapterClient::Configure(const OptionsPtr& options) {
   FX_CHECK(options);
-  if (auto status = test_input_.Reserve(options->max_input_size()); status != ZX_OK) {
+  auto max_input_size = options->max_input_size();
+  if (max_input_size <= test_input_.capacity()) {
+    return;
+  }
+  if (auto status = test_input_.Reserve(max_input_size); status != ZX_OK) {
     FX_LOGS(WARNING) << "Failed to reserve test input: " << zx_status_get_string(status);
   }
-}
-
-Promise<> TargetAdapterClient::Connect() {
-  return fpromise::make_promise([this, handling = Future<>(),
-                                 connect = Future<>()](Context& context) mutable -> Result<> {
-           if (!connect) {
-             if (eventpair_.IsConnected()) {
-               return fpromise::ok();
-             }
-             handler_(ptr_.NewRequest(executor_->dispatcher()));
-             zx::vmo test_input;
-             if (auto status = test_input_.Share(&test_input); status != ZX_OK) {
-               FX_LOGS(WARNING) << "Failed to share test input: " << zx_status_get_string(status);
-               return fpromise::error();
-             }
-             Bridge<> bridge;
-             ptr_->Connect(eventpair_.Create(), std::move(test_input), bridge.completer.bind());
-             connect = bridge.consumer.promise_or(fpromise::error());
-           }
-           if (!connect(context)) {
-             return fpromise::pending();
-           }
-           return connect.result();
-         })
-      .wrap_with(scope_);
+  // Since `test_input_` has been invalidated, the client will need to reconnect.
+  eventpair_.Reset();
 }
 
 Promise<std::vector<std::string>> TargetAdapterClient::GetParameters() {
-  return Connect()
-      .and_then([this] {
-        Bridge<std::vector<std::string>> bridge;
-        ptr_->GetParameters(bridge.completer.bind());
-        return bridge.consumer.promise_or(fpromise::error());
-      })
+  Bridge<std::vector<std::string>> bridge;
+  return fpromise::make_promise(
+             [this, completer = std::move(bridge.completer)]() mutable -> Result<> {
+               if (!ptr_.is_bound()) {
+                 handler_(ptr_.NewRequest(executor_->dispatcher()));
+               }
+               ptr_->GetParameters(completer.bind());
+               return fpromise::ok();
+             })
+      .and_then(bridge.consumer.promise_or(fpromise::error()))
       .wrap_with(scope_);
 }
 
@@ -71,8 +56,35 @@ Promise<> TargetAdapterClient::TestOneInput(const Input& test_input) {
     FX_LOGS(ERROR) << "Failed to write test input: " << zx_status_get_string(status);
     return fpromise::make_error_promise();
   }
-  return Connect()
-      .or_else([] { return fpromise::error(ZX_ERR_CANCELED); })
+  Bridge<> bridge;
+  return fpromise::make_promise(
+             [this, completer = std::move(bridge.completer)]() mutable -> ZxResult<> {
+               if (eventpair_.IsConnected()) {
+                 completer.complete_ok();
+                 return fpromise::ok();
+               }
+               handler_(ptr_.NewRequest(executor_->dispatcher()));
+               zx::vmo test_input;
+               if (auto status = test_input_.Share(&test_input); status != ZX_OK) {
+                 FX_LOGS(WARNING) << "Failed to share test input: " << zx_status_get_string(status);
+                 return fpromise::error(status);
+               }
+               ptr_->Connect(eventpair_.Create(), std::move(test_input), completer.bind());
+               return fpromise::ok();
+             })
+      .and_then([consumer = std::move(bridge.consumer),
+                 fut = Future<>()](Context& context) mutable -> ZxResult<> {
+        if (!fut) {
+          fut = consumer.promise_or(fpromise::error());
+        }
+        if (!fut(context)) {
+          return fpromise::pending();
+        }
+        if (fut.is_error()) {
+          return fpromise::error(ZX_ERR_CANCELED);
+        }
+        return fpromise::ok();
+      })
       .and_then([this]() -> ZxResult<> { return AsZxResult(eventpair_.SignalSelf(kFinish, 0)); })
       .and_then([this]() -> ZxResult<> { return AsZxResult(eventpair_.SignalPeer(0, kStart)); })
       .and_then(eventpair_.WaitFor(kFinish))
