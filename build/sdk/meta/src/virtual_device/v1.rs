@@ -134,22 +134,6 @@ impl JsonObject for Envelope<VirtualDeviceV1> {
     }
 }
 
-/// Versioned virtual device specification.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(untagged)]
-pub enum VirtualDevice {
-    V1(VirtualDeviceV1),
-}
-
-impl VirtualDevice {
-    /// Returns VirtualDevice entry name.
-    pub fn name(&self) -> &str {
-        match self {
-            Self::V1(device) => &device.name.as_str(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

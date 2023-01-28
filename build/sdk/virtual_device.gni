@@ -204,7 +204,7 @@ template("virtual_device_specification") {
                              "testonly",
                              "visibility",
                            ])
-    deps = [
+    public_deps = [
       ":${generator_target}",
       ":${template_target}",
       ":${validator_target}",

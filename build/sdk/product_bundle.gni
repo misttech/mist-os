@@ -52,6 +52,13 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #         [int] A 64-bit integer that sets an anti-rollback epoch for the
 #         update package. See:
 #         https://fuchsia.dev/fuchsia-src/concepts/packages/ota?hl=en#verify-epoch
+#
+#   virtual_devices (optional; default=[])
+#     [list] A list of virtual device spec files.
+#
+#   default_virtual_device (optional)
+#     [string] The name of the default virtual device
+#
 template("product_bundle") {
   assert(defined(invoker.partitions), "Need to define partitions")
 
@@ -67,11 +74,17 @@ template("product_bundle") {
         "${target_out_dir}/${target_name}_hermetic_inputs.d"
     outdir = "$target_out_dir/$target_name"
     product_bundle_manifest = "${outdir}/product_bundle.json"
+    vd_dir = "${outdir}/virtual_devices"
     transfer_manifest = "$target_out_dir/transfer.json"
     all_blobs_json = "$target_out_dir/all_blobs.json"
     images_json = "$target_out_dir/images.json"
     targets_json = "$target_out_dir/targets.json"
     tuf_keys = "//src/sys/pkg/repositories/devhost/keys"
+  }
+
+  virtual_devices = []
+  if (defined(invoker.virtual_devices)) {
+    virtual_devices += invoker.virtual_devices
   }
 
   python_action(labels.hermetic_inputs) {
@@ -226,6 +239,26 @@ template("product_bundle") {
         rebase_path(invoker.system_r, root_build_dir),
       ]
       inputs += [ invoker.system_r ]
+    }
+
+    if (virtual_devices != []) {
+      outputs += [ "${files.vd_dir}/manifest.json" ]
+    }
+    foreach(virtual_device, virtual_devices) {
+      args += [
+        "--virtual-device",
+        rebase_path(virtual_device, root_build_dir),
+      ]
+      inputs += [ virtual_device ]
+      vd_filename = get_path_info(virtual_device, "file")
+      outputs += [ "${files.vd_dir}/${vd_filename}" ]
+    }
+
+    if (defined(invoker.default_virtual_device)) {
+      args += [
+        "--recommended-device",
+        invoker.default_virtual_device,
+      ]
     }
   }
 

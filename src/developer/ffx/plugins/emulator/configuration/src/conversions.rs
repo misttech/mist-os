@@ -149,7 +149,7 @@ fn parse_device_name_as_path(path: &Option<String>) -> Option<VirtualDevice> {
             tracing::debug!("Value '{}' doesn't appear to be a valid file.", name);
             return None;
         }
-        match VirtualDeviceManifest::parse_virtual_device_file(&path) {
+        match VirtualDevice::try_load_from(&path) {
             Ok(VirtualDevice::V1(mut vd)) => {
                 // The template file path is relative to the device file.
                 tracing::debug!("Using file '{}' as a virtual device.", path);

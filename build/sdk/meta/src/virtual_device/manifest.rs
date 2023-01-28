@@ -65,23 +65,6 @@ impl VirtualDeviceManifest {
         }
     }
 
-    /// Given a path to a file, attempt to deserialize its contents as a VirtualDevice.
-    pub fn parse_virtual_device_file(path: &Utf8PathBuf) -> Result<VirtualDevice> {
-        let name = match path.file_stem() {
-            None => bail!("Can't determine device name based on provided path: '{}'", path),
-            Some(n) => n,
-        };
-        let file = File::open(&path).with_context(|| format!("open '{}'", path))?;
-        let mut virtual_device: VirtualDevice =
-            serde_json::from_reader(&file).context("parsing virtual device from_reader")?;
-        match virtual_device {
-            VirtualDevice::V1(ref mut device) => {
-                device.name = name.to_string();
-            }
-        }
-        Ok(virtual_device)
-    }
-
     /// Given a VirtualDevice, ensure the template path is specified relative to this manifest's
     /// local filesystem path.
     fn adjust_template_path(&self, mut device: VirtualDevice) -> VirtualDevice {
@@ -108,8 +91,8 @@ impl VirtualDeviceManifest {
             .device_paths
             .get(name)
             .ok_or_else(|| anyhow!("Device {} is not listed in this Product Bundle.", name))?;
-        let device = Self::parse_virtual_device_file(&self.parent_dir_path.join(path))
-            .with_context(|| {
+        let device =
+            VirtualDevice::try_load_from(&self.parent_dir_path.join(path)).with_context(|| {
                 format!("parse virtual device file '{}'", self.parent_dir_path.join(path))
             })?;
         Ok(self.adjust_template_path(device))
@@ -131,7 +114,7 @@ impl VirtualDeviceManifest {
             .device_paths
             .get(rec)
             .ok_or_else(|| anyhow!("Default of '{}' was not found in the device manifest.", rec))?;
-        Self::parse_virtual_device_file(&self.parent_dir_path.join(path))
+        VirtualDevice::try_load_from(&self.parent_dir_path.join(path))
             .map(|d| self.adjust_template_path(d))
             .map(|d| Some(d))
     }
@@ -146,7 +129,6 @@ mod tests {
     use tempfile::TempDir;
 
     const VIRTUAL_DEVICE_VALID: &str = include_str!("../../test_data/virtual_device.json");
-    const VIRTUAL_DEVICE_INVALID: &str = r#"{ "something": "bad" }"#;
     const VIRTUAL_DEVICE_MANIFEST_SINGLE: &str =
         include_str!("../../test_data/single_vd_manifest.json");
 
@@ -473,41 +455,6 @@ mod tests {
                     .expect("Couldn't get utf8 path buf, local path"),
             }
         );
-        Ok(())
-    }
-
-    #[test]
-    fn test_parse_virtual_device_file_invalid() -> Result<()> {
-        let tempdir = TempDir::new().expect("temp dir");
-        let vd_dir = tempdir.path().join("virtual_devices");
-        create_dir_all(&vd_dir).expect("make_dir virtual_devices");
-
-        let vd_path = vd_dir.join("device.json");
-        let mut file = File::create(&vd_path).expect("create device.json");
-        file.write_all(VIRTUAL_DEVICE_INVALID.as_bytes())?;
-
-        let result = VirtualDeviceManifest::parse_virtual_device_file(
-            &Utf8PathBuf::from_path_buf(vd_path).expect("Couldn't get utf8 path buf, vd path"),
-        );
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn test_parse_virtual_device_file_valid() -> Result<()> {
-        let tempdir = TempDir::new().expect("temp dir");
-        let vd_dir = tempdir.path().join("virtual_devices");
-        create_dir_all(&vd_dir).expect("make_dir virtual_devices");
-
-        let vd_path = vd_dir.join("device.json");
-        let mut file = File::create(&vd_path).expect("create device.json");
-        file.write_all(VIRTUAL_DEVICE_VALID.as_bytes())?;
-
-        let result = VirtualDeviceManifest::parse_virtual_device_file(
-            &Utf8PathBuf::from_path_buf(vd_path).expect("Couldn't get utf8 path buf, vd path"),
-        );
-        assert!(result.is_ok(), "{:?}", result.unwrap_err());
-        assert_eq!(result.unwrap().name(), "device");
         Ok(())
     }
 }

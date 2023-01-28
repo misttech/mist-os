@@ -127,43 +127,68 @@ pub async fn pb_create_with_tools(cmd: CreateCommand, tools: Box<dyn ToolProvide
         vec![]
     };
 
-    let mut virtual_devices_path = None;
-    if !cmd.virtual_device.is_empty() {
-        let vd_path = cmd.out_dir.join("virtual_devices");
-        std::fs::create_dir_all(&vd_path).context("Creating the virtual_devices directory.")?;
+    // Add the virtual devices, and determine the path to the manifest.
+    let virtual_devices_path = if cmd.virtual_device.is_empty() {
+        None
+    } else {
+        // Prepare a manifest for the virtual devices.
         let mut manifest = VirtualDeviceManifest::default();
+
+        // Create the virtual_devices directory.
+        let vd_dir = cmd.out_dir.join("virtual_devices");
+        std::fs::create_dir_all(&vd_dir).context("Creating the virtual_devices directory.")?;
+
         for path in cmd.virtual_device {
-            let device = VirtualDeviceManifest::parse_virtual_device_file(&path)
+            let mut device = VirtualDevice::try_load_from(&path)
                 .with_context(|| format!("Parsing file as virtual device: '{}'", path))?;
+
             match device {
-                VirtualDevice::V1(ref device) => {
+                VirtualDevice::V1(ref mut device) => {
+                    // Copy the template to the directory.
                     let template_path = path
                         .parent()
-                        .unwrap_or_else(|| panic!("Given path has no parent: '{}'", path))
+                        .with_context(|| format!("Template path has no parent: '{}'", path))?
                         .join(&device.start_up_args_template);
-                    copy_file(&template_path, &vd_path).with_context(|| {
+                    copy_file(&template_path, &vd_dir).with_context(|| {
                         format!("Copying template file to target directory: '{}'", template_path)
                     })?;
+
+                    // Update the template path in the virtual device.
+                    let template_file_name =
+                        device.start_up_args_template.file_name().with_context(|| {
+                            format!(
+                                "Template path has no file name: '{}'",
+                                &device.start_up_args_template
+                            )
+                        })?;
+                    device.start_up_args_template = Utf8PathBuf::from(template_file_name);
                 }
             }
-            let vd_file = File::create(vd_path.join(
-                path.file_name().unwrap_or_else(|| panic!("Path has no file name: '{}'", path)),
-            ))?;
-            let name = path.file_stem().unwrap_or_else(|| {
-                panic!("Couldn't determine virtual device name from path: '{}'", path)
-            });
-            serde_json::to_writer(vd_file, &device)
-                .context("Couldn't serialize virtual device to disk.")?;
-            manifest.device_paths.insert(name.to_string(), path);
+
+            // Write the virtual device to the directory.
+            let device_file_name =
+                path.file_name().unwrap_or_else(|| panic!("Path has no file name: '{}'", path));
+            let device_file_name = Utf8PathBuf::from(device_file_name);
+            let path_in_pb = vd_dir.join(&device_file_name);
+            device
+                .write(&path_in_pb)
+                .with_context(|| format!("Writing virtual device: {}", path_in_pb))?;
+
+            // Add the virtual device to the manifest.
+            let name = device.name().to_string();
+            manifest.device_paths.insert(name, device_file_name);
         }
+
+        // Write the manifest into the directory.
         manifest.recommended = cmd.recommended_device;
-        let manifest_path = vd_path.join("manifest.json");
+        let manifest_path = vd_dir.join("manifest.json");
         let manifest_file = File::create(&manifest_path)
             .with_context(|| format!("Couldn't create manifest file '{}'", manifest_path))?;
         serde_json::to_writer(manifest_file, &manifest)
             .context("Couldn't serialize manifest to disk.")?;
-        virtual_devices_path = Some(manifest_path);
-    }
+
+        Some(manifest_path)
+    };
 
     let product_bundle = ProductBundleV2 {
         partitions,

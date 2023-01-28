@@ -384,6 +384,21 @@ if (is_fuchsia) {
     system_a = files.images_json
     system_r = files.recovery_images_json
 
+    # Add the virtual devices.
+    if (board_is_emu) {
+      virtual_devices = [
+        "$root_build_dir/virtual_device_recommended.json",
+        "$root_build_dir/virtual_device_min.json",
+        "$root_build_dir/virtual_device_large.json",
+      ]
+      deps += [
+        "//build/images/flash:virtual_device_specification_large",
+        "//build/images/flash:virtual_device_specification_min",
+        "//build/images/flash:virtual_device_specification_recommended",
+      ]
+      default_virtual_device = "virtual_device_recommended"
+    }
+
     # Create lists of the files that are referenced by the assembly manifests.
     _assembly_contents = [
       files.blobfs,
