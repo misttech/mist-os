@@ -11,7 +11,7 @@ use futures_util::io::AsyncReadExt as _;
 
 /// A controller for managing a single virtualized guest.
 ///
-/// `GuestController` instantiates a guest on creation and exposes
+/// `Controller` instantiates a guest on creation and exposes
 /// methods for communicating with the guest. The guest lifetime
 /// is tied to the controller's; dropping the controller will shutdown
 /// the guest.
