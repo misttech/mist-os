@@ -9,22 +9,21 @@ mod tests {
         session_manager_lib,
     };
 
-    const GRAPHICAL_SESSION_URL: &'static str = "#meta/graphical-session.cm";
+    const SESSION_URL: &'static str = "hello-world-session#meta/hello-world-session.cm";
 
     /// Passes if the root session launches successfully. This tells us:
     ///     - session_manager is able to use the Realm service to launch a component.
     ///     - the root session was started in the "session" collection.
-    ///     - capability routing of the Scenic service to the session collection was successful.
     #[fuchsia::test]
     async fn launch_root_session() {
         let realm =
             connect_to_protocol::<fcomponent::RealmMarker>().expect("could not connect to Realm");
 
-        let session_url = String::from(GRAPHICAL_SESSION_URL);
+        let session_url = String::from(SESSION_URL);
         println!("Session url: {}", &session_url);
 
         session_manager_lib::startup::launch_session(&session_url, &realm)
             .await
-            .expect("Failed to run session");
+            .expect("Failed to launch session");
     }
 }

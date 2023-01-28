@@ -36,5 +36,5 @@ fuchsia_component("component") {
 fuchsia_test_package("package") {
   package_name = "session-manager-integration-tests"
   test_components = [ ":component" ]
-  deps = [ "//src/session/examples/graphical-session:component" ]
+  subpackages = [ "//src/session/examples/hello-world-session" ]
 }
