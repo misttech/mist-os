@@ -5,8 +5,8 @@
 use {
     anyhow::{format_err, Context as _, Error},
     fidl::endpoints::{
-        create_request_stream, ClientEnd, DiscoverableProtocolMarker, MemberOpener, ServerEnd,
-        ServiceMarker, ServiceProxy,
+        create_request_stream, ClientEnd, DiscoverableProtocolMarker, MemberOpener, ProtocolMarker,
+        ServerEnd, ServiceMarker, ServiceProxy,
     },
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_component_test as ftest,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -92,7 +92,7 @@ impl LocalComponentHandles {
     }
 
     /// Connects to a FIDL protocol with the given name and returns a proxy to that protocol.
-    pub fn connect_to_named_protocol<P: DiscoverableProtocolMarker>(
+    pub fn connect_to_named_protocol<P: ProtocolMarker>(
         &self,
         name: &str,
     ) -> Result<P::Proxy, Error> {
