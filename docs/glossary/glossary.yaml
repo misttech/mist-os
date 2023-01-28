@@ -62,10 +62,32 @@
   related_guides: [""]
   area: ["Developer"]
 
+- term: "Bind language"
+  short_description: "The language used to write <a href=\"/docs/glossary#bind-library\">bind
+  libraries</a> and <a href=\"/docs/glossary#bind-rules\">bind rules</a> in a static file."
+  full_description: ""
+  see_also: ["<a href=\"/docs/glossary#driver-binding\">Driver binding</a>"]
+  related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
+                   "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
+- term: "Bind library"
+  short_description: "A bind library is a mechanism used to define node properties.
+  The node properties can be assigned to nodes by their
+  <a href=\"/docs/glossary#parent-driver\">parent drivers</a> or
+  used in the <a href=\"/docs/glossary#bind-rules\">bind rules</a>.
+  Bind libraries are defined through the
+  <a href=\"/docs/glossary#bind-language\">bind language</a>."
+  full_description: ""
+  see_also: ["<a href=\"/docs/glossary#driver-binding\">Driver binding</a>"]
+  related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
+                   "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
 - term: "Bind rules"
-  short_description: "Bind rules are a defined set of conditions provided by a driver that
-  must be satisfied in order for the driver to bind to a node. The conditions are evaluated against
-  node properties."
+  short_description: "Bind rules are a defined set of conditions provided by a
+  <a href=\"/docs/glossary#driver\">driver</a> that must be satisfied in order for the driver to bind
+  to a node. The conditions are evaluated against node properties. Formerly known as a bind program."
   full_description: ""
   see_also: ["<a href=\"/docs/glossary#driver-binding\">Driver binding</a>"]
   related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
@@ -567,11 +589,15 @@
   area: ["System", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Driver binding"
-  short_description: "The process where a <a href=\"/docs/glossary#driver\">driver</a> gets
-  assigned to a <a href=\"/docs/glossary#node\">node</a>, in which the driver becomes bound
-  to the node. A driver bound to a node can access the node’s
-  <a href=\"/docs/glossary#resource\">resources</a> and create child nodes."
-  full_description: ""
+  short_description: "The process where a <a href=\"/docs/glossary#driver\">driver</a> is
+  <a href=\"/docs/glossary#driver-matching\">matched</a> to a
+  <a href=\"/docs/glossary#node\">node</a>, started, and then handed the node’s
+  <a href=\"/docs/glossary#resource\">resources</a>."
+  full_description: "The process where a <a href=\"/docs/glossary#driver\">driver</a> is
+  <a href=\"/docs/glossary#driver-matching\">matched</a> to a <a href=\"/docs/glossary#node\">node</a>,
+  started, and then handed the node’s <a href=\"/docs/glossary#resource\">resources</a>.
+  A driver bound to a node can access the node's <a href=\"/docs/glossary#resource\">resources</a> and
+  create <a href=\"/docs/glossary#child-node\">child nodes</a>."
   see_also: [""]
   related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
                    "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
@@ -593,6 +619,18 @@
   see_also: [""]
   related_guides: [""]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
+
+- term: "Driver matching"
+  short_description: "The process where the Driver Framework finds a
+  <a href=\"/docs/glossary#driver\">driver</a> and assigns it to a
+  <a href=\"/docs/glossary#node\">node</a>. A driver that’s assigned to
+  the node is considered as a matched driver."
+  full_description: ""
+  see_also: [""]
+  related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/driver-binding.md\">Driver binding</a>",
+                   "<a href=\"/docs/development/drivers/tutorials/bind-rules-tutorial.md\">Bind rules tutorial</a>"]
+  area: ["System", "Devices", "Drivers", "Driver SDK"]
+
 
 - term: "Domain object"
   short_description: "The corresponding class or data type in a target language (such as C++) used
