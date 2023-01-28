@@ -17,7 +17,10 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.debugdata.Publisher",
+            protocol: [
+                "fuchsia.debugdata.Publisher",
+                "fuchsia.logger.LogSink",
+            ],
             from: "parent",
             to: "#fuzzer",
         },
