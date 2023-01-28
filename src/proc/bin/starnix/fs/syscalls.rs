@@ -1657,7 +1657,7 @@ pub fn sys_epoll_pwait2(
 
 struct ReadyPollItem {
     index: usize,
-    events: u32,
+    events: FdEvents,
 }
 
 fn poll(
@@ -1686,7 +1686,7 @@ fn poll(
         let file = current_task.files.get(FdNumber::from_raw(poll_descriptor.fd))?;
         let handler_ready_items = ready_items.clone();
         let handler = move |observed: FdEvents| {
-            handler_ready_items.lock().push(ReadyPollItem { index, events: observed.bits() });
+            handler_ready_items.lock().push(ReadyPollItem { index, events: observed });
         };
 
         let sought_events = FdEvents::from_bits_truncate(poll_descriptor.events as u32)
@@ -1697,16 +1697,22 @@ fn poll(
             &waiter,
             sought_events,
             Box::new(handler),
-            WaitAsyncOptions::empty(),
+            WaitAsyncOptions::EDGE_TRIGGERED,
         );
+        let events = file.query_events(current_task) & sought_events;
+        if !events.is_empty() {
+            ready_items.lock().push(ReadyPollItem { index, events });
+        }
     }
 
-    let mask = mask.unwrap_or_else(|| current_task.read().signals.mask());
-    match current_task.wait_with_temporary_mask(mask, |current_task| {
-        waiter.wait_until(current_task, zx::Time::after(timeout))
-    }) {
-        Err(err) if err == ETIMEDOUT => {}
-        result => result?,
+    if ready_items.lock().is_empty() {
+        let mask = mask.unwrap_or_else(|| current_task.read().signals.mask());
+        match current_task.wait_with_temporary_mask(mask, |current_task| {
+            waiter.wait_until(current_task, zx::Time::after(timeout))
+        }) {
+            Err(err) if err == ETIMEDOUT => {}
+            result => result?,
+        }
     }
 
     let ready_items = ready_items.lock();
@@ -1715,7 +1721,7 @@ fn poll(
             FdEvents::from_bits_truncate(pollfds[ready_item.index].events as u32)
                 | FdEvents::POLLERR
                 | FdEvents::POLLHUP;
-        let return_events = interested_events.bits() & ready_item.events;
+        let return_events = (interested_events & ready_item.events).bits();
         pollfds[ready_item.index].revents = return_events as i16;
     }
 

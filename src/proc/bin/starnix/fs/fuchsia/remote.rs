@@ -14,7 +14,7 @@ use syncio::{
 use crate::auth::FsCred;
 use crate::fs::*;
 use crate::lock::{Mutex, RwLockReadGuard, RwLockWriteGuard};
-use crate::logging::{impossible_error, log_warn};
+use crate::logging::*;
 use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
@@ -154,27 +154,22 @@ fn get_events_from_zxio_signals(signals: zxio::zxio_signals_t) -> FdEvents {
 
     let mut events = FdEvents::empty();
 
-    if zxio_signals.intersects(ZxioSignals::READABLE) {
+    if zxio_signals.contains(ZxioSignals::READABLE) {
         events |= FdEvents::POLLIN;
     }
-
-    if zxio_signals.intersects(ZxioSignals::OUT_OF_BAND) {
+    if zxio_signals.contains(ZxioSignals::OUT_OF_BAND) {
         events |= FdEvents::POLLPRI;
     }
-
-    if zxio_signals.intersects(ZxioSignals::WRITABLE) {
+    if zxio_signals.contains(ZxioSignals::WRITABLE) {
         events |= FdEvents::POLLOUT;
     }
-
-    if zxio_signals.intersects(ZxioSignals::ERROR) {
+    if zxio_signals.contains(ZxioSignals::ERROR) {
         events |= FdEvents::POLLERR;
     }
-
-    if zxio_signals.intersects(ZxioSignals::PEER_CLOSED) {
+    if zxio_signals.contains(ZxioSignals::PEER_CLOSED) {
         events |= FdEvents::POLLHUP;
     }
-
-    if zxio_signals.intersects(ZxioSignals::READ_DISABLED) {
+    if zxio_signals.contains(ZxioSignals::READ_DISABLED) {
         events |= FdEvents::POLLRDHUP;
     }
 
@@ -344,9 +339,8 @@ pub fn zxio_cancel_wait(zxio: &Arc<Zxio>, waiter: &Waiter, key: WaitKey) -> bool
     did_cancel
 }
 
-fn zxio_query_events(zxio: &Arc<Zxio>) -> FdEvents {
-    let signals = get_zxio_signals_from_events(FdEvents::POLLIN | FdEvents::POLLOUT);
-    let (handle, signals) = zxio.wait_begin(signals);
+pub fn zxio_query_events(zxio: &Arc<Zxio>) -> FdEvents {
+    let (handle, signals) = zxio.wait_begin(ZxioSignals::all().bits());
     // Wait can error out if the remote gets closed.
     let observed_signals = match handle.wait(signals, zx::Time::INFINITE_PAST) {
         Ok(signals) => signals,

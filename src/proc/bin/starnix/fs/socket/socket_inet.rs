@@ -7,7 +7,7 @@ use super::*;
 use crate::fs::buffers::*;
 use crate::fs::fuchsia::*;
 use crate::fs::*;
-use crate::logging::not_implemented;
+use crate::logging::*;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::task::*;
 use crate::types::*;
@@ -228,8 +228,7 @@ impl SocketOps for InetSocket {
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {
-        not_implemented!("?", "InetSocket::query_events is stubbed");
-        FdEvents::empty()
+        zxio_query_events(&self.zxio)
     }
 
     fn shutdown(&self, _socket: &Socket, how: SocketShutdownFlags) -> Result<(), Errno> {

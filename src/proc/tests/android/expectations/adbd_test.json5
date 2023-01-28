@@ -25,7 +25,6 @@
                 "sysdeps_poll.timeout",
                 "sysdeps_poll.invalid_fd",
                 "sysdeps_poll.duplicate_fd",
-                "sysdeps_poll.fd_count",
                 "ShellServiceTest.RawNoProtocolSubprocess",
                 "ShellServiceTest.PtyNoProtocolSubprocess",
                 "ShellServiceTest.RawShellProtocolSubprocess",

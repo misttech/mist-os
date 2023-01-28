@@ -599,7 +599,6 @@
                 "PollTest.NonBlockingEventPOLLWRNORM",
                 "PollTest.NonBlockingEventPOLLWRNORM_POLLOUT",
                 "PollTest.BlockingEventPOLLWRNORM_POLLOUT",
-                "PollTest.Nfds",
 
                 // ppoll_test - https://fxbug.dev/79316
                 // InvalidMaskSize requires an additional parameter to ppoll, need to determine
