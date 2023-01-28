@@ -1247,9 +1247,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"socket"`
+**Current value (from the default):** `"libcurl"`
 
-From //third_party/crashpad/src/util/net/tls.gni:19
+From //third_party/crashpad/src/util/net/tls.gni:21
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2648,7 +2648,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2683,7 +2683,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -3643,7 +3643,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -3787,7 +3787,7 @@ If you add labels to this variable, these will be included in the 'host'
 artifact set, which represents an additional set of host-only software that
 is produced by the build.
 
-**Current value for `target_cpu = "arm64"`:** `["//tools/devshell:fx", "//tools/bindc:host"]`
+**Current value for `target_cpu = "arm64"`:** `["//tools/devshell:fx", "//tools/bindc:host", "//tools/net/device-finder:host"]`
 
 From //out/not-default/args.gn:12
 
@@ -3795,7 +3795,7 @@ From //out/not-default/args.gn:12
 
 From //BUILD.gn:78
 
-**Current value for `target_cpu = "x64"`:** `["//tools/devshell:fx", "//tools/bindc:host"]`
+**Current value for `target_cpu = "x64"`:** `["//tools/devshell:fx", "//tools/bindc:host", "//tools/net/device-finder:host"]`
 
 From //out/not-default/args.gn:12
 
@@ -4453,7 +4453,7 @@ From //BUILD.gn:73
 
 ### legacy_universe_package_labels
 
-**Current value for `target_cpu = "arm64"`:** `["//tools/net/device-finder:host", "//build/images/tools:fastboot"]`
+**Current value for `target_cpu = "arm64"`:** `[]`
 
 From //products/common/bringup.gni:31
 
@@ -4461,7 +4461,7 @@ From //products/common/bringup.gni:31
 
 From //BUILD.gn:65
 
-**Current value for `target_cpu = "x64"`:** `["//tools/net/device-finder:host", "//build/images/tools:fastboot"]`
+**Current value for `target_cpu = "x64"`:** `[]`
 
 From //products/common/bringup.gni:31
 
@@ -5426,7 +5426,7 @@ package flavors.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:43
+From //products/common/bringup.gni:39
 
 **Overridden from the default:** `[]`
 
@@ -5434,7 +5434,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:43
+From //products/common/bringup.gni:39
 
 **Overridden from the default:** `[]`
 
@@ -7288,7 +7288,7 @@ an extension mechanism for SDK bits outside of the main repository.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //products/common/bringup.gni:45
+From //products/common/bringup.gni:41
 
 **Overridden from the default:** `[]`
 
@@ -7296,7 +7296,7 @@ From //BUILD.gn:89
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //products/common/bringup.gni:45
+From //products/common/bringup.gni:41
 
 **Overridden from the default:** `[]`
 
@@ -7800,7 +7800,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8139,7 +8139,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/lib/vulkan/build/config.gni:40
 
