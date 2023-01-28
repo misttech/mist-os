@@ -467,7 +467,7 @@ impl ProjectSampler {
             metric_logger_factory
                 .create_metric_event_logger(project_spec, metrics_server_end)
                 .await?
-                .map_err(|e| format_err!("error response {:?}", e))?;
+                .map_err(|e| format_err!("error response for project {}: {:?}", project_id, e))?;
             metric_loggers.insert(project_id, metric_logger_proxy);
         }
         let mut all_selectors = Vec::<String>::new();
@@ -482,7 +482,7 @@ impl ProjectSampler {
                     metric_logger_factory
                         .create_metric_event_logger(project_spec, metrics_server_end)
                         .await?
-                        .map_err(|e| format_err!("error response {:?}", e))?;
+                        .map_err(|e| format_err!("error response for project {} while creating metric logger {}: {:?}", project_id, metric_project_id, e))?;
                     metric_loggers.insert(metric_project_id, metric_logger_proxy);
                 }
             }
