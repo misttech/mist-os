@@ -1247,9 +1247,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"socket"`
+**Current value (from the default):** `"libcurl"`
 
-From //third_party/crashpad/src/util/net/tls.gni:19
+From //third_party/crashpad/src/util/net/tls.gni:21
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2648,7 +2648,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2683,7 +2683,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -2963,7 +2963,7 @@ Which requires the following, which could be in args.gn, or in a file
 imported from it (e.g. //vendor/acme/products/device.gni):
 
    extra_gn_labels_for_bazel_inputs = [
-     "//vendor/acme/proprietary:build_installer"
+     "//vendor/acme/proprietary:acme_firmware"
    ]
 
 In order to ensure that the @legacy_ninja_build_outputs//:acme_firmware
@@ -3643,7 +3643,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7800,7 +7800,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8139,7 +8139,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/lib/vulkan/build/config.gni:40
 
