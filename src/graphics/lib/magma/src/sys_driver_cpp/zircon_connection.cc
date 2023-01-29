@@ -4,6 +4,8 @@
 
 #include "zircon_connection.h"
 
+#include <lib/async/cpp/task.h>
+
 #include <optional>
 
 #include "magma/magma_common_defs.h"
@@ -168,58 +170,57 @@ struct AsyncHandleWait : public async_wait {
   void* completer_context;
 };
 
-bool ZirconConnection::AsyncTaskHandler(async_dispatcher_t* dispatcher, AsyncTask* task,
-                                        zx_status_t status) {
-  switch (static_cast<MSD_CONNECTION_NOTIFICATION_TYPE>(task->notification.type)) {
-    case MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND: {
-      zx_status_t status = zx_channel_write(server_notification_endpoint_.get(), 0,
-                                            task->notification.u.channel_send.data,
-                                            task->notification.u.channel_send.size, nullptr, 0);
-      if (status != ZX_OK)
-        return DRETF(false, "Failed writing to channel: %s", zx_status_get_string(status));
-      return true;
+void ZirconConnection::NotificationChannelSend(cpp20::span<uint8_t> data) {
+  async::PostTask(async_loop_.dispatcher(),
+                  [this, data = std::vector<uint8_t>(data.begin(), data.end())]() {
+                    zx_status_t status = server_notification_endpoint_.write(
+                        0, data.data(), static_cast<uint32_t>(data.size()), nullptr, 0);
+                    if (status != ZX_OK)
+                      DLOG("Failed writing to channel: %s", zx_status_get_string(status));
+                  });
+}
+void ZirconConnection::ContextKilled() {
+  async::PostTask(async_loop_.dispatcher(),
+                  [this]() { SetError(nullptr, MAGMA_STATUS_CONTEXT_KILLED); });
+}
+
+void ZirconConnection::PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) {
+  DASSERT(false);
+}
+
+void ZirconConnection::HandleWait(msd_connection_handle_wait_start_t starter,
+                                  msd_connection_handle_wait_complete_t completer,
+                                  void* wait_context, zx::unowned_handle handle) {
+  async::PostTask(async_loop_.dispatcher(), [this, starter, completer, wait_context,
+                                             handle = handle->get()]() mutable {
+    DASSERT(handle != ZX_HANDLE_INVALID);
+
+    auto wait_ptr = std::make_unique<AsyncHandleWait>(completer, wait_context, handle);
+
+    zx_status_t status = async_begin_wait(async_loop()->dispatcher(), wait_ptr.get());
+    if (status != ZX_OK) {
+      DLOG("async_begin_wait failed: %s", zx_status_get_string(status));
+      return;
     }
 
-    case MSD_CONNECTION_NOTIFICATION_CONTEXT_KILLED:
-      // Setting the error will close the connection.
-      SetError(nullptr, MAGMA_STATUS_CONTEXT_KILLED);
-      return true;
+    starter(wait_context, wait_ptr.release());
+  });
+}
 
-    case MSD_CONNECTION_NOTIFICATION_PERFORMANCE_COUNTERS_READ_COMPLETED:
-      // Should be handled in MagmaSystemConnection.
-      break;
+void ZirconConnection::HandleWaitCancel(void* cancel_token) {
+  async::PostTask(async_loop_.dispatcher(), [this, cancel_token]() {
+    auto wait_ptr = reinterpret_cast<AsyncHandleWait*>(cancel_token);
+    DASSERT(wait_ptr);
 
-    case MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT: {
-      DASSERT(task->notification.u.handle_wait.handle != ZX_HANDLE_INVALID);
-
-      auto wait_ptr = std::make_unique<AsyncHandleWait>(
-          task->notification.u.handle_wait.completer, task->notification.u.handle_wait.wait_context,
-          task->notification.u.handle_wait.handle);
-
-      zx_status_t status = async_begin_wait(async_loop()->dispatcher(), wait_ptr.get());
-      if (status != ZX_OK)
-        return DRETF(false, "async_begin_wait failed: %s", zx_status_get_string(status));
-
-      task->notification.u.handle_wait.starter(task->notification.u.handle_wait.wait_context,
-                                               wait_ptr.release());
-      return true;
+    zx_status_t status = async_cancel_wait(async_loop()->dispatcher(), wait_ptr);
+    if (status != ZX_OK) {
+      DLOG("async_cancel_wait failed: %s", zx_status_get_string(status));
+      return;
     }
 
-    case MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT_CANCEL: {
-      auto wait_ptr =
-          reinterpret_cast<AsyncHandleWait*>(task->notification.u.handle_wait_cancel.cancel_token);
-      DASSERT(wait_ptr);
-
-      zx_status_t status = async_cancel_wait(async_loop()->dispatcher(), wait_ptr);
-      if (status != ZX_OK)
-        return DRETF(false, "async_cancel_wait failed: %s", zx_status_get_string(status));
-
-      // Call back to ensure cleanup
-      AsyncHandleWait::Handler(async_loop()->dispatcher(), wait_ptr, ZX_ERR_CANCELED, nullptr);
-      return true;
-    }
-  }
-  return DRETF(false, "Unhandled notification type: %lu", task->notification.type);
+    // Call back to ensure cleanup
+    AsyncHandleWait::Handler(async_loop()->dispatcher(), wait_ptr, ZX_ERR_CANCELED, nullptr);
+  });
 }
 
 void ZirconConnection::EnableFlowControl(EnableFlowControlCompleter::Sync& completer) {

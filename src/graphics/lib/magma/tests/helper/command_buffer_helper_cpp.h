@@ -2,41 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/async-loop/loop.h>
+#include <lib/async/cpp/task.h>
+
 #include <gtest/gtest.h>
 
+#include "msd/msd_cc.h"
 #include "platform_pci_device.h"
 #include "sys_driver_cpp/magma_driver.h"
 #include "sys_driver_cpp/magma_system_connection.h"
 #include "sys_driver_cpp/magma_system_context.h"
 
 // a class to create and own the command buffer were trying to execute
-class CommandBufferHelper {
+class CommandBufferHelper final : public msd::NotificationHandler {
  public:
   static std::unique_ptr<CommandBufferHelper> Create(
       magma::PlatformPciDevice* platform_device = nullptr) {
-    auto msd_drv = msd_driver_unique_ptr_t(msd_driver_create(), &msd_driver_destroy);
+    auto msd_drv = msd::Driver::Create();
     if (!msd_drv)
       return DRETP(nullptr, "failed to create msd driver");
 
-    msd_driver_configure(msd_drv.get(), MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
+    msd_drv->Configure(MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
 
     void* device_handle = platform_device ? platform_device->GetDeviceHandle() : nullptr;
-    auto msd_dev = msd_driver_create_device(msd_drv.get(), device_handle);
+    auto msd_dev = msd_drv->CreateDevice(device_handle);
     if (!msd_dev)
       return DRETP(nullptr, "failed to create msd device");
-    auto dev =
-        std::shared_ptr<MagmaSystemDevice>(MagmaSystemDevice::Create(MsdDeviceUniquePtr(msd_dev)));
+    auto dev = std::shared_ptr<MagmaSystemDevice>(
+        MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev)));
     uint32_t ctx_id = 0;
-    auto msd_connection_t = msd_device_open(msd_dev, 0);
-    if (!msd_connection_t)
+    auto msd_connection = dev->msd_dev()->Open(0);
+    if (!msd_connection)
       return DRETP(nullptr, "msd_device_open failed");
     auto connection = std::unique_ptr<MagmaSystemConnection>(
-        new MagmaSystemConnection(dev, MsdConnectionUniquePtr(msd_connection_t)));
+        new MagmaSystemConnection(dev, std::move(msd_connection)));
     if (!connection)
       return DRETP(nullptr, "failed to connect to msd device");
     connection->CreateContext(ctx_id);
     auto ctx = connection->LookupContext(ctx_id);
-    if (!msd_dev)
+    if (!ctx)
       return DRETP(nullptr, "failed to create context");
 
     return std::unique_ptr<CommandBufferHelper>(
@@ -50,9 +54,9 @@ class CommandBufferHelper {
   static constexpr uint32_t kSignalSemaphoreCount = 2;
 
   std::vector<MagmaSystemBuffer*>& resources() { return resources_; }
-  std::vector<msd_buffer_t*>& msd_resources() { return msd_resources_; }
+  std::vector<msd::Buffer*>& msd_resources() { return msd_resources_; }
 
-  msd_context_t* ctx() { return ctx_->msd_ctx(); }
+  msd::Context* ctx() { return ctx_->msd_ctx(); }
   MagmaSystemDevice* dev() { return dev_.get(); }
   MagmaSystemConnection* connection() { return connection_.get(); }
 
@@ -61,8 +65,8 @@ class CommandBufferHelper {
     return buffer_.get();
   }
 
-  msd_semaphore_t** msd_wait_semaphores() { return msd_wait_semaphores_.data(); }
-  msd_semaphore_t** msd_signal_semaphores() { return msd_signal_semaphores_.data(); }
+  msd::Semaphore** msd_wait_semaphores() { return msd_wait_semaphores_.data(); }
+  msd::Semaphore** msd_signal_semaphores() { return msd_signal_semaphores_.data(); }
 
   magma_command_buffer* abi_cmd_buf() {
     DASSERT(buffer_data_);
@@ -98,40 +102,10 @@ class CommandBufferHelper {
     if (!ctx_->ExecuteCommandBufferWithResources(std::move(command_buffer), std::move(resources),
                                                  std::move(semaphores)))
       return false;
-
     ProcessNotifications();
     return true;
   }
-
-  void ProcessNotifications() {
-    while (notifications_.size()) {
-      std::vector<msd_notification_t> processing_notifications;
-      notifications_.swap(processing_notifications);
-
-      for (auto& notification : processing_notifications) {
-        static int cancel_token;
-
-        if (notification.type == MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT_CANCEL) {
-          EXPECT_EQ(notification.u.handle_wait_cancel.cancel_token, &cancel_token);
-
-        } else if (notification.type == MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT) {
-          notification.u.handle_wait.starter(notification.u.handle_wait.wait_context,
-                                             &cancel_token);
-
-          magma_handle_t handle_copy;
-          ASSERT_TRUE(magma::PlatformHandle::duplicate_handle(notification.u.handle_wait.handle,
-                                                              &handle_copy));
-
-          auto semaphore = magma::PlatformSemaphore::Import(handle_copy);
-          ASSERT_TRUE(semaphore);
-          semaphore->Signal();
-
-          notification.u.handle_wait.completer(notification.u.handle_wait.wait_context,
-                                               MAGMA_STATUS_OK, notification.u.handle_wait.handle);
-        }
-      }
-    }
-  }
+  void ProcessNotifications() { loop_.RunUntilIdle(); }
 
   bool ExecuteAndWait() {
     if (!Execute())
@@ -144,20 +118,40 @@ class CommandBufferHelper {
     return true;
   }
 
-  static void NotificationCallback(void* token, msd_notification_t* notification) {
-    auto helper = reinterpret_cast<CommandBufferHelper*>(token);
-    helper->notifications_.push_back(*notification);
+  // msd::NotificationHandler implementation.
+  void NotificationChannelSend(cpp20::span<uint8_t> data) override {}
+  void ContextKilled() override {}
+  void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override {}
+  void HandleWait(msd_connection_handle_wait_start_t starter,
+                  msd_connection_handle_wait_complete_t completer, void* wait_context,
+                  zx::unowned_handle handle) override {
+    async::PostTask(loop_.dispatcher(),
+                    [this, starter, completer, wait_context, handle = handle->get()]() {
+                      starter(wait_context, &cancel_token_);
+
+                      magma_handle_t handle_copy;
+                      ASSERT_TRUE(magma::PlatformHandle::duplicate_handle(handle, &handle_copy));
+
+                      auto semaphore = magma::PlatformSemaphore::Import(handle_copy);
+                      ASSERT_TRUE(semaphore);
+                      semaphore->Signal();
+
+                      completer(wait_context, MAGMA_STATUS_OK, handle);
+                    });
+  }
+  void HandleWaitCancel(void* cancel_token) override {
+    async::PostTask(loop_.dispatcher(),
+                    [this, cancel_token]() { EXPECT_EQ(cancel_token, &cancel_token_); });
   }
 
  private:
-  CommandBufferHelper(msd_driver_unique_ptr_t msd_drv, std::shared_ptr<MagmaSystemDevice> dev,
+  CommandBufferHelper(std::unique_ptr<msd::Driver> msd_drv, std::shared_ptr<MagmaSystemDevice> dev,
                       std::unique_ptr<MagmaSystemConnection> connection, MagmaSystemContext* ctx)
       : msd_drv_(std::move(msd_drv)),
         dev_(std::move(dev)),
         connection_(std::move(connection)),
         ctx_(ctx) {
-    connection_->SetNotificationCallback(NotificationCallback, this);
-
+    connection_->SetNotificationCallback(this);
     uint64_t buffer_size = sizeof(magma_command_buffer) + sizeof(uint64_t) * kSignalSemaphoreCount +
                            sizeof(magma_exec_resource) * kNumResources;
 
@@ -180,7 +174,7 @@ class CommandBufferHelper {
     {
       auto batch_buf = &abi_resources()[0];
       auto buffer = MagmaSystemBuffer::Create(
-          magma::PlatformBuffer::Create(kBufferSize, "command-buffer-batch"));
+          dev_->driver(), magma::PlatformBuffer::Create(kBufferSize, "command-buffer-batch"));
       DASSERT(buffer);
       uint32_t duplicate_handle;
       success = buffer->platform_buffer()->duplicate_handle(&duplicate_handle);
@@ -199,8 +193,8 @@ class CommandBufferHelper {
     // other buffers
     for (uint32_t i = 1; i < kNumResources; i++) {
       auto resource = &abi_resources()[i];
-      auto buffer =
-          MagmaSystemBuffer::Create(magma::PlatformBuffer::Create(kBufferSize, "resource"));
+      auto buffer = MagmaSystemBuffer::Create(
+          dev_->driver(), magma::PlatformBuffer::Create(kBufferSize, "resource"));
       DASSERT(buffer);
       uint32_t duplicate_handle;
       success = buffer->platform_buffer()->duplicate_handle(&duplicate_handle);
@@ -258,21 +252,22 @@ class CommandBufferHelper {
     }
   }
 
-  msd_driver_unique_ptr_t msd_drv_;
+  std::unique_ptr<msd::Driver> msd_drv_;
   std::shared_ptr<MagmaSystemDevice> dev_;
   std::unique_ptr<MagmaSystemConnection> connection_;
   MagmaSystemContext* ctx_;  // owned by the connection
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 
   std::unique_ptr<magma::PlatformBuffer> buffer_;
   // mapped address of buffer_, do not free
   void* buffer_data_ = nullptr;
 
   std::vector<MagmaSystemBuffer*> resources_;
-  std::vector<msd_buffer_t*> msd_resources_;
+  std::vector<msd::Buffer*> msd_resources_;
 
   std::vector<std::shared_ptr<magma::PlatformSemaphore>> wait_semaphores_;
-  std::vector<msd_semaphore_t*> msd_wait_semaphores_;
+  std::vector<msd::Semaphore*> msd_wait_semaphores_;
   std::vector<std::shared_ptr<magma::PlatformSemaphore>> signal_semaphores_;
-  std::vector<msd_semaphore_t*> msd_signal_semaphores_;
-  std::vector<msd_notification_t> notifications_;
+  std::vector<msd::Semaphore*> msd_signal_semaphores_;
+  int cancel_token_ = 0;
 };

@@ -24,13 +24,12 @@ std::shared_ptr<magma::ZirconConnection> MagmaSystemDevice::Open(
     std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
     std::unique_ptr<magma::PlatformHandle> server_endpoint,
     std::unique_ptr<magma::PlatformHandle> server_notification_endpoint) {
-  msd_connection_t* msd_connection = msd_device_open(device->msd_dev(), client_id);
+  std::unique_ptr<msd::Connection> msd_connection = device->msd_dev()->Open(client_id);
   if (!msd_connection)
     return DRETP(nullptr, "msd_device_open failed");
 
   return magma::ZirconConnection::Create(
-      std::make_unique<MagmaSystemConnection>(std::move(device),
-                                              MsdConnectionUniquePtr(msd_connection)),
+      std::make_unique<MagmaSystemConnection>(std::move(device), std::move(msd_connection)),
       client_id, std::move(server_endpoint), std::move(server_notification_endpoint));
 }
 
@@ -83,11 +82,12 @@ void MagmaSystemDevice::Shutdown() {
 }
 
 void MagmaSystemDevice::SetMemoryPressureLevel(MagmaMemoryPressureLevel level) {
-  msd_device_set_memory_pressure_level(msd_dev(), level);
+  msd_dev()->SetMemoryPressureLevel(level);
 }
 
 magma::Status MagmaSystemDevice::Query(uint64_t id, magma_handle_t* result_buffer_out,
                                        uint64_t* result_out) {
+  zx::vmo vmo;
   switch (id) {
     case MAGMA_QUERY_MAXIMUM_INFLIGHT_PARAMS:
       *result_out = magma::ZirconConnection::kMaxInflightMessages;
@@ -95,20 +95,13 @@ magma::Status MagmaSystemDevice::Query(uint64_t id, magma_handle_t* result_buffe
       *result_out |= magma::ZirconConnection::kMaxInflightMemoryMB;
       return MAGMA_STATUS_OK;
   }
-  return msd_device_query(msd_dev(), id, result_buffer_out, result_out);
+  magma_status_t status = msd_dev()->Query(id, &vmo, result_out);
+  if (result_buffer_out) {
+    *result_buffer_out = vmo.release();
+  }
+  return status;
 }
 
 magma_status_t MagmaSystemDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_list_out) {
-  icd_list_out->clear();
-  uint64_t list_size;
-  magma_status_t status = msd_device_get_icd_list(msd_dev(), 0, nullptr, &list_size);
-  if (status != MAGMA_STATUS_OK)
-    return DRET(status);
-  icd_list_out->resize(list_size);
-  status =
-      msd_device_get_icd_list(msd_dev(), icd_list_out->size(), icd_list_out->data(), &list_size);
-  if (status != MAGMA_STATUS_OK)
-    return DRET(status);
-  DASSERT(list_size == icd_list_out->size());
-  return MAGMA_STATUS_OK;
+  return msd_dev()->GetIcdList(icd_list_out);
 }

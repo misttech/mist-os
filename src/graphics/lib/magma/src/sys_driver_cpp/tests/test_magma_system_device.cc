@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "magma/magma.h"
-#include "mock/mock_msd.h"
+#include "mock/mock_msd_cc.h"
 #include "sys_driver_cpp/magma_system_device.h"
 
 class MsdMockDevice_GetDeviceId : public MsdMockDevice {
@@ -21,8 +21,9 @@ class MsdMockDevice_GetDeviceId : public MsdMockDevice {
 TEST(MagmaSystemDevice, GetDeviceId) {
   uint32_t test_id = 0xdeadbeef;
 
-  auto msd_dev = new MsdMockDevice_GetDeviceId(test_id);
-  auto device = MagmaSystemDevice::Create(MsdDeviceUniquePtr(msd_dev));
+  auto msd_drv = std::make_unique<MsdMockDriver>();
+  auto msd_dev = std::make_unique<MsdMockDevice_GetDeviceId>(test_id);
+  auto device = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
 
   uint32_t device_id = device->GetDeviceId();
   // For now device_id is invalid
@@ -34,8 +35,9 @@ TEST(MagmaSystemDevice, GetDeviceId) {
 }
 
 TEST(MagmaSystemDevice, MaximumInflightMessages) {
-  auto msd_dev = new MsdMockDevice_GetDeviceId(0 /* device_id*/);
-  auto device = MagmaSystemDevice::Create(MsdDeviceUniquePtr(msd_dev));
+  auto msd_dev = std::make_unique<MsdMockDevice_GetDeviceId>(0 /* device_id*/);
+  auto msd_drv = std::make_unique<MsdMockDriver>();
+  auto device = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
 
   uint64_t value;
   EXPECT_TRUE(device->Query(MAGMA_QUERY_MAXIMUM_INFLIGHT_PARAMS, &value));
@@ -44,8 +46,9 @@ TEST(MagmaSystemDevice, MaximumInflightMessages) {
 }
 
 TEST(MagmaSystemDevice, GetIcdList) {
-  auto msd_dev = MsdDeviceUniquePtr(new MsdMockDevice);
-  auto device = MagmaSystemDevice::Create(std::move(msd_dev));
+  auto msd_drv = std::make_unique<MsdMockDriver>();
+  auto msd_dev = std::make_unique<MsdMockDevice>();
+  auto device = MagmaSystemDevice::Create(msd_drv.get(), std::move(msd_dev));
 
   std::vector<msd_icd_info_t> icds;
   magma_status_t status = device->GetIcdList(&icds);

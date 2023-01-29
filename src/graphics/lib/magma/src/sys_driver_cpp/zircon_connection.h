@@ -17,6 +17,7 @@
 
 #include "magma_util/dlog.h"
 #include "msd/msd_defs.h"
+#include "msd_cc.h"
 #include "platform_handle.h"
 #include "platform_object.h"
 #include "platform_thread.h"
@@ -34,40 +35,8 @@ class PlatformPerfCountPool {
                                                          uint32_t result_flags) = 0;
 };
 
-static_assert(sizeof(msd_notification_t) == 4096, "msd_notification_t is not a page");
-
-inline void CopyNotification(const msd_notification_t* src, msd_notification_t* dst) {
-  dst->type = src->type;
-  switch (dst->type) {
-    case MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND:
-      DASSERT(src->u.channel_send.size <= MSD_CHANNEL_SEND_MAX_SIZE);
-      memcpy(dst->u.channel_send.data, src->u.channel_send.data, src->u.channel_send.size);
-      dst->u.channel_send.size = src->u.channel_send.size;
-      break;
-
-    case MSD_CONNECTION_NOTIFICATION_PERFORMANCE_COUNTERS_READ_COMPLETED:
-      memcpy(&dst->u.perf_counter_result, &src->u.perf_counter_result,
-             sizeof(src->u.perf_counter_result));
-      break;
-
-    case MSD_CONNECTION_NOTIFICATION_CONTEXT_KILLED:
-      break;
-
-    case MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT:
-      dst->u.handle_wait = src->u.handle_wait;
-      break;
-
-    case MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT_CANCEL:
-      dst->u.handle_wait_cancel = src->u.handle_wait_cancel;
-      break;
-
-    default:
-      DMESSAGE("Unhandled notification type: %lu", dst->type);
-      DASSERT(false);
-  }
-}
-
-class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary> {
+class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
+                         public msd::NotificationHandler {
  public:
   static constexpr uint32_t kMaxInflightMessages = 1000;
   static constexpr uint32_t kMaxInflightMemoryMB = 100;
@@ -91,8 +60,7 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary> {
     virtual magma::Status BufferRangeOp(uint64_t buffer_id, uint32_t op, uint64_t start,
                                         uint64_t length) = 0;
 
-    virtual void SetNotificationCallback(msd_connection_notification_callback_t callback,
-                                         void* token) = 0;
+    virtual void SetNotificationCallback(msd::NotificationHandler* handler) = 0;
     virtual magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
                                                    void* commands, uint64_t semaphore_count,
                                                    uint64_t* semaphore_ids) = 0;
@@ -126,19 +94,6 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary> {
     ZirconConnection* connection;
   };
 
-  struct AsyncTask : public async_task {
-    AsyncTask(ZirconConnection* connection, msd_notification_t* notification) {
-      this->state = ASYNC_STATE_INIT;
-      this->handler = AsyncTaskHandlerStatic;
-      this->deadline = async_now(connection->async_loop()->dispatcher());
-      this->connection = connection;
-      CopyNotification(notification, &this->notification);
-    }
-
-    ZirconConnection* connection;
-    msd_notification_t notification;
-  };
-
   static std::shared_ptr<ZirconConnection> Create(
       std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
       std::unique_ptr<magma::PlatformHandle> server_endpoint,
@@ -155,10 +110,10 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary> {
         async_wait_shutdown_(
             this, static_cast<magma::ZirconPlatformEvent*>(shutdown_event.get())->zx_handle(),
             ZX_EVENT_SIGNALED) {
-    delegate_->SetNotificationCallback(NotificationCallbackStatic, this);
+    delegate_->SetNotificationCallback(this);
   }
 
-  ~ZirconConnection() { delegate_->SetNotificationCallback(nullptr, 0); }
+  ~ZirconConnection() override { delegate_->SetNotificationCallback(nullptr); }
 
   bool Bind(zx::channel server_endpoint);
 
@@ -186,6 +141,15 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary> {
 
   uint64_t get_request_count() { return request_count_; }
 
+  // msd::NotificationHandler implementation.
+  void NotificationChannelSend(cpp20::span<uint8_t> data) override;
+  void ContextKilled() override;
+  void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override;
+  void HandleWait(msd_connection_handle_wait_start_t starter,
+                  msd_connection_handle_wait_complete_t completer, void* wait_context,
+                  zx::unowned_handle handle) override;
+  void HandleWaitCancel(void* cancel_token) override;
+
  private:
   static void AsyncWaitHandlerStatic(async_dispatcher_t* dispatcher, async_wait_t* async_wait,
                                      zx_status_t status, const zx_packet_signal_t* signal) {
@@ -195,25 +159,6 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary> {
 
   void AsyncWaitHandler(async_dispatcher_t* dispatcher, AsyncWait* wait, zx_status_t status,
                         const zx_packet_signal_t* signal);
-
-  // Could occur on an arbitrary thread (see |msd_connection_set_notification_callback|).
-  // MSD must ensure we aren't in the process of destroying our connection.
-  static void NotificationCallbackStatic(void* token, msd_notification_t* notification) {
-    auto connection = static_cast<ZirconConnection*>(token);
-    zx_status_t status = async_post_task(connection->async_loop()->dispatcher(),
-                                         new AsyncTask(connection, notification));
-    if (status != ZX_OK)
-      DLOG("async_post_task failed, status %s", zx_status_get_string(status));
-  }
-
-  static void AsyncTaskHandlerStatic(async_dispatcher_t* dispatcher, async_task_t* async_task,
-                                     zx_status_t status) {
-    auto task = static_cast<AsyncTask*>(async_task);
-    task->connection->AsyncTaskHandler(dispatcher, task, status);
-    delete task;
-  }
-
-  bool AsyncTaskHandler(async_dispatcher_t* dispatcher, AsyncTask* task, zx_status_t status);
 
   void ImportObject2(ImportObject2RequestView request,
                      ImportObject2Completer::Sync& _completer) override;

@@ -5,7 +5,7 @@
 #include <gtest/gtest.h>
 
 #include "helper/command_buffer_helper_cpp.h"
-#include "mock/mock_msd.h"
+#include "mock/mock_msd_cc.h"
 
 TEST(MagmaSystemContext, ExecuteCommandBuffer_Normal) {
   auto cmd_buf = CommandBufferHelper::Create();

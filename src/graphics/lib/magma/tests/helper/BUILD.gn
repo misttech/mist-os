@@ -31,7 +31,11 @@ source_set("command_buffer_helper") {
 source_set("command_buffer_helper_cpp") {
   public_configs = [ "$magma_build_root:magma_tests_include_config" ]
 
-  public_deps = [ "$magma_build_root/src/magma_util/platform:device" ]
+  public_deps = [
+    "$magma_build_root/src/magma_util/platform:device",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+  ]
 
   sources = [ "command_buffer_helper_cpp.h" ]
 

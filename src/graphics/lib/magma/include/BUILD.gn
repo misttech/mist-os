@@ -29,22 +29,29 @@ config("msd_config") {
   include_dirs = [ "msd" ]
 }
 
-source_set("msd") {
+source_set("msd_defs") {
   public_configs = [ ":msd_config" ]
-
-  sources = [
-    "msd/msd.h",
-    "msd/msd_defs.h",
-  ]
-
+  sources = [ "msd/msd_defs.h" ]
   public_deps = [ ":magma_common" ]
 }
 
-source_set("msd_cc") {
-  sources = [ "msd/msd_cc.h" ]
+source_set("msd") {
+  sources = [ "msd/msd.h" ]
 
   public_deps = [
-    ":msd",
+    ":magma_common",
+    ":msd_defs",
+  ]
+}
+
+source_set("msd_cc") {
+  sources = [
+    "msd/msd_cc.cc",
+    "msd/msd_cc.h",
+  ]
+
+  public_deps = [
+    ":msd_defs",
     "//sdk/lib/stdcompat",
     "//zircon/system/ulib/zx",
   ]

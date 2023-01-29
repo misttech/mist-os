@@ -113,8 +113,7 @@ struct SharedData {
   std::unique_ptr<magma::PlatformHandle> test_access_token;
   bool can_access_performance_counters;
   uint64_t pool_id = UINT64_MAX;
-  std::function<void(msd_connection_notification_callback_t callback, void* token)>
-      notification_handler;
+  std::function<void(msd::NotificationHandler*)> notification_handler;
   // Flow control defaults should avoid tests hitting flow control
   uint64_t max_inflight_messages = 1000u;
   uint64_t max_inflight_bytes = 1000000u;
@@ -575,11 +574,10 @@ class TestDelegate : public magma::ZirconConnection::Delegate {
     return MAGMA_STATUS_OK;
   }
 
-  void SetNotificationCallback(msd_connection_notification_callback_t callback,
-                               void* token) override {
+  void SetNotificationCallback(msd::NotificationHandler* handler) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
 
-    if (!token) {
+    if (!handler) {
       // This doesn't count as test complete because it should happen in every test when the
       // server shuts down.
       shared_data_->got_null_notification = true;
@@ -587,7 +585,7 @@ class TestDelegate : public magma::ZirconConnection::Delegate {
     }
 
     if (shared_data_->notification_handler) {
-      shared_data_->notification_handler(callback, token);
+      shared_data_->notification_handler(handler);
     }
   }
 
@@ -803,15 +801,16 @@ TEST(PlatformConnection, MapUnmapBuffer) {
 TEST(PlatformConnection, NotificationChannel) {
   auto shared_data = std::make_shared<SharedData>();
 
-  shared_data->notification_handler = [](msd_connection_notification_callback_t callback,
-                                         void* token) {
+  shared_data->notification_handler = [](msd::NotificationHandler* handler) {
     msd_notification_t n = {.type = MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND};
     *reinterpret_cast<uint32_t*>(n.u.channel_send.data) = kNotificationData;
     n.u.channel_send.size = sizeof(uint32_t);
+    uint32_t data_to_send = kNotificationData;
+    uint8_t* data_ptr = reinterpret_cast<uint8_t*>(&data_to_send);
 
     for (uint32_t i = 0; i < kNotificationCount; i++) {
-      callback(token, &n);
-      *reinterpret_cast<uint32_t*>(n.u.channel_send.data) += 1;
+      handler->NotificationChannelSend(cpp20::span(data_ptr, data_ptr + sizeof(uint32_t)));
+      data_to_send += 1;
     }
   };
 
@@ -823,8 +822,7 @@ TEST(PlatformConnection, NotificationChannel) {
 namespace {
 struct CompleterContext {
   bool expect_cancelled = false;
-  msd_connection_notification_callback_t callback = nullptr;
-  void* callback_token = nullptr;
+  msd::NotificationHandler* notification_handler = nullptr;
 
   std::shared_ptr<magma::PlatformSemaphore> wait_semaphore = magma::PlatformSemaphore::Create();
   std::shared_ptr<magma::PlatformSemaphore> signal_semaphore = magma::PlatformSemaphore::Create();
@@ -863,11 +861,9 @@ TEST(PlatformConnection, NotificationHandleWait) {
   auto context = std::make_unique<CompleterContext>();
 
   // Invoked from connection thread with shared data mutex held
-  shared_data->notification_handler =
-      [context = context.get()](msd_connection_notification_callback_t callback, void* token) {
-        context->callback = callback;
-        context->callback_token = token;
-      };
+  shared_data->notification_handler = [context = context.get()](msd::NotificationHandler* handler) {
+    context->notification_handler = handler;
+  };
 
   auto Test = TestPlatformConnection::Create(shared_data);
   ASSERT_NE(Test, nullptr);
@@ -875,17 +871,19 @@ TEST(PlatformConnection, NotificationHandleWait) {
   while (true) {
     usleep(10000);
     std::unique_lock<std::mutex> lock(shared_data->mutex);
-    if (context->callback)
+    if (context->notification_handler)
       break;
   }
 
   {
-    msd_notification_t n = {.type = MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT};
-    n.u.handle_wait.wait_context = context.get();
-    n.u.handle_wait.completer = CompleterContext::Completer;
-    n.u.handle_wait.starter = CompleterContext::Starter;
-    EXPECT_TRUE(context->wait_semaphore->duplicate_handle(&n.u.handle_wait.handle));
-    context->callback(context->callback_token, &n);
+    zx_handle_t handle;
+    EXPECT_TRUE(context->wait_semaphore->duplicate_handle(&handle));
+    zx::handle owned_handle(handle);
+
+    context->notification_handler->HandleWait(CompleterContext::Starter,
+                                              CompleterContext::Completer, context.get(),
+                                              zx::unowned_handle(owned_handle));
+    (void)owned_handle.release();
   };
 
   EXPECT_EQ(MAGMA_STATUS_OK, context->started->Wait().get());
@@ -905,11 +903,9 @@ TEST(PlatformConnection, NotificationHandleWaitCancel) {
   context->expect_cancelled = true;
 
   // Invoked from connection thread with shared data mutex held
-  shared_data->notification_handler =
-      [context = context.get()](msd_connection_notification_callback_t callback, void* token) {
-        context->callback = callback;
-        context->callback_token = token;
-      };
+  shared_data->notification_handler = [context = context.get()](msd::NotificationHandler* handler) {
+    context->notification_handler = handler;
+  };
 
   auto Test = TestPlatformConnection::Create(shared_data);
   ASSERT_NE(Test, nullptr);
@@ -917,27 +913,25 @@ TEST(PlatformConnection, NotificationHandleWaitCancel) {
   while (true) {
     usleep(10000);
     std::unique_lock<std::mutex> lock(shared_data->mutex);
-    if (context->callback)
+    if (context->notification_handler)
       break;
   }
 
   {
-    msd_notification_t n = {.type = MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT};
-    n.u.handle_wait.wait_context = context.get();
-    n.u.handle_wait.completer = CompleterContext::Completer;
-    n.u.handle_wait.starter = CompleterContext::Starter;
-    EXPECT_TRUE(context->wait_semaphore->duplicate_handle(&n.u.handle_wait.handle));
-    context->callback(context->callback_token, &n);
+    zx_handle_t handle;
+    EXPECT_TRUE(context->wait_semaphore->duplicate_handle(&handle));
+    zx::handle owned_handle(handle);
+
+    context->notification_handler->HandleWait(CompleterContext::Starter,
+                                              CompleterContext::Completer, context.get(),
+                                              zx::unowned_handle(owned_handle));
+    (void)owned_handle.release();
   };
 
   EXPECT_EQ(MAGMA_STATUS_OK, context->started->Wait().get());
   EXPECT_NE(context->cancel_token, nullptr);
 
-  {
-    msd_notification_t n = {.type = MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT_CANCEL};
-    n.u.handle_wait_cancel.cancel_token = context->cancel_token;
-    context->callback(context->callback_token, &n);
-  };
+  { context->notification_handler->HandleWaitCancel(context->cancel_token); };
 
   // Completer should still be called after cancellation?
   EXPECT_EQ(MAGMA_STATUS_OK, context->signal_semaphore->Wait().get());

@@ -37,6 +37,15 @@ class Driver {
   // Creates a device at system startup. `device_data` is a pointer to a platform-specific device
   // object which is guaranteed to outlive the returned Device.
   virtual std::unique_ptr<Device> CreateDevice(void* device_data) { return {}; }
+
+  // Creates a buffer that owns the provided handle. Can be called on any thread.
+  virtual std::unique_ptr<Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) { return {}; }
+
+  // Creates a semaphore that owns the provided handle. Can be called on any thread.
+  virtual magma_status_t ImportSemaphore(zx::event handle, uint64_t client_id,
+                                         std::unique_ptr<Semaphore>* out) {
+    return MAGMA_STATUS_UNIMPLEMENTED;
+  }
 };
 
 // This represents a single hardware device. Unless otherwise specified, all calls into this class
@@ -64,15 +73,6 @@ class Device {
 
   // Opens a device for the given client. Returns nullptr on failure
   virtual std::unique_ptr<Connection> Open(msd_client_id_t client_id) { return {}; }
-
-  // Creates a buffer that owns the provided handle. Can be called on any thread.
-  virtual std::unique_ptr<Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) { return {}; }
-
-  // Creates a semaphore that owns the provided handle. Can be called on any thread.
-  virtual magma_status_t ImportSemaphore(zx::event handle, uint64_t client_id,
-                                         std::unique_ptr<Semaphore>* out) {
-    return MAGMA_STATUS_UNIMPLEMENTED;
-  }
 };
 
 struct PerfCounterResult {
@@ -90,7 +90,7 @@ class NotificationHandler {
  public:
   virtual void NotificationChannelSend(cpp20::span<uint8_t> data) = 0;
   virtual void ContextKilled() = 0;
-  virtual void PerformanceCounterReadCompleted(PerfCounterResult& result) = 0;
+  virtual void PerformanceCounterReadCompleted(const PerfCounterResult& result) = 0;
   virtual void HandleWait(msd_connection_handle_wait_start_t starter,
                           msd_connection_handle_wait_complete_t completer, void* wait_context,
                           zx::unowned_handle handle) = 0;
@@ -161,8 +161,7 @@ class Connection {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
-  virtual magma_status_t ClearPerformanceCounters(PerfCountPool& pool,
-                                                  cpp20::span<const uint64_t> counters) {
+  virtual magma_status_t ClearPerformanceCounters(cpp20::span<const uint64_t> counters) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 };
