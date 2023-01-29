@@ -93,7 +93,7 @@ declare_args() {
   # imported from it (e.g. //vendor/acme/products/device.gni):
   #
   #    extra_gn_labels_for_bazel_inputs = [
-  #      "//vendor/acme/proprietary:build_installer"
+  #      "//vendor/acme/proprietary:acme_firmware"
   #    ]
   #
   # In order to ensure that the @legacy_ninja_build_outputs//:acme_firmware
