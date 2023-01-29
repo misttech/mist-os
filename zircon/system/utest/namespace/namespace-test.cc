@@ -39,9 +39,15 @@ const Mapping NS[] = {
 };
 
 void CreateNamespaceHelper(fdio_ns_t** out) {
-  ASSERT_TRUE(mkdir("/tmp/fake-namespace-test", 066) == 0 || errno == EEXIST);
-  ASSERT_TRUE(mkdir("/tmp/fake-namespace-test/dev", 066) == 0 || errno == EEXIST);
-  ASSERT_TRUE(mkdir("/tmp/fake-namespace-test-tmp", 066) == 0 || errno == EEXIST);
+  for (const char* path : {
+           "/tmp/fake-namespace-test",
+           "/tmp/fake-namespace-test/dev",
+           "/tmp/fake-namespace-test-tmp",
+       }) {
+    if (mkdir(path, 066) != 0) {
+      ASSERT_EQ(EEXIST, errno, "mkdir(%s): %s", path, strerror(errno));
+    }
+  }
 
   // Create new ns
   fdio_ns_t* ns;
