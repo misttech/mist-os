@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_BLOCK_DRIVERS_SDHCI_SDHCI_REG_H_
-#define SRC_STORAGE_BLOCK_DRIVERS_SDHCI_SDHCI_REG_H_
+#ifndef SRC_DEVICES_BLOCK_DRIVERS_SDHCI_SDHCI_REG_H_
+#define SRC_DEVICES_BLOCK_DRIVERS_SDHCI_SDHCI_REG_H_
 
 #include <hwreg/bitfields.h>
 
@@ -331,24 +331,6 @@ class AdmaSystemAddress : public hwreg::RegisterBase<AdmaSystemAddress, uint32_t
   }
 };
 
-class Adma2DescriptorAttributes : public hwreg::RegisterBase<Adma2DescriptorAttributes, uint16_t> {
- public:
-  static constexpr uint16_t kTypeData = 0b10;
-
-  static auto Get(uint16_t value = 0) {
-    Adma2DescriptorAttributes ret;
-    ret.set_reg_value(value);
-    return ret;
-  }
-
-  DEF_RSVDZ_FIELD(15, 6);
-  DEF_FIELD(5, 4, type);
-  DEF_RSVDZ_BIT(3);
-  DEF_BIT(2, intr);
-  DEF_BIT(1, end);
-  DEF_BIT(0, valid);
-};
-
 class HostControllerVersion : public hwreg::RegisterBase<HostControllerVersion, uint16_t> {
  public:
   static constexpr uint16_t kSpecificationVersion300 = 0x02;
@@ -360,4 +342,4 @@ class HostControllerVersion : public hwreg::RegisterBase<HostControllerVersion, 
 
 }  // namespace sdhci
 
-#endif  // SRC_STORAGE_BLOCK_DRIVERS_SDHCI_SDHCI_REG_H_
+#endif  // SRC_DEVICES_BLOCK_DRIVERS_SDHCI_SDHCI_REG_H_

@@ -7,6 +7,20 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
+source_set("dma-descriptor-builder") {
+  public = [ "dma-descriptor-builder.h" ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//src/devices/block/lib/sdmmc",
+    "//src/lib/ddk",
+    "//src/lib/vmo_store",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 driver_bind_rules("sdhci-bind") {
   rules = "sdhci.bind"
   header_output = "sdhci-bind.h"
@@ -22,6 +36,7 @@ fuchsia_driver("sdhci-driver") {
   ]
   sources = [ "sdhci.cc" ]
   deps = [
+    ":dma-descriptor-builder",
     ":sdhci-bind",
     "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",
@@ -54,6 +69,7 @@ test("sdhci-test-bin") {
     "sdhci.cc",
   ]
   deps = [
+    ":dma-descriptor-builder",
     ":sdhci-bind",
     "//sdk/banjo/fuchsia.hardware.block:fuchsia.hardware.block_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdhci:fuchsia.hardware.sdhci_banjo_cpp",

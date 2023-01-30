@@ -20,6 +20,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
+#include "dma-descriptor-builder.h"
 #include "sdhci-reg.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
@@ -142,15 +143,13 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   ddk::IoBuffer iobuf_ = {};
 
  private:
-  class DmaDescriptorBuilder;
-
   struct OwnedVmoInfo {
     uint64_t offset;
     uint64_t size;
     uint32_t rights;
   };
 
-  using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
+  using SdmmcVmoStore = DmaDescriptorBuilder<OwnedVmoInfo>::VmoStore;
 
   static void PrepareCmd(const sdmmc_req_t& req, TransferMode* transfer_mode, Command* command);
 
@@ -167,8 +166,10 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   int IrqThread() TA_EXCL(mtx_);
   void HandleTransferInterrupt(InterruptStatus status) TA_REQ(mtx_);
 
-  zx_status_t StartRequest(const sdmmc_req_t& request, DmaDescriptorBuilder& builder) TA_REQ(mtx_);
-  zx_status_t SetUpDma(const sdmmc_req_t& request, DmaDescriptorBuilder& builder) TA_REQ(mtx_);
+  zx_status_t StartRequest(const sdmmc_req_t& request, DmaDescriptorBuilder<OwnedVmoInfo>& builder)
+      TA_REQ(mtx_);
+  zx_status_t SetUpDma(const sdmmc_req_t& request, DmaDescriptorBuilder<OwnedVmoInfo>& builder)
+      TA_REQ(mtx_);
   zx_status_t FinishRequest(const sdmmc_req_t& request, uint32_t out_response[4]) TA_REQ(mtx_);
 
   void CompleteRequest() TA_REQ(mtx_);
