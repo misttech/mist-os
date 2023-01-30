@@ -37,9 +37,8 @@ impl FileOps for DevNull {
     ) -> Result<usize, Errno> {
         current_task.mm.read_each(data, |bytes| {
             log_info!(current_task, "write to devnull: {:?}", String::from_utf8_lossy(bytes));
-            Ok(Some(()))
-        })?;
-        UserBuffer::get_total_length(data)
+            Ok(bytes.len())
+        })
     }
 
     fn read_at(
@@ -79,12 +78,10 @@ impl FileOps for DevZero {
         _offset: usize,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let mut actual = 0;
         current_task.mm.write_each(data, |bytes| {
-            actual += bytes.len();
-            Ok(bytes)
-        })?;
-        Ok(actual)
+            bytes.fill(0);
+            Ok(bytes.len())
+        })
     }
 }
 
@@ -110,12 +107,10 @@ impl FileOps for DevFull {
         _offset: usize,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let mut actual = 0;
         current_task.mm.write_each(data, |bytes| {
-            actual += bytes.len();
-            Ok(bytes)
-        })?;
-        Ok(actual)
+            bytes.fill(0);
+            Ok(bytes.len())
+        })
     }
 }
 
@@ -141,13 +136,10 @@ impl FileOps for DevRandom {
         _offset: usize,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let mut actual = 0;
         current_task.mm.write_each(data, |bytes| {
-            actual += bytes.len();
             cprng_draw(bytes);
-            Ok(bytes)
-        })?;
-        Ok(actual)
+            Ok(bytes.len())
+        })
     }
 }
 

@@ -27,13 +27,10 @@ impl FileOps for SyslogFile {
         current_task: &CurrentTask,
         data: &[UserBuffer],
     ) -> Result<usize, Errno> {
-        let mut size = 0;
         current_task.mm.read_each(data, |bytes| {
             log!(level = info, tag = "stdio", "{}", String::from_utf8_lossy(bytes));
-            size += bytes.len();
-            Ok(Some(()))
-        })?;
-        Ok(size)
+            Ok(bytes.len())
+        })
     }
 
     fn read(

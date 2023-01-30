@@ -863,6 +863,8 @@ impl MemoryManagerState {
 
     /// Writes the provided bytes.
     ///
+    /// In case of success, the number of bytes written will always be `bytes.len()`.
+    ///
     /// # Parameters
     /// - `addr`: The address to write to.
     /// - `bytes`: The bytes to write.
@@ -877,7 +879,7 @@ impl MemoryManagerState {
         if bytes_written != bytes.len() {
             error!(EFAULT)
         } else {
-            Ok(bytes_written)
+            Ok(bytes.len())
         }
     }
 }
@@ -916,6 +918,8 @@ pub trait MemoryAccessor {
     fn read_memory_partial(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<usize, Errno>;
 
     /// Writes the provided bytes to `addr`.
+    ///
+    /// In case of success, the number of bytes written will always be `bytes.len()`.
     ///
     /// # Parameters
     /// - `addr`: The address to write to.
@@ -995,20 +999,23 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         Ok(data)
     }
 
-    fn read_each<F>(&self, data: &[UserBuffer], mut callback: F) -> Result<(), Errno>
+    fn read_each<F>(&self, data: &[UserBuffer], mut callback: F) -> Result<usize, Errno>
     where
-        F: FnMut(&[u8]) -> Result<Option<()>, Errno>,
+        F: FnMut(&[u8]) -> Result<usize, Errno>,
     {
+        let mut bytes_read = 0;
         for buffer in data {
             if buffer.address.is_null() && buffer.length == 0 {
                 continue;
             }
             let bytes = self.read_buffer(buffer)?;
-            if callback(&bytes)?.is_none() {
+            let consumed = callback(&bytes)?;
+            bytes_read += consumed;
+            if consumed != bytes.len() {
                 break;
             }
         }
-        Ok(())
+        Ok(bytes_read)
     }
 
     fn read_all(&self, data: &[UserBuffer], bytes: &mut [u8]) -> Result<usize, Errno> {
@@ -1052,7 +1059,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     fn write_each<F>(&self, data: &[UserBuffer], mut callback: F) -> Result<usize, Errno>
     where
-        F: FnMut(&mut [u8]) -> Result<&[u8], Errno>,
+        F: FnMut(&mut [u8]) -> Result<usize, Errno>,
     {
         let mut bytes_written = 0;
         for buffer in data {
@@ -1060,9 +1067,10 @@ pub trait MemoryAccessorExt: MemoryAccessor {
                 continue;
             }
             let mut bytes = vec![0; buffer.length];
-            let result = callback(&mut bytes)?;
-            bytes_written += self.write_memory(buffer.address, result)?;
-            if result.len() != bytes.len() {
+            let produced = callback(&mut bytes)?;
+            // if write_memory success, it will returned Ok(produced)
+            bytes_written += self.write_memory(buffer.address, &bytes[0..produced])?;
+            if produced != bytes.len() {
                 break;
             }
         }
@@ -1994,7 +2002,7 @@ mod tests {
                 }
             };
             read_count += 1;
-            Ok(Some(()))
+            Ok(buffer.len())
         })
         .expect("failed to read each");
         assert_eq!(read_count, 2);
@@ -2002,7 +2010,7 @@ mod tests {
         read_count = 0;
         mm.read_each(&iovec, |_| {
             read_count += 1;
-            Ok(None)
+            Ok(0)
         })
         .expect("failed to read each");
         assert_eq!(read_count, 1);
@@ -2069,7 +2077,7 @@ mod tests {
                 }
             };
             write_count += 1;
-            Ok(buffer)
+            Ok(buffer.len())
         })
         .expect("failed to write each");
         assert_eq!(write_count, 2);

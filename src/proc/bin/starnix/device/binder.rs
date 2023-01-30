@@ -2110,11 +2110,11 @@ impl MemoryAccessor for RemoteBinderTask {
                     .write_memory(addr.ptr() + index, &bytes[index..(index + len)])
                     .map_err(|_| errno!(EINVAL))?;
                 if bytes_count == 0 {
-                    break;
+                    return error!(EFAULT);
                 }
                 index += bytes_count;
             }
-            Ok(index)
+            Ok(bytes.len())
         } else {
             error!(ENOTSUP)
         }
