@@ -144,6 +144,7 @@
 //sdk/fidl/fuchsia.web:fuchsia.web_sdk
 //sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_sdk
 //sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_sdk
+//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_sdk
 //sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_sdk
 //sdk/fidl/fuchsia.wlan.product.deprecatedclient:fuchsia.wlan.product.deprecatedclient_sdk
 //sdk/fidl/fuchsia.wlan.product.deprecatedconfiguration:fuchsia.wlan.product.deprecatedconfiguration_sdk
