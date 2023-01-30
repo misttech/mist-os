@@ -436,8 +436,6 @@ bool TestThread::Reset(bool explicit_kill) {
     EXPECT_TRUE(allow_shutdown_.state());
   }
 
-  constexpr zx_duration_t join_timeout = ZX_MSEC(500);
-
   switch (state()) {
     case State::INITIAL:
       break;
@@ -458,24 +456,25 @@ bool TestThread::Reset(bool explicit_kill) {
         thread_->Kill();
       }
 
-      // Hopefully, the thread is on it's way to termination as we speak.
-      // Attempt to join it.  If this fails, print a warning and then kill it.
+      // The thread should be on its way to termination as we speak.  Attempt to
+      // join it with a relatively short timeout.  If this fails, print a
+      // warning and try again with an infinite timeout.  Why try with a short
+      // timeout and then an infinite timeout?  We might be running in an
+      // emulated or virtualized environment and things may take a lot longer
+      // that they otherwise would.  By timing out quickly and printing an
+      // warning, we can hopefully make it easier for a developer to figure out
+      // what's going on in the case where the second join hangs forever.
+      constexpr zx_duration_t timeout = ZX_MSEC(500);
       ASSERT(thread_ != nullptr);
       int ret_code;
-      zx_status_t res = thread_->Join(&ret_code, current_time() + join_timeout);
+      const Deadline join_deadline = Deadline::after(timeout);
+      zx_status_t res = thread_->Join(&ret_code, join_deadline.when());
+      if (res == ZX_ERR_TIMED_OUT) {
+        printf("Timed out while joining thread %p, retrying with infinite timeout\n", thread_);
+        res = thread_->Join(&ret_code, ZX_TIME_INFINITE);
+      }
       if (res != ZX_OK) {
-        printf("Failed to join thread %p (res %d); attempting to kill\n", thread_, res);
-
-        // If we have already sent the kill signal to the thread and failed,
-        // there is no point in trying to do so gain.
-        if (!explicit_kill) {
-          thread_->Kill();
-          res = thread_->Join(&ret_code, current_time() + join_timeout);
-        }
-
-        if (res != ZX_OK) {
-          panic("Failed to stop thread during PI tests!! (res = %d)\n", res);
-        }
+        panic("join of thread %p failed with %d\n", thread_, res);
       }
       thread_ = nullptr;
   }
