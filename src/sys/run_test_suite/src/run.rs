@@ -281,11 +281,6 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
             Err(Cancelled(_)) => Ok(()),
         });
 
-    // How we poll these futures to completion depends on timeout behavior.
-    let drain_timeout = match suite_start_timeout_duration {
-        Some(duration) => fasync::Timer::new(duration).boxed(),
-        None => futures::future::pending::<()>().boxed(),
-    };
     let result =
         match futures::future::select(handle_suite_fut.boxed_local(), cancellable_run_events_fut)
             .await
@@ -295,24 +290,12 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
                 true => Ok(()),
                 // otherwise, complete with a timeout.
                 false => {
-                    run_events_fut
-                        .or_cancelled(drain_timeout)
-                        .unwrap_or_else(|Cancelled(_)| {
-                            warn!("Cancelled draining run events due to timeout");
-                            Ok(())
-                        })
-                        .await?;
+                    run_events_fut.await?;
                     Ok(())
                 }
             },
             Either::Left((Err(e), run_events_fut)) => {
-                run_events_fut
-                    .or_cancelled(drain_timeout)
-                    .unwrap_or_else(|Cancelled(_)| {
-                        warn!("Cancelled draining run events due to timeout");
-                        Ok(())
-                    })
-                    .await?;
+                run_events_fut.await?;
                 Err(e.into())
             }
             Either::Right((result, suite_fut)) => {
