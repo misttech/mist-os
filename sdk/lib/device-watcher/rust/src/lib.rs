@@ -107,12 +107,12 @@ async fn wait_for_file(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
 /// Open the path `name` within `dir`. This function waits for each directory to
 /// be available before it opens it. If the path never appears this function
 /// will wait forever.
-async fn recursive_wait_and_open_node_with_flags(
+async fn recursive_wait_and_open_with_flags<P: fidl::endpoints::ProtocolMarker>(
     mut dir: fio::DirectoryProxy,
     name: &str,
     flags: fio::OpenFlags,
     mode: u32,
-) -> Result<fio::NodeProxy> {
+) -> Result<P::Proxy> {
     let path = std::path::Path::new(name);
     let mut components = path.components().peekable();
     loop {
@@ -128,7 +128,7 @@ async fn recursive_wait_and_open_node_with_flags(
         if components.peek().is_some() {
             dir = fuchsia_fs::directory::open_directory_no_describe(&dir, file, flags)?;
         } else {
-            break fuchsia_fs::directory::open_node_no_describe(&dir, file, flags, mode)
+            break fuchsia_fs::directory::open_no_describe::<P>(&dir, file, flags, mode)
                 .map_err(Into::into);
         }
     }
@@ -141,7 +141,17 @@ pub async fn recursive_wait_and_open_node(
     dir: &fio::DirectoryProxy,
     name: &str,
 ) -> Result<fio::NodeProxy> {
-    recursive_wait_and_open_node_with_flags(
+    recursive_wait_and_open::<fio::NodeMarker>(dir, name).await
+}
+
+/// Open the path `name` within `dir`. This function waits for each directory to
+/// be available before it opens it. If the path never appears this function
+/// will wait forever.
+pub async fn recursive_wait_and_open<P: fidl::endpoints::ProtocolMarker>(
+    dir: &fio::DirectoryProxy,
+    name: &str,
+) -> Result<P::Proxy> {
+    recursive_wait_and_open_with_flags::<P>(
         Clone::clone(dir),
         name,
         fio::OpenFlags::empty(),
@@ -283,7 +293,7 @@ mod tests {
         );
         fasync::Task::spawn(async move { fs_scope.wait().await }).detach();
 
-        recursive_wait_and_open_node_with_flags(
+        recursive_wait_and_open_with_flags::<fio::NodeMarker>(
             client,
             "test/dir",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,

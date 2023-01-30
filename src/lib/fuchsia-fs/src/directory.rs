@@ -6,7 +6,7 @@
 
 use {
     crate::node::{self, CloneError, CloseError, OpenError, RenameError},
-    fidl::endpoints::ServerEnd,
+    fidl::endpoints::{ClientEnd, ServerEnd},
     fidl_fuchsia_io as fio,
     fuchsia_async::{Duration, DurationExt, TimeoutExt},
     fuchsia_zircon_status as zx_status,
@@ -250,14 +250,23 @@ pub fn open_node_no_describe(
     flags: fio::OpenFlags,
     mode: u32,
 ) -> Result<fio::NodeProxy, OpenError> {
-    let (file, server_end) =
-        fidl::endpoints::create_proxy::<fio::NodeMarker>().map_err(OpenError::CreateProxy)?;
+    open_no_describe::<fio::NodeMarker>(parent, path, flags, mode)
+}
 
-    parent
-        .open(flags, mode, path, ServerEnd::new(server_end.into_channel()))
-        .map_err(OpenError::SendOpenRequest)?;
+/// Opens the given `path` from the given `parent` directory as a [`P::Proxy`]. The target is not
+/// verified to be any particular type and may not implement the [`P`] protocol.
+pub fn open_no_describe<P: fidl::endpoints::ProtocolMarker>(
+    parent: &fio::DirectoryProxy,
+    path: &str,
+    flags: fio::OpenFlags,
+    mode: u32,
+) -> Result<P::Proxy, OpenError> {
+    let (client, server_end) =
+        fidl::endpoints::create_endpoints().map_err(OpenError::CreateProxy)?;
 
-    Ok(file)
+    let () = parent.open(flags, mode, path, server_end).map_err(OpenError::SendOpenRequest)?;
+
+    ClientEnd::<P>::new(client.into_channel()).into_proxy().map_err(OpenError::CreateProxy)
 }
 
 /// Opens a new connection to the given directory using `flags` if provided, or
