@@ -122,9 +122,9 @@ zx::result<> Driver::Serve(std::string_view name, bool is_input) {
                    KV("status", connector.status_string()));
           return;
         }
-        fidl::WireResult export_result = devfs_exporter->ExportV2(
+        fidl::WireResult export_result = devfs_exporter->Export(
             std::move(connector.value()), fidl::StringView::FromExternal(devfs_path),
-            fidl::StringView::FromExternal("codec"), fuchsia_device_fs::ExportOptions());
+            fidl::StringView::FromExternal("codec"));
         if (!export_result.ok()) {
           FDF_SLOG(ERROR, "Failed to export to devfs: %s",
                    KV("status", export_result.status_string()));

@@ -115,20 +115,6 @@ std::string_view Devnode::name() const {
   return {};
 }
 
-Devnode::ExportOptions Devnode::export_options() const {
-  return std::visit(overloaded{[](const NoRemote& no_remote) { return no_remote.export_options; },
-                               [](const Connector& connector) { return connector.export_options; },
-                               [](const Remote&) { return ExportOptions{}; }},
-                    target());
-}
-
-Devnode::ExportOptions* Devnode::export_options() {
-  return std::visit(overloaded{[](const NoRemote& no_remote) { return &no_remote.export_options; },
-                               [](const Connector& connector) { return &connector.export_options; },
-                               [](const Remote&) -> ExportOptions* { return nullptr; }},
-                    target());
-}
-
 void Devnode::advertise_modified() {
   ZX_ASSERT(parent_ != nullptr);
   parent_->Notify(name(), fio::wire::WatchEvent::kRemoved);
@@ -583,22 +569,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
   }
 }
 
-namespace {
-
-bool should_publish(const Devnode::Target& target) {
-  return std::visit(
-      overloaded{[](const Devnode::NoRemote& no_remote) {
-                   return !(no_remote.export_options & Devnode::ExportOptions::kInvisible);
-                 },
-                 [](const Devnode::Remote&) { return true; },
-                 [](const Devnode::Connector& connector) {
-                   return !(connector.export_options & Devnode::ExportOptions::kInvisible);
-                 }},
-      target);
-}
-
-}  // namespace
-
 zx_status_t Devnode::export_class(Devnode::Target target, std::string_view class_path,
                                   std::vector<std::unique_ptr<Devnode>>& out) {
   std::optional proto_node = devfs_.proto_node(class_path);
@@ -615,17 +585,13 @@ zx_status_t Devnode::export_class(Devnode::Target target, std::string_view class
 
   Devnode& child =
       *out.emplace_back(std::make_unique<Devnode>(devfs_, dn.children(), std::move(target), name));
-  if (should_publish(target)) {
-    child.publish();
-  }
+  child.publish();
   return ZX_OK;
 }
 
 zx_status_t Devnode::export_topological_path(Devnode::Target target,
                                              std::string_view topological_path,
                                              std::vector<std::unique_ptr<Devnode>>& out) {
-  const bool publish = should_publish(target);
-
   // Validate the topological path.
   const std::vector segments =
       fxl::SplitString(topological_path, "/", fxl::WhiteSpaceHandling::kKeepWhitespace,
@@ -666,15 +632,9 @@ zx_status_t Devnode::export_topological_path(Devnode::Target target,
         continue;
       }
       PseudoDir& parent = dn->node().children();
-      Devnode& child = *out.emplace_back(std::make_unique<Devnode>(
-          devfs_, parent,
-          NoRemote{
-              .export_options = publish ? ExportOptions() : ExportOptions::kInvisible,
-          },
-          name));
-      if (publish) {
-        child.publish();
-      }
+      Devnode& child =
+          *out.emplace_back(std::make_unique<Devnode>(devfs_, parent, NoRemote{}, name));
+      child.publish();
       dn = &child;
       continue;
     }
@@ -689,9 +649,7 @@ zx_status_t Devnode::export_topological_path(Devnode::Target target,
     {
       Devnode& child = *out.emplace_back(
           std::make_unique<Devnode>(devfs_, dn->node().children(), std::move(target), name));
-      if (publish) {
-        child.publish();
-      }
+      child.publish();
     }
   }
   return ZX_OK;

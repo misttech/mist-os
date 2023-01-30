@@ -96,10 +96,10 @@ class InputReportDriver : public fdf::DriverBase {
                KV("status", connector.status_string()));
       return ScheduleStop();
     }
-    fidl::WireResult export_result = devfs_exporter->ExportV2(
+    fidl::WireResult export_result = devfs_exporter->Export(
         std::move(connector.value()),
         fidl::StringView::FromExternal(compat_context_->TopologicalPath(kDeviceName)),
-        fidl::StringView::FromExternal("input-report"), fuchsia_device_fs::ExportOptions());
+        fidl::StringView::FromExternal("input-report"));
     if (!export_result.ok()) {
       FDF_SLOG(ERROR, "Failed to export to devfs: %s", KV("status", export_result.status_string()));
       return ScheduleStop();

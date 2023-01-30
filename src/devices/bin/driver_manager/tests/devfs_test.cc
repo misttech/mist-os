@@ -196,8 +196,7 @@ TEST(Devfs, ExportWatcherConnector_Export) {
   ASSERT_OK(endpoints);
 
   zx::result export_watcher = driver_manager::ExportWatcher::Create(
-      loop.dispatcher(), devfs, &root_node, std::move(endpoints->client), "one/two", "block",
-      fuchsia_device_fs::wire::ExportOptions());
+      loop.dispatcher(), devfs, &root_node, std::move(endpoints->client), "one/two", "block");
   ASSERT_OK(export_watcher);
 
   // Set our ExportWatcher to let us know if the service was closed.
@@ -241,7 +240,7 @@ TEST(Devfs, ExportWatcherConnector_BadClass) {
 
   zx::result export_watcher = driver_manager::ExportWatcher::Create(
       loop.dispatcher(), devfs, &root_node, std::move(endpoints->client), std::nullopt,
-      "NOT_REAL_CLASS", fuchsia_device_fs::wire::ExportOptions());
+      "NOT_REAL_CLASS");
   ASSERT_STATUS(ZX_ERR_NOT_FOUND, export_watcher.status_value());
 }
 
@@ -260,9 +259,9 @@ TEST(Devfs, ExportWatcherConnector_TopologicalPathExists) {
       return endpoints.take_error();
     }
 
-    return driver_manager::ExportWatcher::Create(
-        loop.dispatcher(), devfs, &root_node, std::move(endpoints->client), "one/two", std::nullopt,
-        fuchsia_device_fs::wire::ExportOptions());
+    return driver_manager::ExportWatcher::Create(loop.dispatcher(), devfs, &root_node,
+                                                 std::move(endpoints->client), "one/two",
+                                                 std::nullopt);
   };
 
   zx::result watcher1 = create_watcher();
@@ -270,86 +269,6 @@ TEST(Devfs, ExportWatcherConnector_TopologicalPathExists) {
 
   zx::result watcher2 = create_watcher();
   ASSERT_STATUS(ZX_ERR_ALREADY_EXISTS, watcher2.status_value());
-}
-
-TEST(Devfs, ExportWatcherConnector_Export_Invisible) {
-  async::Loop loop{&kAsyncLoopConfigNoAttachToCurrentThread};
-
-  std::optional<Devnode> root_slot;
-  Devfs devfs(root_slot);
-  ASSERT_TRUE(root_slot.has_value());
-  Devnode& root_node = root_slot.value();
-
-  // Create the export server and client.
-  driver_manager::DevfsExporter exporter{devfs, &root_node, loop.dispatcher()};
-  fidl::WireClient<fuchsia_device_fs::Exporter> exporter_client;
-  {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_device_fs::Exporter>();
-    ASSERT_OK(endpoints);
-    fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &exporter);
-    exporter_client.Bind(std::move(endpoints->client), loop.dispatcher());
-  }
-
-  Connecter connecter;
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_device_fs::Connector>();
-  ASSERT_OK(endpoints);
-
-  fidl::ServerBindingRef binding_ref =
-      fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &connecter);
-
-  exporter_client
-      ->ExportV2(std::move(endpoints->client), "one/two", "block",
-                 fuchsia_device_fs::wire::ExportOptions::kInvisible)
-      .Then([](auto& result) { ASSERT_OK(result.status()); });
-  ASSERT_OK(loop.RunUntilIdle());
-
-  {
-    std::optional node_one = lookup(root_node, "one");
-    ASSERT_TRUE(node_one.has_value());
-    EXPECT_EQ("one", node_one->get().name());
-    EXPECT_EQ(fuchsia_device_fs::wire::ExportOptions::kInvisible, node_one->get().export_options());
-
-    std::optional node_two = lookup(node_one.value(), "two");
-    ASSERT_TRUE(node_two.has_value());
-    EXPECT_EQ("two", node_two->get().name());
-    EXPECT_EQ(fuchsia_device_fs::wire::ExportOptions::kInvisible, node_two->get().export_options());
-  }
-
-  // Try and make a subdir visible, this will fail because the devfs path has to match exactly with
-  // Export.
-  exporter_client->MakeVisible("one").Then(
-      [](fidl::WireUnownedResult<fuchsia_device_fs::Exporter::MakeVisible>& result) {
-        ASSERT_OK(result.status());
-        ASSERT_FALSE(result->is_ok());
-        ASSERT_STATUS(ZX_ERR_NOT_FOUND, result->error_value());
-      });
-
-  exporter_client->MakeVisible("one/two").Then([](auto& result) {
-    ASSERT_OK(result.status());
-    ASSERT_TRUE(result->is_ok(), "MakeVisible Failed %s",
-                zx_status_get_string(result->error_value()));
-  });
-  ASSERT_OK(loop.RunUntilIdle());
-
-  {
-    std::optional node_one = lookup(root_node, "one");
-    ASSERT_TRUE(node_one.has_value());
-    EXPECT_EQ("one", node_one->get().name());
-    EXPECT_EQ(fuchsia_device_fs::wire::ExportOptions(), node_one->get().export_options());
-
-    std::optional node_two = lookup(node_one->get(), "two");
-    ASSERT_TRUE(node_two.has_value());
-    EXPECT_EQ("two", node_two->get().name());
-    EXPECT_EQ(fuchsia_device_fs::wire::ExportOptions(), node_two->get().export_options());
-  }
-
-  exporter_client->MakeVisible("one/two").Then([](auto& result) {
-    ASSERT_OK(result.status());
-    ASSERT_FALSE(result->is_ok());
-    ASSERT_STATUS(ZX_ERR_BAD_STATE, result->error_value());
-  });
-
-  ASSERT_OK(loop.RunUntilIdle());
 }
 
 }  // namespace

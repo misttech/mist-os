@@ -92,10 +92,10 @@ class LifecycleDriver : public fdf::DriverBase, public fidl::WireServer<ft::Devi
             node().reset();
             return;
           }
-          fidl::WireResult export_result = devfs_exporter->ExportV2(
+          fidl::WireResult export_result = devfs_exporter->Export(
               std::move(connector.value()),
               fidl::StringView::FromExternal(context.value()->TopologicalPath(kDeviceName)),
-              fidl::StringView(), fuchsia_device_fs::ExportOptions());
+              fidl::StringView());
           if (!export_result.ok()) {
             FDF_SLOG(ERROR, "Failed to export to devfs: %s",
                      KV("status", export_result.status_string()));

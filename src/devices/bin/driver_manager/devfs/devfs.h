@@ -27,17 +27,12 @@ std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id);
 
 class Devnode {
  public:
-  using ExportOptions = fuchsia_device_fs::wire::ExportOptions;
-  struct NoRemote {
-    mutable ExportOptions export_options;
-  };
+  struct NoRemote {};
   struct Connector {
     fidl::WireSharedClient<fuchsia_device_fs::Connector> connector;
-    mutable ExportOptions export_options;
     Connector Clone() {
       return Connector{
           .connector = connector.Clone(),
-          .export_options = export_options,
       };
     }
   };
@@ -83,8 +78,6 @@ class Devnode {
 
   std::string_view name() const;
   PseudoDir& children() const { return node().children(); }
-  ExportOptions export_options() const;
-  ExportOptions* export_options();
   void advertise_modified();
 
   // Publishes the node to devfs. Asserts if called more than once.

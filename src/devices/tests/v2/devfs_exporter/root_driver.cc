@@ -38,9 +38,9 @@ class RootDriver : public fdf::DriverBase, public fidl::WireServer<ft::Device> {
                KV("status", connector.status_string()));
       return connector.take_error();
     }
-    fidl::WireResult export_result = devfs_exporter->ExportV2(
-        std::move(connector.value()), fidl::StringView::FromExternal("root-device"),
-        fidl::StringView(), fuchsia_device_fs::ExportOptions());
+    fidl::WireResult export_result =
+        devfs_exporter->Export(std::move(connector.value()),
+                               fidl::StringView::FromExternal("root-device"), fidl::StringView());
     if (!export_result.ok()) {
       FDF_SLOG(ERROR, "Failed to export to devfs: %s", KV("status", export_result.status_string()));
       return zx::error(export_result.status());

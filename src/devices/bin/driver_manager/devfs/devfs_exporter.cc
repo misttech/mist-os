@@ -8,30 +8,15 @@ namespace fdfs = fuchsia_device_fs;
 
 namespace driver_manager {
 
-zx::result<> ExportWatcher::MakeVisible() {
-  for (auto& node : devnodes_) {
-    Devnode::ExportOptions* options = node->export_options();
-    if (*options != fuchsia_device_fs::wire::ExportOptions::kInvisible) {
-      return zx::error(ZX_ERR_BAD_STATE);
-    }
-    *options -= fuchsia_device_fs::wire::ExportOptions::kInvisible;
-    node->publish();
-  }
-
-  return zx::ok();
-}
-
 zx::result<std::unique_ptr<ExportWatcher>> ExportWatcher::Create(
     async_dispatcher_t* dispatcher, Devfs& devfs, Devnode* root,
     fidl::ClientEnd<fuchsia_device_fs::Connector> connector,
-    std::optional<std::string> topological_path, std::optional<std::string> class_name,
-    fuchsia_device_fs::wire::ExportOptions options) {
+    std::optional<std::string> topological_path, std::optional<std::string> class_name) {
   std::unique_ptr<ExportWatcher> watcher{new ExportWatcher(topological_path)};
 
   zx_status_t status = root->export_dir(
       Devnode::Target(Devnode::Connector{
           .connector = fidl::WireSharedClient(std::move(connector), dispatcher, watcher.get()),
-          .export_options = options,
       }),
       std::move(topological_path), std::move(class_name), watcher->devnodes_);
   if (status != ZX_OK) {
@@ -50,7 +35,7 @@ void DevfsExporter::PublishExporter(component::OutgoingDirectory& outgoing) {
   ZX_ASSERT(result.is_ok());
 }
 
-void DevfsExporter::ExportV2(ExportV2RequestView request, ExportV2Completer::Sync& completer) {
+void DevfsExporter::Export(ExportRequestView request, ExportCompleter::Sync& completer) {
   std::optional<std::string> topological_path;
   if (!request->topological_path.is_null()) {
     topological_path.emplace(request->topological_path.get());
@@ -63,25 +48,13 @@ void DevfsExporter::ExportV2(ExportV2RequestView request, ExportV2Completer::Syn
 
   zx::result result =
       ExportWatcher::Create(dispatcher_, devfs_, root_, std::move(request->open_client),
-                            std::move(topological_path), std::move(class_name), request->options);
+                            std::move(topological_path), std::move(class_name));
   if (result.is_error()) {
     completer.ReplyError(result.error_value());
     return;
   }
   AddWatcher(std::move(result.value()));
   completer.ReplySuccess();
-}
-
-void DevfsExporter::MakeVisible(MakeVisibleRequestView request,
-                                MakeVisibleCompleter::Sync& completer) {
-  for (auto& [k, e] : exports_) {
-    if (e->topological_path() != request->devfs_path.get()) {
-      continue;
-    }
-    completer.Reply(e->MakeVisible());
-    return;
-  }
-  completer.ReplyError(ZX_ERR_NOT_FOUND);
 }
 
 void DevfsExporter::AddWatcher(std::unique_ptr<ExportWatcher> watcher) {

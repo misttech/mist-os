@@ -21,8 +21,7 @@ class ExportWatcher : public fidl::WireAsyncEventHandler<fuchsia_io::Node>,
   static zx::result<std::unique_ptr<ExportWatcher>> Create(
       async_dispatcher_t* dispatcher, Devfs& devfs, Devnode* root,
       fidl::ClientEnd<fuchsia_device_fs::Connector> connector,
-      std::optional<std::string> topological_path, std::optional<std::string> class_name,
-      fuchsia_device_fs::wire::ExportOptions options);
+      std::optional<std::string> topological_path, std::optional<std::string> class_name);
 
   void set_on_close_callback(fit::callback<void(ExportWatcher*)> callback) {
     callback_ = std::move(callback);
@@ -35,8 +34,6 @@ class ExportWatcher : public fidl::WireAsyncEventHandler<fuchsia_io::Node>,
   }
 
   const std::optional<std::string>& topological_path() const { return topological_path_; }
-
-  zx::result<> MakeVisible();
 
  private:
   explicit ExportWatcher(std::optional<std::string> topological_path)
@@ -57,9 +54,7 @@ class DevfsExporter : public fidl::WireServer<fuchsia_device_fs::Exporter> {
 
  private:
   // fidl::WireServer<fuchsia_device_fs::Exporter>
-  void ExportV2(ExportV2RequestView request, ExportV2Completer::Sync& completer) override;
-
-  void MakeVisible(MakeVisibleRequestView request, MakeVisibleCompleter::Sync& completer) override;
+  void Export(ExportRequestView request, ExportCompleter::Sync& completer) override;
 
   void AddWatcher(std::unique_ptr<ExportWatcher> watcher);
 

@@ -281,7 +281,7 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
 
 class TestExporter : public fidl::testing::WireTestBase<fuchsia_device_fs::Exporter> {
  public:
-  void ExportV2(ExportV2RequestView request, ExportV2Completer::Sync& completer) override {
+  void Export(ExportRequestView request, ExportCompleter::Sync& completer) override {
     auto [i, inserted] = devfs_paths_.emplace(request->topological_path.get());
     if (!inserted) {
       std::cerr << "Cannot export \"" << request->topological_path.get()
@@ -291,10 +291,6 @@ class TestExporter : public fidl::testing::WireTestBase<fuchsia_device_fs::Expor
 
     connectors_.push_back(std::move(request->open_client));
 
-    completer.ReplySuccess();
-  }
-
-  void MakeVisible(MakeVisibleRequestView request, MakeVisibleCompleter::Sync& completer) override {
     completer.ReplySuccess();
   }
 

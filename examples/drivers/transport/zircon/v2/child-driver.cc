@@ -145,9 +145,9 @@ class ChildZirconTransportDriver : public fdf::DriverBase {
     if (connector.is_error()) {
       return connector.take_error();
     }
-    fidl::WireResult result = devfs_exporter->ExportV2(
-        std::move(connector.value()), fidl::StringView::FromExternal(devfs_path),
-        fidl::StringView(), fuchsia_device_fs::ExportOptions());
+    fidl::WireResult result =
+        devfs_exporter->Export(std::move(connector.value()),
+                               fidl::StringView::FromExternal(devfs_path), fidl::StringView());
     if (!result.ok()) {
       return zx::error(result.status());
     }

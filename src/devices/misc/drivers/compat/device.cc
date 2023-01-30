@@ -366,9 +366,9 @@ zx_status_t Device::ExportAfterInit() {
     }
 
     fidl::StringView class_name = ProtocolIdToClassName(device_server_.proto_id());
-    fidl::WireResult result = driver()->devfs_exporter().sync()->ExportV2(
-        std::move(connector.value()), fidl::StringView::FromExternal(topological_path_), class_name,
-        {});
+    fidl::WireResult result = driver()->devfs_exporter().sync()->Export(
+        std::move(connector.value()), fidl::StringView::FromExternal(topological_path_),
+        class_name);
     if (!result.ok()) {
       FDF_LOG(ERROR, "Device %s: devfs failed: calling export2 returned: %s",
               topological_path_.c_str(), result.status_string());

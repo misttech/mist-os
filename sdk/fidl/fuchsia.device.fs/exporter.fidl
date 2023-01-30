@@ -15,11 +15,6 @@ protocol Connector {
     });
 };
 
-type ExportOptions = strict bits : uint32 {
-    /// If present, the exported service will be invisible.
-    INVISIBLE = 0x00000001;
-};
-
 /// Protocol through which a driver can export services to devfs.
 @discoverable
 protocol Exporter {
@@ -27,7 +22,7 @@ protocol Exporter {
     ///
     /// * error `ZX_ERR_ALREADY_EXISTS` if `topological_path` already exists.
     /// * error `ZX_ERR_NOT_FOUND` if `class_name` doesn't match a valid class name.
-    ExportV2(resource struct {
+    Export(resource struct {
         /// This is the connector that will have Connect called on it when a client opens the
         /// device. If the server end of this connection is dropped the export will automatically be
         /// cleaned up.
@@ -38,14 +33,5 @@ protocol Exporter {
 
         /// If this is present, then the device will be exported into "/dev/class/{class_name}/".
         class_name string:<fuchsia.io.MAX_NAME_LENGTH, optional>;
-
-        /// The options for the device being exported.
-        options ExportOptions;
-    }) -> () error zx.status;
-
-    /// Make a `devfs_path` visible. Will return ZX_ERR_NOT_FOUND if the path
-    /// does not exist or ZX_ERR_BAD_STATE if the path is not invisible.
-    MakeVisible(struct {
-        devfs_path string:fuchsia.io.MAX_PATH;
     }) -> () error zx.status;
 };
