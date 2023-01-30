@@ -78,6 +78,8 @@ rustc_binary("bin") {
     "src/main.rs",
     "src/pkg_cache_resolver.rs",
     "src/true_base_resolver.rs",
+    "src/true_base_resolver/component.rs",
+    "src/true_base_resolver/package.rs",
   ]
 }
 

@@ -6,7 +6,10 @@ use {
     assert_matches::assert_matches,
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::DiscoverableProtocolMarker as _,
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_component_config as fcomponent_config,
+    fidl_fuchsia_component_decl as fcomponent_decl,
+    fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
+    fidl_fuchsia_pkg as fpkg,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     futures::{
         future::{BoxFuture, FutureExt as _},
@@ -126,6 +129,7 @@ impl TestEnvBuilder {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
+                    .capability(Capability::protocol::<fcomponent_resolution::ResolverMarker>())
                     .from(&resolver)
                     .to(Ref::parent()),
             )
@@ -170,6 +174,28 @@ impl TestEnv {
             .await
             .unwrap()?;
         Ok((package, out_context))
+    }
+
+    fn component_resolver(&self) -> fcomponent_resolution::ResolverProxy {
+        self.realm_instance
+            .root
+            .connect_to_protocol_at_exposed_dir::<fcomponent_resolution::ResolverMarker>()
+            .unwrap()
+    }
+
+    async fn resolve_component(
+        &self,
+        url: &str,
+    ) -> Result<fcomponent_resolution::Component, fcomponent_resolution::ResolverError> {
+        self.component_resolver().resolve(url).await.unwrap()
+    }
+
+    async fn resolve_with_context_component(
+        &self,
+        url: &str,
+        mut context: fcomponent_resolution::Context,
+    ) -> Result<fcomponent_resolution::Component, fcomponent_resolution::ResolverError> {
+        self.component_resolver().resolve_with_context(url, &mut context).await.unwrap()
     }
 }
 
@@ -294,4 +320,113 @@ async fn manipulated_context_rejected() {
         env.resolve_with_context_package("sub-package-url", context).await,
         Err(fpkg::ResolveError::InvalidContext)
     );
+}
+
+#[fuchsia::test]
+async fn resolve_component() {
+    let manifest = fidl::encoding::persist(&mut fcomponent_decl::Component {
+        config: Some(fcomponent_decl::ConfigSchema {
+            value_source: Some(fcomponent_decl::ConfigValueSource::PackagePath(
+                "meta/config-data.cvf".to_string(),
+            )),
+            ..fcomponent_decl::ConfigSchema::EMPTY
+        }),
+        ..fcomponent_decl::Component::EMPTY
+    })
+    .unwrap();
+    let config_data = fidl::encoding::persist(&mut fcomponent_config::ValuesData {
+        ..fcomponent_config::ValuesData::EMPTY
+    })
+    .unwrap();
+    let base_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-base-package")
+        .abi_revision(version_history::AbiRevision::new(0x601665c5b1a89c7f))
+        .add_resource_at("meta/manifest.cm", &*manifest)
+        .add_resource_at("meta/config-data.cvf", &*config_data)
+        .build()
+        .await
+        .unwrap();
+    let env = TestEnvBuilder::new().static_packages(&[&base_pkg]).await.build().await;
+
+    let fcomponent_resolution::Component {
+        url,
+        decl,
+        package,
+        config_values,
+        resolution_context,
+        abi_revision,
+        ..
+    } = env
+        .resolve_component("fuchsia-pkg://fuchsia.com/a-base-package/0#meta/manifest.cm")
+        .await
+        .unwrap();
+
+    assert_eq!(url.unwrap(), "fuchsia-pkg://fuchsia.com/a-base-package/0#meta/manifest.cm");
+    assert_eq!(mem_util::bytes_from_data(decl.as_ref().unwrap()).unwrap(), manifest);
+    let fcomponent_resolution::Package { url, directory, .. } = package.unwrap();
+    assert_eq!(url.unwrap(), "fuchsia-pkg://fuchsia.com/a-base-package/0");
+    let () = base_pkg.verify_contents(&directory.unwrap().into_proxy().unwrap()).await.unwrap();
+    assert_eq!(mem_util::bytes_from_data(config_values.as_ref().unwrap()).unwrap(), config_data);
+    assert!(resolution_context.is_some());
+    assert_eq!(abi_revision, Some(0x601665c5b1a89c7f));
+}
+
+#[fuchsia::test]
+async fn resolve_with_context_component() {
+    let manifest = fidl::encoding::persist(&mut fcomponent_decl::Component::EMPTY.clone()).unwrap();
+    let sub_sub_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-sub-sub-package")
+        .add_resource_at("meta/manifest.cm", &*manifest)
+        .build()
+        .await
+        .unwrap();
+    let sub_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-sub-package")
+        .add_resource_at("meta/manifest.cm", &*manifest)
+        .add_subpackage("sub-sub-package-url", &sub_sub_pkg)
+        .build()
+        .await
+        .unwrap();
+    let base_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-base-package")
+        .add_resource_at("meta/manifest.cm", &*manifest)
+        .add_subpackage("sub-package-url", &sub_pkg)
+        .build()
+        .await
+        .unwrap();
+    let env = TestEnvBuilder::new().static_packages(&[&base_pkg]).await.build().await;
+
+    let context = env
+        .resolve_with_context_component(
+            "fuchsia-pkg://fuchsia.com/a-base-package/0#meta/manifest.cm",
+            fcomponent_resolution::Context { bytes: vec![] },
+        )
+        .await
+        .unwrap()
+        .resolution_context
+        .unwrap();
+    let context = env
+        .resolve_with_context_component("sub-package-url#meta/manifest.cm", context)
+        .await
+        .unwrap()
+        .resolution_context
+        .unwrap();
+
+    let fcomponent_resolution::Component {
+        url,
+        decl,
+        package,
+        config_values,
+        resolution_context,
+        abi_revision,
+        ..
+    } = env
+        .resolve_with_context_component("sub-sub-package-url#meta/manifest.cm", context)
+        .await
+        .unwrap();
+
+    assert_eq!(url.unwrap(), "sub-sub-package-url#meta/manifest.cm");
+    assert_eq!(mem_util::bytes_from_data(decl.as_ref().unwrap()).unwrap(), manifest);
+    let fcomponent_resolution::Package { url, directory, .. } = package.unwrap();
+    assert_eq!(url.unwrap(), "sub-sub-package-url");
+    let () = sub_sub_pkg.verify_contents(&directory.unwrap().into_proxy().unwrap()).await.unwrap();
+    assert_eq!(config_values, None);
+    assert!(resolution_context.is_some());
+    assert_eq!(abi_revision, Some(0xeccea2f70acd6fc0));
 }

@@ -100,13 +100,21 @@ enum ResolverError {
 
     #[error("invalid context")]
     InvalidContext(#[from] crate::context_authenticator::ContextAuthenticatorError),
+
+    #[error("resolve must be called with an absolute (not relative) url")]
+    AbsoluteUrlRequired,
+
+    #[error("failed to convert proxy to channel")]
+    ConvertProxyToChannel,
 }
 
 impl From<&ResolverError> for fresolution::ResolverError {
     fn from(err: &ResolverError) -> fresolution::ResolverError {
         use {fresolution::ResolverError as ferror, ResolverError::*};
         match err {
-            InvalidUrl(_) | PackageHashNotSupported | InvalidContext(_) => ferror::InvalidArgs,
+            InvalidUrl(_) | PackageHashNotSupported | InvalidContext(_) | AbsoluteUrlRequired => {
+                ferror::InvalidArgs
+            }
             UnsupportedRepo | AbsoluteUrlWithReservedName => ferror::NotSupported,
             ComponentNotFound(_) => ferror::ManifestNotFound,
             PackageNotFound(_) => ferror::PackageNotFound,
@@ -120,9 +128,10 @@ impl From<&ResolverError> for fresolution::ResolverError {
             | CreatePackageDirectory(_)
             | ReadingSubpackageManifest(_)
             | ConvertProxyToClient => ferror::Io,
-            CreatingContext(_) | ReadingContext(_) | RelativeUrlMissingContext(_) => {
-                ferror::Internal
-            }
+            CreatingContext(_)
+            | ReadingContext(_)
+            | RelativeUrlMissingContext(_)
+            | ConvertProxyToChannel => ferror::Internal,
             SubpackageNotInBase(_) | SubpackageNotFound(_) | PackageNotInBase(_) => {
                 ferror::PackageNotFound
             }
@@ -144,7 +153,8 @@ impl From<&ResolverError> for fpkg::ResolveError {
             InvalidUrl(_)
             | PackageHashNotSupported
             | UnsupportedRepo
-            | AbsoluteUrlWithReservedName => ferror::InvalidUrl,
+            | AbsoluteUrlWithReservedName
+            | AbsoluteUrlRequired => ferror::InvalidUrl,
             ComponentNotFound(_)
             | ConfigValuesNotFound(_)
             | AbiRevision(_)
@@ -153,7 +163,8 @@ impl From<&ResolverError> for fpkg::ResolveError {
             | RelativeUrlMissingContext(_)
             | ParsingManifest(_)
             | UnsupportedConfigSource(_)
-            | InvalidConfigSource => ferror::Internal,
+            | InvalidConfigSource
+            | ConvertProxyToChannel => ferror::Internal,
             ReadManifest(_)
             | CreateEndpoints(_)
             | ServePackageDirectory(_)

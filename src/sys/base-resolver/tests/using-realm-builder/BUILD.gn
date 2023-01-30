@@ -15,6 +15,8 @@ rustc_test("driver") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    "//sdk/fidl/fuchsia.component.config:fuchsia.component.config_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
@@ -23,6 +25,8 @@ rustc_test("driver") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/lib/storage/vfs/rust:vfs",
+    "//src/lib/versioning/version-history/rust:version-history",
+    "//src/sys/lib/mem_util",
     "//src/sys/pkg/lib/fuchsia-hash",
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",

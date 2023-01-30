@@ -530,6 +530,10 @@ impl PackageBuilder {
 
     /// Set the API Level that should be included in the package. This will return an error if there
     /// is no ABI revision that corresponds with this API Level.
+    ///
+    /// # Panics
+    ///
+    /// Panics if API level or ABI Revision has already been set.
     pub fn api_level(self, api_level: u64) -> Result<Self, Error> {
         for v in version_history::VERSION_HISTORY {
             if v.api_level == api_level {
@@ -541,7 +545,13 @@ impl PackageBuilder {
     }
 
     /// Set the ABI Revision that should be included in the package.
+    ///
+    /// # Panics
+    ///
+    /// Panics if ABI Revision has already been set (including by being indirectly set by the API
+    /// level).
     pub fn abi_revision(mut self, abi_revision: AbiRevision) -> Self {
+        assert_eq!(self.abi_revision, None);
         self.abi_revision = Some(abi_revision);
         self
     }

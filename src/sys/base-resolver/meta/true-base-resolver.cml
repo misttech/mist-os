@@ -12,7 +12,12 @@
         args: [ "true_base_resolver" ],
     },
     capabilities: [
-        { protocol: "fuchsia.pkg.PackageResolver" },
+        {
+            protocol: [
+                "fuchsia.component.resolution.Resolver",
+                "fuchsia.pkg.PackageResolver",
+            ],
+        },
     ],
     use: [
         {
@@ -26,7 +31,10 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.pkg.PackageResolver",
+            protocol: [
+                "fuchsia.component.resolution.Resolver",
+                "fuchsia.pkg.PackageResolver",
+            ],
             from: "self",
         },
     ],
