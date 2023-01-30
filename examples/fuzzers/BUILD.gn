@@ -20,16 +20,19 @@ group("tests") {
 }
 
 fuchsia_fuzzer_component("crash-fuzzer-component") {
+  component_name = "crash_fuzzer"
   manifest = "cpp/meta/crash_fuzzer.cml"
   deps = [ "cpp:crash_fuzzer" ]
 }
 
 fuchsia_fuzzer_component("overflow-fuzzer-component") {
+  component_name = "overflow_fuzzer"
   manifest = "cpp/meta/overflow_fuzzer.cml"
   deps = [ "cpp:overflow_fuzzer" ]
 }
 
 fuchsia_fuzzer_component("corpus-fuzzer-component") {
+  component_name = "corpus_fuzzer"
   manifest = "cpp/meta/corpus_fuzzer.cml"
   deps = [
     "cpp:corpus_fuzzer",
@@ -38,11 +41,13 @@ fuchsia_fuzzer_component("corpus-fuzzer-component") {
 }
 
 fuchsia_fuzzer_component("corpus-fuzzer-without-corpus-component") {
+  component_name = "corpus_fuzzer_without_corpus"
   manifest = "cpp/meta/corpus_fuzzer_without_corpus.cml"
   deps = [ "cpp:corpus_fuzzer_without_corpus" ]
 }
 
 fuchsia_fuzzer_component("dictionary-fuzzer-component") {
+  component_name = "dictionary_fuzzer"
   manifest = "cpp/meta/dictionary_fuzzer.cml"
   deps = [
     "cpp:dictionary_fuzzer",
@@ -52,6 +57,7 @@ fuchsia_fuzzer_component("dictionary-fuzzer-component") {
 }
 
 fuchsia_fuzzer_component("dictionary-fuzzer-without-dictionary-component") {
+  component_name = "dictionary_fuzzer_without_dictionary"
   manifest = "cpp/meta/dictionary_fuzzer_without_dictionary.cml"
   deps = [
     "cpp:dictionary_fuzzer_without_dictionary",
@@ -60,36 +66,43 @@ fuchsia_fuzzer_component("dictionary-fuzzer-without-dictionary-component") {
 }
 
 fuchsia_fuzzer_component("fuzzed-data-provider-fuzzer-component") {
+  component_name = "fuzzed_data_provider_fuzzer"
   manifest = "cpp/meta/fuzzed_data_provider_fuzzer.cml"
   deps = [ "cpp:fuzzed_data_provider_fuzzer" ]
 }
 
 fuchsia_fuzzer_component("noop-fuzzer-component") {
+  component_name = "noop_fuzzer"
   manifest = "cpp/meta/noop_fuzzer.cml"
   deps = [ "cpp:noop_fuzzer" ]
 }
 
 fuchsia_fuzzer_component("out-of-memory-fuzzer-component") {
+  component_name = "out_of_memory_fuzzer"
   manifest = "cpp/meta/out_of_memory_fuzzer.cml"
   deps = [ "cpp:out_of_memory_fuzzer" ]
 }
 
 fuchsia_fuzzer_component("echo-fuzzer-component") {
+  component_name = "echo-fuzzer"
   manifest = "fidl/meta/echo-fuzzer.cml"
   deps = [ "fidl:echo-fuzzer" ]
 }
 
 fuchsia_fuzzer_component("toy-example-arbitrary-component") {
+  component_name = "toy_example_arbitrary"
   manifest = "rust/meta/toy_example_arbitrary.cml"
   deps = [ "rust:toy_example_arbitrary" ]
 }
 
 fuchsia_fuzzer_component("toy-example-raw-bytes-component") {
+  component_name = "toy_example_raw_bytes"
   manifest = "rust/meta/toy_example_raw_bytes.cml"
   deps = [ "rust:toy_example_raw_bytes" ]
 }
 
 fuchsia_fuzzer_component("toy-example-with-main-component") {
+  component_name = "toy_example_with_main"
   manifest = "rust/meta/toy_example_with_main.cml"
   deps = [ "rust:toy_example_with_main" ]
 }
