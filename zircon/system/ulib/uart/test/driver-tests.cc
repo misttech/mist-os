@@ -60,6 +60,7 @@ TEST(UartTests, Blocking) {
       .ExpectWrite("hello "sv)
       .ExpectTxReady(false)
       .ExpectWait(true)
+      .ExpectAssertHeld()
       .ExpectEnableTxInterrupt()
       .ExpectTxReady(true)
       .ExpectWrite("world\r\n"sv)

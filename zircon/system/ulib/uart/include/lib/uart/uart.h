@@ -271,7 +271,8 @@ class BasicIoProvider<zbi_dcfg_simple_t> {
   // a subclass constructor method to map the physical address to a virtual
   // address.
   template <typename T>
-  BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size, T&& map_mmio) : pio_size_(pio_size) {
+  BasicIoProvider(const zbi_dcfg_simple_t& cfg, uint16_t pio_size, T&& map_mmio)
+      : pio_size_(pio_size) {
     auto ptr = map_mmio(cfg.mmio_phys);
     if (pio_size != 0) {
       // This is PIO via MMIO, i.e. scaled MMIO.
@@ -333,6 +334,9 @@ struct TA_CAP("uart") Unsynchronized {
   template <typename T>
   explicit Unsynchronized(const T&) {}
 
+  // Runtime assertion that the underlying capability/resource is held.
+  void AssertHeld() TA_ASSERT() {}
+
   // This is the normal pair, used in "process context", i.e. where
   // interrupts might happen.  unlock takes the state returned by lock.
   [[nodiscard]] const InterruptState lock() TA_ACQ() { return {}; }
@@ -341,8 +345,13 @@ struct TA_CAP("uart") Unsynchronized {
   // Wait for a good time to check again.  Implementations that actually
   // block pending an interrupt first call enable_tx_interrupt(), then
   // unlock to block, and finally relock when woken before return.
+  //
+  // This method is not annotated as requiring the associated capability since
+  // there is no clean way to generally ensure that `enable_tx_interrupt`'s
+  // call body actually acquired it. Instead, AssertHeld() is ensured to be
+  // called within that body.
   template <typename T>
-  InterruptState Wait(InterruptState, T&& enable_tx_interrupt) TA_REQ(this) {
+  InterruptState Wait(InterruptState, T&& enable_tx_interrupt) {
     arch::Yield();
     return {};
   }
@@ -424,7 +433,10 @@ class KernelDriver {
       while (!ready) {
         // Block or just unlock and spin or whatever "wait" means to Sync.
         // If that means blocking for interrupt wakeup, enable tx interrupts.
-        lock.Wait([this]() TA_REQ(sync_) { uart_.EnableTxInterrupt(io_); });
+        lock.Wait([this]() TA_REQ(sync_) {
+          sync_.AssertHeld();
+          uart_.EnableTxInterrupt(io_);
+        });
         ready = uart_.TxReady(io_);
       }
       // Advance the iterator by writing some.

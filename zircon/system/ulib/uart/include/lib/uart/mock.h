@@ -100,6 +100,11 @@ class Driver {
     return *this;
   }
 
+  Driver& ExpectAssertHeld() {
+    mock_.ExpectCall({}, ExpectedAssertHeld{});
+    return *this;
+  }
+
   Driver& ExpectEnableTxInterrupt() {
     mock_.ExpectCall({}, ExpectedTxEnable{});
     return *this;
@@ -150,6 +155,7 @@ class Driver {
     constexpr bool operator==(const ExpectedLock& other) const { return unlock == other.unlock; }
   };
   struct ExpectedWait : public ExpectedBase<ExpectedWait> {};
+  struct ExpectedAssertHeld : public ExpectedBase<ExpectedAssertHeld> {};
   struct ExpectedInit : public ExpectedBase<ExpectedInit> {};
   struct ExpectedTxEnable : public ExpectedBase<ExpectedTxEnable> {};
   struct ExpectedTxReady : public ExpectedBase<ExpectedTxReady> {};  // -> bool
@@ -159,8 +165,8 @@ class Driver {
     uint8_t c;
     constexpr bool operator==(const ExpectedChar& other) const { return c == other.c; }
   };
-  using Expected = std::variant<ExpectedLock, ExpectedWait, ExpectedInit, ExpectedTxEnable,
-                                ExpectedTxReady, ExpectedWrite, ExpectedChar>;
+  using Expected = std::variant<ExpectedLock, ExpectedWait, ExpectedAssertHeld, ExpectedInit,
+                                ExpectedTxEnable, ExpectedTxReady, ExpectedWrite, ExpectedChar>;
   using ExpectedResult = std::variant<bool, size_t>;
   mock_function::MockFunction<ExpectedResult, Expected> mock_;
 
@@ -183,6 +189,8 @@ class TA_CAP("uart") Sync {
   }
 
   void unlock(InterruptState) TA_REL() { mock_.Call(Driver::ExpectedLock{true}); }
+
+  void AssertHeld() TA_ASSERT() { mock_.Call(Driver::ExpectedAssertHeld{}); }
 
   template <typename T>
   InterruptState Wait(InterruptState, T&& enable_tx_interrupt)
