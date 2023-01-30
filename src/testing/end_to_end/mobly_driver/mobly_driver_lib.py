@@ -63,7 +63,7 @@ def _execute_test(
                     raise MoblyTestFailureException('Mobly test failed.')
                 output = proc.stdout.readline()
                 if output:
-                    print(output.decode().strip())
+                    print(output.strip())
             # Mobly test timed out.
             proc.kill()
             proc.wait(timeout=10)

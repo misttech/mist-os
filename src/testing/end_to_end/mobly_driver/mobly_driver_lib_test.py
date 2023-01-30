@@ -22,7 +22,7 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch('builtins.print')
     @mock.patch('subprocess.Popen')
     def test_run_success(self, mock_popen, mock_print):
-        self.mock_process.stdout.readline.return_value = b'TEST_OUTPUT'
+        self.mock_process.stdout.readline.return_value = 'TEST_OUTPUT'
         self.mock_process.poll.side_effect = [None, 0]
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
@@ -73,7 +73,7 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch('subprocess.Popen')
     def test_run_teardown_runs_despite_subprocess_error(
             self, mock_popen, mock_print):
-        self.mock_process.stdout.readline.return_value = b'MOCK_FAILURE_OUTPUT'
+        self.mock_process.stdout.readline.return_value = 'MOCK_FAILURE_OUTPUT'
         self.mock_process.poll.side_effect = [None, 1]
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
