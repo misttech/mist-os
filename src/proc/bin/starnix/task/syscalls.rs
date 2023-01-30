@@ -98,7 +98,7 @@ pub fn sys_vfork(current_task: &CurrentTask) -> Result<pid_t, Errno> {
     do_clone(
         current_task,
         &clone_args {
-            flags: CLONE_VFORK as u64,
+            flags: (CLONE_VFORK | CLONE_VM) as u64,
             exit_signal: SIGCHLD.number() as u64,
             ..Default::default()
         },

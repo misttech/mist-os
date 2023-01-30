@@ -366,8 +366,20 @@ impl Task {
             return error!(EINVAL);
         }
 
-        if clone_thread != clone_vm {
-            not_implemented!(self, "CLONE_VM without CLONE_THREAD is not implemented");
+        if clone_vm && !clone_thread {
+            // TODO(fxbug.dev/114813) Implement CLONE_VM for child processes (not just child
+            // threads). Currently this executes CLONE_VM (explicitly passed to clone() or as
+            // used by vfork()) as a fork (the VM in the child is copy-on-write) which is almost
+            // always OK.
+            //
+            // CLONE_VM is primarily as an optimization to avoid making a copy-on-write version of a
+            // process' VM that will be immediately replaced with a call to exec(). The main users
+            // (libc and language runtimes) don't actually rely on the memory being shared between
+            // the two processes. And the vfork() man page explicitly allows vfork() to be
+            // implemented as fork() which is what we do here.
+            log_warn!("CLONE_VM set without CLONE_THREAD. Ignoring CLONE_VM (doing a fork).");
+        } else if clone_thread && !clone_vm {
+            not_implemented!(self, "CLONE_THREAD without CLONE_VM is not implemented");
             return error!(ENOSYS);
         }
 
