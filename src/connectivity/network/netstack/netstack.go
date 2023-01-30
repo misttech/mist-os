@@ -150,7 +150,7 @@ type Netstack struct {
 	}
 
 	destinationCacheMu struct {
-		sync.Mutex
+		sync.RWMutex
 		destinationCache destinationCache
 	}
 

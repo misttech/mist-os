@@ -2650,6 +2650,16 @@ func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.Datagra
 	s.sharedState.destinationCacheMu.Lock()
 	defer s.sharedState.destinationCacheMu.Unlock()
 
+	// NB: It is important that the netstack-wide destination cache lock be held
+	// for the duration of this method in order to avoid data races.
+	//
+	// For example, if an interface is removed after `Preflight` is called, but
+	// before the netstack-wide event pair is duplicated to be sent to the
+	// client, it's possible for the client to receive a valid eventpair for a
+	// route through a NIC that has been removed from the stack.
+	s.ns.destinationCacheMu.RLock()
+	defer s.ns.destinationCacheMu.RUnlock()
+
 	var addr tcpip.FullAddress
 	useConnectedAddr := !req.HasTo()
 
@@ -2691,11 +2701,7 @@ func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.Datagra
 	// whenever the route table is modified.
 	// TODO (https://fxbug.dev/100895): Implement per-route caching invalidation.
 	var nsEventPair zx.Handle
-	if status := func() zx.Status {
-		s.ns.destinationCacheMu.Lock()
-		defer s.ns.destinationCacheMu.Unlock()
-		return zx.Sys_handle_duplicate(s.ns.destinationCacheMu.destinationCache.peer, zx.RightsBasic, &nsEventPair)
-	}(); status != zx.ErrOk {
+	if status := zx.Sys_handle_duplicate(s.ns.destinationCacheMu.destinationCache.peer, zx.RightsBasic, &nsEventPair); status != zx.ErrOk {
 		return socket.DatagramSocketSendMsgPreflightResult{}, &zx.Error{Status: status, Text: "zx.EventPair"}
 	}
 
