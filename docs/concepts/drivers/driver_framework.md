@@ -146,7 +146,7 @@ developer.
 [driver-binding]: driver_binding.md
 [driver-host]: driver_framework.md#driver_host
 [service-discovery]: driver_communication.md#service_discovery
-[node-properties]: drivers_and_nodes.md#node_properties
+[node-properties]: drivers_and_nodes.md#node_attributes
 [node-topology]: drivers_and_nodes.md#node_topology
 [rfc-driver-runtime]: /docs/contribute/governance/rfcs/0126_driver_runtime.md
 [fidl-node]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.driver.framework/topology.fidl;l=107

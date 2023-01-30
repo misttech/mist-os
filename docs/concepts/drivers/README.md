@@ -24,7 +24,7 @@ version of the driver framework (DFv2).
    *  [FIDL interface][fidl-interface]
 *  [Comparison between DFv1 and DFv2][dfv1-and-dfv2]
 *  [Drivers and nodes][nodes]
-   *  [Node properties][node-properties]
+   *  [Node attributes][node-attributes]
    *  [Node capabilities][node-capabilities]
    *  [Node topology][node-topology]
    *  [Node lifecycle][node-lifecycle]
@@ -55,7 +55,7 @@ version of the driver framework (DFv2).
 [fidl-interface]: driver_framework.md#fidl_interface
 [dfv1-and-dfv2]: comparison_between_dfv1_and_dfv2.md
 [nodes]: drivers_and_nodes.md
-[node-properties]: drivers_and_nodes.md#node_properties
+[node-attributes]: drivers_and_nodes.md#node_attributes
 [node-capabilities]: drivers_and_nodes.md#node_capabilities
 [node-topology]: drivers_and_nodes.md#node_topology
 [node-lifecycle]: drivers_and_nodes.md#node_lifecycle

@@ -79,6 +79,6 @@ topology.
 [driver-runtime]: driver_framework.md#driver_runtime
 [fidl-interface]: driver_framework.md#fidl_interface
 [nodes]: drivers_and_nodes.md
-[node-properties]: drivers_and_nodes.md#node_properties
+[node-properties]: drivers_and_nodes.md#node_attributes
 [node-capabilities]: drivers_and_nodes.md#node_capabilities
 [driver-binding-dfv1]: /docs/development/drivers/concepts/device_driver_model/driver-binding.md
