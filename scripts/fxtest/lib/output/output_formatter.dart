@@ -92,8 +92,11 @@ abstract class OutputFormatter {
   /// Future that resolves when the stdout closes for any reason
   Future get stdOutClosedFuture => buffer.stdOutClosedFuture();
 
+  /// Pass-thru to the actual buffer's flush method
+  Future<void> flush() async => await buffer.flushOutput();
+
   /// Pass-thru to the actual buffer's close method
-  void close() => buffer.close();
+  Future<void> close() async => await buffer.close();
 
   void forcefullyClose() => buffer.forcefullyClose();
 

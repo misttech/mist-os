@@ -14,6 +14,7 @@ abstract class StandardOut {
   void writeln(String line);
   Future<dynamic> get done;
   Future<dynamic> close();
+  Future<dynamic> flush();
 }
 
 class RealStandardOut implements StandardOut {
@@ -23,8 +24,12 @@ class RealStandardOut implements StandardOut {
   void writeln(String line) => io.stdout.writeln(line);
   @override
   Future<dynamic> get done => io.stdout.done;
+  // We should not close io.stdout, instead just flush it.
   @override
-  Future<dynamic> close() => io.stdout.close();
+  Future<dynamic> close() => io.stdout.flush();
+
+  @override
+  Future<dynamic> flush() => io.stdout.flush();
 }
 
 /// Implementation of an [OutputBuffer]'s [StandardOut] that writes all content
@@ -64,8 +69,14 @@ class FileStandardOut implements StandardOut {
   }
 
   @override
+  Future<dynamic> flush() async {
+    await _sink?.flush();
+  }
+
+  @override
   Future<dynamic> close() async {
     _sink?.writeln('');
+    await flush();
     await _sink?.close();
     _closedCompleter.complete(true);
   }
@@ -83,6 +94,8 @@ class FileStandardOut implements StandardOut {
   void writeln(String line) {
     initFile();
     _sink?.add(utf8.encode('\n$line'));
+    // not possible to await on flush in non-async function, else we can
+    // flush more often.
   }
 }
 
@@ -116,6 +129,11 @@ class LocMemStandardOut implements StandardOut {
         ? _done.complete()
         : throw io.StdoutException('IO is already closed.');
     return _done.future;
+  }
+
+  @override
+  Future<dynamic> flush() async {
+    // do nothing
   }
 }
 
@@ -214,10 +232,16 @@ class OutputBuffer {
   /// Future used to approximate when the stdout is closed
   Future stdOutClosedFuture() => _stdoutCompleter.future;
 
+  Future<void> flushOutput() async {
+    await stdout.flush();
+  }
+
   /// Resolves the future that waits for the stdout to close. Use this when
   /// the test suite has reached its natural conclusion.
-  void close() =>
-      !_stdoutCompleter.isCompleted ? _stdoutCompleter.complete(true) : null;
+  Future<void> close() async {
+    await stdout.close();
+    !_stdoutCompleter.isCompleted ? _stdoutCompleter.complete(true) : null;
+  }
 
   void forcefullyClose() => _closeFutureWithError();
 

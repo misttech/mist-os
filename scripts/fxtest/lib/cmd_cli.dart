@@ -22,6 +22,9 @@ class FuchsiaTestCommandCli {
   /// The underlying class which does all the work.
   FuchsiaTestCommand? _cmd;
 
+  /// Handle to run operation.
+  Future? _runFuture;
+
   /// Used to create any new directories needed to house test output / artifacts.
   final DirectoryBuilder? directoryBuilder;
 
@@ -73,15 +76,13 @@ class FuchsiaTestCommandCli {
   Future<void> run() async {
     _cmd = createCommand();
 
-    // Without waiting, start the command.
-    unawaited(
-      // But register a listener for when it completes, which resolves the
-      // stdout future.
-      _cmd!.runTestSuite(TestsManifestReader()).then((_) {
-        // Once the actual command finishes without problems, close the stdout.
-        _cmd!.dispose();
-      }),
-    );
+    //register a listener for when run completes, which resolves the
+    // stdout future.
+    _runFuture = _cmd!.runTestSuite(TestsManifestReader()).then((_) async {
+      // Once the actual command finishes without problems, close the output
+      // formatters.
+      await _cmd!.dispose();
+    });
 
     // Register a listener for when the `stdout` closes.
     try {
@@ -90,12 +91,14 @@ class FuchsiaTestCommandCli {
         eagerError: true,
       );
     } on Exception {
+      await _runFuture!;
       if (exitCode == 0) {
         rethrow;
       } else {
         throw OutputClosedException(exitCode);
       }
     }
+    await _runFuture!;
   }
 
   FuchsiaTestCommand createCommand() => FuchsiaTestCommand.fromConfig(
@@ -108,6 +111,8 @@ class FuchsiaTestCommandCli {
 
   Future<void> terminateEarly() async {
     _cmd?.emitEvent(AllTestsCompleted());
+    // Complete run future
+    await _runFuture;
   }
 
   Future<void> cleanUp() async {

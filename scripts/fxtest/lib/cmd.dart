@@ -64,6 +64,8 @@ class FuchsiaTestCommand {
 
   int _numberOfTests;
 
+  late StreamSubscription<TestEvent> _streamSubscription;
+
   /// Used to obtain package hashes for component tests. Lazily loaded so that
   /// host tests do not rely on a package repository.
   PackageRepository? _packageRepository;
@@ -83,7 +85,7 @@ class FuchsiaTestCommand {
     if (outputFormatters.isEmpty) {
       throw AssertionError('Must provide at least one OutputFormatter');
     }
-    stream.listen((output) {
+    _streamSubscription = stream.listen((output) {
       for (var formatter in outputFormatters) {
         formatter.update(output);
       }
@@ -128,11 +130,23 @@ class FuchsiaTestCommand {
     }
   }
 
-  void dispose() {
-    for (var formatter in outputFormatters) {
-      formatter.close();
+  Future<void> _flushOutput() async {
+    if (!_eventStreamController.isClosed) {
+      _streamSubscription.pause();
+      for (var formatter in outputFormatters) {
+        await formatter.flush();
+      }
+      _streamSubscription.resume();
     }
-    _eventStreamController.close();
+  }
+
+  Future<void> dispose() async {
+    var fut = _streamSubscription.asFuture();
+    await _eventStreamController.close();
+    await fut;
+    for (var formatter in outputFormatters) {
+      await formatter.close();
+    }
   }
 
   Future<void> runTestSuite([TestsManifestReader? manifestReader]) async {
@@ -364,6 +378,7 @@ class FuchsiaTestCommand {
   /// natural or the result of a SIGINT.
   Future<void> cleanUp() async {
     await _reportAnalytics();
+    await _flushOutput();
   }
 
   Future<void> _reportAnalytics() async {
