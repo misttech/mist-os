@@ -28,7 +28,7 @@ use crate::{
     },
     socket::{
         address::{AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr},
-        AddrVec, SocketTypeState as _, SocketTypeStateEntry as _, SocketTypeStateMut as _,
+        AddrVec,
     },
     transport::tcp::{
         buffer::SendPayload,

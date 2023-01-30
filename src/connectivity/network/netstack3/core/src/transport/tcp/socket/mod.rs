@@ -66,7 +66,6 @@ use crate::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
         AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, RemoveResult,
         SocketAddrTypeTag, SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
-        SocketTypeState as _, SocketTypeStateEntry as _, SocketTypeStateMut as _,
     },
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},

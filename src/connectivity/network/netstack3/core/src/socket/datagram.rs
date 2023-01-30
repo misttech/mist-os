@@ -39,8 +39,7 @@ use crate::{
         self,
         address::{ConnAddr, ConnIpAddr, ListenerIpAddr},
         AddrVec, Bound, BoundSocketMap, ExistsError, InsertError, ListenerAddr, SocketMapAddrSpec,
-        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec, SocketTypeState as _,
-        SocketTypeStateEntry as _, SocketTypeStateMut as _,
+        SocketMapAddrStateSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
 };
 

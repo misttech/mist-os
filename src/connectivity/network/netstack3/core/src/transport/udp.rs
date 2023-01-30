@@ -60,7 +60,6 @@ use crate::{
             PosixSharingOptions, PosixSocketStateSpec, ToPosixSharingOptions,
         },
         AddrVec, Bound, BoundSocketMap, InsertError, SocketAddrType, SocketMapAddrSpec,
-        SocketTypeState as _,
     },
     sync::RwLock,
     transport, DeviceId, SyncCtx,

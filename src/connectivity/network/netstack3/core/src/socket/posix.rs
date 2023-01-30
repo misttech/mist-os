@@ -328,7 +328,7 @@ mod tests {
     use super::*;
     use crate::{
         ip::{testutil::FakeDeviceId, IpExt},
-        socket::{BoundSocketMap, InsertError, SocketTypeStateEntry as _, SocketTypeStateMut as _},
+        socket::{BoundSocketMap, InsertError},
     };
 
     struct TransportSocketPosixSpec<I: Ip> {
