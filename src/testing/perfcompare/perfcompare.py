@@ -234,7 +234,7 @@ class MultiBootDataset(object):
 # the initial run as a warmup run.  The initial run is often slower than
 # later runs, so it would skew the mean if we included it.  The
 # RoundTrip_*_MultiProcess tests are an extreme case, because the first run
-# waits for a subprocess to start up.  See https://crbug.com/fuchsia/23105.
+# waits for a subprocess to start up.  See https://fxbug.dev/23105.
 def MeanExcludingWarmup(values):
     # Some tests report a single value per process run.  For those tests,
     # we use that value and don't discard it.
