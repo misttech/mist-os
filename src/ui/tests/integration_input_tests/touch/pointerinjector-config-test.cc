@@ -93,8 +93,8 @@ using GfxEvent = fuchsia::ui::gfx::Event;
 
 // Types imported for the realm_builder library.
 using component_testing::ChildRef;
-using component_testing::LocalComponent;
 using component_testing::LocalComponentHandles;
+using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -120,6 +120,17 @@ constexpr auto kTapRetryInterval = zx::sec(1);
 
 enum class TapLocation { kTopLeft };
 
+class ResponseState {
+ public:
+  using CallbackT =
+      fit::function<void(fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest)>;
+  void SetRespondCallback(CallbackT callback) { respond_callback_ = std::move(callback); }
+
+ private:
+  friend class ResponseListenerServer;
+  CallbackT respond_callback_ = nullptr;
+};
+
 // This component implements fuchsia.ui.test.input.TouchInputListener
 // and the interface for a RealmBuilder LocalComponent. A LocalComponent
 // is a component that is implemented here in the test, as opposed to elsewhere
@@ -128,43 +139,38 @@ enum class TapLocation { kTopLeft };
 // library creates the necessary plumbing. It creates a manifest for the component
 // and routes all capabilities to and from it.
 class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListener,
-                               public LocalComponent {
+                               public LocalComponentImpl {
  public:
-  explicit ResponseListenerServer(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  explicit ResponseListenerServer(async_dispatcher_t* dispatcher,
+                                  std::weak_ptr<ResponseState> state)
+      : dispatcher_(dispatcher), state_(state) {}
 
   // |fuchsia::ui::test::input::TouchInputListener|
   void ReportTouchInput(
       fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request) override {
-    FX_CHECK(respond_callback_) << "Expected callback to be set.";
-    respond_callback_(std::move(request));
+    if (auto s = state_.lock()) {
+      FX_CHECK(s->respond_callback_) << "Expected callback to be set.";
+      s->respond_callback_(std::move(request));
+    }
   }
 
-  // |LocalComponent::Start|
+  // |LocalComponentImpl::Start|
   // When the component framework requests for this component to start, this
   // method will be invoked by the realm_builder library.
-  void Start(std::unique_ptr<LocalComponentHandles> local_handles) override {
+  void OnStart() override {
     // When this component starts, add a binding to the test.touch.ResponseListener
     // protocol to this component's outgoing directory.
-    FX_CHECK(local_handles->outgoing()->AddPublicService(
+    FX_CHECK(outgoing()->AddPublicService(
                  fidl::InterfaceRequestHandler<fuchsia::ui::test::input::TouchInputListener>(
                      [this](auto request) {
                        bindings_.AddBinding(this, std::move(request), dispatcher_);
                      })) == ZX_OK);
-    local_handles_.emplace_back(std::move(local_handles));
-  }
-
-  void SetRespondCallback(
-      fit::function<void(fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest)>
-          callback) {
-    respond_callback_ = std::move(callback);
   }
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  std::vector<std::unique_ptr<LocalComponentHandles>> local_handles_;
   fidl::BindingSet<fuchsia::ui::test::input::TouchInputListener> bindings_;
-  fit::function<void(fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest)>
-      respond_callback_;
+  std::weak_ptr<ResponseState> state_;
 };
 
 struct PointerInjectorConfigTestData {
@@ -236,7 +242,7 @@ class PointerInjectorConfigTest
   // Waits for one or more pointer events; calls QuitLoop once one meets expectations.
   void WaitForAResponseMeetingExpectations(float expected_x, float expected_y,
                                            const std::string& component_name) {
-    response_listener()->SetRespondCallback(
+    response_state()->SetRespondCallback(
         [this, expected_x, expected_y, component_name](
             fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request) {
           FX_LOGS(INFO) << "Client received tap at (" << request.local_x() << ", "
@@ -248,7 +254,7 @@ class PointerInjectorConfigTest
           EXPECT_EQ(request.component_name(), component_name);
           if (abs(request.local_x() - expected_x) <= kViewCoordinateEpsilon &&
               abs(request.local_y() - expected_y) <= kViewCoordinateEpsilon) {
-            response_listener()->SetRespondCallback([](auto) {});
+            response_state()->SetRespondCallback([](auto) {});
             QuitLoop();
           }
         });
@@ -319,7 +325,7 @@ class PointerInjectorConfigTest
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }
   Realm* realm() { return realm_.get(); }
 
-  ResponseListenerServer* response_listener() { return response_listener_.get(); }
+  std::shared_ptr<ResponseState> response_state() { return response_state_; }
 
  private:
   void BuildRealm() {
@@ -328,8 +334,9 @@ class PointerInjectorConfigTest
 
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
-    response_listener_ = std::make_unique<ResponseListenerServer>(dispatcher());
-    realm()->AddLocalChild(kMockResponseListener, response_listener_.get());
+    realm()->AddLocalChild(kMockResponseListener, [d = dispatcher(), s = response_state()]() {
+      return std::make_unique<ResponseListenerServer>(d, s);
+    });
 
     realm()->AddChild(kCppGfxClient, kCppGfxClientUrl);
 
@@ -353,7 +360,7 @@ class PointerInjectorConfigTest
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
   std::unique_ptr<Realm> realm_;
 
-  std::unique_ptr<ResponseListenerServer> response_listener_;
+  std::shared_ptr<ResponseState> response_state_ = std::make_shared<ResponseState>();
 
   fuchsia::ui::test::input::RegistryPtr input_registry_;
   fuchsia::ui::test::input::TouchScreenPtr fake_touchscreen_;
