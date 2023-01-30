@@ -22,15 +22,27 @@ test_assembly_config("compiled_package") {
   platform = {
     feature_set_level = "empty"
     build_type = "eng"
+    example_config = {
+      include_example_aib = true
+    }
   }
   core_realm_definition = ":core_realm"
+  additional_args = [
+    "--config",
+    "assembly_example_enabled=true",
+  ]
 }
 
 if (is_host) {
   host_test_data("image_assembly_config") {
-    sources =
-        [ get_label_info(":${target_name}($default_toolchain)",
-                         "target_out_dir") + "/outdir/image_assembly.json" ]
+    sources = [
+      get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
+          "/outdir/image_assembly.json",
+      get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
+          "/outdir/foo/bar/bar.cm",
+      get_label_info(":${target_name}($default_toolchain)", "target_out_dir") +
+          "/outdir/foo/baz/baz.cm",
+    ]
     deps = [ ":compiled_package" ]
   }
 

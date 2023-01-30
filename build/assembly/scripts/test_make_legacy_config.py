@@ -214,8 +214,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     CompiledPackageMainDefinition(
                         name="core",
                         components={
-                            "core":
-                                "compiled_packages/core/component_shards/realm.cml"
+                            "core": "compiled_packages/core/core/realm.cml"
                         },
                         contents=set(
                             [
@@ -229,10 +228,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     CompiledPackageAdditionalShards(
                         name="core",
                         component_shards={
-                            "core":
-                                [
-                                    "compiled_packages/core/component_shards/shard.cml"
-                                ]
+                            "core": ["compiled_packages/core/core/shard.cml"]
                         })
                 ])
 
@@ -440,13 +436,11 @@ class MakeLegacyConfig(unittest.TestCase):
                         FileEntry(
                             source='source/core/realm.cml',
                             destination=
-                            'outdir/compiled_packages/core/component_shards/realm.cml'
-                        ),
+                            'outdir/compiled_packages/core/core/realm.cml'),
                         FileEntry(
                             source='source/core/realm/shard.cml',
                             destination=
-                            'outdir/compiled_packages/core/component_shards/shard.cml'
-                        ),
+                            'outdir/compiled_packages/core/core/shard.cml'),
                         FileEntry(
                             source='source/some/core/package/file',
                             destination=
@@ -487,8 +481,8 @@ class MakeLegacyConfig(unittest.TestCase):
                     'blobs/fd0891d15ce65d7682f7437e441e917b8ed4bde4db07a11dc100104f25056051',
                     'bootfs/another/file',
                     'bootfs/some/file',
-                    'compiled_packages/core/component_shards/realm.cml',
-                    'compiled_packages/core/component_shards/shard.cml',
+                    'compiled_packages/core/core/realm.cml',
+                    'compiled_packages/core/core/shard.cml',
                     'compiled_packages/core/files/core/package/file/destination',
                     'compiled_packages/include/src/include.cml',
                     'kernel/kernel.bin',

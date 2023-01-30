@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Context;
-use assembly_config_schema::{AssemblyConfig, BoardInformation, BuildType, FeatureSupportLevel};
+use anyhow::{bail, Context};
+use assembly_config_schema::{
+    AssemblyConfig, BoardInformation, BuildType, ExampleConfig, FeatureSupportLevel,
+};
 
 use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl};
 
@@ -97,7 +99,13 @@ pub fn define_configuration(
 
     // Configure the Product Assembly + Structured Config example, if enabled.
     if should_configure_example() {
-        example::ExampleSubsystemConfig::define_configuration(&context, &(), &mut builder)?;
+        example::ExampleSubsystemConfig::define_configuration(
+            &context,
+            &config.platform.example_config,
+            &mut builder,
+        )?;
+    } else if config.platform.example_config != ExampleConfig::default() {
+        bail!("Config options were set for the example subsystem, but the example is not enabled to be configured.");
     }
 
     // The real platform subsystems
@@ -165,4 +173,31 @@ pub fn define_configuration(
 fn should_configure_example() -> bool {
     futures::executor::block_on(ffx_config::get::<bool, _>(EXAMPLE_ENABLED_FLAG))
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assembly_util as util;
+
+    #[test]
+    fn test_example_config_without_configure_example_returns_err() {
+        let json5 = r#"
+            {
+            platform: {
+                build_type: "eng",
+                example_config: {
+                    include_example_aib: true
+                }
+            },
+            product: {},
+            }
+        "#;
+
+        let mut cursor = std::io::Cursor::new(json5);
+        let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
+        let result = define_configuration(&config, Option::None);
+
+        assert!(result.is_err());
+    }
 }

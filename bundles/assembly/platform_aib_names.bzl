@@ -26,4 +26,5 @@ ENG_PLATFORM_AIB_NAMES = PLATFORM_AIB_NAMES + [
     "common_minimal_eng",
     "system_update_checker",
     "kernel_args_eng",
+    "example_assembly_bundle",
 ]

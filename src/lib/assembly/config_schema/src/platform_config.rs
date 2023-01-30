@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 pub mod connectivity_config;
 pub mod development_support_config;
 pub mod diagnostics_config;
+pub mod example_config;
 pub mod identity_config;
 pub mod input_config;
 pub mod starnix_config;
@@ -66,6 +67,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the starnix area.
     #[serde(default)]
     pub starnix: starnix_config::PlatformStarnixConfig,
+
+    /// Assembly option triggering the inclusion of test AIBs
+    #[serde(default)]
+    pub example_config: example_config::ExampleConfig,
 }
 
 /// The platform's base service level.

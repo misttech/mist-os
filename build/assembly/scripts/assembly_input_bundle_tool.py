@@ -163,12 +163,12 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
                 instance_from_dict(
                     CompiledPackageAdditionalShards, package_def))
         else:
-            aib_creator.component_shards[
-                package_def["name"]] = package_def["components"]
+            aib_creator.component_shards[package_def["name"]] = package_def.get(
+                "components", dict())
             aib_creator.component_includes[
-                package_def["name"]] = package_def["includes"]
+                package_def["name"]] = package_def.get("includes", dict())
             aib_creator.compiled_package_contents[
-                package_def["name"]] = package_def["contents"]
+                package_def["name"]] = package_def.get("contents", dict())
 
 
 def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):

@@ -421,3 +421,39 @@ assembly_input_bundle("wlan_softmac_support") {
     },
   ]
 }
+
+# Example assembly input bundle for testing
+assembly_input_bundle("example_assembly_bundle") {
+  testonly = true
+  compiled_packages = [
+    # Main definition for another package
+    {
+      name = "foo"
+
+      # Test that multiple components work
+      components = {
+        bar = [ rebase_path(
+                "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml",
+                root_build_dir) ]
+        baz = [ rebase_path(
+                "//src/tests/assembly/assemble_image/compiled_package/meta/test.cml",
+                root_build_dir) ]
+      }
+    },
+
+    # Add a shard to the `core` package which should have a main definition
+    # in the legacy bundle
+    {
+      name = "core"
+      component_shards = {
+        core = [
+          # All paths must be rebased since this is passed directly to the AIB
+          # config.
+          rebase_path(
+              "//src/tests/assembly/assemble_image/compiled_package/meta/test.core_shard.cml",
+              root_build_dir),
+        ]
+      }
+    },
+  ]
+}

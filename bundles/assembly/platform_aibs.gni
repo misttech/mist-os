@@ -63,6 +63,9 @@ _eng_aib_names = [
 
   # Kernel args
   "kernel_args_eng",
+
+  # Example AIB
+  "example_assembly_bundle",
 ]
 eng_platform_aib_names = platform_aib_names + _eng_aib_names
 

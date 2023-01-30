@@ -16,4 +16,4 @@ pub use assembly_config::AssemblyConfig;
 pub use board_config::BoardInformation;
 pub use common::{DriverDetails, FeatureControl, FileEntry};
 pub use image_assembly_config::{ImageAssemblyConfig, PartialImageAssemblyConfig};
-pub use platform_config::{BuildType, FeatureSupportLevel};
+pub use platform_config::{example_config::ExampleConfig, BuildType, FeatureSupportLevel};

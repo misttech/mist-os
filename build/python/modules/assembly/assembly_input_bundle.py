@@ -120,7 +120,7 @@ class AssemblyInputBundle(ImageAssemblyConfig):
             include/
                 path/to/shard/file/in/tree
             <compiled package name>/
-                component_shards/
+                <component_name>/
                     name.shard.cml
                 files/
                     path/to/file/in/package
@@ -391,10 +391,11 @@ class AIBCreator:
         # package cml. These need to be placed in an include directory for
         # the cml compiler in the AIB containing the core package definition.
         # TODO(fxbug.dev/117397): Handle multiple packages properly
-        self.component_includes: Dict[PackageName, FileEntryList] = []
+        self.component_includes: Dict[PackageName, FileEntryList] = dict()
 
         # A set of file entries to include in compiled packages
-        self.compiled_package_contents: Dict[PackageName, FileEntryList] = []
+        self.compiled_package_contents: Dict[PackageName,
+                                             FileEntryList] = dict()
 
         self.compiled_package_shards: List[CompiledPackageAdditionalShards] = []
 
@@ -521,7 +522,8 @@ class AIBCreator:
                 ):
                     component_files, component_deps = self._copy_component_shards(
                         self.component_shards[package_name][component_name],
-                        package_name)
+                        package_name=package_name,
+                        component_name=component_name)
 
                     deps.update(component_deps)
 
@@ -561,7 +563,8 @@ class AIBCreator:
                 for component_name in package_shards.component_shards.keys():
                     component_files, component_deps = self._copy_component_shards(
                         package_shards.component_shards[component_name],
-                        package_name=package_shards.name)
+                        package_name=package_shards.name,
+                        component_name=component_name)
 
                     deps.update(component_deps)
 
@@ -850,8 +853,8 @@ class AIBCreator:
         return shard_include_paths, deps
 
     def _copy_component_shards(
-            self, component_shards: ComponentShards,
-            package_name: str) -> Tuple[List[FilePath], DepSet]:
+            self, component_shards: ComponentShards, package_name: str,
+            component_name: str) -> Tuple[List[FilePath], DepSet]:
         shard_file_paths: List[FilePath] = list()
         deps: DepSet = set()
         for shard in component_shards:
@@ -859,7 +862,7 @@ class AIBCreator:
             # tree. Make sure any directory traversal characters are replaced
             # and it's a valid filename.
             bundle_destination = os.path.join(
-                "compiled_packages", package_name, "component_shards",
+                "compiled_packages", package_name, component_name,
                 os.path.basename(shard))
             copy_destination = os.path.join(self.outdir, bundle_destination)
 

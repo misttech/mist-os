@@ -1,0 +1,27 @@
+// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    children: [
+        {
+            name: "bar",
+            url: "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm",
+            startup: "eager",
+        },
+        {
+            name: "baz",
+            url: "fuchsia-pkg://fuchsia.com/foo#meta/baz.cm",
+            startup: "eager",
+        },
+    ],
+    offer: [
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [
+                "#bar",
+                "#baz",
+            ],
+        },
+    ],
+}
