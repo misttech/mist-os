@@ -5,6 +5,7 @@
 """Rule for running size checker on given image."""
 
 load(":providers.bzl", "FuchsiaProductImageInfo")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 
 # Command for running ffx assembly size-check product.
 _SIZE_CHECKER_RUNNER_SH = """
@@ -21,15 +22,15 @@ $FFX \
 
 def _fuchsia_product_size_check_impl(ctx):
     images_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
-    ffx_tool = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"].ffx
+    fuchsia_toolchain = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
 
     size_file = ctx.actions.declare_file(ctx.label.name + "_size_summary")
     ctx.actions.run_shell(
-        inputs = ctx.files.product_image + [ffx_tool],
+        inputs = ctx.files.product_image + get_ffx_assembly_inputs(fuchsia_toolchain),
         outputs = [size_file],
         command = _SIZE_CHECKER_RUNNER_SH,
         env = {
-            "FFX": ffx_tool.path,
+            "FFX": fuchsia_toolchain.ffx.path,
             "IMAGES_PATH": images_out.path + "/images.json",
             "SIZE_FILE": size_file.path,
         },

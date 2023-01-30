@@ -82,13 +82,14 @@ fuchsia_toolchain_info(
         ":no_experimental": None,
     }),
     blobfs = "//tools:x64/blobfs_do_not_depend",
+    blobfs_manifest = "//tools:x64/blobfs_do_not_depend-meta.json",
     bootserver = "//tools:x64/bootserver",
     cmc = "//tools:x64/cmc",
-    cmc_manifest = "//tools:x64/cmc-meta.json",
     cmc_includes = select({
         "@platforms//os:fuchsia": "//:cmc_includes",
         "//conditions:default": None,
     }),
+    cmc_manifest = "//tools:x64/cmc-meta.json",
     default_fidl_target_api = DEFAULT_FIDL_TARGET_API,
     default_target_api = DEFAULT_TARGET_API,
     exec_cpu = "x64",
@@ -99,11 +100,16 @@ fuchsia_toolchain_info(
     fidlgen_hlcpp = "//tools:x64/fidlgen",  # (TODO: rename to fidlgen_hlcpp once the Core SDK renames it)
     fssh = "//tools:x64/fssh",
     fvm = "//tools:x64/fvm",
+    fvm_manifest = "//tools:x64/fvm-meta.json",
     merkleroot = "//tools:x64/merkleroot",
+    minfs = "//tools:x64/minfs",
+    minfs_manifest = "//tools:x64/minfs-meta.json",
     pm = "//tools:x64/pm",
     runfiles = ":fuchsia_toolchain_files",
     sdk_id = "{{SDK_ID}}",
+    sdk_manifest = "//:meta/manifest.json",
     zbi = "//tools:x64/zbi",
+    zbi_manifest = "//tools:x64/zbi-meta.json",
 )
 
 toolchain(

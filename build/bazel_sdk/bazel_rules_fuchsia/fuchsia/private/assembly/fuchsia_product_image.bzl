@@ -12,6 +12,7 @@ load(
     "FuchsiaProductConfigInfo",
     "FuchsiaProductImageInfo",
 )
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 
 # Base source for running ffx assembly product
 _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE = """
@@ -61,15 +62,8 @@ def _fuchsia_product_image_impl(ctx):
         board_config_arg = "--board-info $ORIG_DIR/$BOARD_CONFIG_PATH" if board_config_file else "",
     )
 
-    # NOTE: The `cmc` host tool is used by `ffx`, which finds its location
-    # by parsing the _sdk_manifest, then the `cmc_manifest` one.
-    ffx_inputs = [
-        ctx.file._sdk_manifest,
-        ffx_tool,
-        fuchsia_toolchain.cmc,
-        fuchsia_toolchain.cmc_manifest,
-        product_config_file,
-    ]
+    ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
+    ffx_inputs.append(product_config_file)
     if board_config_file:
         ffx_inputs.append(board_config_file)
 

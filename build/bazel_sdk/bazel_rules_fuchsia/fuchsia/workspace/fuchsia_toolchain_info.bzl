@@ -11,9 +11,10 @@ def _fuchsia_toolchain_info_impl(ctx):
         name = ctx.label.name,
         bootserver = ctx.executable.bootserver,
         blobfs = ctx.executable.blobfs,
+        blobfs_manifest = ctx.file.blobfs_manifest,
         bindc = ctx.executable.bindc or None,
         cmc = ctx.executable.cmc,
-        cmc_manifest = ctx.files.cmc_manifest[0],
+        cmc_manifest = ctx.file.cmc_manifest,
         cmc_includes = ctx.attr.cmc_includes or None,
         far = ctx.executable.far,
         ffx = ctx.executable.ffx,
@@ -22,14 +23,19 @@ def _fuchsia_toolchain_info_impl(ctx):
         fidlgen_hlcpp = ctx.executable.fidlgen_hlcpp,
         fidlgen_cpp = ctx.executable.fidlgen_cpp,
         fvm = ctx.executable.fvm,
+        fvm_manifest = ctx.file.fvm_manifest,
         merkleroot = ctx.executable.merkleroot,
+        minfs = ctx.executable.minfs,
+        minfs_manifest = ctx.file.minfs_manifest,
         pm = ctx.executable.pm,
         zbi = ctx.executable.zbi,
+        zbi_manifest = ctx.file.zbi_manifest,
         default_api_level = ctx.attr.default_target_api,
         default_fidl_target_api = ctx.attr.default_fidl_target_api,
         exec_cpu = ctx.attr.exec_cpu,
         runfiles = ctx.runfiles(ctx.attr.runfiles.files.to_list()),
         sdk_id = ctx.attr.sdk_id,
+        sdk_manifest = ctx.file.sdk_manifest,
     )]
 
 fuchsia_toolchain_info = rule(
@@ -55,6 +61,12 @@ included in the Fuchsia IDK.
             executable = True,
             allow_single_file = True,
         ),
+        "blobfs_manifest": attr.label(
+            doc = "blobfs tool's manifest, required by ffx.",
+            mandatory = True,
+            cfg = "exec",
+            allow_single_file = True,
+        ),
         "bindc": attr.label(
             doc = "bindc tool executable.",
             mandatory = False,
@@ -70,7 +82,7 @@ included in the Fuchsia IDK.
             allow_single_file = True,
         ),
         "cmc_manifest": attr.label(
-            doc = "cmc tool executable SDK manifest, required by ffx.",
+            doc = "cmc tool's manifest, required by ffx.",
             mandatory = True,
             cfg = "exec",
             allow_single_file = True,
@@ -128,11 +140,30 @@ included in the Fuchsia IDK.
             executable = True,
             allow_single_file = True,
         ),
+        "fvm_manifest": attr.label(
+            doc = "fvm tool's manifest, required by ffx.",
+            mandatory = True,
+            cfg = "exec",
+            allow_single_file = True,
+        ),
         "merkleroot": attr.label(
             doc = "merkleroot tool executable.",
             mandatory = True,
             cfg = "exec",
             executable = True,
+            allow_single_file = True,
+        ),
+        "minfs": attr.label(
+            doc = "minfs tool executable.",
+            mandatory = True,
+            cfg = "exec",
+            executable = True,
+            allow_single_file = True,
+        ),
+        "minfs_manifest": attr.label(
+            doc = "minfs tool's manifest, required by ffx.",
+            mandatory = True,
+            cfg = "exec",
             allow_single_file = True,
         ),
         "pm": attr.label(
@@ -147,6 +178,12 @@ included in the Fuchsia IDK.
             mandatory = True,
             cfg = "exec",
             executable = True,
+            allow_single_file = True,
+        ),
+        "zbi_manifest": attr.label(
+            doc = "zbi tool's manifest, required by ffx.",
+            mandatory = True,
+            cfg = "exec",
             allow_single_file = True,
         ),
         "default_target_api": attr.int(
@@ -169,6 +206,11 @@ included in the Fuchsia IDK.
         "sdk_id": attr.string(
             doc = "The identifier for this sdk toolchain.",
             mandatory = True,
+        ),
+        "sdk_manifest": attr.label(
+            doc = "Top-level SDK manifest location.",
+            mandatory = True,
+            allow_single_file = True,
         ),
     },
     provides = [platform_common.ToolchainInfo],
