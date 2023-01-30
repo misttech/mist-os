@@ -566,14 +566,15 @@
   area: ["System", "Component Framework"]
 
 - term: "Dispatcher"
-  short_description: "A dispatcher, assigned to a driver, coordinates and performs asynchronous
-  operations for the driver."
-  full_description: "A dispatcher mainly handles two tasks: it schedules asynchronous work to
-  run on threads in a driver host and it actually runs the work on those threads
-  on behalf of a driver."
-  see_also: [""]
+  short_description: "A dispatcher is an interface for scheduling asynchronous operations."
+  full_description: "A dispatcher, when assigned to a
+  <a href=\"/docs/glossary#driver\">driver</a>, coordinates and performs asynchronous
+  operations for the driver. A dispatcher mainly handles two tasks: it schedules asynchronous
+  work to run on threads in a <a href=\"/docs/glossary#driver-host\">driver host</a>
+  and it actually runs the work on those threads on behalf of a driver."
+  see_also: ["<a href=\"/docs/glossary#synchronized-dispatcher\">Synchronized dispatcher</a>"]
   related_guides: ["<a href=\"/docs/concepts/drivers/driver-dispatcher-and-threads.md\">Driver dispatcher and threads</a>"]
-  area: ["System", "Devices"]
+  area: ["Languages and Libraries", "Devices", "Drivers", "Driver SDK"]
 
 - term: "Driver"
   short_description: "A driver is a dynamic shared library that enables and
@@ -1656,7 +1657,7 @@
   full_description: ""
   see_also: ["<a href=\"/docs/development/languages/c-cpp/thread-safe-async.md\">Thread safe asynchronous code</a>"]
   related_guides: [""]
-  area: ["System"]
+  area: ["Languages and Libraries"]
 
 - term: "Thread"
   short_description: "A <a href=\"/docs/glossary#kernel-object\">kernel object</a> that
