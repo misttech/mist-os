@@ -23,13 +23,21 @@ void FakeController::HandleSubmission(size_t queue_id, size_t index, nvme::Submi
   completion.set_sq_head(static_cast<uint16_t>(index));
 
   // Try and find the command handler. If it is found, run it, otherwise, return an error.
-  auto& command_set = (queue_id == kAdminQueueId) ? admin_commands_ : io_commands_;
-  auto cmd = command_set.find(static_cast<uint8_t>(submission.opcode()));
-  if (cmd != command_set.end()) {
+  CommandHandler cmd_handler;
+  {
+    fbl::AutoLock lock(&lock_);
+    auto& command_set = (queue_id == kAdminQueueId) ? admin_commands_ : io_commands_;
+    auto cmd = command_set.find(static_cast<uint8_t>(submission.opcode()));
+    if (cmd != command_set.end()) {
+      cmd_handler = cmd->second;
+    }
+  }
+
+  if (cmd_handler) {
     // Find transaction data.
     auto& txn_data = (queue_id == kAdminQueueId) ? nvme_->admin_queue_->txn_data()
                                                  : nvme_->io_queue_->txn_data();
-    cmd->second(submission, txn_data[submission.cid()], completion);
+    cmd_handler(submission, txn_data[submission.cid()], completion);
   } else {
     // Command did not exist, return an error.
     completion.set_status_code_type(nvme::StatusCodeType::kGeneric)
@@ -38,12 +46,18 @@ void FakeController::HandleSubmission(size_t queue_id, size_t index, nvme::Submi
   SubmitCompletion(completion);
 }
 
+FakeController::QueueState& FakeController::GetQueueState(
+    size_t queue_id, std::unordered_map<size_t, QueueState>* queues) {
+  fbl::AutoLock lock(&lock_);
+  auto iter = queues->find(queue_id);
+  ZX_ASSERT(iter != queues->end());
+  ZX_ASSERT(iter->second.queue);
+  return iter->second;
+}
+
 void FakeController::SubmitCompletion(nvme::Completion& completion) {
   // Find queue.
-  size_t queue_id = completion.sq_id();
-  auto iter = completion_queues_.find(queue_id);
-  ZX_ASSERT(iter != completion_queues_.end());
-  QueueState& queue = iter->second;
+  QueueState& queue = GetQueueState(completion.sq_id(), &completion_queues_);
 
   // Check there's space.
   ZX_ASSERT((queue.producer_location + 1) % queue.queue->entry_count() != queue.consumer_location);
@@ -61,10 +75,13 @@ void FakeController::SubmitCompletion(nvme::Completion& completion) {
     queue.producer_location = 0;
     queue.phase ^= 1;
   }
+
+  fbl::AutoLock lock(&lock_);
   irqs_.find(0)->second.Trigger();
 }
 
 zx::result<zx::interrupt> FakeController::GetOrCreateInterrupt(size_t index) {
+  fbl::AutoLock lock(&lock_);
   auto value = irqs_.find(index);
   zx::unowned_interrupt to_clone;
   if (value != irqs_.end()) {
@@ -95,6 +112,7 @@ void FakeController::SetConfig(nvme::ControllerConfigReg& cfg) {
 }
 
 void FakeController::UpdateIrqMask(bool enable, nvme::InterruptReg& state) {
+  fbl::AutoLock lock(&lock_);
   uint32_t val = state.reg_value();
   for (size_t i = 0; i < 32; i++) {
     if ((val >> i) & 1) {
@@ -112,17 +130,18 @@ void FakeController::UpdateIrqMask(bool enable, nvme::InterruptReg& state) {
 void FakeController::RingDoorbell(bool is_submit, size_t queue_id, nvme::DoorbellReg& reg) {
   if (!is_submit) {
     // Completion is easy, just note the new location.
-    completion_queues_[queue_id].consumer_location = static_cast<uint16_t>(reg.value());
+    QueueState& queue = GetQueueState(queue_id, &completion_queues_);
+    queue.consumer_location = static_cast<uint16_t>(reg.value());
     return;
   }
 
   // Submission is a little more complex. For each new submission (between the old and new values of
   // the doorbell), we call HandleSubmission().
-  uint16_t old = submission_queues_[queue_id].consumer_location;
-  const nvme::Queue* queue = submission_queues_[queue_id].queue;
+  QueueState& queue = GetQueueState(queue_id, &submission_queues_);
+  uint16_t old = queue.consumer_location;
 
-  cpp20::span<nvme::Submission> submissions(static_cast<nvme::Submission*>(queue->head()),
-                                            queue->entry_count());
+  cpp20::span<nvme::Submission> submissions(static_cast<nvme::Submission*>(queue.queue->head()),
+                                            queue.queue->entry_count());
 
   size_t i = old;
   auto next = [&i, &submissions]() {
@@ -133,10 +152,10 @@ void FakeController::RingDoorbell(bool is_submit, size_t queue_id, nvme::Doorbel
   };
 
   for (; i != reg.value(); next()) {
-    submission_queues_[queue_id].consumer_location = static_cast<uint16_t>(i);
+    queue.consumer_location = static_cast<uint16_t>(i);
     HandleSubmission(queue_id, i, submissions[i]);
   }
-  submission_queues_[queue_id].consumer_location = static_cast<uint16_t>(i);
+  queue.consumer_location = static_cast<uint16_t>(i);
 }
 
 void FakeController::UpdateAdminQueue() {

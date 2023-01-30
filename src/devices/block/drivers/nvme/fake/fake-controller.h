@@ -6,12 +6,16 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_NVME_FAKE_FAKE_CONTROLLER_H_
 
 #include <lib/fit/function.h>
+#include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>
 
 #include <unordered_map>
 #include <vector>
+
+#include <fbl/auto_lock.h>
+#include <fbl/mutex.h>
 
 #include "src/devices/block/drivers/nvme/commands.h"
 #include "src/devices/block/drivers/nvme/fake/fake-namespace.h"
@@ -39,10 +43,12 @@ class FakeController {
 
   // Add a command handler for the given admin opcode.
   void AddAdminCommand(uint8_t opcode, CommandHandler handler) {
+    fbl::AutoLock lock(&lock_);
     admin_commands_.emplace(opcode, std::move(handler));
   }
   // Add a command handler for the given I/O opcode.
   void AddIoCommand(uint8_t opcode, CommandHandler handler) {
+    fbl::AutoLock lock(&lock_);
     io_commands_.emplace(opcode, std::move(handler));
   }
 
@@ -50,7 +56,10 @@ class FakeController {
   void UpdateAdminQueue();
 
   // Add a namespace to this controller.
-  void AddNamespace(uint32_t nsid, FakeNamespace& ns) { namespaces_.emplace(nsid, ns); }
+  void AddNamespace(uint32_t nsid, FakeNamespace& ns) {
+    fbl::AutoLock lock(&lock_);
+    namespaces_.emplace(nsid, ns);
+  }
 
   // Called by the test fixture to give us a pointer to the driver instance.
   // We use the driver instance to access data buffers and queues since the values written to the
@@ -59,6 +68,7 @@ class FakeController {
 
   void AddQueuePair(size_t queue_id, const nvme::Queue* completion_queue,
                     const nvme::Queue* submission_queue) {
+    fbl::AutoLock lock(&lock_);
     if (completion_queue) {
       completion_queues_.emplace(
           queue_id,
@@ -79,7 +89,10 @@ class FakeController {
 
   FakeRegisters& registers() { return regs_; }
   nvme::Nvme* nvme() { return nvme_; }
-  const std::map<uint32_t, FakeNamespace&>& namespaces() const { return namespaces_; }
+  const std::map<uint32_t, FakeNamespace&>& namespaces() const {
+    fbl::AutoLock lock(&lock_);
+    return namespaces_;
+  }
 
   // Returns IRQ number |index|, and creates it if it doesn't yet exist.
   zx::result<zx::interrupt> GetOrCreateInterrupt(size_t index);
@@ -137,13 +150,19 @@ class FakeController {
   void UpdateIrqMask(bool enable, nvme::InterruptReg& state);
   void RingDoorbell(bool is_submit, size_t queue_id, nvme::DoorbellReg& reg);
 
-  std::unordered_map<size_t, QueueState> completion_queues_;
-  std::unordered_map<size_t, QueueState> submission_queues_;
-  std::unordered_map<size_t, IrqState> irqs_;
-  std::unordered_map<uint8_t, CommandHandler> admin_commands_;
-  std::unordered_map<uint8_t, CommandHandler> io_commands_;
+  QueueState& GetQueueState(size_t queue_id, std::unordered_map<size_t, QueueState>* queues);
+
+  // Used to maintain integrity of the map containers rather than their contents, which are used to
+  // add more elements to the map in certain cases (e.g., processing a queue's command to set up
+  // another queue).
+  mutable fbl::Mutex lock_;
+  std::unordered_map<size_t, QueueState> completion_queues_ TA_GUARDED(lock_);
+  std::unordered_map<size_t, QueueState> submission_queues_ TA_GUARDED(lock_);
+  std::unordered_map<size_t, IrqState> irqs_ TA_GUARDED(lock_);
+  std::unordered_map<uint8_t, CommandHandler> admin_commands_ TA_GUARDED(lock_);
+  std::unordered_map<uint8_t, CommandHandler> io_commands_ TA_GUARDED(lock_);
   // This is ordered because "Get Active Namespaces" returns an ordered list of namespaces.
-  std::map<uint32_t, FakeNamespace&> namespaces_;
+  std::map<uint32_t, FakeNamespace&> namespaces_ TA_GUARDED(lock_);
   nvme::Nvme* nvme_ = nullptr;
 
   FakeRegisters regs_;

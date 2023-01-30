@@ -104,7 +104,7 @@ class NvmeTest : public inspect::InspectTestHelper, public zxtest::Test {
   fake_nvme::FakeAdminCommands admin_commands_{controller_};
 };
 
-TEST_F(NvmeTest, DISABLED_BasicTest) {
+TEST_F(NvmeTest, BasicTest) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
   ASSERT_NO_FATAL_FAILURE(ReadInspect(nvme_->inspect().DuplicateVmo()));
   const auto* controller = hierarchy().GetByPath({"controller"});
@@ -118,7 +118,7 @@ TEST_F(NvmeTest, DISABLED_BasicTest) {
   CheckBooleanProperty(controller->node(), "volatile_write_cache_enabled", true);
 }
 
-TEST_F(NvmeTest, DISABLED_NamespaceBlockSize) {
+TEST_F(NvmeTest, NamespaceBlockSize) {
   fake_nvme::FakeNamespace ns;
   controller_.AddNamespace(1, ns);
   ASSERT_NO_FATAL_FAILURE(RunInit());
@@ -139,7 +139,7 @@ TEST_F(NvmeTest, DISABLED_NamespaceBlockSize) {
   ASSERT_EQ(1024, info.block_count);
 }
 
-TEST_F(NvmeTest, DISABLED_NamespaceReadTest) {
+TEST_F(NvmeTest, NamespaceReadTest) {
   fake_nvme::FakeNamespace ns;
   controller_.AddNamespace(1, ns);
   controller_.AddIoCommand(nvme::IoCommandOpcode::kRead,
