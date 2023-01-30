@@ -57,7 +57,8 @@ class DriverTestLoopFixture : public ::testing::Test {
 
   // Posts a task on the driver dispatcher and waits synchronously until it is completed.
   void RunOnDispatcher(fit::closure task) {
-    fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), std::move(task));
+    ASSERT_EQ(ZX_OK,
+              fdf::RunOnDispatcherSync(dispatcher_.dispatcher(), std::move(task)).status_value());
   }
 
   const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_.driver_dispatcher(); }

@@ -10,14 +10,38 @@
 
 namespace fdf {
 
-void RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task) {
+zx::result<> RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task) {
   libsync::Completion task_completion;
   async::PostTask(dispatcher, [task = std::move(task), &task_completion]() {
     task();
     task_completion.Signal();
   });
 
-  task_completion.Wait();
+  return WaitForCompletion(task_completion);
+}
+
+zx::result<> WaitForCompletion(libsync::Completion& completion) {
+  while (!completion.signaled()) {
+    auto status = fdf_testing_run_until_idle();
+    if (status == ZX_OK) {
+      continue;
+    }
+
+    if (status == ZX_ERR_BAD_STATE) {
+      break;
+    }
+
+    return zx::error(status);
+  }
+
+  auto status = completion.Wait();
+  return zx::make_result(status);
+}
+
+TestSynchronizedDispatcher::~TestSynchronizedDispatcher() {
+  // Stop is safe to call multiple times. It returns immediately if Stop has already happened.
+  zx::result stop_result = Stop();
+  ZX_ASSERT_MSG(stop_result.is_ok(), "Stop failed: %s", stop_result.status_string());
 }
 
 zx::result<> TestSynchronizedDispatcher::Start(fdf::SynchronizedDispatcher::Options options,
@@ -46,18 +70,9 @@ zx::result<> TestSynchronizedDispatcher::StartAsDefault(
   return zx::make_result(fdf_testing_set_default_dispatcher(dispatcher_.get()));
 }
 
-zx::result<> TestSynchronizedDispatcher::StopSync() {
-  StopAsync();
-  return WaitForStop();
-}
-
-void TestSynchronizedDispatcher::StopAsync() { dispatcher_.ShutdownAsync(); }
-
-zx::result<> TestSynchronizedDispatcher::WaitForStop() {
-  if (zx_status_t status = dispatcher_shutdown_.Wait(); status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok();
+zx::result<> TestSynchronizedDispatcher::Stop() {
+  dispatcher_.ShutdownAsync();
+  return WaitForCompletion(dispatcher_shutdown_);
 }
 
 }  // namespace fdf

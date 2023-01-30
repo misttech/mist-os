@@ -10,18 +10,23 @@
 
 namespace fdf {
 
-// Run `task` on `dispatcher`, and block until it is completed.
-// Because this blocks, this cannot be run on the dispatcher's thread.
-void RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task);
+// Run `task` on `dispatcher`, and wait until it is completed.
+//
+// This MUST be called from the main test thread.
+zx::result<> RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task);
+
+// Wait until the completion is signaled. When this function returns, the completion is signaled.
+//
+// This MUST be called from the main test thread.
+zx::result<> WaitForCompletion(libsync::Completion& completion);
 
 // A wrapper around an fdf::SynchronizedDispatcher that is meant for testing.
 class TestSynchronizedDispatcher {
  public:
   TestSynchronizedDispatcher() = default;
 
-  // The dispatcher must be completely shutdown before the dispatcher can be closed.
-  // i.e. StopAsync and WaitForStop must be called.
-  ~TestSynchronizedDispatcher() = default;
+  // If |Stop| hasn't been called, it will get called here.
+  ~TestSynchronizedDispatcher();
 
   // Start the dispatcher. Once this returns successfully the dispatcher is available to be
   // used for queueing and running tasks.
@@ -45,18 +50,12 @@ class TestSynchronizedDispatcher {
   zx::result<> StartAsDefault(fdf::SynchronizedDispatcher::Options options,
                               std::string_view dispatcher_name);
 
-  // Stop the dispatcher. This must be called before TestSynchronizedDispatcher is destructed.
-  // This will block until the dispatcher is stopped, so this cannot be run on the dispatcher's
-  // thread.
-  zx::result<> StopSync();
-
-  // Request that the dispatcher is stopped. This can be called on the dispatcher's thread.
-  // This should be used in conjunction with WaitForStop.
-  void StopAsync();
-
-  // Wait until the dispatcher is stopped. This will block the current thread, so it should not be
-  // called on the dispatcher's thread.
-  zx::result<> WaitForStop();
+  // This will stop the dispatcher and wait until it stops.
+  // When this function returns, the dispatcher is stopped.
+  // Safe to call multiple times. It will return immediately if Stop has already happened
+  //
+  // This MUST be called from the main test thread.
+  zx::result<> Stop();
 
   const fdf::SynchronizedDispatcher& driver_dispatcher() { return dispatcher_; }
   async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }

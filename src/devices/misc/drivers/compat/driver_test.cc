@@ -524,10 +524,6 @@ class DriverTest : public testing::Test {
     }
 
     driver.reset();
-
-    driver_dispatcher_.StopAsync();
-    fdf_testing_run_until_idle();
-    ASSERT_EQ(ZX_OK, driver_dispatcher_.WaitForStop().status_value());
   }
 
   void AssertDevfsPaths(std::unordered_set<std::string> expected) const {
