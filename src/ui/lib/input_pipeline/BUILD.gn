@@ -75,10 +75,13 @@ rustc_library("input_pipeline") {
     "//src/lib/ui/fidl_fuchsia_ui_focus_ext:lib",
     "//src/lib/ui/fidl_fuchsia_ui_views_ext:lib",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:nom",
+    "//third_party/rust_crates:nom_locate",
     "//third_party/rust_crates:pin-utils",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:test-case",
+    "//third_party/rust_crates:thiserror",
   ]
 
   sources = [
@@ -137,6 +140,8 @@ rustc_library("input_pipeline") {
     "src/mouse_binding.rs",
     "src/mouse_config.rs",
     "src/mouse_injector_handler.rs",
+    "src/mouse_model_database/mod.rs",
+    "src/mouse_model_database/xorg_conf_parser.rs",
     "src/observe_fake_events_input_handler.rs",
     "src/pointer_display_scale_handler.rs",
     "src/pointer_sensor_scale_handler.rs",

@@ -6,6 +6,7 @@
 mod testing_utilities;
 mod fake_input_device_binding;
 mod mouse_config;
+mod mouse_model_database;
 mod observe_fake_events_input_handler;
 mod utils;
 
