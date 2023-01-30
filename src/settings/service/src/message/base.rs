@@ -192,14 +192,6 @@ pub mod filter {
             Builder::new(condition, Conjugation::All).build()
         }
 
-        /// Adds an additional condition to the filter under construction.
-        #[cfg(test)]
-        pub(crate) fn append(mut self, condition: Condition) -> Self {
-            self.conditions.push(condition);
-
-            self
-        }
-
         pub(crate) fn build(self) -> Filter {
             Filter { conjugation: self.conjugation, conditions: self.conditions }
         }
