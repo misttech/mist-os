@@ -140,7 +140,8 @@ impl<'a> MultiFvmBuilder<'a> {
     pub fn build(&mut self, tools: &impl ToolProvider) -> Result<()> {
         let outputs = self.outputs.clone();
         for output in outputs {
-            self.build_output_and_add_to_manifest(tools, &output)?;
+            self.build_output_and_add_to_manifest(tools, &output)
+                .with_context(|| format!("Building {output}"))?;
         }
         Ok(())
     }
@@ -182,7 +183,7 @@ impl<'a> MultiFvmBuilder<'a> {
                 for filesystem_name in &config.filesystems {
                     let fs = self
                         .get_filesystem(tools, filesystem_name)
-                        .context(format!("Including filesystem: {}", &filesystem_name))?;
+                        .with_context(|| format!("Including filesystem: {}", &filesystem_name))?;
                     builder.filesystem(fs);
                 }
                 builder.build()?;
@@ -287,7 +288,7 @@ impl<'a> MultiFvmBuilder<'a> {
                 info!("Creating FVM filesystem: {}", name);
                 let (image, filesystem) = self
                     .build_filesystem(tools, params)
-                    .context(format!("Building filesystem: {name}"))?;
+                    .with_context(|| format!("Building filesystem: {name}"))?;
                 if let Some(image) = image {
                     self.assembly_manifest.images.push(image);
                 }

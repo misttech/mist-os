@@ -247,9 +247,9 @@ impl BlobfsContents {
             package_blobs.push(PackageBlob {
                 merkle: blob.merkle.to_string(),
                 path: blob.path.to_string(),
-                used_space_in_blobfs: *merkle_size_map
-                    .get(&blob.merkle.to_string())
-                    .context("Blob merkle not found.")?,
+                used_space_in_blobfs: *merkle_size_map.get(&blob.merkle.to_string()).with_context(
+                    || format!("Blob merkle not found. {} {}", blob.path, blob.merkle),
+                )?,
             });
         }
         for subpackage in subpackages {
@@ -271,7 +271,8 @@ impl BlobfsContents {
         let package_manifest = PackageManifest::try_load_from(&manifest)?;
         let name = package_manifest.name().to_string();
         let mut package_blobs: Vec<PackageBlob> = vec![];
-        Self::add_package_blobs(package_manifest, &mut package_blobs, merkle_size_map)?;
+        Self::add_package_blobs(package_manifest, &mut package_blobs, merkle_size_map)
+            .with_context(|| format!("adding package: {}", manifest))?;
         package_blobs.sort();
         package_set.0.push(PackageMetadata { name, manifest, blobs: package_blobs });
         Ok(())

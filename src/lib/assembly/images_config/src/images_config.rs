@@ -351,6 +351,17 @@ pub enum FvmOutput {
     Nand(NandFvm),
 }
 
+impl std::fmt::Display for FvmOutput {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let (fvm_type, name) = match self {
+            FvmOutput::Standard(fvm) => ("Standard", &fvm.name),
+            FvmOutput::Sparse(fvm) => ("Sparse", &fvm.name),
+            FvmOutput::Nand(fvm) => ("Nand", &fvm.name),
+        };
+        f.write_fmt(format_args!("Fvm::{}(\"{}\")", fvm_type, name))
+    }
+}
+
 /// The default FVM type with no modifications.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StandardFvm {

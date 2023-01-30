@@ -28,9 +28,14 @@ impl BlobManifest {
             self.add_file_with_merkle(blob.source_path, blob.merkle);
         }
         for subpackage in subpackages {
-            let subpackage_manifest = PackageManifest::try_load_from(subpackage.manifest_path)?;
+            let subpackage_manifest = PackageManifest::try_load_from(&subpackage.manifest_path)?;
             if !self.packages.contains_key(&subpackage_manifest.hash()) {
-                self.add_package(subpackage_manifest)?;
+                self.add_package(subpackage_manifest).with_context(|| {
+                    format!(
+                        "adding subpackage '{}' from {}",
+                        subpackage.name, subpackage.manifest_path
+                    )
+                })?;
             }
         }
         Ok(())

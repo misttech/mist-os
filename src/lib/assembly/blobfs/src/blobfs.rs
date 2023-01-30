@@ -51,7 +51,8 @@ impl BlobFSBuilder {
     /// `package_manifest_path` on the host.
     pub fn add_package(&mut self, package_manifest_path: impl AsRef<Utf8Path>) -> Result<()> {
         let package_manifest_path = package_manifest_path.as_ref();
-        let manifest = PackageManifest::try_load_from(package_manifest_path)?;
+        let manifest = PackageManifest::try_load_from(package_manifest_path)
+            .with_context(|| format!("Adding package: {}", package_manifest_path))?;
         self.manifest.add_package(manifest)
     }
 
@@ -224,7 +225,7 @@ mod tests {
         let tools = FakeToolProvider::new_with_side_effect(|_name, args| {
             let blobs_file_path = &args[1];
             let mut blobs_file = File::create(&blobs_file_path).unwrap();
-            let file_contents = r#"[  
+            let file_contents = r#"[
                 {
                   "merkle": "000000000000000000000000000000000000000000000000000000000003212e",
                   "used_space_in_blobfs": 4096
