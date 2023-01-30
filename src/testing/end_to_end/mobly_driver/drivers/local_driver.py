@@ -19,7 +19,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
     This driver is used when executing Mobly tests in the local environment.
     In the local environment, it is assumed that users have full knowledge of
     the physical testbed that will be used during the Mobly test so LocalDriver
-    allows for the Mobly |config_path| to be supllied directly by the user.
+    allows for the Mobly |config_path| to be supplied directly by the user.
     """
 
     def __init__(
@@ -27,7 +27,7 @@ class LocalDriver(base_mobly_driver.BaseDriver):
         """Initializes the instance.
 
         Args:
-          config_path: absolute path to the Mobly testbed config file.
+          config_path: absolute path to the Mobly test config file.
           params_path: absolute path to the Mobly test params file.
         """
         super().__init__(params_path=params_path)

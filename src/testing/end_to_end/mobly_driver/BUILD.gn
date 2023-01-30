@@ -41,10 +41,37 @@ if (is_host) {
     ]
   }
 
+  python_library("driver_factory") {
+    sources = [ "driver_factory.py" ]
+    library_deps = [
+      ":api_infra",
+      "drivers:common",
+      "drivers:infra_driver",
+      "drivers:local_driver",
+    ]
+  }
+
+  python_host_test("driver_factory_test") {
+    main_source = "driver_factory_test.py"
+    sources = [
+      "api_infra.py",
+      "driver_factory.py",
+      "drivers/base_mobly_driver.py",
+      "drivers/common.py",
+      "drivers/infra_driver.py",
+      "drivers/local_driver.py",
+    ]
+    libraries = [
+      ":driver_factory",
+      "//third_party/parameterized",
+    ]
+  }
+
   group("tests") {
     testonly = true
     public_deps = [
       ":api_mobly_test($host_toolchain)",
+      ":driver_factory_test($host_toolchain)",
       ":mobly_driver_lib_test($host_toolchain)",
       "drivers:tests",
     ]
