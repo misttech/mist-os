@@ -17,7 +17,7 @@ struct NodeBank {
 
   void NotifyRemovalComplete() {
     for (auto &n : nodes_) {
-      tracker_->NotifyRemovalComplete(&n);
+      tracker_->Notify(&n, dfv2::NodeState::kStopping);
     }
   }
 
@@ -34,7 +34,7 @@ TEST(NodeRemovalTracker, RegisterOneNode) {
   tracker.set_pkg_callback([&package_callbacks]() { package_callbacks++; });
   tracker.set_all_callback([&all_callbacks]() { all_callbacks++; });
   tracker.FinishEnumeration();
-  tracker.NotifyRemovalComplete(&node1);
+  tracker.Notify(&node1, dfv2::NodeState::kStopping);
 
   EXPECT_EQ(package_callbacks, 1);
   EXPECT_EQ(all_callbacks, 1);
@@ -101,7 +101,7 @@ TEST(NodeRemovalTracker, CallbackDeadlock) {
     tracker.set_all_callback([&all_callbacks]() { all_callbacks++; });
   });
   tracker.FinishEnumeration();
-  tracker.NotifyRemovalComplete(&node1);
+  tracker.Notify(&node1, dfv2::NodeState::kStopping);
 
   EXPECT_EQ(package_callbacks, 1);
   EXPECT_EQ(all_callbacks, 1);

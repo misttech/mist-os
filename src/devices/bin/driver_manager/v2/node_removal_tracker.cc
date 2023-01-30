@@ -19,32 +19,16 @@ void NodeRemovalTracker::RegisterNode(void* node_ptr, Collection node_collection
   nodes_[node_ptr] = {name, node_collection, state};
 }
 
-void NodeRemovalTracker::NotifyWaitingOnChildren(void* node_ptr) {
-  if (auto itr = nodes_.find(node_ptr); itr != nodes_.end()) {
-    auto [name, node_collection, state] = itr->second;
-    nodes_[itr->first] = {name, node_collection, NodeState::kWaitingOnChildren};
-  } else {
-    LOGF(ERROR, "Tried to NotifyWaitingOnChildren without registering!");
+void NodeRemovalTracker::Notify(void* node_ptr, NodeState state) {
+  auto itr = nodes_.find(node_ptr);
+  if (itr == nodes_.end()) {
+    LOGF(ERROR, "Tried to Notify without registering!");
+    return;
   }
-}
-
-void NodeRemovalTracker::NotifyNoChildren(void* node_ptr) {
-  if (auto itr = nodes_.find(node_ptr); itr != nodes_.end()) {
-    auto [name, node_collection, state] = itr->second;
-    nodes_[itr->first] = {name, node_collection, NodeState::kWaitingOnDriver};
-  } else {
-    LOGF(ERROR, "Tried to NotifyNoChildren without registering!");
+  itr->second.state = state;
+  if (state == NodeState::kStopping) {
+    CheckRemovalDone();
   }
-}
-
-void NodeRemovalTracker::NotifyRemovalComplete(void* node_ptr) {
-  if (auto itr = nodes_.find(node_ptr); itr != nodes_.end()) {
-    auto [name, node_collection, state] = itr->second;
-    nodes_[itr->first] = {name, node_collection, NodeState::kStopping};
-  } else {
-    LOGF(ERROR, "Tried to NotifyNoChildren without registering!");
-  }
-  CheckRemovalDone();
 }
 
 void NodeRemovalTracker::CheckRemovalDone() {

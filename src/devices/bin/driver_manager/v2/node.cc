@@ -475,11 +475,11 @@ void Node::CheckForRemoval() {
   if (!children_.empty()) {
     return;
   }
+  node_state_ = NodeState::kWaitingOnDriver;
   if (removal_tracker_) {
-    removal_tracker_->NotifyNoChildren(this);
+    removal_tracker_->Notify(this, node_state_);
   }
   LOGF(DEBUG, "Node::Remove(): %s children are empty", name().c_str());
-  node_state_ = NodeState::kWaitingOnDriver;
   if (driver_component_ && driver_component_->driver && driver_component_->driver->is_valid()) {
     auto result = (*driver_component_->driver)->Stop();
     if (result.ok()) {
@@ -510,7 +510,7 @@ void Node::FinishRemoval() {
   UnbindAndReset(controller_ref_);
   UnbindAndReset(node_ref_);
   if (removal_tracker_) {
-    removal_tracker_->NotifyRemovalComplete(this);
+    removal_tracker_->Notify(this, node_state_);
   }
 }
 // State table for package driver:
@@ -572,7 +572,7 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
     // Either removing kAll, or is package driver and removing kPackage.
     node_state_ = NodeState::kWaitingOnChildren;
     if (!should_register && removal_tracker_) {
-      removal_tracker_->NotifyWaitingOnChildren(this);
+      removal_tracker_->Notify(this, node_state_);
     }
     // All children should be removed regardless as they block removal of this node.
     removal_set = RemovalSet::kAll;
