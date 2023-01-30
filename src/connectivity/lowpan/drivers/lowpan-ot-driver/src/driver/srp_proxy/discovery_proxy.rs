@@ -41,66 +41,9 @@ fn flatten_txt(txt: Option<Vec<Vec<u8>>>) -> Vec<u8> {
     ret
 }
 
-/// Converts an iterator over [`HostAddress`]es to a vector of [`ot::Ip6Address`]es.
-fn process_addresses_from_host_addresses<T: IntoIterator<Item = HostAddress>>(
-    addresses: T,
-) -> Vec<ot::Ip6Address> {
-    let mut addresses = addresses
-        .into_iter()
-        .flat_map(|x| {
-            if let fidl_fuchsia_net::IpAddress::Ipv6(addr) = x.address {
-                let addr = ot::Ip6Address::from(addr.addr);
-                if should_proxy_address(&addr) {
-                    return Some(addr);
-                }
-            }
-            None
-        })
-        .collect::<Vec<_>>();
-    addresses.sort();
-    addresses
-}
-
-/// Converts an iterator over [`fidl_fuchsia_net::SocketAddress`]es to a vector of
-/// [`ot::Ip6Address`]es and a port.
-fn process_addresses_from_socket_addresses<
-    T: IntoIterator<Item = fidl_fuchsia_net::SocketAddress>,
->(
-    addresses: T,
-) -> (Vec<ot::Ip6Address>, Option<u16>) {
-    let mut ret_port: Option<u16> = None;
-    let mut addresses =
-        addresses
-            .into_iter()
-            .flat_map(|x| {
-                if let fidl_fuchsia_net::SocketAddress::Ipv6(
-                    fidl_fuchsia_net::Ipv6SocketAddress { address, port, .. },
-                ) = x
-                {
-                    let addr = ot::Ip6Address::from(address.addr);
-                    if ret_port.is_none() {
-                        ret_port = Some(port);
-                    } else if ret_port != Some(port) {
-                        warn!(
-                            "mDNS service has multiple ports for the same service, {:?} != {:?}",
-                            ret_port.unwrap(),
-                            port
-                        );
-                    }
-                    if should_proxy_address(&addr) {
-                        return Some(addr);
-                    }
-                }
-                None
-            })
-            .collect::<Vec<_>>();
-    addresses.sort();
-    (addresses, ret_port)
-}
-
 #[derive(Debug)]
 enum DnssdUpdate {
-    Host { host_name: CString, addresses: Vec<ot::Ip6Address>, ttl: u32 },
+    Host { host_name: CString, addresses: Vec<fidl_fuchsia_net_mdns::HostAddress>, ttl: u32, name_local_domain: String, },
     Service(ServiceSubscriptionListenerRequest),
 }
 
@@ -109,6 +52,7 @@ enum DnssdUpdate {
 pub struct DiscoveryProxy {
     update_receiver: Mutex<mpsc::Receiver<DnssdUpdate>>,
     subscriptions: Arc<Mutex<HashMap<CString, Task<Result>>>>,
+    local_addresses: Mutex<Vec<std::net::Ipv6Addr>>,
 }
 
 /// Returns `true` if the address is a unicast address with link-local scope.
@@ -166,7 +110,7 @@ impl DiscoveryProxy {
 
         info!("DiscoveryProxy Started");
 
-        Ok(DiscoveryProxy { update_receiver: Mutex::new(update_receiver), subscriptions })
+        Ok(DiscoveryProxy { update_receiver: Mutex::new(update_receiver), subscriptions, local_addresses: Mutex::new(Vec::new()) })
     }
 
     fn dnssd_unsubscribed_from(
@@ -239,6 +183,8 @@ impl DiscoveryProxy {
 
         let update_sender_clone = update_sender.clone();
         let name_srp_domain_copy = name_srp_domain.clone();
+        let name_local_domain_copy_0 = name_local_domain.clone();
+        let name_local_domain_copy_1 = name_local_domain.clone();
 
         let future = stream
             .map_err(anyhow::Error::from)
@@ -248,12 +194,12 @@ impl DiscoveryProxy {
                           responder,
                       }: HostNameSubscriptionListenerRequest| {
                     let mut update_sender_clone = update_sender_clone.clone();
-                    let addresses = process_addresses_from_host_addresses(addresses);
                     let name_srp_domain_copy = name_srp_domain_copy.clone();
                     let dnssd_update = DnssdUpdate::Host {
                         host_name: name_srp_domain_copy,
                         addresses,
                         ttl: DEFAULT_MDNS_TTL, // TODO(fxbug.dev/94352): Change when available.
+                        name_local_domain: name_local_domain_copy_0.clone(),
                     };
                     debug!("DNS-SD host subscription update: {:?}", dnssd_update);
                     async move {
@@ -285,24 +231,12 @@ impl DiscoveryProxy {
                     )
                     .map_err(anyhow::Error::from)
                     .and_then(move |host_addresses| async move {
-                        let addresses =
-                            process_addresses_from_host_addresses(host_addresses.clone());
-
-                        if addresses.is_empty() {
-                            warn!("Unable to resolve {:?} to an IPv6 address.", &name_local_domain);
-                            debug!(
-                                "Full list for {:?} was {:?}",
-                                &name_local_domain, host_addresses
-                            );
-                        } else {
-                            debug!("Resolved {:?} to {:?}", &name_local_domain, addresses);
-                        }
-
                         update_sender_clone
                             .send(DnssdUpdate::Host {
                                 host_name: name_srp_domain_copy,
-                                addresses,
+                                addresses: host_addresses,
                                 ttl: DEFAULT_MDNS_TTL, // TODO(fxbug.dev/94352): Change when available.
+                                name_local_domain: name_local_domain_copy_1,
                             })
                             .await?;
                         Ok(())
@@ -464,6 +398,7 @@ impl DiscoveryProxy {
     }
 
     fn handle_service_instance_update(
+        &self,
         instance: &ot::Instance,
         service_instance: ServiceInstance,
     ) -> Result {
@@ -487,7 +422,7 @@ impl DiscoveryProxy {
 
             let host_name_srp = CString::new(format!("{host_name}.{srp_domain}"))?;
 
-            let (addresses, port) = process_addresses_from_socket_addresses(addresses);
+            let (addresses, port) = self.process_addresses_from_socket_addresses(addresses);
 
             if addresses.is_empty() {
                 warn!(
@@ -519,6 +454,7 @@ impl DiscoveryProxy {
     }
 
     fn handle_service_subscription_listener_request(
+        &self,
         ot_instance: &ot::Instance,
         service_subscription_listener_request: ServiceSubscriptionListenerRequest,
     ) -> Result {
@@ -528,7 +464,7 @@ impl DiscoveryProxy {
                 instance: service_instance,
                 responder,
             } => {
-                Self::handle_service_instance_update(ot_instance, service_instance)?;
+                self.handle_service_instance_update(ot_instance, service_instance)?;
                 responder.send()?;
             }
 
@@ -537,7 +473,7 @@ impl DiscoveryProxy {
                 instance: service_instance,
                 responder,
             } => {
-                Self::handle_service_instance_update(ot_instance, service_instance)?;
+                self.handle_service_instance_update(ot_instance, service_instance)?;
                 responder.send()?;
             }
 
@@ -569,14 +505,27 @@ impl DiscoveryProxy {
                 Some(DnssdUpdate::Service(request)) => {
                     debug!("DnssdUpdate::Service: {:?}", request);
                     if let Err(err) =
-                        Self::handle_service_subscription_listener_request(instance, request)
+                        self.handle_service_subscription_listener_request(instance, request)
                     {
                         error!("handle_service_subscription_listener_request: {:?}", err);
                     }
                 }
-                Some(DnssdUpdate::Host { host_name, addresses, ttl }) => {
-                    debug!("DnssdUpdate::Host: {:?}, {:?}, {}", host_name, addresses, ttl);
-                    instance.dnssd_query_handle_discovered_host(&host_name, &addresses, ttl);
+                Some(DnssdUpdate::Host { host_name, addresses, ttl, name_local_domain }) => {
+                    let ot_ip_addresses =
+                        self.process_addresses_from_host_addresses(addresses.clone());
+
+                    if ot_ip_addresses.is_empty() {
+                        warn!("Unable to resolve {:?} to an IPv6 address.", &name_local_domain);
+                        debug!(
+                            "Full list for {:?} was {:?}",
+                            &name_local_domain, addresses
+                        );
+                    } else {
+                        debug!("Resolved {:?} to {:?}", &name_local_domain, ot_ip_addresses);
+                    }
+
+                    debug!("DnssdUpdate::Host: {:?}, {:?}, {}", host_name, ot_ip_addresses, ttl);
+                    instance.dnssd_query_handle_discovered_host(&host_name, &ot_ip_addresses, ttl);
                 }
                 None => {
                     warn!("update_receiver stream has finished unexpectedly.");
@@ -592,6 +541,105 @@ impl DiscoveryProxy {
                 true
             }
         });
+    }
+
+    /// Converts an iterator over [`fidl_fuchsia_net::SocketAddress`]es to a vector of
+    /// [`ot::Ip6Address`]es and a port.
+    fn process_addresses_from_socket_addresses<
+        T: IntoIterator<Item = fidl_fuchsia_net::SocketAddress>,
+    >(
+        &self,
+        addresses: T,
+    ) -> (Vec<ot::Ip6Address>, Option<u16>) {
+        let mut ret_port: Option<u16> = None;
+        let mut is_local = false;
+        let mut addresses =
+            addresses
+                .into_iter()
+                .flat_map(|x| {
+                    if let fidl_fuchsia_net::SocketAddress::Ipv6(
+                        fidl_fuchsia_net::Ipv6SocketAddress { address, port, .. },
+                    ) = x
+                    {
+                        let addr = ot::Ip6Address::from(address.addr);
+                        if ret_port.is_none() {
+                            ret_port = Some(port);
+                        } else if ret_port != Some(port) {
+                            warn!(
+                                "mDNS service has multiple ports for the same service, {:?} != {:?}",
+                                ret_port.unwrap(),
+                                port
+                            );
+                        }
+                        if should_proxy_address(&addr) {
+                            return Some(addr);
+                        }
+                        if addr.is_loopback() {
+                            is_local = true;
+                            return None;
+                        }
+                    }
+                    None
+                })
+                .collect::<Vec<_>>();
+        if is_local {
+            addresses = self.get_local_addresses()
+            .iter()
+            .map(|x| {
+                ot::Ip6Address::from(x.octets())
+            })
+            .collect::<Vec<_>>();
+        }
+        addresses.sort();
+        (addresses, ret_port)
+    }
+
+    /// Converts an iterator over [`HostAddress`]es to a vector of [`ot::Ip6Address`]es.
+    fn process_addresses_from_host_addresses<T: IntoIterator<Item = HostAddress>>(
+        &self,
+        addresses: T,
+    ) -> Vec<ot::Ip6Address> {
+        let mut is_local = false;
+        let mut addresses = addresses
+            .into_iter()
+            .flat_map(|x| {
+                if let fidl_fuchsia_net::IpAddress::Ipv6(addr) = x.address {
+                    let addr = ot::Ip6Address::from(addr.addr);
+                    if should_proxy_address(&addr) {
+                        return Some(addr);
+                    }
+                    if addr.is_loopback() {
+                        is_local = true;
+                        return None;
+                    }
+                }
+                None
+            })
+            .collect::<Vec<_>>();
+        if is_local {
+            addresses = self.get_local_addresses()
+            .iter()
+            .map(|x| {
+                ot::Ip6Address::from(x.octets())
+            })
+            .collect::<Vec<_>>();
+        }
+        addresses.sort();
+        addresses
+    }
+
+    fn get_local_addresses(&self) -> Vec<std::net::Ipv6Addr> {
+        self.local_addresses.lock().clone()
+    }
+
+    pub fn add_local_address(&self, addr: std::net::Ipv6Addr) {
+        if !ipv6addr_is_unicast_link_local(&addr) {
+            self.local_addresses.lock().push(addr);
+        }
+    }
+
+    pub fn remove_local_address(&self, addr: std::net::Ipv6Addr) {
+        self.local_addresses.lock().retain(|x| x != &addr);
     }
 }
 

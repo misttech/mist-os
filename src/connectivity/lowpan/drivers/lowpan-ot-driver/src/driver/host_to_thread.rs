@@ -118,6 +118,11 @@ where
         if !should_skip {
             let netif_addr = ot::NetifAddress::new(subnet.addr, subnet.prefix_len);
             let driver_state = self.driver_state.lock();
+            let subnet_addr = subnet.addr;
+
+            if let Some(srp_discovery_proxy) = &driver_state.srp_discovery_proxy {
+                srp_discovery_proxy.add_local_address(subnet_addr);
+            }
 
             driver_state
                 .ot_instance
@@ -141,6 +146,10 @@ where
         fx_log_debug!("Netstack removed address: {:?}", subnet);
 
         let driver_state = self.driver_state.lock();
+
+        if let Some(srp_discovery_proxy) = &driver_state.srp_discovery_proxy {
+            srp_discovery_proxy.remove_local_address(subnet.addr);
+        }
 
         driver_state
             .ot_instance
