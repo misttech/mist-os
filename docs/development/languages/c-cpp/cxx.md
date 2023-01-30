@@ -14,7 +14,7 @@ the C++ standard library features is very circumspect.
   - Virtual inheritance
   - Statically constructed objects
   - Trailing return type syntax
-    - Exception: when necessary for lambdas with otherwise unutterable return types
+      - Exception: when necessary for lambdas with otherwise unutterable return types
   - Initializer lists
   - `thread_local` in kernel code
 - Allowed
@@ -25,16 +25,16 @@ the C++ standard library features is very circumspect.
   - `enum class`es
   - `template`s
   - Default parameters
-    - But use judgment. One optional out parameter at the end is
-      probably fine. Four optional bool arguments, probably not.
+      - But use judgment. One optional out parameter at the end is
+        probably fine. Four optional bool arguments, probably not.
   - Plain old classes
   - `auto`
   - Multiple implementation inheritance
-    - But be judicious. This is used widely for e.g. intrusive
-    container mixins.
+      - But be judicious. This is used widely for e.g. intrusive
+        container mixins.
 - Needs more ruling TODO(cpu)
   - Global constructors
-    - Currently we have these for global data structures.
+      - Currently we have these for global data structures.
 
 **TODO:** pointer to style guide(s)?
 
