@@ -23,43 +23,6 @@ kernel_cmdline("userboot.next-component-manager") {
   args = [ "userboot.next=bin/component_manager+--boot" ]
 }
 
-kernel_cmdline("blobfs.cache-eviction-policy--NEVER_EVICT") {
-  args = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
-}
-
-kernel_cmdline("console.shell--true") {
-  args = [ "console.shell=true" ]
-  deps = [ "//build/validate:non_production_tag" ]
-}
-
-kernel_cmdline("kernel.enable-debugging-syscalls--true") {
-  args = [ "kernel.enable-debugging-syscalls=true" ]
-  deps = [ "//build/validate:non_production_tag" ]
-}
-
-kernel_cmdline("kernel.enable-serial-syscalls--true") {
-  args = [ "kernel.enable-serial-syscalls=true" ]
-  deps = [ "//build/validate:non_production_tag" ]
-}
-
-kernel_cmdline("kernel.oom.behavior--reboot") {
-  args = [ "kernel.oom.behavior=reboot" ]
-}
-
-kernel_cmdline("netsvc.all-features--true") {
-  args = [ "netsvc.all-features=true" ]
-  deps = [ "//build/validate:non_production_tag" ]
-}
-
-kernel_cmdline("netsvc.disable--false") {
-  args = [ "netsvc.disable=false" ]
-  deps = [ "//build/validate:non_production_tag" ]
-}
-
-kernel_cmdline("oom.reboot-timeout--low") {
-  args = [ "kernel.oom.reboot-timeout-ms=8000" ]
-}
-
 # Required by "test-manager"
 assembly_input_groups("process-resolver") {
   visibility = [ ":*" ]
@@ -154,17 +117,7 @@ assembly_input_groups("bootstrap") {
     "//src/sys/component_manager:component_manager_bootfs_config",
   ]
 
-  cmdline_deps = [
-    ":blobfs.cache-eviction-policy--NEVER_EVICT",
-    ":console.shell--true",
-    ":kernel.enable-debugging-syscalls--true",
-    ":kernel.enable-serial-syscalls--true",
-    ":kernel.oom.behavior--reboot",
-    ":netsvc.all-features--true",
-    ":netsvc.disable--false",
-    ":oom.reboot-timeout--low",
-    ":userboot.next-component-manager",
-  ]
+  cmdline_deps = [ ":userboot.next-component-manager" ]
 }
 
 assembly_input_groups("session-manager") {
@@ -205,8 +158,6 @@ assembly_input_groups("forensics") {
 assembly_input_groups("diagnostics") {
   base_packages = [
     "//src/diagnostics/config/persistence",
-    "//src/diagnostics/config/triage:triage-detect",
-    "//src/diagnostics/detect:triage-detect",
     "//src/diagnostics/kcounter:diagnostics-kcounter",
     "//src/diagnostics/persistence:diagnostics-persistence",
     "//src/diagnostics/log_listener:log_listener_shell",
@@ -224,10 +175,7 @@ assembly_input_groups("diagnostics") {
 }
 
 assembly_input_groups("bootfs-package-support") {
-  bootfs_labels = [
-    "//src/sys/core:bootfs",
-    "//src/sys/base-resolver:bootfs",
-  ]
+  bootfs_labels = [ "//src/sys/base-resolver:bootfs" ]
 }
 
 assembly_input_groups("time-service") {

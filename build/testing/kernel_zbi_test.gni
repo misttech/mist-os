@@ -29,6 +29,13 @@ cuckoo_kernel_zbi_test_params = {
   ]
 }
 
+_cuckoo_product_config_output_dir =
+    get_label_info("//build/testing:cuckoo-product-configuration",
+                   "target_out_dir")
+cuckoo_product_config_file =
+    _cuckoo_product_config_output_dir +
+    "/cuckoo-product-configuration/product_assembly_config.json"
+
 # Given a kernel_zbi, that will eventually reach userboot, will assemble a system
 # capable of interacting with ffx and fx. This allows data exfiltration from arbitrary
 # devices for gathering data from the provided zbi. E.g. coverage, profile, etc.
@@ -71,6 +78,9 @@ template("cuckoo_kernel_zbi_test") {
     system_image_deps = board_system_image_deps
     fshost_config = board_fshost_config
     core_realm_definition = "//build/testing:cuckoo-core-realm"
+    product_assembly_config_file = cuckoo_product_config_file
+    product_assembly_config_dep = "//build/testing:cuckoo-product-configuration"
+    allow_eng_platform_bundle_use = true
   }
 
   foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {
@@ -81,8 +91,6 @@ template("cuckoo_kernel_zbi_test") {
     assembly_input.system_image_deps +=
         [ "${input_group_label}.system_image_deps" ]
   }
-
-  assembly_input.bootfs_labels += [ "//build/testing:cuckoo-root-realm" ]
 
   assembled_system(cuckoo_target_name) {
     forward_variables_from(assembly_input, "*")

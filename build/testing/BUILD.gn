@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/product_assembly_configuration.gni")
 import("//build/testing/kernel_zbi_test.gni")
 import("//src/sys/core/build/core.gni")
 
@@ -14,5 +15,15 @@ core_realm_definition("cuckoo-core-realm") {
   foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {
     input_group_label = "//bundles/assembly_input_groups:${input_group}"
     deps += [ "${input_group_label}.core_realm_shards" ]
+  }
+}
+
+product_assembly_configuration("cuckoo-product-configuration") {
+  testonly = true
+  platform = {
+    feature_set_level = "bringup"
+    build_type = "eng"
+  }
+  product = {
   }
 }
