@@ -92,18 +92,12 @@ protocol DevBinder {
         /// Mandatory
         1: path vector<uint8>:MAX_PATH_LENGTH;
 
-        /// The handle to the process that will use the binder driver. It is
-        /// used by the driver to read the data sent to the driver.
-        /// Mandatory
-        /// TODO(fxb/112325): Find a better way to give access to the proces memory.
-        2: process zx.handle:PROCESS;
-
         /// The service giving the binder driver access to the resources of the client process.
-        3: process_accessor client_end:ProcessAccessor;
+        2: process_accessor client_end:ProcessAccessor;
 
         /// The request to the Binder protocol implementation.
         /// Mandatory
-        4: binder server_end:Binder;
+        3: binder server_end:Binder;
     });
 };
 

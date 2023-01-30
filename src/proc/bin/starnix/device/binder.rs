@@ -2025,8 +2025,7 @@ impl std::fmt::Debug for CurrentBinderTask<'_> {
 
 /// Implementation of `BinderTask` and `CurrentBinderTask` for a remote client.
 struct RemoteBinderTask {
-    process: Option<zx::Process>,
-    process_accessor: Option<fbinder::ProcessAccessorSynchronousProxy>,
+    process_accessor: fbinder::ProcessAccessorSynchronousProxy,
     kernel: Arc<Kernel>,
 }
 
@@ -2039,53 +2038,31 @@ impl RemoteBinderTask {
         &self,
         request: fbinder::FileRequest,
     ) -> Result<fbinder::FileResponse, Errno> {
-        if let Some(process_accessor) = self.process_accessor.as_ref() {
-            let result = process_accessor
-                .file_request(request, zx::Time::INFINITE)
-                .map_err(|_| errno!(ENOENT))?;
-            result.map_err(|e| errno_from_code!(e.into_primitive() as i16))
-        } else {
-            error!(ENOTSUP)
-        }
+        let result = self
+            .process_accessor
+            .file_request(request, zx::Time::INFINITE)
+            .map_err(|_| errno!(ENOENT))?;
+        result.map_err(|e| errno_from_code!(e.into_primitive() as i16))
     }
 }
 
 impl std::fmt::Debug for RemoteBinderTask {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RemoteBinderTask").field("process", &self.process).finish()
+        f.debug_struct("RemoteBinderTask").finish()
     }
 }
 
-/// The maximal amount of memory that can be read or written using process_{read|write}_memory.
-const max_process_read_write_memory_size: usize = 64 * 1024 * 1024;
-
 impl MemoryAccessor for RemoteBinderTask {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        if let Some(process_accessor) = self.process_accessor.as_ref() {
-            let result = process_accessor
-                .read_memory(addr.ptr() as u64, bytes.len() as u64, zx::Time::INFINITE)
-                .map_err(|_| errno!(ENOENT))?;
-            let vmo = result.map_err(Self::map_fidl_posix_errno)?;
-            vmo.read(bytes, 0).map_err(|e| {
-                log_warn!("Got an error when reading from vmo: {:?}", e);
-                errno!(EFAULT)
-            })
-        } else if let Some(process) = self.process.as_ref() {
-            let mut index = 0;
-            while index < bytes.len() {
-                let len = std::cmp::min(bytes.len() - index, max_process_read_write_memory_size);
-                let bytes_count = process
-                    .read_memory(addr.ptr() + index, &mut bytes[index..(index + len)])
-                    .map_err(|_| errno!(EINVAL))?;
-                if bytes_count == 0 {
-                    return error!(EINVAL);
-                }
-                index += bytes_count;
-            }
-            Ok(())
-        } else {
-            error!(ENOTSUP)
-        }
+        let result = self
+            .process_accessor
+            .read_memory(addr.ptr() as u64, bytes.len() as u64, zx::Time::INFINITE)
+            .map_err(|_| errno!(ENOENT))?;
+        let vmo = result.map_err(Self::map_fidl_posix_errno)?;
+        vmo.read(bytes, 0).map_err(|e| {
+            log_warn!("Got an error when reading from vmo: {:?}", e);
+            errno!(EFAULT)
+        })
     }
 
     fn read_memory_partial(&self, _addr: UserAddress, _bytes: &mut [u8]) -> Result<usize, Errno> {
@@ -2093,31 +2070,14 @@ impl MemoryAccessor for RemoteBinderTask {
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        if let Some(process_accessor) = self.process_accessor.as_ref() {
-            let vmo = zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?;
-            vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
-            vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
-            process_accessor
-                .write_memory(addr.ptr() as u64, vmo, zx::Time::INFINITE)
-                .map_err(|_| errno!(ENOENT))?
-                .map_err(Self::map_fidl_posix_errno)?;
-            Ok(bytes.len())
-        } else if let Some(process) = self.process.as_ref() {
-            let mut index = 0;
-            while index < bytes.len() {
-                let len = std::cmp::min(bytes.len() - index, max_process_read_write_memory_size);
-                let bytes_count = process
-                    .write_memory(addr.ptr() + index, &bytes[index..(index + len)])
-                    .map_err(|_| errno!(EINVAL))?;
-                if bytes_count == 0 {
-                    return error!(EFAULT);
-                }
-                index += bytes_count;
-            }
-            Ok(bytes.len())
-        } else {
-            error!(ENOTSUP)
-        }
+        let vmo = zx::Vmo::create(bytes.len() as u64).map_err(|_| errno!(EINVAL))?;
+        vmo.write(bytes, 0).map_err(|_| errno!(EFAULT))?;
+        vmo.set_content_size(&(bytes.len() as u64)).map_err(|_| errno!(EINVAL))?;
+        self.process_accessor
+            .write_memory(addr.ptr() as u64, vmo, zx::Time::INFINITE)
+            .map_err(|_| errno!(ENOENT))?
+            .map_err(Self::map_fidl_posix_errno)?;
+        Ok(bytes.len())
     }
 }
 
@@ -2265,8 +2225,7 @@ impl BinderDriver {
     pub fn open_external(
         self: &Arc<Self>,
         kernel: &Arc<Kernel>,
-        process: Option<zx::Process>,
-        process_accessor: Option<ClientEnd<fbinder::ProcessAccessorMarker>>,
+        process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
         server_end: ServerEnd<fbinder::BinderMarker>,
     ) -> fasync::Task<()> {
         let kernel = kernel.clone();
@@ -2274,16 +2233,12 @@ impl BinderDriver {
 
         fasync::Task::local(
             async move {
-                let process_accessor = process_accessor.map(|process_accessor| {
-                    fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel())
-                });
+                let process_accessor =
+                    fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel());
                 let binder_process = driver.create_process(kernel.pids.write().allocate_pid());
                 let identifier = binder_process.identifier;
-                let remote_binder_task = Arc::new(RemoteBinderTask {
-                    process,
-                    process_accessor,
-                    kernel: kernel.clone(),
-                });
+                let remote_binder_task =
+                    Arc::new(RemoteBinderTask { process_accessor, kernel: kernel.clone() });
                 driver.remote_tasks.write().insert(identifier, remote_binder_task.clone());
                 scopeguard::defer! {
                     driver.procs.write().remove(&identifier);
@@ -6246,9 +6201,7 @@ mod tests {
             let context_manager_proc = driver.create_process(1);
             let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc);
             driver.context_manager_and_queue.lock().context_manager = Some(context_manager);
-            driver
-                .open_external(&kernel, None, Some(process_accessor_client_end), binder_server_end)
-                .await;
+            driver.open_external(&kernel, process_accessor_client_end, binder_server_end).await;
         });
         const vmo_size: usize = 10 * 1024 * 1024;
         let vmo = zx::Vmo::create(vmo_size as u64).expect("Vmo::create");
@@ -6279,20 +6232,19 @@ mod tests {
 
     #[fuchsia::test]
     fn remote_binder_task() {
-        const vector_size: usize = max_process_read_write_memory_size * 3 / 2;
+        const vector_size: usize = 128 * 1024 * 1024;
         let (process_accessor_client_end, process_accessor_server_end) =
             create_endpoints::<fbinder::ProcessAccessorMarker>().expect("endpoints");
 
         let process_accessor_thread =
             spawn_new_process_accessor_thread(process_accessor_server_end);
 
-        let process_accessor = Some(fbinder::ProcessAccessorSynchronousProxy::new(
+        let process_accessor = fbinder::ProcessAccessorSynchronousProxy::new(
             process_accessor_client_end.into_channel(),
-        ));
+        );
 
         let (kernel, _task) = create_kernel_and_task();
-        let remote_binder_task =
-            RemoteBinderTask { process: None, process_accessor, kernel: kernel.clone() };
+        let remote_binder_task = RemoteBinderTask { process_accessor, kernel: kernel.clone() };
         let mut vector = Vec::with_capacity(vector_size);
         for i in 0..vector_size {
             vector.push((i & 255) as u8);
