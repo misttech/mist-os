@@ -30,6 +30,11 @@ func (f *MockFFXInstance) run(cmd string, args ...string) error {
 	return nil
 }
 
+func (f *MockFFXInstance) TargetWait(_ context.Context) error {
+	f.run("target wait")
+	return nil
+}
+
 func (f *MockFFXInstance) Test(_ context.Context, testList build.TestList, outDir string, args ...string) (*TestRunResult, error) {
 	if testList.SchemaID != build.TestListSchemaIDExperimental {
 		return nil, fmt.Errorf(`schema_id must be %q, found %q`, build.TestListSchemaIDExperimental, testList.SchemaID)

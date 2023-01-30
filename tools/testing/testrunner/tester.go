@@ -73,6 +73,9 @@ const (
 
 	// The name of the test to associate early boot data sinks with.
 	earlyBootSinksTestName = "early_boot_sinks"
+
+	// The max number of times to try reconnecting to the target.
+	maxReconnectAttempts = 3
 )
 
 // Tester describes the interface for all different types of testers.
@@ -503,6 +506,7 @@ func (s *serialSocket) runDiagnostics(ctx context.Context) error {
 // for testability
 type FFXInstance interface {
 	SetStdoutStderr(stdout, stderr io.Writer)
+	TargetWait(ctx context.Context) error
 	Test(ctx context.Context, tests build.TestList, outDir string, args ...string) (*ffxutil.TestRunResult, error)
 	Snapshot(ctx context.Context, outDir string, snapshotFilename string) error
 	Stop() error
@@ -539,6 +543,12 @@ func (t *FFXTester) EnabledForTest(test testsharder.Test) bool {
 
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
 	if t.EnabledForTest(test) {
+		err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
+			return t.ffx.TargetWait(ctx)
+		}, nil)
+		if err != nil {
+			return nil, err
+		}
 		baseTestResult := BaseTestResultFromTest(test)
 		testResults, err := t.TestMultiple(ctx, []testsharder.Test{test}, stdout, stderr, outDir)
 		if err != nil {
@@ -895,7 +905,6 @@ func (t *FFXTester) RunSnapshot(ctx context.Context, snapshotFile string) error 
 		return nil
 	}
 	startTime := clock.Now(ctx)
-	const maxReconnectAttempts = 3
 	err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
 		return t.ffx.Snapshot(ctx, t.localOutputDir, snapshotFile)
 	}, nil)
@@ -994,7 +1003,6 @@ func (t *FuchsiaSSHTester) isTimeoutError(test testsharder.Test, err error) bool
 }
 
 func (t *FuchsiaSSHTester) runSSHCommandWithRetry(ctx context.Context, command []string, stdout, stderr io.Writer) error {
-	const maxReconnectAttempts = 3
 	return retry.Retry(ctx, retry.WithMaxAttempts(t.connectionErrorRetryBackoff, maxReconnectAttempts), func() error {
 		if cmdErr := t.client.Run(ctx, command, stdout, stderr); cmdErr != nil {
 			if !sshutil.IsConnectionError(cmdErr) {
