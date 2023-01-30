@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"fidl/fuchsia/logger"
-	fidlnet "fidl/fuchsia/net"
+	fnet "fidl/fuchsia/net"
 	"fidl/fuchsia/unknown"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
@@ -1195,7 +1195,7 @@ func TestListInterfaceAddresses(t *testing.T) {
 	t.Run("Add", func(t *testing.T) {
 		for _, addr := range testAddresses {
 			t.Run(addr.String(), func(t *testing.T) {
-				ifAddr := fidlnet.Subnet{
+				ifAddr := fnet.Subnet{
 					Addr:      fidlconv.ToNetIpAddress(addr.Address),
 					PrefixLen: uint8(addr.PrefixLen),
 				}
@@ -1229,7 +1229,7 @@ func TestListInterfaceAddresses(t *testing.T) {
 	t.Run("Remove", func(t *testing.T) {
 		for _, addr := range testAddresses {
 			t.Run(addr.String(), func(t *testing.T) {
-				ifAddr := fidlnet.Subnet{
+				ifAddr := fnet.Subnet{
 					Addr:      fidlconv.ToNetIpAddress(addr.Address),
 					PrefixLen: uint8(addr.PrefixLen),
 				}

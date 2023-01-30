@@ -13,7 +13,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
-	fidlnet "fidl/fuchsia/net"
+	fnet "fidl/fuchsia/net"
 	fnetRoutes "fidl/fuchsia/net/routes"
 	"fidl/fuchsia/net/stack"
 
@@ -26,8 +26,8 @@ import (
 // This is challenging because of the way FIDL unions are constructed in Go.
 
 func TestNetIPtoTCPIPAddressIPv4(t *testing.T) {
-	from := fidlnet.IpAddress{}
-	from.SetIpv4(fidlnet.Ipv4Address{Addr: [4]uint8{127, 0, 0, 1}})
+	from := fnet.IpAddress{}
+	from.SetIpv4(fnet.Ipv4Address{Addr: [4]uint8{127, 0, 0, 1}})
 	to := ToTCPIPAddress(from)
 	expected := util.Parse("127.0.0.1")
 	if to != expected {
@@ -36,8 +36,8 @@ func TestNetIPtoTCPIPAddressIPv4(t *testing.T) {
 }
 
 func TestNetIPtoTCPIPAddressIPv6(t *testing.T) {
-	from := fidlnet.IpAddress{}
-	from.SetIpv6(fidlnet.Ipv6Address{Addr: [16]uint8{0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}})
+	from := fnet.IpAddress{}
+	from.SetIpv6(fnet.Ipv6Address{Addr: [16]uint8{0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}})
 	to := ToTCPIPAddress(from)
 	expected := util.Parse("fe80::1")
 	if to != expected {
@@ -48,8 +48,8 @@ func TestNetIPtoTCPIPAddressIPv6(t *testing.T) {
 func TestToFIDLIPAddressIPv4(t *testing.T) {
 	from := util.Parse("127.0.0.1")
 	to := ToNetIpAddress(from)
-	expected := fidlnet.IpAddress{}
-	expected.SetIpv4(fidlnet.Ipv4Address{Addr: [4]uint8{127, 0, 0, 1}})
+	expected := fnet.IpAddress{}
+	expected.SetIpv4(fnet.Ipv4Address{Addr: [4]uint8{127, 0, 0, 1}})
 	if to != expected {
 		t.Fatalf("Expected:\n %v\nActual:\n %v", expected, to)
 	}
@@ -58,8 +58,8 @@ func TestToFIDLIPAddressIPv4(t *testing.T) {
 func TestToFIDLIPAddressIPv6(t *testing.T) {
 	from := util.Parse("fe80::1")
 	to := ToNetIpAddress(from)
-	expected := fidlnet.IpAddress{}
-	expected.SetIpv6(fidlnet.Ipv6Address{Addr: [16]uint8{0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}})
+	expected := fnet.IpAddress{}
+	expected.SetIpv6(fnet.Ipv6Address{Addr: [16]uint8{0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}})
 	if to != expected {
 		t.Fatalf("Expected:\n %v\nActual:\n %v", expected, to)
 	}
@@ -103,10 +103,10 @@ func TestToTCPIPSubnet(t *testing.T) {
 		{[4]uint8{0, 0, 0, 0}, 0, "0.0.0.0/0"},
 	}
 	for _, testCase := range cases {
-		netSubnet := fidlnet.Subnet{
+		netSubnet := fnet.Subnet{
 			PrefixLen: testCase.prefix,
 		}
-		netSubnet.Addr.SetIpv4(fidlnet.Ipv4Address{Addr: testCase.addr})
+		netSubnet.Addr.SetIpv4(fnet.Ipv4Address{Addr: testCase.addr})
 		to := ToTCPIPSubnet(netSubnet)
 		_, ipNet, err := net.ParseCIDR(testCase.expected)
 		if err != nil {
@@ -168,7 +168,7 @@ func TestForwardingEntryAndTcpipRouteConversions(t *testing.T) {
 		},
 	} {
 		fe := stack.ForwardingEntry{
-			Subnet: fidlnet.Subnet{
+			Subnet: fnet.Subnet{
 				Addr:      ToNetIpAddress(destination.ID()),
 				PrefixLen: 19,
 			},
@@ -189,7 +189,7 @@ func TestToNetSocketAddress(t *testing.T) {
 	tests := []struct {
 		name     string
 		fullAddr tcpip.FullAddress
-		sockAddr fidlnet.SocketAddress
+		sockAddr fnet.SocketAddress
 	}{
 		{
 			name: "IPv4",
@@ -197,10 +197,10 @@ func TestToNetSocketAddress(t *testing.T) {
 				Addr: "\xC0\xA8\x00\x01",
 				Port: 8080,
 			},
-			sockAddr: func() fidlnet.SocketAddress {
-				var a fidlnet.SocketAddress
-				a.SetIpv4(fidlnet.Ipv4SocketAddress{
-					Address: fidlnet.Ipv4Address{
+			sockAddr: func() fnet.SocketAddress {
+				var a fnet.SocketAddress
+				a.SetIpv4(fnet.Ipv4SocketAddress{
+					Address: fnet.Ipv4Address{
 						Addr: [4]uint8{192, 168, 0, 1},
 					},
 					Port: 8080,
@@ -214,10 +214,10 @@ func TestToNetSocketAddress(t *testing.T) {
 				Addr: "\x20\x01\x48\x60\x48\x60\x00\x00\x00\x00\x00\x00\x00\x00\x88\x88",
 				Port: 8080,
 			},
-			sockAddr: func() fidlnet.SocketAddress {
-				var a fidlnet.SocketAddress
-				a.SetIpv6(fidlnet.Ipv6SocketAddress{
-					Address: fidlnet.Ipv6Address{
+			sockAddr: func() fnet.SocketAddress {
+				var a fnet.SocketAddress
+				a.SetIpv6(fnet.Ipv6SocketAddress{
+					Address: fnet.Ipv6Address{
 						Addr: [16]uint8{0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0x88},
 					},
 					Port: 8080,
@@ -232,10 +232,10 @@ func TestToNetSocketAddress(t *testing.T) {
 				Port: 8080,
 				NIC:  2,
 			},
-			sockAddr: func() fidlnet.SocketAddress {
-				var a fidlnet.SocketAddress
-				a.SetIpv6(fidlnet.Ipv6SocketAddress{
-					Address: fidlnet.Ipv6Address{
+			sockAddr: func() fnet.SocketAddress {
+				var a fnet.SocketAddress
+				a.SetIpv6(fnet.Ipv6SocketAddress{
+					Address: fnet.Ipv6Address{
 						Addr: [16]uint8{0x20, 0x01, 0x48, 0x60, 0x48, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0x88},
 					},
 					Port: 8080,
@@ -250,10 +250,10 @@ func TestToNetSocketAddress(t *testing.T) {
 				Port: 8080,
 				NIC:  2,
 			},
-			sockAddr: func() fidlnet.SocketAddress {
-				var a fidlnet.SocketAddress
-				a.SetIpv6(fidlnet.Ipv6SocketAddress{
-					Address: fidlnet.Ipv6Address{
+			sockAddr: func() fnet.SocketAddress {
+				var a fnet.SocketAddress
+				a.SetIpv6(fnet.Ipv6SocketAddress{
+					Address: fnet.Ipv6Address{
 						Addr: [16]uint8{0xfe, 0x80, 0x48, 0x60, 0x48, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0x88},
 					},
 					Port:      8080,
@@ -269,10 +269,10 @@ func TestToNetSocketAddress(t *testing.T) {
 				Port: 8080,
 				NIC:  2,
 			},
-			sockAddr: func() fidlnet.SocketAddress {
-				var a fidlnet.SocketAddress
-				a.SetIpv6(fidlnet.Ipv6SocketAddress{
-					Address: fidlnet.Ipv6Address{
+			sockAddr: func() fnet.SocketAddress {
+				var a fnet.SocketAddress
+				a.SetIpv6(fnet.Ipv6SocketAddress{
+					Address: fnet.Ipv6Address{
 						Addr: [16]uint8{0xff, 0x02, 0x48, 0x60, 0x48, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x88, 0x88},
 					},
 					Port:      8080,
@@ -379,15 +379,15 @@ func TestToInstalledRoute(t *testing.T) {
 				V4: fnetRoutes.InstalledRouteV4{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV4{
-						Destination: fidlnet.Ipv4AddressWithPrefix{
-							Addr: fidlnet.Ipv4Address{
+						Destination: fnet.Ipv4AddressWithPrefix{
+							Addr: fnet.Ipv4Address{
 								Addr: subnetV4Bytes,
 							},
 							PrefixLen: prefixLenV4,
 						},
 						Action: fnetRoutes.RouteActionV4WithForward(fnetRoutes.RouteTargetV4{
 							OutboundInterface: interfaceId,
-							NextHop: &fidlnet.Ipv4Address{
+							NextHop: &fnet.Ipv4Address{
 								Addr: gatewayV4Bytes,
 							},
 						}),
@@ -424,8 +424,8 @@ func TestToInstalledRoute(t *testing.T) {
 				V4: fnetRoutes.InstalledRouteV4{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV4{
-						Destination: fidlnet.Ipv4AddressWithPrefix{
-							Addr: fidlnet.Ipv4Address{
+						Destination: fnet.Ipv4AddressWithPrefix{
+							Addr: fnet.Ipv4Address{
 								Addr: subnetV4Bytes,
 							},
 							PrefixLen: prefixLenV4,
@@ -468,15 +468,15 @@ func TestToInstalledRoute(t *testing.T) {
 				V4: fnetRoutes.InstalledRouteV4{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV4{
-						Destination: fidlnet.Ipv4AddressWithPrefix{
-							Addr: fidlnet.Ipv4Address{
+						Destination: fnet.Ipv4AddressWithPrefix{
+							Addr: fnet.Ipv4Address{
 								Addr: subnetV4Bytes,
 							},
 							PrefixLen: prefixLenV4,
 						},
 						Action: fnetRoutes.RouteActionV4WithForward(fnetRoutes.RouteTargetV4{
 							OutboundInterface: interfaceId,
-							NextHop: &fidlnet.Ipv4Address{
+							NextHop: &fnet.Ipv4Address{
 								Addr: gatewayV4Bytes,
 							},
 						}),
@@ -516,15 +516,15 @@ func TestToInstalledRoute(t *testing.T) {
 				V6: fnetRoutes.InstalledRouteV6{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV6{
-						Destination: fidlnet.Ipv6AddressWithPrefix{
-							Addr: fidlnet.Ipv6Address{
+						Destination: fnet.Ipv6AddressWithPrefix{
+							Addr: fnet.Ipv6Address{
 								Addr: subnetV6Bytes,
 							},
 							PrefixLen: prefixLenV6,
 						},
 						Action: fnetRoutes.RouteActionV6WithForward(fnetRoutes.RouteTargetV6{
 							OutboundInterface: interfaceId,
-							NextHop: &fidlnet.Ipv6Address{
+							NextHop: &fnet.Ipv6Address{
 								Addr: gatewayV6Bytes,
 							},
 						}),
@@ -561,8 +561,8 @@ func TestToInstalledRoute(t *testing.T) {
 				V6: fnetRoutes.InstalledRouteV6{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV6{
-						Destination: fidlnet.Ipv6AddressWithPrefix{
-							Addr: fidlnet.Ipv6Address{
+						Destination: fnet.Ipv6AddressWithPrefix{
+							Addr: fnet.Ipv6Address{
 								Addr: subnetV6Bytes,
 							},
 							PrefixLen: prefixLenV6,
@@ -605,15 +605,15 @@ func TestToInstalledRoute(t *testing.T) {
 				V6: fnetRoutes.InstalledRouteV6{
 					RoutePresent: true,
 					Route: fnetRoutes.RouteV6{
-						Destination: fidlnet.Ipv6AddressWithPrefix{
-							Addr: fidlnet.Ipv6Address{
+						Destination: fnet.Ipv6AddressWithPrefix{
+							Addr: fnet.Ipv6Address{
 								Addr: subnetV6Bytes,
 							},
 							PrefixLen: prefixLenV6,
 						},
 						Action: fnetRoutes.RouteActionV6WithForward(fnetRoutes.RouteTargetV6{
 							OutboundInterface: interfaceId,
-							NextHop: &fidlnet.Ipv6Address{
+							NextHop: &fnet.Ipv6Address{
 								Addr: gatewayV6Bytes,
 							},
 						}),

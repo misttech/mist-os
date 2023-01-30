@@ -7,7 +7,7 @@
 package udp_serde
 
 import (
-	fidlnet "fidl/fuchsia/net"
+	fnet "fidl/fuchsia/net"
 	"fmt"
 	"math"
 	"reflect"
@@ -46,11 +46,11 @@ func convertDeserializeSendMsgMetaErr(err C.DeserializeSendMsgMetaError) error {
 	}
 }
 
-func getFidlAddrTypeAndSlice(fidlAddr fidlnet.SocketAddress) (C.IpAddrType, []byte) {
+func getFidlAddrTypeAndSlice(fidlAddr fnet.SocketAddress) (C.IpAddrType, []byte) {
 	switch w := fidlAddr.Which(); w {
-	case fidlnet.SocketAddressIpv4:
+	case fnet.SocketAddressIpv4:
 		return C.Ipv4, fidlAddr.Ipv4.Address.Addr[:]
-	case fidlnet.SocketAddressIpv6:
+	case fnet.SocketAddressIpv6:
 		return C.Ipv6, fidlAddr.Ipv6.Address.Addr[:]
 	default:
 		panic(fmt.Sprintf("unrecognized socket address %d", w))
@@ -175,7 +175,7 @@ func SerializeRecvMsgMeta(protocol tcpip.NetworkProtocolNumber, res tcpip.ReadRe
 		port:         C.ushort(res.RemoteAddr.Port),
 	}
 
-	if fidlAddr.Which() == fidlnet.SocketAddressIpv6 {
+	if fidlAddr.Which() == fnet.SocketAddressIpv6 {
 		recv_meta.zone_index = C.ulong(fidlAddr.Ipv6.ZoneIndex)
 	}
 
@@ -323,7 +323,7 @@ func SerializeSendMsgMeta(protocol tcpip.NetworkProtocolNumber, addr tcpip.FullA
 		},
 	}
 
-	if fidlAddr.Which() == fidlnet.SocketAddressIpv6 {
+	if fidlAddr.Which() == fnet.SocketAddressIpv6 {
 		meta.zone_index = C.ulong(fidlAddr.Ipv6.ZoneIndex)
 	}
 

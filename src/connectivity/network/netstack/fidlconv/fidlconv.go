@@ -127,7 +127,7 @@ func isLinkLocal(addr net.Ipv6Address) bool {
 	return addr.Addr[0] == 0xfe && addr.Addr[1]&0xc0 == 0x80
 }
 
-// ToNetSocketAddress converts a tcpip.FullAddress into a fidlnet.SocketAddress
+// ToNetSocketAddress converts a tcpip.FullAddress into a fnet.SocketAddress
 // taking the protocol into consideration. If addr is unspecified, the
 // unspecified address for the provided protocol is returned.
 //

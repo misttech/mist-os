@@ -29,7 +29,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
-	fidlnet "fidl/fuchsia/net"
+	fnet "fidl/fuchsia/net"
 	"fidl/fuchsia/posix"
 	"fidl/fuchsia/posix/socket"
 	packetsocket "fidl/fuchsia/posix/socket/packet"
@@ -351,7 +351,7 @@ func (ep *endpoint) decRef() bool {
 	return doClose
 }
 
-func (ep *endpointWithMutators) Bind(_ fidl.Context, sockaddr fidlnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
+func (ep *endpointWithMutators) Bind(_ fidl.Context, sockaddr fnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
 	addr := fidlconv.ToTCPIPFullAddress(sockaddr)
 	if err := ep.ep.ep.Bind(addr); err != nil {
 		return socket.BaseNetworkSocketBindResultWithErr(tcpipErrorToCode(err)), nil
@@ -368,7 +368,7 @@ func (ep *endpointWithMutators) Bind(_ fidl.Context, sockaddr fidlnet.SocketAddr
 	return socket.BaseNetworkSocketBindResultWithResponse(socket.BaseNetworkSocketBindResponse{}), nil
 }
 
-func (ep *endpoint) toTCPIPFullAddress(address fidlnet.SocketAddress) (tcpip.FullAddress, tcpip.Error) {
+func (ep *endpoint) toTCPIPFullAddress(address fnet.SocketAddress) (tcpip.FullAddress, tcpip.Error) {
 	addr := fidlconv.ToTCPIPFullAddress(address)
 	if l := len(addr.Addr); l > 0 {
 		addressSupported := func() bool {
@@ -812,7 +812,7 @@ func (ep *endpoint) GetIpMulticastTtl(fidl.Context) (socket.BaseNetworkSocketGet
 	return socket.BaseNetworkSocketGetIpMulticastTtlResultWithResponse(socket.BaseNetworkSocketGetIpMulticastTtlResponse{Value: uint8(value)}), nil
 }
 
-func (ep *endpointWithMutators) SetIpMulticastInterface(_ fidl.Context, iface uint64, value fidlnet.Ipv4Address) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
+func (ep *endpointWithMutators) SetIpMulticastInterface(_ fidl.Context, iface uint64, value fnet.Ipv4Address) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
 	opt := tcpip.MulticastInterfaceOption{
 		NIC:           tcpip.NICID(iface),
 		InterfaceAddr: fidlconv.ToTcpIpAddressDroppingUnspecifiedv4(value),
@@ -828,7 +828,7 @@ func (ep *endpoint) GetIpMulticastInterface(fidl.Context) (socket.BaseNetworkSoc
 	if err := ep.ep.GetSockOpt(&v); err != nil {
 		return socket.BaseNetworkSocketGetIpMulticastInterfaceResultWithErr(tcpipErrorToCode(err)), nil
 	}
-	var addr fidlnet.Ipv4Address
+	var addr fnet.Ipv4Address
 	if len(v.InterfaceAddr) == header.IPv4AddressSize {
 		copy(addr.Addr[:], v.InterfaceAddr)
 	}
@@ -1109,7 +1109,7 @@ func (epe *endpointWithEvent) describe() (zx.Handle, error) {
 	return event, err
 }
 
-func (epe *endpointWithEvent) Connect(_ fidl.Context, address fidlnet.SocketAddress) (socket.BaseNetworkSocketConnectResult, error) {
+func (epe *endpointWithEvent) Connect(_ fidl.Context, address fnet.SocketAddress) (socket.BaseNetworkSocketConnectResult, error) {
 	if err := epe.nonStreamEndpoint.connect(&epe.endpoint, address); err != nil {
 		return socket.BaseNetworkSocketConnectResultWithErr(tcpipErrorToCode(err)), nil
 	}
@@ -1291,7 +1291,7 @@ func (eps *endpointWithSocket) describe() (zx.Handle, error) {
 	return socket, err
 }
 
-func (s *streamSocketImpl) Connect(_ fidl.Context, address fidlnet.SocketAddress) (socket.BaseNetworkSocketConnectResult, error) {
+func (s *streamSocketImpl) Connect(_ fidl.Context, address fnet.SocketAddress) (socket.BaseNetworkSocketConnectResult, error) {
 	err := func() tcpip.Error {
 		addr, err := s.endpoint.toTCPIPFullAddress(address)
 		if err != nil {
@@ -1870,7 +1870,7 @@ func (c *cmsgCache) clear() {
 
 type nonStreamEndpoint struct{}
 
-func (*nonStreamEndpoint) connect(ep *endpoint, address fidlnet.SocketAddress) tcpip.Error {
+func (*nonStreamEndpoint) connect(ep *endpoint, address fnet.SocketAddress) tcpip.Error {
 	addr, err := ep.toTCPIPFullAddress(address)
 	if err != nil {
 		return err
@@ -2229,7 +2229,7 @@ func (s *datagramSocketImpl) addConnection(_ fidl.Context, channel zx.Channel) {
 // wait for the zircon socket to drain so as to avoid applying socket options
 // to packets enqueued before the call.
 
-func (s *datagramSocketImpl) Connect(_ fidl.Context, address fidlnet.SocketAddress) (socket.BaseNetworkSocketConnectResult, error) {
+func (s *datagramSocketImpl) Connect(_ fidl.Context, address fnet.SocketAddress) (socket.BaseNetworkSocketConnectResult, error) {
 	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketConnectResult, error) {
 		if err := s.nonStreamEndpoint.connect(ewm.ep, address); err != nil {
@@ -2344,7 +2344,7 @@ func (s *datagramSocketImpl) SetIpMulticastTtl(ctx fidl.Context, value socket.Op
 	})
 }
 
-func (s *datagramSocketImpl) SetIpMulticastInterface(ctx fidl.Context, iface uint64, value fidlnet.Ipv4Address) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
+func (s *datagramSocketImpl) SetIpMulticastInterface(ctx fidl.Context, iface uint64, value fnet.Ipv4Address) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
 	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends.
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketSetIpMulticastInterfaceResult, error) {
@@ -2392,7 +2392,7 @@ func (s *datagramSocketImpl) DropIpv6Membership(ctx fidl.Context, membership soc
 	})
 }
 
-func (s *datagramSocketImpl) Bind(ctx fidl.Context, sockaddr fidlnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
+func (s *datagramSocketImpl) Bind(ctx fidl.Context, sockaddr fnet.SocketAddress) (socket.BaseNetworkSocketBindResult, error) {
 	// TODO(https://fxbug.dev/109784): Audit cache flushes after Fast UDP launches.
 	// TODO(https://fxbug.dev/95986): Test synchronous semantics wrt packet sends
 	return executeMutatorWithCacheFlushes(s, func(ewm endpointWithMutators) (socket.BaseNetworkSocketBindResult, error) {
@@ -2855,7 +2855,7 @@ func validateSendableControlMessages(cmsgs *tcpip.SendableControlMessages) posix
 	return 0
 }
 
-func fidlNetworkControlDataToControlMessages(in socket.NetworkSocketSendControlData, out *tcpip.SendableControlMessages) {
+func fnetworkControlDataToControlMessages(in socket.NetworkSocketSendControlData, out *tcpip.SendableControlMessages) {
 	if in.HasIp() {
 		inIp := in.GetIp()
 		if inIp.HasTtl() {
@@ -2885,7 +2885,7 @@ func fidlNetworkControlDataToControlMessages(in socket.NetworkSocketSendControlD
 
 func fidlDatagramControlDataToControlMessages(in socket.DatagramSocketSendControlData, out *tcpip.SendableControlMessages) {
 	if in.HasNetwork() {
-		fidlNetworkControlDataToControlMessages(in.GetNetwork(), out)
+		fnetworkControlDataToControlMessages(in.GetNetwork(), out)
 	}
 }
 
@@ -2981,16 +2981,16 @@ func (s *synchronousDatagramSocket) recvMsg(opts tcpip.ReadOptions, dataLen uint
 	return b.Bytes(), res, err
 }
 
-func (s *networkDatagramSocket) recvMsg(wantAddr bool, dataLen uint32, peek bool) (fidlnet.SocketAddress, []byte, uint32, tcpip.ReceivableControlMessages, tcpip.Error) {
+func (s *networkDatagramSocket) recvMsg(wantAddr bool, dataLen uint32, peek bool) (fnet.SocketAddress, []byte, uint32, tcpip.ReceivableControlMessages, tcpip.Error) {
 	bytes, res, err := s.synchronousDatagramSocket.recvMsg(tcpip.ReadOptions{
 		Peek:           peek,
 		NeedRemoteAddr: wantAddr,
 	}, dataLen)
 	if err != nil {
-		return fidlnet.SocketAddress{}, nil, 0, tcpip.ReceivableControlMessages{}, err
+		return fnet.SocketAddress{}, nil, 0, tcpip.ReceivableControlMessages{}, err
 	}
 
-	var addr fidlnet.SocketAddress
+	var addr fnet.SocketAddress
 	if wantAddr {
 		sockaddr := fidlconv.ToNetSocketAddressWithProto(s.netProto, res.RemoteAddr)
 		addr = sockaddr
@@ -3005,7 +3005,7 @@ func (s *synchronousDatagramSocketImpl) RecvMsg(_ fidl.Context, wantAddr bool, d
 	if err != nil {
 		return socket.SynchronousDatagramSocketRecvMsgResultWithErr(tcpipErrorToCode(err)), nil
 	}
-	var pAddr *fidlnet.SocketAddress
+	var pAddr *fnet.SocketAddress
 	if wantAddr {
 		pAddr = &addr
 	}
@@ -3041,7 +3041,7 @@ func (s *synchronousDatagramSocket) sendMsg(to *tcpip.FullAddress, data []uint8,
 	return n, nil
 }
 
-func (s *networkDatagramSocket) sendMsg(addr *fidlnet.SocketAddress, data []uint8, cmsg tcpip.SendableControlMessages) (int64, tcpip.Error) {
+func (s *networkDatagramSocket) sendMsg(addr *fnet.SocketAddress, data []uint8, cmsg tcpip.SendableControlMessages) (int64, tcpip.Error) {
 	var fullAddr tcpip.FullAddress
 	var to *tcpip.FullAddress
 	if addr != nil {
@@ -3055,7 +3055,7 @@ func (s *networkDatagramSocket) sendMsg(addr *fidlnet.SocketAddress, data []uint
 	return s.synchronousDatagramSocket.sendMsg(to, data, cmsg)
 }
 
-func (s *synchronousDatagramSocketImpl) SendMsg(_ fidl.Context, addr *fidlnet.SocketAddress, data []uint8, controlData socket.DatagramSocketSendControlData, _ socket.SendMsgFlags) (socket.SynchronousDatagramSocketSendMsgResult, error) {
+func (s *synchronousDatagramSocketImpl) SendMsg(_ fidl.Context, addr *fnet.SocketAddress, data []uint8, controlData socket.DatagramSocketSendControlData, _ socket.SendMsgFlags) (socket.SynchronousDatagramSocketSendMsgResult, error) {
 	trace.AsyncBegin("net", "fuchsia_posix_socket.synchronousDatagramSocket.SendMsg", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 	defer trace.AsyncEnd("net", "fuchsia_posix_socket.synchronousDatagramSocket.SendMsg", trace.AsyncID(uintptr(unsafe.Pointer(s))))
 	var cmsg tcpip.SendableControlMessages
@@ -4048,7 +4048,7 @@ func (s *rawSocketImpl) RecvMsg(_ fidl.Context, wantAddr bool, dataLen uint32, w
 	if err != nil {
 		return rawsocket.SocketRecvMsgResultWithErr(tcpipErrorToCode(err)), nil
 	}
-	var pAddr *fidlnet.SocketAddress
+	var pAddr *fnet.SocketAddress
 	if wantAddr {
 		pAddr = &addr
 	}
@@ -4066,9 +4066,9 @@ func (s *rawSocketImpl) RecvMsg(_ fidl.Context, wantAddr bool, dataLen uint32, w
 	}), nil
 }
 
-func (s *rawSocketImpl) SendMsg(_ fidl.Context, addr *fidlnet.SocketAddress, data []uint8, controlData socket.NetworkSocketSendControlData, _ socket.SendMsgFlags) (rawsocket.SocketSendMsgResult, error) {
+func (s *rawSocketImpl) SendMsg(_ fidl.Context, addr *fnet.SocketAddress, data []uint8, controlData socket.NetworkSocketSendControlData, _ socket.SendMsgFlags) (rawsocket.SocketSendMsgResult, error) {
 	var cmsg tcpip.SendableControlMessages
-	fidlNetworkControlDataToControlMessages(controlData, &cmsg)
+	fnetworkControlDataToControlMessages(controlData, &cmsg)
 	if err := validateSendableControlMessages(&cmsg); err != 0 {
 		return rawsocket.SocketSendMsgResultWithErr(err), nil
 	}
@@ -4211,12 +4211,12 @@ func (sp *providerImpl) GetInterfaceAddresses(fidl.Context) ([]socket.InterfaceA
 			return ax.PrefixLen < ay.PrefixLen
 		})
 
-		addrs := make([]fidlnet.Subnet, 0, len(info.ProtocolAddresses))
+		addrs := make([]fnet.Subnet, 0, len(info.ProtocolAddresses))
 		for _, a := range info.ProtocolAddresses {
 			if a.Protocol != ipv4.ProtocolNumber && a.Protocol != ipv6.ProtocolNumber {
 				continue
 			}
-			addrs = append(addrs, fidlnet.Subnet{
+			addrs = append(addrs, fnet.Subnet{
 				Addr:      fidlconv.ToNetIpAddress(a.AddressWithPrefix.Address),
 				PrefixLen: uint8(a.AddressWithPrefix.PrefixLen),
 			})

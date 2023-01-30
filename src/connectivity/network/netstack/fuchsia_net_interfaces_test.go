@@ -21,7 +21,7 @@ import (
 	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
-	fidlnet "fidl/fuchsia/net"
+	fnet "fidl/fuchsia/net"
 	"fidl/fuchsia/net/interfaces"
 
 	"github.com/google/go-cmp/cmp"
@@ -34,9 +34,9 @@ import (
 const testId = 1
 const negativeTimeout = 50 * time.Millisecond
 
-func testIpv4Subnet() fidlnet.Subnet {
-	return fidlnet.Subnet{
-		Addr:      fidlnet.IpAddressWithIpv4(fidlnet.Ipv4Address{Addr: [4]uint8{1, 2, 3, 4}}),
+func testIpv4Subnet() fnet.Subnet {
+	return fnet.Subnet{
+		Addr:      fnet.IpAddressWithIpv4(fnet.Ipv4Address{Addr: [4]uint8{1, 2, 3, 4}}),
 		PrefixLen: 16,
 	}
 }
@@ -325,15 +325,15 @@ func TestInterfacesWatcher(t *testing.T) {
 
 	// DHCP Acquired on the interface.
 	blockingWatcher.blockingWatch(t, ch)
-	addr := fidlnet.Ipv4Address{Addr: [4]uint8{192, 168, 0, 4}}
+	addr := fnet.Ipv4Address{Addr: [4]uint8{192, 168, 0, 4}}
 	acquiredAddr := tcpip.AddressWithPrefix{Address: tcpip.Address(addr.Addr[:]), PrefixLen: 24}
 	leaseLength := dhcp.Seconds(10)
 	initUpdatedAt := zxtime.Monotonic(42)
 	ifs.dhcpAcquired(context.Background(), tcpip.AddressWithPrefix{}, acquiredAddr, dhcp.Config{UpdatedAt: initUpdatedAt, LeaseLength: leaseLength})
 	dhcpAddressAdded := id
 	var address interfaces.Address
-	address.SetAddr(fidlnet.Subnet{
-		Addr:      fidlnet.IpAddressWithIpv4(addr),
+	address.SetAddr(fnet.Subnet{
+		Addr:      fnet.IpAddressWithIpv4(addr),
 		PrefixLen: uint8(acquiredAddr.PrefixLen),
 	})
 	address.SetValidUntil(initUpdatedAt.Add(leaseLength.Duration()).MonotonicNano())
