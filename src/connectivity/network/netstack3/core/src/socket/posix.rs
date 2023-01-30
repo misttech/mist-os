@@ -303,7 +303,7 @@ where
     P: PosixSocketStateSpec + PosixConflictPolicy<A>,
     A: SocketMapAddrSpec,
 {
-    fn check_for_conflicts(
+    fn check_insert_conflicts(
         new_sharing_state: &PosixSharingOptions,
         addr: &AA,
         socketmap: &SocketMap<AddrVec<A>, Bound<P>>,

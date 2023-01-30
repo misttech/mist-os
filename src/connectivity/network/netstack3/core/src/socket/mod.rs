@@ -199,6 +199,14 @@ pub(crate) trait SocketMapAddrStateSpec {
     fn remove_by_id(&mut self, id: Self::Id) -> RemoveResult;
 }
 
+pub(crate) trait SocketMapAddrStateUpdateSharingSpec: SocketMapAddrStateSpec {
+    fn try_update_sharing(
+        &mut self,
+        id: Self::Id,
+        new_sharing_state: &Self::SharingState,
+    ) -> Result<(), IncompatibleError>;
+}
+
 pub(crate) trait SocketMapConflictPolicy<Addr, SharingState, A: SocketMapAddrSpec>:
     SocketMapStateSpec
 {
@@ -210,11 +218,26 @@ pub(crate) trait SocketMapConflictPolicy<Addr, SharingState, A: SocketMapAddrSpe
     /// conflicts that would arise when inserting a socket with state
     /// `new_sharing_state` into a new or existing entry at `addr` in
     /// `socketmap`.
-    fn check_for_conflicts(
+    fn check_insert_conflicts(
         new_sharing_state: &SharingState,
         addr: &Addr,
         socketmap: &SocketMap<AddrVec<A>, Bound<Self>>,
     ) -> Result<(), InsertError>
+    where
+        Bound<Self>: Tagged<AddrVec<A>>;
+}
+
+pub(crate) trait SocketMapUpdateSharingPolicy<Addr, SharingState, A>:
+    SocketMapConflictPolicy<Addr, SharingState, A>
+where
+    A: SocketMapAddrSpec,
+{
+    fn allows_sharing_update(
+        socketmap: &SocketMap<AddrVec<A>, Bound<Self>>,
+        addr: &Addr,
+        old_sharing: &SharingState,
+        new_sharing_state: &SharingState,
+    ) -> Result<(), UpdateSharingError>
     where
         Bound<Self>: Tagged<AddrVec<A>>;
 }
@@ -400,7 +423,7 @@ where
             Some(state) => {
                 state.could_insert(sharing).map_err(|IncompatibleError| InsertError::Exists)
             }
-            None => S::check_for_conflicts(&sharing, &addr, &addr_to_state),
+            None => S::check_insert_conflicts(&sharing, &addr, &addr_to_state),
         }
     }
 }
@@ -459,7 +482,7 @@ where
         (InsertError, St, AddrState::SharingState),
     > {
         let Self(id_to_sock, addr_to_state, _) = self;
-        match S::check_for_conflicts(&tag_state, &socket_addr, &addr_to_state) {
+        match S::check_insert_conflicts(&tag_state, &socket_addr, &addr_to_state) {
             Err(e) => return Err((e, state, tag_state)),
             Ok(()) => (),
         };
@@ -531,21 +554,31 @@ where
     }
 }
 
+#[derive(Debug)]
+pub(crate) struct UpdateSharingError;
+
 impl<
         'a,
         State,
-        SharingState,
         Addr: Debug,
         AddrState: SocketMapAddrStateSpec,
         Convert: ConvertSocketTypeState<A, S, Addr, AddrState>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec,
-    > SocketStateEntry<'a, (State, SharingState, Addr), AddrVec<A>, Bound<S>, AddrState, Convert>
+    >
+    SocketStateEntry<
+        'a,
+        (State, AddrState::SharingState, Addr),
+        AddrVec<A>,
+        Bound<S>,
+        AddrState,
+        Convert,
+    >
 where
     Bound<S>: Tagged<AddrVec<A>>,
     AddrState::Id: From<usize>,
 {
-    pub(crate) fn get(&self) -> &(State, SharingState, Addr) {
+    pub(crate) fn get(&self) -> &(State, AddrState::SharingState, Addr) {
         let Self { id_entry, addr_entry: _, _marker } = self;
         id_entry.get()
     }
@@ -557,7 +590,7 @@ where
 
     pub(crate) fn get_state_mut(&mut self) -> &mut State {
         let Self { id_entry, addr_entry: _, _marker } = self;
-        let (state, _, _): &mut (_, SharingState, Addr) = id_entry.get_mut();
+        let (state, _, _): &mut (_, AddrState::SharingState, Addr) = id_entry.get_mut();
         state
     }
 
@@ -573,7 +606,7 @@ where
                     v.into_map()
                 } else {
                     let new_addr_entry = v.insert(addr_state);
-                    let (_, _, addr): &mut (State, SharingState, _) = id_entry.get_mut();
+                    let (_, _, addr): &mut (State, AddrState::SharingState, _) = id_entry.get_mut();
                     *addr = new_addr;
                     return Ok(SocketStateEntry { id_entry, addr_entry: new_addr_entry, _marker });
                 }
@@ -581,7 +614,7 @@ where
         };
         let to_restore = addr_state;
 
-        let (_, _, addr): &(State, SharingState, _) = id_entry.get();
+        let (_, _, addr): &(State, AddrState::SharingState, _) = id_entry.get();
         let addrvec = Convert::to_addr_vec(&addr);
 
         // Restore the old state before returning an error.
@@ -592,7 +625,7 @@ where
         return Err((ExistsError, SocketStateEntry { id_entry, addr_entry, _marker }));
     }
 
-    pub(crate) fn remove(self) -> (State, SharingState, Addr) {
+    pub(crate) fn remove(self) -> (State, AddrState::SharingState, Addr) {
         let Self { id_entry, mut addr_entry, _marker } = self;
         let id = *id_entry.key();
         let (state, tag_state, addr) = id_entry.remove();
@@ -609,6 +642,46 @@ where
             }
         }
         (state, tag_state, addr)
+    }
+
+    #[todo_unused::todo_unused("https://fxbug.dev/120272")]
+    pub(crate) fn try_update_sharing(
+        self,
+        new_sharing_state: AddrState::SharingState,
+    ) -> Result<Self, (UpdateSharingError, Self)>
+    where
+        AddrState: SocketMapAddrStateUpdateSharingSpec,
+        S: SocketMapUpdateSharingPolicy<Addr, AddrState::SharingState, A>,
+    {
+        let Self { mut id_entry, mut addr_entry, _marker } = self;
+        let id = *id_entry.key();
+        let (_, sharing, addr): &mut (State, _, _) = id_entry.get_mut();
+
+        match S::allows_sharing_update(addr_entry.get_map(), addr, sharing, &new_sharing_state) {
+            Err(e) => return Err((e, Self { id_entry, addr_entry, _marker })),
+            Ok(()) => (),
+        };
+
+        match addr_entry.map_mut(|value| {
+            let value = match Convert::from_bound_mut(value) {
+                Some(value) => value,
+                // We shouldn't ever be storing listener state in a bound
+                // address, or bound state in a listener address. Doing so means
+                // we've got a serious bug.
+                None => unreachable!("found invalid state {:?}", value),
+            };
+
+            value.try_update_sharing(id.into(), &new_sharing_state)
+        }) {
+            Err(IncompatibleError) => {
+                return Err((UpdateSharingError, Self { id_entry, addr_entry, _marker }))
+            }
+            Ok(()) => {
+                *sharing = new_sharing_state;
+            }
+        }
+
+        Ok(Self { id_entry, addr_entry, _marker })
     }
 }
 
@@ -990,7 +1063,7 @@ mod tests {
     impl<A: Into<AddrVec<FakeAddrSpec>> + Clone> SocketMapConflictPolicy<A, char, FakeAddrSpec>
         for FakeSpec
     {
-        fn check_for_conflicts(
+        fn check_insert_conflicts(
             new_state: &char,
             addr: &A,
             socketmap: &SocketMap<AddrVec<FakeAddrSpec>, Bound<FakeSpec>>,
@@ -1001,6 +1074,8 @@ mod tests {
             }
             match socketmap.get(&dest) {
                 Some(Bound::Listen(Multiple(c, _))) | Some(Bound::Conn(Multiple(c, _))) => {
+                    // Require that all sockets inserted in a `Multiple` entry
+                    // have the same sharing state.
                     if c != new_state {
                         return Err(InsertError::Exists);
                     }
@@ -1012,6 +1087,46 @@ mod tests {
             } else {
                 Ok(())
             }
+        }
+    }
+
+    impl<I: Eq> SocketMapAddrStateUpdateSharingSpec for Multiple<I> {
+        fn try_update_sharing(
+            &mut self,
+            id: Self::Id,
+            new_sharing_state: &Self::SharingState,
+        ) -> Result<(), IncompatibleError> {
+            let Self(sharing, v) = self;
+            if new_sharing_state == sharing {
+                return Ok(());
+            }
+
+            // Preserve the invariant that all sockets inserted in a `Multiple`
+            // entry have the same sharing state. That means we can't change
+            // the sharing state of all the sockets at the address unless there
+            // is exactly one!
+            if v.len() != 1 {
+                return Err(IncompatibleError);
+            }
+            assert!(v.contains(&id));
+            *sharing = *new_sharing_state;
+            Ok(())
+        }
+    }
+
+    impl<A: Into<AddrVec<FakeAddrSpec>> + Clone> SocketMapUpdateSharingPolicy<A, char, FakeAddrSpec>
+        for FakeSpec
+    {
+        fn allows_sharing_update(
+            _socketmap: &SocketMap<AddrVec<FakeAddrSpec>, Bound<Self>>,
+            _addr: &A,
+            _old_sharing: &char,
+            _new_sharing_state: &char,
+        ) -> Result<(), UpdateSharingError>
+        where
+            Bound<Self>: Tagged<AddrVec<FakeAddrSpec>>,
+        {
+            Ok(())
         }
     }
 
@@ -1271,5 +1386,22 @@ mod tests {
         assert_matches!(map.conns_mut().remove(&conn_id), Some((0, 'a', CONN_ADDR)));
 
         assert!(map.conns_mut().entry(&conn_id).is_none());
+    }
+
+    #[test]
+    fn update_conn_sharing() {
+        let mut map = FakeBoundSocketMap::default();
+        let addr = CONN_ADDR;
+        let entry = map.conns_mut().try_insert(addr.clone(), 0u16, 'a').expect("failed to insert");
+
+        let conn_id = entry.try_update_sharing('d').expect("worked").id();
+        let (val, sharing, _) =
+            map.conns_mut().get_by_id_mut(&conn_id).expect("failed to get conn");
+        assert_eq!((*val, *sharing), (0, 'd'));
+
+        // Updating sharing is only allowed if there are no other occupants at
+        // the address.
+        let second_conn = map.conns_mut().try_insert(addr.clone(), 1u16, 'd').expect("can insert");
+        assert_matches!(second_conn.try_update_sharing('e'), Err((UpdateSharingError, _)));
     }
 }

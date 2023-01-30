@@ -291,6 +291,13 @@ impl<'a, K: Eq + Hash + IterShadows, V: Tagged<K>> OccupiedEntry<'a, K, V> {
         value
     }
 
+    /// Gets a reference to the backing map.
+    #[todo_unused::todo_unused("https://fxbug.dev/120272")]
+    pub(crate) fn get_map(&self) -> &SocketMap<K, V> {
+        let Self(socketmap, _) = self;
+        socketmap
+    }
+
     /// Removes the value from the map and returns both.
     pub(crate) fn remove_from_map(self) -> (V, &'a mut SocketMap<K, V>) {
         let Self(socketmap, key) = self;

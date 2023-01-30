@@ -238,7 +238,7 @@ impl<I: IpExt, D: IpDeviceId, C: NonSyncContext>
     SocketMapConflictPolicy<ListenerAddr<I::Addr, D, NonZeroU16>, SharingState, IpPortSpec<I, D>>
     for TcpSocketSpec<I, D, C>
 {
-    fn check_for_conflicts(
+    fn check_insert_conflicts(
         SharingState: &SharingState,
         addr: &ListenerAddr<I::Addr, D, NonZeroU16>,
         socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Self>>,
@@ -266,7 +266,7 @@ impl<I: IpExt, D: IpDeviceId, C: NonSyncContext>
         IpPortSpec<I, D>,
     > for TcpSocketSpec<I, D, C>
 {
-    fn check_for_conflicts(
+    fn check_insert_conflicts(
         SharingState: &SharingState,
         _addr: &ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
         _socketmap: &SocketMap<AddrVec<IpPortSpec<I, D>>, Bound<Self>>,

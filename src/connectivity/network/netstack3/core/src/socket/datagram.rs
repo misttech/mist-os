@@ -1591,7 +1591,7 @@ mod test {
     impl<A, I: DatagramIpExt, D: IpDeviceId> SocketMapConflictPolicy<A, Sharing, FakeAddrSpec<I, D>>
         for FakeStateSpec<I, D>
     {
-        fn check_for_conflicts(
+        fn check_insert_conflicts(
             _new_sharing_state: &Sharing,
             _addr: &A,
             _socketmap: &SocketMap<AddrVec<FakeAddrSpec<I, D>>, Bound<Self>>,
