@@ -110,6 +110,11 @@
       "*.yaml.golden": "yaml",
     },
 
+    ////////
+    // Dart
+    //
+
+    "dart.sdkPath": "${workspaceFolder/prebuilt/third_party/dart/linux-x64",
 
     ////////
     // Rust
@@ -120,10 +125,11 @@
     // see:  https://github.com/rust-lang/rust-analyzer/issues/12572
     // see:  https://github.com/microsoft/vscode/issues/153154
     "rust-analyzer.files.watcher": "server",
+    "rust-analyzer.server.path": "${workspaceFolder}/prebuilt/third_party/rust/linux-x64/bin/rust-analyzer",
 
-    // Use clippy for checkOnSave, if checkOnSave is enabled.
-    "rust-analyzer.checkOnSave.overrideCommand": [
-      "./scripts/fx",
+    // Use clippy.
+    "rust-analyzer.check.overrideCommand": [
+      "${workspaceFolder}/scripts/fx",
       "clippy",
       "--raw",
       "--all"
@@ -147,6 +153,8 @@
     ////////
     // Go
 
+    "go.goroot": "${workspaceFolder}/prebuilt/third_party/go/linux-x64",
+
     "gopls": {
       // Restrict directories that gopls will search in, otherwise it can fail
       // with "Exhausted" after one million files.
@@ -157,7 +165,11 @@
         "-.jiri_root",
         "-out",
         "-prebuilt",
-      ]
+      ],
+      // Used over specifying a build tag so that cgo is also aware.
+      "build.env": {
+        "GOOS": "fuchsia",
+      },
     },
 
     ////////
