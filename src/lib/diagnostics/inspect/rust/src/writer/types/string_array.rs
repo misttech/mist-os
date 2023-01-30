@@ -45,7 +45,7 @@ impl ArrayProperty for StringArrayProperty {
                 .state
                 .try_lock()
                 .and_then(|mut state| {
-                    state.set_array_string_slot(inner_ref.block_index, index, value)
+                    state.set_array_string_slot(inner_ref.block_index, index, value.into())
                 })
                 .ok();
         }

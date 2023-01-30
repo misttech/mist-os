@@ -67,7 +67,7 @@ macro_rules! locked_state_metric_fns {
         paste::paste! {
             pub fn [<create_ $name _metric>](
                 &mut self,
-                name: impl Into<StringReference>,
+                name: StringReference,
                 value: $type,
                 parent_index: u32,
             ) -> Result<Block<Container>, Error> {
@@ -102,7 +102,7 @@ macro_rules! metric_fns {
         paste::paste! {
             fn [<create_ $name _metric>](
                 &mut self,
-                name: impl Into<StringReference>,
+                name: StringReference,
                 value: $type,
                 parent_index: u32,
             ) -> Result<Block<Container>, Error> {
@@ -149,7 +149,7 @@ macro_rules! locked_state_array_fns {
         paste::paste! {
             pub fn [<create_ $name _array>](
                 &mut self,
-                name: impl Into<StringReference>,
+                name: StringReference,
                 slots: usize,
                 array_format: ArrayFormat,
                 parent_index: u32,
@@ -183,7 +183,7 @@ macro_rules! arithmetic_array_fns {
         paste::paste! {
             pub fn [<create_ $name _array>](
                 &mut self,
-                name: impl Into<StringReference>,
+                name: StringReference,
                 slots: usize,
                 array_format: ArrayFormat,
                 parent_index: u32,
@@ -402,7 +402,7 @@ impl<'a> LockedStateGuard<'a> {
     /// Allocate a NODE block with the given |name| and |parent_index|.
     pub fn create_node(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
         self.inner_lock.create_node(name, parent_index)
@@ -412,7 +412,7 @@ impl<'a> LockedStateGuard<'a> {
     /// of the callback that will fill it.
     pub fn create_lazy_node<F>(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         parent_index: u32,
         disposition: LinkNodeDisposition,
         callback: F,
@@ -435,7 +435,7 @@ impl<'a> LockedStateGuard<'a> {
     /// Allocate a PROPERTY block with the given |name|, |value| and |parent_index|.
     pub fn create_property(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         value: &[u8],
         format: PropertyFormat,
         parent_index: u32,
@@ -451,7 +451,7 @@ impl<'a> LockedStateGuard<'a> {
     #[cfg(test)]
     pub fn get_or_create_string_reference(
         &mut self,
-        value: impl Into<StringReference>,
+        value: StringReference,
     ) -> Result<Block<Container>, Error> {
         self.inner_lock.get_or_create_string_reference(value)
     }
@@ -479,7 +479,7 @@ impl<'a> LockedStateGuard<'a> {
 
     pub fn create_bool(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         value: bool,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -505,7 +505,7 @@ impl<'a> LockedStateGuard<'a> {
 
     pub fn create_string_array(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         slots: usize,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -520,7 +520,7 @@ impl<'a> LockedStateGuard<'a> {
         &mut self,
         block_index: u32,
         slot_index: usize,
-        value: impl Into<StringReference>,
+        value: StringReference,
     ) -> Result<(), Error> {
         self.inner_lock.set_array_string_slot(block_index, slot_index, value)
     }
@@ -528,8 +528,8 @@ impl<'a> LockedStateGuard<'a> {
     #[cfg(test)]
     pub fn allocate_link(
         &mut self,
-        name: impl Into<StringReference>,
-        content: impl Into<StringReference>,
+        name: StringReference,
+        content: StringReference,
         disposition: LinkNodeDisposition,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -620,7 +620,7 @@ impl InnerState {
     /// Allocate a NODE block with the given |name| and |parent_index|.
     fn create_node(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
         let (block, name_block) =
@@ -633,7 +633,7 @@ impl InnerState {
     /// of the callback that will fill it.
     fn create_lazy_node<F>(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         parent_index: u32,
         disposition: LinkNodeDisposition,
         callback: F,
@@ -641,9 +641,8 @@ impl InnerState {
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
-        let converted = name.into();
-        let content: StringReference = self.unique_link_name(&converted).into();
-        let link = self.allocate_link(&converted, content.clone(), disposition, parent_index)?;
+        let content: StringReference = self.unique_link_name(&name).into();
+        let link = self.allocate_link(name, content.clone(), disposition, parent_index)?;
         self.callbacks.insert(content, Arc::from(callback));
         Ok(link)
     }
@@ -675,7 +674,7 @@ impl InnerState {
 
     pub(crate) fn allocate_link(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         content: StringReference,
         disposition: LinkNodeDisposition,
         parent_index: u32,
@@ -711,7 +710,7 @@ impl InnerState {
     /// Allocate a PROPERTY block with the given |name|, |value| and |parent_index|.
     fn create_property(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         value: &[u8],
         format: PropertyFormat,
         parent_index: u32,
@@ -731,7 +730,7 @@ impl InnerState {
     /// When a new string reference is created, its reference count is set to zero.
     fn get_or_create_string_reference(
         &mut self,
-        value: impl Into<StringReference>,
+        value: StringReference,
     ) -> Result<Block<Container>, Error> {
         let string_reference = value.into();
         match self.string_reference_block_indexes.get(&string_reference) {
@@ -893,7 +892,7 @@ impl InnerState {
 
     fn create_bool(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         value: bool,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -919,7 +918,7 @@ impl InnerState {
 
     fn create_string_array(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         slots: usize,
         parent_index: u32,
     ) -> Result<Block<Container>, Error> {
@@ -949,16 +948,15 @@ impl InnerState {
         &mut self,
         block_index: u32,
         slot_index: usize,
-        value: impl Into<StringReference>,
+        value: StringReference,
     ) -> Result<(), Error> {
         let block = self.heap.get_block(block_index)?;
         if block.array_slots()? <= slot_index {
             return Err(Error::VmoFormat(FormatError::ArrayIndexOutOfBounds(slot_index)));
         }
 
-        let value = value.into();
         let reference_index = if !value.is_empty() {
-            let reference = self.get_or_create_string_reference(value)?;
+            let reference = self.get_or_create_string_reference(value.into())?;
             reference.increment_string_reference_count()?;
             reference.index()
         } else {
@@ -1001,7 +999,7 @@ impl InnerState {
 
     fn allocate_reserved_value(
         &mut self,
-        name: impl Into<StringReference>,
+        name: StringReference,
         parent_index: u32,
         block_size: usize,
     ) -> Result<(Block<Container>, Block<Container>), Error> {
@@ -1150,7 +1148,7 @@ mod tests {
     fn test_load_string() {
         let outer = get_state(4096);
         let mut state = outer.try_lock().expect("lock state");
-        let block = state.get_or_create_string_reference("a value").unwrap();
+        let block = state.get_or_create_string_reference("a value".into()).unwrap();
         assert_eq!(state.load_string(block.index()).unwrap(), "a value");
     }
 
@@ -1158,9 +1156,9 @@ mod tests {
     fn test_check_lineage() {
         let core_state = get_state(4096);
         let mut state = core_state.try_lock().expect("lock state");
-        let parent = state.create_node("", 0).unwrap();
-        let child = state.create_node("", parent.index()).unwrap();
-        let uncle = state.create_node("", 0).unwrap();
+        let parent = state.create_node("".into(), 0).unwrap();
+        let child = state.create_node("".into(), parent.index()).unwrap();
+        let uncle = state.create_node("".into(), 0).unwrap();
 
         state.inner_lock.check_lineage(parent.index(), child.index()).unwrap_err();
         state.inner_lock.check_lineage(0, child.index()).unwrap_err();
@@ -1172,8 +1170,8 @@ mod tests {
         let core_state = get_state(4096);
         let mut state = core_state.try_lock().expect("lock state");
 
-        let a = state.create_node("a", 0).unwrap();
-        let b = state.create_node("b", 0).unwrap();
+        let a = state.create_node("a".into(), 0).unwrap();
+        let b = state.create_node("b".into(), 0).unwrap();
 
         assert_eq!(a.parent_index().unwrap(), 0);
         assert_eq!(b.parent_index().unwrap(), 0);
@@ -1189,7 +1187,7 @@ mod tests {
         assert_eq!(a.child_count().unwrap(), 1);
         assert_eq!(b.child_count().unwrap(), 0);
 
-        let c = state.create_node("c", a.index()).unwrap();
+        let c = state.create_node("c".into(), a.index()).unwrap();
 
         assert_eq!(a.parent_index().unwrap(), 0);
         assert_eq!(b.parent_index().unwrap(), a.index());
@@ -1217,7 +1215,7 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
 
             // Create a node value and verify its fields
-            let block = state.create_node("test-node", 0).unwrap();
+            let block = state.create_node("test-node".into(), 0).unwrap();
             assert_eq!(block.block_type(), BlockType::NodeValue);
             assert_eq!(block.index(), 2);
             assert_eq!(block.child_count().unwrap(), 0);
@@ -1245,11 +1243,11 @@ mod tests {
 
         {
             let mut state = core_state.try_lock().expect("lock state");
-            let child_block = state.create_node("child1", block.index()).unwrap();
+            let child_block = state.create_node("child1".into(), block.index()).unwrap();
             assert_eq!(block.child_count().unwrap(), 1);
 
             // Create a child of the child and verify child counts.
-            let child11_block = state.create_node("child1-1", child_block.index()).unwrap();
+            let child11_block = state.create_node("child1-1".into(), child_block.index()).unwrap();
             assert_eq!(child11_block.child_count().unwrap(), 0);
             assert_eq!(child_block.child_count().unwrap(), 1);
             assert_eq!(block.child_count().unwrap(), 1);
@@ -1258,8 +1256,8 @@ mod tests {
             assert_eq!(child_block.child_count().unwrap(), 0);
 
             // Add a couple more children to the block and verify count.
-            let child_block2 = state.create_node("child2", block.index()).unwrap();
-            let child_block3 = state.create_node("child3", block.index()).unwrap();
+            let child_block2 = state.create_node("child2".into(), block.index()).unwrap();
+            let child_block3 = state.create_node("child3".into(), block.index()).unwrap();
             assert_eq!(block.child_count().unwrap(), 3);
 
             // Free children and verify count.
@@ -1283,7 +1281,7 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
 
             // Creates with value
-            let block = state.create_int_metric("test", 3, 0).unwrap();
+            let block = state.create_int_metric("test".into(), 3, 0).unwrap();
             assert_eq!(block.block_type(), BlockType::IntValue);
             assert_eq!(block.index(), 2);
             assert_eq!(block.int_value().unwrap(), 3);
@@ -1339,7 +1337,7 @@ mod tests {
             let mut state = core_state.try_lock().expect("try lock");
 
             // Creates with value
-            let block = state.create_uint_metric("test", 3, 0).unwrap();
+            let block = state.create_uint_metric("test".into(), 3, 0).unwrap();
             assert_eq!(block.block_type(), BlockType::UintValue);
             assert_eq!(block.index(), 2);
             assert_eq!(block.uint_value().unwrap(), 3);
@@ -1395,7 +1393,7 @@ mod tests {
         // Creates with value
         let block = {
             let mut state = core_state.try_lock().expect("lock state");
-            let block = state.create_double_metric("test", 3.0, 0).unwrap();
+            let block = state.create_double_metric("test".into(), 3.0, 0).unwrap();
             assert_eq!(block.block_type(), BlockType::DoubleValue);
             assert_eq!(block.index(), 2);
             assert_eq!(block.double_value().unwrap(), 3.0);
@@ -1445,14 +1443,14 @@ mod tests {
         let core_state = get_state(5121); // large enough to fit to max size blocks plus 1024
         let mut state = core_state.try_lock().expect("lock state");
         // allocate a max size block and one extent
-        let name: String = (0..3000).map(|_| " ").collect::<String>();
+        let name: StringReference = (0..3000).map(|_| " ").collect::<String>().into();
         // allocate a max size property + at least one extent
         // the extent won't fit into the VMO, causing allocation failure when the property
         // is set
         let payload = [0u8; 4096]; // won't fit into vmo
 
         // fails because the property is too big, but, allocates the name and should clean it up
-        assert!(state.create_property(&name, &payload, PropertyFormat::Bytes, 0).is_err());
+        assert!(state.create_property(name, &payload, PropertyFormat::Bytes, 0).is_err());
 
         drop(state);
 
@@ -1474,7 +1472,7 @@ mod tests {
 
             let mut collected = vec![];
             for _ in 0..100 {
-                collected.push(state.create_node(&sf, 0).unwrap());
+                collected.push(state.create_node(sf.clone(), 0).unwrap());
             }
 
             assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_some());
@@ -1490,7 +1488,7 @@ mod tests {
 
             assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_none());
 
-            let node = state.create_node(&sf, 0).unwrap();
+            let node = state.create_node(sf.clone(), 0).unwrap();
             assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_some());
             assert!(state.free_value(node.index()).is_ok());
             assert!(state.inner_lock.string_reference_block_indexes.get(&sf).is_none());
@@ -1509,7 +1507,7 @@ mod tests {
 
         {
             // 4 bytes (4 ASCII characters in UTF-8) will fit inlined with a minimum block size
-            let block = state.get_or_create_string_reference("abcd").unwrap();
+            let block = state.get_or_create_string_reference("abcd".into()).unwrap();
             assert_eq!(block.block_type(), BlockType::StringReference);
             assert_eq!(block.order(), 0);
             assert_eq!(state.stats().allocated_blocks, 2);
@@ -1525,7 +1523,7 @@ mod tests {
         }
 
         {
-            let block = state.get_or_create_string_reference("longer").unwrap();
+            let block = state.get_or_create_string_reference("longer".into()).unwrap();
             assert_eq!(block.block_type(), BlockType::StringReference);
             assert_eq!(block.order(), 1);
             assert_eq!(block.string_reference_count().unwrap(), 0);
@@ -1542,7 +1540,7 @@ mod tests {
         }
 
         {
-            let block = state.get_or_create_string_reference("longer").unwrap();
+            let block = state.get_or_create_string_reference("longer".into()).unwrap();
             let index = block.index();
             assert_eq!(block.order(), 1);
             block.increment_string_reference_count().unwrap();
@@ -1562,8 +1560,9 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
 
             // Creates with value
-            let block =
-                state.create_property("test", b"test-property", PropertyFormat::String, 0).unwrap();
+            let block = state
+                .create_property("test".into(), b"test-property", PropertyFormat::String, 0)
+                .unwrap();
             assert_eq!(block.block_type(), BlockType::BufferValue);
             assert_eq!(block.index(), 2);
             assert_eq!(block.parent_index().unwrap(), 0);
@@ -1610,15 +1609,15 @@ mod tests {
         let core_state = get_state(4096);
         {
             let mut state = core_state.try_lock().expect("lock state");
-            let array = state.create_string_array("array", 4, 0).unwrap();
-            state.set_array_string_slot(array.index(), 0, "0").unwrap();
-            state.set_array_string_slot(array.index(), 1, "1").unwrap();
-            state.set_array_string_slot(array.index(), 2, "2").unwrap();
-            state.set_array_string_slot(array.index(), 3, "3").unwrap();
+            let array = state.create_string_array("array".into(), 4, 0).unwrap();
+            state.set_array_string_slot(array.index(), 0, "0".into()).unwrap();
+            state.set_array_string_slot(array.index(), 1, "1".into()).unwrap();
+            state.set_array_string_slot(array.index(), 2, "2".into()).unwrap();
+            state.set_array_string_slot(array.index(), 3, "3".into()).unwrap();
 
             // size is 4
-            assert!(state.set_array_string_slot(array.index(), 4, "").is_err());
-            assert!(state.set_array_string_slot(array.index(), 5, "").is_err());
+            assert!(state.set_array_string_slot(array.index(), 4, "".into()).is_err());
+            assert!(state.set_array_string_slot(array.index(), 5, "".into()).is_err());
 
             for i in 0..4 {
                 let idx = array.array_get_string_index_slot(i).unwrap();
@@ -1642,13 +1641,13 @@ mod tests {
         let core_state = get_state(4096);
         {
             let mut state = core_state.try_lock().expect("lock state");
-            let array = state.create_string_array("array", 2, 0).unwrap();
+            let array = state.create_string_array("array".into(), 2, 0).unwrap();
 
-            state.set_array_string_slot(array.index(), 0, "abc").unwrap();
-            state.set_array_string_slot(array.index(), 1, "def").unwrap();
+            state.set_array_string_slot(array.index(), 0, "abc".into()).unwrap();
+            state.set_array_string_slot(array.index(), 1, "def".into()).unwrap();
 
-            state.set_array_string_slot(array.index(), 0, "cba").unwrap();
-            state.set_array_string_slot(array.index(), 1, "fed").unwrap();
+            state.set_array_string_slot(array.index(), 0, "cba".into()).unwrap();
+            state.set_array_string_slot(array.index(), 1, "fed".into()).unwrap();
 
             assert_eq!(
                 "cba".to_string(),
@@ -1675,17 +1674,17 @@ mod tests {
         let core_state = get_state(4096);
         {
             let mut state = core_state.try_lock().expect("lock state");
-            let array = state.create_string_array("array", 2, 0).unwrap();
+            let array = state.create_string_array("array".into(), 2, 0).unwrap();
 
             let abc = StringReference::from("abc");
             let def = StringReference::from("def");
             let cba = StringReference::from("cba");
             let fed = StringReference::from("fed");
 
-            state.set_array_string_slot(array.index(), 0, &abc).unwrap();
-            state.set_array_string_slot(array.index(), 1, &def).unwrap();
-            state.set_array_string_slot(array.index(), 0, &abc).unwrap();
-            state.set_array_string_slot(array.index(), 1, &def).unwrap();
+            state.set_array_string_slot(array.index(), 0, abc.clone()).unwrap();
+            state.set_array_string_slot(array.index(), 1, def.clone()).unwrap();
+            state.set_array_string_slot(array.index(), 0, abc.clone()).unwrap();
+            state.set_array_string_slot(array.index(), 1, def.clone()).unwrap();
 
             assert_eq!(
                 "abc".to_string(),
@@ -1696,8 +1695,8 @@ mod tests {
                 state.load_string(array.array_get_string_index_slot(1).unwrap()).unwrap()
             );
 
-            state.set_array_string_slot(array.index(), 0, &cba).unwrap();
-            state.set_array_string_slot(array.index(), 1, &fed).unwrap();
+            state.set_array_string_slot(array.index(), 0, cba.clone()).unwrap();
+            state.set_array_string_slot(array.index(), 1, fed.clone()).unwrap();
             assert_eq!(
                 "cba".to_string(),
                 state.load_string(array.array_get_string_index_slot(0).unwrap()).unwrap()
@@ -1707,8 +1706,8 @@ mod tests {
                 state.load_string(array.array_get_string_index_slot(1).unwrap()).unwrap()
             );
 
-            state.set_array_string_slot(array.index(), 0, &abc).unwrap();
-            state.set_array_string_slot(array.index(), 1, &def).unwrap();
+            state.set_array_string_slot(array.index(), 0, abc.clone()).unwrap();
+            state.set_array_string_slot(array.index(), 1, def.clone()).unwrap();
             assert_eq!(
                 "abc".to_string(),
                 state.load_string(array.array_get_string_index_slot(0).unwrap()).unwrap()
@@ -1718,8 +1717,8 @@ mod tests {
                 state.load_string(array.array_get_string_index_slot(1).unwrap()).unwrap()
             );
 
-            state.set_array_string_slot(array.index(), 0, &cba).unwrap();
-            state.set_array_string_slot(array.index(), 1, &fed).unwrap();
+            state.set_array_string_slot(array.index(), 0, cba.clone()).unwrap();
+            state.set_array_string_slot(array.index(), 1, fed.clone()).unwrap();
 
             assert_eq!(
                 "cba".to_string(),
@@ -1745,12 +1744,12 @@ mod tests {
     fn test_empty_value_string_arrays() {
         let core_state = get_state(4096);
         let mut state = core_state.try_lock().expect("lock state");
-        let array = state.create_string_array("array", 4, 0).unwrap();
+        let array = state.create_string_array("array".into(), 4, 0).unwrap();
 
-        state.set_array_string_slot(array.index(), 0, "").unwrap();
-        state.set_array_string_slot(array.index(), 1, "").unwrap();
-        state.set_array_string_slot(array.index(), 2, "").unwrap();
-        state.set_array_string_slot(array.index(), 3, "").unwrap();
+        state.set_array_string_slot(array.index(), 0, "".into()).unwrap();
+        state.set_array_string_slot(array.index(), 1, "".into()).unwrap();
+        state.set_array_string_slot(array.index(), 2, "".into()).unwrap();
+        state.set_array_string_slot(array.index(), 3, "".into()).unwrap();
 
         drop(state);
 
@@ -1781,8 +1780,9 @@ mod tests {
         // Creates with value
         let block = {
             let mut state = core_state.try_lock().expect("lock state");
-            let block =
-                state.create_property("test", b"test-property", PropertyFormat::Bytes, 0).unwrap();
+            let block = state
+                .create_property("test".into(), b"test-property", PropertyFormat::Bytes, 0)
+                .unwrap();
             assert_eq!(block.block_type(), BlockType::BufferValue);
             assert_eq!(block.index(), 2);
             assert_eq!(block.parent_index().unwrap(), 0);
@@ -1832,7 +1832,7 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
 
             // Creates with value
-            let block = state.create_bool("test", true, 0).unwrap();
+            let block = state.create_bool("test".into(), true, 0).unwrap();
             assert_eq!(block.block_type(), BlockType::BoolValue);
             assert_eq!(block.index(), 2);
             assert_eq!(block.bool_value().unwrap(), true);
@@ -1869,7 +1869,7 @@ mod tests {
         let core_state = get_state(4096);
         let block = {
             let mut state = core_state.try_lock().expect("lock state");
-            let block = state.create_int_array("test", 5, ArrayFormat::Default, 0).unwrap();
+            let block = state.create_int_array("test".into(), 5, ArrayFormat::Default, 0).unwrap();
             assert_eq!(block.block_type(), BlockType::ArrayValue);
             assert_eq!(block.order(), 2);
             assert_eq!(block.index(), 4);
@@ -1919,8 +1919,9 @@ mod tests {
 
             let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
             let data = chars.iter().cycle().take(6000).collect::<String>();
-            let block =
-                state.create_property("test", data.as_bytes(), PropertyFormat::String, 0).unwrap();
+            let block = state
+                .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0)
+                .unwrap();
             assert_eq!(block.block_type(), BlockType::BufferValue);
             assert_eq!(block.index(), 2);
             assert_eq!(block.parent_index().unwrap(), 0);
@@ -1991,22 +1992,22 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
             assert_eq!(state.stats().allocated_blocks, 1);
 
-            let block0 = state.create_node("abcd123456789", 0).unwrap();
+            let block0 = state.create_node("abcd123456789".into(), 0).unwrap();
             let block0_name = state.heap().get_block(block0.name_index().unwrap()).unwrap();
             assert_eq!(block0_name.order(), 1);
             assert_eq!(state.stats().allocated_blocks, 3);
 
-            let block1 = state.get_or_create_string_reference("abcd").unwrap();
+            let block1 = state.get_or_create_string_reference("abcd".into()).unwrap();
             assert_eq!(state.stats().allocated_blocks, 4);
             assert_eq!(block1.order(), 0);
 
             // no allocation!
-            let block2 = state.get_or_create_string_reference("abcd123456789").unwrap();
+            let block2 = state.get_or_create_string_reference("abcd123456789".into()).unwrap();
             assert_eq!(block2.order(), 1);
             assert_eq!(block0_name.index(), block2.index());
             assert_eq!(state.stats().allocated_blocks, 4);
 
-            let block3 = state.create_node("abcd12345678", 0).unwrap();
+            let block3 = state.create_node("abcd12345678".into(), 0).unwrap();
             let block3_name = state.heap().get_block(block3.name_index().unwrap()).unwrap();
             assert_eq!(block3_name.order(), 1);
             assert_eq!(block3.order(), 0);
@@ -2017,7 +2018,7 @@ mod tests {
                 long_name += " ";
             }
 
-            let block4 = state.create_node(long_name, 0).unwrap();
+            let block4 = state.create_node(long_name.into(), 0).unwrap();
             let block4_name = state.heap().get_block(block4.name_index().unwrap()).unwrap();
             assert_eq!(block4_name.order(), 7);
             assert!(block4_name.next_extent().unwrap() != 0);
@@ -2052,14 +2053,14 @@ mod tests {
             let mut state = core_state.try_lock().expect("lock state");
 
             // Create a node value and verify its fields
-            let block = state.create_node("root-node", 0).unwrap();
+            let block = state.create_node("root-node".into(), 0).unwrap();
             let block_name_as_string_ref =
                 state.heap().get_block(block.name_index().unwrap()).unwrap();
             assert_eq!(block_name_as_string_ref.order(), 1);
             assert_eq!(state.stats().allocated_blocks, 3);
             assert_eq!(state.stats().deallocated_blocks, 0);
 
-            let child_block = state.create_node("child-node", block.index()).unwrap();
+            let child_block = state.create_node("child-node".into(), block.index()).unwrap();
             assert_eq!(state.stats().allocated_blocks, 5);
             assert_eq!(state.stats().deallocated_blocks, 0);
 
@@ -2103,8 +2104,8 @@ mod tests {
         assert!(state.header.check_locked(true).is_ok());
         assert_eq!(state.header.header_generation_count().unwrap(), 1);
         // Operations on the lock guard do not change the generation counter.
-        let _ = lock_guard.create_node("test", 0).unwrap();
-        let _ = lock_guard.create_node("test2", 2).unwrap();
+        let _ = lock_guard.create_node("test".into(), 0).unwrap();
+        let _ = lock_guard.create_node("test2".into(), 2).unwrap();
         assert_eq!(state.header.header_generation_count().unwrap(), 1);
 
         // Dropping the guard releases the lock.
@@ -2120,7 +2121,7 @@ mod tests {
         let block = {
             let mut state_guard = state.try_lock().expect("lock state");
             let block = state_guard
-                .create_lazy_node("link-name", 0, LinkNodeDisposition::Inline, || {
+                .create_lazy_node("link-name".into(), 0, LinkNodeDisposition::Inline, || {
                     async move {
                         let inspector = Inspector::default();
                         inspector.root().record_uint("a", 1);
@@ -2194,7 +2195,7 @@ mod tests {
         // Verify adding another link generates a different ID regardless of the params.
         let mut state_guard = state.try_lock().expect("lock state");
         state_guard
-            .create_lazy_node("link-name", 0, LinkNodeDisposition::Inline, || {
+            .create_lazy_node("link-name".into(), 0, LinkNodeDisposition::Inline, || {
                 async move { Ok(Inspector::default()) }.boxed()
             })
             .unwrap();
@@ -2208,7 +2209,7 @@ mod tests {
         let state = get_state(3 * 4096);
         let mut state_guard = state.try_lock().expect("lock state");
         let _block1 = state_guard
-            .create_lazy_node("link-name", 0, LinkNodeDisposition::Inline, || {
+            .create_lazy_node("link-name".into(), 0, LinkNodeDisposition::Inline, || {
                 async move {
                     let inspector = Inspector::default();
                     inspector.root().record_uint("a", 1);
@@ -2217,7 +2218,7 @@ mod tests {
                 .boxed()
             })
             .unwrap();
-        let _block2 = state_guard.create_uint_metric("test", 3, 0).unwrap();
+        let _block2 = state_guard.create_uint_metric("test".into(), 3, 0).unwrap();
         assert_eq!(
             state_guard.stats(),
             Stats {
@@ -2248,7 +2249,7 @@ mod tests {
         assert_eq!(lock_guard1.inner_lock.transaction_count, 1);
         assert_eq!(state.header.header_generation_count().unwrap(), 1);
         assert!(state.header.check_locked(true).is_ok());
-        let _ = lock_guard1.create_node("test", 0).unwrap();
+        let _ = lock_guard1.create_node("test".into(), 0).unwrap();
         assert_eq!(lock_guard1.inner_lock.transaction_count, 1);
         assert_eq!(state.header.header_generation_count().unwrap(), 1);
 
@@ -2278,8 +2279,9 @@ mod tests {
 
             let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
             let data = chars.iter().cycle().take(6000).collect::<String>();
-            let block =
-                state.create_property("test", data.as_bytes(), PropertyFormat::String, 0).unwrap();
+            let block = state
+                .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0)
+                .unwrap();
             assert_eq!(state.header.header_vmo_size().unwrap().unwrap(), 2 * 4096);
 
             block
@@ -2290,8 +2292,9 @@ mod tests {
 
             let chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
             let data = chars.iter().cycle().take(3000).collect::<String>();
-            let block =
-                state.create_property("test", data.as_bytes(), PropertyFormat::String, 0).unwrap();
+            let block = state
+                .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0)
+                .unwrap();
             assert_eq!(state.header.header_vmo_size().unwrap().unwrap(), 3 * 4096);
 
             block

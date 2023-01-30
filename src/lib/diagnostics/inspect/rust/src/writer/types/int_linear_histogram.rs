@@ -24,7 +24,7 @@ pub struct IntLinearHistogramProperty {
 
 impl IntLinearHistogramProperty {
     pub(crate) fn new(
-        name: impl Into<StringReference>,
+        name: StringReference,
         params: LinearHistogramParams<i64>,
         parent: &Node,
     ) -> Self {

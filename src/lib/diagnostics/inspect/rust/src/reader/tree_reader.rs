@@ -265,7 +265,14 @@ mod tests {
         let inspector = Inspector::default();
         inspector.state().map(|state| {
             let mut state = state.try_lock().expect("lock state");
-            state.allocate_link("missing", "missing-404", LinkNodeDisposition::Child, 0).unwrap();
+            state
+                .allocate_link(
+                    "missing".into(),
+                    "missing-404".into(),
+                    LinkNodeDisposition::Child,
+                    0,
+                )
+                .unwrap();
         });
         let hierarchy = reader::read(&inspector).await?;
         assert_eq!(hierarchy.missing.len(), 1);

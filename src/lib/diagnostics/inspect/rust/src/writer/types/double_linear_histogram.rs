@@ -24,7 +24,7 @@ pub struct DoubleLinearHistogramProperty {
 
 impl DoubleLinearHistogramProperty {
     pub(crate) fn new(
-        name: impl Into<StringReference>,
+        name: StringReference,
         params: LinearHistogramParams<f64>,
         parent: &Node,
     ) -> Self {

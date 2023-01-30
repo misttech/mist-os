@@ -49,7 +49,7 @@ impl Node {
                 inner_ref
                     .state
                     .try_lock()
-                    .and_then(|mut state| state.create_node(name, inner_ref.block_index))
+                    .and_then(|mut state| state.create_node(name.into(), inner_ref.block_index))
                     .map(|block| Node::new(inner_ref.state.clone(), block.index()))
                     .ok()
             })
@@ -62,7 +62,7 @@ impl Node {
         F: FnOnce(&Node),
     {
         self.atomic_update(move |n| {
-            let child = n.create_child(name);
+            let child = n.create_child(name.into());
             initialize(&child);
             n.record(child);
         });
@@ -112,7 +112,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_int_metric(name, value, inner_ref.block_index)
+                        state.create_int_metric(name.into(), value, inner_ref.block_index)
                     })
                     .map(|block| IntProperty::new(inner_ref.state.clone(), block.index()))
                     .ok()
@@ -122,7 +122,7 @@ impl Node {
 
     /// Records a new `IntProperty` with the given `name` and `value`.
     pub fn record_int(&self, name: impl Into<StringReference>, value: i64) {
-        let property = self.create_int(name, value);
+        let property = self.create_int(name.into(), value);
         self.record(property);
     }
 
@@ -136,7 +136,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_uint_metric(name, value, inner_ref.block_index)
+                        state.create_uint_metric(name.into(), value, inner_ref.block_index)
                     })
                     .map(|block| UintProperty::new(inner_ref.state.clone(), block.index()))
                     .ok()
@@ -146,7 +146,7 @@ impl Node {
 
     /// Records a new `UintProperty` with the given `name` and `value`.
     pub fn record_uint(&self, name: impl Into<StringReference>, value: u64) {
-        let property = self.create_uint(name, value);
+        let property = self.create_uint(name.into(), value);
         self.record(property);
     }
 
@@ -160,7 +160,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_double_metric(name, value, inner_ref.block_index)
+                        state.create_double_metric(name.into(), value, inner_ref.block_index)
                     })
                     .map(|block| DoubleProperty::new(inner_ref.state.clone(), block.index()))
                     .ok()
@@ -170,7 +170,7 @@ impl Node {
 
     /// Records a new `DoubleProperty` with the given `name` and `value`.
     pub fn record_double(&self, name: impl Into<StringReference>, value: f64) {
-        let property = self.create_double(name, value);
+        let property = self.create_double(name.into(), value);
         self.record(property);
     }
 
@@ -188,7 +188,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_string_array(name, slots, inner_ref.block_index)
+                        state.create_string_array(name.into(), slots, inner_ref.block_index)
                     })
                     .map(|block| StringArrayProperty::new(inner_ref.state.clone(), block.index()))
                     .ok()
@@ -203,7 +203,7 @@ impl Node {
         name: impl Into<StringReference>,
         slots: usize,
     ) -> IntArrayProperty {
-        self.create_int_array_internal(name, slots, ArrayFormat::Default)
+        self.create_int_array_internal(name.into(), slots, ArrayFormat::Default)
     }
 
     #[must_use]
@@ -220,7 +220,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_int_array(name, slots, format, inner_ref.block_index)
+                        state.create_int_array(name.into(), slots, format, inner_ref.block_index)
                     })
                     .map(|block| IntArrayProperty::new(inner_ref.state.clone(), block.index()))
                     .ok()
@@ -235,7 +235,7 @@ impl Node {
         name: impl Into<StringReference>,
         slots: usize,
     ) -> UintArrayProperty {
-        self.create_uint_array_internal(name, slots, ArrayFormat::Default)
+        self.create_uint_array_internal(name.into(), slots, ArrayFormat::Default)
     }
 
     #[must_use]
@@ -252,7 +252,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_uint_array(name, slots, format, inner_ref.block_index)
+                        state.create_uint_array(name.into(), slots, format, inner_ref.block_index)
                     })
                     .map(|block| UintArrayProperty::new(inner_ref.state.clone(), block.index()))
                     .ok()
@@ -267,7 +267,7 @@ impl Node {
         name: impl Into<StringReference>,
         slots: usize,
     ) -> DoubleArrayProperty {
-        self.create_double_array_internal(name, slots, ArrayFormat::Default)
+        self.create_double_array_internal(name.into(), slots, ArrayFormat::Default)
     }
 
     #[must_use]
@@ -284,7 +284,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| {
-                        state.create_double_array(name, slots, format, inner_ref.block_index)
+                        state.create_double_array(name.into(), slots, format, inner_ref.block_index)
                     })
                     .map(|block| DoubleArrayProperty::new(inner_ref.state.clone(), block.index()))
                     .ok()
@@ -299,7 +299,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: LinearHistogramParams<i64>,
     ) -> IntLinearHistogramProperty {
-        IntLinearHistogramProperty::new(name, params, &self)
+        IntLinearHistogramProperty::new(name.into(), params, &self)
     }
 
     /// Creates a new `UintLinearHistogramProperty` with the given `name` and `params`.
@@ -309,7 +309,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: LinearHistogramParams<u64>,
     ) -> UintLinearHistogramProperty {
-        UintLinearHistogramProperty::new(name, params, &self)
+        UintLinearHistogramProperty::new(name.into(), params, &self)
     }
 
     /// Creates a new `DoubleLinearHistogramProperty` with the given `name` and `params`.
@@ -319,7 +319,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: LinearHistogramParams<f64>,
     ) -> DoubleLinearHistogramProperty {
-        DoubleLinearHistogramProperty::new(name, params, &self)
+        DoubleLinearHistogramProperty::new(name.into(), params, &self)
     }
 
     /// Creates a new `IntExponentialHistogramProperty` with the given `name` and `params`.
@@ -329,7 +329,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: ExponentialHistogramParams<i64>,
     ) -> IntExponentialHistogramProperty {
-        IntExponentialHistogramProperty::new(name, params, &self)
+        IntExponentialHistogramProperty::new(name.into(), params, &self)
     }
 
     /// Creates a new `UintExponentialHistogramProperty` with the given `name` and `params`.
@@ -339,7 +339,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: ExponentialHistogramParams<u64>,
     ) -> UintExponentialHistogramProperty {
-        UintExponentialHistogramProperty::new(name, params, &self)
+        UintExponentialHistogramProperty::new(name.into(), params, &self)
     }
 
     /// Creates a new `DoubleExponentialHistogramProperty` with the given `name` and `params`.
@@ -349,7 +349,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: ExponentialHistogramParams<f64>,
     ) -> DoubleExponentialHistogramProperty {
-        DoubleExponentialHistogramProperty::new(name, params, &self)
+        DoubleExponentialHistogramProperty::new(name.into(), params, &self)
     }
 
     /// Creates a new lazy child with the given `name` and `callback`.
@@ -366,7 +366,7 @@ impl Node {
                     .try_lock()
                     .and_then(|mut state| {
                         state.create_lazy_node(
-                            name,
+                            name.into(),
                             inner_ref.block_index,
                             LinkNodeDisposition::Child,
                             callback,
@@ -383,7 +383,7 @@ impl Node {
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
-        let property = self.create_lazy_child(name, callback);
+        let property = self.create_lazy_child(name.into(), callback);
         self.record(property);
     }
 
@@ -401,7 +401,7 @@ impl Node {
                     .try_lock()
                     .and_then(|mut state| {
                         state.create_lazy_node(
-                            name,
+                            name.into(),
                             inner_ref.block_index,
                             LinkNodeDisposition::Inline,
                             callback,
@@ -418,7 +418,7 @@ impl Node {
     where
         F: Fn() -> BoxFuture<'static, Result<Inspector, anyhow::Error>> + Sync + Send + 'static,
     {
-        let property = self.create_lazy_values(name, callback);
+        let property = self.create_lazy_values(name.into(), callback);
         self.record(property);
     }
 
@@ -437,7 +437,7 @@ impl Node {
                     .try_lock()
                     .and_then(|mut state| {
                         state.create_property(
-                            name,
+                            name.into(),
                             value.as_ref().as_bytes(),
                             PropertyFormat::String,
                             inner_ref.block_index,
@@ -451,7 +451,7 @@ impl Node {
 
     /// Creates and saves a string property for the lifetime of the node.
     pub fn record_string(&self, name: impl Into<StringReference>, value: impl AsRef<str>) {
-        let property = self.create_string(name, value);
+        let property = self.create_string(name.into(), value);
         self.record(property);
     }
 
@@ -470,7 +470,7 @@ impl Node {
                     .try_lock()
                     .and_then(|mut state| {
                         state.create_property(
-                            name,
+                            name.into(),
                             value.as_ref(),
                             PropertyFormat::Bytes,
                             inner_ref.block_index,
@@ -484,7 +484,7 @@ impl Node {
 
     /// Creates and saves a bytes property for the lifetime of the node.
     pub fn record_bytes(&self, name: impl Into<StringReference>, value: impl AsRef<[u8]>) {
-        let property = self.create_bytes(name, value);
+        let property = self.create_bytes(name.into(), value);
         self.record(property);
     }
 
@@ -497,7 +497,9 @@ impl Node {
                 inner_ref
                     .state
                     .try_lock()
-                    .and_then(|mut state| state.create_bool(name, value, inner_ref.block_index))
+                    .and_then(|mut state| {
+                        state.create_bool(name.into(), value, inner_ref.block_index)
+                    })
                     .map(|block| BoolProperty::new(inner_ref.state.clone(), block.index()))
                     .ok()
             })
@@ -506,7 +508,7 @@ impl Node {
 
     /// Creates and saves a bool property for the lifetime of the node.
     pub fn record_bool(&self, name: impl Into<StringReference>, value: bool) {
-        let property = self.create_bool(name, value);
+        let property = self.create_bool(name.into(), value);
         self.record(property);
     }
 
