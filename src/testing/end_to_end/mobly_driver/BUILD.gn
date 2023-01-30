@@ -76,4 +76,42 @@ if (is_host) {
       "drivers:tests",
     ]
   }
+
+  # Mobly Driver Python binary definition.
+  _md_bin_target = "mobly_driver_binary_target"
+  _md_bin_name = "mobly_driver.pyz"
+  _md_bin_path = get_label_info(":${_md_bin_target}", "target_out_dir") +
+                 "/${_md_bin_name}"
+  python_binary(_md_bin_target) {
+    testonly = true
+    main_source = "main.py"
+    sources = [
+      "api_infra.py",
+      "api_mobly.py",
+      "driver_factory.py",
+      "drivers/base_mobly_driver.py",
+      "drivers/common.py",
+      "drivers/infra_driver.py",
+      "drivers/local_driver.py",
+      "main.py",
+      "mobly_driver_lib.py",
+    ]
+    main_callable = "main"
+    output_name = _md_bin_name
+    deps = [
+      ":driver_factory",
+      ":mobly_driver_lib",
+    ]
+  }
+
+  # Mobly Driver test data definition.
+  # This enables the Python binary to be used as a host test data dependency..
+  _target_dir = get_label_info(_md_bin_target, "dir")
+  _test_data_dir = "${root_out_dir}/test_data/${_target_dir}"
+  host_test_data("mobly_driver_test_data_target") {
+    testonly = true
+    sources = [ _md_bin_path ]
+    outputs = [ "${_test_data_dir}/${_md_bin_name}" ]
+    deps = [ ":${_md_bin_target}" ]
+  }
 }
