@@ -8,7 +8,11 @@ use std::path::PathBuf;
 
 #[ffx_command()]
 #[derive(FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "start", description = "run as daemon")]
+#[argh(
+    subcommand,
+    name = "start",
+    description = "run as daemon -- normally unnecessary, as the daemon is automatically started on demand. Used primarily for debugging"
+)]
 pub struct StartCommand {
     #[argh(option)]
     /// override the path the socket will be bound to
