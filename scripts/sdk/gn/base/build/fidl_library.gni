@@ -207,6 +207,10 @@ template("fidl_library") {
                              "visibility",
                            ])
 
+    if (defined(visibility)) {
+      visibility += [ ":${target_name}_hlcpp" ]
+    }
+
     sources = [ _tables_file ]
 
     # TODO(https://fxbug.dev/90838): Make zx library less special-cased.
@@ -235,6 +239,11 @@ template("fidl_library") {
   }
 
   group("${target_name}_hlcpp") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
     public_deps = [ ":${invoker.target_name}" ]
   }
 }
