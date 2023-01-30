@@ -57,10 +57,6 @@ driver_bind_rules("msd_arm_bind") {
   ]
 }
 
-magma_pdev_entry("msd_arm_entry") {
-  deps = [ ":msd_arm_bind" ]
-}
-
 driver_bind_rules("msd_arm_test_bind") {
   rules = "msd_arm_test.bind"
   header_output = "test_bind.h"
@@ -72,9 +68,37 @@ driver_bind_rules("msd_arm_test_bind") {
   ]
 }
 
-magma_pdev_entry("msd_arm_test_entry") {
-  test_entry = true
-  deps = [ ":msd_arm_test_bind" ]
+entry_deps = [
+  "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
+  "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+  "//src/devices/lib/driver",
+  "//src/graphics/lib/magma/src/magma_util:macros",
+  "//src/graphics/lib/magma/src/magma_util/platform:logger",
+  "//src/graphics/lib/magma/src/magma_util/platform:trace",
+  "//src/graphics/lib/magma/src/magma_util/platform:trace_provider",
+  "//src/graphics/lib/magma/src/magma_util/platform:trace_provider_with_fdio",
+  "//src/graphics/lib/magma/src/magma_util/platform/zircon:status",
+  "//src/graphics/lib/magma/src/magma_util/platform/zircon:thread_profile",
+  "//src/graphics/lib/magma/src/sys_driver",
+  "//src/graphics/lib/magma/src/sys_driver:device_impl",
+  "//src/lib/ddk",
+  "//src/lib/ddktl",
+  "//zircon/system/ulib/zx",
+]
+
+source_set("msd_arm_entry") {
+  sources = [ "src/driver_entry.cc" ]
+  deps = entry_deps + [ ":msd_arm_bind" ]
+}
+
+source_set("msd_arm_test_entry") {
+  testonly = true
+  sources = [ "src/driver_entry.cc" ]
+  defines = [ "MAGMA_TEST_DRIVER=1" ]
+  deps = entry_deps + [
+           ":msd_arm_test_bind",
+           "//src/graphics/lib/magma/src/magma_util/platform/zircon:pdev_driver_gtest",
+         ]
 }
 
 group("tests") {
