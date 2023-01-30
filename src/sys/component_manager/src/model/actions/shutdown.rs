@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet},
         component::{ComponentInstance, InstanceState, ResolvedInstanceState},
-        error::ModelError,
+        error::StopActionError,
     },
     async_trait::async_trait,
     cm_rust::{
@@ -36,7 +36,7 @@ impl ShutdownAction {
 
 #[async_trait]
 impl Action for ShutdownAction {
-    type Output = Result<(), ModelError>;
+    type Output = Result<(), StopActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_shutdown(component).await
     }
@@ -45,7 +45,7 @@ impl Action for ShutdownAction {
     }
 }
 
-async fn shutdown_component(target: ShutdownInfo) -> Result<ComponentRef, ModelError> {
+async fn shutdown_component(target: ShutdownInfo) -> Result<ComponentRef, StopActionError> {
     match target.ref_ {
         ComponentRef::Self_ => {
             // TODO: Put `self` in a "shutting down" state so that if it creates
@@ -124,7 +124,7 @@ impl ShutdownJob {
     /// Perform shutdown of the Component that was used to create this ShutdownJob A Component must
     /// wait to shut down until all its children are shut down.  The shutdown procedure looks at
     /// the children, if any, and determines the dependency relationships of the children.
-    pub async fn execute(&mut self) -> Result<(), ModelError> {
+    pub async fn execute(&mut self) -> Result<(), StopActionError> {
         // Relationship maps are maintained to track dependencies. A map is
         // maintained both from a Component to its dependents and from a Component to
         // that Component's dependencies. With this dependency tracking, the
@@ -224,7 +224,7 @@ impl ShutdownJob {
     }
 }
 
-async fn do_shutdown(component: &Arc<ComponentInstance>) -> Result<(), ModelError> {
+async fn do_shutdown(component: &Arc<ComponentInstance>) -> Result<(), StopActionError> {
     {
         let state = component.lock_state().await;
         {
@@ -4214,7 +4214,7 @@ mod tests {
             let mut actions = component_d.lock_actions().await;
             actions.mock_result(
                 ActionKey::Shutdown,
-                Err(ModelError::unsupported("ouch")) as Result<(), ModelError>,
+                Err(StopActionError::GetParentFailed) as Result<(), StopActionError>,
             );
         }
 

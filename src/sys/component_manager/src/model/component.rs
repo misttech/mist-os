@@ -13,7 +13,7 @@ use {
         error::{
             AddChildError, AddDynamicChildError, DiscoverActionError, DynamicOfferError,
             ModelError, OpenExposedDirError, RebootError, ResolveActionError, StartActionError,
-            StructuredConfigError,
+            StopActionError, StructuredConfigError,
         },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
@@ -74,7 +74,6 @@ use {
         sync::{Arc, Weak},
         time::Duration,
     },
-    thiserror::Error,
     tracing::warn,
     version_history::AbiRevision,
     vfs::{execution_scope::ExecutionScope, path::Path},
@@ -749,13 +748,13 @@ impl ComponentInstance {
     }
 
     /// Stops this component.
-    pub async fn stop(self: &Arc<Self>) -> Result<(), ModelError> {
+    pub async fn stop(self: &Arc<Self>) -> Result<(), StopActionError> {
         ActionSet::register(self.clone(), StopAction::new(false)).await
     }
 
     /// Shuts down this component. This means the component and its subrealm are stopped and never
     /// allowed to restart again.
-    pub async fn shutdown(self: &Arc<Self>) -> Result<(), ModelError> {
+    pub async fn shutdown(self: &Arc<Self>) -> Result<(), StopActionError> {
         ActionSet::register(self.clone(), ShutdownAction::new()).await
     }
 
@@ -771,7 +770,7 @@ impl ComponentInstance {
     pub async fn stop_instance_internal(
         self: &Arc<Self>,
         shut_down: bool,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), StopActionError> {
         let (was_running, stop_result) = {
             let mut execution = self.lock_execution().await;
             let was_running = execution.runtime.is_some();
@@ -791,13 +790,7 @@ impl ComponentInstance {
                         )));
                         timer.await;
                     });
-                    let ret =
-                        runtime.stop_component(stop_timer, kill_timer).await.map_err(|e| {
-                            ModelError::StopComponentError {
-                                moniker: self.abs_moniker.clone(),
-                                err: e,
-                            }
-                        })?;
+                    let ret = runtime.stop_component(stop_timer, kill_timer).await?;
                     if ret.request == StopRequestSuccess::KilledAfterTimeout
                         || ret.request == StopRequestSuccess::Killed
                     {
@@ -813,7 +806,10 @@ impl ComponentInstance {
                             Rebooting the system",
                             self.abs_moniker
                         );
-                        let top_instance = self.top_instance().await?;
+                        let top_instance = self
+                            .top_instance()
+                            .await
+                            .map_err(|_| StopActionError::GetTopInstanceFailed)?;
                         top_instance.trigger_reboot().await;
                     }
 
@@ -843,18 +839,23 @@ impl ComponentInstance {
         };
 
         // When the component is stopped, any child instances in collections must be destroyed.
-        self.destroy_dynamic_children().await?;
+        self.destroy_dynamic_children()
+            .await
+            .map_err(|e| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(e) })?;
         if was_running {
             let event = Event::new(self, EventPayload::Stopped { status: stop_result });
             self.hooks.dispatch(&event).await;
         }
-        if let ExtendedInstance::Component(parent) = self.try_get_parent()? {
+        if let ExtendedInstance::Component(parent) =
+            self.try_get_parent().map_err(|_| StopActionError::GetParentFailed)?
+        {
             parent
                 .destroy_child_if_single_run(
                     self.child_moniker().expect("child is root instance?"),
                     self.incarnation_id(),
                 )
-                .await?;
+                .await
+                .map_err(|e| StopActionError::SingleRunDestroyFailed { err: Box::new(e) })?;
         }
         Ok(())
     }
@@ -1857,13 +1858,6 @@ pub enum StopRequestSuccess {
     /// could be sent.
     StoppedWithTimeoutRace,
 }
-#[derive(Debug, Error, Clone, PartialEq)]
-pub enum StopComponentError {
-    #[error("error stopping component")]
-    SendStopFailed,
-    #[error("error killing component")]
-    SendKillFailed,
-}
 
 impl Runtime {
     pub fn start_from(
@@ -1920,7 +1914,7 @@ impl Runtime {
         &'a mut self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<ComponentStopOutcome, StopComponentError> {
+    ) -> Result<ComponentStopOutcome, StopActionError> {
         // Potentially there is no controller, perhaps because the component
         // has no running code. In this case this is a no-op.
         if let Some(ref controller) = self.controller {
@@ -1944,7 +1938,7 @@ async fn stop_component_internal<'a, 'b>(
     controller: &ComponentController,
     stop_timer: BoxFuture<'a, ()>,
     kill_timer: BoxFuture<'b, ()>,
-) -> Result<ComponentStopOutcome, StopComponentError> {
+) -> Result<ComponentStopOutcome, StopActionError> {
     let result = match do_runner_stop(controller, stop_timer).await {
         Some(r) => r,
         None => {
@@ -1966,7 +1960,7 @@ async fn stop_component_internal<'a, 'b>(
 async fn do_runner_stop<'a>(
     controller: &ComponentController,
     stop_timer: BoxFuture<'a, ()>,
-) -> Option<Result<StopRequestSuccess, StopComponentError>> {
+) -> Option<Result<StopRequestSuccess, StopActionError>> {
     // Ask the controller to stop the component
     match controller.stop() {
         Ok(()) => {}
@@ -1977,7 +1971,7 @@ async fn do_runner_stop<'a>(
             } else {
                 // There was some problem sending the message, perhaps a
                 // protocol error, but there isn't really a way to recover.
-                return Some(Err(StopComponentError::SendStopFailed));
+                return Some(Err(StopActionError::ControllerStopFidlError(e)));
             }
         }
     }
@@ -2010,7 +2004,7 @@ fn try_clone_dir_endpoint(
 async fn do_runner_kill<'a>(
     controller: &ComponentController,
     kill_timer: BoxFuture<'a, ()>,
-) -> Result<StopRequestSuccess, StopComponentError> {
+) -> Result<StopRequestSuccess, StopActionError> {
     match controller.kill() {
         Ok(()) => {
             // Wait for the controller to close the channel
@@ -2034,7 +2028,7 @@ async fn do_runner_kill<'a>(
             } else {
                 // There was some problem sending the message, perhaps a
                 // protocol error, but there isn't really a way to recover.
-                Err(StopComponentError::SendKillFailed)
+                Err(StopActionError::ControllerKillFidlError(e))
             }
         }
     }

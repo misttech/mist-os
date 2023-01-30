@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::ComponentInstance,
-        error::ModelError,
+        error::StopActionError,
     },
     async_trait::async_trait,
     std::sync::Arc,
@@ -25,7 +25,7 @@ impl StopAction {
 
 #[async_trait]
 impl Action for StopAction {
-    type Output = Result<(), ModelError>;
+    type Output = Result<(), StopActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
         component.stop_instance_internal(self.shut_down).await
     }
@@ -40,6 +40,7 @@ pub mod tests {
         super::*,
         crate::model::{
             actions::{test_utils::is_stopped, ActionNotifier, ActionSet},
+            error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             testing::{
                 test_helpers::{component_decl_with_test_runner, ActionsTest},

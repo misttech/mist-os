@@ -73,7 +73,7 @@ pub use destroy::DestroyAction;
 pub(self) use destroy::DestroyAction;
 
 use {
-    crate::model::component::ComponentInstance,
+    crate::model::{component::ComponentInstance, error::StopActionError},
     async_trait::async_trait,
     cm_moniker::IncarnationId,
     fuchsia_async as fasync,
@@ -345,11 +345,11 @@ impl ActionSet {
 
         if let Some(prereq_action) = prereq_action {
             let prereq_action = prereq_action
-                .downcast_ref::<ActionNotifier<A::Output>>()
+                .downcast_ref::<ActionNotifier<Result<(), StopActionError>>>()
                 .expect("action notifier has unexpected type")
                 .clone();
             async move {
-                prereq_action.await;
+                let _ = prereq_action.await;
             }
             .boxed()
         } else {
@@ -364,7 +364,6 @@ pub mod tests {
         super::*,
         crate::model::{
             actions::{destroy::DestroyAction, shutdown::ShutdownAction},
-            error::ModelError,
             testing::test_helpers::ActionsTest,
         },
         assert_matches::assert_matches,
@@ -419,7 +418,7 @@ pub mod tests {
             ShutdownAction::new(),
             component.clone(),
             tx2,
-            Err(ModelError::ModelNotAvailable), // Some random error.
+            Err(StopActionError::GetParentFailed), // Some random error.
         )
         .await;
         let (tx3, rx3) = oneshot::channel();
@@ -433,7 +432,7 @@ pub mod tests {
         ActionSet::finish(&component, &ActionKey::Shutdown).await;
         assert_matches!(
             rx2.await.expect("Unable to receive result of Notification"),
-            Err(ModelError::ModelNotAvailable)
+            Err(StopActionError::GetParentFailed)
         );
     }
 }

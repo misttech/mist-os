@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::model::{
-        component::StopComponentError, events::error::EventsError, routing::OpenResourceError,
-        storage::StorageError,
-    },
+    crate::model::{events::error::EventsError, routing::OpenResourceError, storage::StorageError},
     ::routing::{
         component_id_index::ComponentIdIndexError,
         config::AbiRevisionError,
@@ -95,12 +92,6 @@ pub enum ModelError {
         #[source]
         err: fidl::Error,
     },
-    #[error("failed to stop component {}: {}", moniker, err)]
-    StopComponentError {
-        moniker: AbsoluteMoniker,
-        #[source]
-        err: StopComponentError,
-    },
     #[error("events error: {}", err)]
     EventsError {
         #[from]
@@ -132,6 +123,11 @@ pub enum ModelError {
     StartActionError {
         #[from]
         err: StartActionError,
+    },
+    #[error("error with stop action: {err}")]
+    StopActionError {
+        #[from]
+        err: StopActionError,
     },
 }
 
@@ -550,6 +546,79 @@ impl Into<fcomponent::Error> for StartActionError {
             StartActionError::InstanceShutDown { .. } => fcomponent::Error::InstanceDied,
             StartActionError::InstanceDestroyed { .. } => fcomponent::Error::InstanceDied,
             _ => fcomponent::Error::InstanceCannotStart,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum StopActionError {
+    #[error("stop failed with unexpected FIDL error ({0})")]
+    ControllerStopFidlError(#[source] fidl::Error),
+    #[error("kill failed with unexpected FIDL error ({0})")]
+    ControllerKillFidlError(#[source] fidl::Error),
+    #[error("failed to get top instance")]
+    GetTopInstanceFailed,
+    #[error("failed to get parent instance")]
+    GetParentFailed,
+    #[error("failed to destroy dynamic children: {err}")]
+    DestroyDynamicChildrenFailed {
+        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+        err: Box<ModelError>,
+    },
+    #[error("failed to destroy this single-run instance: {err}")]
+    SingleRunDestroyFailed {
+        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
+        err: Box<ModelError>,
+    },
+}
+
+#[cfg(test)]
+impl PartialEq for StopActionError {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                StopActionError::ControllerStopFidlError(_),
+                StopActionError::ControllerStopFidlError(_),
+            ) => true,
+            (
+                StopActionError::ControllerKillFidlError(_),
+                StopActionError::ControllerKillFidlError(_),
+            ) => true,
+            (StopActionError::GetTopInstanceFailed, StopActionError::GetTopInstanceFailed) => true,
+            (StopActionError::GetParentFailed, StopActionError::GetParentFailed) => true,
+            (
+                StopActionError::DestroyDynamicChildrenFailed { .. },
+                StopActionError::DestroyDynamicChildrenFailed { .. },
+            ) => true,
+            (
+                StopActionError::SingleRunDestroyFailed { .. },
+                StopActionError::SingleRunDestroyFailed { .. },
+            ) => true,
+            _ => false,
+        }
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                StopActionError::ControllerStopFidlError(_),
+                StopActionError::ControllerStopFidlError(_),
+            ) => false,
+            (
+                StopActionError::ControllerKillFidlError(_),
+                StopActionError::ControllerKillFidlError(_),
+            ) => false,
+            (StopActionError::GetTopInstanceFailed, StopActionError::GetTopInstanceFailed) => false,
+            (StopActionError::GetParentFailed, StopActionError::GetParentFailed) => false,
+            (
+                StopActionError::DestroyDynamicChildrenFailed { .. },
+                StopActionError::DestroyDynamicChildrenFailed { .. },
+            ) => false,
+            (
+                StopActionError::SingleRunDestroyFailed { .. },
+                StopActionError::SingleRunDestroyFailed { .. },
+            ) => false,
+            _ => true,
         }
     }
 }
