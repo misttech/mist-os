@@ -56,27 +56,12 @@ pub fn simple_init_vmo_with_capacity(
 
 /// It is very common in tests to create a read-only file that backed by a non-resizable VMO.  This
 /// function does just that.
-pub fn simple_read_only(
-    content: &[u8],
-) -> Arc<
-    VmoFile<
-        impl Fn() -> BoxFuture<'static, InitVmoResult> + Send + Sync + 'static,
-        BoxFuture<'static, InitVmoResult>,
-    >,
-> {
+pub fn simple_read_only(content: &[u8]) -> Arc<VmoFile> {
     read_only(simple_init_vmo(content))
 }
 
 /// Similar to [`simple_read_only()`], but allows specifying an inode.
-pub fn simple_read_only_with_inode(
-    content: &[u8],
-    inode: u64,
-) -> Arc<
-    VmoFile<
-        impl Fn() -> BoxFuture<'static, InitVmoResult> + Send + Sync + 'static,
-        BoxFuture<'static, InitVmoResult>,
-    >,
-> {
+pub fn simple_read_only_with_inode(content: &[u8], inode: u64) -> Arc<VmoFile> {
     VmoFile::new_with_inode(simple_init_vmo(content), true, false, false, inode)
 }
 
@@ -171,13 +156,6 @@ macro_rules! report_invalid_vmo_content {
 }
 
 /// Constructs a read-write files with the specified `initial_content`.
-pub fn simple_read_write(
-    initial_content: &[u8],
-) -> Arc<
-    VmoFile<
-        impl Fn() -> BoxFuture<'static, InitVmoResult> + Send + Sync + 'static,
-        BoxFuture<'static, InitVmoResult>,
-    >,
-> {
+pub fn simple_read_write(initial_content: &[u8]) -> Arc<VmoFile> {
     read_write(simple_init_vmo(initial_content))
 }

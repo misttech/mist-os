@@ -4,7 +4,6 @@
 
 //! Module holding different kinds of files and their building blocks.
 use {
-    crate::directory::entry::DirectoryEntry,
     async_trait::async_trait,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, Status},

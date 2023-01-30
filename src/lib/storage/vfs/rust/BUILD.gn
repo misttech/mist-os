@@ -73,8 +73,6 @@ rustc_library("vfs") {
     "src/file/vmo/asynchronous.rs",
     "src/file/vmo/asynchronous/test_utils.rs",
     "src/file/vmo/asynchronous/tests.rs",
-    "src/file/vmo/connection.rs",
-    "src/file/vmo/connection/io1.rs",
     "src/lib.rs",
     "src/path.rs",
     "src/pseudo_directory.rs",

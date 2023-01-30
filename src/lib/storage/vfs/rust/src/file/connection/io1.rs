@@ -34,7 +34,7 @@ use {
 };
 
 /// Initializes a file connection, which will be running in the context of the specified
-/// execution `scope`.  This function will also check the flags and will send the `OnOpen`
+/// execution `scope`. This function will also check the flags and will send the `OnOpen`
 /// event if necessary.
 pub fn create_connection<U: 'static + File + FileIo + DirectoryEntry>(
     scope: ExecutionScope,
@@ -363,12 +363,14 @@ impl<T: 'static + File + FileIo + DirectoryEntry> IoOpHandler for FidlIoFile<T> 
             }
         };
 
-        if new_seek < 0 {
-            // Can't seek to before the end of a file.
-            Err(zx::Status::OUT_OF_RANGE)
-        } else {
-            self.seek = new_seek as u64;
+        // TODO(fxbug.dev/100754): There is an undocumented constraint that the seek offset can
+        // never exceed 63 bits, but this is not currently enforced. For now we just ensure that
+        // the values remain consistent internally with a 64-bit unsigned seek offset.
+        if let Ok(new_seek) = u64::try_from(new_seek) {
+            self.seek = new_seek;
             Ok(self.seek)
+        } else {
+            Err(zx::Status::OUT_OF_RANGE)
         }
     }
 

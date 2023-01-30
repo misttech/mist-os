@@ -10,12 +10,12 @@ use {
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     },
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
-    futures::{Future, FutureExt},
+    futures::FutureExt as _,
     std::sync::Arc,
     vfs::{
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
-        file::vmo::asynchronous::{InitVmoResult, VmoFile},
+        file::vmo::asynchronous::VmoFile,
     },
 };
 
@@ -23,33 +23,21 @@ type Directory = Arc<
     vfs::directory::simple::Simple<vfs::directory::immutable::connection::io1::ImmutableConnection>,
 >;
 
-struct FakePackageVariant<InitVmo, InitVmoFuture>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
+struct FakePackageVariant {
     dir: Directory,
-    meta_file: Arc<VmoFile<InitVmo, InitVmoFuture>>,
+    meta_file: Arc<VmoFile>,
 }
 
-impl<InitVmo, InitVmoFuture> FakePackageVariant<InitVmo, InitVmoFuture>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
+impl FakePackageVariant {
     /// Creates a new struct that acts a directory serving `dir`. If the "meta"
     /// node within the directory is read as a file then `meta_file` is served
     /// as the contents of the file.
-    pub fn new(dir: Directory, meta_file: Arc<VmoFile<InitVmo, InitVmoFuture>>) -> Self {
+    pub fn new(dir: Directory, meta_file: Arc<VmoFile>) -> Self {
         Self { dir, meta_file }
     }
 }
 
-impl<InitVmo, InitVmoFuture> DirectoryEntry for FakePackageVariant<InitVmo, InitVmoFuture>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
+impl DirectoryEntry for FakePackageVariant {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,

@@ -4,7 +4,7 @@
 
 //! Tests for the asynchronous files.
 
-use super::{read_only, read_only_const, read_only_static, read_write};
+use super::{read_only, read_only_const, read_only_static, read_write, VmoFile};
 
 // Macros are exported into the root of the crate.
 use crate::{
@@ -535,7 +535,8 @@ fn seek_triggers_overflow() {
         simple_read_only(b"File size and contents don't matter for this test"),
         |proxy| async move {
             assert_seek!(proxy, i64::MAX, Start);
-            assert_seek!(proxy, 1, Current, Err(Status::OUT_OF_RANGE));
+            assert_seek!(proxy, i64::MAX, Current, Ok(u64::MAX - 1));
+            assert_seek!(proxy, 2, Current, Err(Status::OUT_OF_RANGE));
         },
     );
 }
@@ -1072,6 +1073,24 @@ fn get_buffer_two_vmos() {
             assert_vmo_content!(&buffer2.vmo, b"Updated content");
             assert_vmo_content!(&buffer1.vmo, b"Updated content");
 
+            assert_close!(proxy);
+        },
+    );
+}
+
+#[test]
+fn read_only_vmo_file() {
+    let vmo = Vmo::create(1024).expect("create failed");
+    let data = b"Read only str";
+    vmo.write(data, 0).expect("write failed");
+    vmo.set_content_size(&(data.len() as u64)).expect("set_content_size failed");
+    run_server_client(
+        fio::OpenFlags::RIGHT_READABLE,
+        VmoFile::new_from_vmo(
+            vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
+        ),
+        |proxy| async move {
+            assert_read!(proxy, "Read only str");
             assert_close!(proxy);
         },
     );

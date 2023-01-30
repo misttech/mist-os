@@ -2,15 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//!
-//! Implementation of a file backed by a VMO buffer shared by all the file connections.  From the
-//! library user side, these files are backed by asynchronous `init_vmo` callback.
-//!
-//! Connections to this kind of file synchronize and perform operations on a shared VMO initially
-//! provided by the `init_vmo` callback. `init_vmo` callback is called when the first connection to
-//! the file is established and is responsible for providing a VMO to be used by all future
-//! connections.
-//!
+//! Implementation of a file backed by a VMO buffer shared by all the file connections. The VMO can
+//! be created before, or constructed on the first connection to the file via asynchronous callback.
 
 #![warn(missing_docs)]
 
@@ -20,21 +13,43 @@ pub mod test_utils;
 mod tests;
 
 use crate::{
-    common::send_on_open_with_error,
+    common::{rights_to_posix_mode_bits, send_on_open_with_error},
     directory::entry::{DirectoryEntry, EntryInfo},
     execution_scope::ExecutionScope,
-    file::vmo::connection::{io1::VmoFileConnection, AsyncInitVmo, VmoFileInterface},
+    file::{common::vmo_flags_to_rights, connection::io1::create_connection, File, FileIo},
     path::Path,
 };
 
 use {
+    async_trait::async_trait,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::{Status, Vmo},
+    fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _, Status, Vmo},
     futures::future::BoxFuture,
-    futures::lock::{Mutex, MutexLockFuture},
+    futures::lock::Mutex,
     std::{future::Future, sync::Arc},
 };
+
+/// Helper trait to avoid generics in the [`VmoFile`] type by using dynamic dispatch.
+#[async_trait]
+trait AsyncInitVmoFile: Send + Sync {
+    async fn init_vmo(&self) -> InitVmoResult;
+}
+
+struct AsyncInitVmoFileImpl<InitVmo> {
+    callback: InitVmo,
+}
+
+#[async_trait]
+impl<InitVmo, InitVmoFuture> AsyncInitVmoFile for AsyncInitVmoFileImpl<InitVmo>
+where
+    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
+    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
+{
+    async fn init_vmo(&self) -> InitVmoResult {
+        (self.callback)().await
+    }
+}
 
 /// Connection buffer initialization result. It is either a byte buffer with the file content, or
 /// an error code.
@@ -47,7 +62,7 @@ pub type InitVmoResult = Result<Vmo, Status>;
 /// New connections are only allowed when they specify "read-only" access to the file content.
 ///
 /// For more details on this interaction, see the module documentation.
-pub fn read_only<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile<InitVmo, InitVmoFuture>>
+pub fn read_only<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
 where
     InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
     InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
@@ -63,7 +78,7 @@ where
 /// New connections are only allowed when they specify read and/or execute access to the file.
 ///
 /// For more details on this interaction, see the module documentation.
-pub fn read_exec<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile<InitVmo, InitVmoFuture>>
+pub fn read_exec<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
 where
     InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
     InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
@@ -87,14 +102,7 @@ fn init_vmo<'a>(content: Arc<[u8]>) -> impl Fn() -> BoxFuture<'a, InitVmoResult>
 
 /// Creates a new read-only `VmoFile` which serves static content.  Also see
 /// `read_only_const` which allows you to pass the ownership to the file itself.
-pub fn read_only_static<Bytes>(
-    bytes: Bytes,
-) -> Arc<
-    VmoFile<
-        impl Fn() -> BoxFuture<'static, InitVmoResult> + Send + Sync + 'static,
-        BoxFuture<'static, InitVmoResult>,
-    >,
->
+pub fn read_only_static<Bytes>(bytes: Bytes) -> Arc<VmoFile>
 where
     Bytes: AsRef<[u8]> + Send + Sync,
 {
@@ -105,14 +113,7 @@ where
 /// Create a new read-only `VmoFile` which servers a constant content.  The difference with
 /// `read_only_static` is that this function takes a run time values that it will own, while
 /// `read_only_static` requires a reference to something with a static lifetime.
-pub fn read_only_const(
-    bytes: &[u8],
-) -> Arc<
-    VmoFile<
-        impl Fn() -> BoxFuture<'static, InitVmoResult> + Send + Sync,
-        BoxFuture<'static, InitVmoResult>,
-    >,
-> {
+pub fn read_only_const(bytes: &[u8]) -> Arc<VmoFile> {
     let content: Arc<[u8]> = bytes.to_vec().clone().into();
     read_only(init_vmo(content.clone()))
 }
@@ -149,7 +150,7 @@ pub fn simple_init_vmo_with_capacity(
 /// New connections may specify any kind of access to the file content.
 ///
 /// For more details on these interaction, see the module documentation.
-pub fn read_write<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile<InitVmo, InitVmoFuture>>
+pub fn read_write<InitVmo, InitVmoFuture>(init_vmo: InitVmo) -> Arc<VmoFile>
 where
     InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
     InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
@@ -157,55 +158,39 @@ where
     VmoFile::new(init_vmo, true, true, false)
 }
 
-/// Implementation of an asynchronous VMO-backed file in a virtual file system. This is created by
-/// passing async `init_vmo` callback to the exported constructor functions.
+/// Implementation of a VMO-backed file in a virtual file system. Supports both synchronous (from
+/// existing Vmo) and asynchronous (from async callback) construction of the backing Vmo.
 ///
 /// Futures returned by these callbacks will be executed by the library using connection specific
 /// [`ExecutionScope`].
 ///
 /// See the module documentation for more details.
-pub struct VmoFile<InitVmo, InitVmoFuture>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
-    init_vmo: InitVmo,
-    /// Specifies if the file is readable. `init_vmo` is always invoked even for non-readable VMOs.
+pub struct VmoFile {
+    /// Specifies if the file is readable. Always invoked even for non-readable VMOs.
     readable: bool,
 
-    /// Specifies if the file is writable.
+    /// Specifies if the file is writable. If this is the case, the Vmo backing the file is never
+    /// destroyed until this object is dropped.
     writable: bool,
 
     /// Specifies if the file can be opened as executable.
     executable: bool,
 
-    /// Specifies the inode for this file. If you don't care or don't know, INO_UNKNOWN can be
-    /// used.
+    /// Specifies the inode for this file. Can be [`fio::INO_UNKNOWN`] if not required.
     inode: u64,
 
-    // File connections share state with the file itself.
-    // TODO: It should be `pub(in super::connection)` but the compiler claims, `super` does not
-    // contain a `connection`.  Neither `pub(in create:vmo::connection)` works.
-    pub(super) state: Mutex<Option<VmoFileState>>,
+    /// Vmo that backs the file. If constructed as None, will be initialized on first connection
+    /// using [`Self::init_vmo`].
+    vmo: Mutex<Option<Vmo>>,
+
+    /// Asynchronous callback used to initialize [`Self::vmo`] on first connection to the file.
+    init_vmo: Option<Box<dyn AsyncInitVmoFile + 'static>>,
 }
 
-/// State shared between all the connections to a file, across all execution scopes.
-// TODO: It should be `pub(in super::connection)` but the compiler claims, `super` does not contain
-// a `connection`.  Neither the `pub(in create:vmo::connection)` works.
-pub(super) struct VmoFileState {
-    pub vmo: Vmo,
-
-    /// Number of active connections to the file.
-    pub connection_count: u64,
-}
-
-impl<InitVmo, InitVmoFuture> VmoFile<InitVmo, InitVmoFuture>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
-    /// Create a new VmoFile. The reported inode value will be [`fio::INO_UNKNOWN`].
-    /// See [`VmoFile::new_with_inode()`] to construct a VmoFile with an explicit inode value.
+impl VmoFile {
+    /// Create a new VmoFile which will be asynchronously initialized. The reported inode value will
+    /// be [`fio::INO_UNKNOWN`]. See [`VmoFile::new_with_inode()`] to construct a VmoFile with an
+    /// explicit inode value.
     ///
     /// # Arguments
     ///
@@ -213,7 +198,16 @@ where
     /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
     /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
-    pub fn new(init_vmo: InitVmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
+    pub fn new<InitVmo, InitVmoFuture>(
+        init_vmo: InitVmo,
+        readable: bool,
+        writable: bool,
+        executable: bool,
+    ) -> Arc<Self>
+    where
+        InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
+        InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
+    {
         Self::new_with_inode(init_vmo, readable, writable, executable, fio::INO_UNKNOWN)
     }
 
@@ -226,59 +220,48 @@ where
     /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
     /// * `inode` - Inode value to report when getting the VmoFile's attributes.
-    pub fn new_with_inode(
+    pub fn new_with_inode<InitVmo, InitVmoFuture>(
         init_vmo: InitVmo,
         readable: bool,
         writable: bool,
         executable: bool,
         inode: u64,
-    ) -> Arc<Self> {
+    ) -> Arc<Self>
+    where
+        InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
+        InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
+    {
         Arc::new(VmoFile {
-            init_vmo,
             readable,
             writable,
             executable,
             inode,
-            state: Mutex::new(None),
+            vmo: Mutex::new(None),
+            init_vmo: Some(Box::new(AsyncInitVmoFileImpl { callback: init_vmo })),
+        })
+    }
+
+    /// Create a new VmoFile which is backed by an existing Vmo.
+    ///
+    /// # Arguments
+    ///
+    /// * `vmo` - Vmo backing this file object.
+    /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
+    /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
+    /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
+    pub fn new_from_vmo(vmo: Vmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
+        Arc::new(VmoFile {
+            readable,
+            writable,
+            executable,
+            inode: fio::INO_UNKNOWN,
+            vmo: Mutex::new(Some(vmo)),
+            init_vmo: None,
         })
     }
 }
 
-impl<InitVmo, InitVmoFuture> VmoFileInterface for VmoFile<InitVmo, InitVmoFuture>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
-    fn init_vmo(self: Arc<Self>) -> AsyncInitVmo {
-        Box::pin((self.init_vmo)())
-    }
-
-    fn state(&self) -> MutexLockFuture<Option<VmoFileState>> {
-        self.state.lock()
-    }
-
-    fn is_readable(&self) -> bool {
-        return self.readable;
-    }
-
-    fn is_writable(&self) -> bool {
-        return self.writable;
-    }
-
-    fn is_executable(&self) -> bool {
-        return self.executable;
-    }
-
-    fn get_inode(&self) -> u64 {
-        return self.inode;
-    }
-}
-
-impl<InitVmo, InitVmoFuture> DirectoryEntry for VmoFile<InitVmo, InitVmoFuture>
-where
-    InitVmo: Fn() -> InitVmoFuture + Send + Sync + 'static,
-    InitVmoFuture: Future<Output = InitVmoResult> + Send + 'static,
-{
+impl DirectoryEntry for VmoFile {
     fn open(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -292,10 +275,192 @@ where
             return;
         }
 
-        VmoFileConnection::create_connection(scope.clone(), self, flags, server_end);
+        if flags.intersects(fio::OpenFlags::APPEND) {
+            send_on_open_with_error(flags, server_end, Status::NOT_SUPPORTED);
+            return;
+        }
+
+        create_connection(
+            scope.clone(),
+            self.clone(),
+            flags,
+            server_end,
+            self.readable,
+            self.writable,
+            self.executable,
+        );
     }
 
     fn entry_info(&self) -> EntryInfo {
         EntryInfo::new(self.inode, fio::DirentType::File)
     }
+}
+
+#[async_trait]
+impl FileIo for VmoFile {
+    async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
+        let guard = self.vmo.lock().await;
+        let vmo = guard.as_ref().unwrap();
+        let content_size = vmo.get_content_size()?;
+        if offset >= content_size {
+            return Ok(0u64);
+        }
+        let read_len: u64 = std::cmp::min(content_size - offset, buffer.len().try_into().unwrap());
+        let buffer = &mut buffer[..read_len.try_into().unwrap()];
+        vmo.read(buffer, offset)?;
+        Ok(read_len)
+    }
+
+    async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
+        if content.is_empty() {
+            return Ok(0u64);
+        }
+        let guard = self.vmo.lock().await;
+        let vmo = guard.as_ref().unwrap();
+        let capacity = vmo.get_size()?;
+        if offset >= capacity {
+            return Err(Status::OUT_OF_RANGE);
+        }
+        let write_len: u64 = std::cmp::min(capacity - offset, content.len().try_into().unwrap());
+        let content = &content[..write_len.try_into().unwrap()];
+        vmo.write(content, offset)?;
+        let end = offset + write_len;
+        if end > vmo.get_content_size()? {
+            vmo.set_content_size(&end)?;
+        }
+        Ok(write_len)
+    }
+
+    async fn append(&self, _content: &[u8]) -> Result<(u64, u64), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+}
+
+#[async_trait]
+impl File for VmoFile {
+    async fn open(&self, _flags: fio::OpenFlags) -> Result<(), Status> {
+        let mut vmo_state = self.vmo.lock().await;
+        if vmo_state.is_some() {
+            return Ok(());
+        }
+        *vmo_state = Some(self.init_vmo.as_ref().unwrap().init_vmo().await?);
+        Ok(())
+    }
+
+    async fn truncate(&self, length: u64) -> Result<(), Status> {
+        let guard = self.vmo.lock().await;
+        let vmo = guard.as_ref().unwrap();
+        let capacity = vmo.get_size()?;
+
+        if length > capacity {
+            return Err(Status::OUT_OF_RANGE);
+        }
+
+        let old_size = vmo.get_content_size()?;
+        if length < old_size {
+            // Zero out old data (which will decommit).
+            vmo.set_content_size(&length)?;
+            vmo.op_range(zx::VmoOp::ZERO, length, old_size - length)?;
+        } else if length > old_size {
+            // Zero out the range we are extending into.
+            vmo.op_range(zx::VmoOp::ZERO, old_size, length - old_size)?;
+            vmo.set_content_size(&length)?;
+        }
+
+        Ok(())
+    }
+
+    async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<Vmo, Status> {
+        // The only sharing mode we support that disallows the VMO size to change currently
+        // is PRIVATE_CLONE (`get_as_private`), so we require that to be set explicitly.
+        if flags.contains(fio::VmoFlags::WRITE) && !flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
+
+        // Disallow opening as both writable and executable. In addition to improving W^X
+        // enforcement, this also eliminates any inconstiencies related to clones that use
+        // SNAPSHOT_AT_LEAST_ON_WRITE since in that case, we cannot satisfy both requirements.
+        if flags.contains(fio::VmoFlags::EXECUTE) && flags.contains(fio::VmoFlags::WRITE) {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
+
+        let guard = self.vmo.lock().await;
+        let vmo = guard.as_ref().unwrap();
+
+        // Logic here matches fuchsia.io requirements and matches what works for memfs.
+        // Shared requests are satisfied by duplicating an handle, and private shares are
+        // child VMOs.
+        let vmo_rights = vmo_flags_to_rights(flags);
+        // Unless private sharing mode is specified, we always default to shared.
+        let new_vmo = if flags.contains(fio::VmoFlags::PRIVATE_CLONE) {
+            get_as_private(&vmo, vmo_rights)?
+        } else {
+            get_as_shared(&vmo, vmo_rights)?
+        };
+        Ok(new_vmo)
+    }
+
+    async fn get_size(&self) -> Result<u64, Status> {
+        let guard = self.vmo.lock().await;
+        let vmo = guard.as_ref().unwrap();
+        Ok(vmo.get_content_size()?)
+    }
+
+    async fn get_attrs(&self) -> Result<fio::NodeAttributes, Status> {
+        let content_size = self.get_size().await?;
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_FILE
+                | rights_to_posix_mode_bits(self.readable, self.writable, self.executable),
+            id: self.inode,
+            content_size,
+            storage_size: content_size,
+            link_count: 1,
+            creation_time: 0,
+            modification_time: 0,
+        })
+    }
+
+    async fn set_attrs(
+        &self,
+        _flags: fio::NodeAttributeFlags,
+        _attrs: fio::NodeAttributes,
+    ) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
+    async fn close(&self) -> Result<(), Status> {
+        Ok(())
+    }
+
+    async fn sync(&self) -> Result<(), Status> {
+        Ok(())
+    }
+}
+
+fn get_as_shared(vmo: &Vmo, mut rights: zx::Rights) -> Result<Vmo, zx::Status> {
+    // Add set of basic rights to include in shared mode before duplicating the VMO handle.
+    rights |= zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY;
+    vmo.as_handle_ref().duplicate(rights).map(Into::into)
+}
+
+fn get_as_private(vmo: &Vmo, mut rights: zx::Rights) -> Result<Vmo, zx::Status> {
+    // Add set of basic rights to include in private mode, ensuring we provide SET_PROPERTY.
+    rights |=
+        zx::Rights::BASIC | zx::Rights::MAP | zx::Rights::GET_PROPERTY | zx::Rights::SET_PROPERTY;
+
+    // Ensure we give out a copy-on-write clone.
+    let mut child_options = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
+    // If we don't need a writable clone, we need to add CHILD_NO_WRITE since
+    // SNAPSHOT_AT_LEAST_ON_WRITE removes ZX_RIGHT_EXECUTE even if the parent VMO has it, but
+    // adding CHILD_NO_WRITE will ensure EXECUTE is maintained.
+    if !rights.contains(zx::Rights::WRITE) {
+        child_options |= zx::VmoChildOptions::NO_WRITE;
+    } else {
+        // If we need a writable clone, ensure it can be resized.
+        child_options |= zx::VmoChildOptions::RESIZABLE;
+    }
+
+    let size = vmo.get_content_size()?;
+    let new_vmo = vmo.create_child(child_options, 0, size)?;
+    new_vmo.into_handle().replace_handle(rights).map(Into::into)
 }

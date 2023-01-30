@@ -35,7 +35,7 @@ use {
             simple::Simple,
         },
         execution_scope::ExecutionScope,
-        file::vmo::ReadOnlyVmoFile,
+        file::vmo::VmoFile,
         path::Path,
         remote::{remote_dir, remote_node},
         service::endpoint,
@@ -490,7 +490,12 @@ macro_rules! add_functions {
         ///
         /// Panics if any node has already been added at the given path.
         pub fn add_vmo_file_at(&mut self, path: impl Into<String>, vmo: zx::Vmo) -> &mut Self {
-            self.add_entry_at(path.into(), Arc::new(ReadOnlyVmoFile::new(vmo)))
+            self.add_entry_at(
+                path.into(),
+                VmoFile::new_from_vmo(
+                    vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
+                ),
+            )
         }
 
         fn add_entry_at(&mut self, path: String, entry: Arc<dyn DirectoryEntry>) -> &mut Self {
