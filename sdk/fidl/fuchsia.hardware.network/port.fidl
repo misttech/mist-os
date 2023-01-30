@@ -5,16 +5,20 @@ library fuchsia.hardware.network;
 
 /// The maximum number of status samples that can be buffered by a
 /// [`StatusWatcher`].
+@available(added=HEAD)
 const MAX_STATUS_BUFFER uint32 = 50;
 
 /// The maximum number of ports attached to a device at a given time.
+@available(added=HEAD)
 const MAX_PORTS uint8 = 32;
 
 /// The base identifier of a port within a device. Always less than
 /// [`MAX_PORTS`].
+@available(added=HEAD)
 alias BasePortId = uint8;
 
 /// A device port identifier.
+@available(added=HEAD)
 type PortId = struct {
     /// The base identifier for the port.
     ///
@@ -48,9 +52,11 @@ type DeviceClass = strict enum : uint16 {
 };
 
 /// Network port class.
+@available(added=HEAD)
 alias PortClass = DeviceClass;
 
 /// Port status bits, reported in [`PortStatus.flags`].
+@available(added=HEAD)
 type StatusFlags = strict bits : uint32 {
     /// Port is online, i.e., data path is open and any ongoing sessions may
     /// send and receive frames.
@@ -58,6 +64,7 @@ type StatusFlags = strict bits : uint32 {
 };
 
 /// Dynamic port information.
+@available(added=HEAD)
 type PortStatus = table {
     /// Port status flags.
     1: flags StatusFlags;
@@ -69,6 +76,7 @@ type PortStatus = table {
 };
 
 /// Provides a way to receive updates on port status changes.
+@available(added=HEAD)
 protocol StatusWatcher {
     /// `WatchStatus` blocks until the port's status has changed.
     ///
@@ -87,6 +95,7 @@ protocol StatusWatcher {
 };
 
 /// Logical port information.
+@available(added=HEAD)
 type PortInfo = table {
     /// Port's identifier. Required.
     1: id PortId;
@@ -112,6 +121,7 @@ type PortInfo = table {
 };
 
 /// A logical port belonging to a [`Device`].
+@available(added=HEAD)
 protocol Port {
     /// Obtain information about port.
     ///
@@ -160,7 +170,6 @@ protocol Port {
         port server_end:Port;
     });
     /// Retrieves a snapshot of traffic counters on this port.
-    @available(added=10)
     GetCounters() -> (table {
         /// The total number of ingress frames on this port.
         1: rx_frames uint64;
@@ -174,7 +183,6 @@ protocol Port {
     /// Grants access to [`Diagnostics`] for this port.
     ///
     /// + request `diagnostics` grants access to diagnostics information.
-    @available(added=HEAD)
     GetDiagnostics(resource struct {
         diagnostics server_end:Diagnostics;
     });

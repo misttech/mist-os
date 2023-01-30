@@ -4,6 +4,7 @@
 library fuchsia.hardware.network;
 
 /// Types of frames.
+@available(added=HEAD)
 type FrameType = strict enum : uint8 {
     ETHERNET = 0x01;
     IPV4 = 0x02;
@@ -14,9 +15,11 @@ type FrameType = strict enum : uint8 {
 ///
 /// Devices that do not perform any sort of parsing of outbound traffic should
 /// define `FRAME_FEATURES_RAW` in the [`FrameTypeSupport`] entry.
+@available(added=HEAD)
 const FRAME_FEATURES_RAW uint32 = 1;
 
 /// Ethernet frame sub-types and features.
+@available(added=HEAD)
 type EthernetFeatures = strict bits : uint32 {
     /// Device supports any type of ethernet frame.
     ///
@@ -48,6 +51,7 @@ type EthernetFeatures = strict bits : uint32 {
 /// do not perform parsing are encouraged to just use the [`FRAME_FEATURES_RAW`]
 /// bit in `features`, which informs the client that all frame features are
 /// allowed.
+@available(added=HEAD)
 type FrameTypeSupport = struct {
     /// The frame type this support entry refers to.
     type FrameType;
@@ -58,9 +62,11 @@ type FrameTypeSupport = struct {
 };
 
 /// Maximum number of chained descriptors that describe a single frame.
+@available(added=HEAD)
 const MAX_DESCRIPTOR_CHAIN uint8 = 4;
 
 /// The type of metadata information appended to a frame.
+@available(added=HEAD)
 type InfoType = strict enum : uint32 {
     /// No extra information is available.
     NO_INFO = 0x00;
@@ -70,6 +76,7 @@ type InfoType = strict enum : uint32 {
 ///
 /// Features are mapped to the `RX_ACCEL_*` bits in descriptors by the available
 /// values reported in [`Info.rx_accel`].
+@available(added=HEAD)
 type RxAcceleration = strict enum : uint8 {
     /// Inbound rx frame validated the Ethernet Frame Check Sequence.
     VALIDATED_ETHERNET_FCS = 0;
@@ -85,6 +92,7 @@ type RxAcceleration = strict enum : uint8 {
 ///
 /// Features are mapped to the `TX_ACCEL_*` bits in descriptors by the available
 /// values reported in [`Info.tx_accel`].
+@available(added=HEAD)
 type TxAcceleration = strict enum : uint8 {
     /// Request that device calculate the Ethernet Frame Check Sequence and
     /// write it in place.
@@ -104,6 +112,7 @@ type TxAcceleration = strict enum : uint8 {
 /// Flags set by a Device when handing a buffer to a client on the rx path.
 ///
 /// Set by devices on the `inbound_flags` field of an rx descriptor.
+@available(added=HEAD)
 type RxFlags = strict bits : uint32 {
     /// Acceleration flag 0.
     ///
@@ -154,6 +163,7 @@ type RxFlags = strict bits : uint32 {
 /// Flags set by a Client when handing a buffer to a client on the tx path.
 ///
 /// Set by Clients on the `inbound_flags` field of a tx descriptor.
+@available(added=HEAD)
 type TxFlags = strict bits : uint32 {
     /// Acceleration flag 0.
     ///
@@ -181,6 +191,7 @@ type TxFlags = strict bits : uint32 {
 /// Flags set by a Device when returning a tx buffer back to a client.
 ///
 /// Set by Devices on the `return_flags` field of a tx descriptor.
+@available(added=HEAD)
 type TxReturnFlags = strict bits : uint32 {
     /// Requested operation in `inbound_flags` is not supported; the frame was
     /// not sent.

@@ -9,9 +9,11 @@ using zx;
 // NOTE(brunodalbo) 4 seems a sensible number for maximum number of frame types
 // supported by a single device. Most common use cases are going to use 1 or 2
 // types (1 if device operates at L2, 2 if at L3).
+@available(added=HEAD)
 const MAX_FRAME_TYPES uint32 = 4;
 
 /// Maximum length of session label.
+@available(added=HEAD)
 const MAX_SESSION_NAME uint32 = 64;
 
 /// Maximum number of acceleration flags.
@@ -22,9 +24,11 @@ const MAX_SESSION_NAME uint32 = 64;
 /// requested (`TxFlags`) by mapping indexes in the vector of supported
 /// accelerations ([`Info.rx_accel`] and ([`Info.tx_accel`]) to bits in the
 /// respective acceleration flags bitfield.
+@available(added=HEAD)
 const MAX_ACCEL_FLAGS uint32 = 16;
 
 /// Network device information.
+@available(added=HEAD)
 type DeviceInfo = table {
     /// Minimum descriptor length, in 64-bit words. Required.
     ///
@@ -92,6 +96,7 @@ type DeviceInfo = table {
 };
 
 /// A Network Device.
+@available(added=HEAD)
 protocol Device {
     /// Obtain information about device
     ///
@@ -146,6 +151,7 @@ protocol Device {
 };
 
 /// Provides iteration over and updates for ports attached to a device.
+@available(added=HEAD)
 protocol PortWatcher {
     /// Get the next port event.
     ///
@@ -167,11 +173,13 @@ protocol PortWatcher {
 };
 
 // TODO(https://fxbug.dev/7913): Use built-in empty struct when available.
+@available(added=HEAD)
 type Empty = struct {};
 
 /// Port creation and destruction events.
 // TODO(https://fxbug.dev/66767): `PortEvent` is probably a better name here,
 // but it causes rust binding errors.
+@available(added=HEAD)
 type DevicePortEvent = strict union {
     /// Port existed when watcher was created.
     1: existing PortId;

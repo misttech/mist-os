@@ -12,6 +12,7 @@ library fuchsia.hardware.network;
 // only that there is a desire to improve the pattern. The expectation is that
 // pattern will be improved with Unified Services (https://fxbug.dev/8035) and
 // Drivers as Components (https://fxbug.dev/33183).
+@available(added=HEAD)
 protocol DeviceInstance {
     /// Connects to the [`Device`] implementation.
     ///

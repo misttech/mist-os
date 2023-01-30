@@ -31,6 +31,7 @@ using zx;
 ///    - tx buffers smaller than [`Info.min_tx_buffer_length`].
 ///    - tx buffers not respecting [`Info.min_tx_buffer_head`] or
 ///      [`Info.min_tx_buffer_tail`].
+@available(added=HEAD)
 protocol Session {
     /// Attaches the session to `port`.
     ///
@@ -71,6 +72,7 @@ protocol Session {
 };
 
 /// Additional session options.
+@available(added=HEAD)
 type SessionFlags = strict bits : uint16 {
     /// Attach as primary session.
     ///
@@ -104,6 +106,7 @@ type SessionFlags = strict bits : uint16 {
 };
 
 /// Data-plane FIFOs.
+@available(added=HEAD)
 type Fifos = resource struct {
     /// Handle for the rx FIFO.
     ///
@@ -118,6 +121,7 @@ type Fifos = resource struct {
 };
 
 /// Session configuration.
+@available(added=HEAD)
 type SessionInfo = resource table {
     /// VMO containing the descriptors. Required.
     ///
