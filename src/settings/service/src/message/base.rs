@@ -193,6 +193,7 @@ pub mod filter {
         }
 
         /// Adds an additional condition to the filter under construction.
+        #[cfg(test)]
         pub(crate) fn append(mut self, condition: Condition) -> Self {
             self.conditions.push(condition);
 

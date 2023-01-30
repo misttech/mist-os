@@ -7,7 +7,7 @@ use fuchsia_async::Task;
 use futures::StreamExt;
 
 use crate::handler::base::{Error as HandlerError, Payload, Request, Response};
-use crate::message::base::{filter, MessageEvent, MessageType, MessengerType};
+use crate::message::base::{filter, Audience, MessageEvent, MessageType, MessengerType, Signature};
 use crate::policy::policy_handler::{PolicyHandler, RequestTransform, ResponseTransform};
 use crate::policy::{
     self as policy_base, PolicyHandlerFactory, PolicyType, Request as PolicyRequest, Role,
@@ -38,48 +38,40 @@ impl PolicyProxy {
 
         let setting_type = policy_type.setting_type();
         let setting_handler_address = service::Address::Handler(setting_type);
+        let setting_handler_audience = Audience::Address(setting_handler_address);
+        let setting_handler_signature = Signature::Address(setting_handler_address);
         let policy_handler_signature = receptor.get_signature();
 
-        // The policy proxy should intercept responses authored by the
-        // setting proxy
-        let response_author_filter = filter::Builder::new(
-            filter::Condition::Author(service::message::Signature::Address(
-                setting_handler_address,
-            )),
-            filter::Conjugation::All,
-        )
-        .append(filter::Condition::Custom(Arc::new(|message| {
-            matches!(message.payload(), service::Payload::Setting(Payload::Response(Ok(Some(_)))))
-        })))
-        .append(filter::Condition::Custom(Arc::new(move |message| {
-            if let MessageType::Reply(message) = message.get_type() {
-                message.get_author() != policy_handler_signature
-            } else {
-                true
-            }
-        })))
-        .build();
+        let service_proxy_condition = filter::Condition::Custom(Arc::new(move |message| {
+            // Intercept responses authored by the setting proxy.
+            let is_setting_proxy_response = || {
+                if message.get_author() == setting_handler_signature
+                    && matches!(
+                        message.payload(),
+                        service::Payload::Setting(Payload::Response(Ok(Some(_))))
+                    )
+                {
+                    if let MessageType::Reply(message) = message.get_type() {
+                        message.get_author() != policy_handler_signature
+                    } else {
+                        true
+                    }
+                } else {
+                    false
+                }
+            };
 
-        // The policy proxy should intercept all messages where the setting
-        // proxy is the audience
-        let request_audience_filter = filter::Builder::new(
-            filter::Condition::Audience(service::message::Audience::Address(
-                setting_handler_address,
-            )),
-            filter::Conjugation::All,
-        )
-        .append(filter::Condition::Custom(Arc::new({
-            let policy_handler_signature = receptor.get_signature();
-            move |message| message.get_author() != policy_handler_signature
-        })))
-        .build();
+            // Intercept all messages where the setting proxy is the audience.
+            let is_for_setting_proxy = || {
+                matches!(message.get_type(),
+                    MessageType::Origin(target) if target == &setting_handler_audience)
+                    && message.get_author() != policy_handler_signature
+            };
 
-        let service_proxy_filter = filter::Builder::new(
-            filter::Condition::Filter(response_author_filter),
-            filter::Conjugation::Any,
-        )
-        .append(filter::Condition::Filter(request_audience_filter))
-        .build();
+            is_setting_proxy_response() || is_for_setting_proxy()
+        }));
+
+        let service_proxy_filter = filter::Builder::single(service_proxy_condition);
 
         let (_, service_proxy_receptor) =
             delegate.create(MessengerType::Broker(Some(service_proxy_filter))).await?;
