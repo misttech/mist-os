@@ -1,20 +1,20 @@
 # Bind rules tutorial
 
-This guide explains how to write bind rules for a driver so that it binds to the devices it wants. It explains how to find the bind properties and then write bind rules for it using the bind language.
+This guide explains how to write bind rules for a driver so that it binds to the devices it wants. It explains how to find the node properties and then write bind rules for it using the bind language.
 
 This guide assumes familiarity with [Driver Binding](/docs/development/drivers/concepts/device_driver_model/driver-binding.md).
 
-## Current state of bind properties
-Currently, bind properties are defined in bind libraries and C++ header files. In the past, bind properties were integer-based key-value pairs described as a C++ struct. All properties were defined in C++ header files and the bind rules were part of the driver source code.
+## Current state of node properties
+Currently, node properties are defined in bind libraries and C++ header files. In the past, node properties were integer-based key-value pairs described as a C++ struct. All properties were defined in C++ header files and the bind rules were part of the driver source code.
 
-However, the bind system was recently revamped so that bind rules are defined in a separate file using the bind language, and bind properties can support string-based keys with boolean, string, integer or enum values.
+However, the bind system was recently revamped so that bind rules are defined in a separate file using the bind language, and node properties can support string-based keys with boolean, string, integer or enum values.
 
-A migration is now in the process to move all drivers from the old bind system to the new one. Bind properties in the C++ headers are being redefined in bind libraries. For example, all the device protocol ID bind values are hardcoded in [protodefs.h](/src/lib/ddk/include/lib/ddk/protodefs.h). Each device protocol is now defined in their own bind library, which contains a definition of the protocol ID along with other bind properties associated with the protocol. The bind libraries all live in [src/devices/bind](/src/devices/bind).
+A migration is now in the process to move all drivers from the old bind system to the new one. Node properties in the C++ headers are being redefined in bind libraries. For example, all the device protocol ID bind values are hardcoded in [protodefs.h](/src/lib/ddk/include/lib/ddk/protodefs.h). Each device protocol is now defined in their own bind library, which contains a definition of the protocol ID along with other node properties associated with the protocol. The bind libraries all live in [src/devices/bind](/src/devices/bind).
 
 Until the migration is complete, both the old and new bind systems need to be supported simultaneously.
 
-### Future state of bind properties
-Once the bind migration is complete, we can stop supporting the old integer-based bind properties and remove the C++ definitions, such as [protodefs.h](/src/lib/ddk/include/lib/ddk/protodefs.h) and [binding_priv.h](/src/lib/ddk/include/lib/ddk/binding_priv.h). All properties will be defined in bind libraries and the keys will be entirely string-based.
+### Future state of node properties
+Once the bind migration is complete, we can stop supporting the old integer-based node properties and remove the C++ definitions, such as [protodefs.h](/src/lib/ddk/include/lib/ddk/protodefs.h) and [binding_priv.h](/src/lib/ddk/include/lib/ddk/binding_priv.h). All properties will be defined in bind libraries and the keys will be entirely string-based.
 
 Existing properties can be updated so they utilize the features of the new system. For example, the `BIND_COMPOSITE` property is a flag that is only set for composite devices. However, since the old system only supports integer values, an integer instead of a boolean represents the property value. With the old bind system removed, the property value can be changed to a boolean.
 
@@ -30,7 +30,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_VID {
 
 With the new bind system, VIDs can be potentially represented by string values or even enums.
 
-## Looking up bind properties
+## Looking up node properties
 
 ### Using ffx driver list-devices
 The command `ffx driver list-devices -v` prints the properties of every device in the tree in the format:
@@ -51,7 +51,7 @@ Driver   : None
 
 When adding a child device, drivers can provide properties that the bind rules match to. As such, you can find the properties to bind to through the driver source code.
 
-In DFv1, the bind properties in the source code are represented by “Properties” and “String Properties”. Properties contain integer-based keys and values. String properties however, contain string-based keys and values that can be integer, booleans, strings, or enums.
+In DFv1, the node properties in the source code are represented by “Properties” and “String Properties”. Properties contain integer-based keys and values. String properties however, contain string-based keys and values that can be integer, booleans, strings, or enums.
 
 Here is a snippet where a driver adds a device with a `BIND_PROTOCOL` property and “ENABLE_TEST” string property.
 
@@ -77,7 +77,7 @@ args.str_prop_count = std::size(str_props);
 device_add(parent, &args, &dev);
 ```
 
-In DFv2, bind properties are represented by a `NodeProperty` struct in the [fuchsia.driver.framework FIDL library](/sdk/fidl/fuchsia.driver.framework/topology.fidl):
+In DFv2, node properties are represented by a `NodeProperty` struct in the [fuchsia.driver.framework FIDL library](/sdk/fidl/fuchsia.driver.framework/topology.fidl):
 
 ```
 auto properties = fidl::VectorView<fdf::wire::NodeProperty>(arena, 2);
@@ -97,7 +97,7 @@ As we migrate from drivers from the old bind system to the new, we redefine the 
 Any new properties are expected to be defined in the bind libraries.
 
 ### Properties from the old bind system
-Most of the old device property keys and values are defined in [binding_priv.h](/src/lib/ddk/include/lib/ddk/binding_priv.h) and [protodefs.h](/src/lib/ddk/include/lib/ddk/protodefs.h).
+Most of the old node property keys and values are defined in [binding_priv.h](/src/lib/ddk/include/lib/ddk/binding_priv.h) and [protodefs.h](/src/lib/ddk/include/lib/ddk/protodefs.h).
 
 `binding_priv.h` contains the hardcoded property keys. Each property key is assigned a unique integer value. In the new bind system, these keys are redefined with a `fuchsia.BIND_` prefix. For instance, `BIND_PROTOCOL` becomes `fuchsia.BIND_PROTOCOL` and `BIND_COMPOSITE` becomes `fuchsia.BIND_COMPOSITE`.
 
@@ -186,7 +186,7 @@ fuchsia.BIND_PCI_VID == 0x1af4;
 However, it’s preferable to define a value in the bind library.
 
 ### Composite bind rules
-The same process is used for composite bind rules. For each node you want to write bind rules for, you can print the bind properties and write bind rules for them.
+The same process is used for composite bind rules. For each node you want to write bind rules for, you can print the node properties and write bind rules for them.
 
 Say you want to write composite bind rules that contain a node that binds to the above example and another node that binds to the following:
 

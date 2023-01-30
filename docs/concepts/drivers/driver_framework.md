@@ -97,7 +97,7 @@ The driver index tracks the following types of drivers in a Fuchsia system:
 When the driver manager needs to find a driver for an unbound node in the
 [node topology][node-topology], it uses the [`MatchDriver`][fidl-matchdriver]
 FIDL protocol to send a match request to the driver index. The driver index then
-evaluates the node’s [binding properties][node-properties] (which is included in
+evaluates the [node properties][node-properties] (which is included in
 the match request) against the bind rules of every driver that is being tracked.
 When there is a match, the driver index returns the matched driver’s metadata to
 the driver manager. But if there is no match, the driver index responds with

@@ -7,9 +7,9 @@ system. Once bound to a device node, the driver can start providing services for
 the device that the node represents.
 
 The framework matches drivers to device nodes by correlating the
-[binding properties][concepts-node-properties] of each node with the set of bind
+[node properties][concepts-node-properties] of each node with the set of bind
 rules provided by the driver. Bind rules are a set of logic rules that describe
-which device properties the driver supports.
+which node properties the driver supports.
 
 In this section, you'll create a skeleton driver that binds to the `edu` device
 and implements the bare driver framework hooks.
@@ -81,7 +81,7 @@ file to compile the component manifest:
 
 The bind rules describe which device nodes this driver can support. These are
 listed as a series of condition statements that reference the key/value pairs in
-the device node's binding properties. For a driver to be considered a match, all
+the device node's properties. For a driver to be considered a match, all
 rules must evaluate to true for the given device node.
 
 Create `qemu_edu/drivers/qemu_edu.bind` and add the following bind rules to

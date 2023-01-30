@@ -138,12 +138,12 @@ zx_device_prop_t device_props[] = {
 
 For now, binding variables and macros are defined in
 [lib/ddk/binding.h](/src/lib/ddk/include/lib/ddk/binding.h). In the near future,
-all bind properties will be defined by bind libraries like the `fuchsia.pci`
+all node properties will be defined by bind libraries like the `fuchsia.pci`
 library imported above. If you are introducing a new device class, you may need
-to introduce new bind properties to the binding header as well as the
+to introduce new node properties to the binding header as well as the
 [bind libraries](/src/devices/bind/).
 
-Bind properties are 32-bit values. If your variable value requires greater than
+Node properties are 32-bit values. If your variable value requires greater than
 a 32-bit value, split them into multiple 32-bit variables. An example is ACPI
 HID values, which are 8 characters (64-bits) long. It is split into
 `BIND_ACPI_HID_0_3` and `BIND_ACPI_HID_4_7`. Once the migration to bind

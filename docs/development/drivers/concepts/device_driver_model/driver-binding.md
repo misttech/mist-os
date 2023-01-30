@@ -26,7 +26,7 @@ property keys in bind libraries (see below). Instead, the keys from the old driv
 ([lib/ddk/binding.h](/src/lib/ddk/include/lib/ddk/binding.h)) are available to be extended.
 These keys are hardcoded into the bind compiler and are available under the `fuchsia` namespace.
 For example, the PCI vendor ID key is `fuchsia.BIND_PCI_VID`. Eventually the hardcoded keys will be
-removed from this namespace and all bind property keys will be defined in bind libraries.
+removed from this namespace and all node property keys will be defined in bind libraries.
 
 
 ## The compiler

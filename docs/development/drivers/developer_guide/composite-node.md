@@ -50,7 +50,7 @@ becomes a parent of the composite.
 
 The bind rules for node groups consist of a list of accepted and rejected
 property values. To match to the bind rules, the node properties must contain
-all the accepted bind property values and not any of the rejected ones.
+all the accepted node property values and not any of the rejected ones.
 
 For instance, if a node group node contains the bind rules:
 
@@ -516,7 +516,7 @@ for more information.
 ### Matching process
 
 The matching process is done by applying a composite driver's bind rules to the
-node representations' bind properties. A match is successful if the following is
+node representations' properties. A match is successful if the following is
 fulfilled:
 
 *   All node representations must match with a node in the composite bind rules

@@ -8,7 +8,7 @@ In Fuchsia driver development, bind libraries make the following tasks easy to
 coordinate:
 
 - Write [bind rules][bind-rules] for a driver.
-- Assign [binding properties][binding-properties] to a [child node][nodes]
+- Assign [node properties][node-properties] to a [child node][nodes]
   in a parent driver.
 
 The Fuchsia SDK includes a set of bind libraries you can use to write bind rules
@@ -41,17 +41,17 @@ ACPI device, whose target node is `bindlib-child`.
 In this scenario, the following events take place:
 
 1. [Create a new bind library](#create-a-new-bind-library) - A new bind library is
-   created to define binding properties for the new ACPI device.
+   created to define node properties for the new ACPI device.
 
 1. This new custom bind library is then shared between the two groups:
 
    * [Update the parent driver’s child node](#update-the-parent-driver) -
-     Developers that manage `parent-driver` assign new binding properties
+     Developers that manage `parent-driver` assign new node properties
      to the child node `bindlib-child`.
 
    * [Update the child driver’s bind rules](#update-the-child-driver) -
      Developers that work on `child-driver` write bind rules using the new
-     binding properties.
+     node properties.
 
 ## Create a new bind library {:#create-a-new-bind-library}
 
@@ -65,7 +65,7 @@ To create a new bind library, the steps are:
 
 ### 1. Write a new bind library {:#write-a-new-bind-library}
 
-Write a bind library that defines a new set of custom binding properties.
+Write a bind library that defines a new set of custom node properties.
 
 Note: For more details on bind libraries, see this [Bind libraries][bind-library]
 section under the Open source project tab. However, that page may contain information
@@ -137,7 +137,7 @@ static constexpr uint32_t BIND_PCI_VID_GIZMOTRONICS = 3227993;
 #endif  // BIND_FUCHSIA_EXAMPLES_GIZMO_BIND_BINDLIB_
 ```
 
-Developers can now use the binding properties in this C++ header file for the following tasks:
+Developers can now use the node properties in this C++ header file for the following tasks:
 
 - [Update the parent driver’s child node](#update-the-parent-driver).
 - [Update the child driver’s bind rules](#update-the-child-driver).
@@ -146,13 +146,13 @@ Developers can now use the binding properties in this C++ header file for the fo
 
 In Fuchsia, some drivers create child nodes that enable other drivers to bind to. Drivers that
 create child nodes are referred to as parent drivers. With a new bind library, the main task is
-to update the parent driver’s child node so that it receives binding properties from the new
+to update the parent driver’s child node so that it receives node properties from the new
 bind library.
 
 To update the parent driver’s child node, the steps are:
 
 1. [Add the new bind library in the build file](#add-new-bind-library-in-the-parent-drivers-build-file).
-1. [Assign binding properties to the child node](#assign-binding-properties-to-the-child-node).
+1. [Assign node properties to the child node](#assign-node-properties-to-the-child-node).
 
 ### 1. Add the new bind library in the build file {:#add-new-bind-library-in-the-parent-drivers-build-file}
 
@@ -168,14 +168,14 @@ The parent driver’s [`BUILD.bazel`][build-bazel-parent-driver] file below show
 Notice that the dependency is prefixed with `//src/bind_library/lib` (instead of `@fuchsia_sdk//`),
 which indicates that it is from a local directory in the sample.
 
-### 2. Assign binding properties to the child node {:#assign-binding-properties-to-the-child-node}
+### 2. Assign node properties to the child node {:#assign-node-properties-to-the-child-node}
 
-Update the source code of the parent driver so that certain binding properties from the new bind
+Update the source code of the parent driver so that certain node properties from the new bind
 library are passed down to the child node.
 
 With the [auto-generated C++ header](#create-a-build-file-for-the-new-bind-library) file from the
 new bind library included in [`parent-driver.cc`][parent-driver-cc], this driver can now read
-binding properties from the new bind library:
+node properties from the new bind library:
 
 ```cpp {:.devsite-disable-click-to-copy}
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/bind_library/parent/parent-driver.cc" region_tag="bind_imports" adjust_indentation="auto" %}
@@ -187,20 +187,20 @@ binding properties from the new bind library:
 
 Notice that some string variables from the `bind_fuchsia_examples_gizmo_bind` namespace
 (see the [auto-generated C++ header](#create-a-build-file-for-the-new-bind-library) file) are
-used to initialize the child node's binding properties.
+used to initialize the child node's node properties.
 
 ## Update the child driver’s bind rules {:#update-the-child-driver}
 
 A driver that binds to a child node of an existing driver is referred to as a child driver.
 With a new bind library, the main task is to update the child driver’s bind rules to make
-use of binding properties from the new bind library. The underlying goal is to write more
+use of node properties from the new bind library. The underlying goal is to write more
 precise bind rules for the driver so that it is guaranteed to match the target node in a
 Fuchsia system.
 
 To update the child driver’s bind rules, the steps are:
 
 1. [Add the new bind library in the build file](#add-new-bind-library-in-the-child-drivers-build-file).
-1. [Write bind rules using new binding properties](#write-bind-rules-using-new-binding-properties).
+1. [Write bind rules using new node properties](#write-bind-rules-using-new-node-properties).
 
 ### 1. Add the new bind library in the build file {:#add-new-bind-library-in-the-child-drivers-build-file}
 
@@ -217,9 +217,9 @@ The child driver’s [`BUILD.bazel`][build-bazel-child-driver] file below shows 
 Notice that the dependency is prefixed with `//src/bind_library/lib` (instead of `@fuchsia_sdk//`),
 which indicates that it is from a local directory in the sample.
 
-### 2. Write bind rules using new binding properties {:#write-bind-rules-using-new-binding-properties}
+### 2. Write bind rules using new node properties {:#write-bind-rules-using-new-node-properties}
 
-Write (or update) the child driver’s bind rules to use binding properties from the new bind library.
+Write (or update) the child driver’s bind rules to use node properties from the new bind library.
 
 The child driver’s bind rules ([`child-driver.bind`][child-driver-bind]) show that the `ModelName`
 and `GizmoType` properties from the custom bind library `fuchsia.example.gizmo.bind` are used in
@@ -255,7 +255,7 @@ However, the differences are as follows:
 [bazel]: https://bazel.build/
 [sdk-driver-sample-repo]: https://fuchsia.googlesource.com/sdk-samples/drivers/+/refs/heads/main/src/bind_library/
 [bind-rules]: /docs/concepts/drivers/driver_binding.md
-[binding-properties]: /docs/concepts/drivers/drivers_and_nodes.md#node_properties
+[node-properties]: /docs/concepts/drivers/drivers_and_nodes.md#node_properties
 [nodes]: /docs/concepts/drivers/drivers_and_nodes.md
 [bind-library]: /docs/development/drivers/concepts/device_driver_model/driver-binding.md#bind-libraries
 [test-library-bind]: https://fuchsia.googlesource.com/sdk-samples/drivers/+/refs/heads/main/src/bind_library/lib/testlibrary.bind

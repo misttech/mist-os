@@ -82,7 +82,7 @@ class Device : public fidl::WireServer<fidl_examples_echo::Echo> {
     }
 
     // We declare our outgoing protocols here. These will be utilize to
-    // help the framework populate device properties which can be used for
+    // help the framework populate node properties which can be used for
     // binding.
     std::array offers = {
         fidl::DiscoverableProtocolName<fidl_examples_echo::Echo>,
@@ -131,7 +131,7 @@ class Device : public fidl::WireServer<fidl_examples_echo::Echo> {
 ### Binding
 
 The first important thing to discuss is how the child driver will bind. It can
-bind due to any number of device properties, but if you wish to bind based
+bind due to any number of node properties, but if you wish to bind based
 solely on the FIDL protocol the parent exports, you will need the bind library
 that the build automatically generates for you from the FIDL library
 (For more information, see [Generated bind libraries](#generated-bind-libraries)).

@@ -162,12 +162,12 @@ To register a component as a driver in your Fuchsia system, do the following:
 At last, start examining the bind rules of your driver.
 
 A driver’s bind rules determine which nodes it can bind to in a Fuchsia system. The driver
-framework loads drivers only when they match the bind properties of specific nodes in the system.
+framework loads drivers only when they match the node properties of specific nodes in the system.
 If your driver is registered in the system, but is not loaded (therefore is not running), then
 check the driver’s bind rules and verify that they are correctly written to match the bind
 properties of the target node in your Fuchsia system.
 
-To view all nodes and their bind properties in your Fuchsia system, run the following command:
+To view all nodes and their node properties in your Fuchsia system, run the following command:
 
 ```posix-terminal
 ffx driver list-devices -v
@@ -206,7 +206,7 @@ Driver : None
 ```
 
 When debugging bind rules, a recommended practice is to visually examine the output from this
-command to ensure that your Fuchsia system contains nodes with the right bind properties. Also,
+command to ensure that your Fuchsia system contains nodes with the right node properties. Also,
 keep in mind that a node is allowed to have only one driver bound to it. So you want to make sure
 that the target node in your Fuchsia system does not have a driver already bound to it.
 
@@ -235,9 +235,9 @@ node "acpi" {
 ```
 
 For the ACPI node, visually verify that the ACPI values specified in the bind rules match the
-values the ACPI node’s bind properties (shown in the output of the `ffx` command above). And for
+values the ACPI node properties (shown in the output of the `ffx` command above). And for
 the PCI node, examine the [PCI bind library][fuchsia-pci-bind] directly to check if the values
-defined in the library match the values of the PCI node's bind properties. (For more information
+defined in the library match the values of the PCI node's properties. (For more information
 on these two approaches, see [Write bind rules for a driver][write-bind-rules].)
 
 ## Appendices

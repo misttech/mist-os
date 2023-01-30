@@ -4,13 +4,13 @@ This guide walks through the steps for writing bind rules using the
 [`i2c_temperature`][i2c-temperature-sample-driver] sample driver.
 
 For a driver to bind to a [node][drivers-and-nodes] (which represents a hardware
-or virtual device), the driver’s bind rules must match the bind properties of the
+or virtual device), the driver’s bind rules must match the node properties of the
 node. In this guide, we’ll write bind rules for the `i2c_temperature` sample
-driver so that they match the bind properties of the `i2c-child` node.
+driver so that they match the node properties of the `i2c-child` node.
 
 The `i2c_controller` driver creates a child node named `i2c-child` for testing
 the `i2c_temperature` sample driver. We can use this `i2c_controller` driver to
-identify the bind properties of the `i2c-child` node and write the matching
+identify the node properties of the `i2c-child` node and write the matching
 bind rules for `i2c_temperature`.
 
 Before you begin, writing bind rules requires familiarity with the concepts
@@ -18,16 +18,16 @@ in [Driver binding][driver-binding].
 
 The steps are:
 
-1.  [Identify the bind properties](#identify-bind-properties).
+1.  [Identify the node properties](#identify-bind-properties).
 1.  [Write the bind rules](#write-bind-rules).
 1.  [Add a Bazel build target for the bind rules](#add-a-bazel-build-target).
 
-## 1. Identify the bind properties {:#identify-bind-properties}
+## 1. Identify the node properties {:#identify-bind-properties}
 
-You can identify the bind properties of your target node in one of the following ways:
+You can identify the node properties of your target node in one of the following ways:
 
 *   [Use the ffx driver list-devices command](#use-ffx-driver-list-devices)
-*   [Look up the bind properties in the driver source code](#look-up-the-driver-source-code)
+*   [Look up the node properties in the driver source code](#look-up-the-driver-source-code)
 
 ### Use the ffx driver list-devices command {:#use-ffx-driver-list-devices}
 
@@ -49,21 +49,21 @@ Driver   : None
 [ 3/  3] : Key "fuchsia.driver.framework.dfv2" Value true
 ```
 
-The output above shows that the `i2c-child` node has the following bind properties:
+The output above shows that the `i2c-child` node has the following node properties:
 
 *   Property key `fuchsia.hardware.i2c.Service` with an enum value of
     `fuchsia.hardware.i2c.Service.ZirconTransport`.
 *   Property key `fuchsia.BIND_I2C_ADDRESS` with an integer value of `0xFF`.
 
-### Look up the bind properties in the driver source code {#look-up-the-driver-source-code}
+### Look up the node properties in the driver source code {#look-up-the-driver-source-code}
 
-When adding a child node, drivers can provide bind properties to the node.
+When adding a child node, drivers can provide node properties to the node.
 Reviewing the source code of the driver that creates your target node as a child
-node helps you identify the bind properties to include in your bind rules.
+node helps you identify the node properties to include in your bind rules.
 
 The `i2c_controller` driver creates a child node named `i2c-child` to which the
 `i2c_temperature` sample driver binds. Examine the source code of the
-`i2c_controller` driver to identify which bind properties are passed to this
+`i2c_controller` driver to identify which node properties are passed to this
 child node:
 
 ```cpp {:.devsite-disable-click-to-copy}
@@ -83,11 +83,11 @@ properties to a child node, see
 
 ## 2. Write the bind rules {:#write-bind-rules}
 
-Once you know the bind properties you want to match, you can use the bind
+Once you know the node properties you want to match, you can use the bind
 language to write the bind rules for your driver.
 
 In the previous section, we’ve identified that the `i2c-child` node has the
-following bind properties:
+following node properties:
 
 *   Property key `fuchsia.hardware.i2c` with an enum value of
     `fuchsia.hardware.i2c.Service.ZirconTransport`.
@@ -100,7 +100,7 @@ bind rules:
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/i2c_temperature/driver/i2c_temperature.bind" region_tag="bind_rules" adjust_indentation="auto" %}
 ```
 
-Integer-based bind property keys that start with `BIND_` (defined in
+Integer-based node property keys that start with `BIND_` (defined in
 [`binding_priv.h`][binding-prev-h] in the Fuchsia source tree) are old property
 keys currently hardcoded in the bind compiler. See the following definition for
 `BIND_I2C_ADDRESS` from `binding_priv.h`:
@@ -127,7 +127,7 @@ the `fuchsia.hardware.i2c` library, so the build target includes the bind librar
 as a build dependency.
 
 To determine which bind libraries are used in the bind rules, you can examine
-the driver source code. In the bind properties of the `i2c-child` node, the
+the driver source code. In the node properties of the `i2c-child` node, the
 first property key `fuchsia.hardware.i2c.Service` is from a generated bind
 library from the FIDL protocol:
 
@@ -135,7 +135,7 @@ library from the FIDL protocol:
 {% includecode gerrit_repo="fuchsia/sdk-samples/drivers" gerrit_path="src/i2c_temperature/controller/i2c_controller.cc" region_tag="add_child_properties" adjust_indentation="auto" highlight="3,4" %}
 ```
 
-The prefix `fuchsia_hardware_i2c` implies that this bind property’s key and
+The prefix `fuchsia_hardware_i2c` implies that this node property’s key and
 value are defined in the following header:
 
 ```cpp {:.devsite-disable-click-to-copy}
@@ -157,7 +157,7 @@ Note: For more information on the generated bind library, see
 
 ### NodeProperty and NodeAddArgs structs {:#nodeproperty-and-nodeaddargs-structs}
 
-Bind properties are represented by the `NodeProperty` struct in the
+Node properties are represented by the `NodeProperty` struct in the
 `fuchsia.driver.framework` FIDL library:
 
 ```fidl {:.devsite-disable-click-to-copy}
@@ -172,7 +172,7 @@ type NodeProperty = table {
 };
 ```
 
-Then the bind properties are passed to a child node using the `NodeAddArgs`
+Then the node properties are passed to a child node using the `NodeAddArgs`
 struct:
 
 ```fidl {:.devsite-disable-click-to-copy}

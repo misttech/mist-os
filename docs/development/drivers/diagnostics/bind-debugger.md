@@ -12,7 +12,7 @@ You can run the debugger in the following ways:
  - **[As a host tool.](#running-the-debugger-host)** You provide the bind rules
    source file and a file listing the properties of the device. This is useful
    during bind rules development for testing the outcome of the rules against
-   different combinations of device properties.
+   different combinations of node properties.
  - **[On the target device.](#running-the-debugger-target)** You specify the driver
    path and the device path within the system. This is useful for figuring out why
    a driver did or did not bind to a particular device.

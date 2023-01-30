@@ -12,11 +12,11 @@ providing services for the device that the node represents. For example, a USB
 keyboard driver may bind to a node representing a keyboard device.
 
 To identify which drivers can bind to which nodes, each driver has
-bind rules and each node has a set of [binding properties][node-properties].
+bind rules and each node has a set of [node properties][node-properties].
 A driver’s bind rules describe the qualification of a node that the driver can
 serve effectively. When the driver framework attempts to match a driver to
-a node, each unbound node’s binding properties are compared to the driver’s
-bind rules. If a node’s binding properties satisfy the driver’s bind rules,
+a node, each unbound node’s properties are compared to the driver’s
+bind rules. If the node properties satisfy the driver’s bind rules,
 the driver framework allows the driver to bind to the node.
 
 ## Binding sequence
@@ -31,9 +31,9 @@ The following events take place during the initial booting of a Fuchsia system:
 1. (Starting with the root node and its driver) A driver requests that the
    driver manager creates a new child node.
 2. The driver manager asks the driver index to find out which driver
-   best matches this node's binding properties:
+   best matches this node's properties:
     1. The driver index compares each known driver's bind rules against the
-       node's binding properties.
+       node's properties.
     2. The driver index returns the matched driver’s URL to the driver manager.
 3. The driver manager binds the driver to the node:
     1. The driver manager creates (or assigns) a driver host for the driver.
