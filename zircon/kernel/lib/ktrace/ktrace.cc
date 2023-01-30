@@ -233,7 +233,9 @@ zx_status_t KTraceState::RewindLocked() {
     return ZX_ERR_BAD_STATE;
   }
 
-  DEBUG_ASSERT(grpmask_and_inflight_writes_.load(ktl::memory_order_acquire) == 0);
+  [[maybe_unused]] uint64_t observed;
+  DEBUG_ASSERT_MSG((observed = grpmask_and_inflight_writes_.load(ktl::memory_order_acquire)) == 0,
+                   "0x%lx", observed);
 
   {
     Guard<SpinLock, IrqSave> write_guard{&write_lock_};
@@ -285,7 +287,9 @@ ssize_t KTraceState::ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len) 
 
   // If we are in the lock_, and we are stopped, then the group mask
   // must be 0, and we must have synchronized with any in-flight writes by now.
-  DEBUG_ASSERT(grpmask_and_inflight_writes_.load(ktl::memory_order_acquire) == 0);
+  [[maybe_unused]] uint64_t observed;
+  DEBUG_ASSERT_MSG((observed = grpmask_and_inflight_writes_.load(ktl::memory_order_acquire)) == 0,
+                   "0x%lx", observed);
 
   // Grab the write lock, then figure out what we need to copy.  We need to make
   // sure to drop the lock before calling CopyToUser (holding spinlocks while
