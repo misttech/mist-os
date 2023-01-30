@@ -1356,6 +1356,15 @@ void DispatcherCoordinator::WaitUntilDispatchersDestroyed() {
 }
 
 // static
+bool DispatcherCoordinator::HasManagedThreads() {
+  auto& coordinator = GetDispatcherCoordinator();
+  {
+    fbl::AutoLock lock(&coordinator.lock_);
+    return coordinator.number_threads_ > 0;
+  }
+}
+
+// static
 zx_status_t DispatcherCoordinator::RunUntilIdle() {
   auto& coordinator = GetDispatcherCoordinator();
   {

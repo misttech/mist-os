@@ -12,7 +12,7 @@ source_set("runtime") {
 
   public_deps = [
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/driver/runtime:testing",
+    "//sdk/lib/driver/runtime:testing_cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/sync:sync-cpp",
   ]

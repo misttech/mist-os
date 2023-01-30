@@ -561,6 +561,7 @@ class DispatcherCoordinator {
   static void DestroyAllDispatchers();
   static void WaitUntilDispatchersIdle();
   static void WaitUntilDispatchersDestroyed();
+  static bool HasManagedThreads();
   static zx_status_t RunUntilIdle();
   static zx_status_t ShutdownDispatchersAsync(const void* driver,
                                               fdf_env_driver_shutdown_observer_t* observer);

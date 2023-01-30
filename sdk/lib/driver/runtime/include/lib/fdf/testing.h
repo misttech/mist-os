@@ -41,6 +41,14 @@ void fdf_testing_wait_until_all_dispatchers_idle(void);
 // such as from tasks or ChannelRead callbacks.
 void fdf_testing_wait_until_all_dispatchers_destroyed(void);
 
+// Sets the default driver dispatcher to be returned when the current thread does not have a driver
+// associated with it. This is useful for tests that want to attach a dispatcher to their main
+// test thread, so that they can use a synchronization_checker without posting tasks manually.
+// The dispatcher input should have been created using
+// |fdf_env_dispatcher_create_with_owner|.
+// This will return ZX_ERR_BAD_STATE if the driver runtime is managing any threads.
+zx_status_t fdf_testing_set_default_dispatcher(fdf_dispatcher_t* dispatcher);
+
 __END_CDECLS
 
 #endif  // LIB_DRIVER_RUNTIME_INCLUDE_LIB_FDF_TESTING_H_

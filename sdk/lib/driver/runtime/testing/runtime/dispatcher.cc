@@ -4,6 +4,10 @@
 
 #include "sdk/lib/driver/runtime/testing/runtime/dispatcher.h"
 
+#include <lib/async/cpp/task.h>
+#include <lib/fdf/cpp/env.h>
+#include <lib/fdf/testing.h>
+
 namespace fdf {
 
 void RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task) {
@@ -16,22 +20,30 @@ void RunOnDispatcherSync(async_dispatcher_t* dispatcher, fit::closure task) {
   task_completion.Wait();
 }
 
-TestSynchronizedDispatcher::~TestSynchronizedDispatcher() {}
-
 zx::result<> TestSynchronizedDispatcher::Start(fdf::SynchronizedDispatcher::Options options,
                                                std::string_view dispatcher_name) {
-  fdf_testing_push_driver(this);
-  zx::result dispatcher = fdf::SynchronizedDispatcher::Create(
-      options, dispatcher_name,
+  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      this, options, dispatcher_name,
       [this](fdf_dispatcher_t* dispatcher) { dispatcher_shutdown_.Signal(); });
   if (dispatcher.is_error()) {
-    fdf_testing_pop_driver();
     return dispatcher.take_error();
   }
   dispatcher_ = std::move(dispatcher.value());
-
-  fdf_testing_pop_driver();
   return zx::ok();
+}
+
+zx::result<> TestSynchronizedDispatcher::StartAsDefault(
+    fdf::SynchronizedDispatcher::Options options, std::string_view dispatcher_name) {
+  bool allow_sync_calls = options.value & FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS;
+  if (allow_sync_calls) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  if (zx::result result = Start(options, dispatcher_name); result.is_error()) {
+    return result.take_error();
+  }
+
+  return zx::make_result(fdf_testing_set_default_dispatcher(dispatcher_.get()));
 }
 
 zx::result<> TestSynchronizedDispatcher::StopSync() {

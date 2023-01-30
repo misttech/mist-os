@@ -114,3 +114,13 @@ source_set("testing") {
   ]
   public_configs = [ ":include" ]
 }
+
+source_set("testing_cpp") {
+  public_deps = [
+    ":driver_runtime_cpp",
+    ":driver_runtime_env_cpp",
+    ":testing",
+    "//zircon/system/ulib/zx",
+  ]
+  public_configs = [ ":include" ]
+}

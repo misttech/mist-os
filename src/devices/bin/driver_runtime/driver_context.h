@@ -28,6 +28,10 @@ const void* GetCurrentDriver();
 // or null if the stack is empty.
 driver_runtime::Dispatcher* GetCurrentDispatcher();
 
+// Sets the default dispatcher to return in GetCurrentDispatcher
+// when the driver context stack is empty. Only meant for testing.
+void SetDefaultTestingDispatcher(driver_runtime::Dispatcher* dispatcher);
+
 // Returns whether |driver| is in the thread's current call stack.
 bool IsDriverInCallStack(const void* driver);
 

@@ -13,7 +13,6 @@
 #include <fidl/fuchsia.scheduler/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/async-testing/test_loop.h>
 #include <lib/driver/compat/cpp/symbols.h>
 #include <lib/fdf/testing.h>
 #include <lib/fdio/directory.h>
@@ -350,7 +349,7 @@ class DriverTest : public testing::Test {
   TestFile& compat_file() { return compat_file_; }
 
   void SetUp() override {
-    ASSERT_EQ(ZX_OK, driver_dispatcher_.Start({}, "driver-test-loop").status_value());
+    ASSERT_EQ(ZX_OK, driver_dispatcher_.StartAsDefault({}, "driver-test-loop").status_value());
 
     fidl_loop_.StartThread("fidl-server-thread");
 
@@ -367,8 +366,9 @@ class DriverTest : public testing::Test {
     bool did_shutdown = false;
     vfs_->Shutdown([&did_shutdown](auto status) { did_shutdown = true; });
     while (!did_shutdown) {
-      test_loop_.RunUntilIdle();
+      fdf_testing_run_until_idle();
     }
+
     ASSERT_TRUE(did_shutdown);
   }
 
@@ -496,15 +496,11 @@ class DriverTest : public testing::Test {
 
     // Start driver.
     std::unique_ptr<compat::Driver> compat_driver;
-
-    async::PostTask(driver_dispatcher_.dispatcher(), [&] {
-      auto result = compat::DriverFactory::CreateDriver(
-          std::move(start_args), driver_dispatcher_.driver_dispatcher().borrow());
-      EXPECT_EQ(ZX_OK, result.status_value());
-      auto* driver = result.value().release();
-      compat_driver.reset(static_cast<compat::Driver*>(driver));
-    });
-    RunUntilDispatchersIdle();
+    auto result = compat::DriverFactory::CreateDriver(
+        std::move(start_args), driver_dispatcher_.driver_dispatcher().borrow());
+    EXPECT_EQ(ZX_OK, result.status_value());
+    auto* driver = result.value().release();
+    compat_driver.reset(static_cast<compat::Driver*>(driver));
     return compat_driver;
   }
 
@@ -518,32 +514,20 @@ class DriverTest : public testing::Test {
             },
     };
 
-    async::PostTask(driver_dispatcher_.dispatcher(), [&driver, &stop_context] {
-      fdf::PrepareStopCompleter completer(&stop_context);
-      driver->PrepareStop(std::move(completer));
-    });
+    fdf::PrepareStopCompleter completer(&stop_context);
+    driver->PrepareStop(std::move(completer));
 
     // Keep running the test loop while we're waiting for a signal on the dispatcher thread.
     // The dispatcher thread needs to interact with our Node servers, which run on the test loop.
     while (!completion.signaled()) {
-      RunUntilDispatchersIdle();
+      fdf_testing_run_until_idle();
     }
 
-    async::PostTask(driver_dispatcher_.dispatcher(),
-                    [driver = std::move(driver)]() mutable { driver.reset(); });
-    fdf_testing_run_until_idle();
+    driver.reset();
 
     driver_dispatcher_.StopAsync();
     fdf_testing_run_until_idle();
     ASSERT_EQ(ZX_OK, driver_dispatcher_.WaitForStop().status_value());
-  }
-
-  void RunUntilDispatchersIdle() {
-    bool ran = false;
-    do {
-      fdf_testing_run_until_idle();
-      ran = test_loop_.RunUntilIdle();
-    } while (ran);
   }
 
   void AssertDevfsPaths(std::unordered_set<std::string> expected) const {
@@ -552,15 +536,14 @@ class DriverTest : public testing::Test {
 
   void WaitForChildDeviceAdded() {
     while (node().children().empty()) {
-      RunUntilDispatchersIdle();
+      fdf_testing_run_until_idle();
     }
     EXPECT_FALSE(node().children().empty());
   }
 
-  async_dispatcher_t* dispatcher() { return test_loop_.dispatcher(); }
-
   TestProfileProvider profile_provider_;
-  fdf::TestSynchronizedDispatcher driver_dispatcher_;
+
+  async_dispatcher_t* dispatcher() { return driver_dispatcher_.dispatcher(); }
 
  private:
   std::optional<TestNode> node_;
@@ -574,15 +557,11 @@ class DriverTest : public testing::Test {
   TestDirectory pkg_directory_;
   TestExporter exporter_;
   std::optional<fs::ManagedVfs> vfs_;
+  fdf::TestSynchronizedDispatcher driver_dispatcher_;
 
   // This loop is for FIDL servers that get called in a sync fashion from
   // the driver.
   async::Loop fidl_loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  // TODO(fxbug.dev/119188): Use the fdf dispatcher and remove this loop.
-  // This loop exists because there's currently no way to tell the driver framework that
-  // the test exists in the dispatcher environment. That means that we can't create FIDL
-  // objects on the dispatcher loop or the FIDL synchronization checker becomes unhappy.
-  async::TestLoop test_loop_;
 };
 
 TEST_F(DriverTest, Start) {
@@ -638,7 +617,7 @@ TEST_F(DriverTest, Start_MissingBindAndCreate) {
 
   // We will know the driver has finished starting when it closes its node in error.
   while (node().HasNode()) {
-    RunUntilDispatchersIdle();
+    fdf_testing_run_until_idle();
   }
   EXPECT_TRUE(node().children().empty());
 
@@ -697,9 +676,6 @@ TEST_F(DriverTest, DISABLED_Start_RootResourceIsConstant) {
 
   zx_protocol_device_t ops{};
   auto driver = StartDriver("/pkg/driver/v1_device_add_null_test.so", &ops);
-
-  RunUntilDispatchersIdle();
-
   zx_handle_t resource2 = get_root_resource();
 
   // Check that the root resource's value did not change.
@@ -713,7 +689,6 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
   auto driver = StartDriver("/pkg/driver/v1_test.so", &ops);
 
   // Verify that v1_test.so has not added a child device.
-  RunUntilDispatchersIdle();
   EXPECT_TRUE(node().children().empty());
 
   // Verify that v1_test.so has not set a context.
@@ -728,14 +703,14 @@ TEST_F(DriverTest, Start_BindFailed) {
 
   // Verify that v1_test.so has set a context.
   while (!driver->Context()) {
-    RunUntilDispatchersIdle();
+    fdf_testing_run_until_idle();
   }
   std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
   ASSERT_NE(nullptr, v1_test.get());
 
   // Verify that v1_test.so has been bound.
   while (!v1_test->did_bind) {
-    RunUntilDispatchersIdle();
+    fdf_testing_run_until_idle();
   }
 
   // Verify that v1_test.so has not added a child device.
@@ -759,7 +734,7 @@ TEST_F(DriverTest, LoadFirwmareAsync) {
 
   // Verify that v1_test.so has set a context.
   while (!driver->Context()) {
-    RunUntilDispatchersIdle();
+    fdf_testing_run_until_idle();
   }
   std::unique_ptr<V1Test> v1_test(static_cast<V1Test*>(driver->Context()));
   ASSERT_NE(nullptr, v1_test.get());
@@ -784,7 +759,7 @@ TEST_F(DriverTest, LoadFirwmareAsync) {
       },
       &was_called);
   while (!was_called) {
-    RunUntilDispatchersIdle();
+    fdf_testing_run_until_idle();
   }
   ASSERT_TRUE(was_called);
 

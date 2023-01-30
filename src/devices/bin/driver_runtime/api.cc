@@ -227,3 +227,12 @@ __EXPORT void fdf_testing_wait_until_all_dispatchers_idle() {
 __EXPORT void fdf_testing_wait_until_all_dispatchers_destroyed() {
   return driver_runtime::DispatcherCoordinator::WaitUntilDispatchersDestroyed();
 }
+
+__EXPORT zx_status_t fdf_testing_set_default_dispatcher(fdf_dispatcher_t* dispatcher) {
+  if (driver_runtime::DispatcherCoordinator::HasManagedThreads()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  driver_context::SetDefaultTestingDispatcher(static_cast<driver_runtime::Dispatcher*>(dispatcher));
+  return ZX_OK;
+}
