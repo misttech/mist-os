@@ -21,6 +21,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
 
@@ -28,8 +29,7 @@ namespace accessibility_test {
 namespace {
 
 using component_testing::ChildRef;
-using component_testing::LocalComponent;
-using component_testing::LocalComponentHandles;
+using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -88,25 +88,29 @@ struct RootSession {
 
 // See GfxAccessibilityViewTest documentation below for details on the mock
 // scene owner's role in the test.
-class MockSceneOwner : public LocalComponent, public fuchsia::ui::accessibility::view::Registry {
+class MockSceneOwner : public LocalComponentImpl,
+                       public fuchsia::ui::accessibility::view::Registry {
  public:
-  MockSceneOwner(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  MockSceneOwner(async_dispatcher_t* dispatcher, fxl::WeakPtr<MockSceneOwner>* access)
+      : dispatcher_(dispatcher), weak_ptr_(this) {
+    FX_CHECK(access != nullptr);
+    *access = weak_ptr_.GetWeakPtr();
+  }
 
-  // |LocalComponent|
-  void Start(std::unique_ptr<LocalComponentHandles> local_handles) override {
-    FX_CHECK(local_handles->outgoing()->AddPublicService(
+  // |LocalComponentImpl|
+  void OnStart() override {
+    FX_CHECK(outgoing()->AddPublicService(
                  fidl::InterfaceRequestHandler<fuchsia::ui::accessibility::view::Registry>(
                      [this](auto request) {
                        bindings_.AddBinding(this, std::move(request), dispatcher_);
                      })) == ZX_OK);
-    local_handles_ = std::move(local_handles);
   }
 
   // |fuchsia::ui::accessibility::view::Registry|
   void CreateAccessibilityViewHolder(fuchsia::ui::views::ViewRef a11y_view_ref,
                                      fuchsia::ui::views::ViewHolderToken a11y_view_holder_token,
                                      CreateAccessibilityViewHolderCallback callback) override {
-    scenic_ = local_handles_->svc().Connect<fuchsia::ui::scenic::Scenic>();
+    scenic_ = svc().Connect<fuchsia::ui::scenic::Scenic>();
 
     // Set up scene root.
     fuchsia::ui::scenic::SessionEndpoints endpoints;
@@ -153,11 +157,11 @@ class MockSceneOwner : public LocalComponent, public fuchsia::ui::accessibility:
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  std::unique_ptr<LocalComponentHandles> local_handles_;
   fidl::BindingSet<fuchsia::ui::accessibility::view::Registry> bindings_;
   fuchsia::ui::scenic::ScenicPtr scenic_;
   std::unique_ptr<RootSession> root_session_;
   bool proxy_view_attached_ = false;
+  fxl::WeakPtrFactory<MockSceneOwner> weak_ptr_;  // Keep last
 };
 
 // This test fixture sets up a test realm with scenic, a11y manager, and a mock
@@ -204,8 +208,9 @@ class GfxAccessibilityViewTest : public gtest::RealLoopFixture {
     realm_->AddChild(kA11yManager, kA11yManagerUrl);
 
     // Add mock scene owner.
-    mock_scene_owner_ = std::make_unique<MockSceneOwner>(dispatcher());
-    realm_->AddLocalChild(kMockSceneOwner, mock_scene_owner_.get());
+    realm_->AddLocalChild(kMockSceneOwner, [d = dispatcher(), a = &access_]() {
+      return std::make_unique<MockSceneOwner>(d, a);
+    });
 
     // Route tracing provider to a11y manager.
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
@@ -236,18 +241,17 @@ class GfxAccessibilityViewTest : public gtest::RealLoopFixture {
 
   sys::ServiceDirectory* realm_exposed_services() { return realm_exposed_services_.get(); }
 
-  MockSceneOwner* mock_scene_owner() { return mock_scene_owner_.get(); }
+  MockSceneOwner* mock_scene_owner() { return access_.get(); }
 
  private:
   std::unique_ptr<ui_testing::UITestManager> ui_test_manager_;
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
+  fxl::WeakPtr<MockSceneOwner> access_{};
   std::unique_ptr<Realm> realm_;
-
-  std::unique_ptr<MockSceneOwner> mock_scene_owner_;
 };
 
 TEST_F(GfxAccessibilityViewTest, TestSceneConnected) {
-  ASSERT_FALSE(mock_scene_owner()->proxy_view_attached());
+  ASSERT_EQ(mock_scene_owner(), nullptr);
 
   // Connect to an a11y service to force the a11y manager to start.
   auto semantics_manager =
@@ -258,7 +262,12 @@ TEST_F(GfxAccessibilityViewTest, TestSceneConnected) {
   // there must be a fully connected path from the root of the scene to the
   // proxy view. This state can only be achieved if the a11y manager has
   // correctly inserted its view.
-  RunLoopUntil([this]() { return mock_scene_owner()->proxy_view_attached(); });
+  RunLoopUntil([this]() {
+    if (mock_scene_owner() == nullptr) {
+      return false;
+    }
+    return mock_scene_owner()->proxy_view_attached();
+  });
 }
 
 }  // namespace
