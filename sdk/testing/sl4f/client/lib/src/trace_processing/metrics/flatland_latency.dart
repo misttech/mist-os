@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety in the imported files and
-// remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import '../metrics_results.dart';
 import '../trace_model.dart';
 import 'common.dart';
 
 class _Results {
-  List<double> presentLatencyValuesMillis;
+  late List<double> presentLatencyValuesMillis;
 }
 
 _Results _flatlandLatency(Model model) {

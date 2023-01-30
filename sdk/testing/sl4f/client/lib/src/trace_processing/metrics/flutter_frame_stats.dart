@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
+import 'package:collection/collection.dart' show IterableNullableExtension;
 import 'package:logging/logging.dart';
 import 'package:meta/meta.dart';
 
@@ -61,9 +61,9 @@ class _Group {
 }
 
 class _FpsResult {
-  int flowedFrameCount;
-  TimeDelta totalDuration;
-  TimeDelta frameTimeDiscrepancy;
+  late int flowedFrameCount;
+  late TimeDelta totalDuration;
+  late TimeDelta frameTimeDiscrepancy;
   double get averageFps => (totalDuration == TimeDelta.zero())
       ? (0.0)
       : (flowedFrameCount / totalDuration.toSecondsF());
@@ -96,7 +96,7 @@ _FpsResult _computeFps(Model model, Thread uiThread, Thread rasterThread) {
     if (event is AsyncEvent &&
         event.category == 'flutter' &&
         event.name == 'Frame Request Pending') {
-      maybeNewEnd = event.start + event.duration;
+      maybeNewEnd = event.start + event.duration!;
     } else if (event is DurationEvent &&
         event.category == 'flutter' &&
         // TODO(fxbug.dev/48263): Only match "VsyncProcessCallback".
@@ -105,15 +105,15 @@ _FpsResult _computeFps(Model model, Thread uiThread, Thread rasterThread) {
       final maybeFollowingVsync = findFollowingVsync(event);
       if (maybeFollowingVsync == null) {
         maybeNewEnd =
-            _max(event.start + event.duration, event.start + refreshRate);
+            _max(event.start + event.duration!, event.start + refreshRate);
       } else {
         maybeNewEnd =
-            _max(event.start + event.duration, maybeFollowingVsync.start);
+            _max(event.start + event.duration!, maybeFollowingVsync.start);
       }
     } else if (event is DurationEvent &&
         event.category == 'flutter' &&
         event.name == 'GPURasterizer::Draw') {
-      maybeNewEnd = event.start + event.duration;
+      maybeNewEnd = event.start + event.duration!;
     } else {
       continue;
     }
@@ -153,7 +153,7 @@ _FpsResult _computeFps(Model model, Thread uiThread, Thread rasterThread) {
         .followedBy(filterEventsTyped<DurationEvent>(group.events,
             category: 'flutter', name: 'VsyncProcessCallback'));
     final followingVsyncs =
-        vsyncCallbacks.map(findFollowingVsync).where((e) => e != null);
+        vsyncCallbacks.map(findFollowingVsync).whereNotNull();
 
     if (followingVsyncs.isEmpty) {
       print('Warning, found frame group with event count '
@@ -267,7 +267,7 @@ List<double> _computeFrameLatencies(Thread uiThread) {
           return (followingVsync.start - event.start);
         }
       })
-      .where((v) => v != null)
+      .whereNotNull()
       .map((duration) => duration.toMillisecondsF())
       .toList();
 }
@@ -292,15 +292,15 @@ List<double> _computeRenderFrameTotalDurations(Model model) {
     return followingEvents.first;
   });
 
-  final renderFrameTotalDurations =
-      Zip2Iterable<DurationEvent, DurationEvent, double>(
+  final List<double> renderFrameTotalDurations =
+      Zip2Iterable<DurationEvent, DurationEvent?, double?>(
           startRenderingEvents,
           endRenderingEvents,
-          (startRenderingEvent, endRenderingEvent) => (endRenderingEvent ==
-                  null)
-              ? null
-              : (endRenderingEvent.start - startRenderingEvent.start)
-                  .toMillisecondsF()).where((delta) => delta != null).toList();
+          (startRenderingEvent, endRenderingEvent) =>
+              (endRenderingEvent == null)
+                  ? null
+                  : (endRenderingEvent.start - startRenderingEvent.start)
+                      .toMillisecondsF()).whereNotNull().toList();
 
   return renderFrameTotalDurations;
 }
@@ -333,13 +333,13 @@ int _computeUndisplayedFrameCount(Model model) {
 }
 
 class _Results {
-  String appName;
-  _FpsResult fpsResult;
-  List<double> frameBuildTimes;
-  List<double> frameRasterizerTimes;
-  List<double> frameLatencies;
-  List<double> renderFrameTotalDurations;
-  int undisplayedFrameCount;
+  String? appName;
+  late _FpsResult fpsResult;
+  late List<double> frameBuildTimes;
+  late List<double> frameRasterizerTimes;
+  late List<double> frameLatencies;
+  late List<double> renderFrameTotalDurations;
+  late int undisplayedFrameCount;
 }
 
 String _appResultToString(_Results results) {
@@ -384,7 +384,7 @@ ${results.appName} Flutter Frame Stats
 /// [flutterAppName] are considered.
 ///
 /// Returns a list of results with an entry for each flutter app found.
-List<_Results> _flutterFrameStats(Model model, {String flutterAppName}) {
+List<_Results> _flutterFrameStats(Model model, {String? flutterAppName}) {
   final results = <_Results>[];
   // TODO(fxbug.dev/23073): Should only iterate on flutter processes.
   // final flutterProcesses = model.processes
@@ -436,7 +436,7 @@ List<_Results> _flutterFrameStats(Model model, {String flutterAppName}) {
       final rasterThread = rasterThreads.first;
 
       double getDurationInMilliseconds(DurationEvent durationEvent) {
-        return durationEvent.duration.toMillisecondsF();
+        return durationEvent.duration!.toMillisecondsF();
       }
 
       results.add(_Results()
@@ -482,7 +482,7 @@ List<TestCaseResults> flutterFrameStatsMetricsProcessor(
         'Error, expected metrics spec extra args $extraArgs to contain String '
         'field "flutterAppName"');
   }
-  final String flutterAppName = extraArgs['flutterAppName'];
+  final String? flutterAppName = extraArgs['flutterAppName'];
 
   final results =
       _flutterFrameStats(model, flutterAppName: flutterAppName).first;

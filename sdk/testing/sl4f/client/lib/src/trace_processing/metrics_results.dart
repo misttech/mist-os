@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
-
-import 'package:meta/meta.dart';
+// @dart=2.12
 
 // This file implements the perf test results schema.
 //
@@ -62,7 +59,7 @@ class TestCaseResults {
   // This field below is being renamed from "label" to "metric".
   // It is duplicated as a transitional measure so that it can be accessed via
   // either name.  TODO(fxbug.dev/59861): Remove the "label" field."
-  String label;
+  String? label;
   Unit unit;
   List<double> values;
 
@@ -71,7 +68,7 @@ class TestCaseResults {
     label = metric;
   }
 
-  Map<String, dynamic> toJson({@required String testSuite}) => {
+  Map<String, dynamic> toJson({required String testSuite}) => {
         'label': label,
         'test_suite': testSuite,
         'unit': unitToCatapultConverterString(unit),

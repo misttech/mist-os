@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'package:logging/logging.dart';
 
@@ -15,10 +14,10 @@ import 'common.dart';
 final _log = Logger('CameraMetricsProcessor');
 
 class _Results {
-  int receivedCount;
-  int droppedCount;
-  TimeDelta totalDuration;
-  Map<String, int> frameDropReasonCounts;
+  late int receivedCount;
+  late int droppedCount;
+  late TimeDelta totalDuration;
+  late Map<String, int> frameDropReasonCounts;
 
   double get averageFps => (receivedCount - 1) / totalDuration.toSecondsF();
 }
@@ -47,7 +46,7 @@ _Results _computeCameraMetrics(Model model) {
   }
 
   final frameDropReasonCounts = <String, int>{};
-  getArgValuesFromEvents(frameDroppedEvents, 'reason').forEach(
+  getArgValuesFromEvents<String>(frameDroppedEvents, 'reason').forEach(
       (v) => frameDropReasonCounts.update(v, (c) => c + 1, ifAbsent: () => 1));
 
   return _Results()

@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
+
+import 'package:collection/collection.dart' show IterableNullableExtension;
 
 import '../metrics_results.dart';
 import '../trace_model.dart';
@@ -12,14 +13,14 @@ import 'common.dart';
 class _Results {
   // This measures the wall time of all Scenic CPU work needed to produce a
   // frame.
-  List<double> renderFrameCpuDurations;
+  late List<double> renderFrameCpuDurations;
   // This measures the wall time of all Scenic CPU and GPU work needed to
   // produce a frame.
-  List<double> renderFrameTotalDurations;
+  late List<double> renderFrameTotalDurations;
   // This measures the wall time of all ("gfx", "RenderFrame") events.  Note
   // that the event does not cover all of the time that it takes Scenic to
   // render a frame.
-  List<double> renderFrameEventDurations;
+  late List<double> renderFrameEventDurations;
 }
 
 _Results _scenicFrameStats(Model model) {
@@ -52,34 +53,34 @@ _Results _scenicFrameStats(Model model) {
     return followingEvents.first;
   });
 
-  final renderFrameCpuDurations =
-      Zip2Iterable<DurationEvent, DurationEvent, double>(
+  final List<double> renderFrameCpuDurations =
+      Zip2Iterable<DurationEvent, DurationEvent?, double?>(
           startRenderingEvents,
           endCpuRenderingEvents,
-          (startRenderingEvent, endRenderingEvent) => (endRenderingEvent ==
-                  null)
-              ? null
-              : (endRenderingEvent.start +
-                      endRenderingEvent.duration -
-                      startRenderingEvent.start)
-                  .toMillisecondsF()).where((delta) => delta != null).toList();
+          (startRenderingEvent, endRenderingEvent) =>
+              (endRenderingEvent == null)
+                  ? null
+                  : (endRenderingEvent.start +
+                          endRenderingEvent.duration! -
+                          startRenderingEvent.start)
+                      .toMillisecondsF()).whereNotNull().toList();
 
-  final renderFrameTotalDurations =
-      Zip2Iterable<DurationEvent, DurationEvent, double>(
+  final List<double> renderFrameTotalDurations =
+      Zip2Iterable<DurationEvent, DurationEvent?, double?>(
           startRenderingEvents,
           endTotalRenderingEvents,
-          (startRenderingEvent, endRenderingEvent) => (endRenderingEvent ==
-                  null)
-              ? null
-              : (endRenderingEvent.start - startRenderingEvent.start)
-                  .toMillisecondsF()).where((delta) => delta != null).toList();
+          (startRenderingEvent, endRenderingEvent) =>
+              (endRenderingEvent == null)
+                  ? null
+                  : (endRenderingEvent.start - startRenderingEvent.start)
+                      .toMillisecondsF()).whereNotNull().toList();
 
   return _Results()
     ..renderFrameCpuDurations = renderFrameCpuDurations
     ..renderFrameTotalDurations = renderFrameTotalDurations
     ..renderFrameEventDurations = endCpuRenderingEvents
-        .where((e) => e != null)
-        .map((e) => e.duration.toMillisecondsF())
+        .whereNotNull()
+        .map((e) => e.duration!.toMillisecondsF())
         .toList();
 }
 

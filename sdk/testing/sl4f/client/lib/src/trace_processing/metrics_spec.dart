@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
-
-import 'package:meta/meta.dart';
+// @dart=2.12
 
 import 'metrics/camera_metrics.dart';
 import 'metrics/cpu_metrics.dart';
@@ -30,7 +27,7 @@ class MetricsSpec {
   // Additional metric-specific arguments.
   Map<String, dynamic> extraArgs = {};
 
-  MetricsSpec({@required this.name, Map<String, dynamic> extraArgs}) {
+  MetricsSpec({required this.name, Map<String, dynamic>? extraArgs}) {
     this.extraArgs = extraArgs ?? {};
   }
 }
@@ -40,12 +37,12 @@ class MetricsSpec {
 /// Is tagged with a [testName] value to indicate what test name the
 /// collection of computed metrics should be output under.
 class MetricsSpecSet {
-  String testSuite;
-  String testName;
+  String? testSuite;
+  String? testName;
   List<MetricsSpec> metricsSpecs;
 
   MetricsSpecSet(
-      {@required this.metricsSpecs,
+      {required this.metricsSpecs,
       // TODO(fxbug.dev/59861): Make the testSuite argument required after transition
       // is done.
       this.testSuite,

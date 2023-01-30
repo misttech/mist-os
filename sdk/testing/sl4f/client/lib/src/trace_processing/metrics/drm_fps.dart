@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
+
+import 'package:collection/collection.dart' show IterableNullableExtension;
 
 import '../metrics_results.dart';
 import '../time_delta.dart';
@@ -37,8 +38,8 @@ class _AdjacentPairIterator<T, U> extends Iterator<U> {
   final Iterator<T> _iterator;
   final U Function(T, T) _f;
 
-  U _current;
-  T _previous;
+  late U _current;
+  late T _previous;
 
   _AdjacentPairIterator(this._iterator, this._f) {
     if (!_iterator.moveNext()) {
@@ -62,20 +63,21 @@ class _AdjacentPairIterator<T, U> extends Iterator<U> {
 }
 
 class _Results {
-  String appName;
-  List<double> drmFpsValues;
+  String? appName;
+  late List<double> drmFpsValues;
 }
 
 /// Compute a list of DRM FPS values for [events] that eventually link to
 /// display driver VSYNC events.
 List<double> _computeDrmFpsValues(Iterable<DurationEvent> events) {
-  final vsyncs = events
+  final List<DurationEvent> vsyncs = events
       .map(findFollowingVsync)
-      .where((e) => e != null)
+      .whereNotNull()
       .toSet()
       .toList()
     ..sort((a, b) => a.start.compareTo(b.start));
-  return _AdjacentPairIterable(vsyncs, (a, b) => (b.start - a.start))
+  return _AdjacentPairIterable(
+          vsyncs, (DurationEvent a, DurationEvent b) => (b.start - a.start))
       .where((x) => x < TimeDelta.fromSeconds(1))
       .map((x) => 1.0 / x.toSecondsF())
       .toList();
@@ -86,7 +88,7 @@ List<double> _computeDrmFpsValues(Iterable<DurationEvent> events) {
 /// [flutterAppName] are considered.
 ///
 /// Returns a list of results with an entry for each flutter app found.
-List<_Results> _drmFpsMetrics(Model model, {String flutterAppName}) {
+List<_Results> _drmFpsMetrics(Model model, {String? flutterAppName}) {
   final results = <_Results>[];
   // TODO(fxbug.dev/23073): Should only iterate on flutter processes.
   final flutterProcesses = model.processes;
@@ -131,7 +133,7 @@ List<TestCaseResults> drmFpsMetricsProcessor(
         'Error, expected metrics spec extra args $extraArgs to contain String '
         'field "flutterAppName"');
   }
-  final String flutterAppName = extraArgs['flutterAppName'];
+  final String? flutterAppName = extraArgs['flutterAppName'];
 
   final results = _drmFpsMetrics(model, flutterAppName: flutterAppName);
 

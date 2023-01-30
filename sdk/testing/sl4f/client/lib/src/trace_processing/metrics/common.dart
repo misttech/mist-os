@@ -236,7 +236,7 @@ String describeValues<T extends num>(List<T> values,
 /// In other words, iterate over [x1, x2, ...] and [y1, y2, ...] like
 /// [_f(x1, y1), _f(x2, y2), ...].  Iteration stops when any [Iterable] is
 /// exhausted.
-class Zip2Iterable<T1, T2, R> extends Iterable<R?> {
+class Zip2Iterable<T1, T2, R> extends Iterable<R> {
   final Iterable<T1> _t1s;
   final Iterable<T2> _t2s;
   final R Function(T1, T2) _f;
@@ -244,11 +244,11 @@ class Zip2Iterable<T1, T2, R> extends Iterable<R?> {
   Zip2Iterable(this._t1s, this._t2s, this._f);
 
   @override
-  Iterator<R?> get iterator =>
+  Iterator<R> get iterator =>
       Zip2Iterator<T1, T2, R>(_t1s.iterator, _t2s.iterator, _f);
 }
 
-class Zip2Iterator<T1, T2, R> extends Iterator<R?> {
+class Zip2Iterator<T1, T2, R> extends Iterator<R> {
   final Iterator<T1> _t1s;
   final Iterator<T2> _t2s;
   final R Function(T1, T2) _f;
@@ -266,6 +266,9 @@ class Zip2Iterator<T1, T2, R> extends Iterator<R?> {
     return true;
   }
 
+  // Use "as R" instead of "!" because _current can legitimately be
+  // null if R is a nullable type and "!" would reject a null value.
+  // "as R" will only reject a null value if R is a non-nullable type.
   @override
-  R? get current => _current;
+  R get current => _current as R;
 }

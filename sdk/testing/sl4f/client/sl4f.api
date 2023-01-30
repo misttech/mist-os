@@ -275,7 +275,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "iterator",
-              "returnType": "Iterator<R?>",
+              "returnType": "Iterator<R>",
               "type": "MethodDeclarationImpl"
             }
           },
@@ -335,7 +335,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "current",
-              "returnType": "R?",
+              "returnType": "R",
               "type": "MethodDeclarationImpl"
             },
             "moveNext": {
@@ -3462,12 +3462,12 @@
                 "testSuite": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "testSuite",
                   "type": "SimpleFormalParameterImpl",
@@ -3491,7 +3491,7 @@
               "isLate": false,
               "name": "label",
               "type": "VariableDeclarationImpl",
-              "varType": "String"
+              "varType": "String?"
             },
             "metric": {
               "isConst": false,
@@ -3596,8 +3596,8 @@
           "ConstructorDeclarationImpl": {
             "MetricsSpec": {
               "FieldFormalParameterImpl": {
-                "@required this.name": {
-                  "name": "@required this.name",
+                "required this.name": {
+                  "name": "required this.name",
                   "type": "FieldFormalParameterImpl"
                 }
               },
@@ -3614,7 +3614,7 @@
                   "isRequiredPositional": false,
                   "name": "extraArgs",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Map<String, dynamic>"
+                  "varType": "Map<String, dynamic>?"
                 }
               },
               "name": "MetricsSpec",
@@ -3646,8 +3646,8 @@
           "ConstructorDeclarationImpl": {
             "MetricsSpecSet": {
               "FieldFormalParameterImpl": {
-                "@required this.metricsSpecs": {
-                  "name": "@required this.metricsSpecs",
+                "required this.metricsSpecs": {
+                  "name": "required this.metricsSpecs",
                   "type": "FieldFormalParameterImpl"
                 },
                 "this.testName": {
@@ -3678,7 +3678,7 @@
               "isLate": false,
               "name": "testName",
               "type": "VariableDeclarationImpl",
-              "varType": "String"
+              "varType": "String?"
             },
             "testSuite": {
               "isConst": false,
@@ -3686,7 +3686,7 @@
               "isLate": false,
               "name": "testSuite",
               "type": "VariableDeclarationImpl",
-              "varType": "String"
+              "varType": "String?"
             }
           },
           "name": "MetricsSpecSet",

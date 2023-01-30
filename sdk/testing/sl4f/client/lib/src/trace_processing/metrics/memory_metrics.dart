@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'package:logging/logging.dart';
 
@@ -14,17 +13,19 @@ import 'common.dart';
 final _log = Logger('MemoryMetricsProcessor');
 
 class _Results {
-  List<double> totalSystemMemory;
-  List<double> vmoMemory;
-  List<double> mmuMemory;
-  List<double> ipcMemory;
+  late List<double> totalSystemMemory;
+  late List<double> vmoMemory;
+  late List<double> mmuMemory;
+  late List<double> ipcMemory;
 
-  Map<String, List<double>> bandwidthChannels;
-  List<double> totalBandwidth;
-  List<double> bandwidthUsage;
+  late Map<String, List<double>> bandwidthChannels;
+  late List<double> totalBandwidth;
+  late List<double> bandwidthUsage;
 }
 
-_Results _memoryMetrics(Model model, bool excludeBandwidth) {
+double _sum(Iterable<num> seq) => seq.fold(0.0, (a, b) => a + b);
+
+_Results? _memoryMetrics(Model model, bool excludeBandwidth) {
   final memoryMonitorEvents =
       filterEvents(getAllEvents(model), category: 'memory_monitor');
   if (memoryMonitorEvents.isEmpty) {
@@ -98,13 +99,12 @@ _Results _memoryMetrics(Model model, bool excludeBandwidth) {
   for (final event in bandwidthUsageEvents) {
     for (final entry in event.args.entries) {
       bandwidthChannels[entry.key] ??= <double>[];
-      bandwidthChannels[entry.key].add(entry.value.toDouble());
+      bandwidthChannels[entry.key]!.add(entry.value.toDouble());
     }
   }
 
-  final totalBandwidthValues = bandwidthUsageEvents
-      .map((e) => e.args.values.fold(0.0, (a, b) => a + b).toDouble())
-      .cast<double>();
+  final totalBandwidthValues =
+      bandwidthUsageEvents.map((e) => _sum(e.args.values.cast<num>()));
 
   final bandwidthFreeEvents = filterEventsTyped<CounterEvent>(
       memoryMonitorEvents,
