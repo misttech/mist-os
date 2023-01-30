@@ -24,6 +24,10 @@ def main():
         '--output-symlink',
         required=True,
         help='Symlink to create pointing to the repository\'s directory')
+    parser.add_argument(
+        '--rules-fuchsia-path',
+        required=True,
+        help='Path to the rules_fuchsia directory')
 
     args = parser.parse_args()
 
@@ -65,6 +69,15 @@ def main():
             break
 
     assert fuchsia_sdk_dir, 'Could not find @fuchsia_sdk repository location!!'
+
+    # Copy the starlark rules into the generated sdk
+    for path in ["cipd", "fuchsia"]:
+        target_path = os.path.join(args.rules_fuchsia_path, path)
+        link_path = os.path.join(fuchsia_sdk_dir, path)
+        if os.path.islink(link_path):
+            # unlink the existing link if it exists
+            os.unlink(link_path)
+        os.symlink(target_path, link_path)
 
     # Re-generate the symlink if its path has changed, or if it does not exist.
     link_path = os.path.abspath(args.output_symlink)
