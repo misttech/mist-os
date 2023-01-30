@@ -11,7 +11,7 @@ config("include") {
 }
 
 sdk_source_set("driver_runtime") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "driver_runtime"
   sources = [
     "include/lib/fdf/arena.h",
@@ -34,7 +34,7 @@ sdk_source_set("driver_runtime") {
 }
 
 sdk_source_set("driver_runtime_cpp") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "driver_runtime_cpp"
   public = [
     "include/lib/fdf/cpp/arena.h",
@@ -60,10 +60,11 @@ sdk_source_set("driver_runtime_cpp") {
 }
 
 sdk_source_set("driver_runtime_env") {
-  category = "experimental"
+  category = "partner"
   sdk_name = "driver_runtime_env"
   sources = [ "include/lib/fdf/env.h" ]
   visibility = [
+    "//build/sdk:sdk_versioned_source_sets",
     "//sdk/lib/driver/runtime/*",
     "//src/devices/bin/driver_host/*",
     "//src/devices/bin/driver_host2/*",

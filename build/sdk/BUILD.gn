@@ -32,6 +32,9 @@ group("tests") {
 # should be compatible with all the currently supported API levels.
 _sdk_versioned_source_sets_list = [
   # sdk_source_set() targets:
+  "//sdk/lib/driver/runtime:driver_runtime",
+  "//sdk/lib/driver/runtime:driver_runtime_cpp",
+  "//sdk/lib/driver/runtime:driver_runtime_env",
   "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
   "//sdk/lib/fidl/cpp",
   "//sdk/lib/fidl/cpp:cpp_sync",
