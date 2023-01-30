@@ -33,7 +33,6 @@ def _fuchsia_toolchain_info_impl(ctx):
         default_api_level = ctx.attr.default_target_api,
         default_fidl_target_api = ctx.attr.default_fidl_target_api,
         exec_cpu = ctx.attr.exec_cpu,
-        runfiles = ctx.runfiles(ctx.attr.runfiles.files.to_list()),
         sdk_id = ctx.attr.sdk_id,
         sdk_manifest = ctx.file.sdk_manifest,
     )]
@@ -198,10 +197,6 @@ included in the Fuchsia IDK.
             doc = "The exec cpu configuration.",
             mandatory = True,
             values = ["x64", "arm64"],
-        ),
-        "runfiles": attr.label(
-            doc = "A filegroup referencing all runfiles needed for the tools in this toolchain.",
-            mandatory = True,
         ),
         "sdk_id": attr.string(
             doc = "The identifier for this sdk toolchain.",

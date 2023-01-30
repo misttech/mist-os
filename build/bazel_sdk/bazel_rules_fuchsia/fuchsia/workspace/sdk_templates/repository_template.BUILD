@@ -53,21 +53,6 @@ platform(
     visibility = ["//visibility:public"],
 )
 
-# TODO(fxbug.dev/108014): Figure out a more precise way to express toolchain
-# runfile dependencies.
-filegroup(
-    name = "fuchsia_toolchain_files",
-    srcs = [
-        "meta/manifest.json",
-        "//tools:aemu_internal_x64",
-        "//tools:x64/ffx",
-        "//tools:x64/fssh",
-        "//tools:x64/fvm",
-        "//tools:x64/pm",
-        "//tools:x64/zbi",
-    ],
-)
-
 fuchsia_debug_symbols(
     name = "debug_symbols",
     build_dir = "//:BUILD.bazel",
@@ -105,7 +90,6 @@ fuchsia_toolchain_info(
     minfs = "//tools:x64/minfs",
     minfs_manifest = "//tools:x64/minfs-meta.json",
     pm = "//tools:x64/pm",
-    runfiles = ":fuchsia_toolchain_files",
     sdk_id = "{{SDK_ID}}",
     sdk_manifest = "//:meta/manifest.json",
     zbi = "//tools:x64/zbi",

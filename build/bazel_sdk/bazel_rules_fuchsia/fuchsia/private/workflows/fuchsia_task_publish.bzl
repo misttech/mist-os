@@ -6,6 +6,7 @@
 
 load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaPackageGroupInfo", "FuchsiaPackageInfo")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_publish_inputs")
 
 def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
     sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
@@ -13,6 +14,10 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
         pkg.far_file
         for dep in ctx.attr.packages
         for pkg in (dep[FuchsiaPackageGroupInfo].packages if FuchsiaPackageGroupInfo in dep else [dep[FuchsiaPackageInfo]])
+    ]
+
+    sdk_runfiles = get_ffx_publish_inputs(sdk) + [
+        sdk.pm,
     ]
 
     repo_name_args = [
@@ -28,7 +33,7 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
             sdk.pm,
             "--package",
         ] + far_files + repo_name_args,
-        runfiles = [sdk.runfiles, far_files],
+        runfiles = [sdk_runfiles, far_files],
     )
 
 (
