@@ -18,6 +18,7 @@ if (is_host) {
     "ip.go",
     "ipv6.go",
     "ipv6_mld.go",
+    "ipv6_mldv2.go",
     "ipv6_pmtu.go",
     "ipv6_router.go",
     "ipv6ndp.go",

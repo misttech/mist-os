@@ -42,6 +42,7 @@ var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[par
 	addAllExpectations("ip", ipExpectations)
 	addAllExpectations("ipv6", ipv6Expectations)
 	addAllExpectations("ipv6-mld", ipv6MldExpectations)
+	addAllExpectations("ipv6-mldv2", ipv6Mldv2Expectations)
 	addAllExpectations("ipv6-ndp", ipv6ndpExpectations)
 	addAllExpectations("ipv6-pmtu", ipv6PmtuExpectations)
 	addAllExpectations("ipv6-router", ipv6RouterExpectations)
