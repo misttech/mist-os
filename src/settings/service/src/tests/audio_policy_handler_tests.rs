@@ -145,13 +145,13 @@ impl TestEnvironment {
 
     async fn create_request_observer(&self) -> Receptor {
         self.internal_delegate
-            .create(MessengerType::Broker(Some(filter::Builder::single(
-                filter::Condition::Custom(Arc::new(move |message| {
+            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
+                Arc::new(move |message| {
                     matches!(
                         message.payload(),
                         service::Payload::Setting(SettingPayload::Request(_))
                     )
-                })),
+                }),
             ))))
             .await
             .expect("receptor should be present")

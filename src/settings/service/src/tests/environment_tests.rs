@@ -79,13 +79,13 @@ impl TestAgent {
     ) -> InvocationResult {
         let (_, mut receptor) = self
             .delegate
-            .create(MessengerType::Broker(Some(filter::Builder::single(
-                filter::Condition::Custom(Arc::new(move |message| {
+            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
+                Arc::new(move |message| {
                     matches!(
                         message.payload(),
                         Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD)))
                     )
-                })),
+                }),
             ))))
             .await
             .expect("Failed to create broker");

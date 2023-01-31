@@ -74,7 +74,7 @@ impl PolicyProxy {
         let service_proxy_filter = filter::Builder::single(service_proxy_condition);
 
         let (_, service_proxy_receptor) =
-            delegate.create(MessengerType::Broker(Some(service_proxy_filter))).await?;
+            delegate.create(MessengerType::Broker(service_proxy_filter)).await?;
 
         let (_, service_policy_receptor) = delegate
             .messenger_builder(MessengerType::Addressable(service::Address::PolicyHandler(

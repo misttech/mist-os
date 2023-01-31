@@ -99,15 +99,15 @@ impl SettingValuesInspectAgent {
 
         let (messenger_client, receptor) = match context
             .delegate
-            .create(MessengerType::Broker(Some(filter::Builder::single(
-                filter::Condition::Custom(Arc::new(move |message| {
+            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
+                Arc::new(move |message| {
                     // Only catch messages that were originally sent from the interfaces, and
                     // that contain a request for the specific setting type we're interested in.
                     matches!(
                         message.payload(),
                         service::Payload::Controller(HandlerPayload::Event(Event::Changed(_)))
                     )
-                })),
+                }),
             ))))
             .await
         {

@@ -51,6 +51,10 @@ mod test {
     pub(crate) type MessageHub = crate::message::message_hub::MessageHub;
 }
 
+fn no_filter() -> filter::Filter {
+    filter::Builder::single(filter::Condition::Custom(Arc::new(|&_| true)))
+}
+
 // Tests message client creation results in unique ids.
 #[fuchsia::test(allow_stalls = false)]
 async fn test_message_client_equality() {
@@ -181,7 +185,7 @@ async fn test_implicit_forward() {
 
     let (messenger_client_1, _) =
         delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
-    let (_, mut receiver_2) = delegate.create(MessengerType::Broker(None)).await.unwrap();
+    let (_, mut receiver_2) = delegate.create(MessengerType::Broker(no_filter())).await.unwrap();
     let (_, mut receiver_3) =
         delegate.create(MessengerType::Addressable(crate::Address::Test(3))).await.unwrap();
 
@@ -217,7 +221,7 @@ async fn test_observe_addressable() {
 
     let (messenger_client_1, _) =
         delegate.create(MessengerType::Addressable(crate::Address::Test(1))).await.unwrap();
-    let (_, mut receptor_2) = delegate.create(MessengerType::Broker(None)).await.unwrap();
+    let (_, mut receptor_2) = delegate.create(MessengerType::Broker(no_filter())).await.unwrap();
     let (_, mut receptor_3) =
         delegate.create(MessengerType::Addressable(crate::Address::Test(3))).await.unwrap();
 
@@ -422,7 +426,7 @@ async fn test_acknowledge() {
 async fn test_messenger_behavior() {
     // Run tests twice to ensure no one instance leads to a deadlock.
     for _ in 0..2 {
-        verify_messenger_behavior(MessengerType::Broker(None)).await;
+        verify_messenger_behavior(MessengerType::Broker(no_filter())).await;
         verify_messenger_behavior(MessengerType::Unbound).await;
         verify_messenger_behavior(MessengerType::Addressable(crate::Address::Test(2))).await;
     }
@@ -582,9 +586,9 @@ async fn test_reply_propagation() {
 
     // Create broker to propagate a derived message.
     let (_, mut broker) = delegate
-        .create(MessengerType::Broker(Some(filter::Builder::single(filter::Condition::Custom(
+        .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
             Arc::new(move |message| *message.payload() == *REPLY),
-        )))))
+        ))))
         .await
         .expect("broker should be created");
 
@@ -634,12 +638,16 @@ async fn test_propagation() {
     let sending_signature = sending_receptor.get_signature();
 
     // Create brokers to propagate a derived message.
-    let (_, mut broker_1) =
-        delegate.create(MessengerType::Broker(None)).await.expect("broker should be created");
+    let (_, mut broker_1) = delegate
+        .create(MessengerType::Broker(no_filter()))
+        .await
+        .expect("broker should be created");
     let modifier_1_signature = broker_1.get_signature();
 
-    let (_, mut broker_2) =
-        delegate.create(MessengerType::Broker(None)).await.expect("broker should be created");
+    let (_, mut broker_2) = delegate
+        .create(MessengerType::Broker(no_filter()))
+        .await
+        .expect("broker should be created");
     let modifier_2_signature = broker_2.get_signature();
 
     // Create messenger to be target of source message.
@@ -712,10 +720,8 @@ async fn test_broker_filter_custom() {
         *message.payload() == *ORIGINAL
     })));
     // Broker that should only target ORIGINAL messages.
-    let (_, mut broker_receptor) = delegate
-        .create(MessengerType::Broker(Some(filter)))
-        .await
-        .expect("broker should be created");
+    let (_, mut broker_receptor) =
+        delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");
 
     // Send broadcast message.
     messenger.message(BROADCAST.clone(), Audience::Broadcast).ack();
@@ -745,10 +751,8 @@ async fn test_broker_filter_caputring_closure() {
         *message.payload() == *expected_payload
     })));
     // Broker that should only target Foo messages.
-    let (_, mut broker_receptor) = delegate
-        .create(MessengerType::Broker(Some(filter)))
-        .await
-        .expect("broker should be created");
+    let (_, mut broker_receptor) =
+        delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");
 
     // Send broadcast message.
     messenger.message(BROADCAST.clone(), Audience::Broadcast).ack();

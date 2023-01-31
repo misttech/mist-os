@@ -69,10 +69,10 @@ impl PolicyValuesInspectAgent {
         // passed to the agent during this wait, we will deadlock.
         let (messenger_client, broker_receptor) = match context
             .delegate
-            .create(MessengerType::Broker(Some(filter::Builder::single(
-                filter::Condition::Custom(Arc::new(|message| {
+            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
+                Arc::new(|message| {
                     matches!(message.payload(), service::Payload::Policy(PolicyPayload::Request(_)))
-                })),
+                }),
             ))))
             .await
         {

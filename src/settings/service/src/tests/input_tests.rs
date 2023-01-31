@@ -238,7 +238,7 @@ async fn get_and_check_camera_disable(
 
 // Creates a broker to listen in on media buttons events.
 fn create_broker(executor: &mut TestExecutor, delegate: Delegate) -> Receptor {
-    let message_hub_future = delegate.create(MessengerType::Broker(Some(filter::Builder::single(
+    let message_hub_future = delegate.create(MessengerType::Broker(filter::Builder::single(
         filter::Condition::Custom(Arc::new(move |message| {
             // The first condition indicates that it is a response to a set request.
             if let Payload::Setting(HandlerPayload::Response(Ok(None))) = message.payload() {
@@ -247,7 +247,7 @@ fn create_broker(executor: &mut TestExecutor, delegate: Delegate) -> Receptor {
                 false
             }
         })),
-    ))));
+    )));
     pin_mut!(message_hub_future);
     match executor.run_until_stalled(&mut message_hub_future) {
         Poll::Ready(Ok((_, receptor))) => receptor,

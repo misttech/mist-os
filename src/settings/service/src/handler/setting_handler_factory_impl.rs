@@ -195,15 +195,15 @@ mod tests {
 
         // Create a broker that only listens to replies.
         let (_, broker_receptor) = delegate
-            .create(MessengerType::Broker(Some(filter::Builder::single(
-                filter::Condition::Custom(Arc::new(move |message: &Message| {
+            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
+                Arc::new(move |message: &Message| {
                     // Only filter for reply's that contain results.
                     matches!(message.get_type(), MessageType::Reply(_))
                         && matches!(
                             message.payload(),
                             service::Payload::Controller(Payload::Result(_))
                         )
-                })),
+                }),
             ))))
             .await
             .expect("could not create broker receptor");

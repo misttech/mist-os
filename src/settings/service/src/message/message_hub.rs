@@ -41,7 +41,7 @@ struct Broker {
     messenger_id: MessengerId,
     /// A condition that is applied to a message to determine whether it should be directed to the
     /// broker.
-    filter: Option<Filter>,
+    filter: Filter,
 }
 
 impl PartialEq for Broker {
@@ -208,7 +208,7 @@ impl MessageHub {
                         && self
                             .resolve_messenger_id(&message.get_author())
                             .map_or(true, |id| id != broker.messenger_id)
-                        && broker.filter.as_ref().map_or(true, |filter| filter.matches(&message))
+                        && broker.filter.matches(&message)
                 })
                 .map(|broker| broker.messenger_id)
                 .collect();
@@ -292,11 +292,7 @@ impl MessageHub {
                     .brokers
                     .iter()
                     .filter(|&broker| {
-                        broker.messenger_id != author_id
-                            && broker
-                                .filter
-                                .as_ref()
-                                .map_or(true, |filter| filter.matches(&message))
+                        broker.messenger_id != author_id && broker.filter.matches(&message)
                     })
                     .map(|broker| broker.messenger_id);
 

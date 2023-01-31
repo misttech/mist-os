@@ -205,14 +205,14 @@ impl SettingProxyInspectAgent {
     ) {
         let (_, message_rx) = context
             .delegate
-            .create(MessengerType::Broker(Some(filter::Builder::single(
-                filter::Condition::Custom(Arc::new(move |message| {
+            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
+                Arc::new(move |message| {
                     // Only catch setting handler requests.
                     matches!(
                         message.payload(),
                         service::Payload::Setting(HandlerPayload::Request(_))
                     )
-                })),
+                }),
             ))))
             .await
             .expect("should receive client");

@@ -124,7 +124,7 @@ pub enum MessengerType {
     /// are able to send and reply to messages, but the main purpose is to observe
     /// messages. An optional filter may be specified, which limits the messages
     /// directed to this broker.
-    Broker(Option<filter::Filter>),
+    Broker(filter::Filter),
     /// A messenger that cannot be reached by an address.
     Unbound,
 }
