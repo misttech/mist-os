@@ -172,5 +172,70 @@ TEST_F(GfxScreenshotTest, GetMultipleScreenshotsViaChannel) {
   EXPECT_EQ(NumCurrentServedScreenshots(), 0u);
 }
 
+TEST_F(GfxScreenshotTest, SimpleUnreadableVmoTakeFileTest) {
+  gfx_screenshotter_ = std::make_unique<screenshot::GfxScreenshot>(
+      [](fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback) {
+        fuchsia::ui::scenic::ScreenshotData screenshot_data;
+        fuchsia::images::ImageInfo image_info;
+        fuchsia::mem::Buffer data_buffer;
+
+        // Create |info|.
+        image_info.width = 100u;
+        image_info.height = 100u;
+
+        // Create |data|.
+        zx::vmo vmo;
+        zx_status_t status = zx::vmo::create(4096, 0, &vmo);
+        EXPECT_EQ(status, ZX_OK);
+        EXPECT_EQ(vmo.set_cache_policy(ZX_CACHE_POLICY_UNCACHED_DEVICE), ZX_OK);
+        data_buffer.vmo = std::move(vmo);
+
+        screenshot_data.info = image_info;
+        screenshot_data.data = std::move(data_buffer);
+
+        callback(std::move(screenshot_data), /*success=*/true);
+      },
+      [](screenshot::GfxScreenshot* screenshotter) {});
+
+  EXPECT_EQ(NumCurrentServedScreenshots(), 0u);
+
+  ScreenshotTakeFileResponse takefile_response = TakeFile();
+
+  EXPECT_EQ(NumCurrentServedScreenshots(), 1u);
+
+  EXPECT_TRUE(takefile_response.has_size());
+  EXPECT_GT(takefile_response.size().width, 0u);
+  EXPECT_GT(takefile_response.size().height, 0u);
+
+  fidl::InterfaceHandle<::fuchsia::io::File>* file = takefile_response.mutable_file();
+  EXPECT_TRUE(file->is_valid());
+  {
+    fuchsia::io::FilePtr screenshot = file->Bind();
+    // Get screenshot attributes.
+    uint64_t screenshot_size;
+    screenshot->GetAttr(
+        [&screenshot_size](zx_status_t status, fuchsia::io::NodeAttributes attributes) {
+          EXPECT_EQ(ZX_OK, status);
+          screenshot_size = attributes.content_size;
+        });
+
+    uint64_t read_count = 0;
+    uint64_t increment = 0;
+    do {
+      screenshot->Read(fuchsia::io::MAX_BUF,
+                       [&increment](fuchsia::io::Readable_Read_Result result) {
+                         EXPECT_TRUE(result.is_response()) << zx_status_get_string(result.err());
+                         increment = result.response().data.size();
+                       });
+      RunLoopUntilIdle();
+      read_count += increment;
+    } while (increment);
+    EXPECT_EQ(screenshot_size, read_count);
+  }
+
+  RunLoopUntilIdle();
+  EXPECT_EQ(NumCurrentServedScreenshots(), 0u);
+}
+
 }  // namespace test
 }  // namespace screenshot

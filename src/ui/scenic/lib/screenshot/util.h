@@ -9,6 +9,7 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/async/default.h>
 #include <lib/async/dispatcher.h>
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/vfs/cpp/vmo_file.h>
 
 namespace screenshot {
@@ -21,6 +22,12 @@ bool ServeScreenshot(
                        std::pair<std::unique_ptr<vfs::VmoFile>, std::unique_ptr<async::WaitOnce>>>*
         served_screenshots_);
 
+// Extract the data stored in an unreadable vmo, i.e. screenshot on emulator
+std::vector<uint8_t> ExtractVmoData(fzl::VmoMapper mapper, size_t size);
+
+// Store a readable version of 'response_vmo' in 'readable_vmo'.
+// If a readable version cannot be made, no changes will occur to 'readable_vmo'.
+zx_status_t GenerateReadableVmo(zx::vmo response_vmo, size_t vmo_size, zx::vmo* readable_vmo);
 }  // namespace screenshot
 
 #endif  // SRC_UI_SCENIC_LIB_SCREENSHOT_UTIL_H_

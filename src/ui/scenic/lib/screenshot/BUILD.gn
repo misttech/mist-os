@@ -21,5 +21,6 @@ source_set("screenshot") {
     "//src/ui/scenic/lib/allocation",
     "//src/ui/scenic/lib/flatland/engine",
     "//src/ui/scenic/lib/screen_capture",
+    "//zircon/system/ulib/fzl",
   ]
 }

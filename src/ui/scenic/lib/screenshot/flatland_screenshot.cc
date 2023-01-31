@@ -320,8 +320,6 @@ void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRe
         zx::vmo response_vmo = weak_ptr->HandleFrameRender();
         fuchsia::ui::composition::ScreenshotTakeFileResponse response;
 
-        response.set_size({display_size_.width, display_size_.height});
-
         fidl::InterfaceHandle<fuchsia::io::File> file_client;
 
         fidl::InterfaceRequest<fuchsia::io::File> file_server = file_client.NewRequest();
@@ -332,15 +330,13 @@ void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRe
         }
 
         const size_t screenshot_index = served_screenshots_next_id_++;
-        if (!ServeScreenshot(file_server.TakeChannel(), std::move(response_vmo), screenshot_index,
-                             &served_screenshots_)) {
-          return;
+        if (ServeScreenshot(file_server.TakeChannel(), std::move(response_vmo), screenshot_index,
+                            &served_screenshots_)) {
+          response.set_file(std::move(file_client));
+          response.set_size({display_size_.width, display_size_.height});
         }
 
-        response.set_file(std::move(file_client));
-
         take_file_callback_(std::move(response));
-
         take_file_callback_ = nullptr;
         render_event_.reset();
 
