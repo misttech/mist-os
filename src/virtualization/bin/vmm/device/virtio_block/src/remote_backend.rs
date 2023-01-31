@@ -194,16 +194,16 @@ mod tests {
             // Create a VMO to use for the ramdisk. The controller will interface with the VMO
             // directly to verify what has been written to the disk.
             let vmo = zx::Vmo::create(size).unwrap();
-            let ramdisk_client = ramdevice_client::VmoRamdiskClientBuilder::new(
+            let ramdisk_client = ramdevice_client::RamdiskClientBuilder::new_with_vmo(
                 vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                Some(BLOCK_SIZE),
             )
-            .block_size(BLOCK_SIZE)
             .build()
             .await
             .unwrap();
 
             // Open a connection to the ramdisk and use it to create the RemoteBackend.
-            let channel = ramdisk_client.open().unwrap();
+            let channel = ramdisk_client.open().await.unwrap();
             let backend = RemoteBackend::new(channel).await.unwrap();
             let controller = RemoteBackendController::new(ramdisk_client, vmo);
             Ok((backend, controller))

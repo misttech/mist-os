@@ -30,7 +30,7 @@ const RAMDISK_BLOCK_COUNT: u64 = 16 * 1024;
 async fn make_ramdisk() -> (RamdiskClient, RemoteBlockClient) {
     let client = RamdiskClient::builder(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT);
     let ramdisk = client.build().await.expect("RamdiskClientBuilder.build() failed");
-    let client_end = ramdisk.open().expect("ramdisk.open failed");
+    let client_end = ramdisk.open().await.expect("ramdisk.open failed");
     let proxy = client_end.into_proxy().expect("into_proxy failed");
     let remote_block_device = RemoteBlockClient::new(proxy).await.expect("new failed");
 
@@ -92,7 +92,7 @@ async fn ext4_server_mounts_block_device(
             SpawnAction::add_handle(HandleType::DirectoryRequest.into(), dir_server.into()),
             SpawnAction::add_handle(
                 HandleInfo::new(HandleType::User0, 1),
-                ramdisk.open().expect("ramdisk.open").into(),
+                ramdisk.open().await.expect("ramdisk.open").into(),
             ),
         ],
     )
@@ -139,7 +139,7 @@ async fn ext4_server_mounts_block_device_and_dies_on_close() -> Result<(), Error
             SpawnAction::add_handle(HandleType::DirectoryRequest.into(), dir_server.into()),
             SpawnAction::add_handle(
                 HandleInfo::new(HandleType::User0, 1),
-                ramdisk.open().expect("ramdisk.open").into(),
+                ramdisk.open().await.expect("ramdisk.open").into(),
             ),
         ],
     )

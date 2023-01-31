@@ -166,7 +166,7 @@ mod tests {
 
         let builder = RamdiskClientBuilder::new(512, ramdisk_size / 512);
         let ramdisk = builder.build().await.expect("creating ramdisk succeeds");
-        let channel = ramdisk.open().expect("opening ramdisk succeeds");
+        let channel = ramdisk.open().await.expect("opening ramdisk succeeds");
         let block_client = remote_block_device::RemoteBlockClientSync::new(channel)
             .expect("creating remote block client succeeds");
         let cache = remote_block_device::cache::Cache::new(block_client)
@@ -190,7 +190,7 @@ mod tests {
 
         disk.write().expect("writing GPT succeeds");
 
-        let client_end = ramdisk.open().expect("opening ramdisk OK");
+        let client_end = ramdisk.open().await.expect("opening ramdisk OK");
         // TODO(https://fxbug.dev/112484): this relies on multiplexing.
         let client_end =
             fidl::endpoints::ClientEnd::<ControllerMarker>::new(client_end.into_channel());

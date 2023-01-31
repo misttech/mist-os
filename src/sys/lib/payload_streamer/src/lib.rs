@@ -344,7 +344,7 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, HandleBased},
         futures::future::try_join,
-        ramdevice_client::{RamdiskClient, VmoRamdiskClientBuilder},
+        ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
         std::sync::Mutex,
         std::{io::Cursor, sync::Arc},
     };
@@ -382,7 +382,10 @@ mod tests {
     async fn create_ramdisk(src: Vec<u8>) -> Result<RamdiskClient, Error> {
         let vmo = zx::Vmo::create(src.len() as u64).context("failed to create vmo")?;
         vmo.write(&src, 0).context("failed to write vmo")?;
-        VmoRamdiskClientBuilder::new(vmo).build().await.context("failed to create ramdisk client")
+        RamdiskClientBuilder::new_with_vmo(vmo, None)
+            .build()
+            .await
+            .context("failed to create ramdisk client")
     }
 
     async fn attach_vmo(

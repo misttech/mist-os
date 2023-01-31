@@ -10,7 +10,7 @@ use {
         Blobfs, ComponentType,
     },
     fuchsia_zircon::{AsHandleRef, Rights, Vmo},
-    ramdevice_client::{RamdiskClient, VmoRamdiskClientBuilder},
+    ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
     std::convert::TryInto as _,
     storage_isolated_driver_manager::bind_fvm,
 };
@@ -120,8 +120,7 @@ async fn create_ramdisk(vmo: &Vmo, ramdisk_block_size: u64) -> RamdiskClient {
     let duplicated_vmo = Vmo::from(duplicated_handle);
 
     // Create the ramdisks
-    VmoRamdiskClientBuilder::new(duplicated_vmo)
-        .block_size(ramdisk_block_size)
+    RamdiskClientBuilder::new_with_vmo(duplicated_vmo, Some(ramdisk_block_size))
         .build()
         .await
         .unwrap()

@@ -17,7 +17,7 @@ use {
     fuchsia_zircon::{self as zx, HandleBased},
     gpt::{partition_types, GptConfig},
     key_bag::Aes256Key,
-    ramdevice_client::{RamdiskClient, VmoRamdiskClientBuilder},
+    ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
     remote_block_device::BlockClient as _,
     std::{io::Write, ops::Deref, path::Path},
     storage_isolated_driver_manager::{
@@ -130,7 +130,7 @@ fn initialize_gpt(vmo: &zx::Vmo, block_size: u64) {
 
 async fn bind_gpt_driver(ramdisk: &RamdiskClient) {
     let ramdisk_channel =
-        fidl::AsyncChannel::from_channel(ramdisk.open().unwrap().into_channel()).unwrap();
+        fidl::AsyncChannel::from_channel(ramdisk.open().await.unwrap().into_channel()).unwrap();
     let controller_proxy = ControllerProxy::new(ramdisk_channel);
     controller_proxy
         .bind(GPT_DRIVER_PATH)
@@ -288,12 +288,13 @@ impl DiskBuilder {
         }
 
         // Create a ramdisk with a duplicate handle of `vmo` so we can keep the data once destroyed.
-        let ramdisk =
-            VmoRamdiskClientBuilder::new(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
-                .block_size(RAMDISK_BLOCK_SIZE)
-                .build()
-                .await
-                .unwrap();
+        let ramdisk = RamdiskClientBuilder::new_with_vmo(
+            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+            Some(RAMDISK_BLOCK_SIZE),
+        )
+        .build()
+        .await
+        .unwrap();
 
         let dev = fuchsia_fs::directory::open_in_namespace(
             "/dev",
@@ -377,7 +378,7 @@ impl DiskBuilder {
         }
 
         // Destroy the ramdisk device and return a VMO containing the partitions/filesystems.
-        ramdisk.destroy().expect("destroy failed");
+        ramdisk.destroy().await.expect("destroy failed");
         vmo
     }
 

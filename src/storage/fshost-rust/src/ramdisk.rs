@@ -70,7 +70,7 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<(), Error> {
         zstd::decode_all(compressed_buf.as_slice()).context("zstd decompression failed")?;
     ramdisk_vmo.write(&decompressed_buf, 0).context("writing decompressed contents to vmo")?;
 
-    let ramdisk = ramdevice_client::VmoRamdiskClientBuilder::new(ramdisk_vmo)
+    let ramdisk = ramdevice_client::RamdiskClientBuilder::new_with_vmo(ramdisk_vmo, None)
         .build()
         .await
         .context("building ramdisk from vmo")?;

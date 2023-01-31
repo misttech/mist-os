@@ -34,9 +34,11 @@ async fn make_ramdisk_and_filesystem() -> (RamdiskClient, Filesystem, ServingMul
 {
     let ramdisk = ramdisk().await;
 
-    let mut fxfs =
-        Filesystem::from_channel(ramdisk.open().unwrap().into_channel(), FxfsConfig::default())
-            .unwrap();
+    let mut fxfs = Filesystem::from_channel(
+        ramdisk.open().await.unwrap().into_channel(),
+        FxfsConfig::default(),
+    )
+    .unwrap();
 
     fxfs.format().await.expect("failed to format fxfs");
 

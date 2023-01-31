@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeManagerProxy},
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_zircon::{AsHandleRef, Rights, Status, Vmo},
-    ramdevice_client::{RamdiskClient, VmoRamdiskClientBuilder},
+    ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
     std::path::{Path, PathBuf},
     storage_isolated_driver_manager::{
         create_random_guid, fvm, wait_for_block_device, BlockDeviceMatcher,
@@ -21,8 +21,7 @@ async fn create_ramdisk(vmo: &Vmo, ramdisk_block_size: u64) -> RamdiskClient {
     let duplicated_vmo = Vmo::from(duplicated_handle);
 
     // Create the ramdisks
-    VmoRamdiskClientBuilder::new(duplicated_vmo)
-        .block_size(ramdisk_block_size)
+    RamdiskClientBuilder::new_with_vmo(duplicated_vmo, Some(ramdisk_block_size))
         .build()
         .await
         .unwrap()

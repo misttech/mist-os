@@ -81,14 +81,14 @@ pub async fn setup_ramdisk(
 
     // Create ramdisk
     let ramdisk = RamdiskClientBuilder::new(BLOCK_SIZE, BLOCK_COUNT)
-        .dev_root(get_dev_root_fd(realm_instance))
+        .dev_root(get_dev_root(realm_instance))
         .build()
         .await
         .expect("Could not create ramdisk");
 
     // Open ramdisk device and initialize FVM
     {
-        let ramdisk_handle = ramdisk.open().expect("Could not re-open ramdisk");
+        let ramdisk_handle = ramdisk.open().await.expect("Could not re-open ramdisk");
         let ramdisk_handle_raw = ramdisk_handle.raw_handle();
         let status = unsafe { fvm_init(ramdisk_handle_raw, FVM_SLICE_SIZE) };
         Status::ok(status).expect("could not initialize FVM structures in ramdisk");
@@ -97,7 +97,7 @@ pub async fn setup_ramdisk(
     // Open ramdisk device again as fidl_fuchsia_device::ControllerProxy
     //
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    let client_end = ramdisk.open().expect("Could not re-open ramdisk");
+    let client_end = ramdisk.open().await.expect("Could not re-open ramdisk");
     let client_end = fidl::endpoints::ClientEnd::<ControllerMarker>::new(client_end.into_channel());
     let controller =
         client_end.into_proxy().expect("Could not convert ramdisk channel to async channel");

@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    fidl::endpoints::{create_proxy, Proxy},
+    fidl::endpoints::create_proxy,
     fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
@@ -12,7 +12,7 @@ use {
         channel::mpsc::{self},
         FutureExt as _, StreamExt as _,
     },
-    ramdevice_client::{RamdiskClient, VmoRamdiskClientBuilder},
+    ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
 };
 
 pub mod disk_builder;
@@ -231,15 +231,8 @@ impl TestFixture {
 
     pub async fn add_ramdisk(&mut self, vmo: zx::Vmo) {
         let dev = self.dir("dev-topological");
-
-        let dev_fd = fdio::create_fd(dev.into_channel().unwrap().into_zx_channel().into()).unwrap();
-
-        let ramdisk = VmoRamdiskClientBuilder::new(vmo)
-            .dev_root(dev_fd)
-            .block_size(512)
-            .build()
-            .await
-            .unwrap();
+        let ramdisk =
+            RamdiskClientBuilder::new_with_vmo(vmo, Some(512)).dev_root(dev).build().await.unwrap();
         self.ramdisks.push(ramdisk);
     }
 

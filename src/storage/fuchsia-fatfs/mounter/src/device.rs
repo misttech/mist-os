@@ -336,9 +336,9 @@ pub mod test {
     #[fuchsia::test]
     async fn test_mount_device_succeeds() {
         let ramdisk = create_ramdisk().await;
-        let channel = ramdisk.open().expect("Opening ramdisk succeeds");
+        let channel = ramdisk.open().await.expect("Opening ramdisk succeeds");
         format(channel);
-        let channel = ramdisk.open().expect("Opening ramdisk succeeds");
+        let channel = ramdisk.open().await.expect("Opening ramdisk succeeds");
         setup_test_fs(channel, "mount_device");
 
         let dev =
@@ -370,15 +370,15 @@ pub mod test {
     #[fuchsia::test]
     async fn test_multiple_devices_opens_first() {
         let ramdisk1 = create_ramdisk().await;
-        let channel = ramdisk1.open().expect("Opening ramdisk succeeds");
+        let channel = ramdisk1.open().await.expect("Opening ramdisk succeeds");
         format(channel);
-        let channel = ramdisk1.open().expect("Opening ramdisk succeeds");
+        let channel = ramdisk1.open().await.expect("Opening ramdisk succeeds");
         setup_test_fs(channel, "ramdisk1");
 
         let ramdisk2 = create_ramdisk().await;
-        let channel = ramdisk2.open().expect("Opening ramdisk succeeds");
+        let channel = ramdisk2.open().await.expect("Opening ramdisk succeeds");
         format(channel);
-        let channel = ramdisk2.open().expect("Opening ramdisk succeeds");
+        let channel = ramdisk2.open().await.expect("Opening ramdisk succeeds");
         setup_test_fs(channel, "ramdisk2");
 
         let dev =
@@ -401,9 +401,9 @@ pub mod test {
         let _ramdisk1 = create_ramdisk().await;
 
         let ramdisk2 = create_ramdisk().await;
-        let channel = ramdisk2.open().expect("Opening ramdisk succeeds");
+        let channel = ramdisk2.open().await.expect("Opening ramdisk succeeds");
         format(channel);
-        let channel = ramdisk2.open().expect("Opening ramdisk succeeds");
+        let channel = ramdisk2.open().await.expect("Opening ramdisk succeeds");
         setup_test_fs(channel, "ramdisk2");
 
         // Currently, we expect this to fail, because `ramdisk1` has the right GUID but is not

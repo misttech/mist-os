@@ -209,7 +209,7 @@ impl BlobfsRamdisk {
 
     /// Signals blobfs to unmount and waits for it to exit cleanly, stopping the inner ramdisk.
     pub async fn stop(self) -> Result<(), Error> {
-        self.unmount().await?.stop()
+        self.unmount().await?.stop().await
     }
 
     /// Returns a sorted list of all blobs present in this blobfs instance.
@@ -267,7 +267,7 @@ impl RamdiskBuilder {
     pub async fn start(self) -> Result<Ramdisk, Error> {
         let client = RamdiskClient::builder(RAMDISK_BLOCK_SIZE, self.block_count);
         let client = client.build().await?;
-        let block = client.open()?;
+        let block = client.open().await?;
         let client_end = ClientEnd::<fio::NodeMarker>::new(block.into_channel());
         let proxy = client_end.into_proxy()?;
         Ok(Ramdisk { proxy, client })
@@ -315,8 +315,8 @@ impl Ramdisk {
     }
 
     /// Shuts down this ramdisk.
-    pub fn stop(self) -> Result<(), Error> {
-        Ok(self.client.destroy()?)
+    pub async fn stop(self) -> Result<(), Error> {
+        self.client.destroy().await
     }
 }
 
@@ -339,8 +339,8 @@ impl FormattedRamdisk {
     }
 
     /// Shuts down this ramdisk.
-    pub fn stop(self) -> Result<(), Error> {
-        self.0.stop()
+    pub async fn stop(self) -> Result<(), Error> {
+        self.0.stop().await
     }
 }
 
@@ -554,7 +554,7 @@ mod tests {
     async fn ramdisk_builder_sets_block_count() {
         for block_count in [1, 2, 3, 16] {
             let ramdisk = Ramdisk::builder().block_count(block_count).start().await.unwrap();
-            let client_end = ramdisk.client.open().unwrap();
+            let client_end = ramdisk.client.open().await.unwrap();
             let proxy = client_end.into_proxy().unwrap();
             let info = proxy.get_info().await.unwrap().unwrap();
             assert_eq!(info.block_count, block_count);

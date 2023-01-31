@@ -779,8 +779,8 @@ mod tests {
         RamdiskClient::create(block_size, 1 << 16).await.unwrap()
     }
 
-    fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem {
-        Filesystem::from_channel(ramdisk.open().unwrap().into_channel(), config).unwrap()
+    async fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem {
+        Filesystem::from_channel(ramdisk.open().await.unwrap().into_channel(), config).unwrap()
     }
 
     #[fuchsia::test]
@@ -794,25 +794,25 @@ mod tests {
             cache_eviction_policy_override: Some(BlobEvictionPolicy::EvictImmediately),
             ..Default::default()
         };
-        let mut blobfs = new_fs(&ramdisk, config);
+        let mut blobfs = new_fs(&ramdisk, config).await;
 
         blobfs.format().await.expect("failed to format blobfs");
         blobfs.fsck().await.expect("failed to fsck blobfs");
         let _ = blobfs.serve().await.expect("failed to serve blobfs");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
     async fn blobfs_format_fsck_success() {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
-        let mut blobfs = new_fs(&ramdisk, Blobfs::default());
+        let mut blobfs = new_fs(&ramdisk, Blobfs::default()).await;
 
         blobfs.format().await.expect("failed to format blobfs");
         blobfs.fsck().await.expect("failed to fsck blobfs");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[ignore]
@@ -821,13 +821,13 @@ mod tests {
         const BLOCK_SIZE: usize = 512;
 
         let ramdisk = ramdisk(BLOCK_SIZE.try_into().expect("overflow")).await;
-        let mut blobfs = new_fs(&ramdisk, Blobfs::default());
+        let mut blobfs = new_fs(&ramdisk, Blobfs::default()).await;
         let () = blobfs.format().await.expect("failed to format blobfs");
 
         // force fsck to fail by stomping all over one of blobfs's metadata blocks after formatting
         // TODO(fxbug.dev/35860): corrupt something other than the superblock
         {
-            let device_channel = ramdisk.open().expect("failed to get channel to device");
+            let device_channel = ramdisk.open().await.expect("failed to get channel to device");
             let device_proxy = device_channel.into_proxy().expect("into proxy");
             let block_client = RemoteBlockClient::new(device_proxy).await.expect("block client");
             let bytes = Box::new([0xff; BLOCK_SIZE]);
@@ -840,14 +840,14 @@ mod tests {
         let _: anyhow::Error =
             blobfs.fsck().await.expect_err("fsck succeeded when it shouldn't have");
 
-        let () = ramdisk.destroy().expect("failed to destroy ramdisk");
+        let () = ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
     async fn blobfs_format_serve_write_query_restart_read_shutdown() {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
-        let mut blobfs = new_fs(&ramdisk, Blobfs::default());
+        let mut blobfs = new_fs(&ramdisk, Blobfs::default()).await;
 
         blobfs.format().await.expect("failed to format blobfs");
 
@@ -914,7 +914,7 @@ mod tests {
 
         serving.shutdown().await.expect("failed to shutdown blobfs the second time");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
@@ -923,7 +923,7 @@ mod tests {
         let merkle = "be901a14ec42ee0a8ee220eb119294cdd40d26d573139ee3d51e4430e7d08c28";
         let test_content = b"test content";
         let ramdisk = ramdisk(block_size).await;
-        let mut blobfs = new_fs(&ramdisk, Blobfs::default());
+        let mut blobfs = new_fs(&ramdisk, Blobfs::default()).await;
 
         blobfs.format().await.expect("failed to format blobfs");
         let mut serving = blobfs.serve().await.expect("failed to serve blobfs");
@@ -958,25 +958,25 @@ mod tests {
             fsck_after_every_transaction: true,
             ..Default::default()
         };
-        let mut minfs = new_fs(&ramdisk, config);
+        let mut minfs = new_fs(&ramdisk, config).await;
 
         minfs.format().await.expect("failed to format minfs");
         minfs.fsck().await.expect("failed to fsck minfs");
         let _ = minfs.serve().await.expect("failed to serve minfs");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
     async fn minfs_format_fsck_success() {
         let block_size = 8192;
         let ramdisk = ramdisk(block_size).await;
-        let mut minfs = new_fs(&ramdisk, Minfs::default());
+        let mut minfs = new_fs(&ramdisk, Minfs::default()).await;
 
         minfs.format().await.expect("failed to format minfs");
         minfs.fsck().await.expect("failed to fsck minfs");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
@@ -984,13 +984,13 @@ mod tests {
         const BLOCK_SIZE: usize = 8192;
 
         let ramdisk = ramdisk(BLOCK_SIZE.try_into().expect("overflow")).await;
-        let mut minfs = new_fs(&ramdisk, Minfs::default());
+        let mut minfs = new_fs(&ramdisk, Minfs::default()).await;
 
         let () = minfs.format().await.expect("failed to format minfs");
 
         // force fsck to fail by stomping all over one of minfs's metadata blocks after formatting
         {
-            let device_channel = ramdisk.open().expect("failed to get channel to device");
+            let device_channel = ramdisk.open().await.expect("failed to get channel to device");
             let device_proxy = device_channel.into_proxy().expect("into proxy");
             let block_client = RemoteBlockClient::new(device_proxy).await.expect("block client");
             let bytes = Box::new([0xff; BLOCK_SIZE]);
@@ -1012,14 +1012,14 @@ mod tests {
         let _: anyhow::Error =
             minfs.fsck().await.expect_err("fsck succeeded when it shouldn't have");
 
-        let () = ramdisk.destroy().expect("failed to destroy ramdisk");
+        let () = ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
     async fn minfs_format_serve_write_query_restart_read_shutdown() {
         let block_size = 8192;
         let ramdisk = ramdisk(block_size).await;
-        let mut minfs = new_fs(&ramdisk, Minfs::default());
+        let mut minfs = new_fs(&ramdisk, Minfs::default()).await;
 
         minfs.format().await.expect("failed to format minfs");
         let serving = minfs.serve().await.expect("failed to serve minfs the first time");
@@ -1079,7 +1079,7 @@ mod tests {
 
         let _ = serving.shutdown().await.expect("failed to shutdown minfs the second time");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
@@ -1087,7 +1087,7 @@ mod tests {
         let block_size = 8192;
         let test_content = b"test content";
         let ramdisk = ramdisk(block_size).await;
-        let mut minfs = new_fs(&ramdisk, Minfs::default());
+        let mut minfs = new_fs(&ramdisk, Minfs::default()).await;
 
         minfs.format().await.expect("failed to format minfs");
         let mut serving = minfs.serve().await.expect("failed to serve minfs");
@@ -1115,19 +1115,19 @@ mod tests {
     async fn f2fs_format_fsck_success() {
         let block_size = 4096;
         let ramdisk = ramdisk(block_size).await;
-        let mut f2fs = new_fs(&ramdisk, F2fs::default());
+        let mut f2fs = new_fs(&ramdisk, F2fs::default()).await;
 
         f2fs.format().await.expect("failed to format f2fs");
         f2fs.fsck().await.expect("failed to fsck f2fs");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
     async fn f2fs_format_serve_write_query_restart_read_shutdown() {
         let block_size = 4096;
         let ramdisk = ramdisk(block_size).await;
-        let mut f2fs = new_fs(&ramdisk, F2fs::default());
+        let mut f2fs = new_fs(&ramdisk, F2fs::default()).await;
 
         f2fs.format().await.expect("failed to format f2fs");
         let serving = f2fs.serve().await.expect("failed to serve f2fs the first time");
@@ -1188,7 +1188,7 @@ mod tests {
         serving.shutdown().await.expect("failed to shutdown f2fs the second time");
         f2fs.fsck().await.expect("failed to fsck f2fs after shutting down the second time");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
@@ -1196,7 +1196,7 @@ mod tests {
         let block_size = 4096;
         let test_content = b"test content";
         let ramdisk = ramdisk(block_size).await;
-        let mut f2fs = new_fs(&ramdisk, F2fs::default());
+        let mut f2fs = new_fs(&ramdisk, F2fs::default()).await;
 
         f2fs.format().await.expect("failed to format f2fs");
         let mut serving = f2fs.serve().await.expect("failed to serve f2fs");
@@ -1225,45 +1225,45 @@ mod tests {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
         let config = Factoryfs { verbose: true };
-        let mut factoryfs = new_fs(&ramdisk, config);
+        let mut factoryfs = new_fs(&ramdisk, config).await;
 
         factoryfs.format().await.expect("failed to format factoryfs");
         factoryfs.fsck().await.expect("failed to fsck factoryfs");
         let _ = factoryfs.serve().await.expect("failed to serve factoryfs");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
     async fn factoryfs_format_fsck_success() {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
-        let mut factoryfs = new_fs(&ramdisk, Factoryfs::default());
+        let mut factoryfs = new_fs(&ramdisk, Factoryfs::default()).await;
 
         factoryfs.format().await.expect("failed to format factoryfs");
         factoryfs.fsck().await.expect("failed to fsck factoryfs");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
     async fn factoryfs_format_serve_shutdown() {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
-        let mut factoryfs = new_fs(&ramdisk, Factoryfs::default());
+        let mut factoryfs = new_fs(&ramdisk, Factoryfs::default()).await;
 
         factoryfs.format().await.expect("failed to format factoryfs");
         let serving = factoryfs.serve().await.expect("failed to serve factoryfs");
         serving.shutdown().await.expect("failed to shutdown factoryfs");
 
-        ramdisk.destroy().expect("failed to destroy ramdisk");
+        ramdisk.destroy().await.expect("failed to destroy ramdisk");
     }
 
     #[fuchsia::test]
     async fn factoryfs_bind_to_path() {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
-        let mut factoryfs = new_fs(&ramdisk, Factoryfs::default());
+        let mut factoryfs = new_fs(&ramdisk, Factoryfs::default()).await;
 
         factoryfs.format().await.expect("failed to format factoryfs");
         {
@@ -1288,7 +1288,7 @@ mod tests {
     async fn fxfs_shutdown_component_when_dropped() {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
-        let mut fxfs = new_fs(&ramdisk, Fxfs::default());
+        let mut fxfs = new_fs(&ramdisk, Fxfs::default()).await;
 
         fxfs.format().await.expect("failed to format fxfs");
         {
@@ -1317,7 +1317,7 @@ mod tests {
     async fn fxfs_open_volume() {
         let block_size = 512;
         let ramdisk = ramdisk(block_size).await;
-        let mut fxfs = new_fs(&ramdisk, Fxfs::default());
+        let mut fxfs = new_fs(&ramdisk, Fxfs::default()).await;
 
         fxfs.format().await.expect("failed to format fxfs");
 

@@ -760,11 +760,11 @@ mod tests {
         let ramdisk = RamdiskClient::create(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT)
             .await
             .expect("RamdiskClient::create failed");
-        let client_end = ramdisk.open().expect("ramdisk.open failed");
+        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
         let proxy = client_end.into_proxy().expect("into_proxy failed");
         let remote_block_device = RemoteBlockClient::new(proxy).await.expect("new failed");
         assert_eq!(remote_block_device.block_size(), 1024);
-        let client_end = ramdisk.open().expect("ramdisk.open failed");
+        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
         let proxy = client_end.into_proxy().expect("into_proxy failed");
         (ramdisk, proxy, remote_block_device)
     }
@@ -925,7 +925,7 @@ mod tests {
         }
         assert!(remote_block_device.is_connected());
         let _ = futures::join!(futures::future::join_all(reads), async {
-            ramdisk.destroy().expect("ramdisk.destroy failed")
+            ramdisk.destroy().await.expect("ramdisk.destroy failed")
         });
         // Destroying the ramdisk is asynchronous. Keep issuing reads until they start failing.
         while remote_block_device

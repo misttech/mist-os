@@ -106,7 +106,7 @@ impl FvmRamdisk {
     /// and leaving the ramdisk to run once the application has quit.
     pub async fn pave_fvm(mut self) -> Result<(), Error> {
         info!("connecting to the paver");
-        let client_end = self.ramdisk.open().context("Opening ramdisk")?;
+        let client_end = self.ramdisk.open().await.context("Opening ramdisk")?;
         let paver =
             fuchsia_component::client::connect_to_protocol::<fidl_fuchsia_paver::PaverMarker>()?;
         let (data_sink, remote) =
@@ -144,7 +144,7 @@ impl FvmRamdisk {
             .build()
             .await
             .context("building ramdisk")?;
-        let channel = ramdisk.open().context("Opening ramdisk")?;
+        let channel = ramdisk.open().await.context("Opening ramdisk")?;
         let block_client = remote_block_device::RemoteBlockClientSync::new(channel)
             .context("creating remote block client")?;
         let cache = remote_block_device::cache::Cache::new(block_client)
@@ -156,7 +156,7 @@ impl FvmRamdisk {
 
     /// Explicitly binds the GPT driver to the given ramdisk.
     async fn rebind_gpt_driver(&self) -> Result<(), Error> {
-        let client_end = self.ramdisk.open()?;
+        let client_end = self.ramdisk.open().await?;
         // TODO(https://fxbug.dev/112484): this relies on multiplexing.
         let client_end =
             fidl::endpoints::ClientEnd::<ControllerMarker>::new(client_end.into_channel());
