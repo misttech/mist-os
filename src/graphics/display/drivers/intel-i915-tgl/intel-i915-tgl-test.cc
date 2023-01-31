@@ -4,6 +4,8 @@
 
 #include "src/graphics/display/drivers/intel-i915-tgl/intel-i915-tgl.h"
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -103,18 +105,14 @@ class MockNoCpuBufferCollection
   fuchsia_sysmem::wire::BufferCollectionConstraints constraints_;
 };
 
-class FakeSysmem : public ddk::SysmemProtocol<FakeSysmem> {
+class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
   FakeSysmem() = default;
 
-  const sysmem_protocol_ops_t* proto_ops() const { return &sysmem_protocol_ops_; }
-
-  zx_status_t SysmemConnect(zx::channel allocator2_request) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection) {
-    return ZX_ERR_NOT_SUPPORTED;
+  // FIDL methods
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
-  zx_status_t SysmemRegisterSecureMem(zx::channel tee_connection) { return ZX_ERR_NOT_SUPPORTED; }
-  zx_status_t SysmemUnregisterSecureMem() { return ZX_ERR_NOT_SUPPORTED; }
 };
 
 class TglIntegrationTest : public ::testing::Test {
@@ -137,8 +135,15 @@ class TglIntegrationTest : public ::testing::Test {
     });
 
     parent_ = MockDevice::FakeRootParent();
-    parent_->AddProtocol(ZX_PROTOCOL_SYSMEM, sysmem_.proto_ops(), &sysmem_, "sysmem");
-
+    parent_->AddFidlProtocol(
+        fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
+        [this](zx::channel channel) {
+          fidl::BindServer(loop_.dispatcher(),
+                           fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem>(std::move(channel)),
+                           &sysmem_);
+          return ZX_OK;
+        },
+        "sysmem-fidl");
     parent_->AddFidlProtocol(
         fidl::DiscoverableProtocolName<fuchsia_hardware_pci::Device>,
         [this](zx::channel channel) {

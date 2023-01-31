@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_INTEL_I915_TGL_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_INTEL_I915_TGL_H_
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/cpp/banjo.h>
@@ -246,7 +247,7 @@ class Controller : public DeviceType,
   bool gpu_released_ = false;
   bool display_released_ = false;
 
-  sysmem_protocol_t sysmem_;
+  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
 
   ddk::DisplayControllerInterfaceProtocolClient dc_intf_ __TA_GUARDED(display_lock_);
   bool ready_for_callback_ __TA_GUARDED(display_lock_) = false;

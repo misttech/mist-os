@@ -1779,10 +1779,11 @@ void Controller::DisplayControllerImplApplyConfiguration(const display_config_t*
 }
 
 zx_status_t Controller::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  zx_status_t status = sysmem_connect(&sysmem_, connection.release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not connect to sysmem");
-    return status;
+  auto result =
+      sysmem_->ConnectServer(fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(connection)));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Could not connect to sysmem: %s", result.status_string());
+    return result.status();
   }
 
   return ZX_OK;
@@ -2227,12 +2228,21 @@ void Controller::DdkResume(ddk::ResumeTxn txn) {
 zx_status_t Controller::Init() {
   zxlogf(TRACE, "Binding to display controller");
 
-  zx_status_t status = ZX_ERR_NOT_FOUND;
-  if ((status = device_get_fragment_protocol(parent(), "sysmem", ZX_PROTOCOL_SYSMEM, &sysmem_)) !=
-      ZX_OK) {
-    zxlogf(ERROR, "Could not get Display SYSMEM protocol: %s", zx_status_get_string(status));
+  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+  if (sysmem_endpoints.is_error()) {
+    zxlogf(ERROR, "could not create SYSMEM endpoints: %s", sysmem_endpoints.status_string());
+    return sysmem_endpoints.status_value();
+  }
+
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      parent(), "sysmem-fidl", fidl::DiscoverableProtocolName<fuchsia_hardware_sysmem::Sysmem>,
+      sysmem_endpoints->server.TakeHandle().release());
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "could not get SYSMEM protocol: %s", zx_status_get_string(status));
     return status;
   }
+
+  sysmem_.Bind(std::move(sysmem_endpoints->client));
 
   pci_ = ddk::Pci(parent(), "pci");
   if (!pci_.is_valid()) {
