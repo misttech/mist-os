@@ -39,5 +39,20 @@
                 "*skip*",
             ],
         },
+
+        // If a test produces error logs, the `with_err_logs` expectation can be used alongside
+        // GN flags (see README) to restrict the environments in which the test is run.
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                "*a_failing_test_with_err_logs*",
+            ],
+        },
+        {
+            type: "expect_pass_with_err_logs",
+            matchers: [
+                "*a_passing_test_with_err_logs*",
+            ],
+        },
     ],
 }

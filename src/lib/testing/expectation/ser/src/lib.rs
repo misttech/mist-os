@@ -3,14 +3,41 @@
 // found in the LICENSE file.
 
 use serde::ser::SerializeSeq as _;
+use std::str::FromStr;
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
 pub struct Expectations {
     #[serde(rename = "actions")]
     pub expectations: Vec<Expectation>,
+    pub cases_to_run: CasesToRun,
 }
 
-#[derive(serde::Deserialize, serde::Serialize, Debug)]
+pub const ALL_CASES_LABEL: &str = "All";
+const WITH_ERR_LOGS_CASES_LABEL: &str = "WithErrLogs";
+const NO_ERR_LOGS_CASES_LABEL: &str = "NoErrLogs";
+
+#[derive(serde::Deserialize, serde::Serialize, Debug, Eq, PartialEq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum CasesToRun {
+    WithErrLogs,
+    NoErrLogs,
+    All,
+}
+
+impl FromStr for CasesToRun {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            NO_ERR_LOGS_CASES_LABEL => Ok(CasesToRun::NoErrLogs),
+            WITH_ERR_LOGS_CASES_LABEL => Ok(CasesToRun::WithErrLogs),
+            ALL_CASES_LABEL => Ok(CasesToRun::All),
+            _ => Err(anyhow::anyhow!("Invalid CasesToRun {}", s)),
+        }
+    }
+}
+
+#[derive(Clone, serde::Deserialize, serde::Serialize, Debug)]
 pub struct Matchers {
     #[serde(deserialize_with = "deserialize_glob_vec", serialize_with = "serialize_glob_vec")]
     pub matchers: Vec<glob::Pattern>,
@@ -41,6 +68,8 @@ pub enum Expectation {
     ExpectFailure(Matchers),
     ExpectPass(Matchers),
     Skip(Matchers),
+    ExpectFailureWithErrLogs(Matchers),
+    ExpectPassWithErrLogs(Matchers),
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Debug)]
@@ -60,4 +89,21 @@ pub enum UnmergedExpectation {
 pub struct UnmergedExpectations {
     #[serde(rename = "actions")]
     pub expectations: Vec<UnmergedExpectation>,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{CasesToRun, ALL_CASES_LABEL, NO_ERR_LOGS_CASES_LABEL, WITH_ERR_LOGS_CASES_LABEL};
+    use std::str::FromStr;
+
+    #[test]
+    fn cases_to_run_from_str() {
+        assert_eq!(CasesToRun::from_str(ALL_CASES_LABEL).unwrap(), CasesToRun::All);
+        assert_eq!(
+            CasesToRun::from_str(WITH_ERR_LOGS_CASES_LABEL).unwrap(),
+            CasesToRun::WithErrLogs
+        );
+        assert_eq!(CasesToRun::from_str(NO_ERR_LOGS_CASES_LABEL).unwrap(), CasesToRun::NoErrLogs);
+        assert!(CasesToRun::from_str("Garbage").is_err());
+    }
 }

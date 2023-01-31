@@ -27,6 +27,12 @@ template("preprocess_expectations") {
       "--depfile",
       rebase_path(depfile, root_build_dir),
     ]
+    if (defined(invoker.cases_to_run)) {
+      args += [
+        "--cases-to-run",
+        invoker.cases_to_run,
+      ]
+    }
 
     outputs = [ _preprocessed_expectations ]
     sources = [ invoker.expectations ]

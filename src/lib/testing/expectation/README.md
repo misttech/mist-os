@@ -63,3 +63,53 @@ information.
 
 Pass/fail/skip expectations are specified via a JSON5 file.
 See `./example_expectations.json5` for a simple example.
+
+## Cases Generating Error Logs
+
+Due to limitations (see https://fxbug.dev/65359), the testing framework fails
+any test suite in which error logs are generated, even if the test case generating
+those logs is expected to fail. There are a couple of options here.
+
+### Option 1: Skip cases that generate error logs
+
+Pros: Simple.
+Cons: No signal from skipped tests.
+
+### Option 2: Allow error logs in all tests
+
+Run the tests in a package with:
+
+```
+test_specs {
+  log_settings = {
+    max_severity = "ERROR"
+  }
+}
+```
+
+Pro: Retain a signal from skipped tests.
+Con: Lose the signal from error logs.
+
+### Option 3: Use the expectation framework's `expect_{pass|failure}`
+
+In the expectation's file, include expects with one of the following `type`s:
+
+* `expect_pass_with_err_logs`
+* `expect_failure_with_err_logs`
+
+When instantiating a test package, pass one of the following flags:
+
+* "RUN_ONLY_CASES_WITH_ERROR_LOGS", in which case only those cases with a `with_err_logs`
+  expect type will be run.
+* "SKIP_CASES_WITH_ERROR_LOGS", in which case those cases with a `with_err_logs` expect
+  type will NOT be run.
+
+By default, all cases will be run.
+
+Pros:
+* Option to retain both the signal from skipped tests and from error logs (e.g. with
+  two packages).
+* Just one expectations file.
+
+Con:
+* A bit more complex than Options 1 and 2.

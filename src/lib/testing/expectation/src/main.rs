@@ -12,12 +12,30 @@ use itertools::Itertools as _;
 struct Expectation<'a>(&'a ser::Expectation);
 
 impl Expectation<'_> {
-    fn expected_outcome(&self, invocation: &fidl_fuchsia_test::Invocation) -> Option<Outcome> {
+    fn expected_outcome(
+        &self,
+        invocation: &fidl_fuchsia_test::Invocation,
+        cases_to_run: &ser::CasesToRun,
+    ) -> Option<Outcome> {
         let Expectation(expectation) = self;
         let (ser::Matchers { matchers }, outcome) = match expectation {
-            ser::Expectation::ExpectFailure(a) => (a, Outcome::Fail),
-            ser::Expectation::ExpectPass(a) => (a, Outcome::Pass),
             ser::Expectation::Skip(a) => (a, Outcome::Skip),
+            ser::Expectation::ExpectFailure(a) => match cases_to_run {
+                ser::CasesToRun::WithErrLogs => (a, Outcome::Skip),
+                _ => (a, Outcome::Fail),
+            },
+            ser::Expectation::ExpectPass(a) => match cases_to_run {
+                ser::CasesToRun::WithErrLogs => (a, Outcome::Skip),
+                _ => (a, Outcome::Pass),
+            },
+            ser::Expectation::ExpectFailureWithErrLogs(a) => match cases_to_run {
+                ser::CasesToRun::NoErrLogs => (a, Outcome::Skip),
+                _ => (a, Outcome::Fail),
+            },
+            ser::Expectation::ExpectPassWithErrLogs(a) => match cases_to_run {
+                ser::CasesToRun::NoErrLogs => (a, Outcome::Skip),
+                _ => (a, Outcome::Pass),
+            },
         };
         let name = invocation
             .name
@@ -68,11 +86,9 @@ struct ExpectationsComparer {
 
 impl ExpectationsComparer {
     fn expected_outcome(&self, invocation: &fidl_fuchsia_test::Invocation) -> Option<Outcome> {
-        self.expectations
-            .expectations
-            .iter()
-            .rev()
-            .find_map(|expectation| Expectation(expectation).expected_outcome(invocation))
+        self.expectations.expectations.iter().rev().find_map(|expectation| {
+            Expectation(expectation).expected_outcome(invocation, &self.expectations.cases_to_run)
+        })
     }
 
     fn check_against_expectation(
@@ -384,8 +400,22 @@ mod test {
         println!("this is a passing test")
     }
 
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn a_passing_test_with_err_logs() {
+        diagnostics_log::init!();
+        tracing::log::error!("this is an error");
+        println!("this is a passing test");
+    }
+
     #[test]
     fn a_failing_test() {
+        panic!("this is a failing test")
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn a_failing_test_with_err_logs() {
+        diagnostics_log::init!();
+        tracing::log::error!("this is an error");
         panic!("this is a failing test")
     }
 

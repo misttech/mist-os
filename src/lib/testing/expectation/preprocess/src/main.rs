@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use ser::{Expectation, Include, UnmergedExpectation};
+use ser::{CasesToRun, Expectation, Include, UnmergedExpectation, ALL_CASES_LABEL};
+use std::str::FromStr;
 
 #[derive(FromArgs)]
 /// Merge and validate expectations files
@@ -19,6 +20,10 @@ struct PreprocessArgs {
     /// location to write merged expectations file
     #[argh(option)]
     preprocessed_expectations_file: std::path::PathBuf,
+
+    /// location to write merged expectations file
+    #[argh(option, default = "String::from(ALL_CASES_LABEL)")]
+    cases_to_run: String,
 }
 
 fn main() {
@@ -37,6 +42,7 @@ fn preprocess(
         root_expectations_file,
         depfile,
         preprocessed_expectations_file,
+        cases_to_run,
     }: PreprocessArgs,
 ) {
     let mut discovered_deps = std::collections::HashSet::new();
@@ -53,9 +59,8 @@ fn preprocess(
             );
             expectations
         },
+        cases_to_run: CasesToRun::from_str(&cases_to_run).expect("failed to convert from string"),
     };
-    let discovered_deps = discovered_deps;
-
     std::fs::write(
         &preprocessed_expectations_file,
         serde_json5::to_string(&merged_expectations)
@@ -172,6 +177,7 @@ mod tests {
                 .unwrap(),
                 depfile: root_build_dir.join(std::path::Path::new("testdepfile.d")),
                 preprocessed_expectations_file: actual_filepath.clone(),
+                cases_to_run: crate::ALL_CASES_LABEL.to_string(),
             },
         );
 
@@ -207,6 +213,9 @@ mod tests {
             ],
         },
     ],
+    cases_to_run: {
+        type: "all",
+    }
 }
 "#;
         test_preprocessor(
@@ -285,6 +294,9 @@ mod tests {
                         "matchers": [ "relative_case" ],
                     },
                 ],
+                "cases_to_run": {
+                    "type": "all",
+                }
             }),
         )
     }

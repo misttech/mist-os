@@ -41,7 +41,17 @@ import("//tools/cmc/build/expect_includes.gni")
 #     `fuchsia_package()` target) and an optional `name`. See
 #     `fuchsia_package()` for more details.
 #     Type: list of scopes
-
+#
+#   treatment_of_cases_with_error_logs (optional)
+#      Identifies how test cases that are expected to generate error logs
+#      should be run.
+#      Type: string
+#      Options:
+#        - "SKIP_CASES_WITH_ERROR_LOGS" indicates that tests expected to
+#          generate error logs should be skipped.
+#        - "RUN_ONLY_CASES_WITH_ERROR_LOGS" indicates that only those tests
+#          expected to generate error logs should be run.
+#        - By default, all test cases will be run.
 #   data_deps
 #   deps
 #   visibility
@@ -50,8 +60,25 @@ template("fuchsia_test_with_expectations_package") {
 
   _base_target_name = target_name
 
+  _skip_err_logs_cases = "SKIP_CASES_WITH_ERROR_LOGS"
+  _run_err_logs_cases = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+  not_needed([
+               _skip_err_logs_cases,
+               _run_err_logs_cases,
+             ])
+
   _expectations_target = "${target_name}-expectations"
   preprocess_expectations(_expectations_target) {
+    if (defined(invoker.treatment_of_cases_with_error_logs)) {
+      assert(
+          invoker.treatment_of_cases_with_error_logs == _skip_err_logs_cases ||
+          invoker.treatment_of_cases_with_error_logs == _run_err_logs_cases)
+      if (invoker.treatment_of_cases_with_error_logs == _skip_err_logs_cases) {
+        cases_to_run = "NoErrLogs"
+      } else {
+        cases_to_run = "WithErrLogs"
+      }
+    }
     expectations = invoker.expectations
     output_path = "expectations.json5"
   }
