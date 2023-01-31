@@ -76,14 +76,6 @@ impl Filesystem {
         Self { config: Box::new(config), block_device, component: None }
     }
 
-    // TODO(tamird): Remove this after soft transition in v/g.
-    pub fn from_path<FSC: FSConfig + 'static>(path: &str, config: FSC) -> Result<Self, Error> {
-        let proxy = fuchsia_component::client::connect_to_protocol_at_path::<
-            fidl_fuchsia_device::ControllerMarker,
-        >(path)?;
-        Ok(Self::new(proxy, config))
-    }
-
     /// Creates a new `Filesystem`.
     pub fn from_block_device<FSC: FSConfig + 'static>(
         block_device: ClientEnd<fhardware_block::BlockMarker>,
