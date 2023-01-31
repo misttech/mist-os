@@ -2129,7 +2129,8 @@ TEST_F(PinecrestPartitionerTests, FindPartition) {
   // The initial gpt partitions are randomly chosen and does not necessarily reflect the
   // actual gpt partition layout in product.
   const std::vector<PartitionDescription> kPinecrestNewPartitions = {
-      {GUID_ABR_META_NAME, kDummyType, 0x10400, 0x10000},
+      // ABR is matched by type GUID instead of partition name.
+      {GUID_ABR_META_NAME, kAbrMetaType, 0x10400, 0x10000},
       {GPT_VBMETA_A_NAME, kDummyType, 0x20400, 0x10000},
       {GPT_VBMETA_B_NAME, kDummyType, 0x30400, 0x10000},
       {GPT_VBMETA_R_NAME, kDummyType, 0x40400, 0x10000},

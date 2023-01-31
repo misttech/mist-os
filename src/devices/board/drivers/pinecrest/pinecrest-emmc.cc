@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.gpt.metadata/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>
+#include <zircon/hw/gpt.h>
 
 #include <soc/as370/as370-hw.h>
 
@@ -47,6 +49,36 @@ zx_status_t Pinecrest::EmmcInit() {
       }},
   };
 
+  fidl::Arena<> fidl_arena;
+
+  fidl::VectorView<fuchsia_hardware_gpt_metadata::wire::PartitionInfo> partition_info(fidl_arena,
+                                                                                      1);
+
+  // Block core should ignore the 'misc' partition; the abr-shim driver will bind in its place.
+  partition_info[0].name = "misc";
+  partition_info[0].options =
+      fuchsia_hardware_gpt_metadata::wire::PartitionOptions::Builder(fidl_arena)
+          .type_guid_override(GUID_ABR_META_VALUE)
+          .block_driver_should_ignore_device(true)
+          .Build();
+
+  fit::result encoded =
+      fidl::Persist(fuchsia_hardware_gpt_metadata::wire::GptInfo::Builder(fidl_arena)
+                        .partition_info(partition_info)
+                        .Build());
+  if (!encoded.is_ok()) {
+    zxlogf(ERROR, "Failed to encode GPT metadata: %s",
+           encoded.error_value().FormatDescription().c_str());
+    return encoded.error_value().status();
+  }
+
+  static const std::vector<fpbus::Metadata> emmc_metadata{
+      {{
+          .type = DEVICE_METADATA_GPT_INFO,
+          .data = std::move(encoded.value()),
+      }},
+  };
+
   fpbus::Node emmc_dev;
   emmc_dev.name() = "pinecrest-emmc";
   emmc_dev.vid() = PDEV_VID_SYNAPTICS;
@@ -56,8 +88,8 @@ zx_status_t Pinecrest::EmmcInit() {
   emmc_dev.mmio() = emmc_mmios;
   emmc_dev.bti() = emmc_btis;
   emmc_dev.boot_metadata() = emmc_boot_metadata;
+  emmc_dev.metadata() = emmc_metadata;
 
-  fidl::Arena<> fidl_arena;
   fdf::Arena arena('EMMC');
   auto result = pbus_.buffer(arena)->AddComposite(
       fidl::ToWire(fidl_arena, emmc_dev),

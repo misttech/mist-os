@@ -103,6 +103,14 @@ zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartition
     const PartitionSpec& spec) const {
   std::function<bool(const gpt_partition_t&)> filter;
   switch (spec.partition) {
+    case Partition::kAbrMeta: {
+      auto partition = OpenBlockPartition(gpt_->devfs_root(), std::nullopt,
+                                          Uuid(GUID_ABR_META_VALUE), ZX_SEC(5));
+      if (partition.is_error()) {
+        return partition.take_error();
+      }
+      return zx::ok(new BlockPartitionClient(std::move(partition.value())));
+    }
     case Partition::kBootloaderA:
     case Partition::kBootloaderB:
     case Partition::kZirconA:
@@ -111,12 +119,8 @@ zx::result<std::unique_ptr<PartitionClient>> PinecrestPartitioner::FindPartition
     case Partition::kVbMetaA:
     case Partition::kVbMetaB:
     case Partition::kVbMetaR:
-    case Partition::kAbrMeta:
       filter = [&spec](const gpt_partition_t& part) {
-        const auto partition_scheme = spec.partition == Partition::kAbrMeta
-                                          ? PartitionScheme::kLegacy
-                                          : PartitionScheme::kNew;
-        const char* name = PartitionName(spec.partition, partition_scheme);
+        const char* name = PartitionName(spec.partition, PartitionScheme::kNew);
         return FilterByName(part, name);
       };
       break;
