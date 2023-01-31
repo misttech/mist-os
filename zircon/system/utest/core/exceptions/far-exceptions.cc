@@ -38,7 +38,8 @@ void CatchCrash(uintptr_t pc, uintptr_t sp, uintptr_t arg1, zx_exception_report_
   zx_signals_t pending;
   ASSERT_OK(exception_channel.wait_one(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED,
                                        zx::time::infinite(), &pending));
-  ZX_ASSERT_MSG(pending & ZX_CHANNEL_READABLE, "exception channel peer closed");
+  ASSERT_NE(0, pending & ZX_CHANNEL_READABLE, "exception channel peer closed (pending 0x%08x)",
+            pending);
 
   // Read the exception message.
   zx::exception exc;
