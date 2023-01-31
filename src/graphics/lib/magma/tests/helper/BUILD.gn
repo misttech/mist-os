@@ -42,6 +42,12 @@ source_set("command_buffer_helper_cpp") {
   deps = [ "$magma_build_root/src/sys_driver_cpp" ]
 }
 
+source_set("msd_stubs") {
+  testonly = true
+  sources = [ "msd_stubs.h" ]
+  public_deps = [ "//src/graphics/lib/magma/include:msd_cc" ]
+}
+
 source_set("test_device_helper") {
   testonly = true
   public_configs = [ "//src/graphics/lib/magma:magma_tests_include_config" ]

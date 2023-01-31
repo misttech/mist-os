@@ -19,7 +19,7 @@
 
 #include "magma_util/address_space_allocator.h"
 #include "magma_util/macros.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "msd_defs.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_space.h"
@@ -83,7 +83,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   bool ExecuteAtom(size_t* remaining_data_size, magma_arm_mali_atom* atom,
                    std::deque<std::shared_ptr<magma::PlatformSemaphore>>* signal_semaphores);
 
-  void SetNotificationCallback(msd_connection_notification_callback_t callback, void* token);
+  void SetNotificationCallback(msd::NotificationHandler* handler);
   void SendNotificationData(MsdArmAtom* atom);
   void MarkDestroyed();
 
@@ -120,7 +120,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   void DecrementContextCount() { context_count_--; }
   uint64_t context_count() const { return context_count_; }
 
-  void SendPerfCounterNotification(msd_notification_t* notification);
+  void SendPerfCounterNotification(const msd::PerfCounterResult& results);
 
   magma_status_t EnablePerformanceCounters(std::vector<uint64_t> flags);
   magma_status_t DumpPerformanceCounters(std::shared_ptr<MsdArmPerfCountPool> pool,
@@ -223,31 +223,54 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   bool address_space_lost_ = false;
 
   std::mutex callback_lock_;
-  msd_connection_notification_callback_t callback_;
-  void* token_ = {};
+  msd::NotificationHandler* notification_handler_{};
   std::shared_ptr<MsdArmAtom> outstanding_atoms_[256];
   std::atomic<uint32_t> context_count_{0};
 
   std::shared_ptr<ConnectionPerfCountManager> perf_count_manager_;
 };
 
-class MsdArmAbiConnection : public msd_connection_t {
+class MsdArmAbiConnection : public msd::Connection {
  public:
   MsdArmAbiConnection(std::shared_ptr<MsdArmConnection> ptr) : ptr_(std::move(ptr)) {
     magic_ = kMagic;
   }
 
-  static MsdArmAbiConnection* cast(msd_connection_t* connection) {
-    DASSERT(connection);
-    DASSERT(connection->magic_ == kMagic);
-    return static_cast<MsdArmAbiConnection*>(connection);
-  }
+  magma_status_t MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
+                           uint64_t flags) override;
+  magma_status_t UnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override;
+  magma_status_t BufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
+                               uint64_t length) override;
+  void ReleaseBuffer(msd::Buffer& buffer) override;
+
+  void SetNotificationCallback(msd::NotificationHandler* handler) override;
+  std::unique_ptr<msd::Context> CreateContext() override;
+
+  magma_status_t EnablePerformanceCounters(cpp20::span<const uint64_t> counters) override;
+
+  magma_status_t CreatePerformanceCounterBufferPool(
+      uint64_t pool_id, std::unique_ptr<msd::PerfCountPool>* pool_out) override;
+  magma_status_t ReleasePerformanceCounterBufferPool(
+      std::unique_ptr<msd::PerfCountPool> pool) override;
+
+  magma_status_t AddPerformanceCounterBufferOffsetToPool(msd::PerfCountPool& pool,
+                                                         msd::Buffer& buffer, uint64_t buffer_id,
+                                                         uint64_t buffer_offset,
+                                                         uint64_t buffer_size) override;
+
+  magma_status_t RemovePerformanceCounterBufferFromPool(msd::PerfCountPool& pool,
+                                                        msd::Buffer& buffer) override;
+
+  magma_status_t DumpPerformanceCounters(msd::PerfCountPool& pool, uint32_t trigger_id) override;
+
+  magma_status_t ClearPerformanceCounters(cpp20::span<const uint64_t> counters) override;
 
   std::shared_ptr<MsdArmConnection> ptr() { return ptr_; }
 
  private:
   std::shared_ptr<MsdArmConnection> ptr_;
   static const uint32_t kMagic = 0x636f6e6e;  // "conn" (Connection)
+  uint32_t magic_;
 };
 
 #endif  // MSD_ARM_CONNECTION_H

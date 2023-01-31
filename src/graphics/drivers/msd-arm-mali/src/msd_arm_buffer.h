@@ -8,7 +8,7 @@
 #include <unordered_set>
 
 #include "magma_util/macros.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "platform_buffer.h"
 #include "platform_event.h"
 #include "src/graphics/drivers/msd-arm-mali/src/region.h"
@@ -18,7 +18,7 @@ class GpuMapping;
 // This can only be accessed on the connection thread.
 class MsdArmBuffer {
  public:
-  static std::unique_ptr<MsdArmBuffer> Import(uint32_t handle, uint64_t client_id);
+  static std::unique_ptr<MsdArmBuffer> Import(zx::vmo handle, uint64_t client_id);
   static std::unique_ptr<MsdArmBuffer> Create(uint64_t size, const char* name);
 
   ~MsdArmBuffer();
@@ -56,16 +56,17 @@ class MsdArmBuffer {
   Region flushed_region_;
 };
 
-class MsdArmAbiBuffer : public msd_buffer_t {
+class MsdArmAbiBuffer : public msd::Buffer {
  public:
   MsdArmAbiBuffer(std::shared_ptr<MsdArmBuffer> ptr) : base_ptr_(std::move(ptr)) {
     magic_ = kMagic;
   }
 
-  static MsdArmAbiBuffer* cast(msd_buffer_t* buf) {
+  static MsdArmAbiBuffer* cast(msd::Buffer* buf) {
     DASSERT(buf);
-    DASSERT(buf->magic_ == kMagic);
-    return static_cast<MsdArmAbiBuffer*>(buf);
+    auto buffer = static_cast<MsdArmAbiBuffer*>(buf);
+    DASSERT(buffer->magic_ == kMagic);
+    return buffer;
   }
 
   std::shared_ptr<MsdArmBuffer> base_ptr() { return base_ptr_; }
@@ -74,6 +75,7 @@ class MsdArmAbiBuffer : public msd_buffer_t {
   std::shared_ptr<MsdArmBuffer> base_ptr_;
 
   static const uint32_t kMagic = 0x62756666;  // "buff"
+  uint32_t magic_;
 };
 
 #endif  // MSD_ARM_BUFFER_H

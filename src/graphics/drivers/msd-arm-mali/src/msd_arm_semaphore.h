@@ -6,19 +6,20 @@
 #define MSD_ARM_SEMAPHORE_H
 
 #include "magma_util/macros.h"
-#include "msd_defs.h"
+#include "msd_cc.h"
 #include "platform_semaphore.h"
 
-class MsdArmAbiSemaphore : public msd_semaphore_t {
+class MsdArmAbiSemaphore : public msd::Semaphore {
  public:
   MsdArmAbiSemaphore(std::shared_ptr<magma::PlatformSemaphore> ptr) : ptr_(std::move(ptr)) {
     magic_ = kMagic;
   }
 
-  static MsdArmAbiSemaphore* cast(msd_semaphore_t* semaphore) {
+  static MsdArmAbiSemaphore* cast(msd::Semaphore* semaphore) {
     DASSERT(semaphore);
-    DASSERT(semaphore->magic_ == kMagic);
-    return static_cast<MsdArmAbiSemaphore*>(semaphore);
+    auto sem = static_cast<MsdArmAbiSemaphore*>(semaphore);
+    DASSERT(sem->magic_ == kMagic);
+    return sem;
   }
 
   std::shared_ptr<magma::PlatformSemaphore> ptr() { return ptr_; }
@@ -27,6 +28,7 @@ class MsdArmAbiSemaphore : public msd_semaphore_t {
   std::shared_ptr<magma::PlatformSemaphore> ptr_;
 
   static constexpr uint32_t kMagic = 0x73656d61;  // "sema"
+  uint32_t magic_;
 };
 
 #endif  // MSD_ARM_SEMAPHORE_H

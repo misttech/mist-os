@@ -7,6 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "mock/mock_bus_mapper.h"
+#include "msd_cc.h"
 #include "msd_defs.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
 #include "src/graphics/drivers/msd-arm-mali/src/address_manager.h"
@@ -15,6 +16,7 @@
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_context.h"
 #include "src/graphics/drivers/msd-arm-mali/tests/unit_tests/fake_connection_owner_base.h"
+#include "src/graphics/lib/magma/tests/helper/msd_stubs.h"
 
 namespace {
 
@@ -89,17 +91,16 @@ class DeregisterConnectionOwner : public FakeConnectionOwner {
   std::weak_ptr<MsdArmConnection> connection_;
 };
 
-void* g_test_token;
 uint32_t g_test_data_size;
 magma_arm_mali_status g_status;
 
-void TestCallback(void* token, msd_notification_t* notification) {
-  g_test_token = token;
-  if (notification->type == MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND) {
-    g_test_data_size = notification->u.channel_send.size;
-    memcpy(&g_status, notification->u.channel_send.data, g_test_data_size);
+class TestNotificationHandler : public msd::testing::StubNotificationHandler {
+  // msd::NotificationHandler implementation.
+  void NotificationChannelSend(cpp20::span<uint8_t> data) override {
+    g_test_data_size = static_cast<uint32_t>(data.size());
+    memcpy(&g_status, data.data(), g_test_data_size);
   }
-}
+};
 }  // namespace
 
 class TestConnection {
@@ -436,21 +437,20 @@ class TestConnection {
     // Shouldn't do anything.
     connection->SendNotificationData(&atom);
 
-    uint32_t token;
-    connection->SetNotificationCallback(&TestCallback, &token);
+    TestNotificationHandler handler;
+    connection->SetNotificationCallback(&handler);
     MsdArmAtom atom2(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0);
 
     atom2.set_result_code(static_cast<ArmMaliResultCode>(20));
     connection->SendNotificationData(&atom2);
     EXPECT_EQ(sizeof(g_status), g_test_data_size);
-    EXPECT_EQ(&token, g_test_token);
 
     EXPECT_EQ(7u, g_status.data.data[0]);
     EXPECT_EQ(8u, g_status.data.data[1]);
     EXPECT_EQ(20u, g_status.result_code);
     EXPECT_EQ(5u, g_status.atom_number);
 
-    connection->SetNotificationCallback(nullptr, nullptr);
+    connection->SetNotificationCallback(nullptr);
     connection->SendNotificationData(&atom);
 
     EXPECT_EQ(20u, g_status.result_code);
@@ -461,14 +461,13 @@ class TestConnection {
     auto connection = MsdArmConnection::Create(0, &owner);
     EXPECT_TRUE(connection);
 
-    uint32_t token;
-    connection->SetNotificationCallback(&TestCallback, &token);
+    TestNotificationHandler handler;
+    connection->SetNotificationCallback(&handler);
     connection->MarkDestroyed();
 
     EXPECT_TRUE(owner.got_set_to_default_priority());
 
     EXPECT_EQ(sizeof(g_status), g_test_data_size);
-    EXPECT_EQ(&token, g_test_token);
 
     EXPECT_EQ(0u, g_status.data.data[0]);
     EXPECT_EQ(0u, g_status.data.data[1]);
@@ -481,7 +480,7 @@ class TestConnection {
     connection->SendNotificationData(&atom);
     EXPECT_EQ(kArmMaliResultTerminated, g_status.result_code);
 
-    connection->SetNotificationCallback(nullptr, 0);
+    connection->SetNotificationCallback(nullptr);
 
     EXPECT_EQ(1u, owner.cancel_atoms_list().size());
     EXPECT_EQ(connection.get(), owner.cancel_atoms_list()[0]);

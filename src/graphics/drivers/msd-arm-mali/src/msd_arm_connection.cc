@@ -35,23 +35,8 @@ template <typename T, size_t N>
 char (&ArraySizeHelper(T (&array)[N]))[N];
 #define arraysize(array) (sizeof(ArraySizeHelper(array)))
 
-void msd_connection_close(msd_connection_t* connection) {
-  delete MsdArmAbiConnection::cast(connection);
-}
-
-msd_context_t* msd_connection_create_context(msd_connection_t* abi_connection) {
-  auto connection = MsdArmAbiConnection::cast(abi_connection);
-  auto context = std::make_unique<MsdArmContext>(connection->ptr());
-
-  return context.release();
-}
-
-void msd_context_destroy(msd_context_t* ctx) {
-  auto context = static_cast<MsdArmContext*>(ctx);
-  auto connection = context->connection().lock();
-  if (connection)
-    connection->MarkDestroyed();
-  delete context;
+std::unique_ptr<msd::Context> MsdArmAbiConnection::CreateContext() {
+  return std::make_unique<MsdArmContext>(ptr());
 }
 
 namespace {
@@ -267,29 +252,20 @@ bool MsdArmConnection::ExecuteAtom(
   return true;
 }
 
-magma_status_t msd_context_execute_command_buffer_with_resources(
-    struct msd_context_t* ctx, struct magma_command_buffer* command_buffer,
-    struct magma_exec_resource* exec_resources, struct msd_buffer_t** buffers,
-    struct msd_semaphore_t** wait_semaphores, struct msd_semaphore_t** signal_semaphores) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
-}
-
-magma_status_t msd_context_execute_immediate_commands(msd_context_t* ctx, uint64_t commands_size,
-                                                      void* commands, uint64_t semaphore_count,
-                                                      msd_semaphore_t** msd_semaphores) {
-  auto context = static_cast<MsdArmContext*>(ctx);
-  auto connection = context->connection().lock();
+magma_status_t MsdArmContext::ExecuteImmediateCommands(
+    cpp20::span<uint8_t> commands, cpp20::span<msd::Semaphore*> msd_semaphores) {
+  auto connection = connection_.lock();
   if (!connection)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Connection not valid");
 
   std::deque<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
-  for (size_t i = 0; i < semaphore_count; i++) {
+  for (size_t i = 0; i < msd_semaphores.size(); i++) {
     semaphores.push_back(MsdArmAbiSemaphore::cast(msd_semaphores[i])->ptr());
   }
   uint64_t offset = 0;
-  while (offset + sizeof(uint64_t) < commands_size) {
+  while (offset + sizeof(uint64_t) < commands.size()) {
     magma_arm_mali_atom* atom =
-        reinterpret_cast<magma_arm_mali_atom*>(static_cast<uint8_t*>(commands) + offset);
+        reinterpret_cast<magma_arm_mali_atom*>(static_cast<uint8_t*>(commands.data()) + offset);
     if (atom->size < sizeof(uint64_t)) {
       return DRET_MSG(MAGMA_STATUS_CONTEXT_KILLED, "Atom size must be at least 8");
     }
@@ -300,10 +276,10 @@ magma_status_t msd_context_execute_immediate_commands(msd_context_t* ctx, uint64
       return DRET_MSG(MAGMA_STATUS_CONTEXT_KILLED, "Atom size %ld too small", atom->size);
     }
 
-    size_t remaining_data_size = commands_size - offset;
+    size_t remaining_data_size = commands.size() - offset;
     if (!connection->ExecuteAtom(&remaining_data_size, atom, &semaphores))
       return DRET(MAGMA_STATUS_CONTEXT_KILLED);
-    offset = commands_size - remaining_data_size;
+    offset = commands.size() - remaining_data_size;
   }
 
   return MAGMA_STATUS_OK;
@@ -933,30 +909,32 @@ bool MsdArmConnection::DecommitMemoryForBuffer(MsdArmBuffer* buffer, uint64_t pa
   return buffer->DecommitPageRange(page_offset, page_count);
 }
 
-void MsdArmConnection::SetNotificationCallback(msd_connection_notification_callback_t callback,
-                                               void* token) {
+void MsdArmConnection::SetNotificationCallback(msd::NotificationHandler* handler) {
   std::lock_guard<std::mutex> lock(callback_lock_);
-  callback_ = callback;
-  token_ = token;
+  notification_handler_ = handler;
 }
+
+namespace {
+cpp20::span<uint8_t> GetStatusSpan(magma_arm_mali_status* status) {
+  return cpp20::span(reinterpret_cast<uint8_t*>(status), reinterpret_cast<uint8_t*>(status + 1));
+}
+}  // namespace
 
 void MsdArmConnection::SendNotificationData(MsdArmAtom* atom) {
   std::lock_guard<std::mutex> lock(callback_lock_);
   // It may already have been destroyed on the main thread.
-  if (!token_)
+  if (!notification_handler_)
     return;
 
-  msd_notification_t notification = {.type = MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND};
   static_assert(sizeof(magma_arm_mali_status) <= MSD_CHANNEL_SEND_MAX_SIZE,
                 "notification too large");
-  notification.u.channel_send.size = sizeof(magma_arm_mali_status);
+  magma_arm_mali_status status{};
 
-  auto status = reinterpret_cast<magma_arm_mali_status*>(notification.u.channel_send.data);
-  status->result_code = atom->result_code();
-  status->atom_number = atom->atom_number();
-  status->data = atom->user_data();
+  status.result_code = atom->result_code();
+  status.atom_number = atom->atom_number();
+  status.data = atom->user_data();
 
-  callback_(token_, &notification);
+  notification_handler_->NotificationChannelSend(GetStatusSpan(&status));
 }
 
 void MsdArmConnection::MarkDestroyed() {
@@ -964,23 +942,21 @@ void MsdArmConnection::MarkDestroyed() {
   owner_->CancelAtoms(shared_from_this());
 
   std::lock_guard<std::mutex> lock(callback_lock_);
-  if (!token_)
+  if (!notification_handler_)
     return;
 
-  msd_notification_t notification = {.type = MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND};
   static_assert(sizeof(magma_arm_mali_status) <= MSD_CHANNEL_SEND_MAX_SIZE,
                 "notification too large");
-  notification.u.channel_send.size = sizeof(magma_arm_mali_status);
 
-  auto status = reinterpret_cast<magma_arm_mali_status*>(notification.u.channel_send.data);
-  status->result_code = kArmMaliResultTerminated;
-  status->atom_number = {};
-  status->data = {};
+  magma_arm_mali_status status{};
+  status.result_code = kArmMaliResultTerminated;
+  status.atom_number = {};
+  status.data = {};
 
-  callback_(token_, &notification);
+  notification_handler_->NotificationChannelSend(GetStatusSpan(&status));
 
   // Don't send any completion messages after termination.
-  token_ = 0;
+  notification_handler_ = nullptr;
 }
 
 size_t MsdArmConnection::PeriodicMemoryPressureCallback() {
@@ -988,11 +964,11 @@ size_t MsdArmConnection::PeriodicMemoryPressureCallback() {
   return FreeUnusedJitRegionsIfNeeded();
 }
 
-void MsdArmConnection::SendPerfCounterNotification(msd_notification_t* notification) {
+void MsdArmConnection::SendPerfCounterNotification(const msd::PerfCounterResult& results) {
   std::lock_guard<std::mutex> lock(callback_lock_);
-  if (!token_)
+  if (!notification_handler_)
     return;
-  callback_(token_, notification);
+  notification_handler_->PerformanceCounterReadCompleted(results);
 }
 
 bool MsdArmConnection::GetVirtualAddressFromPhysical(uint64_t address,
@@ -1104,9 +1080,8 @@ magma_status_t MsdArmConnection::RemovePerformanceCounterBufferFromPool(
   return reply->Wait().get();
 }
 
-magma_status_t msd_connection_map_buffer(msd_connection_t* abi_connection, msd_buffer_t* abi_buffer,
-                                         uint64_t gpu_va, uint64_t offset, uint64_t length,
-                                         uint64_t flags) {
+magma_status_t MsdArmAbiConnection::MapBuffer(msd::Buffer& abi_buffer, uint64_t gpu_va,
+                                              uint64_t offset, uint64_t length, uint64_t flags) {
   if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length))
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset or length not page aligned");
 
@@ -1114,29 +1089,27 @@ magma_status_t msd_connection_map_buffer(msd_connection_t* abi_connection, msd_b
   uint64_t page_count = length / magma::page_size();
 
   TRACE_DURATION("magma", "msd_connection_map_buffer", "page_count", page_count);
-  MsdArmConnection* connection = MsdArmAbiConnection::cast(abi_connection)->ptr().get();
+  MsdArmConnection* connection = ptr().get();
 
   auto mapping =
       std::make_unique<GpuMapping>(gpu_va, page_offset, page_count * PAGE_SIZE, flags, connection,
-                                   MsdArmAbiBuffer::cast(abi_buffer)->base_ptr());
+                                   MsdArmAbiBuffer::cast(&abi_buffer)->base_ptr());
   if (!connection->AddMapping(std::move(mapping)))
     return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "AddMapping failed");
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t msd_connection_unmap_buffer(msd_connection_t* abi_connection, msd_buffer_t* buffer,
-                                           uint64_t gpu_va) {
+magma_status_t MsdArmAbiConnection::UnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) {
   TRACE_DURATION("magma", "msd_connection_unmap_buffer");
-  if (!MsdArmAbiConnection::cast(abi_connection)->ptr()->RemoveMapping(gpu_va))
+  if (!ptr()->RemoveMapping(gpu_va))
     return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "RemoveMapping failed");
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t msd_connection_buffer_range_op(msd_connection_t* abi_connection,
-                                              msd_buffer_t* abi_buffer, uint32_t options,
-                                              uint64_t start_offset, uint64_t length) {
-  MsdArmConnection* connection = MsdArmAbiConnection::cast(abi_connection)->ptr().get();
-  MsdArmBuffer* buffer = MsdArmAbiBuffer::cast(abi_buffer)->base_ptr().get();
+magma_status_t MsdArmAbiConnection::BufferRangeOp(msd::Buffer& abi_buffer, uint32_t options,
+                                                  uint64_t start_offset, uint64_t length) {
+  MsdArmConnection* connection = ptr().get();
+  MsdArmBuffer* buffer = MsdArmAbiBuffer::cast(&abi_buffer)->base_ptr().get();
   if (options == MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES) {
     if (!connection->CommitMemoryForBuffer(buffer, start_offset / magma::page_size(),
                                            length / magma::page_size()))
@@ -1151,61 +1124,52 @@ magma_status_t msd_connection_buffer_range_op(msd_connection_t* abi_connection,
   return MAGMA_STATUS_OK;
 }
 
-void msd_connection_set_notification_callback(msd_connection_t* abi_connection,
-                                              msd_connection_notification_callback_t callback,
-                                              void* token) {
-  MsdArmAbiConnection::cast(abi_connection)->ptr()->SetNotificationCallback(callback, token);
+void MsdArmAbiConnection::SetNotificationCallback(msd::NotificationHandler* handler) {
+  ptr()->SetNotificationCallback(handler);
 }
 
-void msd_connection_release_buffer(msd_connection_t* abi_connection, msd_buffer_t* abi_buffer) {}
+void MsdArmAbiConnection::ReleaseBuffer(msd::Buffer& buffer) {}
 
-magma_status_t msd_connection_enable_performance_counters(msd_connection_t* abi_connection,
-                                                          const uint64_t* counters,
-                                                          uint64_t counter_count) {
-  auto connection = MsdArmAbiConnection::cast(abi_connection)->ptr();
+magma_status_t MsdArmAbiConnection::EnablePerformanceCounters(
+    cpp20::span<const uint64_t> counters) {
+  auto connection = ptr();
   return connection->EnablePerformanceCounters(
-      std::vector<uint64_t>(counters, counters + counter_count));
+      std::vector<uint64_t>(counters.begin(), counters.end()));
 }
 
-magma_status_t msd_connection_create_performance_counter_buffer_pool(
-    struct msd_connection_t* connection, uint64_t pool_id, struct msd_perf_count_pool** pool_out) {
-  auto pool =
-      std::make_shared<MsdArmPerfCountPool>(MsdArmAbiConnection::cast(connection)->ptr(), pool_id);
+magma_status_t MsdArmAbiConnection::CreatePerformanceCounterBufferPool(
+    uint64_t pool_id, std::unique_ptr<msd::PerfCountPool>* pool_out) {
+  auto pool = std::make_shared<MsdArmPerfCountPool>(ptr(), pool_id);
   auto abi_pool = std::make_unique<MsdArmAbiPerfCountPool>(std::move(pool));
-  *pool_out = abi_pool.release();
+  *pool_out = std::move(abi_pool);
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t msd_connection_release_performance_counter_buffer_pool(
-    struct msd_connection_t* abi_connection, struct msd_perf_count_pool* abi_pool) {
-  auto pool = MsdArmAbiPerfCountPool::cast(abi_pool)->ptr();
-  auto connection = MsdArmAbiConnection::cast(abi_connection)->ptr();
+magma_status_t MsdArmAbiConnection::ReleasePerformanceCounterBufferPool(
+    std::unique_ptr<msd::PerfCountPool> abi_pool) {
+  auto pool = MsdArmAbiPerfCountPool::cast(abi_pool.get())->ptr();
+  auto connection = ptr();
   auto result = connection->ReleasePerformanceCounterBufferPool(pool);
-  delete MsdArmAbiPerfCountPool::cast(abi_pool);
+  MsdArmAbiPerfCountPool::cast(abi_pool.get())->set_in_release_pool_call(true);
+  abi_pool.reset();
   return result;
 }
 
-magma_status_t msd_connection_dump_performance_counters(struct msd_connection_t* abi_connection,
-                                                        struct msd_perf_count_pool* abi_pool,
-                                                        uint32_t trigger_id) {
-  auto pool = MsdArmAbiPerfCountPool::cast(abi_pool);
-  return MsdArmAbiConnection::cast(abi_connection)
-      ->ptr()
-      ->DumpPerformanceCounters(pool->ptr(), trigger_id);
+magma_status_t MsdArmAbiConnection::DumpPerformanceCounters(msd::PerfCountPool& abi_pool,
+                                                            uint32_t trigger_id) {
+  auto pool = MsdArmAbiPerfCountPool::cast(&abi_pool);
+  return ptr()->DumpPerformanceCounters(pool->ptr(), trigger_id);
 }
 
-magma_status_t msd_connection_clear_performance_counters(struct msd_connection_t* connection,
-                                                         const uint64_t* counters,
-                                                         uint64_t counter_count) {
+magma_status_t MsdArmAbiConnection::ClearPerformanceCounters(cpp20::span<const uint64_t> counters) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
-magma_status_t msd_connection_add_performance_counter_buffer_offset_to_pool(
-    struct msd_connection_t* abi_connection, struct msd_perf_count_pool* abi_pool,
-    struct msd_buffer_t* abi_buffer, uint64_t buffer_id, uint64_t buffer_offset,
-    uint64_t buffer_size) {
-  auto pool = MsdArmAbiPerfCountPool::cast(abi_pool);
-  auto buffer = MsdArmAbiBuffer::cast(abi_buffer);
+magma_status_t MsdArmAbiConnection::AddPerformanceCounterBufferOffsetToPool(
+    msd::PerfCountPool& abi_pool, msd::Buffer& abi_buffer, uint64_t buffer_id,
+    uint64_t buffer_offset, uint64_t buffer_size) {
+  auto pool = MsdArmAbiPerfCountPool::cast(&abi_pool);
+  auto buffer = MsdArmAbiBuffer::cast(&abi_buffer);
   uint64_t real_buffer_size = buffer->base_ptr()->platform_buffer()->size();
 
   if (buffer_offset > real_buffer_size || (real_buffer_size - buffer_offset) < buffer_size) {
@@ -1214,21 +1178,16 @@ magma_status_t msd_connection_add_performance_counter_buffer_offset_to_pool(
                     buffer_offset, real_buffer_size);
   }
 
-  return MsdArmAbiConnection::cast(abi_connection)
-      ->ptr()
-      ->AddPerformanceCounterBufferOffsetToPool(pool->ptr(), buffer->base_ptr(), buffer_id,
-                                                buffer_offset, buffer_size);
+  return ptr()->AddPerformanceCounterBufferOffsetToPool(pool->ptr(), buffer->base_ptr(), buffer_id,
+                                                        buffer_offset, buffer_size);
 
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t msd_connection_remove_performance_counter_buffer_from_pool(
-    struct msd_connection_t* abi_connection, struct msd_perf_count_pool* abi_pool,
-    struct msd_buffer_t* abi_buffer) {
-  auto pool = MsdArmAbiPerfCountPool::cast(abi_pool);
-  auto buffer = MsdArmAbiBuffer::cast(abi_buffer);
+magma_status_t MsdArmAbiConnection::RemovePerformanceCounterBufferFromPool(
+    msd::PerfCountPool& abi_pool, msd::Buffer& abi_buffer) {
+  auto pool = MsdArmAbiPerfCountPool::cast(&abi_pool);
+  auto buffer = MsdArmAbiBuffer::cast(&abi_buffer);
 
-  return MsdArmAbiConnection::cast(abi_connection)
-      ->ptr()
-      ->RemovePerformanceCounterBufferFromPool(pool->ptr(), buffer->base_ptr());
+  return ptr()->RemovePerformanceCounterBufferFromPool(pool->ptr(), buffer->base_ptr());
 }

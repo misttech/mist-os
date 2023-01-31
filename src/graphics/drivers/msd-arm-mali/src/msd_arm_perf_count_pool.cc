@@ -46,20 +46,18 @@ void MsdArmPerfCountPool::OnPerfCountDumpLocked(const std::vector<uint32_t>& dum
     }
     buffer.buffer->platform_buffer()->UnmapCpu();
 
-    msd_notification_t notification = {
-        .type = MSD_CONNECTION_NOTIFICATION_PERFORMANCE_COUNTERS_READ_COMPLETED};
-    notification.u.perf_counter_result.pool_id = pool_id_;
-    notification.u.perf_counter_result.buffer_id = buffer.buffer_id;
-    notification.u.perf_counter_result.buffer_offset = magma::to_uint32(buffer.offset);
-    notification.u.perf_counter_result.result_flags =
-        discontinuous_ ? MAGMA_PERF_COUNTER_RESULT_DISCONTINUITY : 0;
+    msd::PerfCounterResult result{};
+    result.pool_id = pool_id_;
+    result.buffer_id = buffer.buffer_id;
+    result.buffer_offset = magma::to_uint32(buffer.offset);
+    result.result_flags = discontinuous_ ? MAGMA_PERF_COUNTER_RESULT_DISCONTINUITY : 0;
     discontinuous_ = false;
-    notification.u.perf_counter_result.trigger_id = triggers[i];
-    notification.u.perf_counter_result.timestamp = zx::clock::get_monotonic().get();
+    result.trigger_id = triggers[i];
+    result.timestamp = zx::clock::get_monotonic().get();
     // MagmaSystemConnection should destroy the pool before destroying connection.
     auto connection = connection_.lock();
     DASSERT(connection);
-    connection->SendPerfCounterNotification(&notification);
+    connection->SendPerfCounterNotification(result);
   }
 }
 

@@ -4,12 +4,11 @@
 
 #include <gtest/gtest.h>
 
-#include "helper/command_buffer_helper.h"
 #include "helper/platform_device_helper.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
-#include "sys_driver/magma_driver.h"
-#include "sys_driver/magma_system_connection.h"
-#include "sys_driver/magma_system_context.h"
+#include "sys_driver_cpp/magma_driver.h"
+#include "sys_driver_cpp/magma_system_connection.h"
+#include "sys_driver_cpp/magma_system_context.h"
 
 namespace {
 
@@ -216,27 +215,27 @@ class Test {
 
  private:
   MagmaSystemContext* InitializeContext() {
-    msd_drv_ = msd_driver_unique_ptr_t(msd_driver_create(), &msd_driver_destroy);
+    msd_drv_ = msd::Driver::Create();
     if (!msd_drv_)
       return DRETP(nullptr, "failed to create msd driver");
 
-    msd_driver_configure(msd_drv_.get(), MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
+    msd_drv_->Configure(MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD);
 
     platform_device_ = TestPlatformDevice::GetInstance();
     if (!platform_device_)
       DLOG("TestCommandBuffer: No platform device");
     void* device_handle = platform_device_ ? platform_device_->GetDeviceHandle() : nullptr;
-    auto msd_dev = msd_driver_create_device(msd_drv_.get(), device_handle);
+    auto msd_dev = msd_drv_->CreateDevice(device_handle);
     if (!msd_dev)
       return DRETP(nullptr, "failed to create msd device");
-    system_dev_ =
-        std::shared_ptr<MagmaSystemDevice>(MagmaSystemDevice::Create(MsdDeviceUniquePtr(msd_dev)));
-    uint32_t ctx_id = 0;
-    auto msd_connection_t = msd_device_open(msd_dev, 0);
+    auto msd_connection_t = msd_dev->Open(0);
     if (!msd_connection_t)
       return DRETP(nullptr, "msd_device_open failed");
+    system_dev_ = std::shared_ptr<MagmaSystemDevice>(
+        MagmaSystemDevice::Create(msd_drv_.get(), std::move(msd_dev)));
+    uint32_t ctx_id = 0;
     connection_ = std::unique_ptr<MagmaSystemConnection>(
-        new MagmaSystemConnection(system_dev_, MsdConnectionUniquePtr(msd_connection_t)));
+        new MagmaSystemConnection(system_dev_, std::move(msd_connection_t)));
     if (!connection_)
       return DRETP(nullptr, "failed to connect to msd device");
     connection_->CreateContext(ctx_id);
@@ -246,7 +245,7 @@ class Test {
     return ctx;
   }
 
-  msd_driver_unique_ptr_t msd_drv_;
+  std::unique_ptr<msd::Driver> msd_drv_;
   magma::PlatformDevice* platform_device_;
   std::shared_ptr<MagmaSystemDevice> system_dev_;
   std::unique_ptr<MagmaSystemConnection> connection_;

@@ -299,7 +299,7 @@ void MsdArmDevice::EnableAllCores() {
   power_manager_->EnableCores(register_io_.get(), enabled_cores);
 }
 
-std::shared_ptr<MsdArmConnection> MsdArmDevice::Open(msd_client_id_t client_id) {
+std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd_client_id_t client_id) {
   auto connection = MsdArmConnection::Create(client_id, this);
   if (connection) {
     connection->InitializeInspectNode(&inspect_);
@@ -307,6 +307,10 @@ std::shared_ptr<MsdArmConnection> MsdArmDevice::Open(msd_client_id_t client_id) 
     connection_list_.push_back(connection);
   }
   return connection;
+}
+
+std::unique_ptr<msd::Connection> MsdArmDevice::Open(msd_client_id_t client_id) {
+  return std::make_unique<MsdArmAbiConnection>(OpenArmConnection(client_id));
 }
 
 void MsdArmDevice::DeregisterConnection() {
@@ -1596,24 +1600,16 @@ void MsdArmDevice::AppendInspectEvent(InspectEvent event) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-msd_connection_t* msd_device_open(msd_device_t* dev, msd_client_id_t client_id) {
-  auto connection = MsdArmDevice::cast(dev)->Open(client_id);
-  if (!connection)
-    return DRETP(nullptr, "MsdArmDevice::Open failed");
-  return new MsdArmAbiConnection(std::move(connection));
-}
-
-void msd_device_destroy(msd_device_t* dev) { delete MsdArmDevice::cast(dev); }
-
-magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
-                                magma_handle_t* result_buffer_out, uint64_t* result_out) {
-  magma_status_t status = MsdArmDevice::cast(device)->QueryReturnsBuffer(id, result_buffer_out);
+magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
+  uint32_t result_buffer;
+  magma_status_t status = QueryReturnsBuffer(id, &result_buffer);
+  *result_buffer_out = zx::vmo(result_buffer);
 
   if (status == MAGMA_STATUS_INVALID_ARGS) {
-    status = MsdArmDevice::cast(device)->QueryInfo(id, result_out);
+    status = QueryInfo(id, result_out);
 
     if (status == MAGMA_STATUS_OK && result_buffer_out)
-      *result_buffer_out = magma::PlatformHandle::kInvalidHandle;
+      result_buffer_out->reset();
   }
 
   if (status == MAGMA_STATUS_INVALID_ARGS) {
@@ -1623,35 +1619,24 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
   return status;
 }
 
-void msd_device_dump_status(msd_device_t* device, uint32_t dump_type) {
-  MsdArmDevice::cast(device)->DumpStatusToLog();
-}
+void MsdArmDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
 
-void msd_device_set_memory_pressure_level(msd_device_t* device, MagmaMemoryPressureLevel level) {
-  MsdArmDevice::cast(device)->SetMemoryPressureLevel(level);
-}
-
-magma_status_t msd_device_get_icd_list(struct msd_device_t* abi_device, uint64_t count,
-                                       msd_icd_info_t* icd_info_out, uint64_t* actual_count_out) {
+magma_status_t MsdArmDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) {
   struct variant {
     const char* suffix;
     const char* url;
   };
   constexpr variant kVariants[] = {
       {"_test", "mali.fuchsia.com"}, {"_test", "fuchsia.com"}, {"", "fuchsia.com"}};
-  if (icd_info_out && count < std::size(kVariants)) {
-    return MAGMA_STATUS_INVALID_ARGS;
-  }
-  *actual_count_out = std::size(kVariants);
-  if (icd_info_out) {
-    auto device = MsdArmDevice::cast(abi_device);
-    for (uint32_t i = 0; i < std::size(kVariants); i++) {
-      strcpy(icd_info_out[i].component_url,
-             fbl::StringPrintf("fuchsia-pkg://%s/libvulkan_arm_mali_%lx%s#meta/vulkan.cm",
-                               kVariants[i].url, device->GpuId(), kVariants[i].suffix)
-                 .c_str());
-      icd_info_out[i].support_flags = ICD_SUPPORT_FLAG_VULKAN;
-    }
+  auto& icd_info = *icd_info_out;
+  icd_info.clear();
+  icd_info.resize(std::size(kVariants));
+  for (uint32_t i = 0; i < std::size(kVariants); i++) {
+    strcpy(icd_info[i].component_url,
+           fbl::StringPrintf("fuchsia-pkg://%s/libvulkan_arm_mali_%lx%s#meta/vulkan.cm",
+                             kVariants[i].url, GpuId(), kVariants[i].suffix)
+               .c_str());
+    icd_info[i].support_flags = ICD_SUPPORT_FLAG_VULKAN;
   }
   return MAGMA_STATUS_OK;
 }

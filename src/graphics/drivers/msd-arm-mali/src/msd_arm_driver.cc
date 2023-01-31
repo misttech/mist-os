@@ -19,9 +19,9 @@ std::unique_ptr<MsdArmDriver> MsdArmDriver::Create() {
 
 void MsdArmDriver::Destroy(MsdArmDriver* drv) { delete drv; }
 
-uint32_t MsdArmDriver::DuplicateInspectHandle() { return inspector_.DuplicateVmo().release(); }
+zx::vmo MsdArmDriver::DuplicateInspectHandle() { return inspector_.DuplicateVmo(); }
 
-std::unique_ptr<MsdArmDevice> MsdArmDriver::CreateDevice(void* device_handle) {
+std::unique_ptr<msd::Device> MsdArmDriver::CreateDevice(void* device_handle) {
   bool start_device_thread = (configure_flags() & MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD) == 0;
 
   std::unique_ptr<MsdArmDevice> device =
@@ -29,6 +29,27 @@ std::unique_ptr<MsdArmDevice> MsdArmDriver::CreateDevice(void* device_handle) {
   if (!device)
     return DRETP(nullptr, "failed to create device");
   return device;
+}
+
+std::unique_ptr<msd::Buffer> MsdArmDriver::ImportBuffer(zx::vmo vmo, uint64_t client_id) {
+  auto buffer = MsdArmBuffer::Import(std::move(vmo), client_id);
+  if (!buffer)
+    return DRETP(nullptr, "MsdArmBuffer::Create failed");
+  return std::make_unique<MsdArmAbiBuffer>(std::move(buffer));
+}
+
+magma_status_t MsdArmDriver::ImportSemaphore(zx::event handle, uint64_t client_id,
+                                             std::unique_ptr<msd::Semaphore>* semaphore_out) {
+  auto semaphore = magma::PlatformSemaphore::Import(std::move(handle));
+  if (!semaphore)
+    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import semaphore handle");
+
+  semaphore->set_local_id(client_id);
+
+  *semaphore_out = std::make_unique<MsdArmAbiSemaphore>(
+      std::shared_ptr<magma::PlatformSemaphore>(std::move(semaphore)));
+
+  return MAGMA_STATUS_OK;
 }
 
 std::unique_ptr<MsdArmDevice> MsdArmDriver::CreateDeviceForTesting(
@@ -43,23 +64,5 @@ std::unique_ptr<MsdArmDevice> MsdArmDriver::CreateDeviceForTesting(
   return device;
 }
 
-//////////////////////////////////////////////////////////////////////////////
-
-msd_driver_t* msd_driver_create(void) { return MsdArmDriver::Create().release(); }
-
-void msd_driver_configure(struct msd_driver_t* drv, uint32_t flags) {
-  MsdArmDriver::cast(drv)->configure(flags);
-}
-
-void msd_driver_destroy(msd_driver_t* drv) { MsdArmDriver::Destroy(MsdArmDriver::cast(drv)); }
-
-uint32_t msd_driver_duplicate_inspect_handle(struct msd_driver_t* drv) {
-  return MsdArmDriver::cast(drv)->DuplicateInspectHandle();
-}
-
-msd_device_t* msd_driver_create_device(msd_driver_t* drv, void* device_handle) {
-  auto arm_drv = MsdArmDriver::cast(drv);
-  auto device = arm_drv->CreateDevice(device_handle);
-  // Transfer ownership
-  return device.release();
-}
+// static
+std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<MsdArmDriver>(); }

@@ -33,7 +33,7 @@
 #include "src/graphics/drivers/msd-arm-mali/src/performance_counters.h"
 #include "src/graphics/drivers/msd-arm-mali/src/power_manager.h"
 
-class MsdArmDevice : public msd_device_t,
+class MsdArmDevice : public msd::Device,
                      public JobScheduler::Owner,
                      public MsdArmConnection::Owner,
                      public AddressManager::Owner,
@@ -49,11 +49,12 @@ class MsdArmDevice : public msd_device_t,
 
   virtual ~MsdArmDevice();
 
-  static MsdArmDevice* cast(msd_device_t* dev) {
-    DASSERT(dev);
-    DASSERT(dev->magic_ == kMagic);
-    return static_cast<MsdArmDevice*>(dev);
-  }
+  // msd::Device impl.
+  void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) override;
+  magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
+  magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) override;
+  void DumpStatus(uint32_t dump_flags) override;
+  std::unique_ptr<msd::Connection> Open(msd_client_id_t client_id) override;
 
   void set_inspect(inspect::Node node) { inspect_ = std::move(node); }
 
@@ -61,7 +62,7 @@ class MsdArmDevice : public msd_device_t,
   bool Init(std::unique_ptr<magma::PlatformDevice> platform_device,
             std::unique_ptr<magma::PlatformBusMapper> bus_mapper);
 
-  std::shared_ptr<MsdArmConnection> Open(msd_client_id_t client_id);
+  std::shared_ptr<MsdArmConnection> OpenArmConnection(msd_client_id_t client_id);
 
   uint64_t GpuId() { return gpu_features_.gpu_id.reg_value(); }
 
@@ -132,8 +133,6 @@ class MsdArmDevice : public msd_device_t,
   void DerefCycleCounter();
 
   magma::Status QueryTimestamp(std::unique_ptr<magma::PlatformBuffer> buffer);
-
-  void SetMemoryPressureLevel(MagmaMemoryPressureLevel level);
 
   // MsdArmConnection::Owner implementation.
   void ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override;
@@ -249,6 +248,7 @@ class MsdArmDevice : public msd_device_t,
   void OutputHangMessage(bool hardware_hang) override;
 
   static const uint32_t kMagic = 0x64657669;  //"devi"
+  uint64_t magic_;
 
   inspect::Node inspect_;
   inspect::Node events_;

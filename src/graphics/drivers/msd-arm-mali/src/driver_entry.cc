@@ -25,9 +25,9 @@
 #include "platform_logger.h"
 #include "platform_trace_provider.h"
 #include "platform_trace_provider_with_fdio.h"
-#include "src/graphics/lib/magma/src/sys_driver/magma_device_impl.h"
-#include "sys_driver/magma_driver.h"
-#include "sys_driver/magma_system_device.h"
+#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
+#include "sys_driver_cpp/magma_driver.h"
+#include "sys_driver_cpp/magma_system_device.h"
 
 #if !MAGMA_TEST_DRIVER
 #include "src/graphics/drivers/msd-arm-mali/bind.h"  //nogncheck

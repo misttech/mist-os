@@ -7,7 +7,7 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_connection.h"
 
-class MsdArmContext : public msd_context_t {
+class MsdArmContext : public msd::Context {
  public:
   MsdArmContext(std::weak_ptr<MsdArmConnection> connection) : connection_(connection) {
     connection.lock()->IncrementContextCount();
@@ -16,8 +16,12 @@ class MsdArmContext : public msd_context_t {
     auto locked = connection_.lock();
     if (locked) {
       locked->DecrementContextCount();
+      locked->MarkDestroyed();
     }
   }
+
+  magma_status_t ExecuteImmediateCommands(cpp20::span<uint8_t> commands,
+                                          cpp20::span<msd::Semaphore*> semaphores) override;
 
   std::weak_ptr<MsdArmConnection> connection() { return connection_; }
 
