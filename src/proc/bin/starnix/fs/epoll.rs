@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
+use itertools::Itertools;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
@@ -10,7 +11,7 @@ use zerocopy::{AsBytes, FromBytes};
 
 use crate::fs::*;
 use crate::lock::RwLock;
-use crate::logging::log_warn;
+use crate::logging::*;
 use crate::task::*;
 use crate::types::*;
 
@@ -49,7 +50,7 @@ fn as_epoll_key(file: &FileHandle) -> EpollKey {
 }
 
 /// ReadyObject represents an event on a waited upon object.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct ReadyObject {
     key: EpollKey,
     observed: FdEvents,
@@ -109,13 +110,49 @@ impl EpollFileObject {
         )
     }
 
+    fn new_wait_handler(&self, key: EpollKey) -> EventHandler {
+        let state = self.state.clone();
+        Box::new(move |observed: FdEvents| {
+            state.write().trigger_list.push_back(ReadyObject { key, observed })
+        })
+    }
+
     fn wait_on_file(
         &self,
         current_task: &CurrentTask,
         key: EpollKey,
         wait_object: &mut WaitObject,
     ) -> Result<(), Errno> {
-        self.wait_on_file_with_options(current_task, key, wait_object, WaitAsyncOptions::empty())
+        let target = wait_object.target()?;
+
+        // First start the wait. If an event happens after this, we'll get it.
+        self.wait_on_file_edge_triggered(current_task, key, wait_object)?;
+
+        // Now check the events. If an event happened before this, we'll detect it here. There's
+        // now no race window where an event would be missed.
+        //
+        // That said, if an event happens between the wait and the query_events, we'll get two
+        // notifications. We handle this by deduping on the epoll_wait end.
+        let events = target.query_events(current_task);
+        if !(events & wait_object.events).is_empty() {
+            self.waiter.wake_immediately(events.bits(), self.new_wait_handler(key));
+            target.cancel_wait(current_task, &self.waiter, wait_object.cancel_key);
+        }
+        Ok(())
+    }
+
+    fn wait_on_file_edge_triggered(
+        &self,
+        current_task: &CurrentTask,
+        key: EpollKey,
+        wait_object: &mut WaitObject,
+    ) -> Result<(), Errno> {
+        self.wait_on_file_with_options(
+            current_task,
+            key,
+            wait_object,
+            WaitAsyncOptions::EDGE_TRIGGERED,
+        )
     }
 
     fn wait_on_file_with_options(
@@ -125,16 +162,11 @@ impl EpollFileObject {
         wait_object: &mut WaitObject,
         options: WaitAsyncOptions,
     ) -> Result<(), Errno> {
-        let state = self.state.clone();
-        let handler = move |observed: FdEvents| {
-            state.write().trigger_list.push_back(ReadyObject { key, observed })
-        };
-
         wait_object.cancel_key = wait_object.target()?.wait_async(
             current_task,
             &self.waiter,
             wait_object.events,
-            Box::new(handler),
+            self.new_wait_handler(key),
             options,
         );
         Ok(())
@@ -262,9 +294,7 @@ impl EpollFileObject {
         current_task: &CurrentTask,
         pending_list: &mut Vec<ReadyObject>,
         max_events: usize,
-    ) -> bool {
-        let mut added_any = false;
-
+    ) {
         let mut state = self.state.write();
         while pending_list.len() < max_events && !state.trigger_list.is_empty() {
             if let Some(pending) = state.trigger_list.pop_front() {
@@ -274,15 +304,14 @@ impl EpollFileObject {
                     // continue.
                     if let Some(target) = wait.target.upgrade() {
                         let observed = target.query_events(current_task);
+                        let ready = ReadyObject { key: pending.key, observed };
                         if observed.intersects(wait.events) {
-                            let ready = ReadyObject { key: pending.key, observed };
                             pending_list.push(ready);
-                            added_any = true;
                         } else {
-                            // Stale wait, re-add to the watch list. Files can be legitimately
-                            // closed out from under us so bad file descriptors are not an error. We
-                            // do not currently expect any other errors and it's not clear how to
-                            // handle them, so warn for now.
+                            // Another thread already handled this event, wait for another one.
+                            // Files can be legitimately closed out from under us so bad file
+                            // descriptors are not an error. We do not currently expect any other
+                            // errors and it's not clear how to handle them, so warn for now.
                             match self.wait_on_file(current_task, pending.key, wait) {
                                 Err(err) if err == EBADF => {} // File closed.
                                 Err(err) => log_warn!("Unexpected wait result {:#?}", err),
@@ -293,7 +322,6 @@ impl EpollFileObject {
                 }
             }
         }
-        added_any
     }
 
     /// Waits until an event exists in `pending_list` or until `timeout` has
@@ -339,17 +367,22 @@ impl EpollFileObject {
                 result => result?,
             }
 
-            if !self.process_triggered_events(current_task, pending_list, max_events)
-                || pending_list.len() == max_events
-            {
+            self.process_triggered_events(current_task, pending_list, max_events);
+
+            if pending_list.len() == max_events {
                 break; // No input events or output list full, nothing more we can do.
             }
 
+            if !pending_list.is_empty() {
+                // We now know we have at least one event to return. We shouldn't return
+                // immediately, in case there are more events available, but the next loop should
+                // wait with a 0 timeout to prevent further blocking.
+                wait_deadline = zx::Time::ZERO;
+            }
+
             // Loop back to check if there are more items in the Waiter's queue. Every wait_until()
-            // call will process a single event. In order to drain as many events as we can that are
-            // synchronously available, keep trying (but now with a 0 timeout to prevent further
-            // waiting) until it reports empty.
-            wait_deadline = zx::Time::ZERO;
+            // call will process a single event. In order to drain as many events as we can that
+            // are synchronously available, keep trying until it reports empty.
         }
 
         Ok(())
@@ -375,9 +408,12 @@ impl EpollFileObject {
         }
 
         // Process any events that are already available in the triggered queue.
+        // TODO(tbodt) fold this into the wait_until_pending_event loop
         let mut wait_deadline = zx::Time::after(timeout);
-        let mut pending_list: Vec<ReadyObject> = vec![];
-        if self.process_triggered_events(current_task, &mut pending_list, max_events) {
+        let mut pending_list = vec![];
+        self.process_triggered_events(current_task, &mut pending_list, max_events);
+        if !pending_list.is_empty() {
+            // TODO(tbodt) delete this block
             // If there are events synchronously available, don't actually wait for any more.
             // We still need to call wait_until_pending_event() (this time with a 0 deadline) to
             // process any events currently pending in the Waiter that haven't been added to our
@@ -395,7 +431,7 @@ impl EpollFileObject {
         // entries to the rearm_list for the next wait.
         let mut result = vec![];
         let mut state = self.state.write();
-        for pending_event in pending_list.iter() {
+        for pending_event in pending_list.iter().unique_by(|e| e.key) {
             // The wait could have been deleted by here,
             // so ignore the None case.
             if let Some(wait) = state.wait_objects.get_mut(&pending_event.key) {
@@ -410,12 +446,7 @@ impl EpollFileObject {
                 if wait.events.bits() & EPOLLET != 0 {
                     // The file can be closed while registered for epoll which is not an error.
                     // We do not expect other errors from waiting.
-                    match self.wait_on_file_with_options(
-                        current_task,
-                        pending_event.key,
-                        wait,
-                        WaitAsyncOptions::EDGE_TRIGGERED,
-                    ) {
+                    match self.wait_on_file_edge_triggered(current_task, pending_event.key, wait) {
                         Err(err) if err == EBADF => {} // File closed, ignore.
                         Err(err) => log_warn!("Unexpected wait result {:#?}", err),
                         _ => {}

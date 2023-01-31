@@ -76,7 +76,6 @@
                 "DupTest.Rlimit",
 
                 // epoll_test - https://fxbug.dev/79261
-                "EpollTest.DoubleEpollOneShot",
                 "EpollTest.CloseFile",
 
                 // eventfd_test - splice() isn't implemented fxbug.dev/119324
@@ -1262,6 +1261,7 @@
                 "ElfTest.ELFInterpreterWrongArch",
                 "ElfTest.NoExecute",
                 "ElfTest.ElfInterpreterNoExecute",
+                "EpollTest.DoubleEpollOneShot",
                 "ExecveTest.BrkAfterBinary",
                 "Cases/ElfInterpreterBadPathTest.Test/*",
                 "Cases/ElfInterpreterStaticTest.Test/*",
