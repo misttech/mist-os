@@ -11,6 +11,7 @@ pub mod example_config;
 pub mod identity_config;
 pub mod input_config;
 pub mod starnix_config;
+pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
 /// platform itself, not anything provided by the product.
@@ -67,6 +68,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the starnix area.
     #[serde(default)]
     pub starnix: starnix_config::PlatformStarnixConfig,
+
+    /// Platform configuration options for the virtualization area.
+    #[serde(default)]
+    pub virtualization: virtualization_config::PlatformVirtualizationConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
     #[serde(default)]

@@ -376,6 +376,21 @@ assembly_input_bundle("system_update_checker") {
 assembly_input_bundle("omaha_client") {
 }
 
+# AIB to enable virtualization support.
+assembly_input_bundle("virtualization_support") {
+  base_packages = [ "//src/virtualization/bin/vmm_launcher" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        core = [ rebase_path(
+                "//src/virtualization/bin/vmm_launcher/meta/vmm_launcher.core_shard.cml",
+                root_build_dir) ]
+      }
+    },
+  ]
+}
+
 assembly_input_bundle("wlan_base") {
   base_packages = [
     "//src/connectivity/location/regulatory_region",

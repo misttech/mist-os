@@ -30,6 +30,7 @@ mod input;
 mod session;
 mod starnix;
 mod swd;
+mod virtualization;
 
 /// ffx config flag for enabling configuring the assembly+structured config example.
 const EXAMPLE_ENABLED_FLAG: &str = "assembly_example_enabled";
@@ -165,6 +166,13 @@ pub fn define_configuration(
         &mut builder,
     )
     .context("Configuring the starnix subsystem")?;
+
+    virtualization::VirtualizationSubsystem::define_configuration(
+        &context,
+        &config.platform.virtualization,
+        &mut builder,
+    )
+    .context("Configuring the 'virtualization' subsystem")?;
 
     Ok(builder.build())
 }

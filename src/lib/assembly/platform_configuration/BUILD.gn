@@ -25,6 +25,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/session.rs",
     "src/subsystems/starnix.rs",
     "src/subsystems/swd.rs",
+    "src/subsystems/virtualization.rs",
   ]
   deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",

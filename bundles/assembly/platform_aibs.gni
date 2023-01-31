@@ -38,6 +38,7 @@ platform_aib_names = [
   "wlan_softmac_support",
 
   "starnix_support",
+  "virtualization_support",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)
