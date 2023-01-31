@@ -128,7 +128,7 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                             scope: None,
                             filter: None,
                             target: OfferTarget::Child(ChildRef {
-                                name: "c".to_string(),
+                                name: "c".into(),
                                 collection: None,
                             }),
                             target_name: CapabilityName::from("started"),

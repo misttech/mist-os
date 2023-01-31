@@ -681,7 +681,10 @@ impl Realm {
                     path,
                     ..ftest::Directory::EMPTY
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: child_name.clone(), collection: None }),
+                fcdecl::Ref::Child(fcdecl::ChildRef {
+                    name: child_name.clone().into(),
+                    collection: None,
+                }),
                 to,
             )
             .await
@@ -824,7 +827,7 @@ impl RealmNodeState {
                 self.decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child.name.clone(),
+                        name: child.name.clone().into(),
                         collection: None,
                     }),
                     source_name: protocol.clone(),
@@ -1941,7 +1944,7 @@ mod tests {
                 self.decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child.name.clone(),
+                        name: child.name.clone().into(),
                         collection: None,
                     }),
                     source_name: LogSinkMarker::PROTOCOL_NAME.into(),
@@ -1955,7 +1958,7 @@ mod tests {
                 self.decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: child_name.clone(),
+                        name: child_name.clone().into(),
                         collection: None,
                     }),
                     source_name: LogSinkMarker::PROTOCOL_NAME.into(),
@@ -2204,7 +2207,7 @@ mod tests {
 
                     // This doesn't exist
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "a".to_string(),
+                        name: "a".into(),
                         collection: None,
                     }),
                     availability: cm_rust::Availability::Required,
@@ -2225,7 +2228,7 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "a".to_string(),
+                            name: "a".into(),
                             collection: None,
                         }),
                         source_name: LogSinkMarker::PROTOCOL_NAME.into(),
@@ -2236,7 +2239,7 @@ mod tests {
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Parent,
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".to_string(),
+                            name: "b".into(),
                             collection: None,
                         }),
                         source_name: LogSinkMarker::PROTOCOL_NAME.into(),
@@ -2263,7 +2266,7 @@ mod tests {
                             cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                                 source: cm_rust::OfferSource::Parent,
                                 target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_static".to_string(),
+                                    name: "b_child_static".into(),
                                     collection: None,
                                 }),
                                 source_name: LogSinkMarker::PROTOCOL_NAME.into(),
@@ -2274,7 +2277,7 @@ mod tests {
                             cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                                 source: cm_rust::OfferSource::Parent,
                                 target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                                    name: "b_child_dynamic".to_string(),
+                                    name: "b_child_dynamic".into(),
                                     collection: None,
                                 }),
                                 source_name: LogSinkMarker::PROTOCOL_NAME.into(),
@@ -2764,7 +2767,7 @@ mod tests {
                 offers: vec![cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                     source: cm_rust::OfferSource::Parent,
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "realm_with_child".to_string(),
+                        name: "realm_with_child".into(),
                         collection: None,
                     }),
                     source_name: LogSinkMarker::PROTOCOL_NAME.into(),
@@ -2900,10 +2903,7 @@ mod tests {
                     ..ftest::Protocol::EMPTY
                 })],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "a".to_owned(),
-                    collection: None,
-                })],
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
             )
             .await;
         let resulting_a_decl = realm_and_builder_task
@@ -3040,10 +3040,7 @@ mod tests {
                     }),
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "a".to_owned(),
-                    collection: None,
-                })],
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
             )
             .await;
 
@@ -3055,10 +3052,7 @@ mod tests {
                     ..ftest::Protocol::EMPTY
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".to_owned(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "b".to_owned(),
-                    collection: None,
-                })],
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
             )
             .await;
 
@@ -3070,7 +3064,7 @@ mod tests {
                     type_: Some(fcdecl::DependencyType::Weak),
                     ..ftest::Protocol::EMPTY
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".to_owned(), collection: None }),
+                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
                 vec![fcdecl::Ref::Parent(fcdecl::ParentRef {})],
             )
             .await;
@@ -3209,8 +3203,8 @@ mod tests {
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
                 vec![
-                    fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".to_owned(), collection: None }),
-                    fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".to_owned(), collection: None }),
+                    fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
+                    fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None }),
                 ],
             )
             .await;
@@ -3397,10 +3391,7 @@ mod tests {
                     }),
                 ],
                 fcdecl::Ref::Parent(fcdecl::ParentRef {}),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "a".to_owned(),
-                    collection: None,
-                })],
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
             )
             .await;
 
@@ -3480,7 +3471,7 @@ mod tests {
                 .iter_mut(),
                 &mut fcdecl::Ref::Parent(fcdecl::ParentRef {}),
                 &mut vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "a".to_owned(),
+                    name: "a".into(),
                     collection: None,
                 })]
                 .iter_mut(),
@@ -3514,11 +3505,8 @@ mod tests {
                     name: Some("fuchsia.examples.Hippo".to_owned()),
                     ..ftest::Protocol::EMPTY
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".to_owned(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "b".to_owned(),
-                    collection: None,
-                })],
+                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
             )
             .await;
         realm_and_builder_task
@@ -3527,11 +3515,8 @@ mod tests {
                     name: Some("fuchsia.examples.Hippo".to_owned()),
                     ..ftest::Protocol::EMPTY
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".to_owned(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "c".to_owned(),
-                    collection: None,
-                })],
+                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "c".into(), collection: None })],
             )
             .await;
 
@@ -3557,12 +3542,12 @@ mod tests {
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".to_owned(),
+                            name: "a".into(),
                             collection: None,
                         }),
                         source_name: "fuchsia.examples.Hippo".into(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".to_owned(),
+                            name: "b".into(),
                             collection: None,
                         }),
                         target_name: "fuchsia.examples.Hippo".into(),
@@ -3571,12 +3556,12 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".to_owned(),
+                            name: "a".into(),
                             collection: None,
                         }),
                         source_name: "fuchsia.examples.Hippo".into(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "c".to_owned(),
+                            name: "c".into(),
                             collection: None,
                         }),
                         target_name: "fuchsia.examples.Hippo".into(),
@@ -3658,11 +3643,8 @@ mod tests {
                     name: Some("fuchsia.examples.Echo".to_owned()),
                     ..ftest::Protocol::EMPTY
                 })],
-                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".to_owned(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "b".to_owned(),
-                    collection: None,
-                })],
+                fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None }),
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "b".into(), collection: None })],
             )
             .await;
         realm_and_builder_task
@@ -3672,10 +3654,7 @@ mod tests {
                     ..ftest::Protocol::EMPTY
                 })],
                 fcdecl::Ref::Child(fcdecl::ChildRef { name: "c".to_owned(), collection: None }),
-                vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "a".to_owned(),
-                    collection: None,
-                })],
+                vec![fcdecl::Ref::Child(fcdecl::ChildRef { name: "a".into(), collection: None })],
             )
             .await;
 
@@ -3701,12 +3680,12 @@ mod tests {
                 offers: vec![
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "a".to_owned(),
+                            name: "a".into(),
                             collection: None,
                         }),
                         source_name: "fuchsia.examples.Echo".into(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "b".to_owned(),
+                            name: "b".into(),
                             collection: None,
                         }),
                         target_name: "fuchsia.examples.Echo".into(),
@@ -3715,12 +3694,12 @@ mod tests {
                     }),
                     cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
                         source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                            name: "c".to_owned(),
+                            name: "c".into(),
                             collection: None,
                         }),
                         source_name: "fuchsia.examples.RandonNumberGenerator".into(),
                         target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                            name: "a".to_owned(),
+                            name: "a".into(),
                             collection: None,
                         }),
                         target_name: "fuchsia.examples.RandonNumberGenerator".into(),
@@ -3946,7 +3925,7 @@ mod tests {
     #[test_case(vec![
         create_valid_capability()],
         fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "unknown".to_owned(),
+            name: "unknown".into(),
             collection: None
         }),
         vec![],
@@ -3954,12 +3933,12 @@ mod tests {
     #[test_case(vec![
         create_valid_capability()],
         fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "a".to_owned(),
+            name: "a".into(),
             collection: None
         }),
         vec![
             fcdecl::Ref::Child(fcdecl::ChildRef {
-                name: "unknown".to_owned(),
+                name: "unknown".into(),
                 collection: None
             }),
         ],
@@ -3967,19 +3946,19 @@ mod tests {
     #[test_case(vec![
         create_valid_capability()],
         fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "a".to_owned(),
+            name: "a".into(),
             collection: None
         }),
         vec![
             fcdecl::Ref::Child(fcdecl::ChildRef {
-                name: "a".to_owned(),
+                name: "a".into(),
                 collection: None
             }),
         ],
         ftest::RealmBuilderError::SourceAndTargetMatch ; "source_and_target_match")]
     #[test_case(vec![],
         fcdecl::Ref::Child(fcdecl::ChildRef {
-            name: "a".to_owned(),
+            name: "a".into(),
             collection: None
         }),
         vec![fcdecl::Ref::Parent(fcdecl::ParentRef {})],
@@ -4245,7 +4224,7 @@ mod tests {
             .read_only_directory(
                 "data",
                 &mut vec![fcdecl::Ref::Child(fcdecl::ChildRef {
-                    name: "a".to_string(),
+                    name: "a".into(),
                     collection: None,
                 })]
                 .iter_mut(),
@@ -4303,12 +4282,12 @@ mod tests {
                 }],
                 offers: vec![cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
                     source: cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                        name: "read-only-directory-0".to_string(),
+                        name: "read-only-directory-0".into(),
                         collection: None,
                     }),
                     source_name: "data".into(),
                     target: cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                        name: "a".to_string(),
+                        name: "a".into(),
                         collection: None,
                     }),
                     target_name: "data".into(),

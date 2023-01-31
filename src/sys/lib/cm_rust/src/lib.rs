@@ -914,19 +914,19 @@ pub struct ChildDecl {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ChildRef {
-    pub name: String,
-    pub collection: Option<String>,
+    pub name: FlyStr,
+    pub collection: Option<FlyStr>,
 }
 
 impl FidlIntoNative<ChildRef> for fdecl::ChildRef {
     fn fidl_into_native(self) -> ChildRef {
-        ChildRef { name: self.name, collection: self.collection }
+        ChildRef { name: self.name.into(), collection: self.collection.map(Into::into) }
     }
 }
 
 impl NativeIntoFidl<fdecl::ChildRef> for ChildRef {
     fn native_into_fidl(self) -> fdecl::ChildRef {
-        fdecl::ChildRef { name: self.name, collection: self.collection }
+        fdecl::ChildRef { name: self.name.into(), collection: self.collection.map(Into::into) }
     }
 }
 
@@ -1927,7 +1927,7 @@ impl FidlIntoNative<EventScope> for fdecl::Ref {
                 if let Some(_) = c.collection {
                     panic!("Dynamic children scopes are not supported for EventStreams");
                 } else {
-                    EventScope::Child(ChildRef { name: c.name, collection: None })
+                    EventScope::Child(ChildRef { name: c.name.into(), collection: None })
                 }
             }
             fdecl::Ref::Collection(collection) => EventScope::Collection(collection.name),
@@ -1959,7 +1959,7 @@ pub enum OfferSource {
 
 impl OfferSource {
     pub fn static_child(name: String) -> Self {
-        Self::Child(ChildRef { name, collection: None })
+        Self::Child(ChildRef { name: name.into(), collection: None })
     }
 }
 
@@ -2138,7 +2138,7 @@ pub enum OfferTarget {
 }
 impl OfferTarget {
     pub fn static_child(name: String) -> Self {
-        Self::Child(ChildRef { name, collection: None })
+        Self::Child(ChildRef { name: name.into(), collection: None })
     }
 }
 
@@ -2869,7 +2869,7 @@ mod tests {
                         }),
                         UseDecl::EventStream(UseEventStreamDecl {
                             source: UseSource::Child("test".to_string()),
-                            scope: Some(vec![EventScope::Child(ChildRef{ name: "a".to_string(), collection: None}), EventScope::Collection("b".to_string())]),
+                            scope: Some(vec![EventScope::Child(ChildRef{ name: "a".into(), collection: None}), EventScope::Collection("b".to_string())]),
                             source_name: CapabilityName::from("stopped"),
                             target_path: CapabilityPath::from_str("/svc/test").unwrap(),
                             filter: None,
@@ -2920,7 +2920,7 @@ mod tests {
                                 source: ExposeSource::Self_,
                                 source_name: CapabilityName::from("diagnostics_ready"),
                                 target: ExposeTarget::Parent,
-                                scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".to_string(), collection: None})]),
+                                scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".into(), collection: None})]),
                                 target_name: CapabilityName::from("diagnostics_ready"),
                             }
                         )
@@ -3002,8 +3002,8 @@ mod tests {
                             OfferEventStreamDecl {
                                 source: OfferSource::Parent,
                                 source_name: CapabilityName::from("diagnostics_ready"),
-                                target: OfferTarget::Child(ChildRef{name: "netstack".to_string(), collection: None}),
-                                scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".to_string(), collection: None})]),
+                                target: OfferTarget::Child(ChildRef{name: "netstack".into(), collection: None}),
+                                scope: Some(vec![EventScope::Child(ChildRef{ name: "netstack".into(), collection: None})]),
                                 target_name: CapabilityName::from("diagnostics_ready"),
                                 filter: None,
                                 availability: Availability::Optional,
@@ -3183,7 +3183,7 @@ mod tests {
                 fdecl::Ref::Debug(fdecl::DebugRef{}),
                 fdecl::Ref::Capability(fdecl::CapabilityRef {name: "capability".to_string()}),
                 fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "foo".to_string(),
+                    name: "foo".into(),
                     collection: None,
                 }),
             ],
@@ -3201,7 +3201,7 @@ mod tests {
             input = vec![
                 fdecl::Ref::Self_(fdecl::SelfRef {}),
                 fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "foo".to_string(),
+                    name: "foo".into(),
                     collection: None,
                 }),
                 fdecl::Ref::Framework(fdecl::FrameworkRef {}),
@@ -3220,7 +3220,7 @@ mod tests {
             input = vec![
                 fdecl::Ref::Self_(fdecl::SelfRef {}),
                 fdecl::Ref::Child(fdecl::ChildRef {
-                    name: "foo".to_string(),
+                    name: "foo".into(),
                     collection: None,
                 }),
                 fdecl::Ref::Framework(fdecl::FrameworkRef {}),
@@ -3264,7 +3264,7 @@ mod tests {
                     name: Some("minfs".to_string()),
                     backing_dir: Some("minfs".into()),
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                        name: "foo".to_string(),
+                        name: "foo".into(),
                         collection: None,
                     })),
                     subdir: None,
@@ -3290,7 +3290,7 @@ mod tests {
                     name: Some("minfs".to_string()),
                     backing_dir: Some("minfs".into()),
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                        name: "foo".to_string(),
+                        name: "foo".into(),
                         collection: None,
                     })),
                     subdir: None,

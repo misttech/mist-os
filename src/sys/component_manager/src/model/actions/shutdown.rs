@@ -16,6 +16,7 @@ use {
         RegistrationDeclCommon, RegistrationSource, StorageDirectorySource, UseDecl,
         UseDirectoryDecl, UseEventDecl, UseProtocolDecl, UseServiceDecl, UseSource,
     },
+    flyweights::FlyStr,
     futures::future::select_all,
     moniker::{ChildMoniker, ChildMonikerBase},
     std::collections::{HashMap, HashSet},
@@ -317,10 +318,10 @@ pub trait Component {
     /// returns `None` if none match. In the case of dynamic children, it's
     /// possible for multiple children to match a given `name` and `collection`,
     /// but at most one of them can be live.
-    fn find_child(&self, name: &String, collection: &Option<String>) -> Option<Child> {
+    fn find_child(&self, name: &str, collection: Option<&FlyStr>) -> Option<Child> {
         self.children().into_iter().find(|child| {
             child.moniker.name() == name
-                && child.moniker.collection() == collection.as_ref().map(|s| s.as_str())
+                && child.moniker.collection() == collection.as_ref().map(|c| c.as_str())
         })
     }
 }
@@ -463,7 +464,7 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
             }
         }
 
-        let child = match instance.find_child(child_name, &None) {
+        let child = match instance.find_child(child_name, None) {
             Some(child) => child.moniker.clone().into(),
             None => {
                 error!(name=?child_name, "use source doesn't exist");
@@ -618,7 +619,7 @@ fn find_service_offer_sources(
 fn find_offer_sources(instance: &impl Component, source: &OfferSource) -> Vec<ComponentRef> {
     match source {
         OfferSource::Child(ChildRef { name, collection }) => {
-            match instance.find_child(name, collection) {
+            match instance.find_child(name, collection.as_ref()) {
                 Some(child) => vec![child.moniker.clone().into()],
                 None => {
                     error!(
@@ -679,18 +680,16 @@ fn find_storage_source(instance: &impl Component, name: &CapabilityName) -> Vec<
     };
 
     match decl.source {
-        StorageDirectorySource::Child(child_name) => {
-            match instance.find_child(&child_name, &None) {
-                Some(child) => vec![child.moniker.clone().into()],
-                None => {
-                    error!(
-                        "source for storage capability {:?} doesn't exist: (name: {:?})",
-                        name, child_name,
-                    );
-                    vec![]
-                }
+        StorageDirectorySource::Child(child_name) => match instance.find_child(&child_name, None) {
+            Some(child) => vec![child.moniker.clone().into()],
+            None => {
+                error!(
+                    "source for storage capability {:?} doesn't exist: (name: {:?})",
+                    name, child_name,
+                );
+                vec![]
             }
-        }
+        },
         StorageDirectorySource::Self_ => vec![ComponentRef::Self_],
 
         // Storage from the parent is not relevant to shutdown order.
@@ -703,7 +702,7 @@ fn find_storage_source(instance: &impl Component, name: &CapabilityName) -> Vec<
 fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<ComponentRef> {
     match target {
         OfferTarget::Child(ChildRef { name, collection }) => {
-            match instance.find_child(name, collection) {
+            match instance.find_child(name, collection.as_ref()) {
                 Some(child) => vec![child.moniker.into()],
                 None => {
                     error!(
@@ -776,18 +775,16 @@ fn find_environment_sources(
     registration_sources
         .flat_map(|source| match source {
             RegistrationSource::Self_ => vec![ComponentRef::Self_],
-            RegistrationSource::Child(child_name) => {
-                match instance.find_child(&child_name, &None) {
-                    Some(child) => vec![child.moniker.into()],
-                    None => {
-                        error!(
-                            "source for environment {:?} doesn't exist: (name: {:?})",
-                            env.name, child_name,
-                        );
-                        vec![]
-                    }
+            RegistrationSource::Child(child_name) => match instance.find_child(&child_name, None) {
+                Some(child) => vec![child.moniker.into()],
+                None => {
+                    error!(
+                        "source for environment {:?} doesn't exist: (name: {:?})",
+                        env.name, child_name,
+                    );
+                    vec![]
                 }
-            }
+            },
             RegistrationSource::Parent => vec![],
         })
         .collect()
@@ -1449,10 +1446,7 @@ mod tests {
             .add_lazy_child("childA")
             .add_transient_collection("coll")
             .offer(OfferDecl::Directory(OfferDirectoryDecl {
-                source: OfferSource::Child(ChildRef {
-                    name: "childA".to_string(),
-                    collection: None,
-                }),
+                source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
                 target: OfferTarget::Collection("coll".to_string()),
                 source_name: "some_dir".into(),
                 target_name: "some_dir".into(),
@@ -1474,12 +1468,12 @@ mod tests {
             dynamic_offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
-                        name: "dyn1".to_string(),
-                        collection: Some("coll".to_string()),
+                        name: "dyn1".into(),
+                        collection: Some("coll".into()),
                     }),
                     target: OfferTarget::Child(ChildRef {
-                        name: "dyn2".to_string(),
-                        collection: Some("coll".to_string()),
+                        name: "dyn2".into(),
+                        collection: Some("coll".into()),
                     }),
                     source_name: "test.protocol".into(),
                     target_name: "test.protocol".into(),
@@ -1488,12 +1482,12 @@ mod tests {
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
-                        name: "dyn1".to_string(),
-                        collection: Some("coll".to_string()),
+                        name: "dyn1".into(),
+                        collection: Some("coll".into()),
                     }),
                     target: OfferTarget::Child(ChildRef {
-                        name: "dyn3".to_string(),
-                        collection: Some("coll".to_string()),
+                        name: "dyn3".into(),
+                        collection: Some("coll".into()),
                     }),
                     source_name: "test.protocol".into(),
                     target_name: "test.protocol".into(),
@@ -1545,12 +1539,12 @@ mod tests {
             dynamic_offers: vec![
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
-                        name: "dyn1".to_string(),
-                        collection: Some("coll1".to_string()),
+                        name: "dyn1".into(),
+                        collection: Some("coll1".into()),
                     }),
                     target: OfferTarget::Child(ChildRef {
-                        name: "dyn1".to_string(),
-                        collection: Some("coll2".to_string()),
+                        name: "dyn1".into(),
+                        collection: Some("coll2".into()),
                     }),
                     source_name: "test.protocol".into(),
                     target_name: "test.protocol".into(),
@@ -1559,12 +1553,12 @@ mod tests {
                 }),
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Child(ChildRef {
-                        name: "dyn2".to_string(),
-                        collection: Some("coll2".to_string()),
+                        name: "dyn2".into(),
+                        collection: Some("coll2".into()),
                     }),
                     target: OfferTarget::Child(ChildRef {
-                        name: "dyn1".to_string(),
-                        collection: Some("coll1".to_string()),
+                        name: "dyn1".into(),
+                        collection: Some("coll1".into()),
                     }),
                     source_name: "test.protocol".into(),
                     target_name: "test.protocol".into(),
@@ -1603,8 +1597,8 @@ mod tests {
             dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Parent,
                 target: OfferTarget::Child(ChildRef {
-                    name: "dyn1".to_string(),
-                    collection: Some("coll".to_string()),
+                    name: "dyn1".into(),
+                    collection: Some("coll".into()),
                 }),
                 source_name: "test.protocol".into(),
                 target_name: "test.protocol".into(),
@@ -1638,8 +1632,8 @@ mod tests {
             dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
                 target: OfferTarget::Child(ChildRef {
-                    name: "dyn1".to_string(),
-                    collection: Some("coll".to_string()),
+                    name: "dyn1".into(),
+                    collection: Some("coll".into()),
                 }),
                 source_name: "test.protocol".into(),
                 target_name: "test.protocol".into(),
@@ -1676,13 +1670,10 @@ mod tests {
                 Child { moniker: "coll:dyn2".try_into().unwrap(), environment_name: None },
             ],
             dynamic_offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
-                source: OfferSource::Child(ChildRef {
-                    name: "childA".to_string(),
-                    collection: None,
-                }),
+                source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
                 target: OfferTarget::Child(ChildRef {
-                    name: "dyn1".to_string(),
-                    collection: Some("coll".to_string()),
+                    name: "dyn1".into(),
+                    collection: Some("coll".into()),
                 }),
                 source_name: "test.protocol".into(),
                 target_name: "test.protocol".into(),
@@ -2180,7 +2171,7 @@ mod tests {
                 source: OfferSource::Collection("coll".to_string()),
                 source_name: "service_capability".into(),
                 target: OfferTarget::Child(ChildRef {
-                    name: "static_child".to_string(),
+                    name: "static_child".into(),
                     collection: None,
                 }),
                 target_name: "service_capbility".into(),
@@ -2230,7 +2221,7 @@ mod tests {
                 source: OfferSource::Collection("coll".to_string()),
                 source_name: "service_capability".into(),
                 target: OfferTarget::Child(ChildRef {
-                    name: "static_child".to_string(),
+                    name: "static_child".into(),
                     collection: None,
                 }),
                 target_name: "service_capbility".into(),
@@ -2861,10 +2852,7 @@ mod tests {
                     )
                     .add_lazy_child("c")
                     .offer(cm_rust::OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::Child(ChildRef {
-                            name: "c".to_string(),
-                            collection: None,
-                        }),
+                        source: OfferSource::Child(ChildRef { name: "c".into(), collection: None }),
                         source_name: "static_offer_source".into(),
                         target: OfferTarget::Collection("coll".to_string()),
                         target_name: "static_offer_target".into(),
@@ -2888,8 +2876,8 @@ mod tests {
             fcomponent::CreateChildArgs {
                 dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                        name: "a".to_string(),
-                        collection: Some("coll".to_string()),
+                        name: "a".into(),
+                        collection: Some("coll".into()),
                     })),
                     source_name: Some("dyn_offer_source_name".to_string()),
                     target_name: Some("dyn_offer_target_name".to_string()),

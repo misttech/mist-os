@@ -3007,14 +3007,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source: OfferSource::Parent,
                         source_name: "started".into(),
                         scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "b".to_string(),
+                            name: "b".into(),
                             collection: None,
                         })]),
                         filter: None,
-                        target: OfferTarget::Child(ChildRef {
-                            name: "b".to_string(),
-                            collection: None,
-                        }),
+                        target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
                         target_name: CapabilityName::from("started"),
                         availability: Availability::Required,
                     }))
@@ -3022,14 +3019,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source: OfferSource::Parent,
                         source_name: "started".into(),
                         scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "c".to_string(),
+                            name: "c".into(),
                             collection: None,
                         })]),
                         filter: None,
-                        target: OfferTarget::Child(ChildRef {
-                            name: "d".to_string(),
-                            collection: None,
-                        }),
+                        target: OfferTarget::Child(ChildRef { name: "d".into(), collection: None }),
                         target_name: CapabilityName::from("started"),
                         availability: Availability::Required,
                     }))
@@ -3037,14 +3031,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source: OfferSource::Parent,
                         source_name: "started".into(),
                         scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "d".to_string(),
+                            name: "d".into(),
                             collection: None,
                         })]),
                         filter: None,
-                        target: OfferTarget::Child(ChildRef {
-                            name: "c".to_string(),
-                            collection: None,
-                        }),
+                        target: OfferTarget::Child(ChildRef { name: "c".into(), collection: None }),
                         target_name: CapabilityName::from("started"),
                         availability: Availability::Required,
                     }))
@@ -3201,14 +3192,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source: OfferSource::Parent,
                         source_name: "started".into(),
                         scope: Some(vec![
-                            EventScope::Child(ChildRef { name: "b".to_string(), collection: None }),
-                            EventScope::Child(ChildRef { name: "c".to_string(), collection: None }),
+                            EventScope::Child(ChildRef { name: "b".into(), collection: None }),
+                            EventScope::Child(ChildRef { name: "c".into(), collection: None }),
                         ]),
                         filter: None,
-                        target: OfferTarget::Child(ChildRef {
-                            name: "b".to_string(),
-                            collection: None,
-                        }),
+                        target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
                         target_name: CapabilityName::from("started"),
                         availability: Availability::Required,
                     }))
@@ -3216,14 +3204,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source: OfferSource::Parent,
                         source_name: "started".into(),
                         scope: Some(vec![
-                            EventScope::Child(ChildRef { name: "b".to_string(), collection: None }),
-                            EventScope::Child(ChildRef { name: "c".to_string(), collection: None }),
+                            EventScope::Child(ChildRef { name: "b".into(), collection: None }),
+                            EventScope::Child(ChildRef { name: "c".into(), collection: None }),
                         ]),
                         filter: None,
-                        target: OfferTarget::Child(ChildRef {
-                            name: "c".to_string(),
-                            collection: None,
-                        }),
+                        target: OfferTarget::Child(ChildRef { name: "c".into(), collection: None }),
                         target_name: CapabilityName::from("started"),
                         availability: Availability::Required,
                     }))
@@ -3259,14 +3244,11 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source: OfferSource::Parent,
                         source_name: "started".into(),
                         scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "e".to_string(),
+                            name: "e".into(),
                             collection: None,
                         })]),
                         filter: None,
-                        target: OfferTarget::Child(ChildRef {
-                            name: "d".to_string(),
-                            collection: None,
-                        }),
+                        target: OfferTarget::Child(ChildRef { name: "d".into(), collection: None }),
                         target_name: CapabilityName::from("started"),
                         availability: Availability::Required,
                     }))

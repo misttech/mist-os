@@ -1538,13 +1538,13 @@ impl ResolvedInstanceState {
         self.dynamic_offers.retain(|offer| {
             let source_matches = offer.source()
                 == &cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                    name: moniker.name().to_string(),
-                    collection: moniker.collection().map(|c| c.to_string()),
+                    name: moniker.name().to_string().into(),
+                    collection: moniker.collection().map(|c| c.to_string().into()),
                 });
             let target_matches = offer.target()
                 == &cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                    name: moniker.name().to_string(),
-                    collection: moniker.collection().map(|c| c.to_string()),
+                    name: moniker.name().to_string().into(),
+                    collection: moniker.collection().map(|c| c.to_string().into()),
                 });
             !source_matches && !target_matches
         });
@@ -1716,8 +1716,8 @@ impl ResolvedInstanceState {
             }
             *offer_target_mut(offer).expect("validation should have found unknown enum type") =
                 Some(fdecl::Ref::Child(fdecl::ChildRef {
-                    name: child.name.clone(),
-                    collection: Some(collection.unwrap().name.clone()),
+                    name: child.name.clone().into(),
+                    collection: Some(collection.unwrap().name.clone().into()),
                 }));
         }
         let mut all_dynamic_offers: Vec<_> =
@@ -2908,8 +2908,8 @@ pub mod tests {
             fcomponent::CreateChildArgs {
                 dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                        name: "a".to_string(),
-                        collection: Some("coll_1".to_string()),
+                        name: "a".into(),
+                        collection: Some("coll_1".into()),
                     })),
                     source_name: Some("dyn_offer_source_name".to_string()),
                     target_name: Some("dyn_offer_target_name".to_string()),
@@ -2925,12 +2925,12 @@ pub mod tests {
 
         let example_dynamic_offer = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Child(ChildRef {
-                name: "a".to_string(),
-                collection: Some("coll_1".to_string()),
+                name: "a".into(),
+                collection: Some("coll_1".into()),
             }),
             target: OfferTarget::Child(ChildRef {
-                name: "b".to_string(),
-                collection: Some("coll_1".to_string()),
+                name: "b".into(),
+                collection: Some("coll_1".into()),
             }),
             source_name: "dyn_offer_source_name".into(),
             target_name: "dyn_offer_target_name".into(),
@@ -3019,8 +3019,8 @@ pub mod tests {
             fcomponent::CreateChildArgs {
                 dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                     source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                        name: "a".to_string(),
-                        collection: Some("coll_2".to_string()),
+                        name: "a".into(),
+                        collection: Some("coll_2".into()),
                     })),
                     source_name: Some("dyn_offer2_source_name".to_string()),
                     target_name: Some("dyn_offer2_target_name".to_string()),
@@ -3035,12 +3035,12 @@ pub mod tests {
 
         let example_dynamic_offer2 = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Child(ChildRef {
-                name: "a".to_string(),
-                collection: Some("coll_2".to_string()),
+                name: "a".into(),
+                collection: Some("coll_2".into()),
             }),
             target: OfferTarget::Child(ChildRef {
-                name: "b".to_string(),
-                collection: Some("coll_1".to_string()),
+                name: "b".into(),
+                collection: Some("coll_1".into()),
             }),
             source_name: "dyn_offer2_source_name".into(),
             target_name: "dyn_offer2_target_name".into(),
@@ -3122,7 +3122,7 @@ pub mod tests {
                 fcomponent::CreateChildArgs {
                     dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "static_child".to_string(),
+                            name: "static_child".into(),
                             collection: None,
                         })),
                         source_name: Some("bar".to_string()),
@@ -3197,8 +3197,8 @@ pub mod tests {
                         source_name: Some("foo".to_string()),
                         target_name: Some("foo".to_string()),
                         target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "dynamic_child".to_string(),
-                            collection: Some("coll".to_string()),
+                            name: "dynamic_child".into(),
+                            collection: Some("coll".into()),
                         })),
                         dependency_type: Some(fdecl::DependencyType::Strong),
                         availability: Some(fdecl::Availability::Required),
