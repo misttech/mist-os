@@ -166,24 +166,21 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
       FAIL("Lost connection to pointerinjector Registry: %s", zx_status_get_string(status));
     });
 
-    // Set up root view.
+    // Set up root view and root transform.
     root_instance_ = realm_->Connect<Flatland>();
     root_instance_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
 
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;
-    ViewBoundProtocols protocols;
-    ViewRefFocusedPtr root_focused_ptr;
 
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
     auto identity = scenic::NewViewIdentityOnCreation();
     root_view_ref_ = fidl::Clone(identity.view_ref);
-    protocols.set_view_ref_focused(root_focused_ptr.NewRequest());
 
-    root_instance_->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
-                                parent_viewport_watcher.NewRequest());
+    root_instance_->CreateView2(std::move(child_token), std::move(identity),
+                                /*view_bound_protocols*/ {}, parent_viewport_watcher.NewRequest());
 
     parent_viewport_watcher->GetLayout([this](auto layout_info) {
       ASSERT_TRUE(layout_info.has_logical_size());
@@ -193,6 +190,9 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
     });
 
     flatland_display_->SetContent(std::move(parent_token), child_view_watcher.NewRequest());
+
+    root_instance_->CreateTransform(kRootTransform);
+    root_instance_->SetRootTransform(kRootTransform);
     BlockingPresent(root_instance_);
 
     // Wait until we get the display size.
@@ -250,14 +250,14 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
   }
 
   void InjectNewViewport(Viewport viewport) {
-    fuchsia::ui::pointerinjector::Event event;
+    Event event;
     event.set_timestamp(0);
     {
-      fuchsia::ui::pointerinjector::Data data;
+      Data data;
       data.set_viewport(std::move(viewport));
       event.set_data(std::move(data));
     }
-    std::vector<fuchsia::ui::pointerinjector::Event> events;
+    std::vector<Event> events;
     events.emplace_back(std::move(event));
     bool hanging_get_returned = false;
     injector_->Inject(std::move(events), [&hanging_get_returned] { hanging_get_returned = true; });
@@ -331,32 +331,13 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
     mouse_source->Watch(watch_loops_.at(index));
   }
 
-  std::array<std::array<float, 2>, 2> FullScreenExtents() const {
-    return {{{0, 0}, {display_width_, display_height_}}};
-  }
-
-  ViewRef CreateChildView(FlatlandPtr& child_instance,
-                          fidl::InterfaceRequest<MouseSource> child_mouse_source = nullptr,
-                          fidl::InterfaceRequest<ViewRefFocused> child_focused_ptr = nullptr) {
-    root_instance_->CreateTransform(kRootTransform);
-    root_instance_->SetRootTransform(kRootTransform);
-    return CreateAndAddChildView(root_instance_,
-                                 /*viewport_transform*/ {.value = kRootTransform.value + 1},
-                                 /*parent_of_viewport_transform*/ kRootTransform,
-                                 /*parent_content*/ {.value = 1}, child_instance,
-                                 std::move(child_mouse_source), std::move(child_focused_ptr));
-  }
-
-  // This function assumes the parent_instance was created via |CreateChildView()|. This assumption
-  // means that the transform topology is a root transform with one level of N children. This
-  // enables virtually every hit testing scenario with minimal test complexity.
-  //
+  // Convenience function, we assume the test constructs topologies with one level of N children.
   // Prereq: |parent_of_viewport_transform| is created and connected to the view's root.
-  ViewRef CreateAndAddChildView(
-      FlatlandPtr& parent_instance, TransformId viewport_transform,
-      TransformId parent_of_viewport_transform, ContentId parent_content,
-      FlatlandPtr& child_instance, fidl::InterfaceRequest<MouseSource> child_mouse_source = nullptr,
-      fidl::InterfaceRequest<ViewRefFocused> child_focused_ptr = nullptr) {
+  ViewRef CreateAndAddChildView(FlatlandPtr& parent_instance, TransformId viewport_transform_id,
+                                TransformId parent_of_viewport_transform,
+                                ContentId parent_content_id, FlatlandPtr& child_instance,
+                                fidl::InterfaceRequest<MouseSource> child_mouse_source = nullptr,
+                                fidl::InterfaceRequest<ViewRefFocused> child_focused = nullptr) {
     child_instance = realm_->Connect<Flatland>();
 
     // Set up the child view watcher.
@@ -365,11 +346,11 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
     ViewportProperties properties;
     properties.set_logical_size({kDefaultSize, kDefaultSize});
 
-    parent_instance->CreateTransform(viewport_transform);
-    parent_instance->CreateViewport(parent_content, std::move(parent_token), std::move(properties),
-                                    child_view_watcher.NewRequest());
-    parent_instance->SetContent(viewport_transform, parent_content);
-    parent_instance->AddChild(parent_of_viewport_transform, viewport_transform);
+    parent_instance->CreateTransform(viewport_transform_id);
+    parent_instance->CreateViewport(parent_content_id, std::move(parent_token),
+                                    std::move(properties), child_view_watcher.NewRequest());
+    parent_instance->SetContent(viewport_transform_id, parent_content_id);
+    parent_instance->AddChild(parent_of_viewport_transform, viewport_transform_id);
 
     BlockingPresent(parent_instance);
 
@@ -380,8 +361,8 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
     ViewBoundProtocols protocols;
     if (child_mouse_source)
       protocols.set_mouse_source(std::move(child_mouse_source));
-    if (child_focused_ptr)
-      protocols.set_view_ref_focused(std::move(child_focused_ptr));
+    if (child_focused)
+      protocols.set_view_ref_focused(std::move(child_focused));
     child_instance->CreateView2(std::move(child_token), std::move(identity), std::move(protocols),
                                 parent_viewport_watcher.NewRequest());
     child_instance->CreateTransform(kRootTransform);
@@ -391,12 +372,12 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
     return child_view_ref;
   }
 
+  std::array<std::array<float, 2>, 2> FullScreenExtents() const {
+    return {{{0, 0}, {display_width_, display_height_}}};
+  }
+
   static constexpr TransformId kRootTransform{.value = 1};
   static constexpr ContentId kRootContentId{.value = 1};
-
-  fuchsia::math::SizeU FullscreenSize() {
-    return {static_cast<uint32_t>(display_width_), static_cast<uint32_t>(display_height_)};
-  }
 
   FlatlandPtr root_instance_;
 
@@ -424,14 +405,19 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
 TEST_F(FlatlandMouseIntegrationTest, ReleaseTargetView_TriggersChannelClosure) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
+  child_mouse_source.set_error_handler([](zx_status_t status) {
+    FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
+  });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -454,14 +440,19 @@ TEST_F(FlatlandMouseIntegrationTest, ReleaseTargetView_TriggersChannelClosure) {
 TEST_F(FlatlandMouseIntegrationTest, DisconnectTargetView_TriggersChannelClosure) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
+  child_mouse_source.set_error_handler([](zx_status_t status) {
+    FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
+  });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -486,7 +477,7 @@ TEST_F(FlatlandMouseIntegrationTest, DisconnectTargetView_TriggersChannelClosure
 TEST_F(FlatlandMouseIntegrationTest, ChildReceivesFocus_OnMouseLatch) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
+  ViewRefFocusedPtr child_focused;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -494,12 +485,16 @@ TEST_F(FlatlandMouseIntegrationTest, ChildReceivesFocus_OnMouseLatch) {
   child_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  child_focused_ptr.set_error_handler([](zx_status_t status) {
+  child_focused.set_error_handler([](zx_status_t status) {
     FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
   });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref =
+      CreateAndAddChildView(root_instance_,
+                            /*viewport_transform_id*/ {.value = 2},
+                            /*parent_of_viewport_transform*/ kRootTransform,
+                            /*parent_content_id*/ {.value = 1}, child_instance,
+                            child_mouse_source.NewRequest(), child_focused.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -516,17 +511,16 @@ TEST_F(FlatlandMouseIntegrationTest, ChildReceivesFocus_OnMouseLatch) {
   RunLoopUntil([&child_events] { return child_events.size() == 1u; });
 
   // Child view should receive focus.
-  std::optional<FocusState> child_focused;
-  child_focused_ptr->Watch([&child_focused](auto update) { child_focused = std::move(update); });
-  RunLoopUntil([&child_focused] { return child_focused.has_value(); });
-  EXPECT_TRUE(child_focused->focused());
+  std::optional<FocusState> is_child_focused;
+  child_focused->Watch([&is_child_focused](auto update) { is_child_focused = std::move(update); });
+  RunLoopUntil([&is_child_focused] { return is_child_focused.has_value(); });
+  EXPECT_TRUE(is_child_focused->focused());
 }
 
 // Send wheel events to scenic ensure client receives wheel events.
 TEST_F(FlatlandMouseIntegrationTest, Wheel) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -534,12 +528,12 @@ TEST_F(FlatlandMouseIntegrationTest, Wheel) {
   child_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  child_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -578,7 +572,6 @@ TEST_F(FlatlandMouseIntegrationTest, Wheel) {
 TEST_F(FlatlandMouseIntegrationTest, DownWheelUpWheel) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -586,12 +579,12 @@ TEST_F(FlatlandMouseIntegrationTest, DownWheelUpWheel) {
   child_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  child_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -655,7 +648,6 @@ TEST_F(FlatlandMouseIntegrationTest, DownWheelUpWheel) {
 TEST_F(FlatlandMouseIntegrationTest, DownWheelUpWheelBundled) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -663,12 +655,12 @@ TEST_F(FlatlandMouseIntegrationTest, DownWheelUpWheelBundled) {
   child_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  child_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -735,7 +727,6 @@ TEST_F(FlatlandMouseIntegrationTest, DownWheelUpWheelBundled) {
 TEST_F(FlatlandMouseIntegrationTest, WheelWithPhysicalPixel) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -743,12 +734,12 @@ TEST_F(FlatlandMouseIntegrationTest, WheelWithPhysicalPixel) {
   child_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  child_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -966,7 +957,6 @@ TEST_F(FlatlandMouseIntegrationTest, WheelWithPhysicalPixel) {
 TEST_F(FlatlandMouseIntegrationTest, SimpleHitTest) {
   FlatlandPtr parent_instance;
   MouseSourcePtr parent_mouse_source;
-  ViewRefFocusedPtr parent_focused_ptr;
 
   parent_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -974,16 +964,15 @@ TEST_F(FlatlandMouseIntegrationTest, SimpleHitTest) {
   parent_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  parent_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto parent_view_ref = CreateChildView(parent_instance, parent_mouse_source.NewRequest(),
-                                         parent_focused_ptr.NewRequest());
+  auto parent_view_ref = CreateAndAddChildView(root_instance_,
+                                               /*viewport_transform_id*/ {.value = 2},
+                                               /*parent_of_viewport_transform*/ kRootTransform,
+                                               /*parent_content_id*/ {.value = 1}, parent_instance,
+                                               parent_mouse_source.NewRequest());
 
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -991,14 +980,10 @@ TEST_F(FlatlandMouseIntegrationTest, SimpleHitTest) {
   child_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  child_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto child_view_ref =
-      CreateAndAddChildView(parent_instance, /*parent_transform=*/{.value = 2}, kRootTransform,
-                            /*parent_content=*/{.value = 2}, child_instance,
-                            child_mouse_source.NewRequest(), child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(
+      parent_instance, /*parent_transform=*/{.value = 2}, kRootTransform,
+      /*parent_content_id=*/{.value = 2}, child_instance, child_mouse_source.NewRequest());
 
   // Place hit regions, overriding any default ones if they exist.
   parent_instance->SetHitRegions(kRootTransform, {{.region = {0, 0, 10, 10}}});
@@ -1043,7 +1028,6 @@ TEST_F(FlatlandMouseIntegrationTest, SimpleHitTest) {
 TEST_F(FlatlandMouseIntegrationTest, SandwichTest) {
   FlatlandPtr parent_instance;
   MouseSourcePtr parent_mouse_source;
-  ViewRefFocusedPtr parent_focused_ptr;
 
   parent_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -1051,16 +1035,15 @@ TEST_F(FlatlandMouseIntegrationTest, SandwichTest) {
   parent_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  parent_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto parent_view_ref = CreateChildView(parent_instance, parent_mouse_source.NewRequest(),
-                                         parent_focused_ptr.NewRequest());
+  auto parent_view_ref = CreateAndAddChildView(root_instance_,
+                                               /*viewport_transform_id*/ {.value = 2},
+                                               /*parent_of_viewport_transform*/ kRootTransform,
+                                               /*parent_content_id*/ {.value = 1}, parent_instance,
+                                               parent_mouse_source.NewRequest());
 
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -1068,14 +1051,10 @@ TEST_F(FlatlandMouseIntegrationTest, SandwichTest) {
   child_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  child_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto child_view_ref =
-      CreateAndAddChildView(parent_instance, /*parent_transform=*/{.value = 2}, kRootTransform,
-                            /*parent_content=*/{.value = 2}, child_instance,
-                            child_mouse_source.NewRequest(), child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(
+      parent_instance, /*parent_transform=*/{.value = 2}, kRootTransform,
+      /*parent_content_id=*/{.value = 2}, child_instance, child_mouse_source.NewRequest());
 
   // After creating the child transform, create an additional transform representing the overlay.
   TransformId overlay_transform = {.value = 3};
@@ -1162,7 +1141,6 @@ TEST_F(FlatlandMouseIntegrationTest, SandwichTest) {
 TEST_F(FlatlandMouseIntegrationTest, PartialScreenViews) {
   FlatlandPtr parent_instance;
   MouseSourcePtr parent_mouse_source;
-  ViewRefFocusedPtr parent_focused_ptr;
 
   parent_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -1170,16 +1148,15 @@ TEST_F(FlatlandMouseIntegrationTest, PartialScreenViews) {
   parent_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  parent_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto parent_view_ref = CreateChildView(parent_instance, parent_mouse_source.NewRequest(),
-                                         parent_focused_ptr.NewRequest());
+  auto parent_view_ref = CreateAndAddChildView(root_instance_,
+                                               /*viewport_transform_id*/ {.value = 2},
+                                               /*parent_of_viewport_transform*/ kRootTransform,
+                                               /*parent_content_id*/ {.value = 1}, parent_instance,
+                                               parent_mouse_source.NewRequest());
 
   FlatlandPtr context_instance;
   MouseSourcePtr context_mouse_source;
-  ViewRefFocusedPtr context_focused_ptr;
 
   context_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -1187,19 +1164,14 @@ TEST_F(FlatlandMouseIntegrationTest, PartialScreenViews) {
   context_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  context_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  const TransformId viewport_transform = {.value = 2};
-  auto context_view_ref =
-      CreateAndAddChildView(parent_instance, viewport_transform, kRootTransform,
-                            /*parent_content=*/{.value = 2}, context_instance,
-                            context_mouse_source.NewRequest(), context_focused_ptr.NewRequest());
+  const TransformId viewport_transform_id = {.value = 2};
+  auto context_view_ref = CreateAndAddChildView(
+      parent_instance, viewport_transform_id, kRootTransform,
+      /*parent_content_id=*/{.value = 2}, context_instance, context_mouse_source.NewRequest());
 
   FlatlandPtr target_instance;
   MouseSourcePtr target_mouse_source;
-  ViewRefFocusedPtr target_focused_ptr;
 
   target_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
@@ -1207,21 +1179,17 @@ TEST_F(FlatlandMouseIntegrationTest, PartialScreenViews) {
   target_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  target_focused_ptr.set_error_handler([](zx_status_t status) {
-    FAIL("ViewRefFocused closed with status: %s", zx_status_get_string(status));
-  });
 
-  auto target_view_ref =
-      CreateAndAddChildView(context_instance, viewport_transform, kRootTransform,
-                            /*parent_content=*/{.value = 2}, target_instance,
-                            target_mouse_source.NewRequest(), target_focused_ptr.NewRequest());
+  auto target_view_ref = CreateAndAddChildView(
+      context_instance, viewport_transform_id, kRootTransform,
+      /*parent_content_id=*/{.value = 2}, target_instance, target_mouse_source.NewRequest());
 
   // Change the context view's origin from (0,0) to (5,5).
   int x_translation = 5;
   int y_translation = 5;
-  parent_instance->SetTranslation(viewport_transform, {x_translation, y_translation});
+  parent_instance->SetTranslation(viewport_transform_id, {x_translation, y_translation});
   fuchsia::math::Rect rect = {0, 0, 5, 5};
-  parent_instance->SetClipBoundary(viewport_transform,
+  parent_instance->SetClipBoundary(viewport_transform_id,
                                    std::make_unique<fuchsia::math::Rect>(std::move(rect)));
 
   // Place hit regions, overriding any default ones if they exist.
@@ -1343,14 +1311,16 @@ TEST_F(FlatlandMouseIntegrationTest, PartialScreenViews) {
 TEST_F(FlatlandMouseIntegrationTest, TargetViewWith_ScaleRotationTranslation) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Scale, rotate, and translate the child_instance. Those operations are applied in that order.
   TransformId kTransformId = {.value = 2};
@@ -1431,14 +1401,16 @@ TEST_F(FlatlandMouseIntegrationTest, TargetViewWith_ScaleRotationTranslation) {
 TEST_F(FlatlandMouseIntegrationTest, InjectedInput_ShouldBeCorrectlyViewportTransformed) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -1509,14 +1481,16 @@ TEST_F(FlatlandMouseIntegrationTest, InjectedInput_ShouldBeCorrectlyViewportTran
 TEST_F(FlatlandMouseIntegrationTest, InjectedInput_OnRotatedChild_ShouldHitEdges) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Apply rotation.
   TransformId transform = {.value = kRootTransform.value + 1};
@@ -1563,14 +1537,16 @@ TEST_F(FlatlandMouseIntegrationTest, InjectionOutsideViewport_ShouldLimitOnClick
   // Viewport.
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -1626,14 +1602,16 @@ TEST_F(FlatlandMouseIntegrationTest, InjectionOutsideViewport_ShouldLimitOnClick
 TEST_F(FlatlandMouseIntegrationTest, HoverTest) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -1701,14 +1679,16 @@ TEST_F(FlatlandMouseIntegrationTest, HoverTest) {
 TEST_F(FlatlandMouseIntegrationTest, InjectorDeath_ShouldCauseViewExitedEvent) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -1742,14 +1722,16 @@ TEST_F(FlatlandMouseIntegrationTest, InjectorDeath_ShouldCauseViewExitedEvent) {
 TEST_F(FlatlandMouseIntegrationTest, REMOVEandCANCEL_ShouldCauseViewExitedEvents) {
   FlatlandPtr child_instance;
   MouseSourcePtr child_mouse_source;
-  ViewRefFocusedPtr child_focused_ptr;
 
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });
 
-  auto child_view_ref = CreateChildView(child_instance, child_mouse_source.NewRequest(),
-                                        child_focused_ptr.NewRequest());
+  auto child_view_ref = CreateAndAddChildView(root_instance_,
+                                              /*viewport_transform_id*/ {.value = 2},
+                                              /*parent_of_viewport_transform*/ kRootTransform,
+                                              /*parent_content_id*/ {.value = 1}, child_instance,
+                                              child_mouse_source.NewRequest());
 
   // Listen for input events.
   std::vector<MouseEvent> child_events;
@@ -1818,7 +1800,11 @@ TEST_F(FlatlandMouseIntegrationTest, AnonymousSubtree) {
   parent_mouse_source.set_error_handler([](zx_status_t status) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
-  const auto parent_view_ref = CreateChildView(parent_instance, parent_mouse_source.NewRequest());
+  const auto parent_view_ref = CreateAndAddChildView(
+      root_instance_,
+      /*viewport_transform_id*/ {.value = 2},
+      /*parent_of_viewport_transform*/ kRootTransform,
+      /*parent_content_id*/ {.value = 1}, parent_instance, parent_mouse_source.NewRequest());
 
   FlatlandPtr child_instance = realm_->Connect<Flatland>();
   child_instance.set_error_handler([](zx_status_t status) {
@@ -1835,16 +1821,16 @@ TEST_F(FlatlandMouseIntegrationTest, AnonymousSubtree) {
     BlockingPresent(child_instance);
 
     // Attach it to the parent.
-    const TransformId viewport_transform{.value = 2};
-    const ContentId parent_content{.value = 1};
+    const TransformId viewport_transform_id{.value = 2};
+    const ContentId parent_content_id{.value = 1};
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;
     ViewportProperties properties;
     properties.set_logical_size({kDefaultSize, kDefaultSize});
-    parent_instance->CreateTransform(viewport_transform);
-    parent_instance->CreateViewport(parent_content, std::move(parent_token), std::move(properties),
-                                    child_view_watcher.NewRequest());
-    parent_instance->SetContent(viewport_transform, parent_content);
-    parent_instance->AddChild(kRootTransform, viewport_transform);
+    parent_instance->CreateTransform(viewport_transform_id);
+    parent_instance->CreateViewport(parent_content_id, std::move(parent_token),
+                                    std::move(properties), child_view_watcher.NewRequest());
+    parent_instance->SetContent(viewport_transform_id, parent_content_id);
+    parent_instance->AddChild(kRootTransform, viewport_transform_id);
     BlockingPresent(parent_instance);
   }
 
@@ -1858,7 +1844,7 @@ TEST_F(FlatlandMouseIntegrationTest, AnonymousSubtree) {
     FAIL("Mouse source closed with status: %s", zx_status_get_string(status));
   });
   CreateAndAddChildView(child_instance, /*parent_transform=*/{.value = 2}, kRootTransform,
-                        /*parent_content=*/{.value = 2}, grandchild_instance,
+                        /*parent_content_id=*/{.value = 2}, grandchild_instance,
                         grandchild_mouse_source.NewRequest());
 
   // Listen for mouse events.

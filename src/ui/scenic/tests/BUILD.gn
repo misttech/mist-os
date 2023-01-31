@@ -218,11 +218,15 @@ fuchsia_test_component("scenic_pixeltest") {
 
 executable("flatland_touch_integration_test_bin") {
   testonly = true
-  sources = [ "flatland_integration_tests/flatland_touch_integration_test.cc" ]
+  sources = [
+    "flatland_integration_tests/flatland_touch_integration_test.cc",
+    "flatland_integration_tests/flatland_touch_local_hit_integration_test.cc",
+  ]
   deps = [
     ":common_deps_cts",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
+    "//sdk/fidl/fuchsia.ui.pointer.augment:fuchsia.ui.pointer.augment_hlcpp",
     "//sdk/fidl/fuchsia.ui.pointerinjector:fuchsia.ui.pointerinjector_hlcpp",
   ]
 }
