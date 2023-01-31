@@ -75,7 +75,7 @@ async fn run_bad_password_test(
         "Attempting to connect to a network with {:?} security using the wrong password.",
         protection
     );
-    connect_to_ap(
+    handle_connect_future(
         main_fut,
         test_helper,
         ssid,

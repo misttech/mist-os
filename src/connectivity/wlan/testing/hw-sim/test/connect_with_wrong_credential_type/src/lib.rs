@@ -63,7 +63,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
         );
         pin_mut!(main_future);
         info!("Attempting to connect to a WPA2 network with no password.");
-        connect_to_ap(
+        handle_connect_future(
             main_future,
             &mut helper,
             &AP_SSID,
@@ -97,7 +97,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
         );
         pin_mut!(main_future);
         info!("Attempting to connect to a WPA1 network with no password.");
-        connect_to_ap(
+        handle_connect_future(
             main_future,
             &mut helper,
             &AP_SSID,
@@ -123,7 +123,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
         );
         pin_mut!(main_future);
         info!("Attempting to connect to a WEP network with no password.");
-        connect_to_ap(
+        handle_connect_future(
             main_future,
             &mut helper,
             &AP_SSID,
@@ -149,7 +149,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
         );
         pin_mut!(main_future);
         info!("Attempting to connect to an open network with a password.");
-        connect_to_ap(
+        handle_connect_future(
             main_future,
             &mut helper,
             &AP_SSID,

@@ -165,14 +165,22 @@ pub async fn start_ap_and_wait_for_confirmation(network_config: NetworkConfigBui
 }
 
 /// Creates a client controller and update stream for getting status updates.
-pub async fn init_client_controller(
+pub async fn get_client_controller(
 ) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
     let provider = connect_to_protocol::<fidl_policy::ClientProviderMarker>().unwrap();
     let (controller_client_end, controller_server_end) = fidl::endpoints::create_proxy().unwrap();
     let (listener_client_end, listener_server_end) = fidl::endpoints::create_endpoints().unwrap();
     provider.get_controller(controller_server_end, listener_client_end).unwrap();
-    let mut client_state_update_stream = listener_server_end.into_stream().unwrap();
+    let client_state_update_stream = listener_server_end.into_stream().unwrap();
 
+    (controller_client_end, client_state_update_stream)
+}
+
+/// Creates a client controller and update stream, and wait to verify that client connections are
+/// enabled.
+pub async fn init_client_controller(
+) -> (fidl_policy::ClientControllerProxy, fidl_policy::ClientStateUpdatesRequestStream) {
+    let (controller_client_end, mut client_state_update_stream) = get_client_controller().await;
     // Clear the initial state notifications that are sent by the policy layer.  This initial state
     // is variable depending on whether or not the policy layer has discovered a PHY or created an
     // interface yet.  The policy layer enables client connections by default.  Wait until the

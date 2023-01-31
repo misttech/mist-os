@@ -800,7 +800,7 @@ pub async fn save_network_and_wait_until_connected(
     (client_controller, client_state_update_stream)
 }
 
-pub async fn connect_to_ap<F, R>(
+pub async fn handle_connect_future<F, R>(
     connect_fut: F,
     helper: &mut test_utils::TestHelper,
     ap_ssid: &Ssid,
@@ -894,7 +894,7 @@ pub async fn connect_with_security_type(
         }
     };
 
-    connect_to_ap(
+    handle_connect_future(
         connect_fut,
         helper,
         ssid,

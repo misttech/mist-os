@@ -119,6 +119,11 @@ fuchsia_component("run-without-regulatory-manager") {
   deps = [ "run_without_regulatory_manager" ]
 }
 
+fuchsia_component("autoconnect-idle-iface") {
+  testonly = true
+  manifest = "meta/autoconnect_idle_iface.cml"
+  deps = [ "autoconnect_idle_iface" ]
+}
 shared_deps = [
   "//sdk/lib/driver_test_realm/simple",
   "//src/connectivity/location/regulatory_region:regulatory_region_component",
@@ -131,6 +136,7 @@ shared_deps = [
 ]
 
 hw_sim_test_components_for_all_privacies = [
+  ":autoconnect-idle-iface",
   ":connect-to-all-modern-bss-protections",
   ":connect-to-open-network",
   ":connect-with-failed-association",
