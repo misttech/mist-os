@@ -369,7 +369,7 @@ async fn test_send_delete() {
     {
         let (messenger_client_1, _) =
             delegate.create(MessengerType::Unbound).await.expect("client should be created");
-        messenger_client_1.message(ORIGINAL.clone(), Audience::Broadcast).ack();
+        let _ = messenger_client_1.message(ORIGINAL.clone(), Audience::Broadcast);
     }
 
     // Ensure observer gets payload and then do nothing with message.
@@ -455,7 +455,7 @@ async fn verify_messenger_behavior(messenger_type: MessengerType) {
             Box::pin(async move {
                 let mut author = captured_signature.lock().await;
                 *author = Some(client.get_author());
-                client.reply(REPLY.clone()).ack();
+                let _ = client.reply(REPLY.clone());
             })
         }))
     })
@@ -468,7 +468,7 @@ async fn verify_messenger_behavior(messenger_type: MessengerType) {
         captured_signature.lock().await.take().expect("signature should be populated");
 
     // Send top level message to Messenger.
-    target_client.message(ORIGINAL.clone(), Audience::Messenger(messenger_signature)).ack();
+    let _ = target_client.message(ORIGINAL.clone(), Audience::Messenger(messenger_signature));
 
     // Verify Messenger received message.
     verify_payload(ORIGINAL.clone(), &mut test_receptor, None).await;
@@ -493,7 +493,7 @@ async fn test_unbound_messenger() {
         &mut unbound_receptor,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.reply(REPLY.clone()).ack();
+                let _ = client.reply(REPLY.clone());
             })
         })),
     )
@@ -511,9 +511,8 @@ async fn test_next_payload() {
     let (_, mut unbound_receptor_2) =
         delegate.create(MessengerType::Unbound).await.expect("should create messenger");
 
-    unbound_messenger_1
-        .message(ORIGINAL.clone(), Audience::Messenger(unbound_receptor_2.get_signature()))
-        .ack();
+    let _ = unbound_messenger_1
+        .message(ORIGINAL.clone(), Audience::Messenger(unbound_receptor_2.get_signature()));
 
     let receptor_result = unbound_receptor_2.next_payload().await;
 
@@ -556,9 +555,8 @@ async fn test_bind_to_recipient() {
     {
         let (scoped_messenger, _scoped_receptor) =
             delegate.create(MessengerType::Unbound).await.unwrap();
-        scoped_messenger
-            .message(ORIGINAL.clone(), Audience::Messenger(receptor.get_signature()))
-            .ack();
+        let _ = scoped_messenger
+            .message(ORIGINAL.clone(), Audience::Messenger(receptor.get_signature()));
 
         if let Some(MessageEvent::Message(payload, mut client)) = receptor.next().await {
             assert_eq!(payload, ORIGINAL.clone());
@@ -604,7 +602,7 @@ async fn test_reply_propagation() {
         &mut target_receptor,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.reply(REPLY.clone()).ack();
+                let _ = client.reply(REPLY.clone());
             })
         })),
     )
@@ -616,7 +614,7 @@ async fn test_reply_propagation() {
         &mut broker,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED.clone()).ack();
+                let _ = client.propagate(MODIFIED.clone());
             })
         })),
     )
@@ -662,7 +660,7 @@ async fn test_propagation() {
         &mut broker_1,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED.clone()).ack();
+                let _ = client.propagate(MODIFIED.clone());
             })
         })),
     )
@@ -675,7 +673,7 @@ async fn test_propagation() {
         &mut broker_2,
         Some(Box::new(move |client| -> BoxFuture<'_, ()> {
             Box::pin(async move {
-                client.propagate(MODIFIED_2.clone()).ack();
+                let _ = client.propagate(MODIFIED_2.clone());
             })
         })),
     )
@@ -693,7 +691,7 @@ async fn test_propagation() {
                 assert!(client.get_modifiers().contains(&modifier_1_signature));
                 assert!(client.get_modifiers().contains(&modifier_2_signature));
                 // ensure the message author has not been modified.
-                client.reply(REPLY.clone()).ack();
+                let _ = client.reply(REPLY.clone());
             })
         })),
     )
@@ -720,10 +718,10 @@ async fn test_broker_filter_custom() {
         delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");
 
     // Send broadcast message.
-    messenger.message(BROADCAST.clone(), Audience::Broadcast).ack();
+    let _ = messenger.message(BROADCAST.clone(), Audience::Broadcast);
 
     // Send original message.
-    messenger.message(ORIGINAL.clone(), Audience::Broadcast).ack();
+    let _ = messenger.message(ORIGINAL.clone(), Audience::Broadcast);
     // Ensure broker gets message. If the broadcast message was received, this
     // will fail.
     verify_payload(ORIGINAL.clone(), &mut broker_receptor, None).await;
@@ -749,10 +747,10 @@ async fn test_broker_filter_caputring_closure() {
         delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");
 
     // Send broadcast message.
-    messenger.message(BROADCAST.clone(), Audience::Broadcast).ack();
+    let _ = messenger.message(BROADCAST.clone(), Audience::Broadcast);
 
     // Send foo message.
-    messenger.message(expected_payload.clone(), Audience::Broadcast).ack();
+    let _ = messenger.message(expected_payload.clone(), Audience::Broadcast);
     // Ensure broker gets message. If the broadcast message was received, this
     // will fail.
     verify_payload(expected_payload.clone(), &mut broker_receptor, None).await;
@@ -800,7 +798,7 @@ async fn test_roles_membership() {
 
     let message = test_message::FOO.clone();
     let audience = Audience::Role(ROLE_1);
-    sender.message(message.clone(), audience).ack();
+    let _ = sender.message(message.clone(), audience);
 
     // Verify payload received by role members.
     verify_payload(message.clone(), &mut foo_role_receptor, None).await;
@@ -838,7 +836,7 @@ async fn test_roles_exclusivity() {
     {
         let message = test_message::BAR.clone();
         let audience = Audience::Role(ROLE_2);
-        sender.message(message.clone(), audience).ack();
+        let _ = sender.message(message.clone(), audience);
 
         // Verify payload received by role members.
         verify_payload(message.clone(), &mut bar_role_receptor, None).await;
@@ -846,7 +844,7 @@ async fn test_roles_exclusivity() {
     {
         let message = test_message::FOO.clone();
         let audience = Audience::Role(ROLE_1);
-        sender.message(message.clone(), audience).ack();
+        let _ = sender.message(message.clone(), audience);
 
         // Verify payload received by role members.
         verify_payload(message, &mut foo_role_receptor, None).await;
@@ -887,7 +885,7 @@ async fn test_roles_audience() {
     {
         let message = test_message::FOO.clone();
         let audience = Audience::Role(ROLE_1);
-        sender.message(message.clone(), audience).ack();
+        let _ = sender.message(message.clone(), audience);
 
         // Verify payload received by role members.
         verify_payload(message, &mut foo_role_receptor, None).await;
@@ -897,7 +895,7 @@ async fn test_roles_audience() {
     {
         let message = test_message::BAZ.clone();
         let audience = Audience::Messenger(outside_signature);
-        sender.message(message.clone(), audience).ack();
+        let _ = sender.message(message.clone(), audience);
 
         // Since outside messenger isn't part of the role, the next message should
         // be the one sent directly to it, rather than the role.

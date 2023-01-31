@@ -157,9 +157,8 @@ mod tests {
                         while let Ok((Payload::Invocation(_), client)) =
                             receptor.next_of::<Payload>().await
                         {
-                            client
-                                .reply(Payload::Complete(Err(AgentError::UnexpectedError)).into())
-                                .ack();
+                            let _ = client
+                                .reply(Payload::Complete(Err(AgentError::UnexpectedError)).into());
                         }
                     })
                     .detach();

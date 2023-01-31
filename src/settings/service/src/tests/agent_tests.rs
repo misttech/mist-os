@@ -93,12 +93,9 @@ impl TestAgent {
                     while let Ok((Payload::Invocation(invocation), client)) =
                         context.receptor.next_of::<Payload>().await
                     {
-                        client
-                            .reply(
-                                Payload::Complete(agent.lock().await.handle(invocation).await)
-                                    .into(),
-                            )
-                            .ack();
+                        let _ = client.reply(
+                            Payload::Complete(agent.lock().await.handle(invocation).await).into(),
+                        );
                     }
                 })
                 .detach();

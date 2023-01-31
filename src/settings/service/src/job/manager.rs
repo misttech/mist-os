@@ -340,12 +340,10 @@ mod tests {
                 .expect("Should be able to queue requests");
         }
 
-        messenger
-            .message(
-                Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
-                Audience::Messenger(manager_signature),
-            )
-            .ack();
+        let _ = messenger.message(
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Audience::Messenger(manager_signature),
+        );
 
         for result in results {
             // Confirm received value matches the value sent from workload.
@@ -410,12 +408,10 @@ mod tests {
             )))))
             .expect("Should be able to queue requests");
 
-        messenger
-            .message(
-                Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
-                Audience::Messenger(manager_signature),
-            )
-            .ack();
+        let _ = messenger.message(
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Audience::Messenger(manager_signature),
+        );
 
         // Confirm received value matches the value sent from the second job.
         assert_matches!(receptor.next_of::<test::Payload>().await.expect("should have payload").0,
@@ -465,12 +461,10 @@ mod tests {
             )))))
             .expect("Should be able to queue requests");
 
-        messenger
-            .message(
-                Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
-                Audience::Messenger(manager_signature),
-            )
-            .ack();
+        let _ = messenger.message(
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Audience::Messenger(manager_signature),
+        );
 
         // Ensure the source started and completed before moving on.
         assert_matches!(
@@ -551,12 +545,10 @@ mod tests {
             )))))
             .expect("Should be able to queue requests");
 
-        messenger
-            .message(
-                Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
-                Audience::Messenger(manager_signature),
-            )
-            .ack();
+        let _ = messenger.message(
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Audience::Messenger(manager_signature),
+        );
 
         // Confirm received value matches the value sent from the second job.
         assert_matches!(receptor.next_of::<test::Payload>().await.expect("should have payload").0,
@@ -618,12 +610,10 @@ mod tests {
                 job::Signature::new::<usize>(),
             ))))
             .expect("Should be able to send queue");
-        messenger
-            .message(
-                Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
-                Audience::Messenger(manager_signature),
-            )
-            .ack();
+        let _ = messenger.message(
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Audience::Messenger(manager_signature),
+        );
 
         // Ensure the requests is in the hanging portion of execute.
         execute_rx.await.expect("Should have started hung execution");
@@ -644,12 +634,10 @@ mod tests {
             ))))
             .expect("Should be able to send queue");
 
-        messenger
-            .message(
-                Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
-                Audience::Messenger(manager_signature),
-            )
-            .ack();
+        let _ = messenger.message(
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Audience::Messenger(manager_signature),
+        );
 
         // Confirm received value matches the value sent from workload.
         assert_matches!(receptor.next_of::<test::Payload>().await.expect("should have payload").0,
@@ -686,12 +674,10 @@ mod tests {
                 cancelation_tx,
             )))
             .expect("Should be able to send queue");
-        messenger
-            .message(
-                Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
-                Audience::Messenger(manager_signature),
-            )
-            .ack();
+        let _ = messenger.message(
+            Payload::Source(Arc::new(Mutex::new(Some(requests_rx.boxed())))).into(),
+            Audience::Messenger(manager_signature),
+        );
 
         // Ensure the request is in the hanging portion of execute.
         execute_rx.await.expect("Should have started hung execution");

@@ -175,12 +175,10 @@ impl Publisher {
 
     /// Broadcasts event to the message hub.
     pub(crate) fn send_event(&self, event: Event) {
-        self.messenger
-            .message(
-                Payload::Event(event).into(),
-                Audience::Role(service::Role::Event(event::Role::Sink)),
-            )
-            .ack();
+        let _ = self.messenger.message(
+            Payload::Event(event).into(),
+            Audience::Role(service::Role::Event(event::Role::Sink)),
+        );
     }
 }
 

@@ -108,9 +108,6 @@ impl Receptor {
 
         Err(format_err!("did not encounter acknowledged status"))
     }
-
-    // Used to consume receptor.
-    pub(crate) fn ack(self) {}
 }
 
 /// Extracts the payload from a given `MessageEvent`. Such event is provided

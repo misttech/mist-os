@@ -60,7 +60,7 @@ impl TestAgent {
             while let Ok((AgentPayload::Invocation(invocation), client)) =
                 context.receptor.next_of::<AgentPayload>().await
             {
-                client.reply(AgentPayload::Complete(agent.handle(invocation).await).into()).ack();
+                let _ = client.reply(AgentPayload::Complete(agent.handle(invocation).await).into());
             }
         })
         .detach();
@@ -94,9 +94,8 @@ impl TestAgent {
                 &mut receptor,
                 Some(Box::new(|client| -> BoxFuture<'_, ()> {
                     Box::pin(async move {
-                        client
-                            .reply(Payload::Event(EventPayload::Event(Event::Custom(TEST_REPLY))))
-                            .ack();
+                        let _ = client
+                            .reply(Payload::Event(EventPayload::Event(Event::Custom(TEST_REPLY))));
                     })
                 })),
             )

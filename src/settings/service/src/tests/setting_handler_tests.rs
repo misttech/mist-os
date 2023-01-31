@@ -332,39 +332,31 @@ async fn test_event_propagation() {
     .await
     .is_ok());
 
-    messenger
-        .message(
-            Payload::Command(Command::ChangeState(State::Startup)).into(),
-            Audience::Messenger(signature),
-        )
-        .ack();
+    let _ = messenger.message(
+        Payload::Command(Command::ChangeState(State::Startup)).into(),
+        Audience::Messenger(signature),
+    );
 
     assert_eq!(Some(State::Startup), event_rx.next().await);
 
-    messenger
-        .message(
-            Payload::Command(Command::ChangeState(State::Listen)).into(),
-            Audience::Messenger(signature),
-        )
-        .ack();
+    let _ = messenger.message(
+        Payload::Command(Command::ChangeState(State::Listen)).into(),
+        Audience::Messenger(signature),
+    );
 
     assert_eq!(Some(State::Listen), event_rx.next().await);
 
-    messenger
-        .message(
-            Payload::Command(Command::ChangeState(State::EndListen)).into(),
-            Audience::Messenger(signature),
-        )
-        .ack();
+    let _ = messenger.message(
+        Payload::Command(Command::ChangeState(State::EndListen)).into(),
+        Audience::Messenger(signature),
+    );
 
     assert_eq!(Some(State::EndListen), event_rx.next().await);
 
-    messenger
-        .message(
-            Payload::Command(Command::ChangeState(State::Teardown)).into(),
-            Audience::Messenger(signature),
-        )
-        .ack();
+    let _ = messenger.message(
+        Payload::Command(Command::ChangeState(State::Teardown)).into(),
+        Audience::Messenger(signature),
+    );
 
     assert_eq!(Some(State::Teardown), event_rx.next().await);
 
@@ -409,20 +401,16 @@ async fn test_rebroadcast() {
     .expect("creating controller should succeed");
 
     // Begin listening, enabling notifications.
-    messenger
-        .message(
-            Payload::Command(Command::ChangeState(State::Listen)).into(),
-            Audience::Messenger(signature),
-        )
-        .ack();
+    let _ = messenger.message(
+        Payload::Command(Command::ChangeState(State::Listen)).into(),
+        Audience::Messenger(signature),
+    );
 
     // Request rebroadcast of data.
-    messenger
-        .message(
-            Payload::Command(Command::HandleRequest(Request::Rebroadcast)).into(),
-            Audience::Messenger(signature),
-        )
-        .ack();
+    let _ = messenger.message(
+        Payload::Command(Command::HandleRequest(Request::Rebroadcast)).into(),
+        Audience::Messenger(signature),
+    );
 
     verify_payload(
         Payload::Event(Event::Changed(UnknownInfo(true).into())).into(),
@@ -456,12 +444,10 @@ async fn verify_controller_state(state: State, n: u8) {
         .await
         .expect("Unable to create ClientImpl");
 
-    messenger
-        .message(
-            Payload::Command(Command::ChangeState(state)).into(),
-            Audience::Messenger(signature),
-        )
-        .ack();
+    let _ = messenger.message(
+        Payload::Command(Command::ChangeState(state)).into(),
+        Audience::Messenger(signature),
+    );
 
     assert_eq!(Some(state), event_rx.next().await);
 

@@ -67,12 +67,10 @@ impl SettingHandler {
     }
 
     fn notify(&self) {
-        self.messenger
-            .message(
-                setting_handler::Payload::Event(Event::Changed(UnknownInfo(true).into())).into(),
-                Audience::Messenger(self.proxy_signature),
-            )
-            .ack();
+        let _ = self.messenger.message(
+            setting_handler::Payload::Event(Event::Changed(UnknownInfo(true).into())).into(),
+            Audience::Messenger(self.proxy_signature),
+        );
     }
 
     fn process_request(&mut self, request: Request) -> Option<SettingHandlerResult> {
@@ -86,12 +84,10 @@ impl SettingHandler {
                         return None;
                     }
                     HandlerAction::Exit(result) => {
-                        self.messenger
-                            .message(
-                                setting_handler::Payload::Event(Event::Exited(result)).into(),
-                                Audience::Messenger(self.proxy_signature),
-                            )
-                            .ack();
+                        let _ = self.messenger.message(
+                            setting_handler::Payload::Event(Event::Exited(result)).into(),
+                            Audience::Messenger(self.proxy_signature),
+                        );
                         return None;
                     }
                 }

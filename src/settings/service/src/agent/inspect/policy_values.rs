@@ -135,7 +135,7 @@ impl PolicyValuesInspectAgent {
                                 = agent_message {
                             // Since the agent runs at creation, there is no
                             // need to handle state here.
-                            client.reply(Payload::Complete(Ok(())).into()).ack();
+                            let _ = client.reply(Payload::Complete(Ok(())).into());
                         }
                     }
 

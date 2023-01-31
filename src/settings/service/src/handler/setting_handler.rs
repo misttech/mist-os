@@ -574,5 +574,5 @@ pub mod persist {
 }
 
 pub(crate) fn reply(client: MessageClient, result: SettingHandlerResult) {
-    client.reply(Payload::Result(result).into()).ack();
+    let _ = client.reply(Payload::Result(result).into());
 }

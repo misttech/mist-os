@@ -41,7 +41,7 @@ impl RestoreAgent {
             while let Ok((Payload::Invocation(invocation), client)) =
                 receptor.next_of::<Payload>().await
             {
-                client.reply(Payload::Complete(agent.handle(invocation).await).into()).ack();
+                let _ = client.reply(Payload::Complete(agent.handle(invocation).await).into());
             }
         })
         .detach();

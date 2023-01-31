@@ -160,7 +160,7 @@ impl SettingValuesInspectAgent {
 
                             // Since the agent runs at creation, there is no
                             // need to handle state here.
-                            client.reply(Payload::Complete(Ok(())).into()).ack();
+                            let _ = client.reply(Payload::Complete(Ok(())).into());
                         }
                     },
                 }
@@ -277,7 +277,7 @@ mod tests {
         });
 
         // Message service lifespan to agent.
-        delegate
+        let _ = delegate
             .create(MessengerType::Unbound)
             .await
             .expect("should create messenger")
@@ -289,8 +289,7 @@ mod tests {
                 })
                 .into(),
                 Audience::Messenger(agent_signature),
-            )
-            .ack();
+            );
 
         // Setting handler reply to get.
         let (_, reply_client) =

@@ -84,7 +84,7 @@ impl Workload {
 #[async_trait]
 impl job::work::Independent for Workload {
     async fn execute(self: Box<Self>, messenger: Messenger, _id: ftrace::Id) {
-        messenger.message(self.payload.into(), Audience::Messenger(self.target)).ack();
+        let _ = messenger.message(self.payload.into(), Audience::Messenger(self.target));
     }
 }
 
@@ -96,7 +96,7 @@ impl job::work::Sequential for Workload {
         _store: data::StoreHandle,
         _id: ftrace::Id,
     ) -> Result<(), job::work::Error> {
-        messenger.message(self.payload.clone().into(), Audience::Messenger(self.target)).ack();
+        let _ = messenger.message(self.payload.clone().into(), Audience::Messenger(self.target));
         Ok(())
     }
 }

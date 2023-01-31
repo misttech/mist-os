@@ -54,7 +54,7 @@ impl MediaButtonsAgent {
             while let Ok((Payload::Invocation(invocation), client)) =
                 receptor.next_of::<Payload>().await
             {
-                client.reply(Payload::Complete(agent.handle(invocation).await).into()).ack();
+                let _ = client.reply(Payload::Complete(agent.handle(invocation).await).into());
             }
 
             fx_log_info!("Media buttons agent done processing requests");

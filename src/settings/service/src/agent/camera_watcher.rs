@@ -56,7 +56,7 @@ impl CameraWatcherAgent {
             while let Ok((payload, client)) = receptor.next_of::<Payload>().await {
                 trace!(id, "payload");
                 if let Payload::Invocation(invocation) = payload {
-                    client.reply(Payload::Complete(agent.handle(invocation).await).into()).ack();
+                    let _ = client.reply(Payload::Complete(agent.handle(invocation).await).into());
                 }
             }
             drop(guard);
@@ -308,7 +308,7 @@ mod tests {
         event_handler.handle_event(true);
 
         // Send an arbitrary request that should be the next payload received.
-        service_message_hub
+        let _ = service_message_hub
             .create(MessengerType::Unbound)
             .await
             .expect("Unable to create messenger")
@@ -316,8 +316,7 @@ mod tests {
             .message(
                 HandlerPayload::Request(verification_request.clone()).into(),
                 Audience::Address(handler_address),
-            )
-            .ack();
+            );
 
         // Delete the messengers for the receptors we're selecting below. This will allow the while
         // loop below to eventually finish.

@@ -506,17 +506,15 @@ impl SettingProxy {
         let handler_signature =
             optional_handler_signature.expect("handler signature should be present");
 
-        self.messenger
-            .message(
-                setting_handler::Payload::Command(Command::ChangeState(if self.is_listening() {
-                    State::Listen
-                } else {
-                    State::EndListen
-                }))
-                .into(),
-                Audience::Messenger(handler_signature),
-            )
-            .ack();
+        let _ = self.messenger.message(
+            setting_handler::Payload::Command(Command::ChangeState(if self.is_listening() {
+                State::Listen
+            } else {
+                State::EndListen
+            }))
+            .into(),
+            Audience::Messenger(handler_signature),
+        );
 
         self.request(ProxyRequest::TeardownTimeout);
     }

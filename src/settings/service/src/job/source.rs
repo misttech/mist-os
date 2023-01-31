@@ -77,12 +77,10 @@ impl Seeder {
             .boxed();
 
         // Send the source stream to the manager.
-        self.messenger
-            .message(
-                Payload::Source(Arc::new(Mutex::new(Some(mapped_stream)))).into(),
-                Audience::Messenger(self.manager_signature),
-            )
-            .ack();
+        let _ = self.messenger.message(
+            Payload::Source(Arc::new(Mutex::new(Some(mapped_stream)))).into(),
+            Audience::Messenger(self.manager_signature),
+        );
     }
 }
 

@@ -52,9 +52,8 @@ async fn test_agent_event_propagation() {
                 while let Ok((Payload::Invocation(_), client)) =
                     context.receptor.next_of::<Payload>().await
                 {
-                    client
-                        .reply(Payload::Complete(Err(AgentError::UnhandledLifespan)).into())
-                        .ack();
+                    let _ =
+                        client.reply(Payload::Complete(Err(AgentError::UnhandledLifespan)).into());
                 }
             })
             .detach();
