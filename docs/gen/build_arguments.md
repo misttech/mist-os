@@ -2571,19 +2571,6 @@ Compiles with ares.
 
 From //third_party/grpc/BUILD.gn:13
 
-### enable_legacy_i915_display_driver
-
-Set to true to opt out of the Tiger Lake display driver with all the Intel
-display engines.
-
-TODO(fxbug.dev/104963): Have this variable default to false when we're ready
-to field bug reports, and remove it after the Tiger Lake driver gets enough
-soak time with Kaby Lake display engines.
-
-**Current value (from the default):** `false`
-
-From //src/graphics/display/drivers/args.gni:11
-
 ### enable_lock_dep
 
 Enable kernel lock dependency tracking.
@@ -3643,7 +3630,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7800,7 +7787,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"dartlang/thinlto-cache"`
+**Current value (from the default):** `"thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
