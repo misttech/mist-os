@@ -64,9 +64,14 @@ pub struct ExploreComponentCommand {
     /// the exit code of the command will be forwarded to the host.
     pub command: Option<String>,
 
-    #[argh(option, short = 'l', long = "layout")]
+    #[argh(
+        option,
+        short = 'l',
+        long = "layout",
+        default = "DashNamespaceLayout::NestAllInstanceDirs"
+    )]
     /// changes the namespace layout that is created for the shell.
     /// nested: nests all instance directories under subdirs (default)
     /// namespace: sets the instance namespace as the root (works better for tools)
-    pub ns_layout: Option<DashNamespaceLayout>,
+    pub ns_layout: DashNamespaceLayout,
 }

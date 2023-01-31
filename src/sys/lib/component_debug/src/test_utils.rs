@@ -4,7 +4,7 @@
 use {
     crate::io::Directory,
     anyhow::Result,
-    fidl::endpoints::{create_proxy_and_stream, ServerEnd},
+    fidl::endpoints::{create_proxy_and_stream, create_request_stream, ClientEnd, ServerEnd},
     fidl_fuchsia_io as fio,
     fidl_fuchsia_io::DirectoryProxy,
     fidl_fuchsia_sys2 as fsys,
@@ -153,4 +153,34 @@ pub async fn read_data_from_namespace(
     let ns_dir = Directory::from_proxy(ns_proxy.to_owned());
     let file_data = ns_dir.read_file_bytes(PathBuf::from(data_path)).await.unwrap();
     Ok(file_data)
+}
+
+pub fn serve_realm_explorer(instances: Vec<fsys::InstanceInfo>) -> fsys::RealmExplorerProxy {
+    let (client, mut stream) = create_proxy_and_stream::<fsys::RealmExplorerMarker>().unwrap();
+    Task::spawn(async move {
+        loop {
+            let fsys::RealmExplorerRequest::GetAllInstanceInfos { responder } =
+                stream.next().await.unwrap().unwrap();
+            let iterator = serve_instance_iterator(instances.clone());
+            responder.send(&mut Ok(iterator)).unwrap();
+        }
+    })
+    .detach();
+    client
+}
+
+pub fn serve_instance_iterator(
+    instances: Vec<fsys::InstanceInfo>,
+) -> ClientEnd<fsys::InstanceInfoIteratorMarker> {
+    let (client, mut stream) = create_request_stream::<fsys::InstanceInfoIteratorMarker>().unwrap();
+    Task::spawn(async move {
+        let fsys::InstanceInfoIteratorRequest::Next { responder } =
+            stream.next().await.unwrap().unwrap();
+        responder.send(&mut instances.clone().iter_mut()).unwrap();
+        let fsys::InstanceInfoIteratorRequest::Next { responder } =
+            stream.next().await.unwrap().unwrap();
+        responder.send(&mut std::iter::empty()).unwrap();
+    })
+    .detach();
+    client
 }

@@ -17,6 +17,9 @@ use {
     std::str::FromStr,
 };
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// Reading from the v1/CMX hub is flaky while components are being added/removed.
 /// Attempt to get CMX instances several times before calling it a failure.
 const CMX_HUB_RETRY_ATTEMPTS: u64 = 10;
@@ -63,6 +66,7 @@ impl FromStr for ListFilter {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(PartialEq, Debug)]
 pub enum InstanceState {
     Unresolved,
@@ -81,6 +85,7 @@ impl From<fsys::InstanceState> for InstanceState {
 }
 
 /// Basic information about a component for the `list` command.
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Instance {
     /// Moniker of the component.
     pub moniker: AbsoluteMoniker,
@@ -101,6 +106,7 @@ pub struct Instance {
     /// Points to the Hub Directory of this component.
     /// Value is present only for CMX components.
     // TODO(https://fxbug.dev/102390): Remove this when CMX is deprecated.
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub hub_dir: Option<Directory>,
 }
 

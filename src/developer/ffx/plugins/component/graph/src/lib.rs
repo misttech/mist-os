@@ -4,7 +4,8 @@
 
 use {
     anyhow::Result,
-    component_debug::{graph::create_dot_graph, list::get_all_instances},
+    component_debug::cli::graph_cmd,
+    errors::FfxError,
     ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query},
     ffx_component_graph_args::ComponentGraphCommand,
     ffx_core::ffx_plugin,
@@ -12,13 +13,13 @@ use {
 };
 
 #[ffx_plugin()]
-pub async fn graph(rcs_proxy: rc::RemoteControlProxy, cmd: ComponentGraphCommand) -> Result<()> {
-    let query_proxy = connect_to_realm_query(&rcs_proxy).await?;
-    let explorer_proxy = connect_to_realm_explorer(&rcs_proxy).await?;
+pub async fn cmd(rcs_proxy: rc::RemoteControlProxy, args: ComponentGraphCommand) -> Result<()> {
+    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
+    let realm_explorer = connect_to_realm_explorer(&rcs_proxy).await?;
 
-    let instances = get_all_instances(&explorer_proxy, &query_proxy, cmd.filter).await?;
-
-    let output = create_dot_graph(instances, cmd.orientation);
-    println!("{}", output);
+    // All errors from component_debug library are user-visible.
+    graph_cmd(args.filter, args.orientation, realm_query, realm_explorer, std::io::stdout())
+        .await
+        .map_err(|e| FfxError::Error(e, 1))?;
     Ok(())
 }

@@ -11,18 +11,11 @@ ffx_plugin("ffx_component_run") {
   deps = [
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
     "//src/developer/ffx/plugins/log:ffx_log",
     "//src/developer/ffx/plugins/log:ffx_log_args",
     "//src/sys/lib/component_debug",
-    "//src/sys/lib/moniker",
-  ]
-  test_deps = [
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:futures",
   ]
 
   args_sources = [ "src/args.rs" ]

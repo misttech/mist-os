@@ -4,67 +4,34 @@
 
 use {
     anyhow::Result,
-    component_debug::list::{create_table, get_all_instances, Instance, InstanceState},
+    component_debug::cli::{list_cmd_print, list_cmd_serialized},
+    errors::FfxError,
     ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query},
     ffx_component_list_args::ComponentListCommand,
     ffx_core::ffx_plugin,
     ffx_writer::Writer,
     fidl_fuchsia_developer_remotecontrol as rc,
-    serde::{Deserialize, Serialize},
 };
 
-#[derive(Deserialize, Serialize)]
-pub struct SerializableInstance {
-    // Moniker of the component. This is the full path in the component hierarchy.
-    pub name: String,
-
-    // URL of the component.
-    pub url: String,
-
-    // True if component is of appmgr/CMX type.
-    // False if it is of the component_manager/CML type.
-    pub is_cmx: bool,
-
-    // CML components may not always be running.
-    // Always true for CMX components.
-    pub is_running: bool,
-}
-
-impl From<Instance> for SerializableInstance {
-    fn from(i: Instance) -> Self {
-        let is_running = i.state == InstanceState::Started;
-        SerializableInstance {
-            name: i.moniker.to_string(),
-            url: i.url.unwrap_or_default(),
-            is_cmx: i.is_cmx,
-            is_running,
-        }
-    }
-}
-
-#[ffx_plugin()]
-pub async fn list(
+#[ffx_plugin]
+pub async fn cmd(
     rcs_proxy: rc::RemoteControlProxy,
-    #[ffx(machine = Vec<ListComponent>)] mut writer: Writer,
-    cmd: ComponentListCommand,
+    args: ComponentListCommand,
+    #[ffx(machine = Vec<Instance>)] writer: Writer,
 ) -> Result<()> {
-    let ComponentListCommand { filter, verbose } = cmd;
-    let query_proxy = connect_to_realm_query(&rcs_proxy).await?;
-    let explorer_proxy = connect_to_realm_explorer(&rcs_proxy).await?;
+    let realm_explorer = connect_to_realm_explorer(&rcs_proxy).await?;
+    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
 
-    let instances = get_all_instances(&explorer_proxy, &query_proxy, filter).await?;
-
+    // All errors from component_debug library are user-visible.
     if writer.is_machine() {
-        let instances: Vec<SerializableInstance> =
-            instances.into_iter().map(SerializableInstance::from).collect();
-        writer.machine(&instances)?;
-    } else if verbose {
-        let table = create_table(instances);
-        table.print(&mut writer)?;
+        let output = list_cmd_serialized(args.filter, realm_query, realm_explorer)
+            .await
+            .map_err(|e| FfxError::Error(e, 1))?;
+        writer.machine(&output)
     } else {
-        for instance in instances {
-            writer.line(instance.moniker.to_string())?;
-        }
+        list_cmd_print(args.filter, args.verbose, realm_query, realm_explorer, writer)
+            .await
+            .map_err(|e| FfxError::Error(e, 1))?;
+        Ok(())
     }
-    Ok(())
 }

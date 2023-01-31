@@ -4,43 +4,34 @@
 
 use {
     anyhow::Result,
-    component_debug::show::{create_table, find_instances},
-    errors::ffx_bail,
+    component_debug::cli::{show_cmd_print, show_cmd_serialized},
+    errors::FfxError,
     ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query},
     ffx_component_show_args::ComponentShowCommand,
     ffx_core::ffx_plugin,
     ffx_writer::Writer,
     fidl_fuchsia_developer_remotecontrol as rc,
-    std::io::Write,
 };
 
-#[ffx_plugin()]
-pub async fn show(
+#[ffx_plugin]
+pub async fn cmd(
     rcs_proxy: rc::RemoteControlProxy,
-    #[ffx(machine = Vec<Instance>)] mut writer: Writer,
-    cmd: ComponentShowCommand,
+    args: ComponentShowCommand,
+    #[ffx(machine = Vec<Instance>)] writer: Writer,
 ) -> Result<()> {
-    let ComponentShowCommand { query } = cmd;
+    let realm_explorer = connect_to_realm_explorer(&rcs_proxy).await?;
+    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
 
-    let query_proxy = connect_to_realm_query(&rcs_proxy).await?;
-    let explorer_proxy = connect_to_realm_explorer(&rcs_proxy).await?;
-
-    let instances = find_instances(query.clone(), &explorer_proxy, &query_proxy).await?;
-
+    // All errors from component_debug library are user-visible.
     if writer.is_machine() {
-        writer.machine(&instances)?;
+        let output = show_cmd_serialized(args.query, realm_query, realm_explorer)
+            .await
+            .map_err(|e| FfxError::Error(e, 1))?;
+        writer.machine(&output)
     } else {
-        if instances.is_empty() {
-            // TODO(fxbug.dev/104031): Clarify the exit code policy of this plugin.
-            ffx_bail!("No matching components found for query \"{}\"", query);
-        }
-
-        for instance in instances {
-            let table = create_table(instance);
-            table.print(&mut writer)?;
-            writeln!(&mut writer, "")?;
-        }
+        show_cmd_print(args.query, realm_query, realm_explorer, writer)
+            .await
+            .map_err(|e| FfxError::Error(e, 1))?;
+        Ok(())
     }
-
-    Ok(())
 }

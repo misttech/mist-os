@@ -4,9 +4,8 @@
 
 use {
     anyhow::Result,
-    component_debug::capability::{
-        find_instances_that_expose_or_use_capability, MatchingInstances,
-    },
+    component_debug::cli::capability_cmd,
+    errors::FfxError,
     ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query},
     ffx_component_capability_args::ComponentCapabilityCommand,
     ffx_core::ffx_plugin,
@@ -14,29 +13,16 @@ use {
 };
 
 #[ffx_plugin()]
-pub async fn capability_cmd(
+pub async fn cmd(
     rcs_proxy: rc::RemoteControlProxy,
-    cmd: ComponentCapabilityCommand,
+    args: ComponentCapabilityCommand,
 ) -> Result<()> {
-    let query_proxy = connect_to_realm_query(&rcs_proxy).await?;
-    let explorer_proxy = connect_to_realm_explorer(&rcs_proxy).await?;
+    let realm_explorer = connect_to_realm_explorer(&rcs_proxy).await?;
+    let realm_query = connect_to_realm_query(&rcs_proxy).await?;
 
-    let MatchingInstances { exposed, used } =
-        find_instances_that_expose_or_use_capability(cmd.capability, &explorer_proxy, &query_proxy)
-            .await?;
-
-    if !exposed.is_empty() {
-        println!("Exposed:");
-        for component in exposed {
-            println!("  {}", component);
-        }
-    }
-    if !used.is_empty() {
-        println!("Used:");
-        for component in used {
-            println!("  {}", component);
-        }
-    }
-
+    // All errors from component_debug library are user-visible.
+    capability_cmd(args.capability, realm_query, realm_explorer, std::io::stdout())
+        .await
+        .map_err(|e| FfxError::Error(e, 1))?;
     Ok(())
 }
