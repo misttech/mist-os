@@ -81,6 +81,7 @@ if (is_efi_toolchain) {
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
       "//zircon/kernel/phys:boot-zbi",
+      "//zircon/kernel/phys:symbolize",
       "//zircon/third_party/ulib/cksum",
       gigaboot_backends,
     ]
