@@ -146,11 +146,27 @@ pub(crate) async fn resolve_impl(
     authenticator: crate::context_authenticator::ContextAuthenticator,
     blobfs: &blobfs::Client,
 ) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
+    let url_storage;
     let url = match url {
         fuchsia_url::AbsolutePackageUrl::Pinned(_) => {
             return Err(crate::ResolverError::PackageHashNotSupported);
         }
-        fuchsia_url::AbsolutePackageUrl::Unpinned(url) => url,
+        fuchsia_url::AbsolutePackageUrl::Unpinned(url) => {
+            // TODO(fxbug.dev/53911) Remove zero-variant fallback once variant concept is removed.
+            // Base packages must have a variant of zero, and the variant is cleared before adding
+            // the URL to the base_packages map. Clients are allowed to specify or omit the
+            // variant (clients generally omit so we minimize the number of allocations in that
+            // case).
+            match url.variant() {
+                Some(variant) if variant.is_zero() => {
+                    let mut url = url.clone();
+                    url.clear_variant();
+                    url_storage = url;
+                    &url_storage
+                }
+                _ => url,
+            }
+        }
     };
     let hash = base_packages
         .get(url)
@@ -238,5 +254,49 @@ mod tests {
             .await,
             Err(crate::ResolverError::PackageHashNotSupported)
         )
+    }
+
+    #[fuchsia::test]
+    async fn resolve_clears_zero_variant() {
+        let pkg = fuchsia_pkg_testing::PackageBuilder::new("name").build().await.unwrap();
+        let (blobfs, fake) = blobfs::Client::new_temp_dir_fake();
+        pkg.write_to_blobfs_dir(&fake.backing_dir_as_openat_dir());
+        let (proxy, server) = fidl::endpoints::create_proxy().unwrap();
+
+        let _: fpkg::ResolutionContext = resolve(
+            "fuchsia-pkg://fuchsia.test/name/0",
+            server,
+            &HashMap::from_iter([(
+                "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
+                *pkg.meta_far_merkle_root(),
+            )]),
+            crate::context_authenticator::ContextAuthenticator::new(),
+            &blobfs,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            fuchsia_pkg::PackageDirectory::from_proxy(proxy).merkle_root().await.unwrap(),
+            *pkg.meta_far_merkle_root()
+        );
+    }
+
+    #[fuchsia::test]
+    async fn resolve_does_not_clear_non_zero_variant() {
+        assert_matches!(
+            resolve(
+                "fuchsia-pkg://fuchsia.test/name/1",
+                fidl::endpoints::create_proxy().unwrap().1,
+                &HashMap::from_iter([(
+                    "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
+                    [0u8; 32].into()
+                )]),
+                crate::context_authenticator::ContextAuthenticator::new(),
+                &blobfs::Client::new_test().0
+            )
+            .await,
+            Err(crate::ResolverError::PackageNotInBase(_))
+        );
     }
 }

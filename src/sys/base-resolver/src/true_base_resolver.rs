@@ -64,6 +64,8 @@ pub(crate) async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Panics if a base package has a non-zero variant.
+/// The URLs in the returned map will not have a variant.
 async fn determine_base_packages(
     blobfs: &blobfs::Client,
     boot_args: &fboot::ArgumentsProxy,
@@ -81,14 +83,11 @@ async fn determine_base_packages(
             .chain([(system_image::SystemImage::package_path(), *system_image.hash())])
             .map(|(path, hash)| {
                 let (name, variant) = path.into_name_and_variant();
-                (
-                    fuchsia_url::UnpinnedAbsolutePackageUrl::new(
-                        base_repo.clone(),
-                        name,
-                        Some(variant),
-                    ),
-                    hash,
-                )
+                // TODO(fxbug.dev/53911) Remove variant checks when variant concept is deleted.
+                if !variant.is_zero() {
+                    panic!("base package variants must be zero: {name} {variant}");
+                }
+                (fuchsia_url::UnpinnedAbsolutePackageUrl::new(base_repo.clone(), name, None), hash)
             }),
     ))
 }
