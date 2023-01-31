@@ -7,7 +7,7 @@
 
 use crate::{parser, DocLine};
 pub use pulldown_cmark::{CowStr, LinkType, Options, Parser, Tag};
-use std::{fmt::Debug, path::PathBuf};
+use std::{collections::HashMap, fmt::Debug, ops::Range, path::PathBuf};
 
 /// Element is a high level construct which collects the low level Tag objects into
 /// a single element. This removes the need for checks to deal with stateful processing of the event stream.
@@ -61,6 +61,24 @@ impl<'a> Element<'a> {
             Element::Text(_, doc_line) => doc_line,
         };
         doc_line.clone()
+    }
+
+    fn doc_line_mut(&mut self) -> &mut DocLine {
+        match self {
+            Element::Block(_, _, ref mut doc_line) => doc_line,
+            Element::Code(_, ref mut doc_line) => doc_line,
+            Element::CodeBlock(_, _, ref mut doc_line) => doc_line,
+            Element::FootnoteReference(_, ref mut doc_line) => doc_line,
+            Element::HardBreak(ref mut doc_line) => doc_line,
+            Element::Html(_, ref mut doc_line) => doc_line,
+            Element::Image(_, _, _, _, ref mut doc_line) => doc_line,
+            Element::Link(_, _, _, _, ref mut doc_line) => doc_line,
+            Element::List(_, _, ref mut doc_line) => doc_line,
+            Element::Rule(ref mut doc_line) => doc_line,
+            Element::SoftBreak(ref mut doc_line) => doc_line,
+            Element::TaskListMarker(_, ref mut doc_line) => doc_line,
+            Element::Text(_, ref mut doc_line) => doc_line,
+        }
     }
 
     pub fn get_contents(&self) -> String {
@@ -143,12 +161,59 @@ impl<'a> Element<'a> {
             Element::Text(_, _) => None,
         }
     }
+
+    fn get_elements_mut(&mut self) -> Option<&mut Vec<Element<'a>>> {
+        match self {
+            Element::Block(_, ref mut elements, _) => Some(elements),
+            Element::Code(_, _) => None,
+            Element::CodeBlock(_, ref mut elements, _) => Some(elements),
+            Element::FootnoteReference(_, _) => None,
+            Element::HardBreak(_) => None,
+            Element::Html(_, _) => None,
+            Element::Image(_, _, _, ref mut elements, _) => Some(elements),
+            Element::Link(_, _, _, ref mut elements, _) => Some(elements),
+            Element::List(_, ref mut elements, _) => Some(elements),
+            Element::Rule(_) => None,
+            Element::SoftBreak(_) => None,
+            Element::TaskListMarker(_, _) => None,
+            Element::Text(_, _) => None,
+        }
+    }
+
+    /**
+     * Add the delta to the line number of this element and all nested elements.
+     */
+    fn add_line_offset(&mut self, delta: i32) {
+        let mut doc_line = self.doc_line_mut();
+        let n: i32 = doc_line.line_num.try_into().unwrap();
+        doc_line.line_num = (n + delta).try_into().unwrap();
+
+        if let Some(elements) = self.get_elements_mut() {
+            elements.iter_mut().for_each(|f| f.add_line_offset(delta));
+        }
+    }
+
+    /**
+     * Public method to correct the line number of this element, the nested elements
+     * are updated relatively.
+     */
+    pub fn set_line_num(&mut self, line_num: usize) {
+        let doc_line = self.doc_line();
+        let new: i32 = line_num.try_into().unwrap();
+        let old: i32 = doc_line.line_num.try_into().unwrap();
+        let delta: i32 = new - old;
+        if delta != 0 {
+            self.add_line_offset(delta);
+        }
+    }
 }
 
 pub struct DocContext<'a> {
     pub file_name: PathBuf,
     pub line_num: usize,
-    pub(crate) parser: pulldown_cmark::Parser<'a>,
+    pub(crate) parser: pulldown_cmark::OffsetIter<'a>,
+    file_text: &'a str,
+    line_index: HashMap<&'a str, usize>,
 }
 
 impl<'a> DocContext<'a> {
@@ -179,11 +244,40 @@ impl<'a> DocContext<'a> {
         let options = Options::empty();
         let cb: Option<&'a dyn Fn(&str, &str) -> Option<(String, String)>> =
             if check_reference_links { Some(&Self::link_callback) } else { None };
+        let mut index = HashMap::new();
+        let lines = text.lines();
+        let mut line_num = 1;
+        for l in lines {
+            index.insert(l, line_num);
+            line_num += 1;
+        }
         DocContext {
             file_name: filename,
             line_num: 1,
-            parser: Parser::new_with_broken_link_callback(text, options, cb),
+            parser: Parser::new_with_broken_link_callback(text, options, cb).into_offset_iter(),
+            file_text: text,
+            line_index: index,
         }
+    }
+
+    /**
+     * Returns the span of the file being parsed for the given range.
+     */
+    pub fn span(&self, range: &Range<usize>) -> &'a str {
+        if range.end > range.start {
+            &self.file_text[range.start..range.end]
+        } else {
+            &self.file_text[range.start..]
+        }
+    }
+
+    /**
+     * Returns the line number of the given span. The span must equal the entire line.
+     * newline ending is stripped.
+     */
+    pub fn line_number_of(&self, span: &str) -> Option<usize> {
+        let key = span.strip_suffix('\n').unwrap_or_else(|| span);
+        self.line_index.get(key).copied()
     }
 
     pub fn line(&self) -> DocLine {
@@ -195,7 +289,7 @@ impl<'a> Iterator for DocContext<'a> {
     type Item = Element<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.parser.next().map(|event| parser::element_from_event(event, self))
+        self.parser.next().map(|(event, range)| parser::element_from_event(event, range, self))
     }
 }
 
@@ -232,23 +326,23 @@ This is an example [link](https://somewhere.com)
         (
             DocContext::new(
                 PathBuf::from("/docs/README.md"),
-                "This is a line to [something](/docs/something.md)",
+                "This is a line to [something-one-line](/docs/something.md)",
             ),
             Some(vec![
                 Link(Inline, Borrowed("/docs/something.md"), Borrowed(""),
-                 vec![Text(Borrowed("something"), DocLine { line_num: 1, file_name: "/docs/README.md".into() })],
+                 vec![Text(Borrowed("something-one-line"), DocLine { line_num: 1, file_name: "/docs/README.md".into() })],
                  DocLine { line_num: 1, file_name: "/docs/README.md".into() })
             ])
         ),
         (
             DocContext::new(
                 PathBuf::from("/docs/README.md"),
-                "This is a multiline\n paragraph. This is a line to [something](/docs/something.md)",
+                "This is a multiline\n\nparagraph. This is a line to [something-two-line](/docs/something.md)",
             ),
             Some(vec![
                 Link(Inline, Borrowed("/docs/something.md"), Borrowed(""),
-                 vec![Text(Borrowed("something"), DocLine { line_num: 2, file_name: "/docs/README.md".into() })],
-                 DocLine { line_num: 2, file_name: "/docs/README.md".into() })
+                 vec![Text(Borrowed("something-two-line"), DocLine { line_num: 3,file_name: "/docs/README.md".into() })],
+                 DocLine { line_num: 3, file_name: "/docs/README.md".into() })
             ])
         ),
         (

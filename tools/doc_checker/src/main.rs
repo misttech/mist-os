@@ -328,7 +328,7 @@ mod test {
         let expected: Vec<DocCheckError> = vec![
             DocCheckError::new_error(8, PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "in-tree link to /docs/missing.md could not be found at \"doc_checker_test_data/docs/missing.md\""),
-            DocCheckError::new_error(11, PathBuf::from("doc_checker_test_data/docs/README.md"),
+            DocCheckError::new_error(10, PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "Should not link to https://fuchsia.dev/fuchsia-src/path.md via https, use relative filepath"),
             DocCheckError::new_error(19, PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "Obsolete or invalid project garnet: https://fuchsia.googlesource.com/garnet/+/refs/heads/main/README.md"),
@@ -346,7 +346,7 @@ mod test {
                 "in-tree link to /docs/missing-image.png could not be found at \"doc_checker_test_data/docs/missing-image.png\""),
             DocCheckError::new_error(4, PathBuf::from("doc_checker_test_data/docs/second.md"),
                 "Invalid link http://{}.com/markdown : invalid uri character"),
-            DocCheckError::new_error(18, PathBuf::from("doc_checker_test_data/docs/second.md"),
+            DocCheckError::new_error(8, PathBuf::from("doc_checker_test_data/docs/second.md"),
                 "Cannot normalize /docs/../../missing.md, references parent beyond root."),
             DocCheckError::new_error(1, PathBuf::from("doc_checker_test_data/docs/unused/_toc.yaml"),
                 "in-tree link to /docs/unused could not be found at \"doc_checker_test_data/docs/unused\" or  \"doc_checker_test_data/docs/unused/README.md\""),

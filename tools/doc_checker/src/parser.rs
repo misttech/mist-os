@@ -10,35 +10,70 @@ use pulldown_cmark::{
     },
     Tag,
 };
+use std::ops::Range;
 
 use crate::md_element::{DocContext, Element};
 
 pub(crate) fn element_from_event<'a>(
     event: Event<'a>,
+    range: Range<usize>,
     doc_context: &mut DocContext<'a>,
 ) -> Element<'a> {
+    let span = doc_context.span(&range);
+    let newlines = span.chars().filter(|c| c == &'\n').count();
     let element = match event {
         // Start indicates the start of a Tag.
+        Start(Tag::Heading(_)) => {
+            let mut element = parse_tag_element(event, doc_context);
+            if let Some(line_num) = doc_context.line_number_of(span) {
+                element.set_line_num(line_num);
+                doc_context.line_num = line_num + 1;
+            } else {
+                doc_context.line_num += newlines;
+            }
+            element
+        }
+        Start(Tag::Paragraph) => {
+            let element = parse_tag_element(event, doc_context);
+            doc_context.line_num += newlines;
+            element
+        }
         Start(_) => parse_tag_element(event, doc_context),
         End(_) => {
             //should not happen
             panic!("Got End event unexpectedly: {:?}", event)
         }
-        Text(text) => Element::Text(text, doc_context.line()),
-        Code(text) => Element::Code(text, doc_context.line()),
-        Html(text) => Element::Html(text, doc_context.line()),
+        Text(text) => {
+            let element = Element::Text(text, doc_context.line());
+            doc_context.line_num += newlines;
+            element
+        }
+        Code(text) => {
+            let element = Element::Code(text, doc_context.line());
+            doc_context.line_num += newlines;
+            element
+        }
+        Html(text) => {
+            let element = Element::Html(text, doc_context.line());
+            doc_context.line_num += newlines;
+            element
+        }
         FootnoteReference(text) => Element::FootnoteReference(text, doc_context.line()),
         HardBreak => {
-            doc_context.line_num += 1;
-            Element::HardBreak(doc_context.line())
+            let element = Element::HardBreak(doc_context.line());
+            doc_context.line_num += newlines;
+            element
         }
         SoftBreak => {
-            doc_context.line_num += 1;
-            Element::SoftBreak(doc_context.line())
+            let element = Element::SoftBreak(doc_context.line());
+            // Don't increment line_num here, it is handled in the Text event.
+            element
         }
         Event::Rule => {
-            doc_context.line_num += 1;
-            Element::Rule(doc_context.line())
+            let element = Element::Rule(doc_context.line());
+
+            doc_context.line_num += newlines;
+            element
         }
         TaskListMarker(checked) => Element::TaskListMarker(checked, doc_context.line()),
     };
@@ -52,15 +87,33 @@ fn parse_tag_element<'a>(event: Event<'a>, doc_context: &mut DocContext<'a>) -> 
             doc_context.line_num += 1;
             block
         }
-        Start(Tag::Heading(level)) => read_block(Tag::Heading(level), doc_context),
-        Start(Tag::BlockQuote) => read_block(Tag::BlockQuote, doc_context),
-        Start(Tag::CodeBlock(code)) => read_codeblock(code, doc_context),
-        Start(Tag::List(starting)) => read_list(starting, doc_context),
-        Start(Tag::Item) => read_block(Tag::Item, doc_context),
+        Start(Tag::Heading(level)) => {
+            let block = read_block(Tag::Heading(level), doc_context);
+
+            doc_context.line_num += 1;
+            block
+        }
+        Start(Tag::BlockQuote) => {
+            let block = read_block(Tag::BlockQuote, doc_context);
+            block
+        }
+        Start(Tag::CodeBlock(code)) => {
+            let block = read_codeblock(code, doc_context);
+            block
+        }
+        Start(Tag::List(starting)) => {
+            let block = read_list(starting, doc_context);
+            block
+        }
+        Start(Tag::Item) => {
+            let block = read_block(Tag::Item, doc_context);
+            doc_context.line_num += 1;
+            block
+        }
         Start(Tag::FootnoteDefinition(text)) => {
             read_block(Tag::FootnoteDefinition(text), doc_context)
         }
-        Start(Tag::Table(alignment)) => read_block(Tag::Table(alignment), doc_context), //read_table(alignment, doc_context),
+        Start(Tag::Table(alignment)) => read_block(Tag::Table(alignment), doc_context),
         Start(Tag::TableCell) => read_block(Tag::TableCell, doc_context),
         Start(Tag::TableHead) => read_block(Tag::TableHead, doc_context),
         Start(Tag::TableRow) => read_block(Tag::TableRow, doc_context),
@@ -74,22 +127,16 @@ fn parse_tag_element<'a>(event: Event<'a>, doc_context: &mut DocContext<'a>) -> 
             read_image(link_type, link_url, title, doc_context)
         }
         End(tag) => panic!("Unexpected tag: {:?}", tag),
-        Text(text) => Element::Text(text, doc_context.line()),
+        Text(text) => {
+            let element = Element::Text(text, doc_context.line());
+            element
+        }
         Code(text) => Element::Code(text, doc_context.line()),
         Html(text) => Element::Html(text, doc_context.line()),
         FootnoteReference(text) => Element::FootnoteReference(text, doc_context.line()),
-        HardBreak => {
-            doc_context.line_num += 1;
-            Element::HardBreak(doc_context.line())
-        }
-        SoftBreak => {
-            doc_context.line_num += 1;
-            Element::SoftBreak(doc_context.line())
-        }
-        Event::Rule => {
-            doc_context.line_num += 1;
-            Element::Rule(doc_context.line())
-        }
+        HardBreak => Element::HardBreak(doc_context.line()),
+        SoftBreak => Element::SoftBreak(doc_context.line()),
+        Event::Rule => Element::Rule(doc_context.line()),
         TaskListMarker(checked) => Element::TaskListMarker(checked, doc_context.line()),
     }
 }
@@ -101,12 +148,12 @@ fn read_image<'a>(
     doc_context: &mut DocContext<'a>,
 ) -> Element<'a> {
     let mut contents = vec![];
-    while let Some(event) = doc_context.parser.next() {
+    while let Some((event, range)) = doc_context.parser.next() {
         match event {
             End(Tag::Image(link_type, link_url, title)) => {
                 return Element::Image(link_type, link_url, title, contents, doc_context.line())
             }
-            _ => contents.push(element_from_event(event, doc_context)),
+            _ => contents.push(element_from_event(event, range, doc_context)),
         };
     }
     // Using :? since link_type does not implement Display.
@@ -123,12 +170,12 @@ fn read_link<'a>(
     let mut contents = vec![];
     // Using loop here vs. while let  so that it is easy to
     // catch the situation where the End tag is not found
-    while let Some(event) = doc_context.parser.next() {
+    while let Some((event, range)) = doc_context.parser.next() {
         match event {
             End(Tag::Link(link_type, link_url, title)) => {
                 return Element::Link(link_type, link_url, title, contents, doc_context.line())
             }
-            _ => contents.push(element_from_event(event, doc_context)),
+            _ => contents.push(element_from_event(event, range, doc_context)),
         };
     }
 
@@ -138,10 +185,11 @@ fn read_link<'a>(
 
 fn read_list<'a>(starting: Option<u64>, doc_context: &mut DocContext<'a>) -> Element<'a> {
     let mut items = vec![];
-    while let Some(event) = doc_context.parser.next() {
+    let start = doc_context.line();
+    while let Some((event, range)) = doc_context.parser.next() {
         match event {
-            End(Tag::List(starting)) => return Element::List(starting, items, doc_context.line()),
-            _ => items.push(element_from_event(event, doc_context)),
+            End(Tag::List(starting)) => return Element::List(starting, items, start),
+            _ => items.push(element_from_event(event, range, doc_context)),
         };
     }
     // This should not happen, so panic.
@@ -153,13 +201,11 @@ fn read_codeblock<'a>(
     doc_context: &mut DocContext<'a>,
 ) -> Element<'a> {
     let mut elements = vec![];
-
-    while let Some(event) = doc_context.parser.next() {
+    let start = doc_context.line();
+    while let Some((event, range)) = doc_context.parser.next() {
         match event {
-            End(Tag::CodeBlock(code)) => {
-                return Element::CodeBlock(code, elements, doc_context.line())
-            }
-            _ => elements.push(element_from_event(event, doc_context)),
+            End(Tag::CodeBlock(code)) => return Element::CodeBlock(code, elements, start),
+            _ => elements.push(element_from_event(event, range, doc_context)),
         };
     }
     // This should not happen, so panic.
@@ -168,14 +214,14 @@ fn read_codeblock<'a>(
 
 fn read_block<'a>(block_type: Tag<'a>, doc_context: &mut DocContext<'a>) -> Element<'a> {
     let mut elements = vec![];
-    while let Some(event) = doc_context.parser.next() {
+    let start = doc_context.line();
+    while let Some((event, range)) = doc_context.parser.next() {
         match event {
             End(block_type) => {
-                let block = Element::Block(block_type, elements, doc_context.line());
-                doc_context.line_num += 1;
+                let block = Element::Block(block_type, elements, start);
                 return block;
             }
-            _ => elements.push(element_from_event(event, doc_context)),
+            _ => elements.push(element_from_event(event, range, doc_context)),
         };
     }
     // This should not happen, so panic.
