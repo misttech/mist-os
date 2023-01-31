@@ -103,7 +103,6 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_filesystem_empty_data.bzl",
     _fuchsia_filesystem_empty_data = "fuchsia_filesystem_empty_data",
-    _fuchsia_filesystem_empty_minfs = "fuchsia_filesystem_empty_minfs",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_filesystem_reserved.bzl",
@@ -171,12 +170,8 @@ fuchsia_zbi = _fuchsia_zbi
 fuchsia_vbmeta = _fuchsia_vbmeta
 fuchsia_filesystem_blobfs = _fuchsia_filesystem_blobfs
 fuchsia_filesystem_empty_account = _fuchsia_filesystem_empty_account
-fuchsia_filesystem_minfs = _fuchsia_filesystem_minfs
 fuchsia_filesystem_empty_data = _fuchsia_filesystem_empty_data
-
-# TODO(fxbug.dev/85134): Remove when in-tree Bazel configuration is updated to
-# use `fuchsia_filesystem_empty_data`.
-fuchsia_filesystem_empty_minfs = _fuchsia_filesystem_empty_minfs
+fuchsia_filesystem_minfs = _fuchsia_filesystem_minfs
 fuchsia_filesystem_reserved = _fuchsia_filesystem_reserved
 fuchsia_fvm_nand = _fuchsia_fvm_nand
 fuchsia_fvm_sparse = _fuchsia_fvm_sparse

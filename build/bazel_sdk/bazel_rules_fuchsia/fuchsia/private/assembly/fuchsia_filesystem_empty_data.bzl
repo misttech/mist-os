@@ -22,22 +22,3 @@ fuchsia_filesystem_empty_data = rule(
         ),
     },
 )
-
-def _fuchsia_filesystem_empty_minfs_impl(ctx):
-    return [
-        FuchsiaFsEmptyDataInfo(
-            empty_data_name = ctx.attr.empty_minfs_name,
-        ),
-    ]
-
-fuchsia_filesystem_empty_minfs = rule(
-    doc = """Generates an empty Minfs filesystem.""",
-    implementation = _fuchsia_filesystem_empty_minfs_impl,
-    provides = [FuchsiaFsEmptyDataInfo],
-    attrs = {
-        "empty_minfs_name": attr.string(
-            doc = "Name of filesystem",
-            default = "empty_data",
-        ),
-    },
-)
