@@ -7,19 +7,38 @@ import("//build/assembly/product_assembly_configuration.gni")
 import("//build/images/paths.gni")
 import("//src/sys/core/build/core.gni")
 
-# NOTE:  The _contents_ of the guest image should not vary based any of the
+#########
+#
+# The Fuchsia Guest System Assembly Definition.
+#
+# The guest image is meant to be run in a VM hosted by the virtualization
+# subsystem in Fuchsia (running a Fuchsia VM on top of Fuchsia).
+#
+# The _contents_ of the guest system should not vary based any of the
 # global GN args that are set by the //product/<foo>.gni product-definition
 # files.  If it exists, it should always be the same regardless of the "main
 # product" that is being built for, as it is its own product-like assembly.
 #
-# The guest image is meant to be run in a VM hosted by the virtualization
-# subsystem in Fuchsia (running a Fuchsia VM on top of Fuchsia).  As this is not
-# available on bringup builds, the guest image is made into no-op group in that
-# build configuration, in order to work around ninja dependency tracking issues
-# for incremental builds when changing from an `fx set core...` to
-# `fx set bringup...`.  When this happens, ninja tries to build dependencies it
-# remembered from the `core` product, even if those are nonsense (or not
-# buildable) for bringup.
+# The primary use of the guest system is to test the virtualization subsystem.
+# Its contents are based around that use-case.
+#
+# It needs:
+#  - General "eng" build-type support from the bringup / bootstrap level
+#      - serial access
+#      - virtcon
+#      - a shell
+#  - A netstack
+#      - ssh isn't required, but not prohibited
+#      - other connectivity components (e.g. bluetooth are not desired)
+#  - The virtio drivers
+#  - It's own vmm-specific board definition (which doesn't yet exist)
+
+# NOTE: As this is not available on bringup builds, the guest image is made into
+# no-op group in that build configuration, in order to work around ninja
+# dependency tracking issues for incremental builds when changing from an
+# `fx set core...` to `fx set bringup...`.  When this happens, ninja tries to
+# build dependencies it remembered from the `core` product, even if those are
+# nonsense (or not buildable) for bringup.
 #
 # And so the use of an empty group when building for bringup is an optimization
 # to make these targets fall out of the build graph in these situations, which
@@ -49,6 +68,8 @@ if (labels.images == "//build/images/bringup") {
   # and is specifically an "eng" build-type so that it can run tests.
   product_assembly_configuration("product_assembly_config") {
     platform = {
+      # TODO(113922): Switch to this when it's available:
+      # feature_set_level = <less than minimal, more than bringup>
       build_type = "eng"
     }
   }
