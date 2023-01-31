@@ -6,6 +6,7 @@
 #define SRC_PERFORMANCE_KTRACE_PROVIDER_APP_H_
 
 #include <lib/sys/cpp/component_context.h>
+#include <lib/trace-provider/provider.h>
 #include <lib/trace/observer.h>
 
 #include <fbl/unique_fd.h>
@@ -14,6 +15,8 @@
 #include "src/performance/ktrace_provider/log_importer.h"
 
 namespace ktrace_provider {
+
+std::vector<trace::KnownCategory> GetKnownCategories();
 
 class App {
  public:

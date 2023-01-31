@@ -19,6 +19,8 @@ int main(int argc, const char** argv) {
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "ktrace_provider");
+  trace_provider.SetGetKnownCategoriesCallback(
+      []() { return fpromise::make_ok_promise(GetKnownCategories()); });
 
   App app(command_line);
   loop.Run();

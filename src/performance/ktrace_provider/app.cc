@@ -115,6 +115,18 @@ void RequestKtraceStart(Controller_SyncProxy& controller, trace_buffering_mode_t
 
 }  // namespace
 
+std::vector<trace::KnownCategory> GetKnownCategories() {
+  std::vector<trace::KnownCategory> known_categories = {
+      {.name = kRetainCategory},
+  };
+
+  for (const auto& category : kGroupCategories) {
+    known_categories.push_back({.name = category.name});
+  }
+
+  return known_categories;
+}
+
 App::App(const fxl::CommandLine& command_line)
     : component_context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()) {
   trace_observer_.Start(async_get_default_dispatcher(), [this] { UpdateState(); });
