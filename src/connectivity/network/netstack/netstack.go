@@ -477,7 +477,7 @@ type addressChanged struct {
 
 var _ interfaceEvent = (*addressChanged)(nil)
 
-func (addressChanged) isInterfaceEvent() {}
+func (*addressChanged) isInterfaceEvent() {}
 
 func (a addressChanged) String() string {
 	return fmt.Sprintf(
@@ -499,7 +499,7 @@ type addressRemoved struct {
 
 var _ interfaceEvent = (*addressRemoved)(nil)
 
-func (addressRemoved) isInterfaceEvent() {}
+func (*addressRemoved) isInterfaceEvent() {}
 
 func (a addressRemoved) String() string {
 	return fmt.Sprintf("{nicid:%d addr:%s reason:%s}", a.nicid, a.protocolAddr.AddressWithPrefix, a.reason)
@@ -522,7 +522,7 @@ func (ad *watcherAddressDispatcher) OnChanged(lifetimes stack.AddressLifetimes, 
 	_ = syslog.Debugf("NIC=%d addr=%s changed lifetimes=%#v state=%s",
 		ad.nicid, ad.protocolAddr.AddressWithPrefix, lifetimes, state)
 	if ad.ch != nil {
-		ad.ch <- addressChanged{
+		ad.ch <- &addressChanged{
 			nicid:        ad.nicid,
 			protocolAddr: ad.protocolAddr,
 			lifetimes:    lifetimes,
@@ -539,7 +539,7 @@ func (ad *watcherAddressDispatcher) OnChanged(lifetimes stack.AddressLifetimes, 
 func (ad *watcherAddressDispatcher) OnRemoved(reason stack.AddressRemovalReason) {
 	_ = syslog.Debugf("NIC=%d addr=%s removed reason=%s", ad.nicid, ad.protocolAddr.AddressWithPrefix, reason)
 	if ad.ch != nil {
-		ad.ch <- addressRemoved{
+		ad.ch <- &addressRemoved{
 			nicid:        ad.nicid,
 			protocolAddr: ad.protocolAddr,
 			reason:       reason,
@@ -579,16 +579,18 @@ func (ifs *ifState) addAddress(protocolAddr tcpip.ProtocolAddress, properties st
 
 // onInterfaceAddLocked must be called with `ifs.mu` locked.
 func (ns *Netstack) onInterfaceAddLocked(ifs *ifState, name string) {
+	e := interfaceAdded(initialProperties(ifs, name))
 	if ns.interfaceEventChan != nil {
-		ns.interfaceEventChan <- interfaceAdded(initialProperties(ifs, name))
+		ns.interfaceEventChan <- &e
 	}
 }
 
 // onInterfaceRemoveLocked must be called with `ifState.mu` of the interface
 // identified by `nicid` locked.
 func (ns *Netstack) onInterfaceRemoveLocked(nicid tcpip.NICID) {
+	e := interfaceRemoved(nicid)
 	if ns.interfaceEventChan != nil {
-		ns.interfaceEventChan <- interfaceRemoved(nicid)
+		ns.interfaceEventChan <- &e
 	}
 }
 
@@ -596,7 +598,7 @@ func (ns *Netstack) onInterfaceRemoveLocked(nicid tcpip.NICID) {
 // identified by `nicid` locked.
 func (ns *Netstack) onOnlineChangeLocked(nicid tcpip.NICID, online bool) {
 	if ns.interfaceEventChan != nil {
-		ns.interfaceEventChan <- onlineChanged{
+		ns.interfaceEventChan <- &onlineChanged{
 			nicid:  nicid,
 			online: online,
 		}
@@ -608,7 +610,7 @@ func (ns *Netstack) onOnlineChangeLocked(nicid tcpip.NICID, online bool) {
 // to avoid races against other route changes.
 func (ns *Netstack) onDefaultIPv4RouteChangeLocked(nicid tcpip.NICID, hasDefaultRoute bool) {
 	if ns.interfaceEventChan != nil {
-		ns.interfaceEventChan <- defaultRouteChanged{
+		ns.interfaceEventChan <- &defaultRouteChanged{
 			nicid:               nicid,
 			hasDefaultIPv4Route: &hasDefaultRoute,
 		}
@@ -620,7 +622,7 @@ func (ns *Netstack) onDefaultIPv4RouteChangeLocked(nicid tcpip.NICID, hasDefault
 // to avoid races against other route changes.
 func (ns *Netstack) onDefaultIPv6RouteChangeLocked(nicid tcpip.NICID, hasDefaultRoute bool) {
 	if ns.interfaceEventChan != nil {
-		ns.interfaceEventChan <- defaultRouteChanged{
+		ns.interfaceEventChan <- &defaultRouteChanged{
 			nicid:               nicid,
 			hasDefaultIPv6Route: &hasDefaultRoute,
 		}
@@ -632,7 +634,7 @@ func (ns *Netstack) onDefaultIPv6RouteChangeLocked(nicid tcpip.NICID, hasDefault
 // to avoid races against other route changes.
 func (ns *Netstack) onDefaultRouteChangeLocked(nicid tcpip.NICID, hasDefaultIPv4Route bool, hasDefaultIPv6Route bool) {
 	if ns.interfaceEventChan != nil {
-		ns.interfaceEventChan <- defaultRouteChanged{
+		ns.interfaceEventChan <- &defaultRouteChanged{
 			nicid:               nicid,
 			hasDefaultIPv4Route: &hasDefaultIPv4Route,
 			hasDefaultIPv6Route: &hasDefaultIPv6Route,

@@ -407,7 +407,10 @@ func TestInterfacesWatcherExistingDeepCopyAddresses(t *testing.T) {
 	si := &interfaceStateImpl{watcherChan: watcherChan}
 
 	initialProperties := testProperties()
-	eventChan <- interfaceAdded(initialProperties)
+	{
+		e := interfaceAdded(initialProperties)
+		eventChan <- &e
+	}
 
 	fakeAddressChanged := func(validUntil tcpip.MonotonicTime) addressChanged {
 		return addressChanged{
@@ -421,7 +424,10 @@ func TestInterfacesWatcherExistingDeepCopyAddresses(t *testing.T) {
 			state: stack.AddressAssigned,
 		}
 	}
-	eventChan <- fakeAddressChanged(tcpip.MonotonicTimeInfinite())
+	{
+		e := fakeAddressChanged(tcpip.MonotonicTimeInfinite())
+		eventChan <- &e
+	}
 
 	// Initialize a watcher so that there is a queued Existing event with the
 	// address.
@@ -437,7 +443,8 @@ func TestInterfacesWatcherExistingDeepCopyAddresses(t *testing.T) {
 		time.Hour * 2,
 	}
 	for _, validUntil := range validUntil {
-		eventChan <- fakeAddressChanged(tcpip.MonotonicTime{}.Add(validUntil))
+		e := fakeAddressChanged(tcpip.MonotonicTime{}.Add(validUntil))
+		eventChan <- &e
 	}
 
 	// Read all the queued events.
@@ -704,7 +711,7 @@ func TestInterfacesWatcherAddressState(t *testing.T) {
 					currentState := stack.AddressAssigned
 					for _, nextState := range states {
 						// Fake an event changing the assignment state.
-						ns.interfaceEventChan <- addressChanged{
+						ns.interfaceEventChan <- &addressChanged{
 							nicid:        ifs.nicid,
 							protocolAddr: protocolAddr,
 							state:        nextState,

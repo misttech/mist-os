@@ -256,7 +256,7 @@ type interfaceAdded interfaces.Properties
 
 var _ interfaceEvent = (*interfaceAdded)(nil)
 
-func (interfaceAdded) isInterfaceEvent() {}
+func (*interfaceAdded) isInterfaceEvent() {}
 
 func deviceClassToString(d interfaces.DeviceClass) string {
 	switch tag := d.Which(); tag {
@@ -312,7 +312,7 @@ type interfaceRemoved tcpip.NICID
 
 var _ interfaceEvent = (*interfaceRemoved)(nil)
 
-func (interfaceRemoved) isInterfaceEvent() {}
+func (*interfaceRemoved) isInterfaceEvent() {}
 
 type onlineChanged struct {
 	nicid  tcpip.NICID
@@ -321,7 +321,7 @@ type onlineChanged struct {
 
 var _ interfaceEvent = (*onlineChanged)(nil)
 
-func (onlineChanged) isInterfaceEvent() {}
+func (*onlineChanged) isInterfaceEvent() {}
 
 type defaultRouteChanged struct {
 	nicid               tcpip.NICID
@@ -331,7 +331,7 @@ type defaultRouteChanged struct {
 
 var _ interfaceEvent = (*defaultRouteChanged)(nil)
 
-func (defaultRouteChanged) isInterfaceEvent() {}
+func (*defaultRouteChanged) isInterfaceEvent() {}
 
 func (c defaultRouteChanged) String() string {
 	var b strings.Builder
@@ -484,8 +484,8 @@ func interfaceWatcherEventLoop(
 			return
 		case e := <-eventChan:
 			switch event := e.(type) {
-			case interfaceAdded:
-				added := interfaces.Properties(event)
+			case *interfaceAdded:
+				added := interfaces.Properties(*event)
 				if !added.HasId() {
 					panic(fmt.Sprintf("interface added event with no ID: %s", event))
 				}
@@ -512,8 +512,8 @@ func interfaceWatcherEventLoop(
 					properties.SetAddresses(nil)
 					w.onEvent(interfaces.EventWithAdded(properties))
 				}
-			case interfaceRemoved:
-				removed := tcpip.NICID(event)
+			case *interfaceRemoved:
+				removed := tcpip.NICID(*event)
 				syslog.InfoTf(watcherProtocolName, "interface removed event: %d", removed)
 				if _, ok := propertiesMap[removed]; !ok {
 					panic(fmt.Sprintf("unknown interface NIC=%d removed", removed))
@@ -523,7 +523,7 @@ func interfaceWatcherEventLoop(
 				for w := range watchers {
 					w.onEvent(interfaces.EventWithRemoved(uint64(removed)))
 				}
-			case defaultRouteChanged:
+			case *defaultRouteChanged:
 				syslog.InfoTf(watcherProtocolName, "default route changed event: %s", event)
 
 				properties, ok := propertiesMap[event.nicid]
@@ -553,7 +553,7 @@ func interfaceWatcherEventLoop(
 						w.onEvent(interfaces.EventWithChanged(changes))
 					}
 				}
-			case onlineChanged:
+			case *onlineChanged:
 				syslog.InfoTf(watcherProtocolName, "online changed event: %#v", event)
 
 				properties, ok := propertiesMap[event.nicid]
@@ -579,7 +579,7 @@ func interfaceWatcherEventLoop(
 				for w := range watchers {
 					w.onEvent(interfaces.EventWithChanged(changes))
 				}
-			case addressChanged:
+			case *addressChanged:
 				properties, ok := propertiesMap[event.nicid]
 				if !ok {
 					panic(fmt.Sprintf("address changed event for unknown interface: %s", event))
@@ -604,7 +604,7 @@ func interfaceWatcherEventLoop(
 				for w := range watchers {
 					w.onAddressesChanged(event.nicid, addresses, addedOrRemoved, propertyChangedBitflag)
 				}
-			case addressRemoved:
+			case *addressRemoved:
 				syslog.InfoTf(watcherProtocolName, "address removed event: %s", event)
 
 				properties, ok := propertiesMap[event.nicid]
