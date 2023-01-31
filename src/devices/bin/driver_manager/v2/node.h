@@ -25,6 +25,7 @@ std::optional<fuchsia_component_decl::wire::Offer> CreateCompositeServiceOffer(
 
 class Node;
 class NodeRemovalTracker;
+using NodeId = uint32_t;
 
 using NodeBindingInfoResultCallback =
     fit::callback<void(fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>)>;
@@ -214,6 +215,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   fit::nullable<DriverHost*> driver_host_;
 
   NodeState node_state_ = NodeState::kRunning;
+  std::optional<NodeId> removal_id_;
   NodeRemovalTracker* removal_tracker_ = nullptr;
 
   std::optional<DriverComponent> driver_component_;

@@ -11,16 +11,13 @@
 
 namespace dfv2 {
 
-void NodeRemovalTracker::RegisterNode(void* node_ptr, Collection node_collection, std::string name,
-                                      NodeState state) {
-  if (nodes_.find(node_ptr) != nodes_.end()) {
-    LOGF(FATAL, "Tried to register Node twice!");
-  }
-  nodes_[node_ptr] = {name, node_collection, state};
+NodeId NodeRemovalTracker::RegisterNode(Node node) {
+  nodes_[next_node_id_] = std::move(node);
+  return next_node_id_++;
 }
 
-void NodeRemovalTracker::Notify(void* node_ptr, NodeState state) {
-  auto itr = nodes_.find(node_ptr);
+void NodeRemovalTracker::Notify(NodeId id, NodeState state) {
+  auto itr = nodes_.find(id);
   if (itr == nodes_.end()) {
     LOGF(ERROR, "Tried to Notify without registering!");
     return;
@@ -36,7 +33,7 @@ void NodeRemovalTracker::CheckRemovalDone() {
     return;
   }
   int pkg_count = 0, all_count = 0;
-  for (auto [ptr, value] : nodes_) {
+  for (auto [id, value] : nodes_) {
     auto [name, node_collection, state] = value;
     if (state != NodeState::kStopping) {
       all_count++;

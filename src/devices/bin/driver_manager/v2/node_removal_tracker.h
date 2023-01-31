@@ -15,8 +15,14 @@
 namespace dfv2 {
 class NodeRemovalTracker {
  public:
-  void RegisterNode(void* node_ptr, Collection node_collection, std::string name, NodeState state);
-  void Notify(void* node_ptr, NodeState state);
+  struct Node {
+    std::string name;
+    Collection collection;
+    NodeState state;
+  };
+
+  NodeId RegisterNode(Node node);
+  void Notify(NodeId id, NodeState state);
 
   void FinishEnumeration();
 
@@ -24,15 +30,11 @@ class NodeRemovalTracker {
   void set_all_callback(fit::callback<void()> callback);
 
  private:
-  struct Node {
-    std::string name;
-    Collection collection;
-    NodeState state;
-  };
   void CheckRemovalDone();
 
   bool fully_enumerated_ = false;
-  std::map<void*, Node> nodes_;
+  NodeId next_node_id_ = 0;
+  std::map<NodeId, Node> nodes_;
   fit::callback<void()> pkg_callback_;
   fit::callback<void()> all_callback_;
 };

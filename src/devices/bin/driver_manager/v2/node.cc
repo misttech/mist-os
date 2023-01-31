@@ -476,8 +476,8 @@ void Node::CheckForRemoval() {
     return;
   }
   node_state_ = NodeState::kWaitingOnDriver;
-  if (removal_tracker_) {
-    removal_tracker_->Notify(this, node_state_);
+  if (removal_tracker_ && removal_id_.has_value()) {
+    removal_tracker_->Notify(removal_id_.value(), node_state_);
   }
   LOGF(DEBUG, "Node::Remove(): %s children are empty", name().c_str());
   if (driver_component_ && driver_component_->driver && driver_component_->driver->is_valid()) {
@@ -509,8 +509,8 @@ void Node::FinishRemoval() {
   LOGF(DEBUG, "Node: %s unbinding and resetting", name().c_str());
   UnbindAndReset(controller_ref_);
   UnbindAndReset(node_ref_);
-  if (removal_tracker_) {
-    removal_tracker_->Notify(this, node_state_);
+  if (removal_tracker_ && removal_id_.has_value()) {
+    removal_tracker_->Notify(removal_id_.value(), node_state_);
   }
 }
 // State table for package driver:
@@ -545,7 +545,11 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
     } else {
       // We are getting a removal tracker for the first time so register ourselves.
       removal_tracker_ = removal_tracker;
-      removal_tracker_->RegisterNode(this, collection_, MakeComponentMoniker(), node_state_);
+      removal_id_ = removal_tracker_->RegisterNode(NodeRemovalTracker::Node{
+          .name = MakeComponentMoniker(),
+          .collection = collection_,
+          .state = node_state_,
+      });
     }
   }
 
@@ -573,8 +577,8 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   }
 
   // Propagate removal message to children
-  if (removal_tracker_) {
-    removal_tracker_->Notify(this, node_state_);
+  if (removal_tracker_ && removal_id_.has_value()) {
+    removal_tracker_->Notify(removal_id_.value(), node_state_);
   }
 
   // Ask each of our children to remove themselves.

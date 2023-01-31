@@ -6,35 +6,39 @@
 
 #include <gtest/gtest.h>
 
-#include "src/devices/bin/driver_manager/v2/node.h"
-
 struct NodeBank {
   NodeBank(dfv2::NodeRemovalTracker *tracker) : tracker_(tracker) {}
   void AddNode(dfv2::Collection collection, dfv2::NodeState state) {
-    nodes_.push_back(state);
-    tracker_->RegisterNode(&nodes_.back(), collection, "node", state);
+    ids_.insert(tracker_->RegisterNode(dfv2::NodeRemovalTracker::Node{
+        .name = "node",
+        .collection = collection,
+        .state = state,
+    }));
   }
 
   void NotifyRemovalComplete() {
-    for (auto &n : nodes_) {
-      tracker_->Notify(&n, dfv2::NodeState::kStopping);
+    for (dfv2::NodeId id : ids_) {
+      tracker_->Notify(id, dfv2::NodeState::kStopping);
     }
   }
 
-  std::list<dfv2::NodeState> nodes_;
+  std::set<dfv2::NodeId> ids_;
   dfv2::NodeRemovalTracker *tracker_;
 };
 
 TEST(NodeRemovalTracker, RegisterOneNode) {
   dfv2::NodeRemovalTracker tracker;
-  dfv2::NodeState node1 = dfv2::NodeState::kRunning;
-  tracker.RegisterNode(&node1, dfv2::Collection::kBoot, "node", node1);
+  dfv2::NodeId id = tracker.RegisterNode(dfv2::NodeRemovalTracker::Node{
+      .name = "node",
+      .collection = dfv2::Collection::kBoot,
+      .state = dfv2::NodeState::kRunning,
+  });
   int package_callbacks = 0;
   int all_callbacks = 0;
   tracker.set_pkg_callback([&package_callbacks]() { package_callbacks++; });
   tracker.set_all_callback([&all_callbacks]() { all_callbacks++; });
   tracker.FinishEnumeration();
-  tracker.Notify(&node1, dfv2::NodeState::kStopping);
+  tracker.Notify(id, dfv2::NodeState::kStopping);
 
   EXPECT_EQ(package_callbacks, 1);
   EXPECT_EQ(all_callbacks, 1);
@@ -92,8 +96,11 @@ TEST(NodeRemovalTracker, CallbacksCallOrder) {
 // during the pkg_callback without causing a deadlock.
 TEST(NodeRemovalTracker, CallbackDeadlock) {
   dfv2::NodeRemovalTracker tracker;
-  dfv2::NodeState node1 = dfv2::NodeState::kRunning;
-  tracker.RegisterNode(&node1, dfv2::Collection::kBoot, "node", node1);
+  dfv2::NodeId id = tracker.RegisterNode(dfv2::NodeRemovalTracker::Node{
+      .name = "node",
+      .collection = dfv2::Collection::kBoot,
+      .state = dfv2::NodeState::kRunning,
+  });
   int package_callbacks = 0;
   int all_callbacks = 0;
   tracker.set_pkg_callback([&tracker, &package_callbacks, &all_callbacks]() {
@@ -101,7 +108,7 @@ TEST(NodeRemovalTracker, CallbackDeadlock) {
     tracker.set_all_callback([&all_callbacks]() { all_callbacks++; });
   });
   tracker.FinishEnumeration();
-  tracker.Notify(&node1, dfv2::NodeState::kStopping);
+  tracker.Notify(id, dfv2::NodeState::kStopping);
 
   EXPECT_EQ(package_callbacks, 1);
   EXPECT_EQ(all_callbacks, 1);
