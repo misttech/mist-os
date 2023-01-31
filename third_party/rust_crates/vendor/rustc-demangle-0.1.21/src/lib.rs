@@ -30,10 +30,36 @@
 #[macro_use]
 extern crate std;
 
+// HACK(eddyb) helper macros for tests.
+#[cfg(test)]
+macro_rules! assert_contains {
+    ($s:expr, $needle:expr) => {{
+        let (s, needle) = ($s, $needle);
+        assert!(
+            s.contains(needle),
+            "{:?} should've contained {:?}",
+            s,
+            needle
+        );
+    }};
+}
+#[cfg(test)]
+macro_rules! assert_ends_with {
+    ($s:expr, $suffix:expr) => {{
+        let (s, suffix) = ($s, $suffix);
+        assert!(
+            s.ends_with(suffix),
+            "{:?} should've ended in {:?}",
+            s,
+            suffix
+        );
+    }};
+}
+
 mod legacy;
 mod v0;
 
-use core::fmt;
+use core::fmt::{self, Write as _};
 
 /// Representation of a demangled symbol name.
 pub struct Demangle<'a> {
@@ -69,11 +95,9 @@ pub fn demangle(mut s: &str) -> Demangle {
     let llvm = ".llvm.";
     if let Some(i) = s.find(llvm) {
         let candidate = &s[i + llvm.len()..];
-        let all_hex = candidate.chars().all(|c| {
-            match c {
-                'A' ... 'F' | '0' ... '9' | '@' => true,
-                _ => false,
-            }
+        let all_hex = candidate.chars().all(|c| match c {
+            'A'..='F' | '0'..='9' | '@' => true,
+            _ => false,
         });
 
         if all_hex {
@@ -92,14 +116,19 @@ pub fn demangle(mut s: &str) -> Demangle {
                 suffix = s;
                 Some(DemangleStyle::V0(d))
             }
-            Err(v0::Invalid) => None,
+            // FIXME(eddyb) would it make sense to treat an unknown-validity
+            // symbol (e.g. one that errored with `RecursedTooDeep`) as
+            // v0-mangled, and have the error show up in the demangling?
+            // (that error already gets past this initial check, and therefore
+            // will show up in the demangling, if hidden behind a backref)
+            Err(v0::ParseError::Invalid) | Err(v0::ParseError::RecursedTooDeep) => None,
         },
     };
 
     // Output like LLVM IR adds extra period-delimited words. See if
     // we are in that case and save the trailing words if so.
     if !suffix.is_empty() {
-        if suffix.starts_with(".") && is_symbol_like(suffix) {
+        if suffix.starts_with('.') && is_symbol_like(suffix) {
             // Keep the suffix.
         } else {
             // Reset the suffix and invalidate the demangling.
@@ -109,9 +138,9 @@ pub fn demangle(mut s: &str) -> Demangle {
     }
 
     Demangle {
-        style: style,
+        style,
         original: s,
-        suffix: suffix,
+        suffix,
     }
 }
 
@@ -162,9 +191,7 @@ fn is_symbol_like(s: &str) -> bool {
 // Copied from the documentation of `char::is_ascii_alphanumeric`
 fn is_ascii_alphanumeric(c: char) -> bool {
     match c {
-        '\u{0041}' ... '\u{005A}' |
-        '\u{0061}' ... '\u{007A}' |
-        '\u{0030}' ... '\u{0039}' => true,
+        '\u{0041}'..='\u{005A}' | '\u{0061}'..='\u{007A}' | '\u{0030}'..='\u{0039}' => true,
         _ => false,
     }
 }
@@ -172,23 +199,76 @@ fn is_ascii_alphanumeric(c: char) -> bool {
 // Copied from the documentation of `char::is_ascii_punctuation`
 fn is_ascii_punctuation(c: char) -> bool {
     match c {
-        '\u{0021}' ... '\u{002F}' |
-        '\u{003A}' ... '\u{0040}' |
-        '\u{005B}' ... '\u{0060}' |
-        '\u{007B}' ... '\u{007E}' => true,
+        '\u{0021}'..='\u{002F}'
+        | '\u{003A}'..='\u{0040}'
+        | '\u{005B}'..='\u{0060}'
+        | '\u{007B}'..='\u{007E}' => true,
         _ => false,
+    }
+}
+
+impl<'a> fmt::Display for DemangleStyle<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            DemangleStyle::Legacy(ref d) => fmt::Display::fmt(d, f),
+            DemangleStyle::V0(ref d) => fmt::Display::fmt(d, f),
+        }
+    }
+}
+
+// Maximum size of the symbol that we'll print.
+const MAX_SIZE: usize = 1_000_000;
+
+#[derive(Copy, Clone, Debug)]
+struct SizeLimitExhausted;
+
+struct SizeLimitedFmtAdapter<F> {
+    remaining: Result<usize, SizeLimitExhausted>,
+    inner: F,
+}
+
+impl<F: fmt::Write> fmt::Write for SizeLimitedFmtAdapter<F> {
+    fn write_str(&mut self, s: &str) -> fmt::Result {
+        self.remaining = self
+            .remaining
+            .and_then(|r| r.checked_sub(s.len()).ok_or(SizeLimitExhausted));
+
+        match self.remaining {
+            Ok(_) => self.inner.write_str(s),
+            Err(SizeLimitExhausted) => Err(fmt::Error),
+        }
     }
 }
 
 impl<'a> fmt::Display for Demangle<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.style {
-            None => try!(f.write_str(self.original)),
-            Some(DemangleStyle::Legacy(ref d)) => {
-                try!(fmt::Display::fmt(d, f))
-            }
-            Some(DemangleStyle::V0(ref d)) => {
-                try!(fmt::Display::fmt(d, f))
+            None => f.write_str(self.original)?,
+            Some(ref d) => {
+                let alternate = f.alternate();
+                let mut size_limited_fmt = SizeLimitedFmtAdapter {
+                    remaining: Ok(MAX_SIZE),
+                    inner: &mut *f,
+                };
+                let fmt_result = if alternate {
+                    write!(size_limited_fmt, "{:#}", d)
+                } else {
+                    write!(size_limited_fmt, "{}", d)
+                };
+                let size_limit_result = size_limited_fmt.remaining.map(|_| ());
+
+                // Translate a `fmt::Error` generated by `SizeLimitedFmtAdapter`
+                // into an error message, instead of propagating it upwards
+                // (which could cause panicking from inside e.g. `std::io::print`).
+                match (fmt_result, size_limit_result) {
+                    (Err(_), Err(SizeLimitExhausted)) => f.write_str("{size limit reached}")?,
+
+                    _ => {
+                        fmt_result?;
+                        size_limit_result
+                            .expect("`fmt::Error` from `SizeLimitedFmtAdapter` was discarded");
+                    }
+                }
             }
         }
         f.write_str(self.suffix)
@@ -206,23 +286,27 @@ mod tests {
     use std::prelude::v1::*;
 
     macro_rules! t {
-        ($a:expr, $b:expr) => (assert!(ok($a, $b)))
+        ($a:expr, $b:expr) => {
+            assert!(ok($a, $b))
+        };
     }
 
     macro_rules! t_err {
-        ($a:expr) => (assert!(ok_err($a)))
+        ($a:expr) => {
+            assert!(ok_err($a))
+        };
     }
 
     macro_rules! t_nohash {
-        ($a:expr, $b:expr) => ({
+        ($a:expr, $b:expr) => {{
             assert_eq!(format!("{:#}", super::demangle($a)), $b);
-        })
+        }};
     }
 
     fn ok(sym: &str, expected: &str) -> bool {
         match super::try_demangle(sym) {
             Ok(s) => {
-                if s.to_string() == expected  {
+                if s.to_string() == expected {
                     true
                 } else {
                     println!("\n{}\n!=\n{}\n", s, expected);
@@ -269,10 +353,12 @@ mod tests {
         t!("_ZN12test$BP$test4foobE", "test*test::foob");
     }
 
-
     #[test]
     fn demangle_osx() {
-        t!("__ZN5alloc9allocator6Layout9for_value17h02a996811f781011E", "alloc::allocator::Layout::for_value::h02a996811f781011");
+        t!(
+            "__ZN5alloc9allocator6Layout9for_value17h02a996811f781011E",
+            "alloc::allocator::Layout::for_value::h02a996811f781011"
+        );
         t!("__ZN38_$LT$core..option..Option$LT$T$GT$$GT$6unwrap18_MSG_FILE_LINE_COL17haf7cb8d5824ee659E", "<core::option::Option<T>>::unwrap::_MSG_FILE_LINE_COL::haf7cb8d5824ee659");
         t!("__ZN4core5slice89_$LT$impl$u20$core..iter..traits..IntoIterator$u20$for$u20$$RF$$u27$a$u20$$u5b$T$u5d$$GT$9into_iter17h450e234d27262170E", "core::slice::<impl core::iter::traits::IntoIterator for &'a [T]>::into_iter::h450e234d27262170");
     }
@@ -293,8 +379,10 @@ mod tests {
 
     #[test]
     fn demangle_trait_impls() {
-        t!("_ZN71_$LT$Test$u20$$u2b$$u20$$u27$static$u20$as$u20$foo..Bar$LT$Test$GT$$GT$3barE",
-           "<Test + 'static as foo::Bar<Test>>::bar");
+        t!(
+            "_ZN71_$LT$Test$u20$$u2b$$u20$$u27$static$u20$as$u20$foo..Bar$LT$Test$GT$$GT$3barE",
+            "<Test + 'static as foo::Bar<Test>>::bar"
+        );
     }
 
     #[test]
@@ -327,7 +415,10 @@ mod tests {
         // One element, no hash.
         t!("_ZN3fooE.llvm.9D1C9369", "foo");
         t!("_ZN3fooE.llvm.9D1C9369@@16", "foo");
-        t_nohash!("_ZN9backtrace3foo17hbb467fcdaea5d79bE.llvm.A5310EB9", "backtrace::foo");
+        t_nohash!(
+            "_ZN9backtrace3foo17hbb467fcdaea5d79bE.llvm.A5310EB9",
+            "backtrace::foo"
+        );
     }
 
     #[test]
@@ -346,11 +437,14 @@ mod tests {
         super::demangle("_ZN2222222222222222222222EE").to_string();
         super::demangle("_ZN5*70527e27.ll34csaғE").to_string();
         super::demangle("_ZN5*70527a54.ll34_$b.1E").to_string();
-        super::demangle("\
-            _ZN5~saäb4e\n\
-            2734cOsbE\n\
-            5usage20h)3\0\0\0\0\0\0\07e2734cOsbE\
-        ").to_string();
+        super::demangle(
+            "\
+             _ZN5~saäb4e\n\
+             2734cOsbE\n\
+             5usage20h)3\0\0\0\0\0\0\07e2734cOsbE\
+             ",
+        )
+        .to_string();
     }
 
     #[test]
@@ -368,6 +462,32 @@ mod tests {
         t!(
             "_ZN88_$LT$core..result..Result$LT$$u21$$C$$u20$E$GT$$u20$as$u20$std..process..Termination$GT$6report17hfc41d0da4a40b3e8E",
             "<core::result::Result<!, E> as std::process::Termination>::report::hfc41d0da4a40b3e8"
+        );
+    }
+
+    #[test]
+    fn limit_recursion() {
+        assert_contains!(
+            super::demangle("_RNvB_1a").to_string(),
+            "{recursion limit reached}"
+        );
+        assert_contains!(
+            super::demangle("_RMC0RB2_").to_string(),
+            "{recursion limit reached}"
+        );
+    }
+
+    #[test]
+    fn limit_output() {
+        assert_ends_with!(
+            super::demangle("RYFG_FGyyEvRYFF_EvRYFFEvERLB_B_B_ERLRjB_B_B_").to_string(),
+            "{size limit reached}"
+        );
+        // NOTE(eddyb) somewhat reduced version of the above, effectively
+        // `<for<...> fn()>` with a larger number of lifetimes in `...`.
+        assert_ends_with!(
+            super::demangle("_RMC0FGZZZ_Eu").to_string(),
+            "{size limit reached}"
         );
     }
 }

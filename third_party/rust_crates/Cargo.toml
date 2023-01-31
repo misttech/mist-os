@@ -180,7 +180,7 @@ ref-cast = "1.0.9"
 regex = "1.0.6"
 regex-syntax = "0.6.5"
 ring = "0.16"
-rustc-demangle = "0.1.16"
+rustc-demangle = "0.1.21"
 rustc-hash = "1.0.1"
 rustls = { version = "0.19.1", features = ["dangerous_configuration"] }
 rustyline = "2.1.0"
