@@ -10,6 +10,7 @@ load(
     "FuchsiaProductBundleInfo",
     "FuchsiaProductImageInfo",
     "FuchsiaScrutinyConfigInfo",
+    "FuchsiaVirtualDeviceInfo",
 )
 
 def _scrutiny_validation(
@@ -420,6 +421,16 @@ def _fuchsia_product_bundle_impl(ctx):
     # Gather all the inputs.
     inputs = [partitions_configuration] + ctx.files.product_image
 
+    # Add virtual devices.
+    for virtual_device in ctx.attr.virtual_devices:
+        ffx_invocation.append("--virtual-device")
+        ffx_invocation.append(virtual_device[FuchsiaVirtualDeviceInfo].config.path)
+        inputs.append(virtual_device[FuchsiaVirtualDeviceInfo].config)
+        inputs.append(virtual_device[FuchsiaVirtualDeviceInfo].template)
+    if ctx.attr.default_virtual_device != None:
+        ffx_invocation.append("--recommended-device")
+        ffx_invocation.append(ctx.attr.default_virtual_device[FuchsiaVirtualDeviceInfo].device_name)
+
     # If recovery is supplied, add it to the product bundle.
     if ctx.attr.recovery != None:
         system_r_out = ctx.attr.recovery[FuchsiaProductImageInfo].images_out
@@ -523,6 +534,16 @@ fuchsia_product_bundle = rule(
         "recovery_scrutiny_config": attr.label(
             doc = "Scrutiny config for recovery",
             providers = [FuchsiaScrutinyConfigInfo],
+        ),
+        "virtual_devices": attr.label_list(
+            doc = "Virtual devices to make available",
+            providers = [FuchsiaVirtualDeviceInfo],
+            default = [],
+        ),
+        "default_virtual_device": attr.label(
+            doc = "Default virtual device to run when none is specified",
+            providers = [FuchsiaVirtualDeviceInfo],
+            default = None,
         ),
     },
 )

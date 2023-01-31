@@ -94,6 +94,15 @@ FuchsiaAssemblyConfigInfo = provider(
     },
 )
 
+FuchsiaVirtualDeviceInfo = provider(
+    doc = "A virtual device spec file which is a single JSON configuration file.",
+    fields = {
+        "device_name": "Name of the virtual device",
+        "config": "JSON configuration file",
+        "template": "QEMU start up arguments template",
+    },
+)
+
 FuchsiaProductAssemblyBundleInfo = provider(
     doc = """
 A bundle of files used by product assembly.

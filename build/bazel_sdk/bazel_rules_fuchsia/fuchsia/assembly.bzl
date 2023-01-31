@@ -52,6 +52,11 @@ load(
     _fuchsia_product_configuration = "fuchsia_product_configuration",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_virtual_device.bzl",
+    _ARCH = "ARCH",
+    _fuchsia_virtual_device = "fuchsia_virtual_device",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_platform_diagnostics_configuration.bzl",
     _ARCHIVIST_TYPES = "ARCHIVIST_TYPES",
     _fuchsia_platform_diagnostics_configuration = "fuchsia_platform_diagnostics_configuration",
@@ -160,6 +165,7 @@ fuchsia_platform_diagnostics_configuration = _fuchsia_platform_diagnostics_confi
 fuchsia_platform_development_support_configuration = _fuchsia_platform_development_support_configuration
 fuchsia_platform_starnix_configuration = _fuchsia_platform_starnix_configuration
 fuchsia_product_configuration = _fuchsia_product_configuration
+fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
 fuchsia_product_image = _fuchsia_product_image
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
@@ -196,3 +202,4 @@ ZBI_COMPRESSION = _ZBI_COMPRESSION
 BLOBFS_LAYOUT = _BLOBFS_LAYOUT
 PARTITION_TYPE = _PARTITION_TYPE
 SLOT = _SLOT
+ARCH = _ARCH
