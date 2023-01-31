@@ -17,66 +17,18 @@ driver_bind_rules("intel-i915-bind") {
   ]
 }
 
-source_set("common_srcs") {
-  configs += [ "//build/config:all_source" ]
-  public_configs = [ "//build/config/fuchsia:enable_zircon_asserts" ]
-
-  sources = [
-    "clock/cdclk.cc",
-    "ddi.cc",
-    "display-device.cc",
-    "dp-display.cc",
-    "dpll.cc",
-    "gtt.cc",
-    "hdmi-display.cc",
-    "igd.cc",
-    "intel-i915.cc",
-    "interrupts.cc",
-    "pch-engine.cc",
-    "pipe.cc",
-    "power-controller.cc",
-    "power.cc",
-  ]
-  public_deps = [
-    ":intel-i915-bind",
-    "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.intelgpucore:fuchsia.hardware.intelgpucore_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
-    "//sdk/lib/stdcompat",
-    "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
-    "//src/devices/pci/lib/device-protocol-pci",
-    "//src/devices/pci/lib/pci",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/image-format",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/region-alloc",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-  ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-
-  # TODO(fxbug.dev/95833): This target uses the deprecated C bindings.
-  # Consider switching to the C++ bindings. See linked bug for details.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
-}
-
 fuchsia_driver("intel-i915-driver") {
   output_name = "intel-i915"
-  deps = [ ":common_srcs" ]
+  # This group will be populated again when the intel-i915-tgl driver moves
+  # back here. The migration is tracked in https://fxbug.dev/104963
 }
 
 fuchsia_driver_component("intel-i915") {
   component_name = "intel-i915"
-  deps = [ ":intel-i915-driver" ]
+  deps = [
+    ":intel-i915-bind",
+    ":intel-i915-driver",
+  ]
   info = "intel-i915-info.json"
   root_resource = true
   uses_profiles = true
