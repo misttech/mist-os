@@ -1979,6 +1979,7 @@ async fn get_route_stats<I: net_types::ip::Ip>(name: &str) {
 
     // Verify that the timestamp is updated each time the route is used.
     for _ in 0..2 {
+        fasync::Timer::new(std::time::Duration::from_millis(1)).await;
         test_network.send_and_receive_multicast_packet(hashmap! { Client::A => true }).await;
         let current_timestamp = get_last_used_timestamp(
             &controller,
