@@ -130,7 +130,7 @@ pub enum MessengerType {
 }
 
 pub mod filter {
-    use super::{Audience, Message, MessageType};
+    use super::Message;
     use core::fmt::{Debug, Formatter};
     use std::sync::Arc;
 
@@ -138,9 +138,6 @@ pub mod filter {
     /// for a filter to match.
     #[derive(Clone)]
     pub enum Condition {
-        /// Matches on the message's intended audience as specified by the
-        /// sender.
-        Audience(Audience),
         /// Matches on a custom closure that may evaluate the sent message.
         #[allow(clippy::type_complexity)]
         Custom(Arc<dyn Fn(&Message) -> bool + Send + Sync>),
@@ -151,7 +148,6 @@ pub mod filter {
     impl Debug for Condition {
         fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
             let condition = match self {
-                Condition::Audience(audience) => format!("audience:{audience:?}"),
                 Condition::Custom(_) => "custom".to_string(),
             };
 
@@ -180,9 +176,6 @@ pub mod filter {
     impl Filter {
         pub(crate) fn matches(&self, message: &Message) -> bool {
             match &self.condition {
-                Condition::Audience(audience) => matches!(
-                        message.get_type(),
-                        MessageType::Origin(target) if target == audience),
                 Condition::Custom(check_fn) => (check_fn)(message),
             }
         }
