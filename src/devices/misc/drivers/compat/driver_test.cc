@@ -14,6 +14,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/driver/compat/cpp/symbols.h>
+#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/testing.h>
 #include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
@@ -59,76 +60,6 @@ zx::vmo GetVmo(std::string_view path) {
   EXPECT_TRUE(response.is_ok()) << zx_status_get_string(response.error_value());
   return std::move(response.value()->vmo);
 }
-
-class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
-                 public fidl::WireServer<fuchsia_driver_framework::Node> {
- public:
-  using ChildrenMap = std::unordered_map<std::string, TestNode>;
-
-  TestNode(async_dispatcher_t* dispatcher, std::string name)
-      : dispatcher_(dispatcher), name_(std::move(name)) {}
-
-  ChildrenMap& children() { return children_; }
-  const std::string& name() const { return name_; }
-
-  zx::result<fidl::ClientEnd<fdf::Node>> CreateNodeChannel() {
-    if (node_binding_.has_value()) {
-      return zx::error(ZX_ERR_ALREADY_EXISTS);
-    }
-    zx::result endpoints = fidl::CreateEndpoints<fdf::Node>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    node_binding_.emplace(dispatcher_, std::move(endpoints->server), this,
-                          [this](fidl::UnbindInfo) { Remove(); });
-    return zx::ok(std::move(endpoints->client));
-  }
-
-  bool HasNode() { return node_binding_.has_value(); }
-
- private:
-  void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override {
-    std::string name{request->args.name().get()};
-    auto [it, inserted] = children_.try_emplace(name, dispatcher_, name);
-    if (!inserted) {
-      completer.ReplyError(fdf::NodeError::kNameAlreadyExists);
-      return;
-    }
-    TestNode& node = it->second;
-    node.parent_ = *this;
-    node.controller_binding_.emplace(dispatcher_, std::move(request->controller), &node,
-                                     fidl::kIgnoreBindingClosure);
-    if (request->node) {
-      node.node_binding_.emplace(dispatcher_, std::move(request->node), &node,
-                                 [this](fidl::UnbindInfo) { Remove(); });
-    }
-
-    completer.ReplySuccess();
-  }
-
-  void Remove(RemoveCompleter::Sync& completer) override { Remove(); }
-
-  void Remove() {
-    children_.clear();
-    node_binding_.reset();
-    controller_binding_.reset();
-
-    if (!parent_.has_value()) {
-      return;
-    }
-    // After this call we are destructed, so don't access anything else.
-    size_t count = parent_.value().get().children_.erase(name_);
-    ZX_ASSERT_MSG(count == 1, "Should've removed 1 child, removed %ld", count);
-  }
-
-  std::optional<fidl::ServerBinding<fdf::Node>> node_binding_;
-  std::optional<fidl::ServerBinding<fdf::NodeController>> controller_binding_;
-
-  async_dispatcher_t* dispatcher_;
-  std::string name_;
-  std::optional<std::reference_wrapper<TestNode>> parent_;
-  ChildrenMap children_;
-};
 
 class TestRootResource : public fidl::testing::WireTestBase<fboot::RootResource> {
  public:
@@ -345,7 +276,7 @@ class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
 
 class DriverTest : public testing::Test {
  protected:
-  TestNode& node() { return node_.value(); }
+  fdf_testing::TestNode& node() { return node_.value(); }
   TestFile& compat_file() { return compat_file_; }
 
   void SetUp() override {
@@ -542,7 +473,7 @@ class DriverTest : public testing::Test {
   async_dispatcher_t* dispatcher() { return driver_dispatcher_.dispatcher(); }
 
  private:
-  std::optional<TestNode> node_;
+  std::optional<fdf_testing::TestNode> node_;
   TestRootResource root_resource_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;

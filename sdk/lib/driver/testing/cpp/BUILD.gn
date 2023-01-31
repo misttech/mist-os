@@ -1,0 +1,15 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("test_node") {
+  testonly = true
+
+  sources = [
+    "test_node.cc",
+    "test_node.h",
+  ]
+
+  public_deps =
+      [ "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp" ]
+}
