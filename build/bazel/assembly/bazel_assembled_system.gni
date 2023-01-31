@@ -80,10 +80,6 @@ template("bazel_assembled_system") {
 
     no_output_dir_leaks = false
 
-    # TODO(https://fxbug.dev/115151): Remove this flag when Bazel assembly is
-    # hermetic.
-    extra_bazel_args = [ "--spawn_strategy=local" ]
-
     command = "build"
     bazel_targets = [ invoker.bazel_assembly_target ]
     bazel_inputs = [

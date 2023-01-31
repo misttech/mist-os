@@ -41,14 +41,9 @@ def _create_pkg_detail(dep):
 
 def _collect_file_deps(dep):
     if FuchsiaPackageInfo in dep:
-        return [dep[FuchsiaPackageInfo].package_manifest]
+        return dep[FuchsiaPackageInfo].files
 
-    package = dep[FuchsiaAssembledPackageInfo].package
-    configs = dep[FuchsiaAssembledPackageInfo].configs
-    deps = [package.package_manifest]
-    for config in configs:
-        deps.append(config.source)
-    return deps
+    return dep[FuchsiaAssembledPackageInfo].files
 
 def _create_platform_config(ctx):
     platform = {}
@@ -127,17 +122,17 @@ def _fuchsia_product_configuration_impl(ctx):
         product["session_url"] = ctx.attr.session_url
     packages = {}
 
-    deps = []
+    pkg_files = []
     base_pkg_details = []
     for dep in ctx.attr.base_packages:
         base_pkg_details.append(_create_pkg_detail(dep))
-        deps += _collect_file_deps(dep)
+        pkg_files += _collect_file_deps(dep)
     packages["base"] = base_pkg_details
 
     cache_pkg_details = []
     for dep in ctx.attr.cache_packages:
         cache_pkg_details.append(_create_pkg_detail(dep))
-        deps += _collect_file_deps(dep)
+        pkg_files += _collect_file_deps(dep)
     packages["cache"] = cache_pkg_details
 
     product["packages"] = packages
@@ -150,7 +145,7 @@ def _fuchsia_product_configuration_impl(ctx):
                 "components": dep[FuchsiaPackageInfo].drivers,
             },
         )
-        deps += [dep[FuchsiaPackageInfo].package_manifest]
+        pkg_files += [dep[FuchsiaPackageInfo].package_manifest]
     product["drivers"] = driver_details
     product_config["product"] = product
 
@@ -193,15 +188,11 @@ def _fuchsia_product_configuration_impl(ctx):
         ],
     )
 
-    deps.append(product_config_file)
     return [
-        DefaultInfo(
-            files = depset(
-                direct = deps,
-            ),
-        ),
+        DefaultInfo(files = depset(direct = [product_config_file])),
         FuchsiaProductConfigInfo(
             product_config = product_config_file,
+            pkg_files = pkg_files,
         ),
     ]
 

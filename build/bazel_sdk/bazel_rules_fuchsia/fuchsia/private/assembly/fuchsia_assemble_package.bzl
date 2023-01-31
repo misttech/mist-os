@@ -7,22 +7,23 @@ load(":providers.bzl", "FuchsiaAssembledPackageInfo", "FuchsiaConfigData")
 
 def _fuchsia_assemble_package_impl(ctx):
     configs = []
-    deps = []
+    files = []
     for config_file in ctx.attr.configs:
         f = config_file.files.to_list()[0]
         configs.append(FuchsiaConfigData(
             source = f,
             destination = ctx.attr.configs[config_file],
         ))
-        deps.append(f)
+        files.append(f)
     package = ctx.attr.package[FuchsiaPackageInfo]
-    deps.append(package.package_manifest)
+    files.extend(ctx.files.package)
 
     return [
-        DefaultInfo(files = depset(deps)),
+        DefaultInfo(files = depset(files)),
         FuchsiaAssembledPackageInfo(
             package = package,
             configs = configs,
+            files = files
         ),
     ]
 

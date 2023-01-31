@@ -11,6 +11,7 @@ FuchsiaAssembledPackageInfo = provider(
     fields = {
         "package": "The base package",
         "configs": "A list of configs that is attached to packages",
+        "files": "Files needed by package and config files.",
     },
 )
 
@@ -77,6 +78,7 @@ FuchsiaProductConfigInfo = provider(
     doc = "A product-info used to containing the product_config.json and deps.",
     fields = {
         "product_config": "The JSON product configuration file.",
+        "pkg_files": "All files from packages (base, cache, and driver) included by this product config.",
     },
 )
 
