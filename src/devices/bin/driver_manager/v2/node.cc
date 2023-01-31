@@ -532,21 +532,20 @@ void Node::FinishRemoval() {
 // a removal is taking place, but this node will not be removed yet, even if all its children
 // are removed.
 void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
-  bool should_register = false;
+  if (!removal_tracker && removal_tracker_) {
+    // TODO(fxbug.dev/115171): Change this to an error when we track shutdown steps better.
+    LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
+         MakeTopologicalPath().c_str());
+  }
+
   if (removal_tracker) {
-    if (!removal_tracker_) {
-      // First time we are seeing the removal tracker, register with it:
-      removal_tracker_ = removal_tracker;
-      should_register = true;
-    } else {
+    if (removal_tracker_) {
       // We should never have two competing trackers
       ZX_ASSERT(removal_tracker_ == removal_tracker);
-    }
-  } else {
-    if (removal_tracker_) {
-      // TODO(fxbug.dev/115171): Change this to an error when we track shutdown steps better.
-      LOGF(WARNING, "Untracked Node::Remove() called on %s, indicating an error during shutdown",
-           name().c_str());
+    } else {
+      // We are getting a removal tracker for the first time so register ourselves.
+      removal_tracker_ = removal_tracker;
+      removal_tracker_->RegisterNode(this, collection_, MakeComponentMoniker(), node_state_);
     }
   }
 
@@ -558,8 +557,6 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
       (node_state_ == NodeState::kPrestop && removal_set == RemovalSet::kPackage)) {
     LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
          MakeComponentMoniker().c_str(), State2String(node_state_));
-    if (should_register)
-      removal_tracker_->RegisterNode(this, collection_, MakeComponentMoniker(), node_state_);
     return;
   }
 
@@ -571,15 +568,13 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   } else {
     // Either removing kAll, or is package driver and removing kPackage.
     node_state_ = NodeState::kWaitingOnChildren;
-    if (!should_register && removal_tracker_) {
-      removal_tracker_->Notify(this, node_state_);
-    }
     // All children should be removed regardless as they block removal of this node.
     removal_set = RemovalSet::kAll;
   }
-  // Either way, propagate removal message to children
-  if (should_register) {
-    removal_tracker_->RegisterNode(this, collection_, MakeComponentMoniker(), node_state_);
+
+  // Propagate removal message to children
+  if (removal_tracker_) {
+    removal_tracker_->Notify(this, node_state_);
   }
 
   // Ask each of our children to remove themselves.
@@ -587,7 +582,7 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
     // We have to be careful here - Remove() could invalidate the iterator, so we increment the
     // iterator before we call Remove().
     LOGF(DEBUG, "Node: %s calling remove on child: %s", name().c_str(), (*it)->name().c_str());
-    auto child = it->get();
+    Node* child = it->get();
     ++it;
     child->Remove(removal_set, removal_tracker);
   }
