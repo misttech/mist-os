@@ -10,7 +10,7 @@
     ],
     program: {
         binary: "bin/direct-mode-bin",
-        args: [ "/pkg/bin/fuchsia_microbenchmarks" ],
+        args: [ "/pkg/bin/direct_mode_microbenchmarks" ],
         environ: [ "TEST_SUITE_LABEL=fuchsia.microbenchmarks.direct_mode" ],
         use_direct_vdso: "true",
     },

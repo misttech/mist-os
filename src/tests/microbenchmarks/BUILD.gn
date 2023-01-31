@@ -15,90 +15,115 @@ import("//zircon/vdso/vdso.gni")
 #
 # In principle this could be built for Mac too, but it may require
 # changes to build and run successfully on Mac.
-executable("bin") {
+
+fuchsia_microbenchmark_sources = [
+  "atomics.cc",
+  "clock_posix.cc",
+  "example.cc",
+  "filesystem.cc",
+  "main.cc",
+  "malloc.cc",
+  "memcpy.cc",
+  "null.cc",
+  "pthreads.cc",
+  "random_memcpy.cc",
+  "round_trips_futex.cc",
+  "round_trips_posix.cc",
+]
+
+if (is_linux) {
+  fuchsia_microbenchmark_sources += [
+    # The getpid() microbenchmark would work on Fuchsia, but it is
+    # not useful to run it on Fuchsia because Fuchsia's getpid()
+    # function does not return a real process ID.
+    "getpid.cc",
+    "process_spawn_posix.cc",
+  ]
+}
+
+if (is_fuchsia) {
+  fuchsia_microbenchmark_sources += [
+    "async_loop.cc",
+    "channels.cc",
+    "clock.cc",
+    "context_switch_overhead.cc",
+    "events.cc",
+    "fdio_spawn.cc",
+    "fifos.cc",
+    "get_info.cc",
+    "handle.cc",
+    "handle_creation.cc",
+    "inspect.cc",
+    "lazy_dir.cc",
+    "mem_alloc.cc",
+    "mmu.cc",
+    "mutex.cc",
+    "object_wait.cc",
+    "ports.cc",
+    "prng.cc",
+    "pseudo_dir.cc",
+    "round_trips.cc",
+    "sleep.cc",
+    "sockets.cc",
+    "streams.cc",
+    "threads.cc",
+    "timer.cc",
+    "tracing.cc",
+    "util.cc",
+    "vmar.cc",
+    "vmo.cc",
+  ]
+
+  if (!exclude_testonly_syscalls) {
+    fuchsia_microbenchmark_sources += [
+      # Uses `zx_syscall_test_*()`.
+      "syscalls.cc",
+    ]
+  }
+}
+
+fuchsia_microbenchmark_deps = [
+  "//sdk/lib/syslog/cpp",
+  "//src/lib/fxl",
+  "//zircon/system/ulib/fbl",
+  "//zircon/system/ulib/perftest",
+]
+
+if (is_fuchsia) {
+  fuchsia_microbenchmark_deps += [
+    ":fuchsia.zircon.benchmarks_hlcpp",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp_wire",
+    "//sdk/lib/fdio",
+    "//src/lib/fsl",
+    "//src/lib/storage/vfs/cpp",
+    "//src/zircon/lib/zircon",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+executable("fuchsia_microbenchmarks_bin") {
   output_name = "fuchsia_microbenchmarks"
   testonly = true
-  sources = [
-    "atomics.cc",
-    "clock_posix.cc",
-    "example.cc",
-    "filesystem.cc",
-    "main.cc",
-    "malloc.cc",
-    "memcpy.cc",
-    "null.cc",
-    "pthreads.cc",
-    "random_memcpy.cc",
-    "round_trips_futex.cc",
-    "round_trips_posix.cc",
-  ]
-  if (is_host) {
+  sources = fuchsia_microbenchmark_sources
+  if (is_fuchsia && !exclude_testonly_syscalls) {
     sources += [
-      # The getpid() microbenchmark would work on Fuchsia, but it is
-      # not useful to run it on Fuchsia because Fuchsia's getpid()
-      # function does not return a real process ID.
-      "getpid.cc",
-      "process_spawn_posix.cc",
+      # Uses `zx_restricted_*()` which is available in the 'next' vdso but
+      # not the 'direct' vdso.
+      "restricted_enter.cc",
     ]
   }
-  if (is_fuchsia) {
-    sources += [
-      "async_loop.cc",
-      "channels.cc",
-      "clock.cc",
-      "context_switch_overhead.cc",
-      "events.cc",
-      "fdio_spawn.cc",
-      "fifos.cc",
-      "get_info.cc",
-      "handle.cc",
-      "handle_creation.cc",
-      "inspect.cc",
-      "lazy_dir.cc",
-      "mem_alloc.cc",
-      "mmu.cc",
-      "mutex.cc",
-      "object_wait.cc",
-      "ports.cc",
-      "prng.cc",
-      "pseudo_dir.cc",
-      "round_trips.cc",
-      "sleep.cc",
-      "sockets.cc",
-      "streams.cc",
-      "threads.cc",
-      "timer.cc",
-      "tracing.cc",
-      "util.cc",
-      "vmar.cc",
-      "vmo.cc",
-    ]
 
-    if (!exclude_testonly_syscalls) {
-      # Uses `zx_syscall_test_*()`.
-      sources += [ "syscalls.cc" ]
-    }
-  }
-  deps = [
-    "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl",
-    "//zircon/system/ulib/fbl",
-  ]
-  if (is_fuchsia) {
-    deps += [
-      ":fuchsia.zircon.benchmarks_hlcpp",
-      "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp_wire",
-      "//sdk/lib/fdio",
-      "//src/lib/fsl",
-      "//src/lib/storage/vfs/cpp",
-      "//src/zircon/lib/zircon",
-      "//zircon/system/ulib/async-loop:async-loop-cpp",
-      "//zircon/system/ulib/async-loop:async-loop-default",
-      "//zircon/system/ulib/inspect",
-      "//zircon/system/ulib/zx",
-    ]
-  }
-  public_deps = [ "//zircon/system/ulib/perftest" ]
+  deps = fuchsia_microbenchmark_deps
+}
+
+executable("direct_mode_microbenchmarks_bin") {
+  output_name = "direct_mode_microbenchmarks"
+  testonly = true
+  sources = fuchsia_microbenchmark_sources
+  deps = fuchsia_microbenchmark_deps
 }
 
 # This is an executable that immediately exits when run.  This is used by the
@@ -136,6 +161,31 @@ executable("get_info_helper") {
   ]
 }
 
+if (is_fuchsia) {
+  # "Helper" executable used to implement the round_trips benchmarks on Fuchsia.
+  executable("round_trips_helper") {
+    output_name = "round_trips_helper"
+    testonly = true
+    sources = [
+      "main.cc",
+      "round_trips.cc",
+    ]
+    deps = [
+      ":fuchsia.zircon.benchmarks_hlcpp",
+      "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp_wire",
+      "//sdk/lib/fdio",
+      "//src/lib/fxl",
+      "//src/lib/storage/vfs/cpp",
+      "//src/zircon/lib/zircon",
+      "//zircon/system/ulib/async-loop:async-loop-cpp",
+      "//zircon/system/ulib/async-loop:async-loop-default",
+      "//zircon/system/ulib/inspect",
+      "//zircon/system/ulib/perftest",
+      "//zircon/system/ulib/zx",
+    ]
+  }
+}
+
 fidl("fuchsia.zircon.benchmarks") {
   testonly = true
   sources = [
@@ -151,10 +201,11 @@ fuchsia_unittest_package("fuchsia_microbenchmarks") {
   manifest = "meta/fuchsia_microbenchmarks.cml"
 
   deps = [
-    ":bin",
     ":context_switch_overhead_helper",
+    ":fuchsia_microbenchmarks_bin",
     ":get_info_helper",
     ":no_op_executable",
+    ":round_trips_helper",
   ]
 }
 
@@ -162,10 +213,11 @@ fuchsia_unittest_package("direct_mode_microbenchmarks") {
   manifest = "meta/direct_mode_microbenchmarks.cml"
 
   deps = [
-    ":bin",
     ":context_switch_overhead_helper",
+    ":direct_mode_microbenchmarks_bin",
     ":get_info_helper",
     ":no_op_executable",
+    ":round_trips_helper",
     "//src/lib/direct-mode:bin",
   ]
 
@@ -178,7 +230,7 @@ if (is_linux) {
   host_test("fuchsia_microbenchmarks_host") {
     binary_path = "$root_out_dir/fuchsia_microbenchmarks"
     deps = [
-      ":bin",
+      ":fuchsia_microbenchmarks_bin",
       ":runtime_deps",
     ]
   }
@@ -198,7 +250,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
   }
 
   starnix_host_test_component("starnix_microbenchmarks_component") {
-    test_label = ":bin"
+    test_label = ":fuchsia_microbenchmarks_bin"
     test_binary = "fuchsia_microbenchmarks"
 
     manifest = "meta/starnix_microbenchmarks.cml"

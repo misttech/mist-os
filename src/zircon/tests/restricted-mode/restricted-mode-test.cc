@@ -73,7 +73,7 @@ bounce:
   mov   %r11, %gs:0
 
 0:
-  syscall #99
+  syscall
 .globl bounce_post_syscall
 bounce_post_syscall:
   jmp 0b

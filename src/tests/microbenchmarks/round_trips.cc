@@ -164,29 +164,44 @@ class ThreadOrProcess {
     if (subprocess_) {
       // Join the process.
       ASSERT_OK(subprocess_.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr));
+      // Make sure it exited cleanly.
+      zx_info_process_t process_info;
+      ASSERT_OK(subprocess_.get_info(ZX_INFO_PROCESS, &process_info, sizeof(process_info), nullptr,
+                                     nullptr));
+      FX_CHECK(process_info.return_code == 0);
     }
   }
 
   void Launch(const char* func_name, std::vector<zx::handle>&& handles,
               ThreadOrProcessParams params) {
     if (params.multi_proc == MultiProcess) {
-      const char* executable_path = "/pkg/bin/fuchsia_microbenchmarks";
+      const char* executable_path = "/pkg/bin/round_trips_helper";
       std::string cpu_mask_arg = fxl::NumberToString(params.cpu_mask);
       const char* args[] = {executable_path, "--subprocess", func_name, cpu_mask_arg.c_str(),
                             nullptr};
-      size_t action_count = handles.size() + 1;
-      fdio_spawn_action_t actions[action_count];
+      std::vector<fdio_spawn_action_t> actions;
       for (uint32_t i = 0; i < handles.size(); ++i) {
-        actions[i].action = FDIO_SPAWN_ACTION_ADD_HANDLE;
-        actions[i].h.id = PA_HND(PA_USER0, i);
-        actions[i].h.handle = handles[i].release();
+        fdio_spawn_action_t action{
+            .action = FDIO_SPAWN_ACTION_ADD_HANDLE,
+            .h =
+                {
+                    .id = PA_HND(PA_USER0, i),
+                    .handle = handles[i].release(),
+                },
+        };
+        actions.push_back(action);
       }
-      actions[handles.size()].action = FDIO_SPAWN_ACTION_SET_NAME;
-      actions[handles.size()].name.data = "test-process";
+      actions.push_back(fdio_spawn_action_t{
+          .action = FDIO_SPAWN_ACTION_SET_NAME,
+          .name =
+              {
+                  .data = "test-process",
+              },
+      });
 
       char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
       if (fdio_spawn_etc(ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_ALL, executable_path, args, nullptr,
-                         action_count, actions, subprocess_.reset_and_get_address(),
+                         actions.size(), actions.data(), subprocess_.reset_and_get_address(),
                          err_msg) != ZX_OK) {
         FX_LOGS(FATAL) << "Subprocess launch failed: " << err_msg;
       }
