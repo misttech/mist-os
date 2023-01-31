@@ -1,8 +1,4 @@
-rdzhuang@google.com
-fmil@google.com
-jaeheon@google.com
-neelsa@google.com
-quiche@google.com
-kpozin@google.com
+rdzhuang@google.com # drivers
+file:/src/ui/lib/input_pipeline/OWNERS
 
 # Component: Zircon>PlatformDrivers
