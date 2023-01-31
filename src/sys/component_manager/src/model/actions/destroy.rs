@@ -9,7 +9,7 @@ use {
             ShutdownAction, StartAction,
         },
         component::{ComponentInstance, InstanceState, StartReason},
-        error::ModelError,
+        error::DestroyActionError,
     },
     async_trait::async_trait,
     futures::{
@@ -30,7 +30,7 @@ impl DestroyAction {
 
 #[async_trait]
 impl Action for DestroyAction {
-    type Output = Result<(), ModelError>;
+    type Output = Result<(), DestroyActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_destroy(component).await
     }
@@ -39,7 +39,7 @@ impl Action for DestroyAction {
     }
 }
 
-async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ModelError> {
+async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyActionError> {
     // Do nothing if already destroyed.
     {
         if let InstanceState::Destroyed = *component.lock_state().await {
@@ -55,7 +55,9 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ModelError
     // NOTE: This will recursively shut down the whole subtree. If this component has children,
     // we'll call DestroyChild on them which in turn will call Shutdown on the child. Because
     // the parent's subtree was shutdown, this shutdown is a no-op.
-    ActionSet::register(component.clone(), ShutdownAction::new()).await?;
+    ActionSet::register(component.clone(), ShutdownAction::new())
+        .await
+        .map_err(|e| DestroyActionError::ShutdownFailed { err: Box::new(e) })?;
 
     let nfs = {
         match *component.lock_state().await {
@@ -114,7 +116,9 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), ModelError
     Ok(())
 }
 
-fn ok_or_first_error(results: Vec<Result<(), ModelError>>) -> Result<(), ModelError> {
+fn ok_or_first_error(
+    results: Vec<Result<(), DestroyActionError>>,
+) -> Result<(), DestroyActionError> {
     results.into_iter().fold(Ok(()), |acc, r| acc.and_then(|_| r))
 }
 
@@ -850,7 +854,9 @@ pub mod tests {
             let mut actions = component_d.lock_actions().await;
             actions.mock_result(
                 ActionKey::Destroy,
-                Err(ModelError::unsupported("ouch")) as Result<(), ModelError>,
+                Err(DestroyActionError::InstanceNotFound {
+                    moniker: component_d.abs_moniker.clone(),
+                }) as Result<(), DestroyActionError>,
             );
         }
 

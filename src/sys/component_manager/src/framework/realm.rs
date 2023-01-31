@@ -12,9 +12,7 @@ use {
             model::Model,
         },
     },
-    ::routing::{
-        capability_source::InternalCapability, config::RuntimeConfig, error::ComponentInstanceError,
-    },
+    ::routing::{capability_source::InternalCapability, config::RuntimeConfig},
     anyhow::Error,
     async_trait::async_trait,
     cm_fidl_validator,
@@ -257,15 +255,9 @@ impl RealmCapabilityHost {
         child.collection.as_ref().ok_or(fcomponent::Error::InvalidArguments)?;
         let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fcomponent::Error::InvalidArguments)?;
-        component.remove_dynamic_child(&child_moniker).await.map_err(|e| match e {
-            ModelError::ComponentInstanceError {
-                err: ComponentInstanceError::InstanceNotFound { .. },
-            } => fcomponent::Error::InstanceNotFound,
-            ModelError::Unsupported { .. } => fcomponent::Error::Unsupported,
-            error => {
-                error!(%error, "remove_dynamic_child() failed");
-                fcomponent::Error::Internal
-            }
+        component.remove_dynamic_child(&child_moniker).await.map_err(|error| {
+            warn!(%error, ?child, "remove_dynamic_child() failed");
+            error.into()
         })?;
         Ok(())
     }

@@ -129,6 +129,11 @@ pub enum ModelError {
         #[from]
         err: StopActionError,
     },
+    #[error("error with destroy action: {err}")]
+    DestroyActionError {
+        #[from]
+        err: DestroyActionError,
+    },
 }
 
 impl ModelError {
@@ -561,15 +566,7 @@ pub enum StopActionError {
     #[error("failed to get parent instance")]
     GetParentFailed,
     #[error("failed to destroy dynamic children: {err}")]
-    DestroyDynamicChildrenFailed {
-        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
-        err: Box<ModelError>,
-    },
-    #[error("failed to destroy this single-run instance: {err}")]
-    SingleRunDestroyFailed {
-        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
-        err: Box<ModelError>,
-    },
+    DestroyDynamicChildrenFailed { err: DestroyActionError },
 }
 
 #[cfg(test)]
@@ -589,10 +586,6 @@ impl PartialEq for StopActionError {
             (
                 StopActionError::DestroyDynamicChildrenFailed { .. },
                 StopActionError::DestroyDynamicChildrenFailed { .. },
-            ) => true,
-            (
-                StopActionError::SingleRunDestroyFailed { .. },
-                StopActionError::SingleRunDestroyFailed { .. },
             ) => true,
             _ => false,
         }
@@ -614,11 +607,35 @@ impl PartialEq for StopActionError {
                 StopActionError::DestroyDynamicChildrenFailed { .. },
                 StopActionError::DestroyDynamicChildrenFailed { .. },
             ) => false,
-            (
-                StopActionError::SingleRunDestroyFailed { .. },
-                StopActionError::SingleRunDestroyFailed { .. },
-            ) => false,
             _ => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum DestroyActionError {
+    #[error("failed to discover component: {}", err)]
+    DiscoverActionError {
+        #[from]
+        err: DiscoverActionError,
+    },
+    #[error("failed to shutdown component: {}", err)]
+    ShutdownFailed {
+        #[source]
+        err: Box<StopActionError>,
+    },
+    #[error("could not find instance with moniker {}", moniker)]
+    InstanceNotFound { moniker: AbsoluteMoniker },
+    #[error("instance with moniker {} is not resolved", moniker)]
+    InstanceNotResolved { moniker: AbsoluteMoniker },
+}
+
+// This is implemented for fuchsia.component.Realm protocol.
+impl Into<fcomponent::Error> for DestroyActionError {
+    fn into(self) -> fcomponent::Error {
+        match self {
+            DestroyActionError::InstanceNotFound { .. } => fcomponent::Error::InstanceNotFound,
+            _ => fcomponent::Error::Internal,
         }
     }
 }

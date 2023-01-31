@@ -6,7 +6,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet, DestroyAction},
         component::{ComponentInstance, InstanceState},
-        error::ModelError,
+        error::DestroyActionError,
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
@@ -29,7 +29,7 @@ impl DestroyChildAction {
 
 #[async_trait]
 impl Action for DestroyChildAction {
-    type Output = Result<(), ModelError>;
+    type Output = Result<(), DestroyActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_destroy_child(component, &self.moniker, self.incarnation).await
     }
@@ -42,7 +42,7 @@ async fn do_destroy_child(
     component: &Arc<ComponentInstance>,
     moniker: &ChildMoniker,
     incarnation: IncarnationId,
-) -> Result<(), ModelError> {
+) -> Result<(), DestroyActionError> {
     // The child may not exist or may already be deleted by a previous DeleteChild action.
     let child = {
         let state = component.lock_state().await;

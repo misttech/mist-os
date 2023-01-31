@@ -11,9 +11,9 @@ use {
         context::ModelContext,
         environment::Environment,
         error::{
-            AddChildError, AddDynamicChildError, DiscoverActionError, DynamicOfferError,
-            ModelError, OpenExposedDirError, RebootError, ResolveActionError, StartActionError,
-            StopActionError, StructuredConfigError,
+            AddChildError, AddDynamicChildError, DestroyActionError, DiscoverActionError,
+            DynamicOfferError, ModelError, OpenExposedDirError, RebootError, ResolveActionError,
+            StartActionError, StopActionError, StructuredConfigError,
         },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
@@ -730,14 +730,22 @@ impl ComponentInstance {
     pub async fn remove_dynamic_child(
         self: &Arc<Self>,
         child_moniker: &ChildMoniker,
-    ) -> Result<(), ModelError> {
+    ) -> Result<(), DestroyActionError> {
         let incarnation = {
-            let state = self.lock_resolved_state().await?;
+            let state = self.lock_state().await;
+            let state = match *state {
+                InstanceState::Resolved(ref s) => s,
+                _ => {
+                    return Err(DestroyActionError::InstanceNotResolved {
+                        moniker: self.abs_moniker.clone(),
+                    })
+                }
+            };
             if let Some(c) = state.get_child(&child_moniker) {
                 c.incarnation_id()
             } else {
                 let moniker = self.abs_moniker.child(child_moniker.clone());
-                return Err(ModelError::instance_not_found(moniker));
+                return Err(DestroyActionError::InstanceNotFound { moniker });
             }
         };
         ActionSet::register(
@@ -841,7 +849,7 @@ impl ComponentInstance {
         // When the component is stopped, any child instances in collections must be destroyed.
         self.destroy_dynamic_children()
             .await
-            .map_err(|e| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(e) })?;
+            .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err })?;
         if was_running {
             let event = Event::new(self, EventPayload::Stopped { status: stop_result });
             self.hooks.dispatch(&event).await;
@@ -854,8 +862,7 @@ impl ComponentInstance {
                     self.child_moniker().expect("child is root instance?"),
                     self.incarnation_id(),
                 )
-                .await
-                .map_err(|e| StopActionError::SingleRunDestroyFailed { err: Box::new(e) })?;
+                .await;
         }
         Ok(())
     }
@@ -864,14 +871,14 @@ impl ComponentInstance {
         self: &Arc<Self>,
         child_moniker: &ChildMoniker,
         incarnation: IncarnationId,
-    ) -> Result<(), ModelError> {
+    ) {
         let single_run_colls = {
             let state = self.lock_state().await;
             let state = match *state {
                 InstanceState::Resolved(ref s) => s,
                 _ => {
                     // Component instance was not resolved, so no dynamic children.
-                    return Ok(());
+                    return;
                 }
             };
             let single_run_colls: HashSet<_> = state
@@ -890,30 +897,28 @@ impl ComponentInstance {
                 let component = self.clone();
                 let child_moniker = child_moniker.clone();
                 fasync::Task::spawn(async move {
-                    match ActionSet::register(
+                    if let Err(error) = ActionSet::register(
                         component.clone(),
-                        DestroyChildAction::new(child_moniker, incarnation),
+                        DestroyChildAction::new(child_moniker.clone(), incarnation),
                     )
                     .await
                     {
-                        Ok(_) => {}
-                        Err(e) => {
-                            warn!(
-                                "component {} was not destroyed when stopped in single run collection: {}",
-                                component.abs_moniker, e
-                            );
-                        }
+                        let moniker = component.abs_moniker.child(child_moniker);
+                        warn!(
+                            %moniker,
+                            %error,
+                            "single-run component could not be destroyed",
+                        );
                     }
                 })
                 .detach();
             }
         }
-        Ok(())
     }
 
     /// Destroys this component instance.
     /// REQUIRES: All children have already been destroyed.
-    pub async fn destroy_instance(self: &Arc<Self>) -> Result<(), ModelError> {
+    pub async fn destroy_instance(self: &Arc<Self>) -> Result<(), DestroyActionError> {
         if self.persistent_storage {
             return Ok(());
         }
@@ -954,7 +959,7 @@ impl ComponentInstance {
     }
 
     /// Registers actions to destroy all dynamic children of collections belonging to this instance.
-    async fn destroy_dynamic_children(self: &Arc<Self>) -> Result<(), ModelError> {
+    async fn destroy_dynamic_children(self: &Arc<Self>) -> Result<(), DestroyActionError> {
         let moniker_incarnations: Vec<_> = {
             let state = self.lock_state().await;
             let state = match *state {

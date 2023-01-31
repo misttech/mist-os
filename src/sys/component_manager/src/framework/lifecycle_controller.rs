@@ -8,7 +8,7 @@ use {
     crate::model::{
         actions::{ActionSet, StopAction},
         component::{ComponentInstance, StartReason, WeakComponentInstance},
-        error::{ModelError, StartActionError},
+        error::{DestroyActionError, ModelError, StartActionError},
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         model::Model,
         storage::admin_protocol::StorageAdmin,
@@ -168,9 +168,7 @@ impl LifecycleController {
             .map_err(|_| fsys::DestroyError::BadChildRef)?;
 
         parent_component.remove_dynamic_child(&child_moniker).await.map_err(|e| match e {
-            ModelError::ComponentInstanceError {
-                err: ComponentInstanceError::InstanceNotFound { .. },
-            } => fsys::DestroyError::InstanceNotFound,
+            DestroyActionError::InstanceNotFound { .. } => fsys::DestroyError::InstanceNotFound,
             error => {
                 warn!(%parent_moniker, %child_moniker, %error, "failed to destroy dynamic child");
                 fsys::DestroyError::Internal
