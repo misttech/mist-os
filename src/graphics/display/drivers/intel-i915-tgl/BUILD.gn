@@ -126,6 +126,7 @@ test("intel-i915-tgl-test") {
     "registers-ddi-unittest.cc",
     "registers-dpll-unittest.cc",
     "registers-gmbus-unittest.cc",
+    "registers-pipe-scaler-unittest.cc",
     "registers-pipe-unittest.cc",
     "registers-transcoder-unittest.cc",
     "registers-typec-unittest.cc",

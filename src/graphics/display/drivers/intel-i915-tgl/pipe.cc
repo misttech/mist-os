@@ -16,6 +16,7 @@
 
 #include "src/graphics/display/drivers/intel-i915-tgl/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/poll-until.h"
+#include "src/graphics/display/drivers/intel-i915-tgl/registers-pipe-scaler.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/tiling.h"
@@ -257,10 +258,17 @@ void Pipe::ResetScaler() {
   // Note that Skylake / Kaby Lake doesn't have PS_CTRL_2_C documented in the
   // PRM, but experiments on Atlas (using Kaby Lake) shows that it does have
   // this scaler, so we use the same value across all generations.
+  //
+  // TODO(fxbug.dev/120328): Verify the existence of the scaler and document
+  // the experiment results.
   const int kScalerCount = 2;
 
-  for (int scaler_id = 0; scaler_id < kScalerCount; scaler_id++) {
-    pipe_regs.PipeScalerCtrl(scaler_id).ReadFrom(mmio_space_).set_enable(0).WriteTo(mmio_space_);
+  for (int scaler_num = 0; scaler_num < kScalerCount; scaler_num++) {
+    auto pipe_scaler_regs = pipe_regs.PipeScalerRegs(scaler_num);
+    pipe_scaler_regs.PipeScalerControlSkylake()
+        .ReadFrom(mmio_space_)
+        .set_is_enabled(false)
+        .WriteTo(mmio_space_);
   }
 }
 
@@ -470,9 +478,15 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
   for (unsigned i = 0; i < tgl_registers::kImagePlaneCount; i++) {
     pipe_regs.PlaneSurface(i).FromValue(regs.plane_surf[i]).WriteTo(mmio_space_);
   }
-  pipe_regs.PipeScalerWinSize(0).FromValue(regs.ps_win_sz[0]).WriteTo(mmio_space_);
+  pipe_regs.PipeScalerRegs(/* num= */ 0)
+      .PipeScalerWindowSize()
+      .FromValue(regs.ps_win_sz[0])
+      .WriteTo(mmio_space_);
   if (pipe_id_ != PipeId::PIPE_C) {
-    pipe_regs.PipeScalerWinSize(1).FromValue(regs.ps_win_sz[1]).WriteTo(mmio_space_);
+    pipe_regs.PipeScalerRegs(/* num= */ 1)
+        .PipeScalerWindowSize()
+        .FromValue(regs.ps_win_sz[1])
+        .WriteTo(mmio_space_);
   }
 }
 
@@ -529,38 +543,46 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     // If there's a scaler pointed at this plane, immediately disable it
     // in case there's nothing else that will claim it this frame.
     if (scaled_planes_[pipe_id()][plane_num]) {
-      uint32_t scaler_idx = scaled_planes_[pipe_id()][plane_num] - 1;
-      pipe_regs.PipeScalerCtrl(scaler_idx).ReadFrom(mmio_space_).set_enable(0).WriteTo(mmio_space_);
+      int scaler_num = scaled_planes_[pipe_id()][plane_num] - 1;
+      tgl_registers::PipeScalerRegs pipe_scaler_regs(pipe_id_, scaler_num);
+      pipe_scaler_regs.PipeScalerControlSkylake()
+          .ReadFrom(mmio_space_)
+          .set_is_enabled(false)
+          .WriteTo(mmio_space_);
       scaled_planes_[pipe_id()][plane_num] = 0;
-      regs->ps_win_sz[scaler_idx] = 0;
+      regs->ps_win_sz[scaler_num] = 0;
     }
   } else {
     pipe_regs.PlanePosition(plane_num).FromValue(0).WriteTo(mmio_space_);
 
-    auto ps_ctrl = pipe_regs.PipeScalerCtrl(*scaler_1_claimed).ReadFrom(mmio_space_);
-    ps_ctrl.set_mode(ps_ctrl.kDynamic);
+    int scaler_num = *scaler_1_claimed ? 1 : 0;
+    tgl_registers::PipeScalerRegs pipe_scaler_regs(pipe_id_, scaler_num);
+
+    auto ps_ctrl = pipe_scaler_regs.PipeScalerControlSkylake().ReadFrom(mmio_space_);
+    ps_ctrl.set_mode(tgl_registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
     if (platform_ != tgl_registers::Platform::kTigerLake) {
       // The mode bits are different in Tiger Lake.
       if (primary->src_frame.width > 2048) {
-        float max_dynamic_height = static_cast<float>(plane_height) *
-                                   tgl_registers::PipeScalerCtrl::kDynamicMaxVerticalRatio2049;
+        float max_dynamic_height =
+            static_cast<float>(plane_height) *
+            tgl_registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
         if (static_cast<uint32_t>(max_dynamic_height) < primary->dest_frame.height) {
           // TODO(stevensd): This misses some cases where 7x5 can be used.
-          ps_ctrl.set_enable(ps_ctrl.k7x5);
+          ps_ctrl.set_mode(tgl_registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
         }
       }
     }
 
-    ps_ctrl.set_binding(plane_num + 1);
-    ps_ctrl.set_enable(1);
+    ps_ctrl.set_scaled_plane_index(plane_num + 1);
+    ps_ctrl.set_is_enabled(1);
     ps_ctrl.WriteTo(mmio_space_);
 
-    auto ps_win_pos = pipe_regs.PipeScalerWinPosition(*scaler_1_claimed).FromValue(0);
-    ps_win_pos.set_x_pos(primary->dest_frame.x_pos);
-    ps_win_pos.set_x_pos(primary->dest_frame.y_pos);
+    auto ps_win_pos = pipe_scaler_regs.PipeScalerWindowPosition().FromValue(0);
+    ps_win_pos.set_x_position(primary->dest_frame.x_pos);
+    ps_win_pos.set_x_position(primary->dest_frame.y_pos);
     ps_win_pos.WriteTo(mmio_space_);
 
-    auto ps_win_size = pipe_regs.PipeScalerWinSize(*scaler_1_claimed).FromValue(0);
+    auto ps_win_size = pipe_scaler_regs.PipeScalerWindowSize().FromValue(0);
     ps_win_size.set_x_size(primary->dest_frame.width);
     ps_win_size.set_y_size(primary->dest_frame.height);
     regs->ps_win_sz[*scaler_1_claimed] = ps_win_size.reg_value();

@@ -56,6 +56,7 @@
 #include "src/graphics/display/drivers/intel-i915-tgl/power.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers-dpll.h"
+#include "src/graphics/display/drivers/intel-i915-tgl/registers-pipe-scaler.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers.h"
@@ -430,13 +431,21 @@ bool Controller::BringUpDisplayEngine(bool resume) {
 
     tgl_registers::PipeRegs pipe_regs(pipe->pipe_id());
 
-    // Disable the scalers (double buffered on PipeScalerWinSize), since
+    // Disable the scalers (double buffered on PipeScalerWindowSize), since
     // we don't know what state they are in at boot.
-    pipe_regs.PipeScalerCtrl(0).ReadFrom(mmio_space()).set_enable(0).WriteTo(mmio_space());
-    pipe_regs.PipeScalerWinSize(0).ReadFrom(mmio_space()).WriteTo(mmio_space());
+    auto pipe_scaler_0_regs = tgl_registers::PipeScalerRegs(pipe->pipe_id(), 0);
+    pipe_scaler_0_regs.PipeScalerControlSkylake()
+        .ReadFrom(mmio_space())
+        .set_is_enabled(0)
+        .WriteTo(mmio_space());
+    pipe_scaler_0_regs.PipeScalerWindowSize().ReadFrom(mmio_space()).WriteTo(mmio_space());
     if (pipe->pipe_id() != PipeId::PIPE_C) {
-      pipe_regs.PipeScalerCtrl(1).ReadFrom(mmio_space()).set_enable(0).WriteTo(mmio_space());
-      pipe_regs.PipeScalerWinSize(1).ReadFrom(mmio_space()).WriteTo(mmio_space());
+      auto pipe_scaler_1_regs = tgl_registers::PipeScalerRegs(pipe->pipe_id(), 1);
+      pipe_scaler_1_regs.PipeScalerControlSkylake()
+          .ReadFrom(mmio_space())
+          .set_is_enabled(0)
+          .WriteTo(mmio_space());
+      pipe_scaler_1_regs.PipeScalerWindowSize().ReadFrom(mmio_space()).WriteTo(mmio_space());
     }
 
     // Disable the cursor watermark
@@ -1546,14 +1555,14 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
           }
 
           if (primary->dest_frame.width != src_width || primary->dest_frame.height != src_height) {
-            float ratio = tgl_registers::PipeScalerCtrl::k7x5MaxRatio;
+            float ratio = tgl_registers::PipeScalerControlSkylake::k7x5MaxRatio;
             uint32_t max_width = static_cast<uint32_t>(static_cast<float>(src_width) * ratio);
             uint32_t max_height = static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
             uint32_t scalers_needed = 1;
             // The 7x5 scaler (i.e. 2 scaler resources) is required if the src width is
             // >2048 and the required vertical scaling is greater than 1.99.
             if (primary->src_frame.width > 2048) {
-              float ratio = tgl_registers::PipeScalerCtrl::kDynamicMaxVerticalRatio2049;
+              float ratio = tgl_registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
               uint32_t max_dynamic_height =
                   static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
               if (max_dynamic_height < primary->dest_frame.height) {
@@ -1566,11 +1575,11 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
             // Verify that the required scaling ratio isn't too large
             bool using_c = pipe_alloc[PipeId::PIPE_C] == display->id();
             if ((total_scalers_needed + scalers_needed) >
-                    (using_c ? tgl_registers::PipeScalerCtrl::kPipeCScalersAvailable
-                             : tgl_registers::PipeScalerCtrl::kPipeABScalersAvailable) ||
-                src_width > tgl_registers::PipeScalerCtrl::kMaxSrcWidthPx ||
-                src_width < tgl_registers::PipeScalerCtrl::kMinSrcSizePx ||
-                src_height < tgl_registers::PipeScalerCtrl::kMinSrcSizePx ||
+                    (using_c ? tgl_registers::PipeScalerControlSkylake::kPipeCScalersAvailable
+                             : tgl_registers::PipeScalerControlSkylake::kPipeABScalersAvailable) ||
+                src_width > tgl_registers::PipeScalerControlSkylake::kMaxSrcWidthPx ||
+                src_width < tgl_registers::PipeScalerControlSkylake::kMinSrcSizePx ||
+                src_height < tgl_registers::PipeScalerControlSkylake::kMinSrcSizePx ||
                 max_width < primary->dest_frame.width || max_height < primary->dest_frame.height) {
               layer_cfg_result[i][j] |= CLIENT_FRAME_SCALE;
             } else {

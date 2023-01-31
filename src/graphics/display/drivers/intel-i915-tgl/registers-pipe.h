@@ -14,6 +14,7 @@
 #include <hwreg/bitfields.h>
 
 #include "src/graphics/display/drivers/intel-i915-tgl/hardware-common.h"
+#include "src/graphics/display/drivers/intel-i915-tgl/registers-pipe-scaler.h"
 
 namespace tgl_registers {
 
@@ -729,54 +730,6 @@ class PlanePosition : public hwreg::RegisterBase<PlanePosition, uint32_t> {
   DEF_FIELD(12, 0, x_pos);
 };
 
-// PS_CTRL
-class PipeScalerCtrl : public hwreg::RegisterBase<PipeScalerCtrl, uint32_t> {
- public:
-  static constexpr uint32_t kBaseAddr = 0x68180;
-
-  DEF_BIT(31, enable);
-  DEF_FIELD(29, 28, mode);
-  static constexpr uint32_t kDynamic = 0;
-  static constexpr uint32_t k7x5 = 1;
-
-  DEF_FIELD(27, 25, binding);
-  static constexpr uint32_t kPipeScaler = 0;
-  static constexpr uint32_t kPlane1 = 1;
-  static constexpr uint32_t kPlane2 = 2;
-  static constexpr uint32_t kPlane3 = 3;
-
-  DEF_FIELD(24, 23, filter_select);
-  static constexpr uint32_t kMedium = 0;
-  static constexpr uint32_t kEdgeEnhance = 2;
-  static constexpr uint32_t kBilienar = 3;
-
-  static constexpr uint32_t kMinSrcSizePx = 8;
-  static constexpr uint32_t kMaxSrcWidthPx = 4096;
-  static constexpr uint32_t kPipeABScalersAvailable = 2;
-  static constexpr uint32_t kPipeCScalersAvailable = 1;
-  static constexpr float k7x5MaxRatio = 2.99f;
-  static constexpr float kDynamicMaxRatio = 2.99f;
-  static constexpr float kDynamicMaxVerticalRatio2049 = 1.99f;
-};
-
-// PS_WIN_POS
-class PipeScalerWinPosition : public hwreg::RegisterBase<PipeScalerWinPosition, uint32_t> {
- public:
-  static constexpr uint32_t kBaseAddr = 0x68170;
-
-  DEF_FIELD(28, 16, x_pos);
-  DEF_FIELD(12, 0, y_pos);
-};
-
-// PS_WIN_SIZE
-class PipeScalerWinSize : public hwreg::RegisterBase<PipeScalerWinSize, uint32_t> {
- public:
-  static constexpr uint32_t kBaseAddr = 0x68174;
-
-  DEF_FIELD(29, 16, x_size);
-  DEF_FIELD(12, 0, y_size);
-};
-
 // DE_PIPE_INTERRUPT (Display Engine Pipe Interrupts)
 //
 // Tiger Lake: IHD-OS-TGL-Vol 2c-12.21 Part 1 pages 361-364
@@ -950,24 +903,13 @@ class PipeRegs {
     return GetPlaneReg<tgl_registers::PlaneKeyMax>(plane_num);
   }
 
-  hwreg::RegisterAddr<tgl_registers::PipeScalerCtrl> PipeScalerCtrl(int num) {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerCtrl>(PipeScalerCtrl::kBaseAddr +
-                                                              0x800 * pipe_id_ + num * 0x100);
-  }
-
-  hwreg::RegisterAddr<tgl_registers::PipeScalerWinPosition> PipeScalerWinPosition(int num) {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerWinPosition>(
-        PipeScalerWinPosition::kBaseAddr + 0x800 * pipe_id_ + num * 0x100);
-  }
-
-  hwreg::RegisterAddr<tgl_registers::PipeScalerWinSize> PipeScalerWinSize(int num) {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerWinSize>(PipeScalerWinSize::kBaseAddr +
-                                                                 0x800 * pipe_id_ + num * 0x100);
-  }
-
   hwreg::RegisterAddr<tgl_registers::PipeInterrupt> PipeInterrupt(InterruptRegister register_type) {
     return hwreg::RegisterAddr<tgl_registers::PipeInterrupt>(static_cast<uint32_t>(register_type) +
                                                              0x10 * pipe_id_);
+  }
+
+  PipeScalerRegs PipeScalerRegs(int scaler_index) {
+    return tgl_registers::PipeScalerRegs(pipe_id_, scaler_index);
   }
 
   hwreg::RegisterAddr<tgl_registers::CursorBase> CursorBase() {
