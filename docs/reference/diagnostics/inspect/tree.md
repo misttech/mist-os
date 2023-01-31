@@ -203,7 +203,7 @@ directory to the framework. This typically looks as follows:
     capabilities: [
         {
             directory: "diagnostics",
-            rights: [ "r*" ],
+            rights: [ "connect" ],
             path: "/diagnostics",
         },
     ],

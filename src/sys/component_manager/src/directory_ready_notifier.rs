@@ -252,7 +252,11 @@ impl DirectoryReadyNotifier {
         let (node, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         outgoing_dir
             .open(
-                rights.into_legacy() | fio::OpenFlags::DESCRIBE,
+                // TODO(fxbug.dev/118292): remove need of WRITABLE for the diagnostics directory.
+                rights.into_legacy()
+                    | fio::OpenFlags::DESCRIBE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::RIGHT_READABLE,
                 fio::MODE_TYPE_DIRECTORY,
                 &canonicalized_path,
                 ServerEnd::new(server_end.into_channel()),

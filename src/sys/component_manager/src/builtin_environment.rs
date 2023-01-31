@@ -1101,7 +1101,7 @@ impl BuiltinEnvironment {
 
         let (node, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         service_fs_proxy.open(
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             fio::MODE_TYPE_DIRECTORY,
             "diagnostics",
             ServerEnd::new(server_end.into_channel()),
