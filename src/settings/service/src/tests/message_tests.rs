@@ -809,44 +809,6 @@ async fn test_broker_filter_audience_address() {
 }
 
 #[fuchsia::test(allow_stalls = false)]
-async fn test_broker_filter_author() {
-    // Prepare a message hub with a sender, broker, and target.
-    let delegate = test::MessageHub::create();
-
-    // Messenger to send targeted message.
-    let author_address = crate::Address::Test(1);
-    let (messenger, _) = delegate
-        .create(MessengerType::Addressable(author_address))
-        .await
-        .expect("messenger should be created");
-
-    // Receptor to receive targeted message.
-    let target_address = crate::Address::Test(2);
-    let (_, mut receptor) = delegate
-        .create(MessengerType::Addressable(target_address))
-        .await
-        .expect("target receptor should be created");
-
-    // Filter to target only messages with a particular author.
-    let filter = filter::Builder::single(filter::Condition::Author(
-        crate::message::base::Signature::Address(author_address),
-    ));
-
-    // Broker that should only target messages for a given author.
-    let (_, mut broker_receptor) = delegate
-        .create(MessengerType::Broker(Some(filter)))
-        .await
-        .expect("broker should be created");
-
-    // Send targeted message.
-    messenger.message(ORIGINAL.clone(), Audience::Address(target_address)).ack();
-    // Ensure broker gets message.
-    verify_payload(ORIGINAL.clone(), &mut broker_receptor, None).await;
-    // Ensure receptor gets message.
-    verify_payload(ORIGINAL.clone(), &mut receptor, None).await;
-}
-
-#[fuchsia::test(allow_stalls = false)]
 async fn test_broker_filter_custom() {
     // Prepare a message hub with a sender, broker, and target.
     let delegate = test::MessageHub::create();
