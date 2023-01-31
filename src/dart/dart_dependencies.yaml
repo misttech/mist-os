@@ -4,6 +4,7 @@
 
 name: modules
 dependencies:
+  _discoveryapis_commons: ^1.0.4
   built_collection: ^5.1.1
   built_value: ^8.4.2
   checked_yaml: ^2.0.1
@@ -13,6 +14,9 @@ dependencies:
   flutter_image: ^4.1.4
   flutter_staggered_grid_view: ^0.6.2
   flutter_svg: ^1.1.6
+  gcloud: ^0.8.7
+  googleapis: ^9.2.0
+  googleapis_auth: ^1.3.1
   grpc: ^3.1.0
   html_unescape: ^2.0.0
   image: ^3.2.2
@@ -37,11 +41,7 @@ dependencies:
 # optin to assist with the flutter-with-deps roller in rolling successfully, in
 # scenarios where that version mismatch isn't really due to API incompatibility.
 pinned_dependencies:
-  _discoveryapis_commons: ^1.0.4
   flutter_mobx: ^2.0.6+5
-  gcloud: ^0.8.7 # gcloud is needed by VP9 decode conformance tests
-  googleapis: ^9.2.0
-  googleapis_auth: ^1.3.1
   mobx: ^2.1.3
   mobx_codegen: ^2.1.1
   protobuf: ^2.1.0
