@@ -120,7 +120,7 @@ TEST_F(NvmeTest, BasicTest) {
   CheckBooleanProperty(controller->node(), "volatile_write_cache_enabled", true);
 }
 
-TEST_F(NvmeTest, NamespaceBlockSize) {
+TEST_F(NvmeTest, NamespaceBlockInfo) {
   fake_nvme::FakeNamespace ns;
   controller_.AddNamespace(1, ns);
   ASSERT_NO_FATAL_FAILURE(RunInit());
@@ -137,8 +137,9 @@ TEST_F(NvmeTest, NamespaceBlockSize) {
   block_info_t info;
   uint64_t op_size;
   client.Query(&info, &op_size);
-  ASSERT_EQ(512, info.block_size);
-  ASSERT_EQ(1024, info.block_count);
+  EXPECT_EQ(512, info.block_size);
+  EXPECT_EQ(1024, info.block_count);
+  EXPECT_TRUE(info.flags & BLOCK_FLAG_FUA_SUPPORT);
 }
 
 TEST_F(NvmeTest, NamespaceReadTest) {

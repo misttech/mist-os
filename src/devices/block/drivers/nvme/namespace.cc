@@ -259,6 +259,7 @@ zx_status_t Namespace::Init() {
 
   auto ns = static_cast<IdentifyNvmeNamespace*>(mapper.start());
 
+  block_info_.flags |= BLOCK_FLAG_FUA_SUPPORT;
   block_info_.block_count = ns->n_sze;
   auto& fmt = ns->lba_formats[ns->lba_format_index()];
   block_info_.block_size = fmt.lba_data_size_bytes();
