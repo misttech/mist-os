@@ -146,8 +146,6 @@ pub mod filter {
         /// Matches on a custom closure that may evaluate the sent message.
         #[allow(clippy::type_complexity)]
         Custom(Arc<dyn Fn(&Message) -> bool + Send + Sync>),
-        /// Matches on another filter and its conditions.
-        Filter(Filter),
     }
 
     /// We must implement Debug since the `Condition::Custom` does not provide
@@ -158,42 +156,20 @@ pub mod filter {
                 Condition::Audience(audience) => format!("audience:{audience:?}"),
                 Condition::Author(signature) => format!("author:{signature:?}"),
                 Condition::Custom(_) => "custom".to_string(),
-                Condition::Filter(filter) => format!("filter:{filter:?}"),
             };
 
             write!(f, "Condition: {condition:?}")
         }
     }
 
-    /// `Conjugation` dictates how multiple conditions are combined to determine
-    /// a match.
-    #[derive(Clone, Debug, PartialEq)]
-    pub enum Conjugation {
-        /// All conditions must match.
-        All,
-        /// Any condition may declare a match.
-        Any,
-    }
-
     /// `Builder` provides a convenient way to construct a [`Filter`] based on
     /// a number of conditions.
-    pub struct Builder {
-        conjugation: Conjugation,
-        conditions: Vec<Condition>,
-    }
+    pub struct Builder {}
 
     impl Builder {
-        pub(crate) fn new(condition: Condition, conjugation: Conjugation) -> Self {
-            Self { conjugation, conditions: vec![condition] }
-        }
-
         /// Shorthand method to create a filter based on a single condition.
         pub(crate) fn single(condition: Condition) -> Filter {
-            Builder::new(condition, Conjugation::All).build()
-        }
-
-        pub(crate) fn build(self) -> Filter {
-            Filter { conjugation: self.conjugation, conditions: self.conditions }
+            Filter { condition }
         }
     }
 
@@ -201,31 +177,18 @@ pub mod filter {
     /// message should be directed to associated broker.
     #[derive(Clone, Debug)]
     pub struct Filter {
-        conjugation: Conjugation,
-        conditions: Vec<Condition>,
+        condition: Condition,
     }
 
     impl Filter {
         pub(crate) fn matches(&self, message: &Message) -> bool {
-            for condition in &self.conditions {
-                let match_found = match condition {
-                    Condition::Audience(audience) => matches!(
-                            message.get_type(),
-                            MessageType::Origin(target) if target == audience),
-                    Condition::Custom(check_fn) => (check_fn)(message),
-                    Condition::Filter(filter) => filter.matches(message),
-                    Condition::Author(signature) => message.get_author().eq(signature),
-                };
-                if match_found {
-                    if self.conjugation == Conjugation::Any {
-                        return true;
-                    }
-                } else if self.conjugation == Conjugation::All {
-                    return false;
-                }
+            match &self.condition {
+                Condition::Audience(audience) => matches!(
+                        message.get_type(),
+                        MessageType::Origin(target) if target == audience),
+                Condition::Custom(check_fn) => (check_fn)(message),
+                Condition::Author(signature) => message.get_author().eq(signature),
             }
-
-            self.conjugation == Conjugation::All
         }
     }
 }
