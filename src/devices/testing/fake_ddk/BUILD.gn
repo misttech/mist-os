@@ -91,7 +91,6 @@ zx_library("fake_ddk") {
     "//src/connectivity/ethernet/drivers/virtio/*",
     "//src/devices/block/drivers/aml-sdmmc/*",
     "//src/devices/block/drivers/sdhci/*",
-    "//src/devices/block/drivers/usb-mass-storage/*",
     "//src/devices/clock/drivers/as370-clk/*",
     "//src/devices/cpu/drivers/aml-cpu-legacy/*",
     "//src/devices/cpu/drivers/aml-cpu/*",

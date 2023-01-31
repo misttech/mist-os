@@ -72,15 +72,18 @@ test("ums-block") {
     "//sdk/lib/fit",
     "//src/devices/block/lib/scsi",
     "//src/devices/testing/fake-bti",
-
-    # TODO(fxb/115052): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/zxtest",
   ]
 }
 
 fuchsia_unittest_package("ums-block-test") {
   deps = [ ":ums-block" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 test("ums") {
@@ -96,7 +99,7 @@ test("ums") {
     "//sdk/lib/fit",
     "//src/devices/block/lib/scsi",
     "//src/devices/testing/fake-bti",
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
     "//zircon/system/ulib/zxtest",
   ]
@@ -104,6 +107,11 @@ test("ums") {
 
 fuchsia_unittest_package("ums-test") {
   deps = [ ":ums" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 fuchsia_test_component("ums-integration-component") {

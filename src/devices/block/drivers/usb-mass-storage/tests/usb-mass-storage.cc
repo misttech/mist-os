@@ -4,7 +4,6 @@
 
 #include "../usb-mass-storage.h"
 
-#include <lib/fake_ddk/fake_ddk.h>
 #include <zircon/process.h>
 
 #include <variant>
@@ -16,6 +15,7 @@
 #include <zxtest/zxtest.h>
 
 #include "../block.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
@@ -66,18 +66,10 @@ enum ErrorInjection {
 constexpr auto kInitialTagValue = 8;
 
 struct Context {
-  Context* parent;
-  ums::UmsBlockDevice* block_device;
-  ums::UsbMassStorageDevice* ums_device;
-  uint32_t desired_proto;
-  usb_protocol_t proto;
   fbl::DoublyLinkedList<fbl::RefPtr<Packet>> pending_packets;
   ums_csw_t csw;
   const usb_descriptor* descs;
   size_t desc_length;
-  size_t block_devs;
-  ums::UmsBlockDevice* devices[4];
-  std::unique_ptr<Context> block_ctxs[4];
   sync_completion_t completion;
   zx_status_t status;
   block_op_t* op;
@@ -91,66 +83,6 @@ struct Context {
   uint32_t tag = kInitialTagValue;
 };
 
-class Binder : public fake_ddk::Bind {
- public:
-  zx_status_t DeviceGetProtocol(const zx_device_t* device, uint32_t proto_id, void* protocol) {
-    auto context = reinterpret_cast<const Context*>(device);
-    if (proto_id == context->desired_proto) {
-      *reinterpret_cast<usb_protocol_t*>(protocol) = context->proto;
-      return ZX_OK;
-    }
-    return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
-  }
-  zx_status_t DeviceRemove(zx_device_t* device) {
-    Context* ctx = reinterpret_cast<Context*>(device);
-    if (ctx->parent) {
-      for (size_t i = 0; i < ctx->parent->block_devs; i++) {
-        ctx->parent->devices[i]->DdkRelease();
-      }
-    }
-    delete ctx;
-    return ZX_OK;
-  }
-
-  void DeviceInitReply(zx_device_t* device, zx_status_t status,
-                       const device_init_reply_args_t* args) {
-    init_reply_ = status;
-  }
-
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) {
-    Context* context = reinterpret_cast<Context*>(parent);
-
-    std::unique_ptr<Context> outctx = std::make_unique<Context>();
-    outctx->parent = context;
-    outctx->block_device = reinterpret_cast<ums::UmsBlockDevice*>(args->ctx);
-    *out = reinterpret_cast<zx_device_t*>(outctx.get());
-
-    // If |parent| has a parent, we are currently adding a UmsBlockDevice.
-    if (context->parent) {
-      Context* parent = context->parent;
-      parent->devices[parent->block_devs] = reinterpret_cast<ums::UmsBlockDevice*>(args->ctx);
-      // Save the context so it will be automatically freed when the test completes.
-      // Usually the real DDK would handle scheduling the unbind / remove tasks for the block
-      // device after the parent's (UsbMassStorageDevice) unbind reply.
-      parent->block_ctxs[parent->block_devs] = std::move(outctx);
-      if ((++parent->block_devs) == 3) {
-        sync_completion_signal(&parent->completion);
-      }
-    } else {
-      // We expect to get a |DeviceRemove| call (from replying to unbind) for the
-      // UsbMassStorageDevice.
-      [[maybe_unused]] auto ptr = outctx.release();
-    }
-    // This needs to come after setting |out|, as this sets the device's internal |zxdev_|,
-    // which needs to be present for the InitTxn.
-    if (args->ops->init) {
-      has_init_hook_ = true;
-      args->ops->init(args->ctx);
-    }
-    return ZX_OK;
-  }
-};
 static size_t GetDescriptorLength(void* ctx) {
   Context* context = reinterpret_cast<Context*>(ctx);
   return context->desc_length;
@@ -488,61 +420,86 @@ static void CompletionCallback(void* ctx, zx_status_t status, block_op_t* op) {
   sync_completion_signal(&context->completion);
 }
 
-static zx_status_t Setup(Context* context, ums::UsbMassStorageDevice* dev, usb_protocol_ops_t* ops,
-                         ErrorInjection inject_failure = NoFault) {
-  zx_status_t status = ZX_OK;
-  // Device paramaters for physical (parent) device
-  context->failure_mode = inject_failure;
-  context->parent = nullptr;
-  context->ums_device = dev;
-  context->block_devs = 0;
-  context->pending_write = 0;
-  context->csw.dCSWSignature = htole32(CSW_SIGNATURE);
-  context->csw.bmCSWStatus = CSW_SUCCESS;
-  context->descs = kDescriptors;
-  context->desc_length = sizeof(kDescriptors);
-  context->desired_proto = ZX_PROTOCOL_USB;
-  // Binding of ops to enable communication between the virtual device and UMS driver
+class UmsTest : public zxtest::Test {
+ public:
+  UmsTest() : parent_(MockDevice::FakeRootParent()) {}
 
-  context->proto.ctx = context;
-  context->proto.ops = ops;
-  ops->get_descriptors_length = GetDescriptorLength;
-  ops->get_descriptors = GetDescriptors;
-  ops->get_request_size = GetRequestSize;
-  ops->request_queue = RequestQueue;
-  ops->get_max_transfer_size = GetMaxTransferSize;
-  ops->control_in = ControlIn;
-  // Driver initialization
-  status = dev->Init(true /* is_test_mode */);
-  if (status != ZX_OK) {
-    return status;
+  void SetUp() override {
+    ops_.get_descriptors_length = GetDescriptorLength;
+    ops_.get_descriptors = GetDescriptors;
+    ops_.get_request_size = GetRequestSize;
+    ops_.request_queue = RequestQueue;
+    ops_.get_max_transfer_size = GetMaxTransferSize;
+    ops_.control_in = ControlIn;
+    parent_->AddProtocol(ZX_PROTOCOL_USB, &ops_, &context_);
+
+    context_.pending_write = 0;
+    context_.csw.dCSWSignature = htole32(CSW_SIGNATURE);
+    context_.csw.bmCSWStatus = CSW_SUCCESS;
+    context_.descs = kDescriptors;
+    context_.desc_length = sizeof(kDescriptors);
   }
-  sync_completion_wait(&context->completion, ZX_TIME_INFINITE);
-  sync_completion_reset(&context->completion);
-  return status;
-}
+
+  void TearDown() override {
+    ums_->UnbindOp();
+    EXPECT_EQ(ZX_OK, ums_->WaitUntilUnbindReplyCalled());
+    EXPECT_TRUE(ums_->UnbindReplyCalled());
+
+    ASSERT_FALSE(has_zero_duration_);
+
+    device_async_remove(dev_->zxdev());
+    mock_ddk::ReleaseFlaggedDevices(parent_.get());
+  }
+
+ protected:
+  Context context_;
+
+  MockDevice* ums_;
+  ums::UsbMassStorageDevice* dev_;
+
+  void Setup(ErrorInjection inject_failure = NoFault) {
+    // Device paramaters for physical (parent) device
+    context_.failure_mode = inject_failure;
+    // Driver initialization
+    auto timer = fbl::MakeRefCounted<FakeTimer>();
+    timer->set_timeout_handler([&](sync_completion_t* completion, zx_duration_t duration) {
+      if (duration == 0) {
+        has_zero_duration_ = true;
+      }
+      if (duration == ZX_TIME_INFINITE) {
+        return sync_completion_wait(completion, duration);
+      }
+      return ZX_OK;
+    });
+    auto dev = std::make_unique<ums::UsbMassStorageDevice>(std::move(timer), parent_.get());
+    ASSERT_OK(dev->Init(true /* is_test_mode */));
+    dev.release();
+    EXPECT_EQ(1, parent_->child_count());
+    ums_ = parent_->GetLatestChild();
+    dev_ = ums_->GetDeviceContext<ums::UsbMassStorageDevice>();
+    ums_->InitOp();
+    EXPECT_EQ(ZX_OK, ums_->WaitUntilInitReplyCalled());
+    EXPECT_TRUE(ums_->InitReplyCalled());
+
+    while (true) {
+      if (ums_->child_count() >= 3) {
+        break;
+      }
+      usleep(10);
+    }
+  }
+
+ private:
+  usb_protocol_ops_t ops_;
+  std::shared_ptr<zx_device> parent_;
+  bool has_zero_duration_ = false;
+};
 
 // UMS read test
 // This test validates the read functionality on multiple LUNS
 // of a USB mass storage device.
-TEST(Ums, TestRead) {
-  // Setup
-  Binder bind;
-  Context parent_dev;
-  usb_protocol_ops_t ops;
-  auto timer = fbl::MakeRefCounted<FakeTimer>();
-  bool has_zero_duration = false;
-  timer->set_timeout_handler([&](sync_completion_t* completion, zx_duration_t duration) {
-    if (duration == 0) {
-      has_zero_duration = true;
-    }
-    if (duration == ZX_TIME_INFINITE) {
-      return sync_completion_wait(completion, duration);
-    }
-    return ZX_OK;
-  });
-  ums::UsbMassStorageDevice dev(timer, reinterpret_cast<zx_device_t*>(&parent_dev));
-  Setup(&parent_dev, &dev, &ops);
+TEST_F(UmsTest, TestRead) {
+  Setup();
   zx_handle_t vmo;
   uint64_t size;
   zx_vaddr_t mapped;
@@ -553,54 +510,35 @@ TEST(Ums, TestRead) {
   EXPECT_EQ(ZX_OK, zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, &mapped),
             "Failed to map VMO");
   // Perform read transactions
-  for (uint32_t i = 0; i < parent_dev.block_devs; i++) {
+  uint32_t i = 0;
+  for (auto const& it : ums_->children()) {
     ums::Transaction transaction;
     transaction.op.command = BLOCK_OP_READ;
     transaction.op.rw.offset_dev = i;
     transaction.op.rw.length = (i + 1) * 65534;
     transaction.op.rw.offset_vmo = 0;
     transaction.op.rw.vmo = vmo;
-    transaction.cookie = &parent_dev;
-    transaction.dev = parent_dev.devices[i];
+    transaction.cookie = &context_;
+    transaction.dev = it->GetDeviceContext<ums::UmsBlockDevice>();
     transaction.completion_cb = CompletionCallback;
-    dev.QueueTransaction(&transaction);
-    sync_completion_wait(&parent_dev.completion, ZX_TIME_INFINITE);
-    sync_completion_reset(&parent_dev.completion);
+    dev_->QueueTransaction(&transaction);
+    sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
+    sync_completion_reset(&context_.completion);
     scsi::Opcode xfer_type = i == 0   ? scsi::Opcode::READ_10
                              : i == 3 ? scsi::Opcode::READ_16
                                       : scsi::Opcode::READ_12;
-    EXPECT_EQ(i, parent_dev.transfer_lun);
-    EXPECT_EQ(xfer_type, parent_dev.transfer_type);
-    EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), parent_dev.last_transfer->data.data(),
-                        parent_dev.last_transfer->data.size()));
+    EXPECT_EQ(i, context_.transfer_lun);
+    EXPECT_EQ(xfer_type, context_.transfer_type);
+    EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), context_.last_transfer->data.data(),
+                        context_.last_transfer->data.size()));
+    i++;
   }
-  // Unbind
-  dev.DdkUnbind(ddk::UnbindTxn(dev.zxdev()));
-  EXPECT_EQ(4, parent_dev.block_devs);
-  ASSERT_FALSE(has_zero_duration);
-  dev.Release();
 }
 
 // This test validates the write functionality on multiple LUNS
 // of a USB mass storage device.
-TEST(Ums, TestWrite) {
-  // Setup
-  Binder bind;
-  Context parent_dev;
-  usb_protocol_ops_t ops;
-  auto timer = fbl::MakeRefCounted<FakeTimer>();
-  bool has_zero_duration = false;
-  timer->set_timeout_handler([&](sync_completion_t* completion, zx_duration_t duration) {
-    if (duration == 0) {
-      has_zero_duration = true;
-    }
-    if (duration == ZX_TIME_INFINITE) {
-      return sync_completion_wait(completion, duration);
-    }
-    return ZX_OK;
-  });
-  ums::UsbMassStorageDevice dev(timer, reinterpret_cast<zx_device_t*>(&parent_dev));
-  Setup(&parent_dev, &dev, &ops);
+TEST_F(UmsTest, TestWrite) {
+  Setup();
   zx_handle_t vmo;
   uint64_t size;
   zx_vaddr_t mapped;
@@ -617,130 +555,56 @@ TEST(Ums, TestWrite) {
     reinterpret_cast<size_t*>(mapped)[i] = i;
   }
   // Perform write transactions
-  for (uint32_t i = 0; i < parent_dev.block_devs; i++) {
+  uint32_t i = 0;
+  for (auto const& it : ums_->children()) {
     ums::Transaction transaction;
     transaction.op.command = BLOCK_OP_WRITE;
     transaction.op.rw.offset_dev = i;
     transaction.op.rw.length = (i + 1) * 65534;
     transaction.op.rw.offset_vmo = 0;
     transaction.op.rw.vmo = vmo;
-    transaction.cookie = &parent_dev;
-    transaction.dev = parent_dev.devices[i];
+    transaction.cookie = &context_;
+    transaction.dev = it->GetDeviceContext<ums::UmsBlockDevice>();
     transaction.completion_cb = CompletionCallback;
-    dev.QueueTransaction(&transaction);
-    sync_completion_wait(&parent_dev.completion, ZX_TIME_INFINITE);
-    sync_completion_reset(&parent_dev.completion);
+    dev_->QueueTransaction(&transaction);
+    sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
+    sync_completion_reset(&context_.completion);
     scsi::Opcode xfer_type = i == 0   ? scsi::Opcode::WRITE_10
                              : i == 3 ? scsi::Opcode::WRITE_16
                                       : scsi::Opcode::WRITE_12;
-    EXPECT_EQ(i, parent_dev.transfer_lun);
-    EXPECT_EQ(xfer_type, parent_dev.transfer_type);
-    EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), parent_dev.last_transfer->data.data(),
+    EXPECT_EQ(i, context_.transfer_lun);
+    EXPECT_EQ(xfer_type, context_.transfer_type);
+    EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), context_.last_transfer->data.data(),
                         transaction.op.rw.length * kBlockSize));
+    i++;
   }
-  // Unbind
-  dev.DdkUnbind(ddk::UnbindTxn(dev.zxdev()));
-  ASSERT_FALSE(has_zero_duration);
-  EXPECT_EQ(4, parent_dev.block_devs);
-  dev.Release();
 }
 
 // This test validates the flush functionality on multiple LUNS
 // of a USB mass storage device.
-TEST(Ums, TestFlush) {
-  // Setup
-  Binder bind;
-  Context parent_dev;
-  auto timer = fbl::MakeRefCounted<FakeTimer>();
-  bool has_zero_duration = false;
-  timer->set_timeout_handler([&](sync_completion_t* completion, zx_duration_t duration) {
-    if (duration == 0) {
-      has_zero_duration = true;
-    }
-    // Wait for the sync_completion_t if given an infinite timeout
-    // (infinite timeouts are used for synchronization)
-    if (duration == ZX_TIME_INFINITE) {
-      return sync_completion_wait(completion, duration);
-    }
-    return ZX_OK;
-  });
-  ums::UsbMassStorageDevice dev(timer, reinterpret_cast<zx_device_t*>(&parent_dev));
-  usb_protocol_ops_t ops;
-  Setup(&parent_dev, &dev, &ops);
+TEST_F(UmsTest, TestFlush) {
+  Setup();
 
   // Perform flush transactions
-  for (uint32_t i = 0; i < parent_dev.block_devs; i++) {
+  uint32_t i = 0;
+  for (auto const& it : ums_->children()) {
     ums::Transaction transaction;
     transaction.op.command = BLOCK_OP_FLUSH;
-    transaction.cookie = &parent_dev;
-    transaction.dev = parent_dev.devices[i];
+    transaction.cookie = &context_;
+    transaction.dev = it->GetDeviceContext<ums::UmsBlockDevice>();
     transaction.completion_cb = CompletionCallback;
-    dev.QueueTransaction(&transaction);
-    sync_completion_wait(&parent_dev.completion, ZX_TIME_INFINITE);
-    sync_completion_reset(&parent_dev.completion);
+    dev_->QueueTransaction(&transaction);
+    sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
+    sync_completion_reset(&context_.completion);
     scsi::Opcode xfer_type = scsi::Opcode::SYNCHRONIZE_CACHE_10;
-    EXPECT_EQ(i, parent_dev.transfer_lun);
-    EXPECT_EQ(xfer_type, parent_dev.transfer_type);
+    EXPECT_EQ(i, context_.transfer_lun);
+    EXPECT_EQ(xfer_type, context_.transfer_type);
+    i++;
   }
-  // Unbind
-  dev.DdkUnbind(ddk::UnbindTxn(dev.zxdev()));
-  ASSERT_FALSE(has_zero_duration);
-  EXPECT_EQ(4, parent_dev.block_devs);
-  dev.Release();
 }
 
-TEST(Ums, CbwStallDoesNotFreezeDriver) {
-  // Setup
-  Binder bind;
-  Context parent_dev;
-  auto timer = fbl::MakeRefCounted<FakeTimer>();
-  bool has_zero_duration = false;
-  timer->set_timeout_handler([&](sync_completion_t* completion, zx_duration_t duration) {
-    if (duration == 0) {
-      has_zero_duration = true;
-    }
-    // Wait for the sync_completion_t if given an infinite timeout
-    // (infinite timeouts are used for synchronization)
-    if (duration == ZX_TIME_INFINITE) {
-      return sync_completion_wait(completion, duration);
-    }
-    return ZX_OK;
-  });
-  ums::UsbMassStorageDevice dev(timer, reinterpret_cast<zx_device_t*>(&parent_dev));
-  usb_protocol_ops_t ops;
-  Setup(&parent_dev, &dev, &ops, RejectCacheCbw);
-  // Unbind
-  dev.DdkUnbind(ddk::UnbindTxn(dev.zxdev()));
-  ASSERT_FALSE(has_zero_duration);
-  EXPECT_EQ(4, parent_dev.block_devs);
-  dev.Release();
-}
+TEST_F(UmsTest, CbwStallDoesNotFreezeDriver) { Setup(RejectCacheCbw); }
 
-TEST(Ums, DataStageStallDoesNotFreezeDriver) {
-  // Setup
-  Binder bind;
-  Context parent_dev;
-  auto timer = fbl::MakeRefCounted<FakeTimer>();
-  bool has_zero_duration = false;
-  timer->set_timeout_handler([&](sync_completion_t* completion, zx_duration_t duration) {
-    if (duration == 0) {
-      has_zero_duration = true;
-    }
-    // Wait for the sync_completion_t if given an infinite timeout
-    // (infinite timeouts are used for synchronization)
-    if (duration == ZX_TIME_INFINITE) {
-      return sync_completion_wait(completion, duration);
-    }
-    return ZX_OK;
-  });
-  ums::UsbMassStorageDevice dev(timer, reinterpret_cast<zx_device_t*>(&parent_dev));
-  usb_protocol_ops_t ops;
-  Setup(&parent_dev, &dev, &ops, RejectCacheDataStage);
-  // Unbind
-  dev.DdkUnbind(ddk::UnbindTxn(dev.zxdev()));
-  ASSERT_FALSE(has_zero_duration);
-  EXPECT_EQ(4, parent_dev.block_devs);
-  dev.Release();
-}
+TEST_F(UmsTest, DataStageStallDoesNotFreezeDriver) { Setup(RejectCacheDataStage); }
 
 }  // namespace
