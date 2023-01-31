@@ -104,18 +104,17 @@ void QueryLeadingFvmSlice(const TestDevice& device, bool fvm) {
   const fidl::WireResult parent_result =
       fidl::WireCall(device.parent_volume())
           ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(start_slices));
+  ASSERT_OK(parent_result.status());
+  const fidl::WireResponse parent_response = parent_result.value();
 
   const fidl::WireResult zxcrypt_result =
       fidl::WireCall(device.zxcrypt_volume())
           ->QuerySlices(fidl::VectorView<uint64_t>::FromExternal(start_slices));
+  ASSERT_OK(zxcrypt_result.status());
+  const fidl::WireResponse zxcrypt_response = zxcrypt_result.value();
 
   if (fvm) {
-    ASSERT_OK(parent_result.status());
-    const fidl::WireResponse parent_response = parent_result.value();
     ASSERT_OK(parent_response.status);
-
-    ASSERT_OK(zxcrypt_result.status());
-    const fidl::WireResponse zxcrypt_response = zxcrypt_result.value();
     ASSERT_OK(zxcrypt_response.status);
 
     // Query zxcrypt about the slices, which should omit those reserved.
@@ -131,13 +130,7 @@ void QueryLeadingFvmSlice(const TestDevice& device, bool fvm) {
     EXPECT_EQ(parent_response.response[0].count,
               zxcrypt_response.response[0].count + reserved_slices.value());
   } else {
-    // Non-FVM parent devices will close the connection upon receiving FVM requests.
-    ASSERT_STATUS(parent_result.status(), ZX_ERR_PEER_CLOSED);
-
-    // zxcrypt always supports the FVM protocol, but returns ERR_NOT_SUPPORTED if not
-    // sitting atop an FVM driver.
-    ASSERT_OK(zxcrypt_result.status());
-    const fidl::WireResponse zxcrypt_response = zxcrypt_result.value();
+    ASSERT_STATUS(parent_response.status, ZX_ERR_NOT_SUPPORTED);
     ASSERT_STATUS(zxcrypt_response.status, ZX_ERR_NOT_SUPPORTED);
   }
 }

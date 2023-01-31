@@ -48,7 +48,8 @@ static uint64_t number(const char* str) {
   return m * n;
 }
 
-static zx::duration iotime_posix(int is_read, int fd, size_t total_io_size, size_t buffer_size) {
+static zx::duration iotime_posix(int is_read, fbl::unique_fd fd, size_t total_io_size,
+                                 size_t buffer_size) {
   std::unique_ptr<unsigned char[]> buffer(new unsigned char[buffer_size]);
   if (buffer.get() == nullptr) {
     fprintf(stderr, "error: out of memory\n");
@@ -60,8 +61,8 @@ static zx::duration iotime_posix(int is_read, int fd, size_t total_io_size, size
   const char* fn_name = is_read ? "read" : "write";
   while (bytes_remaining > 0) {
     size_t transfer_size = std::min(buffer_size, bytes_remaining);
-    ssize_t r =
-        is_read ? read(fd, buffer.get(), transfer_size) : write(fd, buffer.get(), transfer_size);
+    ssize_t r = is_read ? read(fd.get(), buffer.get(), transfer_size)
+                        : write(fd.get(), buffer.get(), transfer_size);
     if (r < 0) {
       fprintf(stderr, "error: %s() error %d\n", fn_name, errno);
       return zx::duration::infinite();
@@ -77,7 +78,8 @@ static zx::duration iotime_posix(int is_read, int fd, size_t total_io_size, size
   return t1 - t0;
 }
 
-static zx::duration iotime_block(int is_read, int fd, size_t total_io_size, size_t buffer_size) {
+static zx::duration iotime_block(int is_read, fbl::unique_fd fd, size_t total_io_size,
+                                 size_t buffer_size) {
   if ((total_io_size % 4096) || (buffer_size % 4096)) {
     fprintf(stderr, "error: total_io_size and buffer_size must be multiples of 4K\n");
     return zx::duration::infinite();
@@ -121,9 +123,16 @@ static zx::duration iotime_block(int is_read, int fd, size_t total_io_size, size
   return t1 - t0;
 }
 
-static zx::duration iotime_fifo(const char* dev, int is_read, int fd, size_t total_io_size,
-                                size_t buffer_size) {
-  zx::result block_device = block_client::RemoteBlockDevice::Create(fd);
+static zx::duration iotime_fifo(const char* dev, int is_read, fbl::unique_fd fd,
+                                size_t total_io_size, size_t buffer_size) {
+  fdio_cpp::FdioCaller disk_connection(std::move(fd));
+  zx::result channel = disk_connection.take_as<fuchsia_hardware_block_volume::Volume>();
+  if (channel.is_error()) {
+    fprintf(stderr, "error: cannot take volume channel for '%s': %s\n", dev,
+            channel.status_string());
+    return zx::duration::infinite();
+  }
+  zx::result block_device = block_client::RemoteBlockDevice::Create(std::move(channel.value()));
   if (block_device.is_error()) {
     fprintf(stderr, "error: cannot create remote block device for '%s': %s\n", dev,
             block_device.status_string());
@@ -237,11 +246,11 @@ int main(int argc, char** argv) {
 
   zx::duration io_duration;
   if (mode == "posix") {
-    io_duration = iotime_posix(is_read, fd.get(), total_io_size, buffer_size);
+    io_duration = iotime_posix(is_read, std::move(fd), total_io_size, buffer_size);
   } else if (mode == "block") {
-    io_duration = iotime_block(is_read, fd.get(), total_io_size, buffer_size);
+    io_duration = iotime_block(is_read, std::move(fd), total_io_size, buffer_size);
   } else if (mode == "fifo") {
-    io_duration = iotime_fifo(device.c_str(), is_read, fd.get(), total_io_size, buffer_size);
+    io_duration = iotime_fifo(device.c_str(), is_read, std::move(fd), total_io_size, buffer_size);
   } else {
     fprintf(stderr, "error: unsupported mode '%s'\n", mode.c_str());
     return EXIT_FAILURE;

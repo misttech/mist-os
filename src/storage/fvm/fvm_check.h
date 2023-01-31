@@ -6,6 +6,7 @@
 #define SRC_STORAGE_FVM_FVM_CHECK_H_
 
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <stdarg.h>
 #include <stdlib.h>
 

@@ -7,6 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.hardware.block.volume") {
   sources = [ "volume.fidl" ]
   public_deps = [
+    "//sdk/fidl/fuchsia.device",
     "//sdk/fidl/fuchsia.hardware.block",
     "//sdk/fidl/fuchsia.hardware.block.partition",
     "//sdk/fidl/fuchsia.io",
@@ -14,7 +15,10 @@ fidl("fuchsia.hardware.block.volume") {
 
   # TODO(https://fxbug.dev/88443): Remove this dependency since this target does
   # not directly depend on these libraries.
-  public_deps += [ "//sdk/fidl/fuchsia.unknown" ]
+  public_deps += [
+    "//sdk/fidl/fuchsia.logger",
+    "//sdk/fidl/fuchsia.unknown",
+  ]
 
   enable_hlcpp = true
 }

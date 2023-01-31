@@ -4,7 +4,7 @@
 
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
 
-#include <fidl/fuchsia.hardware.block/cpp/wire_test_base.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fzl/fifo.h>
@@ -30,7 +30,7 @@ constexpr uint64_t kBlockCount = 10;
 // Emulate the non-standard behavior of the block device which implements both the block device APIs
 // and the Node API.
 class MockBlockDevice final
-    : public fidl::testing::WireTestBase<fuchsia_hardware_block::BlockAndNode> {
+    : public fidl::testing::WireTestBase<fuchsia_hardware_block_volume::Volume> {
  public:
   explicit MockBlockDevice() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     // Create buffer for read / write calls
@@ -38,15 +38,13 @@ class MockBlockDevice final
     ZX_ASSERT(loop_.StartThread() == ZX_OK);
   }
 
-  ~MockBlockDevice() {
+  ~MockBlockDevice() override {
     // Shutting down the loop will force all the unbind callbacks to run.
     loop_.Shutdown();
   }
 
-  void Bind(fidl::ServerEnd<fuchsia_hardware_block::Block> server_end) {
-    fidl::BindServer(
-        loop_.dispatcher(),
-        fidl::ServerEnd<fuchsia_hardware_block::BlockAndNode>(server_end.TakeChannel()), this);
+  void BindServer(fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> server_end) {
+    fidl::BindServer(loop_.dispatcher(), std::move(server_end), this);
   }
 
   zx_status_t ReadFifoRequests(block_fifo_request_t* requests, size_t* count) const {
@@ -70,10 +68,8 @@ class MockBlockDevice final
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override {
-    fidl::BindServer(
-        loop_.dispatcher(),
-        fidl::ServerEnd<fuchsia_hardware_block::BlockAndNode>(request->object.TakeChannel()), this);
+  void GetVolumeInfo(GetVolumeInfoCompleter::Sync& completer) override {
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {}, {});
   }
 
   void GetInfo(GetInfoCompleter::Sync& completer) override {
@@ -164,31 +160,33 @@ class MockBlockDevice final
 
 // Tests that the RemoteBlockDevice can be created and immediately destroyed.
 TEST(RemoteBlockDeviceTest, Constructor) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
   auto& [client, server] = endpoints.value();
 
   MockBlockDevice mock_device;
-  mock_device.Bind(std::move(server));
+  mock_device.BindServer(std::move(server));
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  ASSERT_EQ(RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+  zx::result device = RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{client.TakeChannel()});
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
 }
 
 // Tests that a fifo is attached to the block device for the duration of the
 // RemoteBlockDevice lifetime.
 TEST(RemoteBlockDeviceTest, FifoClosedOnDestruction) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
   auto& [client, server] = endpoints.value();
 
   MockBlockDevice mock_device;
-  mock_device.Bind(std::move(server));
+  mock_device.BindServer(std::move(server));
 
   EXPECT_FALSE(mock_device.FifoAttached());
   {
-    std::unique_ptr<RemoteBlockDevice> device;
-    ASSERT_EQ(RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+    zx::result device = RemoteBlockDevice::Create(
+        fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{client.TakeChannel()});
+    ASSERT_TRUE(device.is_ok()) << device.status_string();
     EXPECT_TRUE(mock_device.FifoAttached());
   }
   EXPECT_FALSE(mock_device.FifoAttached());
@@ -197,21 +195,22 @@ TEST(RemoteBlockDeviceTest, FifoClosedOnDestruction) {
 // Tests that the RemoteBlockDevice is capable of transmitting and receiving
 // messages with the block device.
 TEST(RemoteBlockDeviceTest, WriteTransactionReadResponse) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
   auto& [client, server] = endpoints.value();
 
   MockBlockDevice mock_device;
-  mock_device.Bind(std::move(server));
+  mock_device.BindServer(std::move(server));
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  ASSERT_EQ(RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+  zx::result device = RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{client.TakeChannel()});
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
 
   zx::vmo vmo;
   ASSERT_EQ(zx::vmo::create(ZX_PAGE_SIZE, 0, &vmo), ZX_OK);
 
   storage::OwnedVmoid vmoid;
-  ASSERT_EQ(device->BlockAttachVmo(vmo, &vmoid.GetReference(device.get())), ZX_OK);
+  ASSERT_EQ(device->BlockAttachVmo(vmo, &vmoid.GetReference(device.value().get())), ZX_OK);
   ASSERT_EQ(kGoldenVmoid, vmoid.get());
 
   block_fifo_request_t request;
@@ -246,12 +245,12 @@ TEST(RemoteBlockDeviceTest, WriteTransactionReadResponse) {
 // Tests that the RemoteBlockDevice is capable of transmitting and receiving
 // messages with the block device.
 TEST(RemoteBlockDeviceTest, WriteReadBlock) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
   auto& [client, server] = endpoints.value();
 
   MockBlockDevice mock_device;
-  mock_device.Bind(std::move(server));
+  mock_device.BindServer(std::move(server));
 
   constexpr size_t max_count = 3;
 
@@ -262,23 +261,23 @@ TEST(RemoteBlockDeviceTest, WriteReadBlock) {
     write_buffer[i] = static_cast<uint8_t>(i % 251);
   }
   // Test that unaligned counts and offsets result in failures:
-  ASSERT_NE(SingleWriteBytes(client, write_buffer.data(), 5, 0), ZX_OK);
-  ASSERT_NE(SingleWriteBytes(client, write_buffer.data(), kBlockSize, 5), ZX_OK);
-  ASSERT_NE(SingleWriteBytes(client, nullptr, kBlockSize, 0), ZX_OK);
-  ASSERT_NE(SingleReadBytes(client, read_buffer.data(), 5, 0), ZX_OK);
-  ASSERT_NE(SingleReadBytes(client, read_buffer.data(), kBlockSize, 5), ZX_OK);
-  ASSERT_NE(SingleReadBytes(client, nullptr, kBlockSize, 0), ZX_OK);
+  fidl::ClientEnd<fuchsia_hardware_block::Block> block{client.TakeChannel()};
+  ASSERT_NE(SingleWriteBytes(block, write_buffer.data(), 5, 0), ZX_OK);
+  ASSERT_NE(SingleWriteBytes(block, write_buffer.data(), kBlockSize, 5), ZX_OK);
+  ASSERT_NE(SingleWriteBytes(block, nullptr, kBlockSize, 0), ZX_OK);
+  ASSERT_NE(SingleReadBytes(block, read_buffer.data(), 5, 0), ZX_OK);
+  ASSERT_NE(SingleReadBytes(block, read_buffer.data(), kBlockSize, 5), ZX_OK);
+  ASSERT_NE(SingleReadBytes(block, nullptr, kBlockSize, 0), ZX_OK);
 
   // test multiple counts, multiple offsets
   for (uint64_t count = 1; count < max_count; ++count) {
     for (uint64_t offset = 0; offset < 2; ++offset) {
       size_t buffer_offset = count + 10 * offset;
-      ASSERT_EQ(SingleWriteBytes(client, write_buffer.data() + buffer_offset, kBlockSize * count,
+      ASSERT_EQ(SingleWriteBytes(block, write_buffer.data() + buffer_offset, kBlockSize * count,
                                  kBlockSize * offset),
                 ZX_OK);
-      ASSERT_EQ(
-          SingleReadBytes(client, read_buffer.data(), kBlockSize * count, kBlockSize * offset),
-          ZX_OK);
+      ASSERT_EQ(SingleReadBytes(block, read_buffer.data(), kBlockSize * count, kBlockSize * offset),
+                ZX_OK);
       ASSERT_EQ(memcmp(write_buffer.data() + buffer_offset, read_buffer.data(), kBlockSize * count),
                 0);
     }
@@ -286,51 +285,46 @@ TEST(RemoteBlockDeviceTest, WriteReadBlock) {
 }
 
 TEST(RemoteBlockDeviceTest, VolumeManagerOrdinals) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
   auto& [client, server] = endpoints.value();
 
   MockBlockDevice mock_device;
-  mock_device.Bind(std::move(server));
+  mock_device.BindServer(std::move(server));
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  ASSERT_EQ(RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+  zx::result device = RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{client.TakeChannel()});
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
 
   // Querying the volume returns an error; the device doesn't implement
   // any FVM protocols. However, VolumeQuery utilizes a distinct
   // channel, so the connection should remain open.
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info;
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info;
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, device->VolumeGetInfo(&manager_info, &volume_info));
+  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, device->VolumeGetInfo(&manager_info, &volume_info));
 
   // Other block functions still function correctly.
   fuchsia_hardware_block::wire::BlockInfo block_info;
   EXPECT_EQ(device->BlockGetInfo(&block_info), ZX_OK);
-
-  // Sending any FVM method other than "VolumeQuery" also returns an error.
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, device->VolumeExtend(0, 0));
-
-  // But now, other (previously valid) block methods fail, because FIDL has
-  // closed the channel.
-  EXPECT_EQ(ZX_ERR_PEER_CLOSED, device->BlockGetInfo(&block_info));
 }
 
 TEST(RemoteBlockDeviceTest, LargeThreadCountSuceeds) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
   auto& [client, server] = endpoints.value();
 
   MockBlockDevice mock_device;
-  mock_device.Bind(std::move(server));
+  mock_device.BindServer(std::move(server));
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  ASSERT_EQ(RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+  zx::result device = RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{client.TakeChannel()});
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
 
   zx::vmo vmo;
   ASSERT_EQ(zx::vmo::create(ZX_PAGE_SIZE, 0, &vmo), ZX_OK);
 
   storage::OwnedVmoid vmoid;
-  ASSERT_EQ(device->BlockAttachVmo(vmo, &vmoid.GetReference(device.get())), ZX_OK);
+  ASSERT_EQ(device->BlockAttachVmo(vmo, &vmoid.GetReference(device.value().get())), ZX_OK);
   ASSERT_EQ(kGoldenVmoid, vmoid.get());
 
   constexpr int kThreadCount = 2 * MAX_TXN_GROUP_COUNT;
@@ -339,16 +333,17 @@ TEST(RemoteBlockDeviceTest, LargeThreadCountSuceeds) {
   fbl::ConditionVariable condition;
   int done = 0;
   for (auto& thread : threads) {
-    thread = std::thread([device = device.get(), &mutex, &done, &condition, vmoid = vmoid.get()]() {
-      block_fifo_request_t request = {};
-      request.opcode = BLOCKIO_READ;
-      request.vmoid = vmoid;
-      request.length = 1;
-      ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
-      fbl::AutoLock lock(&mutex);
-      ++done;
-      condition.Signal();
-    });
+    thread = std::thread(
+        [device = device.value().get(), &mutex, &done, &condition, vmoid = vmoid.get()]() {
+          block_fifo_request_t request = {};
+          request.opcode = BLOCKIO_READ;
+          request.vmoid = vmoid;
+          request.length = 1;
+          ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
+          fbl::AutoLock lock(&mutex);
+          ++done;
+          condition.Signal();
+        });
   }
   vmoid.TakeId();  // We don't need the vmoid any more.
   block_fifo_request_t requests[kThreadCount + BLOCK_FIFO_MAX_DEPTH];
@@ -386,7 +381,7 @@ TEST(RemoteBlockDeviceTest, LargeThreadCountSuceeds) {
 }
 
 TEST(RemoteBlockDeviceTest, NoHangForErrorsWithMultipleThreads) {
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Block>();
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
   auto& [client, server] = endpoints.value();
 
@@ -396,9 +391,14 @@ TEST(RemoteBlockDeviceTest, NoHangForErrorsWithMultipleThreads) {
 
   {
     MockBlockDevice mock_device;
-    mock_device.Bind(std::move(server));
+    mock_device.BindServer(std::move(server));
 
-    ASSERT_EQ(RemoteBlockDevice::Create(std::move(client), &device), ZX_OK);
+    {
+      zx::result result = RemoteBlockDevice::Create(
+          fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{client.TakeChannel()});
+      ASSERT_TRUE(result.is_ok()) << result.status_string();
+      device = std::move(result.value());
+    }
 
     zx::vmo vmo;
     ASSERT_EQ(zx::vmo::create(ZX_PAGE_SIZE, 0, &vmo), ZX_OK);

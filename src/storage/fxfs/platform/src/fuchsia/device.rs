@@ -284,11 +284,11 @@ impl BlockServer {
         maybe_reply
     }
 
-    fn handle_clone_request(&self, object: ServerEnd<fio::NodeMarker>) {
+    fn handle_clone_request(&self, object: zx::Channel) {
         let file = OpenedNode::new(self.file.clone());
         let scope_cloned = self.scope.clone();
         self.scope.spawn(async move {
-            let mut cloned_server = BlockServer::new(file, scope_cloned, object.into_channel());
+            let mut cloned_server = BlockServer::new(file, scope_cloned, object);
             let _ = cloned_server.run().await;
         });
     }
@@ -464,7 +464,7 @@ impl BlockServer {
             VolumeAndNodeRequest::Clone { flags: _, object, control_handle: _ } => {
                 // Have to move this into a non-async function to avoid Rust compiler's
                 // complaint about recursive async functions
-                self.handle_clone_request(object);
+                self.handle_clone_request(object.into_channel());
             }
             // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::Reopen {
@@ -535,6 +535,44 @@ impl BlockServer {
                     Ok(mut info) => responder.send(zx::sys::ZX_OK, Some(&mut info))?,
                     Err(e) => responder.send(e.into_raw(), None)?,
                 }
+            }
+            VolumeAndNodeRequest::ConnectToDeviceFidl { server, control_handle: _ } => {
+                // This should serve *only* Volume, but it's a pain to write that without
+                // duplication.
+                //
+                // TODO(https://fxbug.dev/89873):  make it so.
+                // TODO(https://fxbug.dev/103827): make it so.
+                self.handle_clone_request(server);
+            }
+            VolumeAndNodeRequest::Bind { driver: _, responder } => {
+                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
+            VolumeAndNodeRequest::Rebind { driver: _, responder } => {
+                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
+            VolumeAndNodeRequest::UnbindChildren { responder } => {
+                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
+            VolumeAndNodeRequest::ScheduleUnbind { responder } => {
+                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
+            VolumeAndNodeRequest::GetTopologicalPath { responder } => {
+                responder.send(&mut Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
+            VolumeAndNodeRequest::GetMinDriverLogSeverity { responder } => {
+                responder.send(
+                    zx::sys::ZX_ERR_NOT_SUPPORTED,
+                    fidl_fuchsia_logger::LogLevelFilter::None,
+                )?;
+            }
+            VolumeAndNodeRequest::SetMinDriverLogSeverity { severity: _, responder } => {
+                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
+            }
+            VolumeAndNodeRequest::GetCurrentPerformanceState { responder } => {
+                responder.send(Default::default())?;
+            }
+            VolumeAndNodeRequest::SetPerformanceState { requested_state: _, responder } => {
+                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, Default::default())?;
             }
         }
         Ok(())

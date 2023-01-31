@@ -25,9 +25,11 @@ namespace block_client {
 // This class is not movable or copyable.
 class RemoteBlockDevice final : public BlockDevice {
  public:
-  static zx_status_t Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
-                            std::unique_ptr<RemoteBlockDevice>* out);
-  static zx::result<std::unique_ptr<RemoteBlockDevice>> Create(int fd);
+  static zx::result<std::unique_ptr<RemoteBlockDevice>> Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device);
+  [[deprecated("Create with Volume instead. All block devices speak Volume.")]] static zx_status_t
+  Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+         std::unique_ptr<RemoteBlockDevice>* out);
   RemoteBlockDevice& operator=(RemoteBlockDevice&&) = delete;
   RemoteBlockDevice(RemoteBlockDevice&&) = delete;
   RemoteBlockDevice& operator=(const RemoteBlockDevice&) = delete;
@@ -46,11 +48,13 @@ class RemoteBlockDevice final : public BlockDevice {
   zx_status_t VolumeExtend(uint64_t offset, uint64_t length) final;
   zx_status_t VolumeShrink(uint64_t offset, uint64_t length) final;
 
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> TakeDevice();
+
  private:
-  RemoteBlockDevice(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+  RemoteBlockDevice(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
                     fidl::ClientEnd<fuchsia_hardware_block::Session> session, zx::fifo fifo);
 
-  const fidl::ClientEnd<fuchsia_hardware_block::Block> device_;
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device_;
   block_client::Client fifo_client_;
 };
 

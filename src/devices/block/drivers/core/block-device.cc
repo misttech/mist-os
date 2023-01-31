@@ -272,7 +272,7 @@ void BlockDevice::WriteBlocks(WriteBlocksRequestView request,
 
 void BlockDevice::GetTypeGuid(GetTypeGuidCompleter::Sync& completer) {
   if (!parent_partition_protocol_.is_valid()) {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
     return;
   }
   fuchsia_hardware_block_partition::wire::Guid guid;
@@ -284,7 +284,7 @@ void BlockDevice::GetTypeGuid(GetTypeGuidCompleter::Sync& completer) {
 
 void BlockDevice::GetInstanceGuid(GetInstanceGuidCompleter::Sync& completer) {
   if (!parent_partition_protocol_.is_valid()) {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
     return;
   }
   fuchsia_hardware_block_partition::wire::Guid guid;
@@ -296,7 +296,7 @@ void BlockDevice::GetInstanceGuid(GetInstanceGuidCompleter::Sync& completer) {
 
 void BlockDevice::GetName(GetNameCompleter::Sync& completer) {
   if (!parent_partition_protocol_.is_valid()) {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
     return;
   }
   char name[fuchsia_hardware_block_partition::wire::kNameLength];
@@ -308,7 +308,7 @@ void BlockDevice::GetName(GetNameCompleter::Sync& completer) {
 void BlockDevice::QuerySlices(QuerySlicesRequestView request,
                               QuerySlicesCompleter::Sync& completer) {
   if (!parent_volume_protocol_.is_valid()) {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {}, {});
     return;
   }
   fidl::Array<fuchsia_hardware_block_volume::wire::VsliceRange,
@@ -325,7 +325,7 @@ void BlockDevice::QuerySlices(QuerySlicesRequestView request,
 
 void BlockDevice::GetVolumeInfo(GetVolumeInfoCompleter::Sync& completer) {
   if (!parent_volume_protocol_.is_valid()) {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED, {}, {});
     return;
   }
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info;
@@ -346,7 +346,7 @@ void BlockDevice::GetVolumeInfo(GetVolumeInfoCompleter::Sync& completer) {
 
 void BlockDevice::Extend(ExtendRequestView request, ExtendCompleter::Sync& completer) {
   if (!parent_volume_protocol_.is_valid()) {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
   }
   slice_extent_t extent = {
@@ -358,7 +358,7 @@ void BlockDevice::Extend(ExtendRequestView request, ExtendCompleter::Sync& compl
 
 void BlockDevice::Shrink(ShrinkRequestView request, ShrinkCompleter::Sync& completer) {
   if (!parent_volume_protocol_.is_valid()) {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
   }
   slice_extent_t extent = {
@@ -370,7 +370,7 @@ void BlockDevice::Shrink(ShrinkRequestView request, ShrinkCompleter::Sync& compl
 
 void BlockDevice::Destroy(DestroyCompleter::Sync& completer) {
   if (!parent_volume_protocol_.is_valid()) {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
+    completer.Reply(ZX_ERR_NOT_SUPPORTED);
     return;
   }
   completer.Reply(parent_volume_protocol_.Destroy());

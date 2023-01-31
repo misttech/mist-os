@@ -128,45 +128,46 @@ zx_status_t Client::Transaction(block_fifo_request_t* requests, size_t count) {
 
 zx_status_t Client::DoRead(block_fifo_response_t* response, size_t* count) {
   while (true) {
-    if (zx_status_t status = fifo_.read(sizeof(*response), response, *count, count);
-        status != ZX_ERR_SHOULD_WAIT)
-      return status;
-
-    zx_signals_t signals;
-    if (zx_status_t status =
-            fifo_.wait_one(ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED, zx::time::infinite(), &signals);
-        status != ZX_OK) {
-      return status;
+    switch (zx_status_t status = fifo_.read(sizeof(block_fifo_request_t), response, *count, count);
+            status) {
+      case ZX_ERR_SHOULD_WAIT: {
+        zx_signals_t signals;
+        if (zx_status_t status = fifo_.wait_one(ZX_FIFO_READABLE | ZX_FIFO_PEER_CLOSED,
+                                                zx::time::infinite(), &signals);
+            status != ZX_OK) {
+          return status;
+        }
+        continue;
+      }
+      default:
+        return status;
     }
-    if (signals & ZX_FIFO_PEER_CLOSED) {
-      return ZX_ERR_PEER_CLOSED;
-    }
-    // Try reading again...
   }
 }
 
 zx_status_t Client::DoWrite(block_fifo_request_t* request, size_t count) {
   while (true) {
     size_t actual;
-    zx_status_t write_status = fifo_.write(sizeof(block_fifo_request_t), request, count, &actual);
-    if (write_status == ZX_ERR_SHOULD_WAIT) {
-      zx_signals_t signals;
-      if (zx_status_t wait_status = fifo_.wait_one(ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED,
-                                                   zx::time::infinite(), &signals);
-          wait_status != ZX_OK) {
-        return wait_status;
+    switch (zx_status_t status = fifo_.write(sizeof(block_fifo_request_t), request, count, &actual);
+            status) {
+      case ZX_OK:
+        count -= actual;
+        request += actual;
+        if (count == 0) {
+          return ZX_OK;
+        }
+        break;
+      case ZX_ERR_SHOULD_WAIT: {
+        zx_signals_t signals;
+        if (zx_status_t status = fifo_.wait_one(ZX_FIFO_WRITABLE | ZX_FIFO_PEER_CLOSED,
+                                                zx::time::infinite(), &signals);
+            status != ZX_OK) {
+          return status;
+        }
+        continue;
       }
-      if (signals & ZX_FIFO_PEER_CLOSED) {
-        return ZX_ERR_PEER_CLOSED;
-      }
-      // Try writing again...
-    } else if (write_status == ZX_OK) {
-      count -= actual;
-      request += actual;
-      if (count == 0)
-        return ZX_OK;
-    } else {
-      return write_status;
+      default:
+        return status;
     }
   }
 }

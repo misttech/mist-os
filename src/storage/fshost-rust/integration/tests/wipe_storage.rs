@@ -163,7 +163,12 @@ async fn blobfs_formatted() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
+    admin
+        .wipe_storage(blobfs_server)
+        .await
+        .unwrap()
+        .map_err(zx::Status::from_raw)
+        .expect("WipeStorage unexpectedly failed");
 
     // Verify there are no more blobs.
     assert!(fuchsia_fs::directory::readdir(&blobfs_root).await.unwrap().is_empty());

@@ -191,10 +191,20 @@ zx::result<fs_management::StartedSingleVolumeFilesystem> WipeStorage(
 
   FX_LOGS(INFO) << "Allocating new partitions.";
 
-  zx::result<fbl::unique_fd> blob_partition = AllocateFvmPartitions(*std::move(fvm_device));
-  if (blob_partition.is_error()) {
-    FX_LOGS(ERROR) << "Failed to allocate new partitions: " << blob_partition.status_string();
-    return blob_partition.take_error();
+  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device;
+  {
+    zx::result<fbl::unique_fd> blob_partition = AllocateFvmPartitions(*std::move(fvm_device));
+    if (blob_partition.is_error()) {
+      FX_LOGS(ERROR) << "Failed to allocate new partitions: " << blob_partition.status_string();
+      return blob_partition.take_error();
+    }
+    fdio_cpp::FdioCaller disk_connection(std::move(blob_partition.value()));
+    zx::result channel = disk_connection.take_as<fuchsia_hardware_block_volume::Volume>();
+    if (channel.is_error()) {
+      FX_LOGS(ERROR) << "Failed to take volume channel: " << channel.status_string();
+      return channel.take_error();
+    }
+    device = std::move(channel.value());
   }
 
   FX_LOGS(INFO) << "Formatting Blobfs.";
@@ -205,7 +215,7 @@ zx::result<fs_management::StartedSingleVolumeFilesystem> WipeStorage(
                   << ", num_inodes = " << blobfs_options.num_inodes
                   << ", oldest_min_version = " << blobfs_options.oldest_minor_version;
 
-    zx::result blobfs_device = block_client::RemoteBlockDevice::Create(blob_partition->get());
+    zx::result blobfs_device = block_client::RemoteBlockDevice::Create(std::move(device));
     if (blobfs_device.is_error()) {
       FX_LOGS(ERROR) << "Failed to create RemoteBlockDevice: " << blobfs_device.status_string();
       return blobfs_device.take_error();
@@ -216,19 +226,14 @@ zx::result<fs_management::StartedSingleVolumeFilesystem> WipeStorage(
       FX_LOGS(ERROR) << "Failed to format Blobfs: " << zx_status_get_string(status);
       return zx::error(status);
     }
-  }
-
-  zx::result device = fdio_cpp::FdioCaller(std::move(blob_partition.value()))
-                          .take_as<fuchsia_hardware_block::Block>();
-  if (device.is_error()) {
-    FX_PLOGS(ERROR, device.error_value()) << "Failed to acquire partition channel";
-    return device.take_error();
+    device = blobfs_device->TakeDevice();
   }
 
   FX_LOGS(INFO) << "Mounting Blobfs.";
-  zx::result blobfs = fs_management::Mount(
-      std::move(device.value()), fs_management::kDiskFormatBlobfs,
-      fshost::GetBlobfsMountOptionsForRecovery(config), fs_management::LaunchLogsAsync);
+  fidl::ClientEnd<fuchsia_hardware_block::Block> block{device.TakeChannel()};
+  zx::result blobfs = fs_management::Mount(std::move(block), fs_management::kDiskFormatBlobfs,
+                                           fshost::GetBlobfsMountOptionsForRecovery(config),
+                                           fs_management::LaunchLogsAsync);
   if (blobfs.is_error()) {
     FX_LOGS(ERROR) << "Failed to mount Blobfs: " << blobfs.status_string();
     return blobfs.take_error();

@@ -59,17 +59,7 @@ zx_status_t RemoteBlockDevice::BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid
 zx_status_t RemoteBlockDevice::VolumeGetInfo(
     fuchsia_hardware_block_volume::wire::VolumeManagerInfo* out_manager_info,
     fuchsia_hardware_block_volume::wire::VolumeInfo* out_volume_info) const {
-  // Querying may be used to confirm if the underlying connection is capable of
-  // communicating the FVM protocol. Clone the connection, since if the block
-  // device does NOT speak the Volume protocol, the connection is terminated.
-  //
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result clone = component::Clone(device_, component::AssumeProtocolComposesNode);
-  if (clone.is_error()) {
-    return clone.status_value();
-  }
-  fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> volume(clone.value().TakeChannel());
-  const fidl::WireResult result = fidl::WireCall(volume)->GetVolumeInfo();
+  const fidl::WireResult result = fidl::WireCall(device_)->GetVolumeInfo();
   if (!result.ok()) {
     return result.status();
   }
@@ -119,46 +109,39 @@ zx_status_t RemoteBlockDevice::VolumeShrink(uint64_t offset, uint64_t length) {
   const fidl::WireResponse response = result.value();
   return response.status;
 }
-
-zx_status_t RemoteBlockDevice::Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
-                                      std::unique_ptr<RemoteBlockDevice>* out) {
+zx::result<std::unique_ptr<RemoteBlockDevice>> RemoteBlockDevice::Create(
+    fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
   if (endpoints.is_error()) {
-    return endpoints.error_value();
+    return endpoints.take_error();
   }
   auto& [session, server] = endpoints.value();
   if (fidl::Status result = fidl::WireCall(device)->OpenSession(std::move(server)); !result.ok()) {
-    return result.status();
+    return zx::error(result.status());
   }
   const fidl::WireResult result = fidl::WireCall(session)->GetFifo();
   if (!result.ok()) {
-    return result.status();
+    return zx::error(result.status());
   }
-  const fit::result response = result.value();
+  fit::result response = result.value();
   if (response.is_error()) {
-    return response.error_value();
+    return response.take_error();
   }
-
-  *out = std::unique_ptr<RemoteBlockDevice>(
-      new RemoteBlockDevice(std::move(device), std::move(session), std::move(response->fifo)));
-  return ZX_OK;
+  return zx::ok(std::unique_ptr<RemoteBlockDevice>(
+      new RemoteBlockDevice(std::move(device), std::move(session), std::move(response->fifo))));
 }
 
-zx::result<std::unique_ptr<RemoteBlockDevice>> RemoteBlockDevice::Create(int fd) {
-  fdio_cpp::UnownedFdioCaller caller(fd);
-  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-  zx::result clone = component::Clone(caller.borrow_as<fuchsia_hardware_block::Block>(),
-                                      component::AssumeProtocolComposesNode);
-  if (clone.is_error()) {
-    return clone.take_error();
+zx_status_t RemoteBlockDevice::Create(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+                                      std::unique_ptr<RemoteBlockDevice>* out) {
+  zx::result ret =
+      Create(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>{device.TakeChannel()});
+  if (ret.is_ok()) {
+    *out = std::move(ret.value());
   }
-
-  std::unique_ptr<block_client::RemoteBlockDevice> client;
-  zx_status_t status = block_client::RemoteBlockDevice::Create(std::move(clone.value()), &client);
-  return zx::make_result(status, std::move(client));
+  return ret.status_value();
 }
 
-RemoteBlockDevice::RemoteBlockDevice(fidl::ClientEnd<fuchsia_hardware_block::Block> device,
+RemoteBlockDevice::RemoteBlockDevice(fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> device,
                                      fidl::ClientEnd<fuchsia_hardware_block::Session> session,
                                      zx::fifo fifo)
     : device_(std::move(device)), fifo_client_(std::move(session), std::move(fifo)) {}
@@ -219,6 +202,10 @@ zx_status_t ReadWriteBlocks(fidl::UnownedClientEnd<fuchsia_hardware_block::Block
     return read_vmo.read(buffer, 0, buffer_length);
   }
   return ZX_OK;
+}
+
+fidl::ClientEnd<fuchsia_hardware_block_volume::Volume> RemoteBlockDevice::TakeDevice() {
+  return std::move(device_);
 }
 
 zx_status_t SingleReadBytes(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device,
