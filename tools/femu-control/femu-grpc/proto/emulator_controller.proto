@@ -131,7 +131,7 @@ service EmulatorController {
   // Streams a series of screenshots in the desired format.
   // A new frame will be delivered whenever the device produces a new frame.
   // (Beware that this can produce a significant amount of data, and that
-  // certain translations are (png transform) can be costly).
+  // certain translations (png transform) can be costly).
   //
   // If the requested display is not visible it will send a single empty image
   // and wait start producing images once the display becomes active, again
