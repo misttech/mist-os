@@ -12,6 +12,7 @@ pub(crate) mod ndp;
 pub mod queue;
 mod state;
 
+use alloc::vec::Vec;
 use core::{
     fmt::{self, Debug, Display, Formatter},
     hash::{Hash, Hasher},
@@ -33,10 +34,7 @@ use packet_formats::ethernet::EthernetIpExt;
 
 use crate::{
     context::{FrameContext, InstantContext, RecvFrameContext},
-    data_structures::{
-        id_map::{self, IdMap},
-        id_map_collection::IdMapCollectionKey,
-    },
+    data_structures::id_map_collection::IdMapCollectionKey,
     device::{
         ethernet::{
             EthernetDeviceState, EthernetDeviceStateBuilder, EthernetLinkDevice, EthernetTimerId,
@@ -255,7 +253,7 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx> for &'_ Sync
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
 pub(crate) struct DevicesIter<'s, I: Instant> {
-    ethernet: id_map::Iter<'s, ReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>>,
+    ethernet: <&'s EthernetDevices<I> as IntoIterator>::IntoIter,
     loopback: core::option::Iter<'s, ReferenceCounted<IpLinkDeviceState<I, LoopbackDeviceState>>>,
 }
 
@@ -265,7 +263,7 @@ impl<'s, I: Instant> Iterator for DevicesIter<'s, I> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ethernet, loopback } = self;
         ethernet
-            .map(|(id, state)| EthernetDeviceId(id, ReferenceCounted::downgrade(state)).into())
+            .map(|(state, id)| EthernetDeviceId(*id, ReferenceCounted::downgrade(state)).into())
             .chain(loopback.map(|state| {
                 DeviceIdInner::Loopback(LoopbackDeviceId(ReferenceCounted::downgrade(state))).into()
             }))
@@ -768,9 +766,63 @@ impl FrameDestination {
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
+struct EthernetDevices<I: Instant> {
+    pointers: Vec<(ReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>, usize)>,
+    next_id: usize,
+}
+
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
 struct Devices<I: Instant> {
-    ethernet: IdMap<ReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>>,
+    ethernet: EthernetDevices<I>,
     loopback: Option<ReferenceCounted<IpLinkDeviceState<I, LoopbackDeviceState>>>,
+}
+
+impl<'a, I: Instant> IntoIterator for &'a EthernetDevices<I> {
+    type Item = &'a (ReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>, usize);
+    type IntoIter = <&'a Vec<(ReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>, usize)> as IntoIterator>::IntoIter;
+    fn into_iter(self) -> Self::IntoIter {
+        let EthernetDevices { pointers, next_id: _ } = self;
+        pointers.into_iter()
+    }
+}
+
+impl<I: Instant> EthernetDevices<I> {
+    fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+        self.into_iter()
+    }
+
+    /// Adds a new value, returning its unique ID and a pointer to the state.
+    pub(crate) fn push(
+        &mut self,
+        state: IpLinkDeviceState<I, EthernetDeviceState>,
+    ) -> (usize, WeakReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>) {
+        let Self { pointers, next_id } = self;
+
+        let ptr = ReferenceCounted::new(state);
+        let weak_ptr = ReferenceCounted::downgrade(&ptr);
+        let id = *next_id;
+        pointers.push((ptr, id));
+
+        *next_id += 1;
+        (id, weak_ptr)
+    }
+
+    /// Removes the device with the provided state.
+    ///
+    /// Returns the ID for the device if the device exists.
+    pub(crate) fn remove(
+        &mut self,
+        ptr: &WeakReferenceCounted<IpLinkDeviceState<I, EthernetDeviceState>>,
+    ) -> Option<usize> {
+        let Self { pointers, next_id: _ } = self;
+        let ptr = WeakReferenceCounted::upgrade(ptr)?;
+        let index = pointers
+            .iter()
+            .position(|(other, _): &(_, usize)| ReferenceCounted::ptr_eq(&ptr, other))?;
+        let (_, id) = pointers.swap_remove(index);
+        Some(id)
+    }
 }
 
 /// The state associated with the device layer.
@@ -824,12 +876,11 @@ impl<I: Instant> DeviceLayerState<I> {
     pub(crate) fn add_ethernet_device(&self, mac: UnicastAddr<Mac>, mtu: u32) -> DeviceId<I> {
         let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
-        let ptr = ReferenceCounted::new(IpLinkDeviceState::new(
+        let state = IpLinkDeviceState::new(
             EthernetDeviceStateBuilder::new(mac, mtu).build(),
             self.origin.clone(),
-        ));
-        let weak_ptr = ReferenceCounted::downgrade(&ptr);
-        let id = ethernet.push(ptr);
+        );
+        let (id, weak_ptr) = ethernet.push(state);
         debug!("adding Ethernet device with ID {} and MTU {}", id, mtu);
         EthernetDeviceId(id, weak_ptr).into()
     }
@@ -927,12 +978,11 @@ pub fn remove_device<NonSyncCtx: NonSyncContext>(
 
     match device.inner() {
         DeviceIdInner::Ethernet(EthernetDeviceId(id, ptr)) => {
-            let removed = devices
+            let removed_id = devices
                 .ethernet
-                .remove(*id)
+                .remove(ptr)
                 .unwrap_or_else(|| panic!("no such Ethernet device: {}", id));
-            let ptr = ptr.upgrade().unwrap();
-            assert!(ReferenceCounted::ptr_eq(&ptr, &removed));
+            assert_eq!(*id, removed_id);
             debug!("removing Ethernet device with ID {}", id);
         }
         DeviceIdInner::Loopback(LoopbackDeviceId(ptr)) => {
