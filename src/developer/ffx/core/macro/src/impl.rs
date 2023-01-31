@@ -656,7 +656,7 @@ pub fn ffx_plugin(input: ItemFn, proxies: ProxyMap) -> Result<TokenStream, Error
     } = parse_arguments(input.sig.inputs.clone(), &proxies)?;
 
     let mut outer_args: Punctuated<_, Token!(,)> = Punctuated::new();
-    outer_args.push(quote! {injector: Box<dyn ffx_core::Injector>});
+    outer_args.push(quote! {injector: &::std::sync::Arc<dyn ffx_core::Injector>});
     outer_args.push(quote! {#cmd});
 
     let writer_attributes: Result<Vec<WriterArgument>, Error> =

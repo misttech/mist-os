@@ -90,6 +90,7 @@ if (is_host) {
       "//src/developer/ffx:ffx_lib_suite",
       "//src/developer/ffx/command:lib",
       "//src/developer/ffx/config:lib",
+      "//src/developer/ffx/core:lib",
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/fho:lib",
       "//src/developer/ffx/plugins/daemon:ffx_daemon_plugin_args",

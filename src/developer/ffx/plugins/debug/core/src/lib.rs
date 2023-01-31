@@ -2,24 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{anyhow, bail, Context, Result},
-    chrono::{Local, TimeZone},
-    errors::{ffx_bail, ffx_error},
-    ffx_component::rcs::connect_to_lifecycle_controller,
-    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_io as fio,
-    fuchsia_async::unblock,
-    fuchsia_fs::directory::{open_directory_no_describe, open_file_no_describe},
-    fuchsia_zircon_status::Status,
-    futures::StreamExt,
-    std::io::{BufRead, Write},
-    std::process::Command,
-    tempfile::{NamedTempFile, TempPath},
-};
+use anyhow::{anyhow, bail, Context, Result};
+use chrono::{Local, TimeZone};
+use errors::{ffx_bail, ffx_error};
+use ffx_component::rcs::connect_to_lifecycle_controller;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
+use fidl_fuchsia_io as fio;
+use fuchsia_async::unblock;
+use fuchsia_fs::directory::{open_directory_no_describe, open_file_no_describe};
+use fuchsia_zircon_status::Status;
+use futures::StreamExt;
+use std::io::{BufRead, Write};
+use std::process::Command;
+use std::sync::Arc;
+use tempfile::{NamedTempFile, TempPath};
 
 pub async fn ffx_plugin_impl(
-    injector: Box<dyn ffx_core::Injector>,
+    injector: &Arc<dyn ffx_core::Injector>,
     cmd: ffx_debug_core_args::CoreCommand,
 ) -> Result<()> {
     let sdk = ffx_config::global_env_context()

@@ -12,7 +12,7 @@ use ffx_config::EnvironmentContext;
 use ffx_lib_args::FfxBuiltIn;
 use ffx_lib_sub_command::SubCommand;
 use fho::ExternalSubToolSuite;
-use std::{os::unix::process::ExitStatusExt, process::ExitStatus};
+use std::{os::unix::process::ExitStatusExt, process::ExitStatus, sync::Arc};
 
 /// The command to be invoked and everything it needs to invoke
 struct FfxSubCommand {
@@ -127,7 +127,8 @@ async fn run_legacy_subcommand(
             DaemonVersionCheck::SameBuildId(context.daemon_version_string()?),
         )
         .await?;
-    ffx_lib_suite::ffx_plugin_impl(Box::new(injector), subcommand).await
+    let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
+    ffx_lib_suite::ffx_plugin_impl(&injector, subcommand).await
 }
 
 fn is_daemon(subcommand: &FfxBuiltIn) -> bool {

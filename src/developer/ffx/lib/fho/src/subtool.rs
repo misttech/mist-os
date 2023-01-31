@@ -12,6 +12,7 @@ use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use std::os::unix::process::ExitStatusExt;
 use std::process::ExitStatus;
+use std::sync::Arc;
 use std::{fs::File, path::PathBuf};
 
 use crate::{FhoToolMetadata, TryFromEnv};
@@ -94,10 +95,11 @@ struct FhoTool<M: FfxTool> {
     command: ToolCommand<M>,
 }
 
+#[derive(Clone)]
 pub struct FhoEnvironment {
     pub ffx: FfxCommandLine,
     pub context: EnvironmentContext,
-    pub injector: Box<dyn Injector>,
+    pub injector: Arc<dyn Injector>,
 }
 
 impl MetadataCmd {
@@ -157,7 +159,7 @@ async fn run_main<T: FfxTool>(
             DaemonVersionCheck::SameVersionInfo(build_info),
         )
         .await?;
-    let env = FhoEnvironment { ffx: cmd, context: suite.context, injector: Box::new(injector) };
+    let env = FhoEnvironment { ffx: cmd, context: suite.context, injector: Arc::new(injector) };
     let writer = TryFromEnv::try_from_env(&env).await?;
     let main = T::from_env(env, tool).await?;
     main.main(&writer).await.map(|_| ExitStatus::from_raw(0))

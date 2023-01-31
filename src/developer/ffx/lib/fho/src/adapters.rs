@@ -10,7 +10,7 @@
 macro_rules! embedded_plugin {
     ($tool:ty) => {
         pub async fn ffx_plugin_impl(
-            injector: Box<dyn ffx_core::Injector>,
+            injector: &::std::sync::Arc<dyn ffx_core::Injector>,
             cmd: <$tool as $crate::FfxTool>::Command,
         ) -> $crate::macro_deps::anyhow::Result<()> {
             #[allow(unused_imports)]
@@ -18,6 +18,7 @@ macro_rules! embedded_plugin {
 
             let ffx = FfxCommandLine::from_env()?;
             let context = global_env_context().context("Loading global environment context")?;
+            let injector = injector.clone();
 
             let env = $crate::FhoEnvironment { ffx, context, injector };
 
@@ -49,6 +50,7 @@ mod tests {
     use crate::testing::*;
     use argh::FromArgs;
     use ffx_command::FfxCommandLine;
+    use std::sync::Arc;
 
     // The main testing part will happen in the `main()` function of the tool.
     #[fuchsia_async::run_singlethreaded(test)]
@@ -87,7 +89,8 @@ mod tests {
             FhoHandler::Metadata(_) => panic!("Not testing metadata generation"),
         };
 
-        ffx_plugin_impl(Box::new(injector), fake_tool).await.expect("Plugin to run successfully");
+        let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
+        ffx_plugin_impl(&injector, fake_tool).await.expect("Plugin to run successfully");
 
         assert_eq!(
             SIMPLE_CHECK_COUNTER.with(|counter| *counter.borrow()),

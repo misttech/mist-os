@@ -15,6 +15,7 @@ use fidl_fuchsia_developer_ffx::{DaemonProxy, FastbootProxy, TargetProxy, Versio
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 
 pub struct ToolEnv {
     injector: FakeInjector,
@@ -92,7 +93,7 @@ impl ToolEnv {
         context: EnvironmentContext,
     ) -> Result<T::Main> {
         let env =
-            FhoEnvironment { injector: Box::new(self.injector), context, ffx: self.ffx_cmd_line };
+            FhoEnvironment { injector: Arc::new(self.injector), context, ffx: self.ffx_cmd_line };
         T::from_env(env, cmd).await
     }
 }
