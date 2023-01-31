@@ -266,6 +266,14 @@ class PageSource final : public PageRequestInterface {
 
   // Updates the request tracking metadata to account for pages [offset, offset + len) having
   // been supplied to the owning vmo.
+  //
+  // Note that the range [offset, offset + len) should not have been previously supplied. The page
+  // request tracking in PageSource works by tracking only a fulfilled length, and not exact
+  // fulfilled offsets, to save on memory required for metadata. So in order to prevent
+  // over-accounting errors, the caller must ensure that they are only calling OnPagesSupplied for
+  // newly supplied ranges.
+  // TODO(rashaeqbal): Consider relaxing this constraint by more precise tracking of fulfilled
+  // offsets with a bitmap. Might require capping the max permissible length of a page request.
   void OnPagesSupplied(uint64_t offset, uint64_t len);
 
   // Fails outstanding page requests in the range [offset, offset + len). Events associated with the
@@ -316,6 +324,14 @@ class PageSource final : public PageRequestInterface {
 
   // Updates the request tracking metadata to account for pages [offset, offset + len) having
   // been dirtied in the owning VMO.
+  //
+  // Note that the range [offset, offset + len) should not have been previously dirtied. The page
+  // request tracking in PageSource works by tracking only a fulfilled length, and not exact
+  // fulfilled offsets, to save on memory required for metadata. So in order to prevent
+  // over-accounting errors, the caller must ensure that they are only calling OnPagesDirtied for
+  // newly dirtied ranges.
+  // TODO(rashaeqbal): Consider relaxing this constraint by more precise tracking of fulfilled
+  // offsets with a bitmap. Might require capping the max permissible length of a page request.
   void OnPagesDirtied(uint64_t offset, uint64_t len);
 
   // Detaches the source from the VMO. All future calls into the page source will fail. All
