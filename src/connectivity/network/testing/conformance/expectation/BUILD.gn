@@ -15,6 +15,7 @@ if (is_host) {
     "icmpv6.go",
     "icmpv6_router.go",
     "igmp.go",
+    "igmpv3.go",
     "ip.go",
     "ipv6.go",
     "ipv6_mld.go",
