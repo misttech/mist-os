@@ -63,7 +63,19 @@ void FileConnection::Describe(DescribeCallback callback) {
 }
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCallback callback) {
-  Connection::GetConnectionInfo(vn_, std::move(callback));
+  fuchsia::io::Operations rights = fuchsia::io::Operations::GET_ATTRIBUTES;
+  if (!Flags::IsNodeReference(flags())) {
+    if (Flags::IsReadable(flags())) {
+      rights |= fuchsia::io::Operations::READ_BYTES;
+    }
+    if (Flags::IsWritable(flags())) {
+      rights |= fuchsia::io::Operations::WRITE_BYTES;
+    }
+    if (Flags::IsExecutable(flags())) {
+      rights |= fuchsia::io::Operations::EXECUTE;
+    }
+  }
+  callback(std::move(fuchsia::io::ConnectionInfo().set_rights(rights)));
 }
 
 void FileConnection::Sync(SyncCallback callback) { Connection::Sync(vn_, std::move(callback)); }

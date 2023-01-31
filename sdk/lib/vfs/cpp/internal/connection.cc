@@ -40,9 +40,6 @@ void Connection::Describe(Node* vn, fit::function<void(fuchsia::io::NodeInfoDepr
   }
 }
 
-void Connection::GetConnectionInfo(Node* vn,
-                                   fuchsia::io::Node::GetConnectionInfoCallback callback) {}
-
 zx_status_t Connection::Bind(zx::channel request, async_dispatcher_t* dispatcher) {
   auto status = BindInternal(std::move(request), dispatcher);
   if (status == ZX_OK && Flags::ShouldDescribe(flags_)) {

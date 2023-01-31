@@ -49,7 +49,6 @@ class Service : public vfs::internal::Node {
   zx_status_t GetAttr(fuchsia::io::NodeAttributes* out_attributes) const final;
 
   void Describe(fuchsia::io::NodeInfoDeprecated* out_info) final;
-  void GetConnectionInfo(fuchsia::io::ConnectionInfo* out_info) final;
 
   const Connector& connector() const { return connector_; }
 

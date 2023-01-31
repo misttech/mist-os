@@ -83,7 +83,17 @@ void FileConnection::Describe(DescribeCompleter::Sync& completer) {
 }
 
 void FileConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  completer.Reply({});
+  using fuchsia_io::Operations;
+  using fuchsia_io::wire::ConnectionInfo;
+
+  Operations rights = Operations::kGetAttributes;
+  if (!options().flags.node_reference) {
+    rights |= options().rights.read ? Operations::kReadBytes : Operations();
+    rights |= options().rights.write ? Operations::kWriteBytes : Operations();
+    rights |= options().rights.execute ? Operations::kExecute : Operations();
+  }
+  fidl::Arena arena;
+  completer.Reply(ConnectionInfo::Builder(arena).rights(rights).Build());
 }
 
 void FileConnection::Sync(SyncCompleter::Sync& completer) {

@@ -41,7 +41,8 @@ void NodeConnection::Query(QueryCallback callback) {
 }
 
 void NodeConnection::GetConnectionInfo(GetConnectionInfoCallback callback) {
-  Connection::GetConnectionInfo(vn_, std::move(callback));
+  constexpr fuchsia::io::Operations kNodeReferenceRights = fuchsia::io::Operations::GET_ATTRIBUTES;
+  callback(std::move(fuchsia::io::ConnectionInfo().set_rights(kNodeReferenceRights)));
 }
 
 void NodeConnection::Sync(SyncCallback callback) { Connection::Sync(vn_, std::move(callback)); }

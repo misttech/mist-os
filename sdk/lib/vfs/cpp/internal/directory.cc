@@ -61,8 +61,6 @@ void Directory::Describe(fuchsia::io::NodeInfoDeprecated* out_info) {
   out_info->set_directory(fuchsia::io::DirectoryObject());
 }
 
-void Directory::GetConnectionInfo(fuchsia::io::ConnectionInfo* out_info) { *out_info = {}; }
-
 zx_status_t Directory::Lookup(const std::string& name, Node** out_node) const {
   return ZX_ERR_NOT_SUPPORTED;
 }

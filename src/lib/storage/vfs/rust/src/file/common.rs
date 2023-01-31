@@ -11,12 +11,12 @@ use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 /// `writable` is true, or either when both are true.  It also does some sanity checking and
 /// normalization, matching `flags` with the `mode` value.
 ///
-/// On success, returns the validated flags, with some ambiguities cleaned up.  On failure, it
+/// On success, returns the validated flags, with some ambiguities cleaned up. On failure, it
 /// returns a [`Status`] indicating the problem.
 ///
 /// `OPEN_FLAG_NODE_REFERENCE` is preserved and prohibits both read and write access.
 ///
-/// Changing this function can be dangerous!  Flags operations may have security implications.
+/// Changing this function can be dangerous! Flags operations may have security implications.
 pub fn new_connection_validate_flags(
     mut flags: fio::OpenFlags,
     mut readable: bool,
@@ -119,7 +119,7 @@ pub fn vmo_flags_to_rights(vmo_flags: fio::VmoFlags) -> zx::Rights {
 /// Validate flags passed to `get_backing_memory` against the underlying connection flags.
 /// Returns Ok() if the flags were validated, and an Error(zx::Status) otherwise.
 ///
-/// Changing this function can be dangerous!  Flags operations may have security implications.
+/// Changing this function can be dangerous! Flags operations may have security implications.
 pub fn get_backing_memory_validate_flags(
     vmo_flags: fio::VmoFlags,
     connection_flags: fio::OpenFlags,
@@ -157,6 +157,23 @@ pub fn get_backing_memory_validate_flags(
     }
 
     Ok(())
+}
+
+/// Map a set of io1 rights flags for files to their respective io2 Operations.
+///
+/// Changing this function can be dangerous! Allowed operations may have security implications.
+pub fn io1_rights_to_io2_operations(flags: &fio::OpenFlags) -> fio::Operations {
+    let mut operations = fio::Operations::empty();
+    if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+        operations |= fio::Operations::READ_BYTES;
+    }
+    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+        operations |= fio::Operations::WRITE_BYTES;
+    }
+    if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+        operations |= fio::Operations::EXECUTE;
+    }
+    operations
 }
 
 #[cfg(test)]

@@ -47,7 +47,6 @@ class File : public Node {
   virtual zx_status_t Truncate(uint64_t length);
 
   void Describe(fuchsia::io::NodeInfoDeprecated* out_info) override;
-  void GetConnectionInfo(fuchsia::io::ConnectionInfo* out_info) override;
 
   // Returns current file length.
   //

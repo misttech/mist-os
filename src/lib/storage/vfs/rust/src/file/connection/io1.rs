@@ -8,7 +8,10 @@ use {
         directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope,
         file::{
-            common::{get_backing_memory_validate_flags, new_connection_validate_flags},
+            common::{
+                get_backing_memory_validate_flags, io1_rights_to_io2_operations,
+                new_connection_validate_flags,
+            },
             File, FileIo,
         },
         path::Path,
@@ -671,8 +674,15 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             }
             fio::FileRequest::GetConnectionInfo { responder } => {
                 fuchsia_trace::duration!("storage", "File::GetConnectionInfo");
-                let _ = responder;
-                todo!("https://fxbug.dev/77623");
+                // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES.
+                let mut rights = fio::Operations::GET_ATTRIBUTES;
+                if !self.flags.contains(fio::OpenFlags::NODE_REFERENCE) {
+                    rights |= io1_rights_to_io2_operations(&self.flags);
+                }
+                responder.send(fio::ConnectionInfo {
+                    rights: Some(rights),
+                    ..fio::ConnectionInfo::EMPTY
+                })?;
             }
             fio::FileRequest::Sync { responder } => {
                 fuchsia_trace::duration!("storage", "File::Sync");

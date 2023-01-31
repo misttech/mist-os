@@ -17,8 +17,6 @@ void Service::Describe(fuchsia::io::NodeInfoDeprecated* out_info) {
   out_info->set_service(fuchsia::io::Service());
 }
 
-void Service::GetConnectionInfo(fuchsia::io::ConnectionInfo* out_info) { *out_info = {}; }
-
 zx_status_t Service::CreateConnection(fuchsia::io::OpenFlags flags,
                                       std::unique_ptr<vfs::internal::Connection>* connection) {
   return ZX_ERR_NOT_SUPPORTED;

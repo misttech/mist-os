@@ -30,7 +30,6 @@ class TestNode : public vfs::internal::Node {
 
  private:
   void Describe(fuchsia::io::NodeInfoDeprecated* out_info) override {}
-  void GetConnectionInfo(fuchsia::io::ConnectionInfo* out_info) override {}
 
   zx_status_t CreateConnection(fuchsia::io::OpenFlags flags,
                                std::unique_ptr<vfs::internal::Connection>* connection) override {

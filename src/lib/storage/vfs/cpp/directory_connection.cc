@@ -123,7 +123,15 @@ void DirectoryConnection::Query(QueryCompleter::Sync& completer) {
 }
 
 void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  completer.Reply({});
+  using fuchsia_io::Operations;
+  using fuchsia_io::wire::ConnectionInfo;
+
+  Operations rights = Operations::kGetAttributes;
+  if (!options().flags.node_reference) {
+    rights |= Operations::kEnumerate | Operations::kTraverse;
+  }
+  fidl::Arena arena;
+  completer.Reply(ConnectionInfo::Builder(arena).rights(rights).Build());
 }
 
 void DirectoryConnection::Sync(SyncCompleter::Sync& completer) {

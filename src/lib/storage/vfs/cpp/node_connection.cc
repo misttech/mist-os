@@ -64,7 +64,11 @@ void NodeConnection::Query(QueryCompleter::Sync& completer) {
 }
 
 void NodeConnection::GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) {
-  completer.Reply({});
+  using fuchsia_io::Operations;
+  using fuchsia_io::wire::ConnectionInfo;
+
+  fidl::Arena arena;
+  completer.Reply(ConnectionInfo::Builder(arena).rights(Operations::kGetAttributes).Build());
 }
 
 void NodeConnection::Sync(SyncCompleter::Sync& completer) {

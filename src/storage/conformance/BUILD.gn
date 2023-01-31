@@ -77,6 +77,7 @@ rustc_test("io1_conformance_test") {
     "tests/file/read.rs",
     "tests/file/resize.rs",
     "tests/file/write.rs",
+    "tests/get_connection_info.rs",
     "tests/remote.rs",
     "tests/tests.rs",
   ]

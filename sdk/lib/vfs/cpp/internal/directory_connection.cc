@@ -48,7 +48,11 @@ void DirectoryConnection::Query(QueryCallback callback) {
 }
 
 void DirectoryConnection::GetConnectionInfo(GetConnectionInfoCallback callback) {
-  Connection::GetConnectionInfo(vn_, std::move(callback));
+  fuchsia::io::Operations rights = fuchsia::io::Operations::GET_ATTRIBUTES;
+  if (!Flags::IsNodeReference(flags())) {
+    rights |= fuchsia::io::Operations::TRAVERSE | fuchsia::io::Operations::ENUMERATE;
+  }
+  callback(std::move(fuchsia::io::ConnectionInfo().set_rights(rights)));
 }
 
 void DirectoryConnection::Sync(SyncCallback callback) {

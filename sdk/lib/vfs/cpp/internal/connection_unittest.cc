@@ -74,7 +74,6 @@ class DummyTestNode : public vfs::internal::Node {
   }
 
   void Describe(fuchsia::io::NodeInfoDeprecated* out_info) override {}
-  void GetConnectionInfo(fuchsia::io::ConnectionInfo* out_info) override {}
 
   fuchsia::io::OpenFlags GetAllowedFlags() const override { return {}; }
 

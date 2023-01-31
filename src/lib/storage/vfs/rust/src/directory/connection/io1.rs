@@ -184,8 +184,16 @@ where
             }
             fio::DirectoryRequest::GetConnectionInfo { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetConnectionInfo");
-                let _ = responder;
-                todo!("https://fxbug.dev/77623");
+                // TODO(https://fxbug.dev/77623): Restrict GET_ATTRIBUTES, ENUMERATE, and TRAVERSE.
+                // TODO(https://fxbug.dev/77623): Implement MODIFY_DIRECTORY and UPDATE_ATTRIBUTES.
+                let mut rights = fio::Operations::GET_ATTRIBUTES;
+                if !self.flags.contains(fio::OpenFlags::NODE_REFERENCE) {
+                    rights |= fio::Operations::ENUMERATE | fio::Operations::TRAVERSE;
+                }
+                responder.send(fio::ConnectionInfo {
+                    rights: Some(rights),
+                    ..fio::ConnectionInfo::EMPTY
+                })?;
             }
             fio::DirectoryRequest::GetAttr { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetAttr");
