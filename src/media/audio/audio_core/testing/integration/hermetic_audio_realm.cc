@@ -127,7 +127,7 @@ void HermeticAudioRealm::Create(Options options, async_dispatcher* dispatcher,
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::RealmArgs realm_args;
   realm_args.set_root_driver("fuchsia-boot:///#driver/platform-bus.so");
 
@@ -318,7 +318,7 @@ inspect::Hierarchy HermeticAudioRealm::ReadInspect(std::string_view component_na
   FX_CHECK(component_name == kAudioCore);
 
   fuchsia::inspect::TreeSyncPtr tree;
-  auto status = fdio_service_connect_at(root_.CloneRoot().TakeChannel().release(),
+  auto status = fdio_service_connect_at(root_.component().exposed().unowned_channel()->get(),
                                         "diagnostics-audio-core/fuchsia.inspect.Tree",
                                         tree.NewRequest().TakeChannel().release());
   FX_CHECK(status == ZX_OK) << "could not connect to fuchsia.inspect.Tree for component '"

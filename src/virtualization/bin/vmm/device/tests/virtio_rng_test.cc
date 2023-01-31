@@ -46,7 +46,7 @@ class VirtioRngTest : public TestWithDevice {
                         .targets = {ParentRef()}});
 
     realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
-    rng_ = realm_->ConnectSync<fuchsia::virtualization::hardware::VirtioRng>();
+    rng_ = realm_->component().ConnectSync<fuchsia::virtualization::hardware::VirtioRng>();
 
     fuchsia::virtualization::hardware::StartInfo start_info;
     zx_status_t status = MakeStartInfo(queue_.end(), &start_info);

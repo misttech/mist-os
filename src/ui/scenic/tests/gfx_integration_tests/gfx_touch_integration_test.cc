@@ -145,11 +145,11 @@ class GfxTouchIntegrationTest : public zxtest::Test, public loop_fixture::RealLo
             .AddRealmProtocol(fuchsia::ui::pointerinjector::Registry::Name_)
             .Build());
 
-    scenic_ = realm_->Connect<fuchsia::ui::scenic::Scenic>();
+    scenic_ = realm_->component().Connect<fuchsia::ui::scenic::Scenic>();
     scenic_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
-    registry_ = realm_->Connect<fuchsia::ui::pointerinjector::Registry>();
+    registry_ = realm_->component().Connect<fuchsia::ui::pointerinjector::Registry>();
     registry_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to pointerinjector Registry: %s", zx_status_get_string(status));
     });

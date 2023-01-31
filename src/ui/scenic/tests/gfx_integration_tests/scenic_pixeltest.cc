@@ -2436,7 +2436,7 @@ TEST_P(ParameterizedImage3PixelTest, Image3PixelTest) {
 
   // Create Scenic Allocator channel.
   fuchsia::ui::composition::AllocatorPtr scenic_allocator;
-  scenic_allocator = realm()->Connect<fuchsia::ui::composition::Allocator>();
+  scenic_allocator = realm()->component().Connect<fuchsia::ui::composition::Allocator>();
   EXPECT_TRUE(scenic_allocator.is_bound());
   scenic_allocator.set_error_handler(
       [](zx_status_t status) { FAIL() << "Lost connection to Scenic Allocator"; });
@@ -2645,7 +2645,7 @@ TEST_F(ScenicPixelTest, CreateImage3FromMultipleSessions) {
 
   // Create Scenic Allocator channel.
   fuchsia::ui::composition::AllocatorPtr scenic_allocator;
-  scenic_allocator = realm()->Connect<fuchsia::ui::composition::Allocator>();
+  scenic_allocator = realm()->component().Connect<fuchsia::ui::composition::Allocator>();
   EXPECT_TRUE(scenic_allocator.is_bound());
   scenic_allocator.set_error_handler(
       [](zx_status_t status) { FAIL() << "Lost connection to Scenic Allocator"; });

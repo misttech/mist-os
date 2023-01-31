@@ -41,7 +41,8 @@ TEST_F(OutgoingDirectoryTest, Connects) {
                                .targets = {ChildRef{kEchoServiceServer}}});
   auto realm = realm_builder.Build(dispatcher());
 
-  auto default_service = sys::OpenServiceAt<fuchsia::examples::EchoService>(realm.CloneRoot());
+  auto default_service =
+      sys::OpenServiceAt<fuchsia::examples::EchoService>(realm.component().CloneExposedDir());
   auto regular = default_service.regular_echo().Connect().Bind();
 
   constexpr char kMessage[] = "Ping!";

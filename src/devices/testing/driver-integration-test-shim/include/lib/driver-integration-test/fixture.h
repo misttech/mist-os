@@ -53,11 +53,11 @@ class IsolatedDevmgr {
   const fbl::unique_fd& devfs_root() const { return devfs_root_; }
 
   zx_status_t Connect(const std::string& interface_name, zx::channel channel) {
-    return realm_->Connect(interface_name, std::move(channel));
+    return realm_->component().Connect(interface_name, std::move(channel));
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> fshost_svc_dir() const {
-    auto root = realm_->CloneRoot();
+    auto root = realm_->component().CloneExposedDir();
     return fidl::ClientEnd<fuchsia_io::Directory>(root.TakeChannel());
   }
 

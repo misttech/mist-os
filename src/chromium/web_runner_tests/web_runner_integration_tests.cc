@@ -111,7 +111,7 @@ class ChromiumAppTest : public gtest::RealLoopFixture,
                                  .targets = {ParentRef()}});
     realm_ = std::make_unique<component_testing::RealmRoot>(realm_builder.Build(dispatcher()));
     auto incoming_service_clone = context_->svc()->CloneChannel();
-    auto web_context_provider = realm_->Connect<fuchsia::web::ContextProvider>();
+    auto web_context_provider = realm_->component().Connect<fuchsia::web::ContextProvider>();
     web_context_provider.set_error_handler([](zx_status_t status) {
       FX_LOGS(ERROR) << "web_context_provider: " << zx_status_get_string(status);
     });

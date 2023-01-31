@@ -173,7 +173,7 @@ class MouseInputBase : public ui_testing::PortableUITest {
 
     // Get the display dimensions.
     FX_LOGS(INFO) << "Waiting for scenic display info";
-    auto scenic = realm_root()->Connect<fuchsia::ui::scenic::Scenic>();
+    auto scenic = realm_root()->component().Connect<fuchsia::ui::scenic::Scenic>();
     scenic->GetDisplayInfo([this](fuchsia::ui::gfx::DisplayInfo display_info) {
       display_width_ = display_info.width_in_px;
       display_height_ = display_info.height_in_px;

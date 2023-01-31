@@ -187,7 +187,7 @@ TEST_F(RealmBuilderTest, RouteServiceToComponent) {
 
   auto realm = builder.Build(dispatcher());
   fuchsia::process::explorer::QueryPtr explorer;
-  ASSERT_EQ(realm.Connect(explorer.NewRequest()), ZX_OK);
+  ASSERT_EQ(realm.component().Connect(explorer.NewRequest()), ZX_OK);
   zx::socket socket[2];
   ASSERT_EQ(zx::socket::create(0u, &socket[0], &socket[1]), ZX_OK);
   explorer->WriteJsonProcessesData(std::move(socket[0]));

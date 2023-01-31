@@ -146,7 +146,7 @@ std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithRealmBuilder(
   InstallInRealm(realm_builder.root(), guest_launch_info);
   realm_root_ =
       std::make_unique<component_testing::RealmRoot>(realm_builder.Build(loop_.dispatcher()));
-  return std::make_unique<sys::ServiceDirectory>(realm_root_->CloneRoot());
+  return std::make_unique<sys::ServiceDirectory>(realm_root_->component().CloneExposedDir());
 }
 
 std::unique_ptr<sys::ServiceDirectory> EnclosedGuest::StartWithUITestManager(

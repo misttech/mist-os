@@ -94,7 +94,8 @@ void GuestInteractionTest::SetUp() {
 
   realm_root_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
   fuchsia::virtualization::GuestManager_Launch_Result res;
-  guest_manager_ = realm_root_->ConnectSync<fuchsia::virtualization::DebianGuestManager>();
+  guest_manager_ =
+      realm_root_->component().ConnectSync<fuchsia::virtualization::DebianGuestManager>();
 
   FX_LOGS(INFO) << "Starting Debian Guest";
   ASSERT_OK(guest_manager_->Launch(std::move(cfg), guest_.NewRequest(), &res));

@@ -102,11 +102,11 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
   std::shared_ptr<sys::ServiceDirectory> svc() { return component_context_->svc(); }
 
   std::string cm1_selector() {
-    return "realm_builder\\:" + realm_->GetChildName() + "/test_app:root";
+    return "realm_builder\\:" + realm_->component().GetChildName() + "/test_app:root";
   }
 
   std::string cm2_selector() {
-    return "realm_builder\\:" + realm_->GetChildName() + "/test_app_2:root";
+    return "realm_builder\\:" + realm_->component().GetChildName() + "/test_app_2:root";
   }
 
  private:

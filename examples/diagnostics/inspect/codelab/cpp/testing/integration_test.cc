@@ -43,12 +43,12 @@ fuchsia::examples::inspect::ReverserPtr IntegrationTest::ConnectToReverser(TestO
           .targets = {component_testing::ChildRef{"reverser"}}});
   realm_ = std::make_unique<component_testing::RealmRoot>(realm_builder.Build());
   fuchsia::examples::inspect::ReverserPtr proxy;
-  realm_->Connect(proxy.NewRequest());
+  realm_->component().Connect(proxy.NewRequest());
   return proxy;
 }
 
 std::string IntegrationTest::ReverserMonikerForSelectors() const {
-  auto root_name = realm_->GetChildName();
+  auto root_name = realm_->component().GetChildName();
   return "realm_builder\\:" + root_name + "/reverser";
 }
 

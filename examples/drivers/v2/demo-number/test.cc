@@ -26,7 +26,7 @@ TEST(DriverTestRealmTest, DriversExist) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
 
   auto args = fuchsia::driver::test::RealmArgs();
   args.set_use_driver_framework_v2(true);

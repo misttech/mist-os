@@ -29,7 +29,7 @@ class RuntimeTest : public gtest::TestLoopFixture {
 
     // Start DriverTestRealm.
     fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-    ASSERT_EQ(ZX_OK, realm_->Connect(driver_test_realm.NewRequest()));
+    ASSERT_EQ(ZX_OK, realm_->component().Connect(driver_test_realm.NewRequest()));
     fuchsia::driver::test::Realm_Start_Result realm_result;
     ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
     ASSERT_FALSE(realm_result.is_err());

@@ -47,13 +47,13 @@ class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test, public loop
                                              .AddRealmProtocol(fuv::ViewRefInstalled::Name_)
                                              .Build());
 
-    flatland_display_ = realm_->Connect<fuc::FlatlandDisplay>();
+    flatland_display_ = realm_->component().Connect<fuc::FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
 
     // Set up root view.
-    root_session_ = realm_->Connect<fuc::Flatland>();
+    root_session_ = realm_->component().Connect<fuc::Flatland>();
     root_session_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
@@ -75,7 +75,7 @@ class FlatlandViewRefInstalledIntegrationTest : public zxtest::Test, public loop
     });
     BlockingPresent(root_session_);
 
-    view_ref_installed_ptr_ = realm_->Connect<fuv::ViewRefInstalled>();
+    view_ref_installed_ptr_ = realm_->component().Connect<fuv::ViewRefInstalled>();
     view_ref_installed_ptr_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to ViewRefInstalled: %s", zx_status_get_string(status));
     });
@@ -147,7 +147,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, InvalidatedViewRef_ShouldReturnE
 TEST_F(FlatlandViewRefInstalledIntegrationTest, InstalledViewRef_ShouldReturnImmediately) {
   // Create the child view and connect it to the root view.
   fuc::FlatlandPtr child_session;
-  child_session = realm_->Connect<fuc::Flatland>();
+  child_session = realm_->component().Connect<fuc::Flatland>();
 
   auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
@@ -194,7 +194,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, WaitedOnViewRef_ShouldReturnWhen
 
   // Create the child view with the viewRef.
   fuc::FlatlandPtr child_session;
-  child_session = realm_->Connect<fuc::Flatland>();
+  child_session = realm_->component().Connect<fuc::Flatland>();
 
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   fuc::ViewBoundProtocols protocols;
@@ -221,7 +221,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest,
        InstalledAndDisconnectedViewRef_ShouldReturnResponse) {
   // Create the child view and connect it to the root view.
   fuc::FlatlandPtr child_session;
-  child_session = realm_->Connect<fuc::Flatland>();
+  child_session = realm_->component().Connect<fuc::Flatland>();
 
   auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
@@ -257,7 +257,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest,
 TEST_F(FlatlandViewRefInstalledIntegrationTest, InstalledAndDestroyedViewRef_ShouldReturnError) {
   // Create the child view and connect it to the root view.
   fuc::FlatlandPtr child_session;
-  child_session = realm_->Connect<fuc::Flatland>();
+  child_session = realm_->component().Connect<fuc::Flatland>();
 
   auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
@@ -295,7 +295,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, InstalledAndDestroyedViewRef_Sho
 TEST_F(FlatlandViewRefInstalledIntegrationTest, TransitiveConnection_ShouldReturnResponse) {
   // Create the parent view and connect it to the root view.
   fuc::FlatlandPtr parent_session;
-  parent_session = realm_->Connect<fuc::Flatland>();
+  parent_session = realm_->component().Connect<fuc::Flatland>();
   auto [parent_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
 
   {
@@ -311,7 +311,7 @@ TEST_F(FlatlandViewRefInstalledIntegrationTest, TransitiveConnection_ShouldRetur
 
   // Create the child view and connect it to the parent view.
   fuc::FlatlandPtr child_session;
-  child_session = realm_->Connect<fuc::Flatland>();
+  child_session = realm_->component().Connect<fuc::Flatland>();
   fuv::ViewRef child_view_ref;
   {
     auto [child_token, parent_token] = scenic::ViewCreationTokenPair::New();

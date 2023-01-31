@@ -410,7 +410,7 @@ class AdbRealmTest : public AdbTest, public loop_fixture::RealLoop {
 };
 
 TEST_F(AdbRealmTest, ServiceConnectTest) {
-  auto provider = realm_->Connect<fuchsia::hardware::adb::Provider>();
+  auto provider = realm_->component().Connect<fuchsia::hardware::adb::Provider>();
 
   zx::socket server, client;
   EXPECT_EQ(zx::socket::create(ZX_SOCKET_STREAM, &server, &client), ZX_OK);
@@ -424,7 +424,7 @@ TEST_F(AdbRealmTest, ServiceConnectTest) {
 }
 
 TEST_F(AdbRealmTest, ServiceOpenCloseTest) {
-  auto provider = realm_->Connect<fuchsia::hardware::adb::Provider>();
+  auto provider = realm_->component().Connect<fuchsia::hardware::adb::Provider>();
   zx::socket server, client;
   EXPECT_EQ(zx::socket::create(ZX_SOCKET_STREAM, &server, &client), ZX_OK);
 
@@ -476,7 +476,7 @@ TEST_F(AdbRealmTest, ServiceOpenCloseTest) {
 }
 
 TEST_F(AdbRealmTest, ServiceReadWriteTest) {
-  auto provider = realm_->Connect<fuchsia::hardware::adb::Provider>();
+  auto provider = realm_->component().Connect<fuchsia::hardware::adb::Provider>();
   zx::socket server, client;
   EXPECT_EQ(zx::socket::create(ZX_SOCKET_STREAM, &server, &client), ZX_OK);
 

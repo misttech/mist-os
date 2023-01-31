@@ -67,8 +67,8 @@ class FakeBuildInfoTestFixture : public gtest::RealLoopFixture {
 };
 
 TEST_F(FakeBuildInfoTestFixture, SetBuildInfo) {
-  auto provider = realm()->ConnectSync<Provider>();
-  auto test_controller = realm()->ConnectSync<BuildInfoTestController>();
+  auto provider = realm()->component().ConnectSync<Provider>();
+  auto test_controller = realm()->component().ConnectSync<BuildInfoTestController>();
 
   BuildInfo result;
   provider->GetBuildInfo(&result);

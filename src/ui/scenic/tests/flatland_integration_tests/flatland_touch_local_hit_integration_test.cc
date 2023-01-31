@@ -89,23 +89,24 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public loop_fi
             .AddRealmProtocol(fuchsia::ui::pointerinjector::Registry::Name_)
             .Build());
 
-    flatland_display_ = realm_->Connect<FlatlandDisplay>();
+    flatland_display_ = realm_->component().Connect<FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
 
-    pointerinjector_registry_ = realm_->Connect<fuchsia::ui::pointerinjector::Registry>();
+    pointerinjector_registry_ =
+        realm_->component().Connect<fuchsia::ui::pointerinjector::Registry>();
     pointerinjector_registry_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to pointerinjector Registry: %s", zx_status_get_string(status));
     });
 
-    local_hit_registry_ = realm_->Connect<fuchsia::ui::pointer::augment::LocalHit>();
+    local_hit_registry_ = realm_->component().Connect<fuchsia::ui::pointer::augment::LocalHit>();
     local_hit_registry_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to LocalHit Registry: %s", zx_status_get_string(status));
     });
 
     // Set up root view and root transform.
-    root_instance_ = realm_->Connect<Flatland>();
+    root_instance_ = realm_->component().Connect<Flatland>();
     root_instance_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
@@ -234,7 +235,7 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public loop_fi
                                 TransformId parent_of_viewport_transform,
                                 ContentId viewport_content_id, FlatlandPtr& child_instance,
                                 fidl::InterfaceRequest<TouchSource> child_touch_source = nullptr) {
-    child_instance = realm_->Connect<Flatland>();
+    child_instance = realm_->component().Connect<Flatland>();
 
     // Set up the child view watcher.
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;

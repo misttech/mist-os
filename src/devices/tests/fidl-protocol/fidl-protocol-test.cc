@@ -24,7 +24,7 @@ TEST_F(FidlProtocolTest, ChildBinds) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
@@ -61,7 +61,7 @@ TEST_F(FidlProtocolTest, ColocateFlagIsRespected) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
@@ -84,7 +84,7 @@ TEST_F(FidlProtocolTest, ColocateFlagIsRespected) {
 
   // Connect to the driver development server.
   fuchsia::driver::development::DriverDevelopmentSyncPtr driver_dev;
-  status = realm.Connect(driver_dev.NewRequest());
+  status = realm.component().Connect(driver_dev.NewRequest());
   ASSERT_EQ(status, ZX_OK);
 
   // Get the child device's driver host.
@@ -130,7 +130,7 @@ TEST_F(FidlProtocolTest, MustIsolateFlagIsPassed) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
@@ -152,7 +152,7 @@ TEST_F(FidlProtocolTest, MustIsolateFlagIsPassed) {
 
   // Connect to the driver development server.
   fuchsia::driver::development::DriverDevelopmentSyncPtr driver_dev;
-  status = realm.Connect(driver_dev.NewRequest());
+  status = realm.component().Connect(driver_dev.NewRequest());
   ASSERT_EQ(status, ZX_OK);
 
   fuchsia::driver::development::DeviceInfoIteratorSyncPtr iterator;
@@ -179,7 +179,7 @@ TEST_F(FidlProtocolTest, ChildBindsV2) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
 
   auto args = fuchsia::driver::test::RealmArgs();

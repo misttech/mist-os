@@ -29,7 +29,7 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
     realm_ = std::make_unique<component_testing::RealmRoot>(realm_builder.Build(dispatcher()));
 
     fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-    ASSERT_EQ(realm_->Connect(driver_test_realm.NewRequest()), ZX_OK);
+    ASSERT_EQ(realm_->component().Connect(driver_test_realm.NewRequest()), ZX_OK);
     fuchsia::driver::test::Realm_Start_Result realm_result;
     ASSERT_EQ(driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result), ZX_OK);
     ASSERT_FALSE(realm_result.is_err());
@@ -83,7 +83,7 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
     }
 
     // Connect to the DriverDevelopment service.
-    status = realm_->Connect(driver_dev_.NewRequest());
+    status = realm_->component().Connect(driver_dev_.NewRequest());
     ASSERT_EQ(status, ZX_OK);
   }
 

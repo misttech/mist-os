@@ -97,7 +97,7 @@ class VirtioBlockTest : public TestWithDevice,
     fd_ = fbl::unique_fd(open(path_template, O_RDWR));
     ASSERT_TRUE(fd_);
 
-    block_ = realm_->ConnectSync<fuchsia::virtualization::hardware::VirtioBlock>();
+    block_ = realm_->component().ConnectSync<fuchsia::virtualization::hardware::VirtioBlock>();
 
     uint64_t capacity;
     uint32_t block_size;

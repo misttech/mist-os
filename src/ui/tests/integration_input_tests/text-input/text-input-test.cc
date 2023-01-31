@@ -205,7 +205,7 @@ class TextInputTest : public gtest::RealLoopFixture {
 
   void RegisterKeyboard() {
     FX_LOGS(INFO) << "Registering fake keyboard";
-    input_registry_ = realm_root_->Connect<fuchsia::ui::test::input::Registry>();
+    input_registry_ = realm_root_->component().Connect<fuchsia::ui::test::input::Registry>();
     input_registry_.set_error_handler([](zx_status_t status) {
       FX_LOGS(ERROR) << "Error from input helper" << zx_status_get_string(status);
     });
@@ -221,11 +221,11 @@ class TextInputTest : public gtest::RealLoopFixture {
   void InitializeScene() {
     // Instruct Scene Manager to present test's View.
     std::optional<zx_koid_t> view_ref_koid;
-    scene_provider_ = realm_root_->Connect<fuchsia::ui::test::scene::Controller>();
+    scene_provider_ = realm_root_->component().Connect<fuchsia::ui::test::scene::Controller>();
     scene_provider_.set_error_handler(
         [](auto) { FX_LOGS(ERROR) << "Error from test scene provider"; });
     fuchsia::ui::test::scene::ControllerAttachClientViewRequest request;
-    request.set_view_provider(realm_root_->Connect<fuchsia::ui::app::ViewProvider>());
+    request.set_view_provider(realm_root_->component().Connect<fuchsia::ui::app::ViewProvider>());
     scene_provider_->RegisterViewTreeWatcher(view_tree_watcher_.NewRequest(), []() {});
     scene_provider_->AttachClientView(
         std::move(request),

@@ -272,14 +272,14 @@ void FlutterEmbedderTest::BuildRealmAndLaunchApp(const std::string& component_ur
   // Get the display information using the |fuchsia.ui.display.singleton.Info|.
   std::optional<bool> has_completed;
   fuchsia::ui::display::singleton::InfoPtr display_info =
-      realm_->Connect<fuchsia::ui::display::singleton::Info>();
+      realm_->component().Connect<fuchsia::ui::display::singleton::Info>();
   display_info->GetMetrics([this, &has_completed](auto info) {
     display_width_ = info.extent_in_px().width;
     display_height_ = info.extent_in_px().height;
     has_completed = true;
   });
 
-  screenshotter_ = realm_->Connect<fuchsia::ui::composition::Screenshot>();
+  screenshotter_ = realm_->component().Connect<fuchsia::ui::composition::Screenshot>();
 
   RunLoopUntil([&has_completed] { return has_completed.has_value(); });
 
@@ -290,11 +290,11 @@ void FlutterEmbedderTest::BuildRealmAndLaunchApp(const std::string& component_ur
 
   // Instruct Root Presenter to present test's View.
   std::optional<zx_koid_t> view_ref_koid;
-  scene_provider_ = realm_->Connect<fuchsia::ui::test::scene::Controller>();
+  scene_provider_ = realm_->component().Connect<fuchsia::ui::test::scene::Controller>();
   scene_provider_.set_error_handler(
       [](auto) { FX_LOGS(ERROR) << "Error from test scene provider"; });
   fuchsia::ui::test::scene::ControllerAttachClientViewRequest request;
-  request.set_view_provider(realm_->Connect<fuchsia::ui::app::ViewProvider>());
+  request.set_view_provider(realm_->component().Connect<fuchsia::ui::app::ViewProvider>());
   scene_provider_->RegisterViewTreeWatcher(view_tree_watcher_.NewRequest(), []() {});
   scene_provider_->AttachClientView(
       std::move(request),
@@ -311,13 +311,13 @@ void FlutterEmbedderTest::BuildRealmAndLaunchApp(const std::string& component_ur
   });
   FX_LOGS(INFO) << "Client view has rendered";
 
-  scenic_ = realm_->Connect<fuchsia::ui::scenic::Scenic>();
+  scenic_ = realm_->component().Connect<fuchsia::ui::scenic::Scenic>();
   FX_LOGS(INFO) << "Launched component: " << component_url;
 }
 
 void FlutterEmbedderTest::RegisterTouchScreen() {
   FX_LOGS(INFO) << "Registering fake touch screen";
-  input_registry_ = realm_->Connect<fuchsia::ui::test::input::Registry>();
+  input_registry_ = realm_->component().Connect<fuchsia::ui::test::input::Registry>();
   input_registry_.set_error_handler([](auto) { FX_LOGS(ERROR) << "Error from input helper"; });
   bool touchscreen_registered = false;
   fuchsia::ui::test::input::RegistryRegisterTouchScreenRequest request;

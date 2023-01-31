@@ -63,7 +63,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromChild) {
                                .source = ChildRef{kEchoServer},
                                .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
-  auto echo = realm.ConnectSync<test::placeholders::Echo>();
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response, fidl::StringPtr("hello"));
@@ -81,7 +81,7 @@ TEST_F(RealmBuilderTest, PackagedConfigValuesOnly) {
                                .source = ChildRef{kEchoServerSc},
                                .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
-  auto echo = realm.ConnectSync<test::placeholders::Echo>();
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response,
@@ -125,7 +125,7 @@ TEST_F(RealmBuilderTest, SetConfigValuesOnly) {
                                .source = ParentRef(),
                                .targets = {ChildRef{kEchoServerSc}}});
   auto realm = realm_builder.Build(dispatcher());
-  auto echo = realm.ConnectSync<test::placeholders::Echo>();
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response, fidl::StringPtr("hello "
@@ -156,7 +156,7 @@ TEST_F(RealmBuilderTest, MixPackagedAndSetConfigValues) {
                                .source = ParentRef(),
                                .targets = {ChildRef{kEchoServerSc}}});
   auto realm = realm_builder.Build(dispatcher());
-  auto echo = realm.ConnectSync<test::placeholders::Echo>();
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response, fidl::StringPtr("hello "
@@ -217,7 +217,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromRelativeChild) {
                                .source = ChildRef{kEchoServer},
                                .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
-  auto echo = realm.ConnectSync<test::placeholders::Echo>();
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response, fidl::StringPtr("hello"));
@@ -344,7 +344,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromLocalComponentRawPointer) {
                                .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
   test::placeholders::EchoPtr echo;
-  ASSERT_EQ(realm.Connect(echo.NewRequest()), ZX_OK);
+  ASSERT_EQ(realm.component().Connect(echo.NewRequest()), ZX_OK);
   echo->EchoString("hello", [](fidl::StringPtr response) { ASSERT_EQ(response, "hello"); });
 
   RunLoop();
@@ -370,7 +370,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolUsesLocalComponentFactory) {
                                .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
   test::placeholders::EchoPtr echo;
-  ASSERT_EQ(realm.Connect(echo.NewRequest()), ZX_OK);
+  ASSERT_EQ(realm.component().Connect(echo.NewRequest()), ZX_OK);
   echo->EchoString("hello", [&](fidl::StringPtr response) {
     ASSERT_EQ(response, "hello");
     QuitLoop();
@@ -413,7 +413,7 @@ TEST_F(RealmBuilderTest, ComponentCanStopAndBeRestarted) {
                                .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
   test::placeholders::EchoPtr echo;
-  ASSERT_EQ(realm.Connect(echo.NewRequest()), ZX_OK);
+  ASSERT_EQ(realm.component().Connect(echo.NewRequest()), ZX_OK);
   echo.set_error_handler([&](zx_status_t status) {
     FX_PLOGS(INFO, status) << "ComponentCanStopAndBeRestarted: Echo proxy error";
     if (status == ZX_ERR_PEER_CLOSED) {
@@ -454,7 +454,7 @@ TEST_F(RealmBuilderTest, ComponentCanStopAndBeRestarted) {
 
     // The component destructed, but it will start up again when another request
     // is made.
-    ASSERT_EQ(realm.Connect(echo.NewRequest()), ZX_OK);
+    ASSERT_EQ(realm.component().Connect(echo.NewRequest()), ZX_OK);
     echo->EchoString("You're back!", [&](fidl::StringPtr response) {
       FX_LOGS(INFO) << "ComponentCanStopAndBeRestarted: got_response = true, second response = "
                     << response;
@@ -498,7 +498,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromPrebuiltLocalComponentInstance) {
                                .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
   test::placeholders::EchoPtr echo;
-  ASSERT_EQ(realm.Connect(echo.NewRequest()), ZX_OK);
+  ASSERT_EQ(realm.component().Connect(echo.NewRequest()), ZX_OK);
   echo->EchoString("hello", [](fidl::StringPtr _) {});
 
   RunLoop();
@@ -648,7 +648,7 @@ TEST_F(RealmBuilderTest, ConnectsToChannelDirectly) {
   ASSERT_EQ(zx::channel::create(0, &controller, &request), ZX_OK);
   fidl::SynchronousInterfacePtr<test::placeholders::Echo> echo;
   echo.Bind(std::move(controller));
-  ASSERT_EQ(realm.Connect(test::placeholders::Echo::Name_, std::move(request)), ZX_OK);
+  ASSERT_EQ(realm.component().Connect(test::placeholders::Echo::Name_, std::move(request)), ZX_OK);
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response, fidl::StringPtr("hello"));
@@ -674,7 +674,7 @@ TEST_F(RealmBuilderTest, RoutesProtocolFromLocalComponentInSubRealm) {
 
   auto realm = realm_builder.Build(dispatcher());
   test::placeholders::EchoPtr echo;
-  ASSERT_EQ(realm.Connect(echo.NewRequest()), ZX_OK);
+  ASSERT_EQ(realm.component().Connect(echo.NewRequest()), ZX_OK);
   echo->EchoString("hello", [&](const fidl::StringPtr& response) {
     ASSERT_EQ("hello", response);
     QuitLoop();
@@ -765,7 +765,7 @@ TEST_F(RealmBuilderTest, RealmDeclCanBeReplaced) {
   realm_builder.ReplaceRealmDecl(std::move(decl));
   auto realm = realm_builder.Build(dispatcher());
 
-  auto echo = realm.ConnectSync<test::placeholders::Echo>();
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response, fidl::StringPtr("hello"));
@@ -779,7 +779,7 @@ TEST_F(RealmBuilderTest, BuildsRealmFromFragmentOnlyUrl) {
 
   auto realm_builder = RealmBuilder::CreateFromRelativeUrl(kPrePopulatedRealmUrl);
   auto realm = realm_builder.Build(dispatcher());
-  auto echo = realm.ConnectSync<test::placeholders::Echo>();
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response, fidl::StringPtr("hello"));
@@ -921,7 +921,7 @@ TEST_F(RealmBuilderTest, LocalComponentGetsLifecycleControllerStop) {
   }
 
   // Stop the components and verify all components have been asked to stop.
-  auto lifecycle_controller = realm->Connect<fuchsia::sys2::LifecycleController>();
+  auto lifecycle_controller = realm->component().Connect<fuchsia::sys2::LifecycleController>();
   for (size_t i = 0; i < components.size(); ++i) {
     size_t orig = destructors_called;
     std::string moniker = "./numbered" + std::to_string(i);
@@ -1159,7 +1159,7 @@ TEST_F(RealmBuilderTest, UsesProvidedSvcDirectory) {
                                .source = ChildRef{kEchoServer},
                                .targets = {ParentRef()}});
   auto realm = realm_builder.Build(dispatcher());
-  auto echo = realm.ConnectSync<test::placeholders::Echo>();
+  auto echo = realm.component().ConnectSync<test::placeholders::Echo>();
   fidl::StringPtr response;
   ASSERT_EQ(echo->EchoString("hello", &response), ZX_OK);
   EXPECT_EQ(response, fidl::StringPtr("hello"));
@@ -1170,13 +1170,13 @@ TEST_F(RealmBuilderTest, UsesRandomChildName) {
   {
     auto realm_builder = RealmBuilder::Create();
     auto realm = realm_builder.Build(dispatcher());
-    child_name_1 = realm.GetChildName();
+    child_name_1 = realm.component().GetChildName();
   }
   std::string child_name_2;
   {
     auto realm_builder = RealmBuilder::Create();
     auto realm = realm_builder.Build(dispatcher());
-    child_name_2 = realm.GetChildName();
+    child_name_2 = realm.component().GetChildName();
   }
 
   EXPECT_NE(child_name_1, child_name_2);

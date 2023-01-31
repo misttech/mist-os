@@ -63,15 +63,15 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
     auto context = sys::ComponentContext::Create();
     context->svc()->Connect(sysmem_allocator_.NewRequest());
 
-    flatland_display_ = realm_->Connect<fuc::FlatlandDisplay>();
+    flatland_display_ = realm_->component().Connect<fuc::FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
       FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
     });
 
-    flatland_allocator_ = realm_->ConnectSync<fuc::Allocator>();
+    flatland_allocator_ = realm_->component().ConnectSync<fuc::Allocator>();
 
     // Create a root view.
-    root_flatland_ = realm_->Connect<fuc::Flatland>();
+    root_flatland_ = realm_->component().Connect<fuc::Flatland>();
     root_flatland_.set_error_handler([](zx_status_t status) {
       FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
     });
@@ -89,7 +89,7 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
     root_flatland_->SetRootTransform(kRootTransform);
 
     // Get the display's width and height.
-    auto singleton_display = realm_->Connect<fuchsia::ui::display::singleton::Info>();
+    auto singleton_display = realm_->component().Connect<fuchsia::ui::display::singleton::Info>();
     std::optional<fuchsia::ui::display::singleton::Metrics> info;
     singleton_display->GetMetrics([&info](auto result) { info = std::move(result); });
     RunLoopUntil([&info] { return info.has_value(); });
@@ -97,7 +97,7 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
     display_width_ = info->extent_in_px().width;
     display_height_ = info->extent_in_px().height;
 
-    screenshotter_ = realm_->ConnectSync<fuc::Screenshot>();
+    screenshotter_ = realm_->component().ConnectSync<fuc::Screenshot>();
   }
 
   // Draws a rectangle of size |width|*|height|, color |color|, opacity |opacity| and origin
@@ -783,7 +783,7 @@ TEST_P(ParameterizedOpacityPixelTest, OpacityTest) {
 TEST_F(FlatlandPixelTestBase, ViewBoundClipping) {
   // Create a child view.
   fuc::FlatlandPtr child;
-  child = realm_->Connect<fuc::Flatland>();
+  child = realm_->component().Connect<fuc::Flatland>();
   uint32_t child_width = 0, child_height = 0;
 
   auto [view_creation_token, viewport_token] = scenic::ViewCreationTokenPair::New();
@@ -995,7 +995,7 @@ TEST_F(FlatlandPixelTestBase, ScaleTest) {
 // This test ensures that detaching a viewport ceases rendering the view.
 TEST_F(FlatlandPixelTestBase, ViewportDetach) {
   fuc::FlatlandPtr child;
-  child = realm_->Connect<fuc::Flatland>();
+  child = realm_->component().Connect<fuc::Flatland>();
 
   // Create the child view.
   auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();
@@ -1049,7 +1049,7 @@ TEST_F(FlatlandPixelTestBase, ViewportDetach) {
 // as hints for clients, and they won't affect rendering of views in Scenic.
 TEST_F(FlatlandPixelTestBase, InsetNotEnforced) {
   fuc::FlatlandPtr child;
-  child = realm_->Connect<fuc::Flatland>();
+  child = realm_->component().Connect<fuc::Flatland>();
 
   // Create the child view.
   auto [view_creation_token, viewport_creation_token] = scenic::ViewCreationTokenPair::New();

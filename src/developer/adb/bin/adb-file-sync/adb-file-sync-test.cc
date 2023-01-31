@@ -243,9 +243,9 @@ class AdbFileSyncTest : public gtest::RealLoopFixture {
     builder.SetConfigValue("adb-file-sync", "filesync_moniker", std::move(default_moniker));
     realm_ = std::make_unique<RealmRoot>(builder.Build(dispatcher()));
 
-    ASSERT_EQ(
-        realm_->Connect<fuchsia::hardware::adb::Provider>(file_sync_.NewRequest(dispatcher())),
-        ZX_OK);
+    ASSERT_EQ(realm_->component().Connect<fuchsia::hardware::adb::Provider>(
+                  file_sync_.NewRequest(dispatcher())),
+              ZX_OK);
 
     zx::socket server, client;
     ASSERT_EQ(zx::socket::create(ZX_SOCKET_STREAM, &server, &client), ZX_OK);

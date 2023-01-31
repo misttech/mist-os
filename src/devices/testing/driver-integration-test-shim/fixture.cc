@@ -91,7 +91,7 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  if (zx_status_t status = devmgr.realm_->Connect(driver_test_realm.NewRequest());
+  if (zx_status_t status = devmgr.realm_->component().Connect(driver_test_realm.NewRequest());
       status != ZX_OK) {
     return status;
   }
@@ -162,9 +162,9 @@ zx_status_t IsolatedDevmgr::SuspendDriverManager() {
   if (endpoints.is_error()) {
     return endpoints.error_value();
   }
-  zx_status_t status =
-      realm_->Connect(fidl::DiscoverableProtocolName<fuchsia_device_manager::Administrator>,
-                      endpoints->server.TakeChannel());
+  zx_status_t status = realm_->component().Connect(
+      fidl::DiscoverableProtocolName<fuchsia_device_manager::Administrator>,
+      endpoints->server.TakeChannel());
   if (status != ZX_OK) {
     return status;
   }

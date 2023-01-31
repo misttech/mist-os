@@ -179,7 +179,7 @@ TEST_F(Integration, MagmaDevice) {
   auto builder = RealmBuilder::Create();
   InitializeRoutes(builder);
   auto realm = builder.Build(loop_.dispatcher());
-  auto factory = realm.Connect<fuchsia::mediacodec::CodecFactory>();
+  auto factory = realm.component().Connect<fuchsia::mediacodec::CodecFactory>();
 
   factory.set_error_handler([&](zx_status_t status) {
     EXPECT_TRUE(false);
@@ -245,7 +245,7 @@ TEST_F(Integration, MagmaDeviceNoIcd) {
   magma_device_.set_has_icds(false);
 
   auto realm = builder.Build(loop_.dispatcher());
-  auto factory = realm.Connect<fuchsia::mediacodec::CodecFactory>();
+  auto factory = realm.component().Connect<fuchsia::mediacodec::CodecFactory>();
 
   factory.set_error_handler([&](zx_status_t status) {
     EXPECT_TRUE(false);
@@ -276,7 +276,7 @@ TEST_F(Integration, MagmaEncoder) {
   auto builder = RealmBuilder::Create();
   InitializeRoutes(builder);
   auto realm = builder.Build(loop_.dispatcher());
-  auto factory = realm.Connect<fuchsia::mediacodec::CodecFactory>();
+  auto factory = realm.component().Connect<fuchsia::mediacodec::CodecFactory>();
 
   factory.set_error_handler([&](zx_status_t status) {
     EXPECT_TRUE(false);

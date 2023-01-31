@@ -213,7 +213,7 @@ class VirtioWlTest : public TestWithDevice {
                         .targets = {ParentRef()}});
 
     realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
-    wl_ = realm_->ConnectSync<fuchsia::virtualization::hardware::VirtioWayland>();
+    wl_ = realm_->component().ConnectSync<fuchsia::virtualization::hardware::VirtioWayland>();
 
     fuchsia::virtualization::hardware::StartInfo start_info;
     zx_status_t status = MakeStartInfo(out_queue_.end(), &start_info);

@@ -54,7 +54,7 @@ class HermeticAudioRealm {
   // Connect to a discoverable service exposed by a child component.
   template <typename Interface>
   zx_status_t Connect(fidl::InterfaceRequest<Interface> request) const {
-    return root_.Connect(std::move(request));
+    return root_.component().Connect(std::move(request));
   }
 
   // Specialization for fuchsia.virtualaudio.Control, which is connected in a different way.

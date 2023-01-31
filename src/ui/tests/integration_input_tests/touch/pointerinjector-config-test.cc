@@ -262,8 +262,7 @@ class PointerInjectorConfigTest
 
   void RegisterInjectionDevice() {
     FX_LOGS(INFO) << "Registering fake touch screen";
-    input_registry_ =
-        realm_exposed_services()->template Connect<fuchsia::ui::test::input::Registry>();
+    input_registry_ = realm_exposed_services()->Connect<fuchsia::ui::test::input::Registry>();
     input_registry_.set_error_handler([](auto) { FX_LOGS(ERROR) << "Error from input helper"; });
 
     bool touchscreen_registered = false;

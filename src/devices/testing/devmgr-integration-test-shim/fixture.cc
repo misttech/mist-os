@@ -75,7 +75,7 @@ zx::result<IsolatedDevmgr> IsolatedDevmgr::Create(devmgr_launcher::Args args,
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  if (zx_status_t status = devmgr.realm_->Connect(driver_test_realm.NewRequest());
+  if (zx_status_t status = devmgr.realm_->component().Connect(driver_test_realm.NewRequest());
       status != ZX_OK) {
     return zx::error(status);
   }

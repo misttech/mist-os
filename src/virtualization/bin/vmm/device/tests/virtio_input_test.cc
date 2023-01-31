@@ -71,7 +71,7 @@ class VirtioInputTest : public TestWithDevice,
     zx_status_t status = MakeStartInfo(status_queue_.end(), &start_info);
     ASSERT_EQ(ZX_OK, status);
 
-    input_ = realm_->ConnectSync<fuchsia::virtualization::hardware::VirtioInput>();
+    input_ = realm_->component().ConnectSync<fuchsia::virtualization::hardware::VirtioInput>();
 
     status = input_->Start(std::move(start_info), std::move(input_type));
     ASSERT_EQ(ZX_OK, status);

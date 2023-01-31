@@ -122,11 +122,11 @@ bool PortableUITest::HasViewConnected(zx_koid_t view_ref_koid) {
 }
 
 void PortableUITest::LaunchClient() {
-  scene_provider_ = realm_->Connect<fuchsia::ui::test::scene::Controller>();
+  scene_provider_ = realm_->component().Connect<fuchsia::ui::test::scene::Controller>();
   scene_provider_.set_error_handler(
       [](auto) { FX_LOGS(ERROR) << "Error from test scene provider"; });
   fuchsia::ui::test::scene::ControllerAttachClientViewRequest request;
-  request.set_view_provider(realm_->Connect<fuchsia::ui::app::ViewProvider>());
+  request.set_view_provider(realm_->component().Connect<fuchsia::ui::app::ViewProvider>());
   scene_provider_->RegisterViewTreeWatcher(view_tree_watcher_.NewRequest(), []() {});
   scene_provider_->AttachClientView(std::move(request), [this](auto client_view_ref_koid) {
     client_root_view_ref_koid_ = client_view_ref_koid;
@@ -184,7 +184,7 @@ void PortableUITest::LaunchClientWithEmbeddedView() {
 
 void PortableUITest::RegisterTouchScreen() {
   FX_LOGS(INFO) << "Registering fake touch screen";
-  input_registry_ = realm_->Connect<fuchsia::ui::test::input::Registry>();
+  input_registry_ = realm_->component().Connect<fuchsia::ui::test::input::Registry>();
   input_registry_.set_error_handler([](auto) { FX_LOGS(ERROR) << "Error from input helper"; });
 
   bool touchscreen_registered = false;
@@ -239,7 +239,7 @@ void PortableUITest::InjectSwipe(int start_x, int start_y, int end_x, int end_y,
 
 void PortableUITest::RegisterMouse() {
   FX_LOGS(INFO) << "Registering fake mouse";
-  input_registry_ = realm_->Connect<fuchsia::ui::test::input::Registry>();
+  input_registry_ = realm_->component().Connect<fuchsia::ui::test::input::Registry>();
   input_registry_.set_error_handler([](auto) { FX_LOGS(ERROR) << "Error from input helper"; });
 
   bool mouse_registered = false;

@@ -57,10 +57,10 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest {
   void SetUp() override {
     ui_testing::PortableUITest::SetUp();
 
-    screenshotter_ = realm_root()->Connect<fuchsia::ui::composition::Screenshot>();
+    screenshotter_ = realm_root()->component().Connect<fuchsia::ui::composition::Screenshot>();
 
     // Get display information.
-    info_ = realm_root()->Connect<fuchsia::ui::display::singleton::Info>();
+    info_ = realm_root()->component().Connect<fuchsia::ui::display::singleton::Info>();
     bool has_completed = false;
     info_->GetMetrics([this, &has_completed](auto info) {
       display_width_ = info.extent_in_px().width;

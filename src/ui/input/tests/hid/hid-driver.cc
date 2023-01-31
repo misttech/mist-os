@@ -38,7 +38,7 @@ class HidDriverTest : public zxtest::Test {
         std::make_unique<component_testing::RealmRoot>(realm_builder.Build(loop_.dispatcher()));
 
     // Start DriverTestRealm.
-    ASSERT_OK(realm_->Connect(driver_test_realm.NewRequest()));
+    ASSERT_OK(realm_->component().Connect(driver_test_realm.NewRequest()));
     fuchsia::driver::test::Realm_Start_Result realm_result;
 
     auto args = fuchsia::driver::test::RealmArgs();

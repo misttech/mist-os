@@ -300,9 +300,9 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
                    })
                    .Build(loop.dispatcher());
 
-  auto _binder = realm.ConnectSync<fuchsia::component::Binder>();
+  auto _binder = realm.component().ConnectSync<fuchsia::component::Binder>();
 
-  auto selector = "realm_builder\\:" + realm.GetChildName() + "/inspect-publisher:root";
+  auto selector = "realm_builder\\:" + realm.component().GetChildName() + "/inspect-publisher:root";
   inspect::contrib::ArchiveReader reader(std::move(accessor), {selector});
 
   fpromise::result<std::vector<inspect::contrib::DiagnosticsData>, std::string> actual_result;
@@ -330,7 +330,7 @@ TEST_F(AccessorTest, StreamDiagnosticsInspect) {
   std::string expected = EXPECTED_DATA;
 
   // Replace non-deterministic expected values.
-  re2::RE2::GlobalReplace(&expected, re2::RE2("CHILD_NAME"), realm.GetChildName());
+  re2::RE2::GlobalReplace(&expected, re2::RE2("CHILD_NAME"), realm.component().GetChildName());
   re2::RE2::GlobalReplace(&expected, re2::RE2("TIMESTAMP"), timestamp);
 
   EXPECT_EQ(expected, SortJsonFile(actual));

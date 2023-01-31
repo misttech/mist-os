@@ -85,7 +85,8 @@ void TestBase::ConnectToBluetoothDevice() {
       .source = ChildRef{"audio-device-output-harness"},
       .targets = {ParentRef{}}});
   realm_ = std::make_unique<RealmRoot>(builder.Build());
-  ASSERT_EQ(ZX_OK, realm_->Connect("audio-binder", audio_binder_.NewRequest().TakeChannel()));
+  ASSERT_EQ(ZX_OK,
+            realm_->component().Connect("audio-binder", audio_binder_.NewRequest().TakeChannel()));
   audio_binder_.set_error_handler(
       [](zx_status_t status) { FAIL() << "audio-device-output-harness exited"; });
 

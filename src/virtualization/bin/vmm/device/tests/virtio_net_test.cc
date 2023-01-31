@@ -177,7 +177,7 @@ class VirtioNetTest : public TestWithDevice {
                         .targets = {ParentRef()}});
 
     realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
-    net_ = realm_->Connect<fuchsia::virtualization::hardware::VirtioNet>();
+    net_ = realm_->component().Connect<fuchsia::virtualization::hardware::VirtioNet>();
 
     fuchsia::virtualization::hardware::StartInfo start_info;
     zx_status_t status = MakeStartInfo(tx_queue_.end(), &start_info);

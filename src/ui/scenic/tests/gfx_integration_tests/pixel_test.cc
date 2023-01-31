@@ -11,12 +11,12 @@ namespace integration_tests {
 void PixelTest::SetUp() {
   realm_ = std::make_unique<RealmRoot>(SetupRealm());
 
-  scenic_ = realm_->Connect<fuchsia::ui::scenic::Scenic>();
+  scenic_ = realm_->component().Connect<fuchsia::ui::scenic::Scenic>();
   scenic_.set_error_handler([](zx_status_t status) {
     FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
   });
 
-  annotation_registry_ = realm_->Connect<fuchsia::ui::annotation::Registry>();
+  annotation_registry_ = realm_->component().Connect<fuchsia::ui::annotation::Registry>();
   annotation_registry_.set_error_handler([](zx_status_t status) {
     FAIL() << "Lost connection to Annotation Registry: " << zx_status_get_string(status);
   });

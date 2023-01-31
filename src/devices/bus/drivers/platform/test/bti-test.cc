@@ -43,7 +43,7 @@ TEST(PbusBtiTest, BtiIsSameAfterCrash) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
   auto args = fuchsia::driver::test::RealmArgs();
   args.set_root_driver("fuchsia-boot:///#driver/platform-bus.so");

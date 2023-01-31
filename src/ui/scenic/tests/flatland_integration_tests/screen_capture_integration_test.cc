@@ -64,15 +64,15 @@ class ScreenCaptureIntegrationTest : public gtest::RealLoopFixture {
     auto context = sys::ComponentContext::Create();
     context->svc()->Connect(sysmem_allocator_.NewRequest());
 
-    flatland_display_ = realm_.Connect<fuchsia::ui::composition::FlatlandDisplay>();
+    flatland_display_ = realm_.component().Connect<fuchsia::ui::composition::FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
       FAIL() << "Lost connection to FlatlandDisplay: " << zx_status_get_string(status);
     });
 
-    flatland_allocator_ = realm_.ConnectSync<fuchsia::ui::composition::Allocator>();
+    flatland_allocator_ = realm_.component().ConnectSync<fuchsia::ui::composition::Allocator>();
 
     // Set up root view.
-    root_session_ = realm_.Connect<fuchsia::ui::composition::Flatland>();
+    root_session_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
     root_session_.events().OnError = [](fuchsia::ui::composition::FlatlandError error) {
       FAIL() << "Received FlatlandError: " << static_cast<int>(error);
     };
@@ -118,7 +118,7 @@ class ScreenCaptureIntegrationTest : public gtest::RealLoopFixture {
     BlockingPresent(root_session_);
 
     // Set up the child view.
-    child_session_ = realm_.Connect<fuchsia::ui::composition::Flatland>();
+    child_session_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher2;
     auto identity = scenic::NewViewIdentityOnCreation();
     auto child_view_ref = fidl::Clone(identity.view_ref);
@@ -130,7 +130,7 @@ class ScreenCaptureIntegrationTest : public gtest::RealLoopFixture {
     BlockingPresent(child_session_);
 
     // Create ScreenCapture client.
-    screen_capture_ = realm_.Connect<fuchsia::ui::composition::ScreenCapture>();
+    screen_capture_ = realm_.component().Connect<fuchsia::ui::composition::ScreenCapture>();
     screen_capture_.set_error_handler(
         [](zx_status_t status) { FAIL() << "Lost connection to ScreenCapture"; });
   }

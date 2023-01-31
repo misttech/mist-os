@@ -69,7 +69,7 @@ void ForSomeImpls(const Impls& impls, const AllowImplPair& allow, const TestBody
 
       async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
       auto realm = builder.Build(loop.dispatcher());
-      auto echo = realm.Connect<fidl::test::compatibility::Echo>();
+      auto echo = realm.component().Connect<fidl::test::compatibility::Echo>();
       echo.set_error_handler([&proxy_url, &loop, &test_completed](zx_status_t status) {
         if (!test_completed) {
           loop.Quit();

@@ -23,7 +23,7 @@ TEST_F(FidlServiceTest, ChildBinds) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
@@ -52,7 +52,7 @@ TEST_F(FidlServiceTest, ChildBindsV2) {
 
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
-  ASSERT_EQ(ZX_OK, realm.Connect(driver_test_realm.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
 
   auto args = fuchsia::driver::test::RealmArgs();

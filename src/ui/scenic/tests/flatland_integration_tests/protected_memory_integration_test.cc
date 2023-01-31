@@ -40,14 +40,14 @@ class ProtectedMemoryIntegrationTest : public gtest::RealLoopFixture {
     auto context = sys::ComponentContext::Create();
     context->svc()->Connect(sysmem_allocator_.NewRequest());
 
-    flatland_display_ = realm_.Connect<fuchsia::ui::composition::FlatlandDisplay>();
+    flatland_display_ = realm_.component().Connect<fuchsia::ui::composition::FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
       FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
     });
 
-    flatland_allocator_ = realm_.ConnectSync<fuchsia::ui::composition::Allocator>();
+    flatland_allocator_ = realm_.component().ConnectSync<fuchsia::ui::composition::Allocator>();
 
-    root_flatland_ = realm_.Connect<fuchsia::ui::composition::Flatland>();
+    root_flatland_ = realm_.component().Connect<fuchsia::ui::composition::Flatland>();
     root_flatland_.set_error_handler([](zx_status_t status) {
       FAIL() << "Lost connection to Scenic: " << zx_status_get_string(status);
     });
@@ -67,7 +67,7 @@ class ProtectedMemoryIntegrationTest : public gtest::RealLoopFixture {
     });
     BlockingPresent(root_flatland_);
 
-    screenshotter_ = realm_.ConnectSync<fuchsia::ui::composition::Screenshot>();
+    screenshotter_ = realm_.component().ConnectSync<fuchsia::ui::composition::Screenshot>();
   }
 
  protected:

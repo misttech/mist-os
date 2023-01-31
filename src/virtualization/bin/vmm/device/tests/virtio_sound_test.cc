@@ -389,7 +389,7 @@ class VirtioSoundTestBase : public TestWithDevice {
     zx_status_t status = MakeStartInfo(phys_mem_size_, &start_info);
     ASSERT_EQ(ZX_OK, status);
 
-    sound_ = realm_->ConnectSync<fuchsia::virtualization::hardware::VirtioSound>();
+    sound_ = realm_->component().ConnectSync<fuchsia::virtualization::hardware::VirtioSound>();
 
     uint32_t features, jacks, streams, chmaps;
     ASSERT_EQ(ZX_OK,

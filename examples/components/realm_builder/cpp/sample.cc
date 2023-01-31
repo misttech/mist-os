@@ -68,11 +68,11 @@ TEST_F(RealmBuilderTest, RoutesFromEcho) {
   // [END build_realm_cpp]
 
   // [START get_child_name_cpp]
-  std::cout << "Child Name: " << realm.GetChildName() << std::endl;
+  std::cout << "Child Name: " << realm.component().GetChildName() << std::endl;
   // [END get_child_name_cpp]
 
   // [START call_echo_cpp]
-  auto echo = realm.ConnectSync<fidl::examples::routing::echo::Echo>();
+  auto echo = realm.component().ConnectSync<fidl::examples::routing::echo::Echo>();
   fidl::StringPtr response;
   echo->EchoString("hello", &response);
   ASSERT_EQ(response, "hello");
@@ -124,7 +124,7 @@ TEST_F(RealmBuilderTest, RoutesFromMockEcho) {
 
   auto realm = builder.Build(dispatcher());
 
-  auto echo = realm.Connect<fidl::examples::routing::echo::Echo>();
+  auto echo = realm.component().Connect<fidl::examples::routing::echo::Echo>();
   fidl::StringPtr response;
   echo->EchoString("hello", [&](fidl::StringPtr response) {
     // Use EXPECT here so the loop can still quit if the test fails

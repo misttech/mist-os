@@ -525,7 +525,7 @@ std::unique_ptr<sys::ServiceDirectory> UITestRealm::CloneExposedServicesDirector
   FX_CHECK(realm_root_)
       << "Client must call Build() before attempting to take exposed services directory";
 
-  return std::make_unique<sys::ServiceDirectory>(realm_root_->CloneRoot());
+  return std::make_unique<sys::ServiceDirectory>(realm_root_->component().CloneExposedDir());
 }
 
 }  // namespace ui_testing

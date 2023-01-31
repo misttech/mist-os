@@ -67,7 +67,7 @@ class VirtioBalloonTest : public TestWithDevice {
                         .targets = {ParentRef()}});
 
     realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
-    balloon_ = realm_->ConnectSync<fuchsia::virtualization::hardware::VirtioBalloon>();
+    balloon_ = realm_->component().ConnectSync<fuchsia::virtualization::hardware::VirtioBalloon>();
 
     fuchsia::virtualization::hardware::StartInfo start_info;
 
@@ -97,7 +97,8 @@ class VirtioBalloonTest : public TestWithDevice {
 
   template <typename T>
   T InspectValue(std::string value_name) {
-    return GetInspect("realm_builder\\:" + realm_->GetChildName() + "/" + kComponentName + ":root",
+    return GetInspect("realm_builder\\:" + realm_->component().GetChildName() + "/" +
+                          kComponentName + ":root",
                       kComponentName)
         .GetByPath({"root", std::move(value_name)})
         .Get<T>();

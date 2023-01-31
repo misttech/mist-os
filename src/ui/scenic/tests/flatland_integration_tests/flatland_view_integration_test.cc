@@ -51,13 +51,13 @@ class FlatlandViewIntegrationTest : public zxtest::Test, public loop_fixture::Re
             .Build());
 
     // Create the flatland display.
-    flatland_display_ = realm_->Connect<fuc::FlatlandDisplay>();
+    flatland_display_ = realm_->component().Connect<fuc::FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
 
     // Get the display's width and height.
-    auto singleton_display = realm_->Connect<fuchsia::ui::display::singleton::Info>();
+    auto singleton_display = realm_->component().Connect<fuchsia::ui::display::singleton::Info>();
     std::optional<fuchsia::ui::display::singleton::Metrics> info;
     singleton_display->GetMetrics([&info](auto result) { info = std::move(result); });
     RunLoopUntil([&info] { return info.has_value(); });
@@ -107,7 +107,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   // Create the child view.
   {
-    child = realm_->Connect<fuc::Flatland>();
+    child = realm_->component().Connect<fuc::Flatland>();
 
     auto identity = scenic::NewViewIdentityOnCreation();
     child->CreateView2(std::move(child_view_token), std::move(identity), {},
@@ -118,7 +118,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
   // Create the parent view and connect the child view to it.
   {
     fuc::FlatlandPtr parent;
-    parent = realm_->Connect<fuc::Flatland>();
+    parent = realm_->component().Connect<fuc::Flatland>();
     fidl::InterfacePtr<fuc::ChildViewWatcher> parent_view_watcher;
     auto [parent_view_token, display_viewport_token] = scenic::ViewCreationTokenPair::New();
 
@@ -150,7 +150,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnParentDeath) {
 TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnInvalidTokenTest) {
   // Create the flatland view.
   fuc::FlatlandPtr flatland;
-  flatland = realm_->Connect<fuc::Flatland>();
+  flatland = realm_->component().Connect<fuc::Flatland>();
   fuv::ViewCreationToken invalid_token;
 
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
@@ -168,7 +168,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnInvalidTokenTe
 TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnReleaseView) {
   // Create the parent view.
   fuc::FlatlandPtr parent;
-  parent = realm_->Connect<fuc::Flatland>();
+  parent = realm_->component().Connect<fuc::Flatland>();
   fidl::InterfacePtr<fuc::ChildViewWatcher> parent_view_watcher;
   auto [parent_view_creation_token, display_viewport_token] = scenic::ViewCreationTokenPair::New();
 
@@ -197,7 +197,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
 
   // Create the parent view and connect it to the display.
   {
-    parent = realm_->Connect<fuc::Flatland>();
+    parent = realm_->component().Connect<fuc::Flatland>();
     fidl::InterfacePtr<fuc::ChildViewWatcher> child_view_watcher;
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
     flatland_display_->SetContent(std::move(parent_viewport_token),
@@ -215,7 +215,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
   // Create the child view and connect it to the parent view.
   {
     fuc::FlatlandPtr child;
-    child = realm_->Connect<fuc::Flatland>();
+    child = realm_->component().Connect<fuc::Flatland>();
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
     fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
     auto identity = scenic::NewViewIdentityOnCreation();
@@ -238,7 +238,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnChildDeath) {
 TEST_F(FlatlandViewIntegrationTest, ChildViewWatcherUnbindsOnInvalidToken) {
   // Create the parent view.
   fuc::FlatlandPtr parent;
-  parent = realm_->Connect<fuc::Flatland>();
+  parent = realm_->component().Connect<fuc::Flatland>();
 
   fidl::InterfacePtr<fuc::ChildViewWatcher> parent_view_watcher;
   auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
@@ -278,7 +278,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportStatusTest) {
   fuc::FlatlandPtr parent;
   // Create the parent view and connect it to the display.
   {
-    parent = realm_->Connect<fuc::Flatland>();
+    parent = realm_->component().Connect<fuc::Flatland>();
     fidl::InterfacePtr<fuc::ChildViewWatcher> child_view_watcher;
 
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
@@ -297,7 +297,7 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportStatusTest) {
   fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
   // Create the child view and connect it to the parent.
   {
-    child = realm_->Connect<fuc::Flatland>();
+    child = realm_->component().Connect<fuc::Flatland>();
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
 
     auto identity = scenic::NewViewIdentityOnCreation();
@@ -337,7 +337,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewStatusTest) {
   fuc::FlatlandPtr parent;
   // Create the parent view and connect it to the display.
   {
-    parent = realm_->Connect<fuc::Flatland>();
+    parent = realm_->component().Connect<fuc::Flatland>();
 
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
     fidl::InterfacePtr<fuc::ChildViewWatcher> parent_view_watcher;
@@ -356,7 +356,7 @@ TEST_F(FlatlandViewIntegrationTest, ChildViewStatusTest) {
   std::optional<fuc::ChildViewStatus> child_status;
   // Create the child view and connect it to the parent view.
   {
-    child = realm_->Connect<fuc::Flatland>();
+    child = realm_->component().Connect<fuc::Flatland>();
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
 
     fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
@@ -385,7 +385,7 @@ TEST_F(FlatlandViewIntegrationTest, GetViewRefTest) {
 
   // Create the parent view.
   {
-    parent = realm_->Connect<fuc::Flatland>();
+    parent = realm_->component().Connect<fuc::Flatland>();
 
     fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;
     auto identity = scenic::NewViewIdentityOnCreation();
@@ -402,7 +402,7 @@ TEST_F(FlatlandViewIntegrationTest, GetViewRefTest) {
 
   // Create the child view and connect it to the parent view.
   {
-    child = realm_->Connect<fuc::Flatland>();
+    child = realm_->component().Connect<fuc::Flatland>();
     auto [child_view_token, parent_viewport_token] = scenic::ViewCreationTokenPair::New();
 
     fidl::InterfacePtr<fuc::ParentViewportWatcher> parent_viewport_watcher;

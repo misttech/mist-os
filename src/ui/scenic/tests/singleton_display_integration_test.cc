@@ -43,7 +43,7 @@ class SingletonDisplayIntegrationTest : public zxtest::Test, public loop_fixture
                                              .AddRealmProtocol(fuds_Info::Name_)
                                              .AddRealmProtocol(fuc_FlatlandDisplay::Name_)
                                              .Build());
-    singleton_display_ = realm_->Connect<fuds_Info>();
+    singleton_display_ = realm_->component().Connect<fuds_Info>();
     singleton_display_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to SingletonDisplay: %s", zx_status_get_string(status));
     });
@@ -75,7 +75,7 @@ TEST_F(SingletonDisplayIntegrationTest, GetMetrics) {
 }
 
 TEST_F(SingletonDisplayIntegrationTest, DevicePixelRatioChange) {
-  auto flatland_display = realm_->Connect<fuc_FlatlandDisplay>();
+  auto flatland_display = realm_->component().Connect<fuc_FlatlandDisplay>();
   const float kDPRx = 1.25f;
   const float kDPRy = 1.25f;
   flatland_display->SetDevicePixelRatio({kDPRx, kDPRy});

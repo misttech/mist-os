@@ -104,12 +104,12 @@ class GfxViewRefInstalledIntegrationTest : public zxtest::Test, public loop_fixt
             .AddRealmProtocol(fuchsia::ui::views::ViewRefInstalled::Name_)
             .Build());
 
-    scenic_ = realm_->Connect<fuchsia::ui::scenic::Scenic>();
+    scenic_ = realm_->component().Connect<fuchsia::ui::scenic::Scenic>();
     scenic_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
 
-    view_ref_installed_ptr_ = realm_->Connect<fuchsia::ui::views::ViewRefInstalled>();
+    view_ref_installed_ptr_ = realm_->component().Connect<fuchsia::ui::views::ViewRefInstalled>();
     view_ref_installed_ptr_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to ViewRefInstalled: %s", zx_status_get_string(status));
     });

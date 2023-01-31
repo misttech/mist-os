@@ -98,7 +98,7 @@ class RealmRoot final {
 
   // Return a handle to the exposed directory of the root component.
   fidl::InterfaceHandle<fuchsia::io::Directory> CloneRoot() const
-      ZX_DEPRECATED_SINCE(1, 11, "Use root() instead") {
+      ZX_DEPRECATED_SINCE(1, 11, "Use component().CloneExposedDir() instead") {
     ZX_ASSERT_MSG(root_, "RealmRoot already torn down.");
     return root_->CloneExposedDir();
   }
@@ -127,6 +127,7 @@ class RealmRoot final {
   // value will yield undefined behavior. Invoking this method after |Teardown| is
   // invoked will cause this process to panic.
   ScopedChild& component() ZX_AVAILABLE_SINCE(11);
+  const ScopedChild& component() const ZX_AVAILABLE_SINCE(11);
 
  private:
   // Friend classes are needed because the constructor is private.

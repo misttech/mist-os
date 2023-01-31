@@ -234,8 +234,8 @@ class VirtioVsockTest : public TestWithDevice {
             .targets = {component_testing::ParentRef()}});
 
     realm_ = std::make_unique<component_testing::RealmRoot>(realm_builder.Build(dispatcher()));
-    vsock_ = realm_->ConnectSync<VirtioVsock>();
-    host_endpoint_ = realm_->Connect<HostVsockEndpoint>();
+    vsock_ = realm_->component().ConnectSync<VirtioVsock>();
+    host_endpoint_ = realm_->component().Connect<HostVsockEndpoint>();
 
     rx_queue_ = std::make_unique<VirtioQueueFake>(phys_mem_, PAGE_SIZE, kVirtioVsockQueueSize);
     tx_queue_ = std::make_unique<VirtioQueueFake>(phys_mem_, rx_queue_->end() + PAGE_SIZE * 128,

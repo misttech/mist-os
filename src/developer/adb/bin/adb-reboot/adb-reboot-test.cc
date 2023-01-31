@@ -104,7 +104,8 @@ class AdbRebootTest : public gtest::RealLoopFixture {
                            .targets = {ParentRef()}});
     realm_ = std::make_unique<RealmRoot>(builder.Build(dispatcher()));
 
-    ASSERT_EQ(realm_->Connect<fuchsia::hardware::adb::Provider>(reboot_.NewRequest(dispatcher())),
+    ASSERT_EQ(realm_->component().Connect<fuchsia::hardware::adb::Provider>(
+                  reboot_.NewRequest(dispatcher())),
               ZX_OK);
 
     reboot_.set_error_handler(

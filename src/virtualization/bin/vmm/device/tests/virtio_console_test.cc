@@ -50,7 +50,7 @@ class VirtioConsoleTest : public TestWithDevice {
                         .targets = {ParentRef()}});
 
     realm_ = std::make_unique<RealmRoot>(realm_builder.Build(dispatcher()));
-    console_ = realm_->ConnectSync<fuchsia::virtualization::hardware::VirtioConsole>();
+    console_ = realm_->component().ConnectSync<fuchsia::virtualization::hardware::VirtioConsole>();
 
     fuchsia::virtualization::hardware::StartInfo start_info;
     zx_status_t status = MakeStartInfo(tx_queue_.end(), &start_info);

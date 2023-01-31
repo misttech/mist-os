@@ -50,7 +50,7 @@ void UITestManager::BuildRealm() {
   // Get the display information using the |fuchsia.ui.display.singleton.Info|.
   fuchsia::ui::display::singleton::Metrics info;
   fuchsia::ui::display::singleton::InfoSyncPtr display_info =
-      realm_.realm_root()->ConnectSync<fuchsia::ui::display::singleton::Info>();
+      realm_.realm_root()->component().ConnectSync<fuchsia::ui::display::singleton::Info>();
   auto status = display_info->GetMetrics(&info);
 
   FX_DCHECK(status == ZX_OK);
@@ -59,19 +59,21 @@ void UITestManager::BuildRealm() {
   display_height_ = info.extent_in_px().height;
 
   // Connect screenshotter.
-  screenshotter_ = realm_.realm_root()->ConnectSync<fuchsia::ui::composition::Screenshot>();
+  screenshotter_ =
+      realm_.realm_root()->component().ConnectSync<fuchsia::ui::composition::Screenshot>();
 
   // Register focus chain listener.
   auto focus_chain_listener_registry =
-      realm_.realm_root()->Connect<fuchsia::ui::focus::FocusChainListenerRegistry>();
+      realm_.realm_root()->component().Connect<fuchsia::ui::focus::FocusChainListenerRegistry>();
   focus_chain_listener_registry->Register(focus_chain_listener_binding_.NewBinding());
 
   // Register geometry observer.
   if (realm_.config().scene_owner) {
-    scene_controller_ = realm_.realm_root()->Connect<fuchsia::ui::test::scene::Controller>();
+    scene_controller_ =
+        realm_.realm_root()->component().Connect<fuchsia::ui::test::scene::Controller>();
     scene_controller_->RegisterViewTreeWatcher(view_tree_watcher_.NewRequest(), []() {});
   } else {
-    realm_.realm_root()->Connect<fuchsia::ui::observation::test::Registry>(
+    realm_.realm_root()->component().Connect<fuchsia::ui::observation::test::Registry>(
         observer_registry_.NewRequest());
     observer_registry_->RegisterGlobalViewTreeWatcher(view_tree_watcher_.NewRequest());
   }
@@ -90,7 +92,8 @@ std::unique_ptr<sys::ServiceDirectory> UITestManager::CloneExposedServicesDirect
 void UITestManager::InitializeScene() {
   // Use scene provider helper component to attach client view to the scene.
   fuchsia::ui::test::scene::ControllerAttachClientViewRequest request;
-  request.set_view_provider(realm_.realm_root()->Connect<fuchsia::ui::app::ViewProvider>());
+  request.set_view_provider(
+      realm_.realm_root()->component().Connect<fuchsia::ui::app::ViewProvider>());
   scene_controller_->AttachClientView(std::move(request), [this](zx_koid_t client_view_ref_koid) {
     client_view_ref_koid_ = client_view_ref_koid;
   });

@@ -156,18 +156,18 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
             .AddRealmProtocol(fuchsia::ui::pointerinjector::Registry::Name_)
             .Build());
 
-    flatland_display_ = realm_->Connect<FlatlandDisplay>();
+    flatland_display_ = realm_->component().Connect<FlatlandDisplay>();
     flatland_display_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
 
-    pointerinjector_registry_ = realm_->Connect<Registry>();
+    pointerinjector_registry_ = realm_->component().Connect<Registry>();
     pointerinjector_registry_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to pointerinjector Registry: %s", zx_status_get_string(status));
     });
 
     // Set up root view and root transform.
-    root_instance_ = realm_->Connect<Flatland>();
+    root_instance_ = realm_->component().Connect<Flatland>();
     root_instance_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
@@ -338,7 +338,7 @@ class FlatlandMouseIntegrationTest : public zxtest::Test, public loop_fixture::R
                                 ContentId parent_content_id, FlatlandPtr& child_instance,
                                 fidl::InterfaceRequest<MouseSource> child_mouse_source = nullptr,
                                 fidl::InterfaceRequest<ViewRefFocused> child_focused = nullptr) {
-    child_instance = realm_->Connect<Flatland>();
+    child_instance = realm_->component().Connect<Flatland>();
 
     // Set up the child view watcher.
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;
@@ -1806,7 +1806,7 @@ TEST_F(FlatlandMouseIntegrationTest, AnonymousSubtree) {
       /*parent_of_viewport_transform*/ kRootTransform,
       /*parent_content_id*/ {.value = 1}, parent_instance, parent_mouse_source.NewRequest());
 
-  FlatlandPtr child_instance = realm_->Connect<Flatland>();
+  FlatlandPtr child_instance = realm_->component().Connect<Flatland>();
   child_instance.set_error_handler([](zx_status_t status) {
     FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
   });

@@ -52,8 +52,8 @@ class SysInspectTest : public gtest::RealLoopFixture {
   async::Executor& executor() { return executor_; }
 
   zx_status_t GetInspectTree(fuchsia::inspect::TreePtr* ptr) {
-    return realm_->Connect("parent-diagnostics/fuchsia.inspect.Tree",
-                           ptr->NewRequest(dispatcher()).TakeChannel());
+    return realm_->component().Connect("parent-diagnostics/fuchsia.inspect.Tree",
+                                       ptr->NewRequest(dispatcher()).TakeChannel());
   }
 
  private:

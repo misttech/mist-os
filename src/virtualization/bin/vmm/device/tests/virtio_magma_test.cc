@@ -221,7 +221,7 @@ class VirtioMagmaTest : public TestWithDevice {
     zx_status_t status = MakeStartInfo(out_queue_.end(), &start_info);
     ASSERT_EQ(ZX_OK, status);
 
-    magma_ = realm_->Connect<fuchsia::virtualization::hardware::VirtioMagma>();
+    magma_ = realm_->component().Connect<fuchsia::virtualization::hardware::VirtioMagma>();
 
     {
       zx_status_t status;

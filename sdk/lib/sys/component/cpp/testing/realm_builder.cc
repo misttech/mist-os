@@ -488,4 +488,9 @@ ScopedChild& RealmRoot::component() {
   return *root_;
 }
 
+const ScopedChild& RealmRoot::component() const {
+  ZX_ASSERT_MSG(root_ != nullptr, "RealmRoot::component() invoked after |Teardown|");
+  return *root_;
+}
+
 }  // namespace component_testing

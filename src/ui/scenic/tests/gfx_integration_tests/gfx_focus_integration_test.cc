@@ -112,13 +112,13 @@ class GfxFocusIntegrationTest : public zxtest::Test,
             .AddRealmProtocol(fuchsia::ui::focus::FocusChainListenerRegistry::Name_)
             .Build());
 
-    scenic_ = realm_->Connect<fuchsia::ui::scenic::Scenic>();
+    scenic_ = realm_->component().Connect<fuchsia::ui::scenic::Scenic>();
     scenic_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to Scenic: %s", zx_status_get_string(status));
     });
 
     focus_chain_listener_registry_ =
-        realm_->Connect<fuchsia::ui::focus::FocusChainListenerRegistry>();
+        realm_->component().Connect<fuchsia::ui::focus::FocusChainListenerRegistry>();
     focus_chain_listener_registry_.set_error_handler([](zx_status_t status) {
       FAIL("Lost connection to FocusChainListener: %s", zx_status_get_string(status));
     });
