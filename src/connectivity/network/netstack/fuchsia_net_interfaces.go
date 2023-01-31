@@ -12,12 +12,14 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync/atomic"
 	"syscall/zx"
 	"syscall/zx/fidl"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
+	zxtime "go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/time"
 	"go.fuchsia.dev/fuchsia/src/lib/component"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
@@ -211,6 +213,41 @@ func (si *interfaceStateImpl) GetWatcher(_ fidl.Context, options interfaces.Watc
 	return nil
 }
 
+func fidlSubnetToString(s net.Subnet) string {
+	return fidlconv.ToTCPIPAddressWithPrefix(s).String()
+}
+
+func preferredLifetimeInfoToString(p interfaces.PreferredLifetimeInfo) string {
+	switch tag := p.Which(); tag {
+	case interfaces.PreferredLifetimeInfoDeprecated:
+		return "deprecated"
+	case interfaces.PreferredLifetimeInfoPreferredUntil:
+		return fmt.Sprintf("boot+%s", zxtime.Duration(p.PreferredUntil))
+	default:
+		panic(fmt.Sprintf("fuchsia.net.interfaces/PreferredLifetimeInfo with unknown tag: %d", tag))
+	}
+}
+
+func addressToString(a interfaces.Address) string {
+	var b strings.Builder
+
+	if !a.HasAddr() {
+		// Note that due to the lack of addr, this will not accidentally print an
+		// address in bytes that prevents anonymization.
+		panic(fmt.Sprintf("fuchsia.net.interfaces/Address must contain addr field: %#v", a))
+	}
+	b.WriteString(fmt.Sprintf("{Addr:%s", fidlSubnetToString(a.GetAddr())))
+	if a.HasValidUntil() {
+		b.WriteString(fmt.Sprintf(", ValidUntil:boot+%s", zxtime.Duration(a.GetValidUntil())))
+	}
+	if a.HasPreferredLifetimeInfo() {
+		b.WriteString(fmt.Sprintf(", PreferredLifetimeInfo:%s", preferredLifetimeInfoToString(a.GetPreferredLifetimeInfo())))
+	}
+	b.WriteString("}")
+
+	return b.String()
+}
+
 type interfaceEvent interface {
 	isInterfaceEvent()
 }
@@ -220,6 +257,56 @@ type interfaceAdded interfaces.Properties
 var _ interfaceEvent = (*interfaceAdded)(nil)
 
 func (interfaceAdded) isInterfaceEvent() {}
+
+func deviceClassToString(d interfaces.DeviceClass) string {
+	switch tag := d.Which(); tag {
+	case interfaces.DeviceClassLoopback:
+		return "loopback"
+	case interfaces.DeviceClassDevice:
+		return d.Device.String()
+	default:
+		panic(fmt.Sprintf("fuchsia.net.interfaces/DeviceClass with unknown tag: %d", tag))
+	}
+}
+
+func (a interfaceAdded) String() string {
+	p := interfaces.Properties(a)
+	var b strings.Builder
+
+	if !p.HasId() {
+		panic("fuchsia.net.interfaces/Properties missing id field")
+	}
+
+	b.WriteString(fmt.Sprintf("{Id:%d", p.GetId()))
+	if p.HasName() {
+		b.WriteString(fmt.Sprintf(", Name:%s", p.GetName()))
+	}
+	if p.HasDeviceClass() {
+		b.WriteString(fmt.Sprintf(", DeviceClass:%s", deviceClassToString(p.GetDeviceClass())))
+	}
+	if p.HasOnline() {
+		b.WriteString(fmt.Sprintf(", Online:%t", p.GetOnline()))
+	}
+	if p.HasHasDefaultIpv4Route() {
+		b.WriteString(fmt.Sprintf(", HasDefaultIpv4Route:%t", p.GetHasDefaultIpv4Route()))
+	}
+	if p.HasHasDefaultIpv6Route() {
+		b.WriteString(fmt.Sprintf(", HasDefaultIpv6Route:%t", p.GetHasDefaultIpv6Route()))
+	}
+	if p.HasAddresses() && len(p.GetAddresses()) > 0 {
+		b.WriteString(", Addresses:[")
+		for i, addr := range p.GetAddresses() {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(addressToString(addr))
+		}
+		b.WriteString("]")
+	}
+	b.WriteString("}")
+
+	return b.String()
+}
 
 type interfaceRemoved tcpip.NICID
 
@@ -247,19 +334,18 @@ var _ interfaceEvent = (*defaultRouteChanged)(nil)
 func (defaultRouteChanged) isInterfaceEvent() {}
 
 func (c defaultRouteChanged) String() string {
-	nullableBoolToString := func(b *bool) string {
-		if b == nil {
-			return "(nil)"
-		}
-		return fmt.Sprintf("%t", *b)
-	}
+	var b strings.Builder
 
-	return fmt.Sprintf(
-		"nicid: %d, hasDefaultIPv4Route: %s, hasDefaultIpv6Route: %s",
-		c.nicid,
-		nullableBoolToString(c.hasDefaultIPv4Route),
-		nullableBoolToString(c.hasDefaultIPv6Route),
-	)
+	b.WriteString(fmt.Sprintf("{nicid:%d", c.nicid))
+	if c.hasDefaultIPv4Route != nil {
+		b.WriteString(fmt.Sprintf(", hasDefaultIPv4Route:%t", *c.hasDefaultIPv4Route))
+	}
+	if c.hasDefaultIPv6Route != nil {
+		b.WriteString(fmt.Sprintf(", hasDefaultIPv6Route:%t", *c.hasDefaultIPv6Route))
+	}
+	b.WriteString("}")
+
+	return b.String()
 }
 
 type addressProperties struct {
@@ -401,18 +487,18 @@ func interfaceWatcherEventLoop(
 			case interfaceAdded:
 				added := interfaces.Properties(event)
 				if !added.HasId() {
-					panic(fmt.Sprintf("interface added event with no ID: %#v", event))
+					panic(fmt.Sprintf("interface added event with no ID: %s", event))
 				}
 				if len(added.GetAddresses()) > 0 {
 					// This panic enforces that interfaces are never added
 					// with addresses present, which enables the event loop to
 					// not have to worry about address properties/assignment
 					// state when handling interface-added events.
-					panic(fmt.Sprintf("interface added event contains addresses: %#v", event))
+					panic(fmt.Sprintf("interface added event contains addresses: %s", event))
 				}
 				nicid := tcpip.NICID(added.GetId())
-				if properties, ok := propertiesMap[nicid]; ok {
-					panic(fmt.Sprintf("interface %#v already exists but duplicate added event received: %#v", properties, event))
+				if _, ok := propertiesMap[nicid]; ok {
+					panic(fmt.Sprintf("interface already exists but duplicate added event received: %s", event))
 				}
 				propertiesMap[nicid] = interfaceProperties{
 					Properties: added,
@@ -496,7 +582,7 @@ func interfaceWatcherEventLoop(
 			case addressChanged:
 				properties, ok := propertiesMap[event.nicid]
 				if !ok {
-					panic(fmt.Sprintf("address changed event for unknown interface: %#v", event))
+					panic(fmt.Sprintf("address changed event for unknown interface: %s", event))
 				}
 				nextProperties := addressProperties{state: event.state, lifetimes: event.lifetimes}
 				prevProperties, found := properties.addresses[event.protocolAddr]
@@ -508,7 +594,7 @@ func interfaceWatcherEventLoop(
 				// Due to the frequency of lifetime changes in certain environments, don't
 				// log when the only difference is in address lifetimes in assigned state.
 				if !found || nextProperties.state != prevProperties.state || nextProperties.state != stack.AddressAssigned {
-					syslog.InfoTf(watcherProtocolName, "address changed event: %#v", event)
+					syslog.InfoTf(watcherProtocolName, "address changed event: %s", event)
 				}
 
 				propertyChangedBitflag, addedOrRemoved := addressesChangeType(found, prevProperties, nextProperties)
@@ -519,15 +605,15 @@ func interfaceWatcherEventLoop(
 					w.onAddressesChanged(event.nicid, addresses, addedOrRemoved, propertyChangedBitflag)
 				}
 			case addressRemoved:
-				syslog.InfoTf(watcherProtocolName, "address removed event: %#v", event)
+				syslog.InfoTf(watcherProtocolName, "address removed event: %s", event)
 
 				properties, ok := propertiesMap[event.nicid]
 				if !ok {
-					panic(fmt.Sprintf("address removed event for unknown interface: %#v", event))
+					panic(fmt.Sprintf("address removed event for unknown interface: %s", event))
 				}
 				addrProperties, ok := properties.addresses[event.protocolAddr]
 				if !ok {
-					panic(fmt.Sprintf("address removed event for unknown address: %#v", event))
+					panic(fmt.Sprintf("address removed event for unknown address: %s", event))
 				}
 				delete(properties.addresses, event.protocolAddr)
 				addresses := addressMapToSlice(properties.addresses)

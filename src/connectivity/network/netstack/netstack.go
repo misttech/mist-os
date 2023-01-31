@@ -479,6 +479,18 @@ var _ interfaceEvent = (*addressChanged)(nil)
 
 func (addressChanged) isInterfaceEvent() {}
 
+func (a addressChanged) String() string {
+	return fmt.Sprintf(
+		"{nicid:%d addr:%s lifetimes:{Deprecated:%t PreferredUntil:boot+%s ValidUntil:boot+%s} state:%s}",
+		a.nicid,
+		a.protocolAddr.AddressWithPrefix,
+		a.lifetimes.Deprecated,
+		a.lifetimes.PreferredUntil.Sub(tcpip.MonotonicTime{}),
+		a.lifetimes.ValidUntil.Sub(tcpip.MonotonicTime{}),
+		a.state,
+	)
+}
+
 type addressRemoved struct {
 	nicid        tcpip.NICID
 	protocolAddr tcpip.ProtocolAddress
@@ -488,6 +500,10 @@ type addressRemoved struct {
 var _ interfaceEvent = (*addressRemoved)(nil)
 
 func (addressRemoved) isInterfaceEvent() {}
+
+func (a addressRemoved) String() string {
+	return fmt.Sprintf("{nicid:%d addr:%s reason:%s}", a.nicid, a.protocolAddr.AddressWithPrefix, a.reason)
+}
 
 var _ stack.AddressDispatcher = (*watcherAddressDispatcher)(nil)
 

@@ -859,3 +859,117 @@ func TestAddressesChangeType(t *testing.T) {
 		})
 	}
 }
+
+func TestAddressToString(t *testing.T) {
+	subnet := testIpv4Subnet()
+
+	for _, tc := range []struct {
+		name string
+		fn   func(*interfaces.Address)
+		want string
+	}{
+		{
+			name: "no lifetimes",
+			fn:   func(a *interfaces.Address) {},
+			want: "{Addr:1.2.3.4/16}",
+		},
+		{
+			name: "infinite valid-until and preferred-until",
+			fn: func(a *interfaces.Address) {
+				a.SetValidUntil(int64(zx.TimensecInfinite))
+				a.SetPreferredLifetimeInfo(interfaces.PreferredLifetimeInfoWithPreferredUntil(int64(zx.TimensecInfinite)))
+			},
+			want: "{Addr:1.2.3.4/16, ValidUntil:boot+2562047h47m16.854775807s, PreferredLifetimeInfo:boot+2562047h47m16.854775807s}",
+		},
+		{
+			name: "finite valid-until and deprecated",
+			fn: func(a *interfaces.Address) {
+				a.SetValidUntil(int64(60_000_000_000))
+				a.SetPreferredLifetimeInfo(interfaces.PreferredLifetimeInfoWithDeprecated(interfaces.Empty{}))
+			},
+			want: "{Addr:1.2.3.4/16, ValidUntil:boot+1m0s, PreferredLifetimeInfo:deprecated}",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var a interfaces.Address
+			a.SetAddr(subnet)
+			tc.fn(&a)
+
+			if got := addressToString(a); got != tc.want {
+				t.Fatalf("got \"%s\", want \"%s\"", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestInterfaceAddedStringer(t *testing.T) {
+	want := "{Id:1, Name:testif01, DeviceClass:loopback, Online:true, HasDefaultIpv4Route:true, HasDefaultIpv6Route:true}"
+	if got := interfaceAdded(testProperties()).String(); got != want {
+		t.Fatalf("got \"%s\", want \"%s\"", got, want)
+	}
+}
+
+func TestDefaultRouteChangedStringer(t *testing.T) {
+	ipv4, ipv6 := true, true
+	for _, tc := range []struct {
+		name  string
+		event defaultRouteChanged
+		want  string
+	}{
+		{
+			name: "neither present",
+			event: defaultRouteChanged{
+				nicid: tcpip.NICID(1),
+			},
+			want: "{nicid:1}",
+		},
+		{
+			name: "both present",
+			event: defaultRouteChanged{
+				nicid:               tcpip.NICID(1),
+				hasDefaultIPv4Route: &ipv4,
+				hasDefaultIPv6Route: &ipv6,
+			},
+			want: "{nicid:1, hasDefaultIPv4Route:true, hasDefaultIPv6Route:true}",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := tc.event.String(); got != tc.want {
+				t.Fatalf("got = \"%s\", want = \"%s\"", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAddressChangedStringer(t *testing.T) {
+	a := addressChanged{
+		nicid: tcpip.NICID(1),
+		protocolAddr: tcpip.ProtocolAddress{
+			AddressWithPrefix: tcpip.AddressWithPrefix{Address: util.Parse("1.2.3.4"), PrefixLen: 16},
+		},
+		lifetimes: stack.AddressLifetimes{
+			Deprecated:     false,
+			PreferredUntil: (tcpip.MonotonicTime{}).Add(time.Minute),
+			ValidUntil:     (tcpip.MonotonicTime{}).Add(time.Minute),
+		},
+		state: stack.AddressAssigned,
+	}
+	want := "{nicid:1 addr:1.2.3.4/16 lifetimes:{Deprecated:false PreferredUntil:boot+1m0s ValidUntil:boot+1m0s} state:Assigned}"
+	if got := a.String(); got != want {
+		t.Fatalf("got = \"%s\", want = \"%s\"", got, want)
+	}
+}
+
+func TestAddressRemovedStringer(t *testing.T) {
+	a := addressRemoved{
+		nicid: tcpip.NICID(1),
+		protocolAddr: tcpip.ProtocolAddress{
+			AddressWithPrefix: tcpip.AddressWithPrefix{Address: util.Parse("1.2.3.4"), PrefixLen: 16},
+		},
+		reason: stack.AddressRemovalManualAction,
+	}
+	want := "{nicid:1 addr:1.2.3.4/16 reason:ManualAction}"
+	if got := a.String(); got != want {
+		t.Fatalf("got = \"%s\", want = \"%s\"", got, want)
+	}
+}
