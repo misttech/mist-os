@@ -101,7 +101,7 @@ class AudioConsumerTests : public gtest::RealLoopFixture {
     realm_ = realm_builder.Build(dispatcher());
     teardown_callback_ = realm_->TeardownCallback();
     auto session_audio_consumer_factory =
-        realm_->ConnectSync<fuchsia::media::SessionAudioConsumerFactory>();
+        realm_->component().ConnectSync<fuchsia::media::SessionAudioConsumerFactory>();
     ASSERT_EQ(ZX_OK, session_audio_consumer_factory->CreateAudioConsumer(
                          0, audio_consumer_.NewRequest(dispatcher())));
     EXPECT_EQ(true, audio_consumer_.is_bound());
@@ -153,7 +153,7 @@ TEST_F(AudioConsumerTests, ConsumerClosed) {
   fuchsia::media::AudioConsumerPtr audio_consumer2;
   // Instantiate the audio consumer under test.
   auto session_audio_consumer_factory =
-      realm_->Connect<fuchsia::media::SessionAudioConsumerFactory>();
+      realm_->component().Connect<fuchsia::media::SessionAudioConsumerFactory>();
   session_audio_consumer_factory.set_error_handler(
       [&factory_closed](zx_status_t status) { factory_closed = true; });
   {

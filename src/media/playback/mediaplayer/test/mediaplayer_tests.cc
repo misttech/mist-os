@@ -107,7 +107,7 @@ class MediaPlayerTests : public gtest::RealLoopFixture {
     realm_ = realm_builder.Build(dispatcher());
     teardown_callback_ = realm_->TeardownCallback();
 
-    zx_status_t const status = realm_->Connect(player_.NewRequest());
+    zx_status_t const status = realm_->component().Connect(player_.NewRequest());
 
     FX_CHECK(status == ZX_OK);
 
