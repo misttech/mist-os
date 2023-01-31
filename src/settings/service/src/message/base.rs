@@ -9,8 +9,9 @@ use crate::message::messenger::MessengerClient;
 use crate::message::receptor::Receptor;
 use futures::channel::mpsc::UnboundedSender;
 use futures::channel::oneshot::Sender;
-use std::fmt::Debug;
+use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
+use std::sync::Arc;
 use thiserror::Error;
 
 /// Trait alias for types of data that can be used as the payload in a
@@ -22,6 +23,10 @@ impl<T: Clone + Debug + Send + Sync> Payload for T {}
 /// MessageHub.
 pub trait Address: Copy + Debug + Eq + Hash + Unpin + Send + Sync {}
 impl<T: Copy + Debug + Eq + Hash + Unpin + Send + Sync> Address for T {}
+
+/// `Filter` is used by the `MessageHub` to determine whether an incoming
+/// message should be directed to associated broker.
+pub type Filter = Arc<dyn Fn(&Message) -> bool + Send + Sync>;
 
 /// A mod for housing common definitions for messengers. Messengers are
 /// MessageHub participants, which are capable of sending and receiving
@@ -115,7 +120,7 @@ pub struct Fingerprint {
 }
 
 /// The messengers that can participate in messaging
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub enum MessengerType {
     /// An endpoint in the messenger graph. Can have messages specifically
     /// addressed to it and can author new messages.
@@ -124,60 +129,19 @@ pub enum MessengerType {
     /// are able to send and reply to messages, but the main purpose is to observe
     /// messages. An optional filter may be specified, which limits the messages
     /// directed to this broker.
-    Broker(filter::Filter),
+    Broker(Filter),
     /// A messenger that cannot be reached by an address.
     Unbound,
 }
 
-pub mod filter {
-    use super::Message;
-    use core::fmt::{Debug, Formatter};
-    use std::sync::Arc;
-
-    /// `Condition` allows specifying a filter condition that must be true
-    /// for a filter to match.
-    #[derive(Clone)]
-    pub enum Condition {
-        /// Matches on a custom closure that may evaluate the sent message.
-        #[allow(clippy::type_complexity)]
-        Custom(Arc<dyn Fn(&Message) -> bool + Send + Sync>),
-    }
-
-    /// We must implement Debug since the `Condition::Custom` does not provide
-    /// a `Debug` implementation.
-    impl Debug for Condition {
-        fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-            let condition = match self {
-                Condition::Custom(_) => "custom".to_string(),
-            };
-
-            write!(f, "Condition: {condition:?}")
-        }
-    }
-
-    /// `Builder` provides a convenient way to construct a [`Filter`] based on
-    /// a number of conditions.
-    pub struct Builder {}
-
-    impl Builder {
-        /// Shorthand method to create a filter based on a single condition.
-        pub(crate) fn single(condition: Condition) -> Filter {
-            Filter { condition }
-        }
-    }
-
-    /// `Filter` is used by the `MessageHub` to determine whether an incoming
-    /// message should be directed to associated broker.
-    #[derive(Clone, Debug)]
-    pub struct Filter {
-        condition: Condition,
-    }
-
-    impl Filter {
-        pub(crate) fn matches(&self, message: &Message) -> bool {
-            match &self.condition {
-                Condition::Custom(check_fn) => (check_fn)(message),
-            }
+/// We must implement Debug since the `Filter` does not provide
+/// a `Debug` implementation.
+impl Debug for MessengerType {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            MessengerType::Addressable(addr) => write!(f, "Addressable({addr:?})"),
+            MessengerType::Broker(_) => write!(f, "Broker"),
+            MessengerType::Unbound => write!(f, "Unbound"),
         }
     }
 }

@@ -137,7 +137,7 @@ mod tests {
     use crate::handler::setting_handler::{
         BoxedController, ClientImpl, ControllerError, ControllerStateResult, SettingHandlerResult,
     };
-    use crate::message::base::{filter, Message, MessageType};
+    use crate::message::base::{Message, MessageType};
     use crate::service;
     use crate::service_context::ServiceContext;
     use fuchsia_async as fasync;
@@ -195,16 +195,11 @@ mod tests {
 
         // Create a broker that only listens to replies.
         let (_, broker_receptor) = delegate
-            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-                Arc::new(move |message: &Message| {
-                    // Only filter for reply's that contain results.
-                    matches!(message.get_type(), MessageType::Reply(_))
-                        && matches!(
-                            message.payload(),
-                            service::Payload::Controller(Payload::Result(_))
-                        )
-                }),
-            ))))
+            .create(MessengerType::Broker(Arc::new(move |message: &Message| {
+                // Only filter for reply's that contain results.
+                matches!(message.get_type(), MessageType::Reply(_))
+                    && matches!(message.payload(), service::Payload::Controller(Payload::Result(_)))
+            })))
             .await
             .expect("could not create broker receptor");
 

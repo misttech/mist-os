@@ -12,7 +12,7 @@ use crate::ingress::fidl;
 use crate::ingress::registration;
 use crate::job::source::Error;
 use crate::job::{self, Job};
-use crate::message::base::{filter, Audience, MessengerType};
+use crate::message::base::{Audience, MessengerType};
 use crate::migration::MIGRATION_FILE_NAME;
 use crate::service::Payload;
 use crate::service_context::ServiceContext;
@@ -79,14 +79,12 @@ impl TestAgent {
     ) -> InvocationResult {
         let (_, mut receptor) = self
             .delegate
-            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-                Arc::new(move |message| {
-                    matches!(
-                        message.payload(),
-                        Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD)))
-                    )
-                }),
-            ))))
+            .create(MessengerType::Broker(Arc::new(move |message| {
+                matches!(
+                    message.payload(),
+                    Payload::Event(EventPayload::Event(Event::Custom(TEST_PAYLOAD)))
+                )
+            })))
             .await
             .expect("Failed to create broker");
 

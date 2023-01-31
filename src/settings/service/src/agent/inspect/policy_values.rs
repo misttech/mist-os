@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::agent::{Context, Payload};
 use crate::blueprint_definition;
 use crate::clock;
-use crate::message::base::{filter, MessageEvent, MessengerType};
+use crate::message::base::{MessageEvent, MessengerType};
 use crate::policy::{self as policy_base, Payload as PolicyPayload, Request, Role};
 use crate::service::message::{Audience, MessageClient, Messenger, Signature};
 use crate::{service, trace};
@@ -69,11 +69,9 @@ impl PolicyValuesInspectAgent {
         // passed to the agent during this wait, we will deadlock.
         let (messenger_client, broker_receptor) = match context
             .delegate
-            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-                Arc::new(|message| {
-                    matches!(message.payload(), service::Payload::Policy(PolicyPayload::Request(_)))
-                }),
-            ))))
+            .create(MessengerType::Broker(Arc::new(|message| {
+                matches!(message.payload(), service::Payload::Policy(PolicyPayload::Request(_)))
+            })))
             .await
         {
             Ok(messenger) => messenger,

@@ -13,7 +13,7 @@ use crate::agent::Payload;
 use crate::base::SettingType;
 use crate::blueprint_definition;
 use crate::handler::base::{Payload as HandlerPayload, Request};
-use crate::message::base::{filter, MessageEvent, MessengerType};
+use crate::message::base::{MessageEvent, MessengerType};
 use crate::service::TryFromWithClient;
 use crate::{service, trace};
 use fuchsia_async as fasync;
@@ -77,15 +77,10 @@ impl SettingTypeUsageInspectAgent {
     async fn create_with_node(context: Context, node: inspect::Node) {
         let (_, message_rx) = context
             .delegate
-            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-                Arc::new(move |message| {
-                    // Only catch setting handler requests.
-                    matches!(
-                        message.payload(),
-                        service::Payload::Setting(HandlerPayload::Request(_))
-                    )
-                }),
-            ))))
+            .create(MessengerType::Broker(Arc::new(move |message| {
+                // Only catch setting handler requests.
+                matches!(message.payload(), service::Payload::Setting(HandlerPayload::Request(_)))
+            })))
             .await
             .expect("should receive client");
 

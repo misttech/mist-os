@@ -42,7 +42,7 @@
 use crate::agent::{Context, Payload};
 use crate::blueprint_definition;
 use crate::event::{Event, Payload as EventPayload};
-use crate::message::base::{filter, MessageEvent, MessengerType};
+use crate::message::base::{MessageEvent, MessengerType};
 use crate::service::{self as service, TryFromWithClient};
 use crate::service_context::ExternalServiceEvent;
 use crate::trace;
@@ -180,18 +180,14 @@ impl ExternalApiInspectAgent {
     async fn create_with_node(context: Context, node: Node) {
         let (_, message_rx) = context
             .delegate
-            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-                Arc::new(move |message| {
-                    // TODO(fxb/108370): Explore combining inspect agents.
-                    // Only catch external api requests.
-                    matches!(
-                        message.payload(),
-                        service::Payload::Event(EventPayload::Event(Event::ExternalServiceEvent(
-                            _
-                        )))
-                    )
-                }),
-            ))))
+            .create(MessengerType::Broker(Arc::new(move |message| {
+                // TODO(fxb/108370): Explore combining inspect agents.
+                // Only catch external api requests.
+                matches!(
+                    message.payload(),
+                    service::Payload::Event(EventPayload::Event(Event::ExternalServiceEvent(_)))
+                )
+            })))
             .await
             .expect("should receive client");
 

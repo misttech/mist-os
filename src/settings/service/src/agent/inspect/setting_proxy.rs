@@ -17,7 +17,7 @@ use crate::blueprint_definition;
 use crate::clock;
 use crate::handler::base::{Error, Payload as HandlerPayload, Request};
 use crate::inspect::utils::enums::ResponseType;
-use crate::message::base::{filter, MessageEvent, MessengerType};
+use crate::message::base::{MessageEvent, MessengerType};
 use crate::message::receptor::Receptor;
 use crate::service::TryFromWithClient;
 use crate::{service, trace};
@@ -205,15 +205,10 @@ impl SettingProxyInspectAgent {
     ) {
         let (_, message_rx) = context
             .delegate
-            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-                Arc::new(move |message| {
-                    // Only catch setting handler requests.
-                    matches!(
-                        message.payload(),
-                        service::Payload::Setting(HandlerPayload::Request(_))
-                    )
-                }),
-            ))))
+            .create(MessengerType::Broker(Arc::new(move |message| {
+                // Only catch setting handler requests.
+                matches!(message.payload(), service::Payload::Setting(HandlerPayload::Request(_)))
+            })))
             .await
             .expect("should receive client");
 

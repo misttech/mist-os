@@ -7,7 +7,7 @@ use fuchsia_async::Task;
 use futures::StreamExt;
 
 use crate::handler::base::{Error as HandlerError, Payload, Request, Response};
-use crate::message::base::{filter, Audience, MessageEvent, MessageType, MessengerType, Signature};
+use crate::message::base::{Audience, Filter, MessageEvent, MessageType, MessengerType, Signature};
 use crate::policy::policy_handler::{PolicyHandler, RequestTransform, ResponseTransform};
 use crate::policy::{
     self as policy_base, PolicyHandlerFactory, PolicyType, Request as PolicyRequest, Role,
@@ -42,7 +42,7 @@ impl PolicyProxy {
         let setting_handler_signature = Signature::Address(setting_handler_address);
         let policy_handler_signature = receptor.get_signature();
 
-        let service_proxy_condition = filter::Condition::Custom(Arc::new(move |message| {
+        let service_proxy_filter: Filter = Arc::new(move |message| {
             // Intercept responses authored by the setting proxy.
             let is_setting_proxy_response = || {
                 if message.get_author() == setting_handler_signature
@@ -69,9 +69,7 @@ impl PolicyProxy {
             };
 
             is_setting_proxy_response() || is_for_setting_proxy()
-        }));
-
-        let service_proxy_filter = filter::Builder::single(service_proxy_condition);
+        });
 
         let (_, service_proxy_receptor) =
             delegate.create(MessengerType::Broker(service_proxy_filter)).await?;

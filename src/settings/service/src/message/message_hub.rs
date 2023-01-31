@@ -4,9 +4,9 @@
 
 use crate::message::action_fuse::ActionFuse;
 use crate::message::base::{
-    filter::Filter, messenger, ActionSender, Attribution, Audience, Fingerprint, Message,
-    MessageAction, MessageClientId, MessageError, MessageType, MessengerAction, MessengerId,
-    MessengerType, Signature, Status,
+    messenger, ActionSender, Attribution, Audience, Filter, Fingerprint, Message, MessageAction,
+    MessageClientId, MessageError, MessageType, MessengerAction, MessengerId, MessengerType,
+    Signature, Status,
 };
 use crate::message::beacon::{Beacon, BeaconBuilder};
 use crate::message::delegate::Delegate;
@@ -208,7 +208,7 @@ impl MessageHub {
                         && self
                             .resolve_messenger_id(&message.get_author())
                             .map_or(true, |id| id != broker.messenger_id)
-                        && broker.filter.matches(&message)
+                        && (broker.filter)(&message)
                 })
                 .map(|broker| broker.messenger_id)
                 .collect();
@@ -291,9 +291,7 @@ impl MessageHub {
                 let iter = self
                     .brokers
                     .iter()
-                    .filter(|&broker| {
-                        broker.messenger_id != author_id && broker.filter.matches(&message)
-                    })
+                    .filter(|&broker| broker.messenger_id != author_id && (broker.filter)(&message))
                     .map(|broker| broker.messenger_id);
 
                 let should_find_sender = {

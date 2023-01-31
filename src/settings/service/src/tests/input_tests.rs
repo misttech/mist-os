@@ -13,7 +13,7 @@ use crate::input::monitor_media_buttons;
 use crate::input::types::{
     DeviceState, DeviceStateSource, InputCategory, InputDeviceType, InputInfoSources, InputState,
 };
-use crate::message::base::{filter, Attribution, Message, MessageType, MessengerType};
+use crate::message::base::{Attribution, Message, MessageType, MessengerType};
 use crate::message::receptor::Receptor;
 use crate::service::message::Delegate;
 use crate::service::Payload;
@@ -238,16 +238,14 @@ async fn get_and_check_camera_disable(
 
 // Creates a broker to listen in on media buttons events.
 fn create_broker(executor: &mut TestExecutor, delegate: Delegate) -> Receptor {
-    let message_hub_future = delegate.create(MessengerType::Broker(filter::Builder::single(
-        filter::Condition::Custom(Arc::new(move |message| {
-            // The first condition indicates that it is a response to a set request.
-            if let Payload::Setting(HandlerPayload::Response(Ok(None))) = message.payload() {
-                is_attr_onbutton(message)
-            } else {
-                false
-            }
-        })),
-    )));
+    let message_hub_future = delegate.create(MessengerType::Broker(Arc::new(move |message| {
+        // The first condition indicates that it is a response to a set request.
+        if let Payload::Setting(HandlerPayload::Response(Ok(None))) = message.payload() {
+            is_attr_onbutton(message)
+        } else {
+            false
+        }
+    })));
     pin_mut!(message_hub_future);
     match executor.run_until_stalled(&mut message_hub_future) {
         Poll::Ready(Ok((_, receptor))) => receptor,

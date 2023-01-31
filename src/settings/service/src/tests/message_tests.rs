@@ -4,7 +4,7 @@
 
 use crate::event;
 use crate::message::action_fuse::ActionFuse;
-use crate::message::base::{filter, Audience, MessageEvent, MessengerType, Status};
+use crate::message::base::{Audience, Filter, MessageEvent, MessengerType, Status};
 use crate::message::receptor::Receptor;
 use crate::policy;
 use crate::tests::message_utils::verify_payload;
@@ -51,8 +51,8 @@ mod test {
     pub(crate) type MessageHub = crate::message::message_hub::MessageHub;
 }
 
-fn no_filter() -> filter::Filter {
-    filter::Builder::single(filter::Condition::Custom(Arc::new(|&_| true)))
+fn no_filter() -> Filter {
+    Arc::new(|&_| true)
 }
 
 // Tests message client creation results in unique ids.
@@ -586,9 +586,7 @@ async fn test_reply_propagation() {
 
     // Create broker to propagate a derived message.
     let (_, mut broker) = delegate
-        .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-            Arc::new(move |message| *message.payload() == *REPLY),
-        ))))
+        .create(MessengerType::Broker(Arc::new(move |message| *message.payload() == *REPLY)))
         .await
         .expect("broker should be created");
 
@@ -716,9 +714,7 @@ async fn test_broker_filter_custom() {
         .await
         .expect("broadcast messenger should be created");
     // Filter to target only the ORIGINAL message.
-    let filter = filter::Builder::single(filter::Condition::Custom(Arc::new(|message| {
-        *message.payload() == *ORIGINAL
-    })));
+    let filter: Filter = Arc::new(|message| *message.payload() == *ORIGINAL);
     // Broker that should only target ORIGINAL messages.
     let (_, mut broker_receptor) =
         delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");
@@ -747,9 +743,7 @@ async fn test_broker_filter_caputring_closure() {
         .expect("broadcast messenger should be created");
     // Filter to target only the Foo message.
     let expected_payload = &test_message::FOO;
-    let filter = filter::Builder::single(filter::Condition::Custom(Arc::new(move |message| {
-        *message.payload() == *expected_payload
-    })));
+    let filter: Filter = Arc::new(move |message| *message.payload() == *expected_payload);
     // Broker that should only target Foo messages.
     let (_, mut broker_receptor) =
         delegate.create(MessengerType::Broker(filter)).await.expect("broker should be created");

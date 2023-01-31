@@ -18,7 +18,7 @@ use crate::blueprint_definition;
 use crate::clock;
 use crate::handler::base::{Payload as SettingPayload, Request};
 use crate::handler::setting_handler::{Event, Payload as HandlerPayload};
-use crate::message::base::{filter, Audience, MessageEvent, MessengerType};
+use crate::message::base::{Audience, MessageEvent, MessengerType};
 use crate::service;
 use crate::service::message::Messenger;
 use crate::service::TryFromWithClient;
@@ -99,16 +99,14 @@ impl SettingValuesInspectAgent {
 
         let (messenger_client, receptor) = match context
             .delegate
-            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-                Arc::new(move |message| {
-                    // Only catch messages that were originally sent from the interfaces, and
-                    // that contain a request for the specific setting type we're interested in.
-                    matches!(
-                        message.payload(),
-                        service::Payload::Controller(HandlerPayload::Event(Event::Changed(_)))
-                    )
-                }),
-            ))))
+            .create(MessengerType::Broker(Arc::new(move |message| {
+                // Only catch messages that were originally sent from the interfaces, and
+                // that contain a request for the specific setting type we're interested in.
+                matches!(
+                    message.payload(),
+                    service::Payload::Controller(HandlerPayload::Event(Event::Changed(_)))
+                )
+            })))
             .await
         {
             Ok(messenger) => messenger,

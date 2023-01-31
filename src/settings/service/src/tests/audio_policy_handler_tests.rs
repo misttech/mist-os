@@ -15,7 +15,7 @@ use crate::audio::types::{AudioInfo, AudioSettingSource, AudioStream, SetAudioSt
 use crate::audio::utils::round_volume_level;
 use crate::base::SettingType;
 use crate::handler::base::{Payload as SettingPayload, Request as SettingRequest};
-use crate::message::base::{filter, Audience, MessageEvent, MessengerType, Status};
+use crate::message::base::{Audience, MessageEvent, MessengerType, Status};
 use crate::policy::policy_handler::{ClientProxy, Create, PolicyHandler, RequestTransform};
 use crate::policy::response::{Error as PolicyError, Payload};
 use crate::policy::{PolicyInfo, PolicyType, Request};
@@ -145,14 +145,9 @@ impl TestEnvironment {
 
     async fn create_request_observer(&self) -> Receptor {
         self.internal_delegate
-            .create(MessengerType::Broker(filter::Builder::single(filter::Condition::Custom(
-                Arc::new(move |message| {
-                    matches!(
-                        message.payload(),
-                        service::Payload::Setting(SettingPayload::Request(_))
-                    )
-                }),
-            ))))
+            .create(MessengerType::Broker(Arc::new(move |message| {
+                matches!(message.payload(), service::Payload::Setting(SettingPayload::Request(_)))
+            })))
             .await
             .expect("receptor should be present")
             .1
