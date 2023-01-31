@@ -88,7 +88,6 @@ void ClientBase::ReleaseResponseContexts(fidl::UnbindInfo info) {
       case fidl::Reason::kClose:
         // |kClose| is never used on the client side.
         __builtin_abort();
-        break;
       case fidl::Reason::kUnbind:
         // The user explicitly initiated teardown.
       case fidl::Reason::kEncodeError:

@@ -766,8 +766,7 @@ class __POINTER(KeyType_) WAVLTree {
       // key.  This will be either...
       // 1) The RL-most child of our LR-hand sub-tree.
       // 2) Our first ancestor for which we are a LR-hand descendant.
-      auto ns = &NodeTraits::node_state(*node_);
-      auto rl_child = LRTraits::RLChild(*ns);
+      auto rl_child = LRTraits::RLChild(NodeTraits::node_state(*node_));
       if (rl_child != nullptr) {
         node_ = rl_child;
 
