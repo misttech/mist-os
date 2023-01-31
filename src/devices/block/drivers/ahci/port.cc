@@ -43,7 +43,7 @@ bool cmd_is_read(uint8_t cmd) {
 
 bool cmd_is_write(uint8_t cmd) {
   if (cmd == SATA_CMD_WRITE_DMA || cmd == SATA_CMD_WRITE_DMA_EXT ||
-      cmd == SATA_CMD_WRITE_FPDMA_QUEUED) {
+      cmd == SATA_CMD_WRITE_FPDMA_QUEUED || cmd == SATA_CMD_WRITE_DMA_FUA_EXT) {
     return true;
   } else {
     return false;
@@ -414,6 +414,9 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, sata_txn_t* txn) {
       cmd = SATA_CMD_READ_FPDMA_QUEUED;
     } else if (cmd == SATA_CMD_WRITE_DMA_EXT) {
       cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
+    } else if (cmd == SATA_CMD_WRITE_DMA_FUA_EXT) {
+      cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
+      device |= 1 << 7;  // Set FUA
     }
   }
 
@@ -433,7 +436,8 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, sata_txn_t* txn) {
   cfis[7] = device;
 
   // some commands have lba/count fields
-  if (cmd == SATA_CMD_READ_DMA_EXT || cmd == SATA_CMD_WRITE_DMA_EXT) {
+  if (cmd == SATA_CMD_READ_DMA_EXT || cmd == SATA_CMD_WRITE_DMA_EXT ||
+      cmd == SATA_CMD_WRITE_DMA_FUA_EXT) {
     cfis[4] = lba & 0xff;
     cfis[5] = (lba >> 8) & 0xff;
     cfis[6] = (lba >> 16) & 0xff;
