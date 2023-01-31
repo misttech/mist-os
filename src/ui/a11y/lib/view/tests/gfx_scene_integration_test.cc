@@ -14,9 +14,12 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <memory>
+
 #include <gtest/gtest.h>
 
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/testing/ui_test_manager/ui_test_manager.h"
 #include "src/ui/testing/util/gfx_test_view.h"
@@ -25,8 +28,8 @@ namespace accessibility_test {
 namespace {
 
 using component_testing::ChildRef;
-using component_testing::LocalComponent;
 using component_testing::LocalComponentHandles;
+using component_testing::LocalComponentImpl;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Realm;
@@ -42,23 +45,25 @@ constexpr auto kA11yManagerUrl = "#meta/a11y-manager.cm";
 //
 // (1) Observe the a11y view's ViewRef.
 // (2) Synchronize our test based on when the a11y view has been inserted.
-class AccessibilityViewRegistryProxy : public LocalComponent,
+class AccessibilityViewRegistryProxy : public LocalComponentImpl,
                                        public fuchsia::ui::accessibility::view::Registry {
  public:
-  explicit AccessibilityViewRegistryProxy(async_dispatcher_t* dispatcher)
-      : dispatcher_(dispatcher) {}
+  AccessibilityViewRegistryProxy(async_dispatcher_t* dispatcher,
+                                 fxl::WeakPtr<AccessibilityViewRegistryProxy>* access)
+      : dispatcher_(dispatcher), weak_ptr_(this) {
+    FX_CHECK(access != nullptr);
+    *access = weak_ptr_.GetWeakPtr();
+  }
   ~AccessibilityViewRegistryProxy() override = default;
 
-  // |LocalComponent|
-  void Start(std::unique_ptr<LocalComponentHandles> local_handles) override {
-    FX_CHECK(local_handles->outgoing()->AddPublicService(
+  // |LocalComponentImpl|
+  void OnStart() override {
+    FX_CHECK(outgoing()->AddPublicService(
                  fidl::InterfaceRequestHandler<fuchsia::ui::accessibility::view::Registry>(
                      [this](auto request) {
                        bindings_.AddBinding(this, std::move(request), dispatcher_);
                      })) == ZX_OK);
-    local_handles_ = std::move(local_handles);
-
-    registry_ = local_handles_->svc().Connect<fuchsia::ui::accessibility::view::Registry>();
+    registry_ = svc().Connect<fuchsia::ui::accessibility::view::Registry>();
   }
 
   // |fuchsia::ui::accessibility::view::Registry|
@@ -97,7 +102,6 @@ class AccessibilityViewRegistryProxy : public LocalComponent,
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  std::unique_ptr<LocalComponentHandles> local_handles_;
   fidl::BindingSet<fuchsia::ui::accessibility::view::Registry> bindings_;
   fuchsia::ui::accessibility::view::RegistryPtr registry_;
   std::optional<fuchsia::ui::views::ViewRef> a11y_view_ref_;
@@ -105,6 +109,7 @@ class AccessibilityViewRegistryProxy : public LocalComponent,
   CreateAccessibilityViewHolderCallback callback_;
   zx_koid_t a11y_view_ref_koid_ = ZX_KOID_INVALID;
   bool a11y_view_holder_created_ = false;
+  fxl::WeakPtrFactory<AccessibilityViewRegistryProxy> weak_ptr_;  // Keep last
 };
 
 // This test exercises the handshake between a11y manager and the scene owner
@@ -149,8 +154,9 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
     });
 
     // Add the a11y view registry proxy.
-    a11y_view_registry_proxy_.emplace(dispatcher());
-    realm_->AddLocalChild(kRegistryProxy, &(*a11y_view_registry_proxy_));
+    realm_->AddLocalChild(kRegistryProxy, [d = dispatcher(), a = &access_]() {
+      return std::make_unique<AccessibilityViewRegistryProxy>(d, a);
+    });
 
     // Route low-level system services to a11y manager.
     realm_->AddRoute(Route{.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
@@ -196,7 +202,7 @@ class GfxAccessibilitySceneTestBase : public gtest::RealLoopFixture {
   std::unique_ptr<sys::ServiceDirectory> realm_exposed_services_;
   std::shared_ptr<ui_testing::TestViewAccess> test_view_access_;
   std::optional<Realm> realm_;
-  std::optional<AccessibilityViewRegistryProxy> a11y_view_registry_proxy_;
+  fxl::WeakPtr<AccessibilityViewRegistryProxy> access_;
 };
 
 class ClientAttachesFirst
@@ -228,21 +234,26 @@ TEST_P(ClientAttachesFirst, SceneReconnectedAndClientRefocused) {
   auto semantics_manager_unused =
       realm_exposed_services_->Connect<fuchsia::accessibility::semantics::SemanticsManager>();
   FX_LOGS(INFO) << "Waiting for a11y manager to request view";
-  RunLoopUntil([this] { return a11y_view_registry_proxy_->a11y_view_requested(); });
+  RunLoopUntil([this] {
+    if (access_.get() == nullptr) {
+      return false;
+    }
+    return access_->a11y_view_requested();
+  });
 
   // The a11y view should not yet be part of the scene.
   // NOTE: Any view with a descendant that renders content is considered
   // "rendering".
-  EXPECT_FALSE(ui_test_manager_->ViewIsRendering(a11y_view_registry_proxy_->a11y_view_ref_koid()));
+  EXPECT_FALSE(ui_test_manager_->ViewIsRendering(access_->a11y_view_ref_koid()));
 
   // Pass the a11y view request through to the scene owner, and wait until the
   // a11y view and client view are both attached to the scene and the client
   // view is re-focused.
-  a11y_view_registry_proxy_->PassCreateRequestToSceneOwner();
+  access_->PassCreateRequestToSceneOwner();
   FX_LOGS(INFO) << "Waiting for a11y and client views to render";
   RunLoopUntil([this] {
     return ui_test_manager_->ClientViewIsRendering() &&
-           ui_test_manager_->ViewIsRendering(a11y_view_registry_proxy_->a11y_view_ref_koid());
+           ui_test_manager_->ViewIsRendering(access_->a11y_view_ref_koid());
   });
 
   FX_LOGS(INFO) << "Waiting for client view to receive focus";
@@ -255,7 +266,7 @@ TEST_P(ClientAttachesFirst, SceneReconnectedAndClientRefocused) {
 class A11yViewAttachesFirstTest : public GfxAccessibilitySceneTestBase {
  public:
   A11yViewAttachesFirstTest() = default;
-  ~A11yViewAttachesFirstTest() = default;
+  ~A11yViewAttachesFirstTest() override = default;
 
   ui_testing::UITestRealm::SceneOwnerType SceneOwner() override {
     return ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
@@ -270,17 +281,22 @@ TEST_F(A11yViewAttachesFirstTest, A11yViewAttachesFirst) {
   auto semantics_manager_unused =
       realm_exposed_services_->Connect<fuchsia::accessibility::semantics::SemanticsManager>();
   FX_LOGS(INFO) << "Waiting for a11y manager to request view";
-  RunLoopUntil([this] { return a11y_view_registry_proxy_->a11y_view_requested(); });
+  RunLoopUntil([this] {
+    if (access_.get() == nullptr) {
+      return false;
+    }
+    return access_->a11y_view_requested();
+  });
 
   // The a11y view should not yet be part of the scene.
   // NOTE: Any view with a descendant that renders content is considered
   // "rendering".
-  EXPECT_FALSE(ui_test_manager_->ViewIsRendering(a11y_view_registry_proxy_->a11y_view_ref_koid()));
+  EXPECT_FALSE(ui_test_manager_->ViewIsRendering(access_->a11y_view_ref_koid()));
 
   // Pass the a11y view request through to the scene owner, and wait until the
   // a11y view holder has been created.
-  a11y_view_registry_proxy_->PassCreateRequestToSceneOwner();
-  RunLoopUntil([this] { return a11y_view_registry_proxy_->a11y_view_holder_created(); });
+  access_->PassCreateRequestToSceneOwner();
+  RunLoopUntil([this] { return access_->a11y_view_holder_created(); });
 
   // Attach the client view, and wait for both the client and a11y views to be
   // attached to the scene.
@@ -288,7 +304,7 @@ TEST_F(A11yViewAttachesFirstTest, A11yViewAttachesFirst) {
   FX_LOGS(INFO) << "Waiting for a11y and client views to render";
   RunLoopUntil([this] {
     return ui_test_manager_->ClientViewIsRendering() &&
-           ui_test_manager_->ViewIsRendering(a11y_view_registry_proxy_->a11y_view_ref_koid()) &&
+           ui_test_manager_->ViewIsRendering(access_->a11y_view_ref_koid()) &&
            ui_test_manager_->ClientViewIsFocused();
   });
 }
