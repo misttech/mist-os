@@ -1363,6 +1363,30 @@ mod sys {
     }
 }
 
+/// Creates a convenience macro that returns a string literal.
+///
+/// Example:
+///
+/// ```rust
+/// string_name_macro!(CATEGORY, "category");
+/// string_name_macro!(NAME, "name");
+///
+/// ...
+///
+/// duration!(CATEGORY!(), NAME!());
+/// ```
+#[macro_export]
+macro_rules! string_name_macro {
+    ($name:ident, $s:literal) => {
+        #[macro_export]
+        macro_rules! $name {
+            () => {
+                $s
+            };
+        }
+    };
+}
+
 #[cfg(test)]
 mod test {
     use super::{trim_to_last_char_boundary, Id};

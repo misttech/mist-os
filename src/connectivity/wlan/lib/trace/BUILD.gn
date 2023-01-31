@@ -16,6 +16,8 @@ rustc_library("wlan-trace") {
     "src/lib.rs",
     "src/names.rs",
   ]
+
+  deps = [ "//src/lib/trace/rust:trace" ]
 }
 
 fuchsia_unittest_component("wlan-trace-tests") {
