@@ -1,0 +1,10 @@
+{
+    "short_description": "ABR shim driver",
+    "manufacturer": "",
+    "families": [],
+    "models": [],
+    "areas": [
+        "Block",
+        "Storage"
+    ]
+}

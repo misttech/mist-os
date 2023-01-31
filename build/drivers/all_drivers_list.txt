@@ -73,6 +73,7 @@
 //src/devices/bin/driver_host:driver-host-test-driver-driver
 //src/devices/bin/driver_host:unit-test-fail-driver
 //src/devices/bin/driver_host:unit-test-pass-driver
+//src/devices/block/drivers/abr-shim:abr-shim-driver
 //src/devices/block/drivers/ahci:ahci-driver
 //src/devices/block/drivers/aml-sdmmc:aml-sdmmc-driver
 //src/devices/block/drivers/as370-sdhci:as370-sdhci-driver
