@@ -12,12 +12,10 @@ pub(super) const MAX_SCROLL_DIRECTION_SKEW_DEGREES: f32 = 40.0;
 
 /// Based on palm / thumb size data collected from adults.
 ///
-/// Min of max of contact size of palm sequence is 8.122mm.
-/// Max thumb contact is 7.752mm.
-/// Mean of max of contact size of thumb sequence is 5.853mm,
-/// standard deviation is 0.925mm. Mean + 2 stddev = 7.70mm.
-/// So we believe 7.8mm maybe a threshold of thumb to palm.
-pub(super) const MIN_PALM_SIZE_MM: f32 = 7.8;
+/// Mean of the max of contact size of thumb sequence is 4.878mm,
+/// std of the max of contact size of thumb is 0.4836.
+/// So we believe 5.8mm maybe a threshold of thumb to palm.
+pub(super) const MIN_PALM_SIZE_MM: f32 = 5.8;
 
 pub(super) const SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM: f32 =
     3.0 * SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_MM;

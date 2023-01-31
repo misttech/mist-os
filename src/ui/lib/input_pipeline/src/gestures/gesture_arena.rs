@@ -494,6 +494,11 @@ fn parse_touchpad_event(
 }
 
 fn filter_palm_contact(touchpad_event: TouchpadEvent) -> TouchpadEvent {
+    // Button down will make the contact of finger larger. We are not able to
+    // use the same threshold to distinguish finger or palm.
+    if touchpad_event.pressed_buttons.len() > 0 {
+        return touchpad_event;
+    }
     let (contacts, filtered_palm_contacts) = touchpad_event.contacts.into_iter().fold(
         (
             Vec::<touch_binding::TouchContact>::default(),
@@ -515,21 +520,8 @@ fn filter_palm_contact(touchpad_event: TouchpadEvent) -> TouchpadEvent {
             out
         },
     );
-    let size_of_contacts = contacts.len();
 
-    TouchpadEvent {
-        contacts,
-        filtered_palm_contacts,
-        pressed_buttons: match size_of_contacts {
-            // Gesture arena remove button because:
-            // 1. Palm is resting heavily enough on the pad to trigger a click.
-            // 2. Recognizers assume that a button click always requires a contact.
-            //    if only palm contacting, also remove the button.
-            0 => vec![],
-            _ => touchpad_event.pressed_buttons,
-        },
-        ..touchpad_event
-    }
+    TouchpadEvent { contacts, filtered_palm_contacts, ..touchpad_event }
 }
 
 impl std::convert::From<MouseEvent> for input_device::InputEvent {
@@ -3308,22 +3300,6 @@ mod tests {
                 pressed_buttons: hashset! {},
             }; "only palm contact"
         )]
-        #[test_case(
-            touch_binding::TouchpadEvent {
-                injector_contacts: vec![
-                    touch_binding::TouchContact{
-                        id: 1,
-                        position: Position { x: 0.0, y: 0.0 },
-                        contact_size: Some(Size {
-                            width: args::MIN_PALM_SIZE_MM,
-                            height: 0.15,
-                        }),
-                        pressure: None,
-                    }
-                ],
-                pressed_buttons: hashset! {1},
-            }; "palm contact and button down"
-        )]
         #[fuchsia::test(allow_stalls = false)]
         async fn ignore_palm_contact(event: touch_binding::TouchpadEvent) {
             let contender = Box::new(StubContender::new());
@@ -3367,23 +3343,6 @@ mod tests {
                 pressed_buttons: hashset! {},
             }, vec![]; "palm contact and finger"
         )]
-        #[test_case(
-            touch_binding::TouchpadEvent {
-                injector_contacts: vec![
-                    TOUCH_CONTACT_INDEX_FINGER,
-                    touch_binding::TouchContact{
-                        id: 1,
-                        position: Position { x: 0.0, y: 0.0 },
-                        contact_size: Some(Size {
-                            width: args::MIN_PALM_SIZE_MM,
-                            height: 0.15,
-                        }),
-                        pressure: None,
-                    }
-                ],
-                pressed_buttons: hashset! {1},
-            }, vec![1]; "palm contact finger and button down"
-        )]
         #[fuchsia::test(allow_stalls = false)]
         async fn ignore_palm_contact_keep_finger(
             event: touch_binding::TouchpadEvent,
@@ -3413,6 +3372,77 @@ mod tests {
             let got = contender.get_last_touchpad_event().unwrap();
             assert_eq!(got.contacts.as_slice(), [TOUCH_CONTACT_INDEX_FINGER]);
             assert_eq!(got.pressed_buttons, expect_buttons);
+        }
+
+        #[test_case(
+            touch_binding::TouchpadEvent {
+                injector_contacts: vec![
+                    touch_binding::TouchContact{
+                        id: 1,
+                        position: Position { x: 0.0, y: 0.0 },
+                        contact_size: Some(Size {
+                            width: args::MIN_PALM_SIZE_MM,
+                            height: 0.15,
+                        }),
+                        pressure: None,
+                    }
+                ],
+                pressed_buttons: hashset! {1},
+            }; "palm contact"
+        )]
+        #[test_case(
+            touch_binding::TouchpadEvent {
+                injector_contacts: vec![
+                    touch_binding::TouchContact{
+                        id: 1,
+                        position: Position { x: 0.0, y: 0.0 },
+                        contact_size: Some(Size {
+                            width: args::MIN_PALM_SIZE_MM,
+                            height: 0.15,
+                        }),
+                        pressure: None,
+                    },
+                    touch_binding::TouchContact{
+                        id: 2,
+                        position: Position { x: 5.0, y: 5.0 },
+                        contact_size: Some(Size {
+                            width: args::MIN_PALM_SIZE_MM / 2.0,
+                            height: 0.15,
+                        }),
+                        pressure: None,
+                    },
+                ],
+                pressed_buttons: hashset! {1},
+            }; "palm and finger contact"
+        )]
+        #[fuchsia::test(allow_stalls = false)]
+        async fn skip_palm_detection_when_button_down(event: touch_binding::TouchpadEvent) {
+            let contender = Box::new(StubContender::new());
+            let contender_factory = ContenderFactoryOnceOrPanic::new(vec![contender.clone()]);
+            let arena = Rc::new(GestureArena::new_for_test(
+                Box::new(contender_factory),
+                &fuchsia_inspect::Inspector::default(),
+                1,
+            ));
+            contender.set_next_result(ExamineEventResult::Mismatch(Reason::Basic("some reason")));
+
+            let count_of_contact = event.injector_contacts.len();
+            let input_event = input_device::InputEvent {
+                device_event: input_device::InputDeviceEvent::Touchpad(event),
+                device_descriptor: make_touchpad_descriptor(vec![(
+                    fidl_input_report::Unit { type_: UnitType::Meters, exponent: -3 },
+                    fidl_input_report::Unit { type_: UnitType::Meters, exponent: -3 },
+                )]),
+                event_time: zx::Time::ZERO,
+                trace_id: None,
+                handled: input_device::Handled::No,
+            };
+
+            arena.handle_input_event(input_event).await;
+            assert_eq!(
+                contender.get_last_touchpad_event().unwrap().contacts.len(),
+                count_of_contact
+            );
         }
 
         #[test_case(
