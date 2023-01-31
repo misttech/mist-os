@@ -50,20 +50,13 @@ impl fmt::Debug for LocalExecutor {
 
 impl LocalExecutor {
     /// Create a new single-threaded executor running with actual time.
-    #[allow(deprecated)]
     pub fn new() -> Self {
-        Self::try_new().unwrap()
-    }
-
-    /// Deprecated, will be deleted.
-    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
-    pub fn try_new() -> Result<Self, zx::Status> {
         let inner = Arc::new(Inner::new(ExecutorTime::RealTime, /* is_local */ true));
         inner.clone().set_local(TimerHeap::default());
         let main_task =
             Arc::new(MainTask { executor: Arc::downgrade(&inner), notifier: Notifier::default() });
         let main_waker = futures::task::waker(main_task.clone());
-        Ok(Self { inner, main_task, main_waker })
+        Self { inner, main_task, main_waker }
     }
 
     /// Run a single future to completion on a single thread, also polling other active tasks.
@@ -159,26 +152,12 @@ pub struct TestExecutor {
 
 impl TestExecutor {
     /// Create a new executor for testing.
-    #[allow(deprecated)]
     pub fn new() -> Self {
-        Self::try_new().unwrap()
-    }
-
-    /// Deprecated, will be deleted.
-    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
-    pub fn try_new() -> Result<Self, zx::Status> {
-        Ok(Self { local: LocalExecutor::new(), next_packet: None })
+        Self { local: LocalExecutor::new(), next_packet: None }
     }
 
     /// Create a new single-threaded executor running with fake time.
-    #[allow(deprecated)]
     pub fn new_with_fake_time() -> Self {
-        Self::try_new_with_fake_time().unwrap()
-    }
-
-    /// Deprecated, will be deleted.
-    #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
-    pub fn try_new_with_fake_time() -> Result<Self, zx::Status> {
         let inner = Arc::new(Inner::new(
             ExecutorTime::FakeTime(AtomicI64::new(Time::INFINITE_PAST.into_nanos())),
             /* is_local */ true,
@@ -187,7 +166,7 @@ impl TestExecutor {
         let main_task =
             Arc::new(MainTask { executor: Arc::downgrade(&inner), notifier: Notifier::default() });
         let main_waker = futures::task::waker(main_task.clone());
-        Ok(Self { local: LocalExecutor { inner, main_task, main_waker }, next_packet: None })
+        Self { local: LocalExecutor { inner, main_task, main_waker }, next_packet: None }
     }
 
     /// Return the current time according to the executor.

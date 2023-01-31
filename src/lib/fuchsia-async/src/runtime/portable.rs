@@ -92,7 +92,6 @@ pub mod task {
 pub mod executor {
     use crate::runtime::WakeupTime;
     use easy_parallel::Parallel;
-    use fuchsia_zircon_status as zx_status;
     use std::future::Future;
 
     pub use std::time::Duration;
@@ -139,15 +138,8 @@ pub mod executor {
 
     impl SendExecutor {
         /// Create a new executor running with actual time.
-        #[allow(deprecated)]
         pub fn new(num_threads: usize) -> Self {
-            Self::try_new(num_threads).unwrap()
-        }
-
-        /// Deprecated, will be deleted.
-        #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
-        pub fn try_new(num_threads: usize) -> Result<Self, zx_status::Status> {
-            Ok(Self { num_threads })
+            Self { num_threads }
         }
 
         /// Run a single future to completion using multiple threads.
@@ -187,15 +179,8 @@ pub mod executor {
 
     impl LocalExecutor {
         /// Create a new executor.
-        #[allow(deprecated)]
         pub fn new() -> Self {
-            Self::try_new().unwrap()
-        }
-
-        /// Deprecated, will be deleted.
-        #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
-        pub fn try_new() -> Result<Self, zx_status::Status> {
-            Ok(Self {})
+            Self {}
         }
 
         /// Run a single future to completion on a single thread.
@@ -215,15 +200,8 @@ pub mod executor {
 
     impl TestExecutor {
         /// Create a new executor for testing.
-        #[allow(deprecated)]
         pub fn new() -> Self {
-            Self::try_new().unwrap()
-        }
-
-        /// Deprecated, will be deleted.
-        #[deprecated] // TODO(https://fxbug.dev/115386) delete this once new() is infallible
-        pub fn try_new() -> Result<Self, zx_status::Status> {
-            Ok(Self {})
+            Self {}
         }
 
         /// Run a single future to completion on a single thread.
