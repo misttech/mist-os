@@ -919,16 +919,6 @@ pub fn remove_device<NonSyncCtx: NonSyncContext>(
     ctx: &mut NonSyncCtx,
     device: DeviceId<NonSyncCtx::Instant>,
 ) {
-    // Start cleaning up the device by disabling IP state. This removes timers
-    // for the device that would otherwise hold references to defunct device
-    // state.
-    crate::ip::device::update_ipv4_configuration(&mut sync_ctx, ctx, &device, |state| {
-        state.ip_config.ip_enabled = false
-    });
-    crate::ip::device::update_ipv6_configuration(&mut sync_ctx, ctx, &device, |state| {
-        state.ip_config.ip_enabled = false
-    });
-
     // Uninstall all routes associated with the device.
     crate::ip::del_device_routes::<Ipv4, _, _>(&mut sync_ctx, ctx, &device);
     crate::ip::del_device_routes::<Ipv6, _, _>(&mut sync_ctx, ctx, &device);
@@ -1248,7 +1238,6 @@ mod tests {
 
     use net_declare::{net_mac, net_subnet_v4, net_subnet_v6};
     use net_types::ip::SubnetEither;
-    use nonzero_ext::nonzero;
 
     use super::*;
     use crate::{
@@ -1359,44 +1348,5 @@ mod tests {
         ]
         .map(|s: SubnetEither| (s, None));
         assert_eq!(get_routes(&sync_ctx, &ethernet_device), HashMap::from(expected));
-    }
-
-    #[test]
-    fn remove_device_disables_timers() {
-        let Ctx { mut sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
-
-        let ethernet_device = crate::device::add_ethernet_device(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
-            55, /* mtu */
-        );
-
-        // Enable the device, turning on a bunch of features that install
-        // timers.
-        crate::device::update_ipv4_configuration(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            &ethernet_device,
-            |state| {
-                state.ip_config.ip_enabled = true;
-                state.ip_config.gmp_enabled = true;
-            },
-        );
-        crate::device::update_ipv6_configuration(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            &ethernet_device,
-            |state| {
-                state.ip_config.ip_enabled = true;
-                state.ip_config.gmp_enabled = true;
-                state.max_router_solicitations = Some(nonzero!(2u8));
-                state.slaac_config.enable_stable_addresses = true;
-            },
-        );
-
-        crate::device::remove_device(&mut sync_ctx, &mut non_sync_ctx, ethernet_device);
-
-        assert_eq!(non_sync_ctx.timer_ctx().timers(), &[]);
     }
 }

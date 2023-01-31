@@ -666,12 +666,12 @@ async fn remove_interface(ctx: NetstackContext, id: BindingId) {
     let device_info = {
         let mut ctx = ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
-        let core_id = non_sync_ctx
+        let info = non_sync_ctx
             .devices
-            .get_core_id(id)
+            .remove_device(id)
             .expect("device lifetime should be tied to channel lifetime");
-        netstack3_core::device::remove_device(sync_ctx, non_sync_ctx, core_id);
-        non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval")
+        netstack3_core::device::remove_device(sync_ctx, non_sync_ctx, info.core_id().clone());
+        info
     };
     let handler = match device_info.into_info() {
         devices::DeviceSpecificInfo::Netdevice(devices::NetdeviceInfo {
