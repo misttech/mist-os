@@ -7,8 +7,6 @@
 #include <lib/ddk/debug.h>
 #include <zircon/status.h>
 
-#include <fbl/auto_lock.h>
-
 #include "server.h"
 
 zx_status_t MessageGroup::ExpectResponses(int response_count, int request_count,

@@ -6,6 +6,8 @@
 
 void StubBlockDevice::BlockQueue(block_op_t* operation, block_queue_callback completion_cb,
                                  void* cookie) {
+  command_sequence_.push_back(operation->command);
+
   if (callback_) {
     completion_cb(cookie, callback_(*operation), operation);
   } else {

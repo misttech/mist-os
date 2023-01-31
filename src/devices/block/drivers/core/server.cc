@@ -223,7 +223,7 @@ void Server::GetFifo(GetFifoCompleter::Sync& completer) {
   completer.ReplySuccess(std::move(fifo.value()));
 }
 
-zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request) {
+zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool do_postflush) {
   fbl::RefPtr<IoBuffer> iobuf;
   {
     fbl::AutoLock lock(&server_lock_);
@@ -290,14 +290,30 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request) {
       // We'll be using a new BlockMsg for each sub-component.
       // Take a copy of the |oneshot_group| shared_ptr into each completer, so oneshot_group is
       // deallocated after all messages complete.
-      auto completer = [oneshot_group, transaction_group](zx_status_t status,
-                                                          block_fifo_request_t& req) mutable {
+      auto completer = [this, oneshot_group, transaction_group, do_postflush, request](
+                           zx_status_t status, block_fifo_request_t& req) mutable {
         TRACE_DURATION("storage", "FinishTransactionGroup");
         if (req.trace_flow_id) {
           TRACE_FLOW_STEP("storage", "BlockOp", req.trace_flow_id);
         }
-        transaction_group->Complete(status);
+        if (do_postflush && transaction_group->StatusOkPendingLastOp() && status == ZX_OK) {
+          // Issue (Post)Flush command when last sub transaction completed.
+          auto postflush_completer = [transaction_group](zx_status_t postflush_status,
+                                                         block_fifo_request_t& req) {
+            transaction_group->Complete(postflush_status);
+          };
+          if (zx_status_t status =
+                  IssueFlushCommand(request, std::move(postflush_completer), /*internal_cmd=*/true);
+              status != ZX_OK) {
+            zxlogf(ERROR, "ProcessReadWriteRequest: (Post)Flush command issue has failed, %s",
+                   zx_status_get_string(status));
+            transaction_group->Complete(status);
+          }
+        } else {
+          transaction_group->Complete(status);
+        }
       };
+
       std::unique_ptr<Message> msg;
       if (zx_status_t status =
               Message::Create(iobuf, this, request, block_op_size_, std::move(completer), &msg);
@@ -322,13 +338,28 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request) {
     }
     ZX_DEBUG_ASSERT(len_remaining == 0);
   } else {
-    auto completer = [this](zx_status_t status, block_fifo_request_t& req) {
+    auto completer = [this, do_postflush, request](zx_status_t status, block_fifo_request_t& req) {
       TRACE_DURATION("storage", "FinishTransaction");
       if (req.trace_flow_id) {
         TRACE_FLOW_STEP("storage", "BlockOp", req.trace_flow_id);
       }
-      FinishTransaction(status, req.reqid, req.group);
+      if (do_postflush && status == ZX_OK) {
+        // Issue (Post)Flush command
+        auto postflush_completer = [this](zx_status_t postflush_status, block_fifo_request_t& req) {
+          FinishTransaction(postflush_status, req.reqid, req.group);
+        };
+        if (zx_status_t status =
+                IssueFlushCommand(request, std::move(postflush_completer), /*internal_cmd=*/true);
+            status != ZX_OK) {
+          zxlogf(ERROR, "ProcessReadWriteRequest: (Post)Flush command issue failed, %s",
+                 zx_status_get_string(status));
+          FinishTransaction(status, req.reqid, req.group);
+        }
+      } else {
+        FinishTransaction(status, req.reqid, req.group);
+      }
     };
+
     std::unique_ptr<Message> msg;
     if (zx_status_t status =
             Message::Create(iobuf, this, request, block_op_size_, std::move(completer), &msg);
@@ -344,6 +375,57 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request) {
                               .offset_vmo = request->vmo_offset,
                           }};
     Enqueue(std::move(msg));
+  }
+  return ZX_OK;
+}
+
+zx_status_t Server::ProcessReadWriteRequestWithFlush(block_fifo_request_t* request) {
+  // PREFLUSH|FORCE_ACCESS request must operate differently depending on the device's writeback
+  // cache and FUA command support. There are two cases.
+  // 1. Device has writeback cache and support FUA command
+  //    => Issue (Pre)Flush + FUA(w/ completion) write commands
+  // 2. Device has writeback cache but doesn't support FUA command
+  //    => Issue (Pre)Flush + Write + (Post)Flush(w/ completion) commands
+  bool need_preflush = false, need_postflush = false;
+  if (request->opcode & BLOCK_FL_PREFLUSH) {
+    // The BLOCK_FL_PREFLUSH flag is not used by the device. Therefore, clear the BLOCK_FL_PREFLUSH
+    // flag.
+    request->opcode &= ~BLOCK_FL_PREFLUSH;
+    need_preflush = true;
+  }
+
+  if ((request->opcode & BLOCK_FL_FORCE_ACCESS) && !(info_.flags & BLOCK_FLAG_FUA_SUPPORT)) {
+    // If the device does not support the FUA command, clear the BLOCK_FL_FORCE_ACCESS flag and
+    // send the (Post)Flush command. A completion for the request must be sent after the last
+    // (Post)Flush is completed.
+    request->opcode &= ~BLOCK_FL_FORCE_ACCESS;
+    need_postflush = true;
+  }
+
+  if (need_preflush) {
+    auto preflush_completer = [this, need_postflush](zx_status_t preflush_status,
+                                                     block_fifo_request_t& req) {
+      if (preflush_status != ZX_OK) {
+        FinishTransaction(preflush_status, req.reqid, req.group);
+        return;
+      }
+      if (zx_status_t status = ProcessReadWriteRequest(&req, need_postflush); status != ZX_OK) {
+        FinishTransaction(status, req.reqid, req.group);
+      }
+    };
+
+    // Issue (Pre)Flush command
+    if (zx_status_t status =
+            IssueFlushCommand(request, std::move(preflush_completer), /*internal_cmd=*/true);
+        status != ZX_OK) {
+      zxlogf(ERROR, "ProcessReadWriteRequestWithFlush: (Pre)Flush command issue failed, %s",
+             zx_status_get_string(status));
+      return status;
+    }
+  } else {
+    if (zx_status_t status = ProcessReadWriteRequest(request, need_postflush); status != ZX_OK) {
+      return status;
+    }
   }
   return ZX_OK;
 }
@@ -364,19 +446,28 @@ zx_status_t Server::ProcessCloseVmoRequest(block_fifo_request_t* request) {
   return ZX_OK;
 }
 
-zx_status_t Server::ProcessFlushRequest(block_fifo_request_t* request) {
+zx_status_t Server::IssueFlushCommand(block_fifo_request_t* request, MessageCompleter completer,
+                                      bool internal_cmd) {
   std::unique_ptr<Message> msg;
-  auto completer = [this](zx_status_t result, block_fifo_request_t& req) {
-    FinishTransaction(result, req.reqid, req.group);
-  };
   zx_status_t status =
       Message::Create(nullptr, this, request, block_op_size_, std::move(completer), &msg);
   if (status != ZX_OK) {
     return status;
   }
-  msg->Op()->command = OpcodeAndFlagsToCommand(request->opcode);
+  if (internal_cmd) {
+    msg->Op()->command = BLOCK_OP_FLUSH;
+  } else {
+    msg->Op()->command = OpcodeAndFlagsToCommand(request->opcode);
+  }
   Enqueue(std::move(msg));
   return ZX_OK;
+}
+
+zx_status_t Server::ProcessFlushRequest(block_fifo_request_t* request) {
+  auto completer = [this](zx_status_t result, block_fifo_request_t& req) {
+    FinishTransaction(result, req.reqid, req.group);
+  };
+  return IssueFlushCommand(request, std::move(completer), /*internal_cmd=*/false);
 }
 
 zx_status_t Server::ProcessTrimRequest(block_fifo_request_t* request) {
@@ -410,7 +501,7 @@ void Server::ProcessRequest(block_fifo_request_t* request) {
   switch (request->opcode & BLOCK_OP_MASK) {
     case BLOCK_OP_READ:
     case BLOCK_OP_WRITE:
-      if (zx_status_t status = ProcessReadWriteRequest(request); status != ZX_OK) {
+      if (zx_status_t status = ProcessReadWriteRequestWithFlush(request); status != ZX_OK) {
         FinishTransaction(status, request->reqid, request->group);
       }
       break;

@@ -36,6 +36,9 @@ type BlockInfo = struct {
 
         /// The device provides trim support.
         TRIM_SUPPORT = 0x00000008;
+
+        /// The device provides fua support.
+        FUA_SUPPORT = 0x00000010;
     };
 
     reserved uint32;
@@ -220,6 +223,15 @@ const BLOCK_OP_MASK uint32 = 0x000000FF;
 /// it should not complete until the data is written to the non-volatile
 /// medium (write), and that reads should bypass any on-device caches.
 const BLOCK_FL_FORCE_ACCESS uint32 = 0x00001000;
+
+/// The pre-flush flag generates a flush operation before running this operation
+/// and flushes on-device caches. It ensures that previous data is written to
+/// the non-volatile medium. Applying the preflush to an operation in a group
+/// will only apply to the operation with the flag and not all the other
+/// operations in the group. The preflush only applies to an operation where the
+/// preflush flag is set. It does not affect other operations and can proceed in
+/// parallel. If the flush operation fails, the operation will not proceed.
+const BLOCK_FL_PREFLUSH uint32 = 0x00002000;
 
 /// Associate the following request with `group`.
 const BLOCK_GROUP_ITEM uint32 = 0x00000400;

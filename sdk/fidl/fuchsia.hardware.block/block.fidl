@@ -78,6 +78,9 @@ protocol Block {
 
                 /// The device provides trim support.
                 TRIM_SUPPORT = 0x00000008;
+
+                /// The device provides fua support.
+                FUA_SUPPORT = 0x00000010;
             };
         };
     }) error zx.status;

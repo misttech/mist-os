@@ -18,177 +18,149 @@
 
 namespace {
 
-TEST(ServerTest, Create) {
-  StubBlockDevice blkdev;
-  ddk::BlockProtocolClient client(blkdev.proto());
-  zx::result server = Server::Create(&client);
-  ASSERT_OK(server);
-  std::thread thread([&server = server.value()]() { server->Serve(); });
-  auto join = fit::defer([&server = server.value(), &thread]() {
-    server->Close();
-    thread.join();
-  });
+class ServerTest : public zxtest::Test {
+ public:
+  ServerTest() : client_(blkdev_.proto()) {}
+
+  void TearDown() override {
+    server_->Close();
+    server_thread_.join();
+  }
+
+  void CreateServer() {
+    zx::result server_or = Server::Create(&client_);
+    ASSERT_OK(server_or);
+    server_ = std::move(server_or.value());
+    server_thread_ = std::thread([&server = server_]() { server->Serve(); });
+
+    zx::result fifo_or = server_->GetFifo();
+    ASSERT_OK(fifo_or);
+    fifo_ = std::move(fifo_or.value());
+  }
+
+  void CreateServer(const block_info_t& block_info) {
+    blkdev_.SetInfo(&block_info);
+    CreateServer();
+  }
+
+  void AttachVmo(bool do_fill) {
+    zx::vmo vmo;
+    const size_t vmo_size = 8192;
+    ASSERT_OK(zx::vmo::create(vmo_size, 0, &vmo));
+
+    if (do_fill) {
+      ASSERT_OK(FillVmo(vmo, vmo_size));
+    }
+
+    zx::result vmoid_or = server_->AttachVmo(std::move(vmo));
+    ASSERT_OK(vmoid_or);
+    vmoid_ = vmoid_or.value();
+  }
+
+  zx_status_t FillVmo(const zx::vmo& vmo, size_t size) {
+    std::vector<uint8_t> buf(zx_system_get_page_size());
+    memset(buf.data(), 0x44, zx_system_get_page_size());
+    for (size_t i = 0; i < size; i += zx_system_get_page_size()) {
+      size_t remain = size - i;
+      if (remain > zx_system_get_page_size()) {
+        remain = zx_system_get_page_size();
+      }
+      if (zx_status_t status = vmo.write(buf.data(), i, remain); status != ZX_OK) {
+        return status;
+      }
+    }
+    return ZX_OK;
+  }
+
+  void RequestOne(const block_fifo_request_t& request) {
+    // Write request.
+    size_t actual_count = 0;
+    ASSERT_OK(fifo_.write(sizeof(request), &request, 1, &actual_count));
+    ASSERT_EQ(actual_count, 1);
+  }
+
+  void RequestOneAndWaitResponse(const block_fifo_request_t& request, zx_status_t expected_status,
+                                 uint32_t expected_response_count = 1) {
+    // Write request.
+    size_t actual_count = 0;
+    ASSERT_OK(fifo_.write(sizeof(request), &request, 1, &actual_count));
+    ASSERT_EQ(actual_count, 1);
+
+    // Wait for response.
+    zx_signals_t observed;
+    ASSERT_OK(fifo_.wait_one(ZX_FIFO_READABLE, zx::time::infinite(), &observed));
+
+    block_fifo_response_t response;
+    ASSERT_OK(fifo_.read(sizeof(response), &response, 1, &actual_count));
+    ASSERT_EQ(actual_count, 1);
+    ASSERT_EQ(response.status, expected_status);
+    ASSERT_EQ(request.reqid, response.reqid);
+    ASSERT_EQ(response.count, expected_response_count);
+  }
+
+ protected:
+  StubBlockDevice blkdev_;
+  ddk::BlockProtocolClient client_;
+  std::unique_ptr<Server> server_;
+  std::thread server_thread_;
+  zx::fifo fifo_;
+  vmoid_t vmoid_;
+};
+
+TEST_F(ServerTest, Create) { CreateServer(); }
+
+TEST_F(ServerTest, AttachVmo) {
+  CreateServer();
+  AttachVmo(/*do_fill=*/false);
 }
 
-TEST(ServerTest, AttachVmo) {
-  StubBlockDevice blkdev;
-  ddk::BlockProtocolClient client(blkdev.proto());
-  zx::result server = Server::Create(&client);
-  ASSERT_OK(server);
-  std::thread thread([&server = server.value()]() { server->Serve(); });
-  auto join = fit::defer([&server = server.value(), &thread]() {
-    server->Close();
-    thread.join();
-  });
-
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(8192, 0, &vmo));
-
-  zx::result vmoid = server.value()->AttachVmo(std::move(vmo));
-  ASSERT_OK(vmoid);
-}
-
-TEST(ServerTest, CloseVMO) {
-  StubBlockDevice blkdev;
-  ddk::BlockProtocolClient client(blkdev.proto());
-  zx::result server = Server::Create(&client);
-  ASSERT_OK(server);
-  std::thread thread([&server = server.value()]() { server->Serve(); });
-  auto join = fit::defer([&server = server.value(), &thread]() {
-    server->Close();
-    thread.join();
-  });
-  zx::result fifo = server.value()->GetFifo();
-  ASSERT_OK(fifo);
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(8192, 0, &vmo));
-  zx::result vmoid = server.value()->AttachVmo(std::move(vmo));
-  ASSERT_OK(vmoid);
+TEST_F(ServerTest, CloseVMO) {
+  CreateServer();
+  AttachVmo(/*do_fill=*/false);
 
   // Request close VMO.
   block_fifo_request_t req = {
       .opcode = BLOCK_OP_CLOSE_VMO,
       .reqid = 0x100,
       .group = 0,
-      .vmoid = vmoid.value(),
+      .vmoid = vmoid_,
       .length = 0,
       .vmo_offset = 0,
       .dev_offset = 0,
   };
-
-  // Write request.
-  size_t actual_count = 0;
-  ASSERT_OK(fifo.value().write(sizeof(req), &req, 1, &actual_count));
-  ASSERT_EQ(actual_count, 1);
-
-  // Wait for response.
-  zx_signals_t observed;
-  ASSERT_OK(fifo.value().wait_one(ZX_FIFO_READABLE, zx::time::infinite(), &observed));
-
-  block_fifo_response_t res;
-  ASSERT_OK(fifo.value().read(sizeof(res), &res, 1, &actual_count));
-  ASSERT_EQ(actual_count, 1);
-  ASSERT_OK(res.status);
-  ASSERT_EQ(req.reqid, res.reqid);
-  ASSERT_EQ(res.count, 1);
+  RequestOneAndWaitResponse(req, ZX_OK);
 }
 
-zx_status_t FillVMO(const zx::vmo& vmo, size_t size) {
-  std::vector<uint8_t> buf(zx_system_get_page_size());
-  memset(buf.data(), 0x44, zx_system_get_page_size());
-  for (size_t i = 0; i < size; i += zx_system_get_page_size()) {
-    size_t remain = size - i;
-    if (remain > zx_system_get_page_size()) {
-      remain = zx_system_get_page_size();
-    }
-    if (zx_status_t status = vmo.write(buf.data(), i, remain); status != ZX_OK) {
-      return status;
-    }
-  }
-  return ZX_OK;
-}
-
-TEST(ServerTest, ReadSingleTest) {
-  StubBlockDevice blkdev;
-  ddk::BlockProtocolClient client(blkdev.proto());
-  zx::result server = Server::Create(&client);
-  ASSERT_OK(server);
-  std::thread thread([&server = server.value()]() { server->Serve(); });
-  auto join = fit::defer([&server = server.value(), &thread]() {
-    server->Close();
-    thread.join();
-  });
-  zx::result fifo = server.value()->GetFifo();
-  ASSERT_OK(fifo);
-
-  const size_t vmo_size = 8192;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(vmo_size, 0, &vmo));
-  ASSERT_OK(FillVMO(vmo, vmo_size));
-
-  zx::result vmoid = server.value()->AttachVmo(std::move(vmo));
-  ASSERT_OK(vmoid);
+TEST_F(ServerTest, ReadSingleTest) {
+  CreateServer();
+  AttachVmo(/*do_fill=*/true);
 
   // Request close VMO.
   block_fifo_request_t req = {
       .opcode = BLOCK_OP_READ,
       .reqid = 0x100,
       .group = 0,
-      .vmoid = vmoid.value(),
+      .vmoid = vmoid_,
       .length = 1,
       .vmo_offset = 0,
       .dev_offset = 0,
   };
-
-  // Write request.
-  size_t actual_count = 0;
-  ASSERT_OK(fifo.value().write(sizeof(req), &req, 1, &actual_count));
-  ASSERT_EQ(actual_count, 1);
-
-  // Wait for response.
-  zx_signals_t observed;
-  ASSERT_OK(zx_object_wait_one(fifo.value().get(), ZX_FIFO_READABLE, ZX_TIME_INFINITE, &observed));
-
-  block_fifo_response_t res;
-  ASSERT_OK(fifo.value().read(sizeof(res), &res, 1, &actual_count));
-  ASSERT_EQ(actual_count, 1);
-  ASSERT_OK(res.status);
-  ASSERT_EQ(req.reqid, res.reqid);
-  ASSERT_EQ(res.count, 1);
+  RequestOneAndWaitResponse(req, ZX_OK);
 }
 
-TEST(ServerTest, ReadManyBlocksHasOneResponse) {
-  StubBlockDevice blkdev;
+TEST_F(ServerTest, ReadManyBlocksHasOneResponse) {
   // Restrict max_transfer_size so that the server has to split up our request.
   block_info_t block_info = {
       .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
-  blkdev.SetInfo(&block_info);
-  ddk::BlockProtocolClient client(blkdev.proto());
-  zx::result server = Server::Create(&client);
-  ASSERT_OK(server);
-  std::thread thread([&server = server.value()]() { server->Serve(); });
-  auto join = fit::defer([&server = server.value(), &thread]() {
-    server->Close();
-    thread.join();
-  });
-
-  zx::result fifo = server.value()->GetFifo();
-  ASSERT_OK(fifo);
-
-  const size_t vmo_size = 8192;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(vmo_size, 0, &vmo));
-  ASSERT_OK(FillVMO(vmo, vmo_size));
-
-  zx::result vmoid = server.value()->AttachVmo(std::move(vmo));
-  ASSERT_OK(vmoid);
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
 
   block_fifo_request_t reqs[2] = {
       {
           .opcode = BLOCK_OP_READ,
           .reqid = 0x100,
           .group = 0,
-          .vmoid = vmoid.value(),
+          .vmoid = vmoid_,
           .length = 4,
           .vmo_offset = 0,
           .dev_offset = 0,
@@ -197,7 +169,7 @@ TEST(ServerTest, ReadManyBlocksHasOneResponse) {
           .opcode = BLOCK_OP_READ,
           .reqid = 0x101,
           .group = 0,
-          .vmoid = vmoid.value(),
+          .vmoid = vmoid_,
           .length = 1,
           .vmo_offset = 0,
           .dev_offset = 0,
@@ -206,61 +178,43 @@ TEST(ServerTest, ReadManyBlocksHasOneResponse) {
 
   // Write requests.
   size_t actual_count = 0;
-  ASSERT_OK(fifo.value().write(sizeof(reqs[0]), reqs, 2, &actual_count));
+  ASSERT_OK(fifo_.write(sizeof(reqs[0]), reqs, 2, &actual_count));
   ASSERT_EQ(actual_count, 2);
 
   // Wait for first response.
   zx_signals_t observed;
-  ASSERT_OK(zx_object_wait_one(fifo.value().get(), ZX_FIFO_READABLE, ZX_TIME_INFINITE, &observed));
+  ASSERT_OK(zx_object_wait_one(fifo_.get(), ZX_FIFO_READABLE, ZX_TIME_INFINITE, &observed));
 
   block_fifo_response_t res;
-  ASSERT_OK(fifo.value().read(sizeof(res), &res, 1, &actual_count));
+  ASSERT_OK(fifo_.read(sizeof(res), &res, 1, &actual_count));
   ASSERT_EQ(actual_count, 1);
   ASSERT_OK(res.status);
   ASSERT_EQ(reqs[0].reqid, res.reqid);
   ASSERT_EQ(res.count, 1);
 
   // Wait for second response.
-  ASSERT_OK(zx_object_wait_one(fifo.value().get(), ZX_FIFO_READABLE, ZX_TIME_INFINITE, &observed));
+  ASSERT_OK(zx_object_wait_one(fifo_.get(), ZX_FIFO_READABLE, ZX_TIME_INFINITE, &observed));
 
-  ASSERT_OK(fifo.value().read(sizeof(res), &res, 1, &actual_count));
+  ASSERT_OK(fifo_.read(sizeof(res), &res, 1, &actual_count));
   ASSERT_EQ(actual_count, 1);
   ASSERT_OK(res.status);
   ASSERT_EQ(reqs[1].reqid, res.reqid);
   ASSERT_EQ(res.count, 1);
 }
 
-TEST(ServerTest, TestLargeGroupedTransaction) {
-  StubBlockDevice blkdev;
+TEST_F(ServerTest, TestLargeGroupedTransaction) {
   // Restrict max_transfer_size so that the server has to split up our request.
   block_info_t block_info = {
       .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
-  blkdev.SetInfo(&block_info);
-  ddk::BlockProtocolClient client(blkdev.proto());
-  zx::result server = Server::Create(&client);
-  ASSERT_OK(server);
-  std::thread thread([&server = server.value()]() { server->Serve(); });
-  auto join = fit::defer([&server = server.value(), &thread]() {
-    server->Close();
-    thread.join();
-  });
-  zx::result fifo = server.value()->GetFifo();
-  ASSERT_OK(fifo);
-
-  const size_t vmo_size = 8192;
-  zx::vmo vmo;
-  ASSERT_OK(zx::vmo::create(vmo_size, 0, &vmo));
-  ASSERT_OK(FillVMO(vmo, vmo_size));
-
-  zx::result vmoid = server.value()->AttachVmo(std::move(vmo));
-  ASSERT_OK(vmoid);
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
 
   block_fifo_request_t reqs[2] = {
       {
           .opcode = BLOCK_OP_READ | BLOCK_GROUP_ITEM,
           .reqid = 0x101,
           .group = 0,
-          .vmoid = vmoid.value(),
+          .vmoid = vmoid_,
           .length = 4,
           .vmo_offset = 0,
           .dev_offset = 0,
@@ -269,7 +223,7 @@ TEST(ServerTest, TestLargeGroupedTransaction) {
           .opcode = BLOCK_OP_READ | BLOCK_GROUP_ITEM | BLOCK_GROUP_LAST,
           .reqid = 0x101,
           .group = 0,
-          .vmoid = vmoid.value(),
+          .vmoid = vmoid_,
           .length = 1,
           .vmo_offset = 0,
           .dev_offset = 0,
@@ -278,15 +232,15 @@ TEST(ServerTest, TestLargeGroupedTransaction) {
 
   // Write requests.
   size_t actual_count = 0;
-  ASSERT_OK(fifo.value().write(sizeof(reqs[0]), reqs, 2, &actual_count));
+  ASSERT_OK(fifo_.write(sizeof(reqs[0]), reqs, 2, &actual_count));
   ASSERT_EQ(actual_count, 2);
 
   // Wait for first response.
   zx_signals_t observed;
-  ASSERT_OK(zx_object_wait_one(fifo.value().get(), ZX_FIFO_READABLE, ZX_TIME_INFINITE, &observed));
+  ASSERT_OK(zx_object_wait_one(fifo_.get(), ZX_FIFO_READABLE, ZX_TIME_INFINITE, &observed));
 
   block_fifo_response_t res;
-  ASSERT_OK(fifo.value().read(sizeof(res), &res, 1, &actual_count));
+  ASSERT_OK(fifo_.read(sizeof(res), &res, 1, &actual_count));
   ASSERT_EQ(actual_count, 1);
   ASSERT_OK(res.status);
   ASSERT_EQ(reqs[0].reqid, res.reqid);
@@ -324,6 +278,366 @@ TEST(BlockTest, TestReadWriteSingle) {
             ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
           });
   ASSERT_OK(loop.RunUntilIdle());
+}
+
+TEST_F(ServerTest, FuaWrite) {
+  block_info_t block_info = {
+      .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_FORCE_ACCESS,  // Write FUA
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 1,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+  RequestOneAndWaitResponse(req, ZX_OK);
+
+  // If there is no volatile write cache in the device, pre flush command and  is not delivered.
+  auto commands = blkdev_.GetCommandSequence();
+  ASSERT_EQ(commands.size(), 2);
+  ASSERT_EQ(commands[0], BLOCK_OP_WRITE);  // FUA flag is removed
+  ASSERT_EQ(commands[1], BLOCK_OP_FLUSH);  // Post flush
+}
+
+TEST_F(ServerTest, FuaWriteWithFua) {
+  block_info_t block_info = {.block_count = kBlockCount,
+                             .block_size = kBlockSize,
+                             .max_transfer_size = kBlockSize,
+                             .flags = BLOCK_FLAG_FUA_SUPPORT};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_FORCE_ACCESS,  // Write FUA
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 1,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+  RequestOneAndWaitResponse(req, ZX_OK);
+
+  // If there is no volatile write cache in the device, pre flush command is not delivered.
+  auto commands = blkdev_.GetCommandSequence();
+  ASSERT_EQ(commands.size(), 1);
+  ASSERT_EQ(commands[0], BLOCK_OP_WRITE | BLOCK_FL_FORCE_ACCESS);  // FUA write
+}
+
+TEST_F(ServerTest, PreflushWrite) {
+  block_info_t block_info = {
+      .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH,  // Write preflush
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 1,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+  RequestOneAndWaitResponse(req, ZX_OK);
+
+  // If there is no volatile write cache in the device, pre flush command is not delivered.
+  auto commands = blkdev_.GetCommandSequence();
+  ASSERT_EQ(commands.size(), 2);
+  ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+  ASSERT_EQ(commands[1], BLOCK_OP_WRITE);  // Write
+}
+
+TEST_F(ServerTest, PreflushAndFuaWriteWithFua) {
+  block_info_t block_info = {.block_count = kBlockCount,
+                             .block_size = kBlockSize,
+                             .max_transfer_size = kBlockSize,
+                             .flags = BLOCK_FLAG_FUA_SUPPORT};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH | BLOCK_FL_FORCE_ACCESS,  // Write flush and FUA
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 1,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+  RequestOneAndWaitResponse(req, ZX_OK);
+
+  // If the device has a volatile write cache and FUA command is supported, the pre flush command is
+  // delivered.
+  auto commands = blkdev_.GetCommandSequence();
+  ASSERT_EQ(commands.size(), 2);
+  ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);                          // Pre flush
+  ASSERT_EQ(commands[1], BLOCK_OP_WRITE | BLOCK_FL_FORCE_ACCESS);  // FUA write
+}
+
+TEST_F(ServerTest, PreflushAndPostflush) {
+  block_info_t block_info = {
+      .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH | BLOCK_FL_FORCE_ACCESS,  // Write flush and FUA
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 1,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+  RequestOneAndWaitResponse(req, ZX_OK);
+
+  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
+  // post flush commands are delivered.
+  auto commands = blkdev_.GetCommandSequence();
+  ASSERT_EQ(commands.size(), 3);
+  ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+  ASSERT_EQ(commands[1], BLOCK_OP_WRITE);  // FUA flag is removed
+  ASSERT_EQ(commands[2], BLOCK_OP_FLUSH);  // Post flush
+}
+
+TEST_F(ServerTest, PreflushAndPostflushException) {
+  block_info_t block_info = {
+      .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH | BLOCK_FL_FORCE_ACCESS,  // Write flush and FUA
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 1,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+
+  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
+  // post flush commands are delivered.
+  // (I/O sequence = Pre flush -> Write -> Post flush)
+  auto& commands = blkdev_.GetCommandSequence();
+  {
+    // I/O error occurs on preflush
+    blkdev_.set_callback([&](const block_op_t& block_op) {
+      if (commands.size() == 1 && block_op.command == BLOCK_OP_FLUSH) {
+        return ZX_ERR_IO;
+      }
+      return ZX_OK;
+    });
+    RequestOneAndWaitResponse(req, ZX_ERR_IO);
+    ASSERT_EQ(commands.size(), 1);           // Error is reported after preflush transfered
+    ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+    commands.clear();
+  }
+  {
+    // I/O error occurs on write
+    blkdev_.set_callback([&](const block_op_t& block_op) {
+      if (commands.size() == 2 && block_op.command == BLOCK_OP_WRITE) {
+        return ZX_ERR_IO;
+      }
+      return ZX_OK;
+    });
+    RequestOneAndWaitResponse(req, ZX_ERR_IO);
+    ASSERT_EQ(commands.size(), 2);           // Error is reported after write transfered
+    ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+    ASSERT_EQ(commands[1], BLOCK_OP_WRITE);  // FUA flag is removed
+    commands.clear();
+  }
+  {
+    // I/O error occurs on postflush
+    blkdev_.set_callback([&](const block_op_t& block_op) {
+      if (commands.size() == 3 && block_op.command == BLOCK_OP_FLUSH) {
+        return ZX_ERR_IO;
+      }
+      return ZX_OK;
+    });
+    RequestOneAndWaitResponse(req, ZX_ERR_IO);
+    ASSERT_EQ(commands.size(), 3);           // Error is reported after postflush transfered
+    ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+    ASSERT_EQ(commands[1], BLOCK_OP_WRITE);  // FUA flag is removed
+    ASSERT_EQ(commands[2], BLOCK_OP_FLUSH);  // Post flush
+    commands.clear();
+  }
+}
+
+TEST_F(ServerTest, PreflushAndFuaWriteWithLargeGroupedTransaction) {
+  // Restrict max_transfer_size so that the server has to split up our request.
+  block_info_t block_info = {.block_count = kBlockCount,
+                             .block_size = kBlockSize,
+                             .max_transfer_size = kBlockSize,
+                             .flags = BLOCK_FLAG_FUA_SUPPORT};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH | BLOCK_FL_FORCE_ACCESS,  // Write flush and FUA
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 5,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+  RequestOneAndWaitResponse(req, ZX_OK);
+
+  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
+  // post flush commands are delivered.
+  auto commands = blkdev_.GetCommandSequence();
+  ASSERT_EQ(commands.size(), 6);
+  ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+  for (int i = 1; i <= 5; ++i) {
+    ASSERT_EQ(commands[i], BLOCK_OP_WRITE | BLOCK_FL_FORCE_ACCESS);  // FUA write
+  }
+}
+
+TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransaction) {
+  // Restrict max_transfer_size so that the server has to split up our request.
+  block_info_t block_info = {
+      .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH | BLOCK_FL_FORCE_ACCESS,  // Write flush and FUA
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 5,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+  RequestOneAndWaitResponse(req, ZX_OK);
+
+  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
+  // post flush commands are delivered.
+  auto commands = blkdev_.GetCommandSequence();
+  ASSERT_EQ(commands.size(), 7);
+  ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+  for (int i = 1; i <= 5; ++i) {
+    ASSERT_EQ(commands[i], BLOCK_OP_WRITE);  // FUA flag is removed
+  }
+  ASSERT_EQ(commands[6], BLOCK_OP_FLUSH);  // Post flush
+}
+
+TEST_F(ServerTest, PreflushAndPostflushWithLargeGroupedTransactionException) {
+  // Restrict max_transfer_size so that the server has to split up our request.
+  block_info_t block_info = {
+      .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t req = {
+      .opcode = BLOCK_OP_WRITE | BLOCK_FL_PREFLUSH | BLOCK_FL_FORCE_ACCESS,  // Write flush and FUA
+      .reqid = 0x100,
+      .group = 0,
+      .vmoid = vmoid_,
+      .length = 5,
+      .vmo_offset = 0,
+      .dev_offset = 0,
+  };
+
+  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
+  // post flush commands are delivered.
+  // (I/O Sequence = Pre flush -> Write -> Post flush)
+  auto& commands = blkdev_.GetCommandSequence();
+  {
+    // I/O error occurs on preflush
+    blkdev_.set_callback([&](const block_op_t& block_op) {
+      if (commands.size() == 1 && block_op.command == BLOCK_OP_FLUSH) {
+        return ZX_ERR_IO;
+      }
+      return ZX_OK;
+    });
+    RequestOneAndWaitResponse(req, ZX_ERR_IO);
+    ASSERT_EQ(commands.size(), 1);           // Error is reported after preflush transfered
+    ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+    commands.clear();
+  }
+  {
+    // I/O error occurs on write
+    blkdev_.set_callback([&](const block_op_t& block_op) {
+      if (commands.size() == 2 && block_op.command == BLOCK_OP_WRITE) {
+        return ZX_ERR_IO;
+      }
+      return ZX_OK;
+    });
+    RequestOneAndWaitResponse(req, ZX_ERR_IO);
+    ASSERT_EQ(commands.size(), 6);           // Error is reported after write transfered
+    ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+    for (int i = 1; i <= 5; ++i) {
+      ASSERT_EQ(commands[i], BLOCK_OP_WRITE);  // FUA flag is removed
+    }
+    commands.clear();
+  }
+  {
+    // I/O error occurs on postflush
+    blkdev_.set_callback([&](const block_op_t& block_op) {
+      if (commands.size() == 7 && block_op.command == BLOCK_OP_FLUSH) {
+        return ZX_ERR_IO;
+      }
+      return ZX_OK;
+    });
+    RequestOneAndWaitResponse(req, ZX_ERR_IO);
+    ASSERT_EQ(commands.size(), 7);           // Error is reported after postflush transfered
+    ASSERT_EQ(commands[0], BLOCK_OP_FLUSH);  // Pre flush
+    for (int i = 1; i <= 5; ++i) {
+      ASSERT_EQ(commands[i], BLOCK_OP_WRITE);  // FUA flag is removed
+    }
+    ASSERT_EQ(commands[6], BLOCK_OP_FLUSH);  // Post flush
+    commands.clear();
+  }
+}
+
+TEST_F(ServerTest, PostflushMustBeIssuedOnlyAfterGroupLast) {
+  // Restrict max_transfer_size so that the server has to split up our request.
+  block_info_t block_info = {
+      .block_count = kBlockCount, .block_size = kBlockSize, .max_transfer_size = kBlockSize};
+  CreateServer(block_info);
+  AttachVmo(/*do_fill=*/true);
+
+  block_fifo_request_t reqs[2] = {
+      {
+          .opcode = BLOCK_OP_WRITE | BLOCK_GROUP_ITEM |
+                    BLOCK_FL_FORCE_ACCESS,  // FUA flag must be ignored
+          .reqid = 0x101,
+          .group = 0,
+          .vmoid = vmoid_,
+          .length = 4,
+          .vmo_offset = 0,
+          .dev_offset = 0,
+      },
+      {
+          .opcode = BLOCK_OP_WRITE | BLOCK_GROUP_ITEM | BLOCK_GROUP_LAST | BLOCK_FL_FORCE_ACCESS,
+          .reqid = 0x101,
+          .group = 0,
+          .vmoid = vmoid_,
+          .length = 1,
+          .vmo_offset = 0,
+          .dev_offset = 0,
+      },
+  };
+  RequestOne(reqs[0]);
+  RequestOneAndWaitResponse(reqs[1], ZX_OK, /*expected_response_count=*/2);
+
+  // If the device has a volatile write cache but FUA command is not supported, the pre flush and
+  // post flush commands are delivered.
+  auto commands = blkdev_.GetCommandSequence();
+  ASSERT_EQ(commands.size(), 6);
+  for (int i = 0; i < 4; ++i) {
+    ASSERT_EQ(commands[i], BLOCK_OP_WRITE);  // FUA flag is ignored
+  }
+  ASSERT_EQ(commands[4], BLOCK_OP_WRITE);  // BLOCK_GROUP_LAST, FUA flag is removed
+  ASSERT_EQ(commands[5], BLOCK_OP_FLUSH);  // Post flush
 }
 
 }  // namespace

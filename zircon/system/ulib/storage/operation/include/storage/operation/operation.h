@@ -18,7 +18,8 @@ enum class OperationType {
   kWrite,
   kTrim,  // Unimplemented.
   kWriteFua,
-  kMaxValue = kWriteFua,  // For FuzzedDataProvider
+  kWritePreflushAndFua,
+  kMaxValue = kWritePreflushAndFua,  // For FuzzedDataProvider
 };
 
 const char* OperationTypeToString(OperationType type);

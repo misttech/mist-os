@@ -44,6 +44,9 @@ zx_status_t DeviceTransactionHandler::RunRequests(
         case storage::OperationType::kWriteFua:
           request.opcode = BLOCKIO_WRITE | BLOCKIO_FL_FORCE_ACCESS;
           break;
+        case storage::OperationType::kWritePreflushAndFua:
+          request.opcode = BLOCKIO_WRITE | BLOCKIO_FL_PREFLUSH | BLOCKIO_FL_FORCE_ACCESS;
+          break;
         default:
           ZX_DEBUG_ASSERT_MSG(false, "Unsupported operation");
       }

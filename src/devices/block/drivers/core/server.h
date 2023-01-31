@@ -72,10 +72,14 @@ class Server : public fidl::WireServer<fuchsia_hardware_block::Session> {
 
   // Helper for processing a single message read from the FIFO.
   void ProcessRequest(block_fifo_request_t* request);
-  zx_status_t ProcessReadWriteRequest(block_fifo_request_t* request);
+  zx_status_t ProcessReadWriteRequest(block_fifo_request_t* request, bool do_postflush);
   zx_status_t ProcessCloseVmoRequest(block_fifo_request_t* request);
   zx_status_t ProcessFlushRequest(block_fifo_request_t* request);
   zx_status_t ProcessTrimRequest(block_fifo_request_t* request);
+  zx_status_t ProcessReadWriteRequestWithFlush(block_fifo_request_t* request);
+
+  zx_status_t IssueFlushCommand(block_fifo_request_t* request, MessageCompleter completer,
+                                bool internal_cmd);
 
   zx_status_t Read(block_fifo_request_t* requests, size_t* count);
 

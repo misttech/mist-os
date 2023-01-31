@@ -19,6 +19,7 @@
 // Block device has bootdata partition map provided by device metadata.
 #define BLOCK_FLAG_BOOTPART 0x00000004
 #define BLOCK_FLAG_TRIM_SUPPORT 0x00000008
+#define BLOCK_FLAG_FUA_SUPPORT 0x00000010
 
 #define BLOCK_MAX_TRANSFER_UNBOUNDED 0xFFFFFFFF
 
@@ -164,6 +165,14 @@ typedef uint16_t groupid_t;
 // it should not complete until the data is written to the non-volatile
 // medium (write), and that reads should bypass any on-device caches.
 #define BLOCKIO_FL_FORCE_ACCESS 0x00001000
+// The pre-flush flag generates a flush operation before running this operation
+// and flushes on-device caches. It ensures that previous data is written to
+// the non-volatile medium. Applying the preflush to an operation in a group
+// will only apply to the operation with the flag and not all the other
+// operations in the group. The preflush only applies to an operation where the
+// preflush flag is set. It does not affect other operations and can proceed in
+// parallel. If the flush operation fails, the operation will not proceed.
+#define BLOCKIO_FL_PREFLUSH 0x00002000
 #define BLOCKIO_FLAG_MASK 0x0000FF00
 
 typedef struct {
