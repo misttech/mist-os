@@ -23,9 +23,6 @@
 
 #include "controller.h"
 
-#define SATA_FLAG_DMA (1 << 0)
-#define SATA_FLAG_LBA48 (1 << 1)
-
 namespace ahci {
 
 struct sata_device_t {
@@ -35,7 +32,6 @@ struct sata_device_t {
   block_info_t info{};
 
   uint32_t port = 0;
-  uint32_t flags = 0;
   uint32_t max_cmd = 0;  // inclusive
 };
 
@@ -95,7 +91,6 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
   }
 
   // parse results
-  int flags = 0;
   sata_devinfo_response_t devinfo;
   status = vmo.read(&devinfo, 0, sizeof(devinfo));
   if (status != ZX_OK) {
@@ -145,7 +140,6 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
   uint16_t cap = devinfo.capabilities_1;
   if (cap & (1 << 8)) {
     zxlogf(INFO, " DMA");
-    flags |= SATA_FLAG_DMA;
   } else {
     zxlogf(INFO, " PIO");
   }
@@ -159,7 +153,6 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
       block_size = 2 * devinfo.logical_sector_size;
     }
     if (devinfo.command_set1_1 & (1 << 10)) {
-      flags |= SATA_FLAG_LBA48;
       block_count = devinfo.lba_capacity2;
       zxlogf(INFO, "  LBA48");
     } else {
@@ -170,11 +163,21 @@ static zx_status_t sata_device_identify(sata_device_t* dev, Controller* controll
   } else {
     zxlogf(INFO, "  CHS unsupported!");
   }
-  dev->flags = flags;
 
   memset(&dev->info, 0, sizeof(dev->info));
   dev->info.block_size = block_size;
   dev->info.block_count = block_count;
+
+  if (devinfo.command_set2_0 & SATA_DEVINFO_CMD_SET2_0_VOLATILE_WRITE_CACHE_ENABLED) {
+    zxlogf(DEBUG, " Volatile write cache enabled");
+  }
+  if (devinfo.command_set1_0 & SATA_DEVINFO_CMD_SET1_0_VOLATILE_WRITE_CACHE_SUPPORTED) {
+    zxlogf(DEBUG, " Volatile write cache supported");
+  }
+  if (devinfo.command_set1_2 & SATA_DEVINFO_CMD_SET1_2_WRITE_DMA_FUA_EXT_SUPPORTED) {
+    zxlogf(DEBUG, " FUA command supported");
+    dev->info.flags |= BLOCK_FLAG_FUA_SUPPORT;
+  }
 
   uint32_t max_sg_size = SATA_MAX_BLOCK_COUNT * block_size;  // SATA cmd limit
   if (is_qemu) {
