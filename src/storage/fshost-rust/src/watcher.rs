@@ -82,15 +82,19 @@ impl PathSource {
                     }
                     .map(|p| p.into_os_string().into_string().unwrap());
                     match path {
-                        Some(path) => {
-                            if is_nand {
-                                Some(Box::new(NandDevice::new(path).await.unwrap())
-                                    as Box<dyn Device>)
-                            } else {
-                                Some(Box::new(BlockDevice::new(path).await.unwrap())
-                                    as Box<dyn Device>)
-                            }
+                        Some(path) => if is_nand {
+                            NandDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
+                        } else {
+                            BlockDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
                         }
+                        .map_err(|e| {
+                            tracing::warn!(
+                                "Failed to create device (maybe it went away?): {:?}",
+                                e
+                            );
+                            e
+                        })
+                        .ok(),
                         None => None,
                     }
                 }),
