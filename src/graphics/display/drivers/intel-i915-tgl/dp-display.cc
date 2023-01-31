@@ -29,6 +29,7 @@
 #include "src/graphics/display/drivers/intel-i915-tgl/dpll.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/intel-i915-tgl.h"
+#include "src/graphics/display/drivers/intel-i915-tgl/pch-engine.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/pipe.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/poll-until.h"
@@ -40,7 +41,6 @@
 #include "src/graphics/display/drivers/intel-i915-tgl/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers-typec.h"
 #include "src/graphics/display/drivers/intel-i915-tgl/registers.h"
-#include "src/graphics/display/drivers/intel-i915/pch-engine.h"
 
 namespace i915_tgl {
 namespace {
