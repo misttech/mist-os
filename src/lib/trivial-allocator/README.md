@@ -45,6 +45,13 @@ system.
 provide classes to specialize `PageAllocator` for using POSIX `mmap`, and for
 using the Zircon VMAR and VMO objects, respectively.
 
+## SealedPageAllocator
+
+The `trivial_allocator::SealedPageAllocator` template class in
+[<lib/trivial-allocator/sealed-page-allocator.h>](include/lib/trivial-allocator/sealed-page-allocator.h)
+is a variant of `PageAllocator` (above) meant for allocations that will be
+written once and then "sealed", that is made read-only (and then never freed).
+
 ## `delete` support
 
 A separate companion "stub-delete" library provides no-op `operator delete` and

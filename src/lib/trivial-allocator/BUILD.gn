@@ -17,6 +17,7 @@ zx_library("trivial-allocator") {
     "lib/trivial-allocator/new.h",
     "lib/trivial-allocator/page-allocator.h",
     "lib/trivial-allocator/posix.h",
+    "lib/trivial-allocator/sealed-page-allocator.h",
     "lib/trivial-allocator/single-heap-allocator.h",
     "lib/trivial-allocator/zircon.h",
   ]
@@ -101,6 +102,7 @@ test("trivial-allocator-unittests") {
     "basic-owning-allocator-tests.cc",
     "new-tests.cc",
     "page-allocator-tests.cc",
+    "sealed-page-allocator-tests.cc",
     "single-heap-allocator-tests.cc",
   ]
   deps = [
