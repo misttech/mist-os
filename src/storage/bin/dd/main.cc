@@ -5,10 +5,12 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fuchsia/hardware/skipblock/c/fidl.h>
+#include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
+#include <lib/stdcompat/string_view.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -20,7 +22,11 @@
 #include <zircon/process.h>
 #include <zircon/syscalls.h>
 
-int usage(void) {
+#include <memory>
+
+#include <fbl/unique_fd.h>
+
+int Usage() {
   fprintf(stderr, "usage: dd [OPTIONS]\n");
   fprintf(stderr, "dd can be used to convert and copy files\n");
   fprintf(stderr, " bs=BYTES  : read and write BYTES bytes at a time\n");
@@ -43,16 +49,16 @@ int usage(void) {
 
 // Returns "true" if the argument matches the prefix.
 // In this case, moves the argument past the prefix.
-bool prefix_match(const char** arg, const char* prefix) {
-  if (!strncmp(*arg, prefix, strlen(prefix))) {
-    *arg += strlen(prefix);
+bool PrefixMatch(const char** arg, std::string_view prefix) {
+  if (cpp20::starts_with(std::string_view(*arg), prefix)) {
+    *arg += prefix.length();
     return true;
   }
   return false;
 }
 
 #define MAYBE_MULTIPLY_SUFFIX(str, out, suffix, value) \
-  if (!strcmp((str), (suffix))) {                      \
+  if (std::string_view(str) == (suffix)) {             \
     (out) *= (value);                                  \
     return 0;                                          \
   }
@@ -61,9 +67,9 @@ bool prefix_match(const char** arg, const char* prefix) {
 // the result in |out|.
 //
 // Returns 0 on success.
-int parse_size(const char* s, size_t* out) {
+int ParseSize(const char* s, size_t* out) {
   char* endptr;
-  if (!(*s >= '0' && *s <= '9')) {
+  if (*s < '0' || *s > '9') {
     goto done;
   }
   *out = strtol(s, &endptr, 10);
@@ -87,7 +93,7 @@ done:
   return -1;
 }
 
-typedef struct {
+struct DdOptions {
   bool use_count;
   size_t count;
   size_t input_bs;
@@ -97,49 +103,49 @@ typedef struct {
   char input[PATH_MAX];
   char output[PATH_MAX];
   bool pad;
-} dd_options_t;
+};
 
-int parse_args(int argc, const char** argv, dd_options_t* options) {
+int ParseArgs(int argc, const char** argv, DdOptions* options) {
   while (argc > 1) {
     const char* arg = argv[1];
-    if (prefix_match(&arg, "bs=")) {
+    if (PrefixMatch(&arg, "bs=")) {
       size_t size;
-      if (parse_size(arg, &size)) {
-        return usage();
+      if (ParseSize(arg, &size)) {
+        return Usage();
       }
       options->input_bs = size;
       options->output_bs = size;
-    } else if (prefix_match(&arg, "count=")) {
-      if (parse_size(arg, &options->count)) {
-        return usage();
+    } else if (PrefixMatch(&arg, "count=")) {
+      if (ParseSize(arg, &options->count)) {
+        return Usage();
       }
       options->use_count = true;
-    } else if (prefix_match(&arg, "ibs=")) {
-      if (parse_size(arg, &options->input_bs)) {
-        return usage();
+    } else if (PrefixMatch(&arg, "ibs=")) {
+      if (ParseSize(arg, &options->input_bs)) {
+        return Usage();
       }
-    } else if (prefix_match(&arg, "obs=")) {
-      if (parse_size(arg, &options->output_bs)) {
-        return usage();
+    } else if (PrefixMatch(&arg, "obs=")) {
+      if (ParseSize(arg, &options->output_bs)) {
+        return Usage();
       }
-    } else if (prefix_match(&arg, "seek=")) {
-      if (parse_size(arg, &options->output_seek)) {
-        return usage();
+    } else if (PrefixMatch(&arg, "seek=")) {
+      if (ParseSize(arg, &options->output_seek)) {
+        return Usage();
       }
-    } else if (prefix_match(&arg, "skip=")) {
-      if (parse_size(arg, &options->input_skip)) {
-        return usage();
+    } else if (PrefixMatch(&arg, "skip=")) {
+      if (ParseSize(arg, &options->input_skip)) {
+        return Usage();
       }
-    } else if (prefix_match(&arg, "if=")) {
+    } else if (PrefixMatch(&arg, "if=")) {
       strncpy(options->input, arg, PATH_MAX);
       options->input[PATH_MAX - 1] = '\0';
-    } else if (prefix_match(&arg, "of=")) {
+    } else if (PrefixMatch(&arg, "of=")) {
       strncpy(options->output, arg, PATH_MAX);
       options->output[PATH_MAX - 1] = '\0';
     } else if (strcmp(arg, "conv=sync") == 0) {
       options->pad = true;
     } else {
-      return usage();
+      return Usage();
     }
     argc--;
     argv++;
@@ -150,39 +156,33 @@ int parse_args(int argc, const char** argv, dd_options_t* options) {
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 #define MAX(x, y) ((x) < (y) ? (y) : (x))
 
-bool is_skip_block(const char* path, fuchsia_hardware_skipblock_PartitionInfo* partition_info) {
-  int fd = open(path, O_RDONLY);
-  if (fd < 0) {
-    return false;
+bool IsSkipBlockPath(std::string_view path) {
+  // E.g. /dev/sys/platform/05:00:f/aml-raw_nand/nand/zircon-a/skip-block
+  return cpp20::starts_with(path, "/dev") && cpp20::ends_with(path, "skip-block");
+}
+
+zx::result<fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>> GetSkipBlockClient(
+    const char* path, size_t* block_size) {
+  auto client = component::Connect<fuchsia_hardware_skipblock::SkipBlock>(path);
+  if (client.is_error()) {
+    return client.take_error();
   }
-
-  zx_handle_t channel;
-  zx_status_t status = fdio_get_service_handle(fd, &channel);
-  if (status != ZX_OK) {
-    return false;
+  auto res = fidl::WireCall(*client)->GetPartitionInfo();
+  if (!res.ok()) {
+    return zx::error(res.error().status());
   }
-
-  // |status| is used for the status of the whole FIDL request. We expect
-  // |status| to be ZX_OK if the channel connects to a skip-block driver.
-  // |op_status| refers to the status of the underlying read/write operation
-  // and will be ZX_OK only if the read/write succeeds. It is NOT set if
-  // the channel is not connected to a skip-block driver.
-  zx_status_t op_status;
-
-  status =
-      fuchsia_hardware_skipblock_SkipBlockGetPartitionInfo(channel, &op_status, partition_info);
-
-  close(fd);
-  return status == ZX_OK;
+  if (res.value().status != ZX_OK) {
+    return zx::error(res.value().status);
+  }
+  *block_size = res.value().partition_info.block_size_bytes;
+  return zx::ok(std::move(*client));
 }
 
 int main(int argc, const char** argv) {
-  dd_options_t options;
-  memset(&options, 0, sizeof(dd_options_t));
+  DdOptions options = {};
   options.input_bs = 512;
   options.output_bs = 512;
-  int r;
-  if ((r = parse_args(argc, argv, &options))) {
+  if (int r = ParseArgs(argc, argv, &options); r) {
     return r;
   }
 
@@ -196,12 +196,12 @@ int main(int argc, const char** argv) {
   size_t buf_size = MAX(options.output_bs, options.input_bs);
 
   // Input and output fds
-  int in = -1;
-  int out = -1;
+  fbl::unique_fd in;
+  fbl::unique_fd out;
   // Buffer to contain partially read data
-  char* buf = NULL;
+  std::unique_ptr<char[]> buf;
   // Return code
-  r = -1;
+  int r = EXIT_FAILURE;
   // Number of full records copied to/from target
   size_t records_in = 0;
   size_t records_out = 0;
@@ -211,77 +211,81 @@ int main(int argc, const char** argv) {
 
   uint64_t sum_bytes_out = 0;
   // Logic for skip-block devices.
-  fuchsia_hardware_skipblock_PartitionInfo partition_info = {};
-  bool in_is_skip_block = false;
-  bool out_is_skip_block = false;
-  zx_handle_t vmo = ZX_HANDLE_INVALID;
-  zx_handle_t channel_in = ZX_HANDLE_INVALID;
-  zx_handle_t channel_out = ZX_HANDLE_INVALID;
+  zx::vmo vmo;
+  fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock> skipblock_in;
+  size_t skipblock_size_in;
+  fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock> skipblock_out;
+  size_t skipblock_size_out;
   zx_time_t start = 0, stop = 0;
 
   if (*options.input == '\0') {
-    in = STDIN_FILENO;
+    in.reset(STDIN_FILENO);
   } else {
-    in = open(options.input, O_RDONLY);
-    if (in < 0) {
+    in.reset(open(options.input, O_RDONLY));
+    if (!in) {
       fprintf(stderr, "Couldn't open input file %s : %d\n", options.input, errno);
-      goto done;
+      return EXIT_FAILURE;
     }
   }
 
   if (*options.output == '\0') {
-    out = STDOUT_FILENO;
+    out.reset(STDOUT_FILENO);
   } else {
-    out = open(options.output, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-    if (out < 0) {
+    out.reset(open(options.output, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR));
+    if (!out) {
       fprintf(stderr, "Couldn't open output file %s : %d\n", options.output, errno);
-      goto done;
+      return EXIT_FAILURE;
     }
   }
 
-  if (is_skip_block(options.input, &partition_info)) {
-    if (options.input_bs % partition_info.block_size_bytes) {
-      fprintf(stderr, "BS must be a multiple of %lu\n", partition_info.block_size_bytes);
-      return false;
+  if (IsSkipBlockPath(options.input)) {
+    zx::result result = GetSkipBlockClient(options.input, &skipblock_size_in);
+    if (result.is_error()) {
+      fprintf(stderr, "Failed to get skip-block client: %s\n", result.status_string());
+      return EXIT_FAILURE;
     }
-
-    in_is_skip_block = true;
-    fdio_get_service_handle(in, &channel_in);
+    if (options.input_bs % skipblock_size_in) {
+      fprintf(stderr, "BS must be a multiple of %lu\n", skipblock_size_in);
+      return EXIT_FAILURE;
+    }
+    skipblock_in = std::move(*result);
   }
 
-  if (is_skip_block(options.output, &partition_info)) {
-    if (options.output_bs % partition_info.block_size_bytes) {
-      fprintf(stderr, "BS must be a multiple of %lu\n", partition_info.block_size_bytes);
-      return false;
+  if (IsSkipBlockPath(options.output)) {
+    zx::result result = GetSkipBlockClient(options.output, &skipblock_size_out);
+    if (result.is_error()) {
+      fprintf(stderr, "Failed to get skip-block client: %s\n", result.status_string());
+      return EXIT_FAILURE;
     }
-
-    out_is_skip_block = true;
-    fdio_get_service_handle(out, &channel_out);
+    if (options.output_bs % skipblock_size_out) {
+      fprintf(stderr, "BS must be a multiple of %lu\n", skipblock_size_out);
+      return EXIT_FAILURE;
+    }
+    skipblock_out = std::move(*result);
   }
 
-  if (in_is_skip_block || out_is_skip_block) {
-    if (zx_vmo_create(buf_size, 0, &vmo) != ZX_OK) {
+  if (skipblock_in || skipblock_out) {
+    if (zx::vmo::create(buf_size, 0, &vmo) != ZX_OK) {
       fprintf(stderr, "No memory\n");
-      goto done;
+      return EXIT_FAILURE;
     }
-    if (zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, buf_size,
-                    (zx_vaddr_t*)&buf) != ZX_OK) {
+    if (zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo.get(), 0,
+                    buf_size, reinterpret_cast<zx_vaddr_t*>(&buf)) != ZX_OK) {
       fprintf(stderr, "Failed to map vmo\n");
-      goto done;
+      return EXIT_FAILURE;
     }
   } else {
-    buf = malloc(buf_size);
-    if (buf == NULL) {
-      fprintf(stderr, "No memory\n");
-      goto done;
-    }
+    buf.reset(new char[buf_size]);
   }
 
-  if (options.input_skip != 0 && !in_is_skip_block) {
+  bool terminating = false;
+  size_t rlen = 0;
+  if (options.input_skip != 0 && !skipblock_in) {
     // Try seeking first; if that doesn't work, try reading to an input buffer.
-    if (lseek(in, (off_t)options.input_skip, SEEK_SET) != (off_t)options.input_skip) {
+    if (lseek(in.get(), static_cast<off_t>(options.input_skip), SEEK_SET) !=
+        static_cast<off_t>(options.input_skip)) {
       while (options.input_skip) {
-        if (read(in, buf, options.input_bs) != (ssize_t)options.input_bs) {
+        if (read(in.get(), buf.get(), options.input_bs) != static_cast<ssize_t>(options.input_bs)) {
           fprintf(stderr, "Couldn't read from input\n");
           goto done;
         }
@@ -290,8 +294,9 @@ int main(int argc, const char** argv) {
     }
   }
 
-  if (options.output_seek != 0 && !out_is_skip_block) {
-    if (lseek(out, (off_t)options.output_seek, SEEK_SET) != (off_t)options.output_seek) {
+  if (options.output_seek != 0 && !skipblock_out) {
+    if (lseek(out.get(), static_cast<off_t>(options.output_seek), SEEK_SET) !=
+        static_cast<off_t>(options.output_seek)) {
       fprintf(stderr, "Failed to seek on output\n");
       goto done;
     }
@@ -303,54 +308,55 @@ int main(int argc, const char** argv) {
     goto done;
   }
 
-  bool terminating = false;
-  size_t rlen = 0;
   start = zx_clock_get_monotonic();
   while (true) {
     if (options.use_count && !options.count) {
-      r = 0;
+      r = EXIT_SUCCESS;
       goto done;
     }
 
     // Read as much as we can (up to input_bs) into our target buffer
-    if (in_is_skip_block) {
-      zx_handle_t dup;
-      if (zx_handle_duplicate(vmo, ZX_RIGHT_SAME_RIGHTS, &dup) != ZX_OK) {
+    if (skipblock_in) {
+      zx::vmo dup;
+      if (vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup) != ZX_OK) {
         fprintf(stderr, "Cannot duplicate handle\n");
         goto done;
       }
-      const uint32_t block_count = (uint32_t)(options.input_bs / partition_info.block_size_bytes);
-      fuchsia_hardware_skipblock_ReadWriteOperation op = {
-          .vmo = dup,
+      const auto block_count = static_cast<uint32_t>(options.input_bs / skipblock_size_in);
+      fuchsia_hardware_skipblock::wire::ReadWriteOperation op = {
+          .vmo = std::move(dup),
           .vmo_offset = 0,
-          .block = (uint32_t)((options.input_skip / partition_info.block_size_bytes) +
-                              (records_in * block_count)),
+          .block = static_cast<uint32_t>((options.input_skip / skipblock_size_in) +
+                                         (records_in * block_count)),
           .block_count = block_count,
       };
 
-      zx_status_t status;
-      fuchsia_hardware_skipblock_SkipBlockRead(channel_in, &op, &status);
-
-      if (status != ZX_OK) {
-        fprintf(stderr, "Failed to read\n");
+      auto res =
+          fidl::WireCall<fuchsia_hardware_skipblock::SkipBlock>(skipblock_in)->Read(std::move(op));
+      if (!res.ok()) {
+        fprintf(stderr, "Read FIDL failure\n");
+        goto done;
+      }
+      if (res.value().status != ZX_OK) {
+        fprintf(stderr, "Read failed: %s\n", res.status_string());
         goto done;
       }
       records_in++;
       rlen += options.input_bs;
     } else {
-      ssize_t rout;
-      if ((rout = read(in, buf, options.input_bs)) != (ssize_t)options.input_bs) {
-        terminating = true;
-      }
-      if (rout == (ssize_t)options.input_bs) {
+      ssize_t rout = read(in.get(), buf.get(), options.input_bs);
+      if (rout == static_cast<ssize_t>(options.input_bs)) {
         records_in++;
-      } else if (rout > 0) {
-        if (options.pad) {
-          memset(buf + rout, 0, options.input_bs - rout);
-          records_in++;
-          rout = (ssize_t)options.input_bs;
-        } else {
-          record_in_partial = rout;
+      } else {
+        terminating = true;
+        if (rout > 0) {
+          if (options.pad) {
+            memset(buf.get() + rout, 0, options.input_bs - rout);
+            records_in++;
+            rout = static_cast<ssize_t>(options.input_bs);
+          } else {
+            record_in_partial = rout;
+          }
         }
       }
       if (rout > 0) {
@@ -367,38 +373,38 @@ int main(int argc, const char** argv) {
     // If we can (or should, due to impending termination), dump the read
     // buffer into the output file.
     if (rlen >= options.output_bs || terminating) {
-      if (out_is_skip_block) {
-        zx_handle_t dup;
-        if (zx_handle_duplicate(vmo, ZX_RIGHT_SAME_RIGHTS, &dup) != ZX_OK) {
+      if (skipblock_out) {
+        zx::vmo dup;
+        if (vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup) != ZX_OK) {
           fprintf(stderr, "Cannot duplicate handle\n");
           goto done;
         }
-        const uint32_t block_count =
-            (uint32_t)(options.output_bs / partition_info.block_size_bytes);
+        const uint32_t block_count = static_cast<uint32_t>(options.output_bs / skipblock_size_out);
 
-        fuchsia_hardware_skipblock_ReadWriteOperation op = {
-            .vmo = dup,
+        fuchsia_hardware_skipblock::wire::ReadWriteOperation op = {
+            .vmo = std::move(dup),
             .vmo_offset = 0,
-            .block = (uint32_t)((options.output_seek / partition_info.block_size_bytes) +
-                                (records_out * block_count)),
+            .block = static_cast<uint32_t>((options.output_seek / skipblock_size_out) +
+                                           (records_out * block_count)),
             .block_count = block_count,
         };
 
-        zx_status_t status;
-        bool bad_block_grown;
-        fuchsia_hardware_skipblock_SkipBlockWrite(channel_out, &op, &status, &bad_block_grown);
-
-        if (status != ZX_OK) {
-          fprintf(stderr, "Failed to write\n");
+        auto res = fidl::WireCall<fuchsia_hardware_skipblock::SkipBlock>(skipblock_out)
+                       ->Write(std::move(op));
+        if (!res.ok()) {
+          fprintf(stderr, "Write FIDL failure\n");
           goto done;
         }
-
+        if (res.value().status != ZX_OK) {
+          fprintf(stderr, "Write failed: %s\n", res.status_string());
+          goto done;
+        }
         records_out++;
       } else {
         size_t off = 0;
         while (off != rlen) {
           size_t wlen = MIN(options.output_bs, rlen - off);
-          if (write(out, buf + off, wlen) != (ssize_t)wlen) {
+          if (write(out.get(), buf.get() + off, wlen) != static_cast<ssize_t>(wlen)) {
             fprintf(stderr, "Couldn't write %zu bytes to output\n", wlen);
             goto done;
           }
@@ -414,7 +420,7 @@ int main(int argc, const char** argv) {
     }
 
     if (terminating) {
-      r = 0;
+      r = EXIT_SUCCESS;
       goto done;
     }
   }
@@ -429,24 +435,6 @@ done:
             sum_bytes_out * ZX_SEC(1) / (stop - start));
   } else {
     printf("%zu bytes copied\n", sum_bytes_out);
-  }
-
-  if (buf) {
-    if (in_is_skip_block || out_is_skip_block) {
-      zx_vmar_unmap(zx_vmar_root_self(), (uintptr_t)*buf, buf_size);
-    } else {
-      free(buf);
-    }
-  }
-  if (vmo != ZX_HANDLE_INVALID) {
-    zx_handle_close(vmo);
-  }
-
-  if (in != -1) {
-    close(in);
-  }
-  if (out != -1) {
-    close(out);
   }
   return r;
 }

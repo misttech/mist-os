@@ -3,12 +3,16 @@
 # found in the LICENSE file.
 
 executable("dd") {
-  sources = [ "main.c" ]
+  sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_c",
+    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
+    "//sdk/lib/stdcompat",
+    "//src/lib/storage/block_client/cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/storage/buffer",
+    "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/114596): Remove.
-  configs += [ "//build/c:fidl-deprecated-c-bindings" ]
 }

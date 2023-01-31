@@ -110,9 +110,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/media/audio/drivers/intel-hda/controller:src",
     "//src/performance/ktrace_provider:bin",
     "//src/power/thermd:bin",
-
-    # TODO(https://fxbug.dev/114596): Remove.
-    "//src/storage/bin/dd",
     "//src/sys/early_boot_instrumentation:coverage-source",
     "//src/virtualization/bin/vmm/device:block",
     "//src/virtualization/bin/vmm/device/virtio_magma:magma_image",
