@@ -49,6 +49,12 @@ tmp             .req x16
 // until the dirty cache lines in the disabled cache are written back, we must
 // avoid accessing RAM and its possible stale values.
 .function DisableLocalCachesAndMmu, global
+  // Make sure the caches are flushed before we start bypassing them.
+first_flush:
+  data_cache_way_set_op cisw, flush1
+  ic  iallu
+  isb
+
   // What EL are we running at?
   mrs     tmp, CurrentEL
   cmp     tmp, #(1 << 2)
@@ -60,7 +66,7 @@ disable_el2:  // EL2 version
   bic     tmp, tmp, #SCTLR_EL2_C  // Data and unified caches
   bic     tmp, tmp, #SCTLR_EL2_M  // MMU
   msr     sctlr_el2, tmp
-  b       flush
+  b       second_flush
 
 disable_el1:  // EL1 version
   mrs     tmp, sctlr_el1
@@ -69,9 +75,9 @@ disable_el1:  // EL1 version
   bic     tmp, tmp, #SCTLR_EL1_M
   msr     sctlr_el1, tmp
 
-  // Immediatlely flush the caches and the TLBs, per the documentation.
-flush:
-  data_cache_way_set_op cisw, disable
+  // And flush again before returning to leave the caches and TLB in pristine shape.
+second_flush:
+  data_cache_way_set_op cisw, flush2
   ic  iallu
   isb
   tlbi vmalle1
