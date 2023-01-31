@@ -10,7 +10,8 @@ use {
     async_trait::async_trait,
     diagnostics_reader::{ArchiveReader, Inspect},
     either::Either,
-    fidl::endpoints::Proxy,
+    fidl::endpoints::Proxy as _,
+    fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
     fs_management::{filesystem::Filesystem, FSConfig},
@@ -161,9 +162,9 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
         // Initialize the filesystem on a new volume
         let volume_guid = fvm.new_volume("default", &TYPE_GUID, Some(fvm.free_space().await)).await;
         let volume_path = get_volume_path(&volume_guid).await;
-        let node =
-            connect_to_protocol_at_path::<fio::NodeMarker>(volume_path.to_str().unwrap()).unwrap();
-        let mut fs = Filesystem::from_node(node, config.clone());
+        let controller =
+            connect_to_protocol_at_path::<ControllerMarker>(volume_path.to_str().unwrap()).unwrap();
+        let mut fs = Filesystem::new(controller, config.clone());
         fs.format().await.unwrap();
         let moniker = fs.get_component_moniker();
 
@@ -339,11 +340,11 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
             )
             .await;
             let volume_path = get_volume_path(&self.volume_guid).await;
-            let node =
-                connect_to_protocol_at_path::<fio::NodeMarker>(volume_path.to_str().unwrap())
+            let controller =
+                connect_to_protocol_at_path::<ControllerMarker>(volume_path.to_str().unwrap())
                     .unwrap();
 
-            let mut fs = Filesystem::from_node(node, self.config.clone());
+            let mut fs = Filesystem::new(controller, self.config.clone());
             fs.fsck().await.unwrap();
             let instance = if fs.config().is_multi_volume() {
                 let mut instance = fs.serve_multi_volume().await.unwrap();

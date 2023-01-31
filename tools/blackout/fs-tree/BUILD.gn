@@ -20,6 +20,7 @@ rustc_binary("blackout-minfs-tree-target-bin") {
   testonly = true
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -57,6 +58,7 @@ rustc_binary("blackout-fxfs-tree-target-bin") {
   testonly = true
   edition = "2021"
   deps = [
+    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",

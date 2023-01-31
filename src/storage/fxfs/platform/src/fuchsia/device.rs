@@ -598,6 +598,7 @@ mod tests {
     use {
         crate::fuchsia::testing::{open_file_checked, TestFixture},
         fidl::endpoints::{ClientEnd, ServerEnd},
+        fidl_fuchsia_device::ControllerMarker,
         fidl_fuchsia_hardware_block::BlockMarker,
         fidl_fuchsia_hardware_block_volume::VolumeAndNodeMarker,
         fidl_fuchsia_io as fio,
@@ -611,11 +612,10 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_block_server() {
-        let (client_channel, server_channel) = zx::Channel::create();
+        let (client, server) = fidl::endpoints::create_proxy::<ControllerMarker>().unwrap();
         join!(
             async {
-                let mut blobfs = Filesystem::from_channel(client_channel, Blobfs::default())
-                    .expect("create filesystem from channel failed");
+                let mut blobfs = Filesystem::new(client, Blobfs::default());
                 blobfs.format().await.expect("format blobfs failed");
                 blobfs.fsck().await.expect("fsck failed");
             },
@@ -649,7 +649,7 @@ mod tests {
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                     fio::MODE_TYPE_BLOCK_DEVICE,
                     "block_device",
-                    ServerEnd::new(server_channel),
+                    server.into_channel().into(),
                 )
                 .expect("open failed");
 
@@ -1001,11 +1001,10 @@ mod tests {
 
     #[fuchsia::test(threads = 10)]
     async fn test_blobfs() {
-        let (client_channel, server_channel) = zx::Channel::create();
+        let (client, server) = fidl::endpoints::create_proxy::<ControllerMarker>().unwrap();
         join!(
             async {
-                let mut blobfs = Filesystem::from_channel(client_channel, Blobfs::default())
-                    .expect("create filesystem from channel failed");
+                let mut blobfs = Filesystem::new(client, Blobfs::default());
                 blobfs.format().await.expect("format blobfs failed");
                 blobfs.fsck().await.expect("fsck failed");
                 // Mount blobfs
@@ -1084,7 +1083,7 @@ mod tests {
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                     fio::MODE_TYPE_BLOCK_DEVICE,
                     "block_device",
-                    ServerEnd::new(server_channel),
+                    server.into_channel().into(),
                 )
                 .expect("open failed");
 

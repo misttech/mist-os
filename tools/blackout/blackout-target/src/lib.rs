@@ -9,9 +9,9 @@
 use {
     anyhow::{Context as _, Result},
     async_trait::async_trait,
-    device_watcher::recursive_wait_and_open_node,
+    device_watcher::{recursive_wait_and_open, recursive_wait_and_open_node},
     fidl_fuchsia_blackout_test::{ControllerRequest, ControllerRequestStream},
-    fidl_fuchsia_device::ControllerMarker,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_component::server::{ServiceFs, ServiceObj},
@@ -207,7 +207,7 @@ pub async fn set_up_partition(
     partition_label: &str,
     device_path: Option<&str>,
     skip_ramdisk: bool,
-) -> Result<String> {
+) -> Result<ControllerProxy> {
     let path = match device_path {
         Some(path) => path.to_string(),
         None => {
@@ -280,11 +280,14 @@ pub async fn set_up_partition(
     .await
     .context("create_fvm_volume failed")?;
     let fvm_block_path = format!("{}/fvm/{}-p-1/block", path, partition_label);
-    recursive_wait_and_open_node(&dev(), fvm_block_path.strip_prefix("/dev/").unwrap())
-        .await
-        .context("recursive_wait for new fvm path failed")?;
+    let controller = recursive_wait_and_open::<ControllerMarker>(
+        &dev(),
+        fvm_block_path.strip_prefix("/dev/").unwrap(),
+    )
+    .await
+    .context("recursive_wait for new fvm path failed")?;
 
-    Ok(fvm_block_path)
+    Ok(controller)
 }
 
 /// During the test or verify steps, finds a block device which represents an fvm partition named

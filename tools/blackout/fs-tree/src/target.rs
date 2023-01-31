@@ -10,6 +10,7 @@ use {
         Test, TestServer,
     },
     fidl::endpoints::Proxy as _,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
     fidl_fuchsia_io as fio,
     fs_management::{
@@ -61,9 +62,8 @@ impl FsTree {
         Ok(())
     }
 
-    async fn setup_fxfs(&self, device_path: &str) -> Result<()> {
-        tracing::info!("formatting block device with Fxfs");
-        let mut fxfs = Fxfs::new(device_path)?;
+    async fn setup_fxfs(&self, controller: ControllerProxy) -> Result<()> {
+        let mut fxfs = Fxfs::new(controller);
         fxfs.format().await?;
         let mut fs = fxfs.serve_multi_volume().await?;
         self.setup_crypt_service().await?;
@@ -74,16 +74,14 @@ impl FsTree {
         Ok(())
     }
 
-    async fn setup_minfs(&self, device_path: &str) -> Result<()> {
-        tracing::info!("formatting block device with minfs");
-        let mut minfs = Minfs::new(&device_path)?;
+    async fn setup_minfs(&self, controller: ControllerProxy) -> Result<()> {
+        let mut minfs = Minfs::new(controller);
         minfs.format().await.context("failed to format minfs")?;
         Ok(())
     }
 
-    async fn serve_fxfs(&self, device_path: &str) -> Result<FsInstance> {
-        tracing::info!("mounting Fxfs from {}", device_path);
-        let mut fxfs = Fxfs::new(device_path)?;
+    async fn serve_fxfs(&self, controller: ControllerProxy) -> Result<FsInstance> {
+        let mut fxfs = Fxfs::new(controller);
         let mut fs = fxfs.serve_multi_volume().await?;
         self.setup_crypt_service().await?;
         let crypt_service = Some(
@@ -93,15 +91,13 @@ impl FsTree {
         Ok(FsInstance::Fxfs(fs))
     }
 
-    async fn serve_minfs(&self, device_path: &str) -> Result<FsInstance> {
-        tracing::info!("mounting minfs from {}", device_path);
-        let mut minfs = Minfs::new(device_path)?;
+    async fn serve_minfs(&self, controller: ControllerProxy) -> Result<FsInstance> {
+        let mut minfs = Minfs::new(controller);
         let fs = minfs.serve().await?;
         Ok(FsInstance::Minfs(fs))
     }
 
-    async fn verify_fxfs(&self, device_path: &str) -> Result<()> {
-        tracing::info!("verifying Fxfs at {}", device_path);
+    async fn verify_fxfs(&self, controller: ControllerProxy) -> Result<()> {
         self.setup_crypt_service().await?;
         let crypt_client_fn = Some(Arc::new(|| {
             connect_to_protocol::<CryptMarker>()
@@ -111,15 +107,13 @@ impl FsTree {
                 .into_zx_channel()
                 .into()
         }) as CryptClientFn);
-        let mut fxfs =
-            Filesystem::from_path(device_path, Fxfs { crypt_client_fn, ..Default::default() })?;
+        let mut fxfs = Filesystem::new(controller, Fxfs { crypt_client_fn, ..Default::default() });
         fxfs.fsck().await?;
         Ok(())
     }
 
-    async fn verify_minfs(&self, device_path: &str) -> Result<()> {
-        tracing::info!("verifying minfs at {}", device_path);
-        let mut minfs = Minfs::new(device_path)?;
+    async fn verify_minfs(&self, controller: ControllerProxy) -> Result<()> {
+        let mut minfs = Minfs::new(controller);
         minfs.fsck().await?;
         Ok(())
     }
@@ -152,11 +146,12 @@ impl Test for FsTree {
     ) -> Result<()> {
         let dev =
             blackout_target::set_up_partition(&device_label, device_path.as_deref(), true).await?;
-        tracing::info!("using block device: {}", dev);
+        let path = dev.get_topological_path().await?.map_err(zx::Status::from_raw)?;
+        tracing::info!("using block device: {}", &path);
 
         match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.setup_fxfs(&dev).await,
-            "minfs" => self.setup_minfs(&dev).await,
+            "fxfs" => self.setup_fxfs(dev).await,
+            "minfs" => self.setup_minfs(dev).await,
             _ => panic!("Unsupported filesystem"),
         }
     }
@@ -167,12 +162,14 @@ impl Test for FsTree {
         device_path: Option<String>,
         seed: u64,
     ) -> Result<()> {
-        let dev = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
-        tracing::info!("using block device: {}", dev);
+        let path = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
+        tracing::info!("using block device: {}", &path);
+        let dev =
+            fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(&path)?;
 
         let fs = match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.serve_fxfs(&dev).await?,
-            "minfs" => self.serve_minfs(&dev).await?,
+            "fxfs" => self.serve_fxfs(dev).await?,
+            "minfs" => self.serve_minfs(dev).await?,
             _ => panic!("Unsupported filesystem"),
         };
 
@@ -206,12 +203,14 @@ impl Test for FsTree {
         device_path: Option<String>,
         _seed: u64,
     ) -> Result<()> {
-        let dev = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
-        tracing::info!("using block device: {}", dev);
+        let path = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
+        tracing::info!("using block device: {}", &path);
+        let dev =
+            fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(&path)?;
 
         match DATA_FILESYSTEM_FORMAT {
-            "fxfs" => self.verify_fxfs(&dev).await,
-            "minfs" => self.verify_minfs(&dev).await,
+            "fxfs" => self.verify_fxfs(dev).await,
+            "minfs" => self.verify_minfs(dev).await,
             _ => panic!("Unsupported filesystem"),
         }
     }

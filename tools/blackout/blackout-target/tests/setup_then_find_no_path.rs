@@ -36,8 +36,9 @@ async fn setup_then_find_no_path() {
             .expect("failed to wait for device");
     }
 
-    let setup_device_path =
+    let setup_device_controller =
         set_up_partition("test-label", None, false).await.expect("failed to set up device");
+    let setup_device_path = setup_device_controller.get_topological_path().await.unwrap().unwrap();
     assert_eq!(setup_device_path, format!("{}/fvm/test-label-p-1/block", ramdisk_path));
 
     let find_device_path = find_partition("test-label", None).await.expect("failed to find device");

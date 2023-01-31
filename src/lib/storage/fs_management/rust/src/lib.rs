@@ -15,7 +15,6 @@ pub mod format;
 pub mod partition;
 
 use {
-    anyhow::Error,
     cstr::cstr,
     fdio::{spawn_etc, SpawnAction, SpawnOptions},
     fidl_fuchsia_fs_startup::{
@@ -218,16 +217,9 @@ pub struct Blobfs {
 }
 
 impl Blobfs {
-    /// Manages a block device at a given path using
-    /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_path(path, Self::default())
-    }
-
-    /// Manages a block device at a given channel using
-    /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_channel(channel, Self::default())
+    /// Manages a block device using the default configuration.
+    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_device, Self::default())
     }
 
     /// Launch blobfs, with the default configuration, as a dynamic child in the fs-collection.
@@ -302,16 +294,9 @@ pub struct Minfs {
 }
 
 impl Minfs {
-    /// Manages a block device at a given path using
-    /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_path(path, Self::default())
-    }
-
-    /// Manages a block device at a given channel using
-    /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_channel(channel, Self::default())
+    /// Manages a block device using the default configuration.
+    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_device, Self::default())
     }
 
     /// Launch minfs, with the default configuration, as a dynamic child in the fs-collection.
@@ -367,16 +352,9 @@ pub struct MinfsLegacy {
 }
 
 impl MinfsLegacy {
-    /// Manages a block device at a given path using
-    /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_path(path, Self::default())
-    }
-
-    /// Manages a block device at a given channel using
-    /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_channel(channel, Self::default())
+    /// Manages a block device using the default configuration.
+    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_device, Self::default())
     }
 }
 
@@ -429,16 +407,9 @@ impl Fxfs {
         Fxfs { crypt_client_fn: Some(crypt_client_fn), ..Default::default() }
     }
 
-    /// Manages a block device at a given path using
-    /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_path(path, Self::default())
-    }
-
-    /// Manages a block device at a given channel using
-    /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_channel(channel, Self::default())
+    /// Manages a block device using the default configuration.
+    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_device, Self::default())
     }
 
     /// Launch Fxfs, with the default configuration, as a dynamic child in the fs-collection.
@@ -497,16 +468,9 @@ pub struct F2fs {
 }
 
 impl F2fs {
-    /// Manages a block device at a given path using
-    /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_path(path, Self::default())
-    }
-
-    /// Manages a block device at a given channel using
-    /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_channel(channel, Self::default())
+    /// Manages a block device using the default configuration.
+    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_device, Self::default())
     }
 
     /// Launch f2fs, with the default configuration, as a dynamic child in the fs-collection.
@@ -560,16 +524,9 @@ pub struct Factoryfs {
 }
 
 impl Factoryfs {
-    /// Manages a block device at a given path using
-    /// the default configuration.
-    pub fn new(path: &str) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_path(path, Self::default())
-    }
-
-    /// Manages a block device at a given channel using
-    /// the default configuration.
-    pub fn from_channel(channel: zx::Channel) -> Result<filesystem::Filesystem, Error> {
-        filesystem::Filesystem::from_channel(channel, Self::default())
+    /// Manages a block device using the default configuration.
+    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_device, Self::default())
     }
 }
 

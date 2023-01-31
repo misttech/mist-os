@@ -90,7 +90,8 @@ impl DiskManager for MockDiskManager {
     type BlockDevice = MockBlockDevice;
     type Partition = MockPartition;
     type EncryptedBlockDevice = MockEncryptedBlockDevice;
-    type Minfs = MockMinfs;
+    type Minfs = ();
+    type ServingMinfs = MockMinfs;
 
     async fn partitions(&self) -> Result<Vec<MockPartition>, DiskError> {
         self.maybe_partitions
@@ -105,11 +106,13 @@ impl DiskManager for MockDiskManager {
         block_dev.bind_behavior.map_err(|err_factory| err_factory())
     }
 
-    async fn format_minfs(&self, _block_dev: &MockBlockDevice) -> Result<(), DiskError> {
+    fn create_minfs(&self, _block_dev: MockBlockDevice) -> Self::Minfs {}
+
+    async fn format_minfs(&self, _minfs: &mut Self::Minfs) -> Result<(), DiskError> {
         self.format_minfs_behavior.map_err(|err_factory| err_factory())
     }
 
-    async fn serve_minfs(&self, _block_dev: MockBlockDevice) -> Result<MockMinfs, DiskError> {
+    async fn serve_minfs(&self, _minfs: Self::Minfs) -> Result<MockMinfs, DiskError> {
         let mut locked_fn = self.serve_minfs_fn.lock().await;
         (*locked_fn)()
     }

@@ -16,7 +16,8 @@ use {
         FSConfig,
     },
     fuchsia_component::client::{
-        connect_channel_to_protocol, connect_to_childs_protocol, open_childs_exposed_directory,
+        connect_channel_to_protocol, connect_to_childs_protocol, connect_to_protocol_at_path,
+        open_childs_exposed_directory,
     },
     fuchsia_zircon as zx,
     std::{
@@ -38,11 +39,10 @@ struct FsmFilesystem {
 
 impl FsmFilesystem {
     pub async fn new<FSC: FSConfig>(config: FSC, block_device: Box<dyn BlockDevice>) -> Self {
-        let mut fs = fs_management::filesystem::Filesystem::from_path(
-            block_device.get_path().to_str().unwrap(),
-            config,
-        )
-        .unwrap();
+        let path = block_device.get_path().to_str().unwrap();
+        let controller =
+            connect_to_protocol_at_path::<fidl_fuchsia_device::ControllerMarker>(path).unwrap();
+        let mut fs = fs_management::filesystem::Filesystem::new(controller, config);
         fs.format().await.expect("Failed to format the filesystem");
         let serving_filesystem = if fs.config().is_multi_volume() {
             let mut serving_filesystem =

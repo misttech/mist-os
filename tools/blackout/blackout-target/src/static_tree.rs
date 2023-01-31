@@ -239,9 +239,13 @@ mod tests {
         let tree: DirectoryEntry = rng.sample(dist);
 
         let ramdisk = RamdiskClient::create(512, 1 << 16).await.expect("failed to make ramdisk");
-        let device_path = ramdisk.get_path();
+        let device = ramdisk.open().await.unwrap();
+        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+        let controller: fidl::endpoints::ClientEnd<fidl_fuchsia_device::ControllerMarker> =
+            device.into_channel().into();
+        let controller = controller.into_proxy().unwrap();
 
-        let mut minfs = Minfs::new(device_path).expect("failed to make new minfs");
+        let mut minfs = Minfs::new(controller);
         minfs.format().await.expect("failed to format minfs");
         let mut minfs = minfs.serve().await.expect("failed to mount minfs");
         minfs.bind_to_path(root).expect("failed to bind path");

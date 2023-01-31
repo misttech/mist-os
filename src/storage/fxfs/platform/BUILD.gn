@@ -67,6 +67,7 @@ rustc_library("platform") {
       deps += [ "//zircon/system/ulib/backtrace-request/rust" ]
     }
     test_deps += [
+      "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-component",
       "//src/lib/fuchsia-fs",

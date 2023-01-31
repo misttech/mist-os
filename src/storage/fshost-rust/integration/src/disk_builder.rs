@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    device_watcher::recursive_wait_and_open_node,
-    fidl::endpoints::Proxy,
-    fidl_fuchsia_device::ControllerProxy,
+    device_watcher::{recursive_wait_and_open, recursive_wait_and_open_node},
+    fidl::endpoints::Proxy as _,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
+    fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
     fs_management::{
         format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC},
@@ -332,10 +333,13 @@ impl DiskBuilder {
         .await
         .expect("create_fvm_volume failed");
         let blobfs_path = format!("{}/fvm/blobfs-p-1/block", base_path);
-        recursive_wait_and_open_node(&dev, &blobfs_path.strip_prefix("/dev/").unwrap())
-            .await
-            .expect("recursive_wait_and_open_node failed");
-        let mut blobfs = Blobfs::new(&blobfs_path).expect("new failed");
+        let controller = recursive_wait_and_open::<ControllerMarker>(
+            &dev,
+            &blobfs_path.strip_prefix("/dev/").unwrap(),
+        )
+        .await
+        .expect("recursive_wait_and_open_node failed");
+        let mut blobfs = Blobfs::new(controller);
         blobfs.format().await.expect("format failed");
 
         // Create and format the data partition.
@@ -351,10 +355,12 @@ impl DiskBuilder {
         .expect("create_fvm_volume failed");
 
         let data_path = format!("{}/fvm/data-p-2/block", base_path);
-        let mut data_device =
-            recursive_wait_and_open_node(&dev, &data_path.strip_prefix("/dev/").unwrap())
-                .await
-                .expect("recursive_wait_and_open_node failed");
+        let mut data_device = recursive_wait_and_open::<ControllerMarker>(
+            &dev,
+            &data_path.strip_prefix("/dev/").unwrap(),
+        )
+        .await
+        .expect("recursive_wait_and_open_node failed");
 
         // Potentially set up zxcrypt, if we are configured to and aren't using Fxfs.
         if self.data_spec.format != Some("fxfs") && self.data_spec.zxcrypt {
@@ -362,10 +368,12 @@ impl DiskBuilder {
                 .await
                 .expect("failed to set up zxcrypt");
             let zxcrypt_path = zxcrypt_path.as_os_str().to_str().unwrap();
-            data_device =
-                recursive_wait_and_open_node(&dev, zxcrypt_path.strip_prefix("/dev/").unwrap())
-                    .await
-                    .expect("recursive_wait_and_open_node failed");
+            data_device = recursive_wait_and_open::<ControllerMarker>(
+                &dev,
+                zxcrypt_path.strip_prefix("/dev/").unwrap(),
+            )
+            .await
+            .expect("recursive_wait_and_open_node failed");
         }
 
         if let Some(format) = self.data_spec.format {
@@ -382,60 +390,45 @@ impl DiskBuilder {
         vmo
     }
 
-    async fn init_data_minfs(&self, data_device: fio::NodeProxy) {
+    async fn init_data_minfs(&self, data_device: ControllerProxy) {
         if self.corrupt_contents {
+            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+            let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
+
             // Just write the magic so it appears formatted to fshost.
-            self.write_magic(
-                fidl_fuchsia_hardware_block::BlockProxy::new(data_device.into_channel().unwrap()),
-                MINFS_MAGIC,
-                0,
-            )
-            .await;
-            return;
+            return self.write_magic(block, MINFS_MAGIC, 0).await;
         }
 
-        let mut minfs = fs_management::Minfs::from_channel(
-            data_device.into_channel().unwrap().into_zx_channel(),
-        )
-        .expect("from_channel failed");
+        let mut minfs = fs_management::Minfs::new(data_device);
         minfs.format().await.expect("format failed");
         let fs = minfs.serve().await.expect("serve_single_volume failed");
         self.write_test_data(&fs.root()).await;
         fs.shutdown().await.expect("shutdown failed");
     }
 
-    async fn init_data_f2fs(&self, data_device: fio::NodeProxy) {
+    async fn init_data_f2fs(&self, data_device: ControllerProxy) {
         if self.corrupt_contents {
+            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+            let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
+
             // Just write the magic so it appears formatted to fshost.
-            self.write_magic(
-                fidl_fuchsia_hardware_block::BlockProxy::new(data_device.into_channel().unwrap()),
-                F2FS_MAGIC,
-                1024,
-            )
-            .await;
-            return;
+            return self.write_magic(block, F2FS_MAGIC, 1024).await;
         }
 
-        let mut f2fs = fs_management::F2fs::from_channel(
-            data_device.into_channel().unwrap().into_zx_channel(),
-        )
-        .expect("from_channel failed");
+        let mut f2fs = fs_management::F2fs::new(data_device);
         f2fs.format().await.expect("format failed");
         let fs = f2fs.serve().await.expect("serve_single_volume failed");
         self.write_test_data(&fs.root()).await;
         fs.shutdown().await.expect("shutdown failed");
     }
 
-    async fn init_data_fxfs(&self, data_device: fio::NodeProxy) {
+    async fn init_data_fxfs(&self, data_device: ControllerProxy) {
         if self.corrupt_contents {
+            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+            let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
+
             // Just write the magic so it appears formatted to fshost.
-            self.write_magic(
-                fidl_fuchsia_hardware_block::BlockProxy::new(data_device.into_channel().unwrap()),
-                FXFS_MAGIC,
-                0,
-            )
-            .await;
-            return;
+            return self.write_magic(block, FXFS_MAGIC, 0).await;
         }
 
         let (data_key, metadata_key) = if self.data_spec.legacy_crypto_format {
@@ -444,8 +437,7 @@ impl DiskBuilder {
             (DATA_KEY, METADATA_KEY)
         };
         let crypt_realm = create_hermetic_crypt_service(data_key, metadata_key).await;
-        let mut fxfs = Fxfs::from_channel(data_device.into_channel().unwrap().into_zx_channel())
-            .expect("from_channel failed");
+        let mut fxfs = Fxfs::new(data_device);
         fxfs.format().await.expect("format failed");
         let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
         let vol = if self.data_spec.legacy_crypto_format {

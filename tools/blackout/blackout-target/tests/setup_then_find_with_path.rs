@@ -13,9 +13,10 @@ async fn setup_then_find_with_path() {
     let ramdisk = RamdiskClient::create(8192, 128).await.unwrap();
     let ramdisk_path = ramdisk.get_path();
 
-    let setup_device_path = set_up_partition("test-label", Some(ramdisk_path), false)
+    let setup_device_controller = set_up_partition("test-label", Some(ramdisk_path), false)
         .await
         .expect("failed to set up device");
+    let setup_device_path = setup_device_controller.get_topological_path().await.unwrap().unwrap();
     assert_eq!(setup_device_path, format!("{}/fvm/test-label-p-1/block", ramdisk_path));
 
     let find_device_path =

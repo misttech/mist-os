@@ -7,9 +7,9 @@ pub mod constants;
 use {
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    fidl::endpoints::{create_endpoints, Proxy},
+    fidl::endpoints::{create_endpoints, ClientEnd, Proxy as _},
     fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_hardware_block::BlockProxy,
+    fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_hardware_block_volume::VolumeAndNodeProxy,
     fidl_fuchsia_io::OpenFlags,
     fs_management::format::{detect_disk_format, DiskFormat},
@@ -45,8 +45,8 @@ pub trait Device: Send + Sync {
     /// Otherwise, an error is returned.
     async fn partition_instance(&mut self) -> Result<&[u8; 16], Error>;
 
-    /// Returns a proxy for the device.
-    fn proxy(&self) -> Result<BlockProxy, Error>;
+    /// Returns a channel connected to the device.
+    fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error>;
 
     /// Returns a new Device, which is a child of this device with the specified suffix. This
     /// function will return when the device is available. This function assumes the child device
@@ -118,8 +118,8 @@ impl Device for NandDevice {
         self.block_device.partition_instance().await
     }
 
-    fn proxy(&self) -> Result<BlockProxy, Error> {
-        self.block_device.proxy()
+    fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {
+        self.block_device.client_end()
     }
 }
 
@@ -188,8 +188,9 @@ impl Device for BlockDevice {
         if let Some(format) = self.content_format {
             return Ok(format);
         }
-        let block_proxy = BlockProxy::new(self.proxy()?.into_channel().unwrap());
-        return Ok(detect_disk_format(&block_proxy).await);
+        let block = self.client_end()?;
+        let block = block.into_proxy()?;
+        return Ok(detect_disk_format(&block).await);
     }
 
     fn topological_path(&self) -> &str {
@@ -232,10 +233,10 @@ impl Device for BlockDevice {
         Ok(self.partition_instance.as_ref().unwrap())
     }
 
-    fn proxy(&self) -> Result<BlockProxy, Error> {
+    fn client_end(&self) -> Result<ClientEnd<BlockMarker>, Error> {
         let (client, server) = create_endpoints()?;
         self.volume_proxy.clone(OpenFlags::CLONE_SAME_RIGHTS, server)?;
-        Ok(BlockProxy::new(fidl::AsyncChannel::from_channel(client.into_channel())?))
+        Ok(client.into_channel().into())
     }
 
     async fn get_child(&self, suffix: &str) -> Result<Box<dyn Device>, Error> {

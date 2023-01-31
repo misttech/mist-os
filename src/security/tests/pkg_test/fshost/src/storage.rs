@@ -57,13 +57,16 @@ impl BlobfsInstance {
         let blobfs_block_path = format!("{}/{}", fvm.topological_path(), FVM_BLOBFS_BLOCK_SUBDIR);
 
         // Wait for device at blobfs block path before interacting with it.
-        let block = device_watcher::recursive_wait_and_open_node(&dev_root, &blobfs_block_path)
-            .await
-            .expect("blobfs block did not appear");
+        let block = device_watcher::recursive_wait_and_open::<ControllerMarker>(
+            &dev_root,
+            &blobfs_block_path,
+        )
+        .await
+        .expect("blobfs block did not appear");
 
         // Instantiate blobfs.
         let config = Blobfs { component_type: ComponentType::StaticChild, ..Default::default() };
-        let mut blobfs = Filesystem::from_node(block, config);
+        let mut blobfs = Filesystem::new(block, config);
 
         // Check blobfs consistency.
         blobfs.fsck().await.unwrap();

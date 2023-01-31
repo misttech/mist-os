@@ -11,6 +11,7 @@ using fuchsia.io as io;
 /// which have a hand-written method of protocol switching.
 /// Composing all of the desired protocols is the easier and safer
 /// way to mock this behavior.
+// TODO(https://fxbug.dev/112484): this implements out-of-spec multiplexing.
 closed protocol MockPartition {
     compose io.Node; // For Clone.
     compose partition.Partition;

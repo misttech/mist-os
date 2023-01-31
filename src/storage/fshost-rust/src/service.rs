@@ -189,7 +189,9 @@ async fn wipe_storage(
         blobfs_config.num_inodes = config.blobfs_initial_inodes;
     }
 
-    let mut blobfs = filesystem::Filesystem::from_path(&blobfs_path, blobfs_config)?;
+    let controller =
+        connect_to_protocol_at_path::<fidl_fuchsia_device::ControllerMarker>(&blobfs_path)?;
+    let mut blobfs = filesystem::Filesystem::new(controller, blobfs_config);
     blobfs.format().await.context("Failed to format blobfs")?;
     let mut blobfs_device =
         BlockDevice::new(blobfs_path).await.context("Failed to make new device")?;

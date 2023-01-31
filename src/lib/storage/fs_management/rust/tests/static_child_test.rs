@@ -15,7 +15,8 @@ async fn blobfs_static_child() {
     let ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
 
     let config = Blobfs { component_type: ComponentType::StaticChild, ..Default::default() };
-    let mut blobfs = Filesystem::from_path(ramdisk.get_path(), config).unwrap();
+    let block = ramdisk.open().await.unwrap();
+    let mut blobfs = Filesystem::from_block_device(block, config).unwrap();
 
     blobfs.format().await.unwrap();
     blobfs.fsck().await.unwrap();
@@ -30,7 +31,8 @@ async fn minfs_static_child() {
     let ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
 
     let config = Minfs { component_type: ComponentType::StaticChild, ..Default::default() };
-    let mut minfs = Filesystem::from_path(ramdisk.get_path(), config).unwrap();
+    let block = ramdisk.open().await.unwrap();
+    let mut minfs = Filesystem::from_block_device(block, config).unwrap();
 
     minfs.format().await.unwrap();
     minfs.fsck().await.unwrap();
@@ -45,7 +47,8 @@ async fn fxfs_static_child() {
     let ramdisk = RamdiskClient::create(1024, 1 << 16).await.unwrap();
 
     let config = Fxfs { component_type: ComponentType::StaticChild, ..Default::default() };
-    let mut fxfs = Filesystem::from_path(ramdisk.get_path(), config).unwrap();
+    let block = ramdisk.open().await.unwrap();
+    let mut fxfs = Filesystem::from_block_device(block, config).unwrap();
 
     fxfs.format().await.unwrap();
     fxfs.fsck().await.unwrap();

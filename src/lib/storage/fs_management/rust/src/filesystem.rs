@@ -14,7 +14,7 @@ use {
     fdio::SpawnAction,
     fidl::{
         encoding::Decodable,
-        endpoints::{create_endpoints, create_proxy, ClientEnd, ServerEnd},
+        endpoints::{create_endpoints, create_proxy, ClientEnd, Proxy as _, ServerEnd},
     },
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
     fidl_fuchsia_component_decl as fdecl,
@@ -24,13 +24,10 @@ use {
     fuchsia_async::OnSignals,
     fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol,
-        connect_to_protocol_at_dir_root, connect_to_protocol_at_path,
-        open_childs_exposed_directory,
+        connect_to_protocol_at_dir_root, open_childs_exposed_directory,
     },
     fuchsia_runtime::{HandleInfo, HandleType},
-    fuchsia_zircon::{
-        self as zx, AsHandleRef as _, Channel, HandleBased as _, Process, Signals, Status, Task,
-    },
+    fuchsia_zircon::{self as zx, AsHandleRef as _, Process, Signals, Status, Task},
     std::{
         collections::HashMap,
         sync::{
@@ -50,6 +47,13 @@ pub struct Filesystem {
     /// generic over config. Clients that want to be generic over filesystem type also pay the
     /// monomorphization cost, with some, like fshost, paying a lot.
     config: Box<dyn FSConfig>,
+    // TODO(https://fxbug.dev/112484): this should be a fuchsia.device/Controller, but it is used
+    // to vend channels that are expected to multiplex fuchsia.io/Node (see e.g.
+    // RemoteBlockDevice::VolumeGetInfo, which clones the channel before dispatching
+    // fuchsia.hardware.block.volume/Volume methods on it). The only way to get such a multiplexed
+    // channel is to clone a channel that multiplexes, so that's what we do.
+    //
+    // Change this to a ControllerProxy when downstream isn't so clone-happy.
     block_device: fio::NodeProxy,
     component: Option<Arc<DynamicComponentInstance>>,
 }
@@ -62,23 +66,34 @@ impl Filesystem {
         self.config.as_ref()
     }
 
-    /// Creates a new `Filesystem` with the block device represented by `node_proxy`.
-    pub fn from_node<FSC: FSConfig + 'static>(node_proxy: fio::NodeProxy, config: FSC) -> Self {
-        Self { config: Box::new(config), block_device: node_proxy, component: None }
+    /// Creates a new `Filesystem`.
+    pub fn new<FSC: FSConfig + 'static>(
+        block_device: fidl_fuchsia_device::ControllerProxy,
+        config: FSC,
+    ) -> Self {
+        let block_device = block_device.into_channel().unwrap();
+        let block_device = fio::NodeProxy::from_channel(block_device);
+        Self { config: Box::new(config), block_device, component: None }
     }
 
-    /// Creates a new `Filesystem` from the block device at the given path.
+    // TODO(tamird): Remove this after soft transition in v/g.
     pub fn from_path<FSC: FSConfig + 'static>(path: &str, config: FSC) -> Result<Self, Error> {
-        let proxy = connect_to_protocol_at_path::<fio::NodeMarker>(path)?;
-        Ok(Self::from_node(proxy, config))
+        let proxy = fuchsia_component::client::connect_to_protocol_at_path::<
+            fidl_fuchsia_device::ControllerMarker,
+        >(path)?;
+        Ok(Self::new(proxy, config))
     }
 
-    /// Creates a new `Filesystem` with the block device represented by `channel`.
-    pub fn from_channel<FSC: FSConfig + 'static>(
-        channel: Channel,
+    /// Creates a new `Filesystem`.
+    pub fn from_block_device<FSC: FSConfig + 'static>(
+        block_device: ClientEnd<fhardware_block::BlockMarker>,
         config: FSC,
     ) -> Result<Self, Error> {
-        Ok(Self::from_node(ClientEnd::<fio::NodeMarker>::new(channel).into_proxy()?, config))
+        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+        let controller: ClientEnd<fidl_fuchsia_device::ControllerMarker> =
+            block_device.into_channel().into();
+        let controller = controller.into_proxy()?;
+        Ok(Self::new(controller, config))
     }
 
     /// If the filesystem is a currently running component, returns its (relative) moniker.
@@ -93,15 +108,10 @@ impl Filesystem {
         })
     }
 
-    // Clone a Channel to the block device.
-    fn get_block_handle(
-        &self,
-    ) -> Result<fidl::endpoints::ClientEnd<fhardware_block::BlockMarker>, fidl::Error> {
+    fn clone_multiplexed_channel(&self) -> Result<zx::Channel, fidl::Error> {
         let (client, server) = fidl::endpoints::create_endpoints()?;
-        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
         let () = self.block_device.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server)?;
-        let client = client.into_channel();
-        Ok(client.into())
+        Ok(client.into_channel())
     }
 
     async fn get_component_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
@@ -183,7 +193,7 @@ impl Filesystem {
                 let exposed_dir = self.get_component_exposed_dir().await?;
                 let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
                 proxy
-                    .format(self.get_block_handle()?.into(), &mut format_options)
+                    .format(self.clone_multiplexed_channel()?.into(), &mut format_options)
                     .await?
                     .map_err(Status::from_raw)?;
             }
@@ -197,7 +207,7 @@ impl Filesystem {
                         // device handle is passed in as a PA_USER0 handle at argument 1
                         SpawnAction::add_handle(
                             HandleInfo::new(HandleType::User0, 1),
-                            self.get_block_handle()?.into_handle(),
+                            self.clone_multiplexed_channel()?.into(),
                         ),
                     ];
                     launch_process(&args, actions)?
@@ -219,13 +229,15 @@ impl Filesystem {
     ///
     /// Returns [`Err`] if the filesystem process failed to launch or returned a non-zero exit code.
     pub async fn fsck(&mut self) -> Result<(), Error> {
-        let handle = self.get_block_handle()?;
         match self.config.mode() {
             Mode::Component { .. } => {
                 let exposed_dir = self.get_component_exposed_dir().await?;
                 let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
                 let mut options = CheckOptions::new_empty();
-                proxy.check(handle, &mut options).await?.map_err(Status::from_raw)?;
+                proxy
+                    .check(self.clone_multiplexed_channel()?.into(), &mut options)
+                    .await?
+                    .map_err(Status::from_raw)?;
             }
             Mode::Legacy(mut config) => {
                 // SpawnAction is not Send, so make sure it is dropped before any `await`s.
@@ -236,7 +248,7 @@ impl Filesystem {
                         // device handle is passed in as a PA_USER0 handle at argument 1
                         SpawnAction::add_handle(
                             HandleInfo::new(HandleType::User0, 1),
-                            handle.into(),
+                            self.clone_multiplexed_channel()?.into(),
                         ),
                     ];
                     launch_process(&args, actions)?
@@ -263,7 +275,7 @@ impl Filesystem {
             let exposed_dir = self.get_component_exposed_dir().await?;
             let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
             proxy
-                .start(self.get_block_handle()?.into(), &mut start_options)
+                .start(self.clone_multiplexed_channel()?.into(), &mut start_options)
                 .await?
                 .map_err(Status::from_raw)?;
 
@@ -308,7 +320,7 @@ impl Filesystem {
             let exposed_dir = self.get_component_exposed_dir().await?;
             let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
             proxy
-                .start(self.get_block_handle()?.into(), &mut start_options)
+                .start(self.clone_multiplexed_channel()?.into(), &mut start_options)
                 .await?
                 .map_err(Status::from_raw)?;
 
@@ -343,7 +355,7 @@ impl Filesystem {
                 // device handle is passed in as a PA_USER0 handle at argument 1
                 SpawnAction::add_handle(
                     HandleInfo::new(HandleType::User0, 1),
-                    self.get_block_handle()?.into(),
+                    self.clone_multiplexed_channel()?.into(),
                 ),
             ];
 
@@ -766,7 +778,7 @@ mod tests {
     use {
         super::*,
         crate::{BlobCompression, BlobEvictionPolicy, Blobfs, F2fs, Factoryfs, Fxfs, Minfs},
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fuchsia_async as fasync,
         ramdevice_client::RamdiskClient,
         remote_block_device::{BlockClient as _, RemoteBlockClient},
         std::{
@@ -780,7 +792,8 @@ mod tests {
     }
 
     async fn new_fs<FSC: FSConfig>(ramdisk: &RamdiskClient, config: FSC) -> Filesystem {
-        Filesystem::from_channel(ramdisk.open().await.unwrap().into_channel(), config).unwrap()
+        let block = ramdisk.open().await.unwrap();
+        Filesystem::from_block_device(block, config).unwrap()
     }
 
     #[fuchsia::test]

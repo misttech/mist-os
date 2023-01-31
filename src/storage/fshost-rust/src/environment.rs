@@ -15,8 +15,8 @@ use {
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
     either::Either,
-    fidl::endpoints::{create_proxy, Proxy, ServerEnd},
-    fidl_fuchsia_device::ControllerProxy,
+    fidl::endpoints::{create_proxy, ClientEnd, ServerEnd},
+    fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_hardware_block_partition::Guid,
     fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
     fidl_fuchsia_io as fio,
@@ -221,10 +221,11 @@ impl Environment for FshostEnvironment {
                     None
                 };
 
+                // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+                let controller: ClientEnd<ControllerMarker> =
+                    device.client_end()?.into_channel().into();
+                let controller = controller.into_proxy()?;
                 // Once we unbind, the inner_device is no longer valid.
-                let controller = fidl_fuchsia_device::ControllerProxy::from_channel(
-                    device.proxy()?.into_channel().unwrap().into(),
-                );
                 controller.unbind_children().await?.map_err(zx::Status::from_raw)?;
                 copied_data
             }
@@ -294,7 +295,9 @@ pub struct FilesystemLauncher {
 impl FilesystemLauncher {
     async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error> {
         tracing::info!(path = %device.path(), %driver_path, "Binding driver to device");
-        let controller = ControllerProxy::new(device.proxy()?.into_channel().unwrap());
+        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+        let controller: ClientEnd<ControllerMarker> = device.client_end()?.into_channel().into();
+        let controller = controller.into_proxy()?;
         controller.bind(driver_path).await?.map_err(zx::Status::from_raw)?;
         Ok(())
     }
@@ -323,12 +326,10 @@ impl FilesystemLauncher {
             component_type: fs_management::ComponentType::StaticChild,
             ..Default::default()
         };
-        let fs = fs_management::filesystem::Filesystem::from_channel(
-            device.proxy()?.into_channel().unwrap().into(),
-            config,
-        )?
-        .serve()
-        .await?;
+        let block = device.client_end()?;
+        let fs = fs_management::filesystem::Filesystem::from_block_device(block, config)?
+            .serve()
+            .await?;
 
         Ok(Filesystem::Serving(fs))
     }
@@ -340,10 +341,8 @@ impl FilesystemLauncher {
         inside_zxcrypt: bool,
         copied_data: Option<copier::CopiedData>,
     ) -> Result<Filesystem, Error> {
-        let fs = fs_management::filesystem::Filesystem::from_channel(
-            device.proxy()?.into_channel().unwrap().into(),
-            config,
-        )?;
+        let block = device.client_end()?;
+        let fs = fs_management::filesystem::Filesystem::from_block_device(block, config)?;
         self.serve_data_from(device, fs, inside_zxcrypt, copied_data).await
     }
 
@@ -364,9 +363,11 @@ impl FilesystemLauncher {
         );
 
         let detected_format = device.content_format().await?;
-        let volume_proxy = fidl_fuchsia_hardware_block_volume::VolumeProxy::from_channel(
-            device.proxy()?.into_channel().unwrap(),
-        );
+        let volume_proxy = {
+            let volume: ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker> =
+                device.client_end()?.into_channel().into();
+            volume.into_proxy()?
+        };
 
         if detected_format != format {
             tracing::info!(
@@ -549,8 +550,10 @@ impl FilesystemLauncher {
         device: &mut dyn Device,
     ) -> Result<copier::CopiedData, Error> {
         tracing::info!(path = %device.topological_path(), "Copying data off device");
-        let mut minfs = Minfs::from_channel(device.proxy()?.into_channel().unwrap().into())
-            .context("making minfs filesystem")?;
+        // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+        let controller: ClientEnd<ControllerMarker> = device.client_end()?.into_channel().into();
+        let controller = controller.into_proxy()?;
+        let mut minfs = Minfs::new(controller);
         let mut fs = minfs.serve().await.context("serving minfs filesystem")?;
         let path = "/minfs-for-copying";
         fs.bind_to_path(path).context("binding minfs to path")?;

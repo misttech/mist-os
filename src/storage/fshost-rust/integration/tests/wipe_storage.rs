@@ -141,9 +141,9 @@ async fn blobfs_formatted() {
 
     // Mount Blobfs and write a blob.
     {
-        let block = device_watcher::wait_for_device_with(&dev, |info| {
+        let controller = device_watcher::wait_for_device_with(&dev, |info| {
             info.topological_path.ends_with("/fvm/blobfs-p-1/block").then(|| {
-                connect_to_named_protocol_at_dir_root::<fidl_fuchsia_hardware_block::BlockMarker>(
+                connect_to_named_protocol_at_dir_root::<fidl_fuchsia_device::ControllerMarker>(
                     &dev,
                     info.filename,
                 )
@@ -152,11 +152,7 @@ async fn blobfs_formatted() {
         })
         .await
         .unwrap();
-        let blobfs = Blobfs::from_channel(block.into_channel().unwrap().into())
-            .unwrap()
-            .serve()
-            .await
-            .unwrap();
+        let blobfs = Blobfs::new(controller).serve().await.unwrap();
 
         let blobfs_root = blobfs.root();
         write_test_blob(blobfs_root).await;

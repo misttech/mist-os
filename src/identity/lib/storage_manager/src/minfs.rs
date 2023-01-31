@@ -29,7 +29,7 @@ where
     DM: DiskManager,
 {
     disk_manager: DM,
-    state: Arc<Mutex<State<(DM::EncryptedBlockDevice, DM::Minfs)>>>,
+    state: Arc<Mutex<State<(DM::EncryptedBlockDevice, DM::ServingMinfs)>>>,
 }
 
 impl<DM> StorageManager<DM>
@@ -102,17 +102,12 @@ where
             error!("provision_new_account: couldn't unseal encrypted block device: {}", err);
             AccountManagerError::new(AccountApiError::Internal).with_cause(err)
         })?;
-        let () = {
-            let fut = self.disk_manager.format_minfs(&unsealed_block);
-            fut.await.map_err(|err| {
-                error!(
-                    "provision_new_account: couldn't format minfs on inner block device: {}",
-                    err
-                );
-                AccountManagerError::new(AccountApiError::Resource).with_cause(err)
-            })?
-        };
-        let minfs = self.disk_manager.serve_minfs(unsealed_block).await.map_err(|err| {
+        let mut minfs = self.disk_manager.create_minfs(unsealed_block);
+        let () = self.disk_manager.format_minfs(&mut minfs).await.map_err(|err| {
+            error!("provision_new_account: couldn't format minfs on inner block device: {}", err);
+            AccountManagerError::new(AccountApiError::Resource).with_cause(err)
+        })?;
+        let minfs = self.disk_manager.serve_minfs(minfs).await.map_err(|err| {
             error!(
                 "provision_new_account: couldn't serve minfs on inner unsealed block \
                        device: {}",
@@ -160,7 +155,8 @@ where
             }
         }?;
 
-        let minfs = self.disk_manager.serve_minfs(block_device).await.map_err(|err| {
+        let minfs = self.disk_manager.create_minfs(block_device);
+        let minfs = self.disk_manager.serve_minfs(minfs).await.map_err(|err| {
             error!("unseal_account: couldn't serve minfs: {}", err);
             AccountManagerError::new(AccountApiError::Resource).with_cause(err)
         })?;

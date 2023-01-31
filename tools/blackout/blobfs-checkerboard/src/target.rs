@@ -7,6 +7,7 @@ use {
     async_trait::async_trait,
     blackout_target::{Test, TestServer},
     byteorder::{NativeEndian, ReadBytesExt, WriteBytesExt},
+    fidl_fuchsia_device::ControllerMarker,
     fidl_fuchsia_io as fio,
     fs_management::Blobfs,
     fuchsia_fs::directory::readdir,
@@ -60,8 +61,9 @@ impl Test for BlobfsCheckerboard {
         );
         let block_device =
             blackout_target::set_up_partition(&device_label, device_path.as_deref(), true).await?;
-        tracing::info!("using block device: {}", block_device);
-        let mut blobfs = Blobfs::new(&block_device)?;
+        let path = block_device.get_topological_path().await?.map_err(zx::Status::from_raw)?;
+        tracing::info!("using block device: {}", path);
+        let mut blobfs = Blobfs::new(block_device);
 
         let mut rng = StdRng::seed_from_u64(seed);
 
@@ -103,10 +105,11 @@ impl Test for BlobfsCheckerboard {
             device_label,
             device_path
         );
+        let path = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
+        tracing::info!("using block device: {}", &path);
         let block_device =
-            blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
-        tracing::info!("using block device: {}", block_device);
-        let mut blobfs = Blobfs::new(&block_device)?;
+            fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(&path)?;
+        let mut blobfs = Blobfs::new(block_device);
 
         let mut rng = StdRng::seed_from_u64(seed);
 
@@ -226,10 +229,11 @@ impl Test for BlobfsCheckerboard {
             device_label,
             device_path
         );
+        let path = blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
+        tracing::info!("using block device: {}", &path);
         let block_device =
-            blackout_target::find_partition(&device_label, device_path.as_deref()).await?;
-        tracing::info!("using block device: {}", block_device);
-        let mut blobfs = Blobfs::new(&block_device)?;
+            fuchsia_component::client::connect_to_protocol_at_path::<ControllerMarker>(&path)?;
+        let mut blobfs = Blobfs::new(block_device);
 
         tracing::info!("verifying disk with fsck");
         blobfs.fsck().await.context("fsck failed")?;

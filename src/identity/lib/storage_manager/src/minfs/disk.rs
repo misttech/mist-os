@@ -4,8 +4,8 @@
 
 use {
     async_trait::async_trait,
-    fidl::endpoints::{ProtocolMarker, ServerEnd},
-    fidl_fuchsia_device::ControllerMarker,
+    fidl::endpoints::ServerEnd,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_hardware_block_encrypted::{DeviceManagerMarker, DeviceManagerProxy},
     fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxyInterface},
     fidl_fuchsia_identity_account as faccount, fidl_fuchsia_io as fio,
@@ -118,13 +118,13 @@ async fn all_partitions(
     let dirents = fuchsia_fs::directory::readdir(&block_dir).await?;
     let mut partitions = Vec::new();
     for child in dirents {
-        match fuchsia_fs::directory::open_node_no_describe(
+        match fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
             &block_dir,
             &child.name,
             fio::OpenFlags::empty(),
             fio::MODE_TYPE_SERVICE,
         ) {
-            Ok(node_proxy) => partitions.push(DevBlockPartition(Node(node_proxy))),
+            Ok(controller) => partitions.push(DevBlockPartition(controller)),
             Err(err) => {
                 // Ignore failures to open any particular block device and just omit it from the
                 // listing.
@@ -163,7 +163,8 @@ pub trait DiskManager: Sync + Send {
     type BlockDevice: Send;
     type Partition: Partition<BlockDevice = Self::BlockDevice>;
     type EncryptedBlockDevice: EncryptedBlockDevice<BlockDevice = Self::BlockDevice>;
-    type Minfs: Minfs;
+    type Minfs: Send;
+    type ServingMinfs: Minfs;
 
     /// Returns a list of all block devices that are valid partitions.
     async fn partitions(&self) -> Result<Vec<Self::Partition>, DiskError>;
@@ -174,11 +175,14 @@ pub trait DiskManager: Sync + Send {
         block_dev: Self::BlockDevice,
     ) -> Result<Self::EncryptedBlockDevice, DiskError>;
 
+    // Create the minfs filesystem.
+    fn create_minfs(&self, block_dev: Self::BlockDevice) -> Self::Minfs;
+
     /// Format the minfs filesystem onto a block device.
-    async fn format_minfs(&self, block_dev: &Self::BlockDevice) -> Result<(), DiskError>;
+    async fn format_minfs(&self, minfs: &mut Self::Minfs) -> Result<(), DiskError>;
 
     /// Serves the minfs filesystem on the given block device.
-    async fn serve_minfs(&self, block_dev: Self::BlockDevice) -> Result<Self::Minfs, DiskError>;
+    async fn serve_minfs(&self, minfs: Self::Minfs) -> Result<Self::ServingMinfs, DiskError>;
 }
 
 /// The `Partition` trait provides a narrow interface for
@@ -248,7 +252,8 @@ impl DiskManager for DevDiskManager {
     type BlockDevice = DevBlockDevice;
     type Partition = DevBlockPartition;
     type EncryptedBlockDevice = EncryptedDevBlockDevice;
-    type Minfs = DevMinfs;
+    type Minfs = Filesystem;
+    type ServingMinfs = DevMinfs;
 
     async fn partitions(&self) -> Result<Vec<Self::Partition>, DiskError> {
         all_partitions(&self.dev_root).await
@@ -258,9 +263,8 @@ impl DiskManager for DevDiskManager {
         &self,
         block_dev: Self::BlockDevice,
     ) -> Result<Self::EncryptedBlockDevice, DiskError> {
-        let node = block_dev.0;
         let block_path = {
-            let controller = node.clone_as::<ControllerMarker>()?;
+            let DevBlockDevice(controller) = block_dev;
             // Bind the zxcrypt driver to the block device, which will result in
             // a zxcrypt subdirectory appearing under the block.
             match controller.bind("zxcrypt.so").await?.map_err(zx::Status::from_raw) {
@@ -297,55 +301,49 @@ impl DiskManager for DevDiskManager {
         Ok(EncryptedDevBlockDevice(block_dir))
     }
 
-    async fn format_minfs(&self, block_dev: &Self::BlockDevice) -> Result<(), DiskError> {
-        let node = block_dev.0.clone_as::<fio::NodeMarker>()?;
-        let mut minfs = Filesystem::from_node(node, fs::MinfsLegacy::default());
-        minfs.format().await.map_err(DiskError::MinfsFormatError)?;
+    fn create_minfs(&self, block_dev: Self::BlockDevice) -> Self::Minfs {
+        let DevBlockDevice(controller) = block_dev;
+        Filesystem::new(controller, fs::MinfsLegacy::default())
+    }
+
+    async fn format_minfs(&self, minfs: &mut Self::Minfs) -> Result<(), DiskError> {
+        let () = minfs.format().await.map_err(DiskError::MinfsFormatError)?;
         Ok(())
     }
 
-    async fn serve_minfs(&self, block_dev: Self::BlockDevice) -> Result<Self::Minfs, DiskError> {
-        let mut minfs = Filesystem::from_node(block_dev.0 .0, fs::MinfsLegacy::default());
+    async fn serve_minfs(&self, mut minfs: Self::Minfs) -> Result<Self::ServingMinfs, DiskError> {
         let serving_fs = minfs.serve().await.map_err(DiskError::MinfsServeError)?;
         Ok(DevMinfs { serving_fs })
     }
 }
 
-/// A convenience wrapper around a NodeProxy.
-struct Node(fio::NodeProxy);
-
-impl Node {
-    /// Clones the connection to the node and casts it as the protocol `T`.
-    pub fn clone_as<T: ProtocolMarker>(&self) -> Result<T::Proxy, DiskError> {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<T>()?;
-        self.0
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end.into_channel()))?;
-        Ok(proxy)
-    }
-}
-
 /// A production device block.
-pub struct DevBlockDevice(Node);
+pub struct DevBlockDevice(ControllerProxy);
 
 /// The production implementation of [`Partition`].
-pub struct DevBlockPartition(Node);
+pub struct DevBlockPartition(ControllerProxy);
 
 #[async_trait]
 impl Partition for DevBlockPartition {
     type BlockDevice = DevBlockDevice;
 
     async fn has_guid(&self, desired_guid: [u8; 16]) -> Result<bool, DiskError> {
-        let partition_proxy = self.0.clone_as::<PartitionMarker>()?;
+        let Self(controller) = self;
+        let (partition_proxy, server) = fidl::endpoints::create_proxy::<PartitionMarker>()?;
+        let () = controller.connect_to_device_fidl(server.into_channel())?;
         Ok(partition_has_guid(&partition_proxy, desired_guid).await)
     }
 
     async fn has_label(&self, desired_label: &str) -> Result<bool, DiskError> {
-        let partition_proxy = self.0.clone_as::<PartitionMarker>()?;
+        let Self(controller) = self;
+        let (partition_proxy, server) = fidl::endpoints::create_proxy::<PartitionMarker>()?;
+        let () = controller.connect_to_device_fidl(server.into_channel())?;
         Ok(partition_has_label(&partition_proxy, desired_label).await)
     }
 
     fn into_block_device(self) -> Self::BlockDevice {
-        DevBlockDevice(self.0)
+        let Self(controller) = self;
+        DevBlockDevice(controller)
     }
 }
 
@@ -388,13 +386,13 @@ impl EncryptedBlockDevice for EncryptedDevBlockDevice {
         .await?;
 
         wait_for_node(&unsealed_dir, "block").await?;
-        let unsealed_block_node = fuchsia_fs::directory::open_node_no_describe(
+        let unsealed_block = fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
             &unsealed_dir,
             "block",
             fio::OpenFlags::empty(),
             fio::MODE_TYPE_SERVICE,
         )?;
-        Ok(DevBlockDevice(Node(unsealed_block_node)))
+        Ok(DevBlockDevice(unsealed_block))
     }
 
     async fn seal(&self) -> Result<(), DiskError> {
@@ -625,6 +623,16 @@ pub mod test {
                                 ServerEnd::<MockPartitionMarker>::new(object.into_channel())
                                     .into_stream()
                                     .unwrap();
+                            scope.spawn(Arc::clone(&self).handle_requests_for_stream(
+                                scope.clone(),
+                                id,
+                                stream,
+                            ));
+                        }
+                        MockPartitionRequest::ConnectToDeviceFidl { server, control_handle: _ } => {
+                            let stream = ServerEnd::<MockPartitionMarker>::new(server)
+                                .into_stream()
+                                .unwrap();
                             scope.spawn(Arc::clone(&self).handle_requests_for_stream(
                                 scope.clone(),
                                 id,
@@ -930,15 +938,8 @@ pub mod test {
         let disk_manager = DevDiskManager::new(serve_mock_devfs(&scope, mock_devfs));
         let mut partitions = disk_manager.partitions().await.expect("list partitions");
         let block_device = partitions.remove(0).into_block_device();
-        let cloned_block =
-            DevBlockDevice(Node(block_device.0.clone_as::<fio::NodeMarker>().expect("clone")));
         let _ = disk_manager
             .bind_to_encrypted_block(block_device)
-            .await
-            .expect("bind_to_encrypted_block");
-
-        let _ = disk_manager
-            .bind_to_encrypted_block(cloned_block)
             .await
             .expect("bind_to_encrypted_block");
 
