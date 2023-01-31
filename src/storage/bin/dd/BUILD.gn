@@ -5,6 +5,7 @@
 executable("dd") {
   sources = [ "main.cc" ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
@@ -14,5 +15,6 @@ executable("dd") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/storage/buffer",
     "//zircon/system/ulib/zx",
+    "//zircon/third_party/ulib/safemath",
   ]
 }
