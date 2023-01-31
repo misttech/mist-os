@@ -30,6 +30,11 @@
             ],
         },
         {
+            storage: "tmp",
+            from: "parent",
+            to: [ "#starnix_test_runner" ],
+        },
+        {
             protocol: [
                 "fuchsia.kernel.VmexResource",
                 "fuchsia.process.Launcher",

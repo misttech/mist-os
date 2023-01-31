@@ -3,6 +3,7 @@
     features: [
         "wayland",
         "custom_artifacts",
+        "test_data",
     ],
     init: [],
     init_user: "root:x:0:0",

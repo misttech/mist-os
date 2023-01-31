@@ -301,6 +301,9 @@ fn create_fs_context(
     if config.features.contains(&"custom_artifacts".to_string()) {
         mappings.push((b"custom_artifacts".to_vec(), TmpFs::new_fs(kernel)));
     }
+    if config.features.contains(&"test_data".to_string()) {
+        mappings.push((b"test_data".to_vec(), TmpFs::new_fs(kernel)));
+    }
     let root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
 
     Ok(FsContext::new(root_fs))

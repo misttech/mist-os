@@ -10,7 +10,7 @@
             ],
         },
         {
-            type: "expect_failure",
+            type: "skip",
             matchers: [
                 // TODO(https://fxbug.dev/97514): Make these tests pass in Starnix then enable.
                 "MapGrowsdownTest.Mprotect*",

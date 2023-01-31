@@ -510,6 +510,7 @@
             from: "self",
             to: [
                 "#starnix-tests",
+                "#starnix_test_runners",
                 "#system-tests",
                 "#tests",
             ],

@@ -72,6 +72,16 @@ pub async fn start_component(
         mount_custom_artifacts(&galaxy, &custom_artifacts)?;
     }
 
+    // Mount `/test_data`, used for gtest output files.
+    if let Some(directory) = ns
+        .iter_mut()
+        .find(|entry| entry.path == Some("/test_data".to_string()))
+        .and_then(|entry| entry.directory.take())
+    {
+        let test_data = fio::DirectorySynchronousProxy::new(directory.into_channel());
+        mount_test_data(&galaxy, &test_data)?;
+    }
+
     let args = get_program_strvec(&start_info, "args")
         .map(|args| {
             args.iter()
@@ -205,6 +215,22 @@ fn mount_custom_artifacts(
     // Create the filesystem and mount it.
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
     let fs = create_remotefs_filesystem(&galaxy.kernel, custom_artifacts, rights, ".")?;
+    mount_point.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
+    Ok(())
+}
+
+fn mount_test_data(
+    galaxy: &Galaxy,
+    test_data: &fio::DirectorySynchronousProxy,
+) -> Result<(), Error> {
+    const PATH: &str = "/test_data";
+
+    // Create the new directory.
+    let mount_point = galaxy.system_task.lookup_path_from_root(PATH.as_bytes())?;
+
+    // Create the filesystem and mount it.
+    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+    let fs = create_remotefs_filesystem(&galaxy.kernel, test_data, rights, ".")?;
     mount_point.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
     Ok(())
 }

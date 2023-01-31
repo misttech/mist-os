@@ -11,7 +11,6 @@ group("gvisor") {
   deps = [
     # The benchmarks aren't currently enabled by default in CQ.
     #":starnix_gvisor_benchmarks",
-    ":starnix_gvisor_sequential_tests",
     ":starnix_gvisor_tests",
   ]
 }
@@ -314,14 +313,6 @@ zip_resource("gvisor_runfiles") {
   dest_prefix = "data/tests"
 }
 
-sequential_gvisor_tests = [
-  "raw_socket_icmp_test",
-  "raw_socket_test",
-  "socket_ipv4_udp_unbound_loopback_test",
-  "socket_unix_unbound_abstract_test",
-  "unlink_test",
-]
-
 starbionic_test_package_with_expectations("starnix_gvisor_tests") {
   deps = [
     ":gvisor_runfiles",
@@ -334,17 +325,11 @@ starbionic_test_package_with_expectations("starnix_gvisor_tests") {
     test_components += [ ":${test_name}" ]
   }
 
-  foreach(test_name, sequential_gvisor_tests) {
-    test_components -= [ ":${test_name}" ]
-  }
-
   expectations = "expectations/default.json5"
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
-    parallel = 100
-    timeout_secs = 600
   }
 
   # TODO(fxbug.dev/114774): Flaky test disabled on coverage.
@@ -356,27 +341,6 @@ starbionic_test_package_with_expectations("starnix_gvisor_tests") {
         tags = [ "disabled" ]
       },
     ]
-  }
-}
-
-# These tests contain cases that fail if run in parallel so run them sequentially.
-starbionic_test_package_with_expectations("starnix_gvisor_sequential_tests") {
-  deps = [
-    ":gvisor_runfiles",
-    "//src/connectivity/network/netstack:component",
-  ]
-
-  test_components = []
-
-  foreach(test_name, sequential_gvisor_tests) {
-    test_components += [ ":${test_name}" ]
-  }
-
-  expectations = "expectations/sequential.json5"
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
   }
 }
 

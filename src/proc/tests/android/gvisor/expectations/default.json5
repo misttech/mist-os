@@ -22,7 +22,6 @@
                 "AffinityTest.ConsistentWithProcCpuInfo",
                 "AffinityTest.ConsistentWithProcStat",
                 "AffinityTest.Sanity",
-                "AffinityTest.SchedSetAffinityInvalidSize",
 
                 // aio_test
                 "AIOTest.BasicWrite",
@@ -41,7 +40,6 @@
                 "BadOffset/AIOReadWriteParamTest.BadOffset/2",
 
                 // chroot_test
-                "ChrootTest.PermissionDenied",
                 "ChrootTest.ProcMemSelfFdsNoEscapeProcOpen",
                 "ChrootTest.ProcMountsMountinfoNoEscape",
 
@@ -103,7 +101,6 @@
                 "ExecveatTest.AbsolutePathWithEmptyPathFlag",
                 "ExecveatTest.RelativePathWithEmptyPathFlag",
                 "ExecveatTest.SymlinkNoFollowWithRelativePath",
-                "ExecveatTest.UnshareFiles",
                 "ExecveatTest.SymlinkNoFollowWithAbsolutePath",
                 "ExecveatTest.SymlinkNoFollowAndEmptyPath",
                 "ExecveatTest.SymlinkNoFollowIgnoreSymlinkAncestor",
@@ -202,10 +199,6 @@
                 "ForkTest.Alarm",
                 "CloneTest.NewUserNamespacePermitsAllOtherNamespaces",
                 "CloneTest.NonCanonicalTLS",
-
-                // fpsig_fork_test
-                "FPSigTest.ForkWithZeroMxcsr",
-                "FPSigTest.Fork",
 
                 // fpsig_nested_test
                 "FPSigTest.NestedSignals",
@@ -408,7 +401,6 @@
                 "MlockTest.MadviseDontneed",
 
                 // mmap_test
-                "MMapDeathTest.TruncateAfterCOWBreak",
                 "MMapTest.MapDevZeroShared",
                 "MMapTest.MapDevZeroPrivate",
                 "MMapTest.MapDevZeroNoPersistence",
@@ -417,25 +409,17 @@
                 "MMapTest.MapDevZeroSegfaultAfterUnmap",
                 "MMapTest.MapDevZeroUnaligned",
                 "MMapTest.MapLocked",
-                "MMapTest.ProtNoneDeath",
-                "MMapTest.ReadOnlyDeath",
-                "MMapTest.MprotectReadOnlyDeath",
                 "MMapTest.MprotectHugeLength",
-                "MMapTest.NoProtExecDeath",
                 "MMapTest.NoExceedLimitData",
                 "MMapTest.ExceedLimitData",
                 "MMapTest.ExceedLimitDataPrlimit",
                 "MMapTest.ExceedLimitDataPrlimitPID",
                 "MMapTest.NoExceedLimitAS",
                 "MMapTest.ExceedLimitAS",
-                "MMapFileTest.MapOffsetBeyondEnd",
                 "MMapFileTest.MapLastPositivePage",
                 "MMapFileTest.MapFirstNegativePage",
                 "MMapFileTest.MapSecondToLastNegativePage",
                 "MMapFileTest.MapLastNegativePage",
-                "MMapFileTest.ReadSharedTruncateSIGBUS",
-                "MMapFileTest.WriteSharedTruncateSIGBUS",
-                "ReadWriteSharedPrivate/MMapFileParamTest.SigBusDeath/*",
 
                 // mount_test
                 "MountTest.OpenFileBusy",
@@ -456,7 +440,6 @@
                 "MountTest.TmpfsEmptySizeAllocCheck",
                 "MountTest.TmpfsSizePartialWriteSinglePage",
                 "MountTest.TmpfsSizePartialWriteMultiplePages",
-                "MountTest.TmpfsSizeMmap",
                 "MountTest.BindToSelf",
                 "MountTest.MaxMounts",
                 "MountTest.MakeShared",
@@ -475,11 +458,6 @@
                 "MountTest.BindPeerGroupsWithChildren",
                 "MountTest.BindParentToChild",
                 "MountTest.MountInfoHasRoot",
-
-                // mremap_test - https://fxbug.dev/79303
-                // Skip the only death test since Starnix doesn't support handling SIGBUS
-                // for processes.
-                "MremapDeathTest.SharedAnon",
 
                 // msgqueue_test
                 "MsgqueueTest.MsgCtlIpcSet",
@@ -785,6 +763,26 @@
                 // pselect_test
                 "PselectTest.SignalMaskBlocksSignal", // maybe flaky
 
+                // raw_socket_icmp
+                "RawSocketICMPTest.IPv6ChecksumNotSupported",
+                "RawSocketICMPTest.ICMPv6FilterNotSupported",
+                "RawSocketICMPTest.SendAndReceiveBadChecksum",
+                "RawSocketICMPTest.SendAndReceive",
+                "RawSocketICMPTest.MultipleSocketReceive",
+                "RawSocketICMPTest.RawAndPingSockets",
+                "RawSocketICMPTest.SendAndReceiveViaConnect",
+                "RawSocketICMPTest.BindSendAndReceive",
+                "RawSocketICMPTest.BindConnectSendAndReceive",
+
+                // raw_socket_test
+                "RawSocketTest.ReceiveIPPacketInfo",
+                "RawSocketTest.ReceiveIPv6PacketInfo",
+                "RawSocketTest.ReceiveTOS",
+                "RawSocketTest.ReceiveTClass",
+                "RawSocketTest.ReceiveTTL",
+                "RawSocketTest.ReceiveHopLimit",
+                "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
+
                 // readahead_test
                 "ReadaheadTest.WriteOnly",
                 "ReadaheadTest.UnsupportedFile",
@@ -839,10 +837,8 @@
 
                 // sigaltstack_test - https://fxbug.dev/79359
                 "SigaltstackTest.ResetByExecve",
-                "SigaltstackTest.SetCurrentStack",
 
                 // signalfd_test
-                "Signalfd.KillStillKills",
                 "Signalfd/SignalfdTest.SetMask/kSigno",
                 "Signalfd/SignalfdTest.SetMask/kSignoMax",
 
@@ -934,6 +930,22 @@
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.IpMulticastIfSetNic/*",
                 "IPv4Sockets/IPv4DatagramBasedUnboundSocketTest.TestMultipleJoinsOnSingleSocket/*",
 
+                // socket_ipv4_udp_unbound_loopback_test
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNicNoDefaultSendIf/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNic/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfaceIndexAndAddr/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNic/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicConnect/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelf/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfConnect/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfNoLoop/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastDropNic/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestTwoSocketsJoinSameMulticastGroup/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestBindToMcastThenJoinThenReceive/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPPKTINFO/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.SetAndReceiveIPReceiveOrigDstAddr/*",
+                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastIPPacketInfo/*",
+
                 // socket_ipv4_udp_unbound_loopback_nogotsan_test
                 "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPConnectPortExhaustion/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPBindPortExhaustion/*",
@@ -992,6 +1004,13 @@
 
                 // socket_unix_seqpacket_local_test
                 "SeqpacketUnixSockets/SeqpacketUnixSocketPairTest.Sendto/*",
+
+                // socket_unix_unbound_abstract_test
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/0",
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/1",
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/2",
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.ListenZeroBacklog/3",
+                "AllUnixDomainSockets/UnboundAbstractUnixSocketPairTest.GetSockNamePartialLength/*",
 
                 // socket_unix_unbound_dgram_test
                 "AllUnixDomainSockets/UnboundDgramUnixSocketPairTest.Sendto/*",
@@ -1155,7 +1174,6 @@
                 "AllTimerTypes/TimerfdTest.BlockingPoll_SetTimeResetsExpirations/CLOCK_BOOTTIME",
 
                 // timers_test
-                "IntervalTimerTest.AlreadyPendingSignal",
                 "IntervalTimerTest.MultipleTimers",
                 "IntervalTimerTest.SingleShotSilent",
                 "IntervalTimerTest.PeriodicGroupDirectedSignal",
@@ -1168,12 +1186,6 @@
                 "IntervalTimerTest.PeriodicThreadDirectedSignal",
                 "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
-
-                // time_test
-                "TimeTest.VsyscallTime_InvalidAddressSIGSEGV",
-
-                // tkill_test
-                "TkillTest.ValidTIDAndRealSignal",
 
                 // truncate_test
                 "FixtureTruncateTest.Truncate",
@@ -1199,14 +1211,10 @@
                 // vfork_test: Unknown why this fails, this is theoretically implemented.
                 "VforkTest.ParentStopsUntilChildExecves",
 
-                // vsyscall_test
-                "VsyscallTest.VsyscallAlwaysAvailableOnGvisor",
-
                 // wait_test - https://fxbug.dev/79451
                 "WaitTest.KillZombie",
                 "WaitTest.Wait4Rusage",
                 "WaitTest.WaitidRusage",
-                "WaitTest.TraceeWALL",
                 "Waiters/WaitAnyChildTest.WaitedChildRusage/*",
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",
@@ -1305,6 +1313,10 @@
 
                 // These tests are flaky.
                 "FcntlTest.SetFdO_ASYNC",
+                "AllInetTests/RawSocketTest.SendAndReceive/*",
+                "AllInetTests/RawSocketTest.MultipleSocketReceive/*",
+                "AllInetTests/RawSocketTest.RecvBufLimitsEmptyRecvBuffer/*",
+                "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
                 "UnameTest.Sanity",
 
                 // TODO: These tests have different outcomes in socket_domain_test and
@@ -1321,6 +1333,40 @@
                 "Waiters/WaitSpecificChildTest.CloneAfterExit/*",
                 "Waiters/WaitSpecificChildTest.CloneWCLONE/*",
                 "Waiters/WaitSpecificChildTest.WALL/*",
+
+                // mremap_test - https://fxbug.dev/79303
+                // Skip the only death test since Starnix doesn't support handling SIGBUS
+                // for processes.
+                "MremapDeathTest.SharedAnon",
+
+                // These tests cause fatal signals that crash the test suite.
+                "AffinityTest.SchedSetAffinityInvalidSize",
+                "ExecveatTest.UnshareFiles",
+                "FaultTest.InRange",
+                "FPSigTest.Fork",
+                "FPSigTest.ForkWithZeroMxcsr",
+                "MMapDeathTest.TruncateAfterCOWBreak",
+                "MMapTest.ProtNoneDeath",
+                "MMapTest.ReadOnlyDeath",
+                "MMapTest.MprotectReadOnlyDeath",
+                "MMapTest.NoProtExecDeath",
+                "MMapFileTest.MapOffsetBeyondEnd",
+                "MMapFileTest.ReadSharedTruncateSIGBUS",
+                "MMapFileTest.WriteSharedTruncateSIGBUS",
+                "ReadWriteSharedPrivate/MMapFileParamTest.SigBusDeath/*",
+                "MountTest.TmpfsSizeMmap",
+                "SigaltstackTest.SetCurrentStack",
+                "Signalfd.KillStillKills",
+                "IntervalTimerTest.AlreadyPendingSignal",
+                "TimeTest.VsyscallTime_InvalidAddressSIGSEGV",
+                "TkillTest.ValidTIDAndRealSignal",
+                "VsyscallTest.VsyscallAlwaysAvailableOnGvisor",
+
+                // Causes some other wait tests to fail.
+                "WaitTest.TraceeWALL",
+
+                // Causes the other chroot tests to fail.
+                "ChrootTest.PermissionDenied",
             ],
         },
     ],

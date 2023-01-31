@@ -6,34 +6,24 @@ use {
     crate::helpers::*,
     anyhow::{anyhow, Error},
     fidl::endpoints::create_proxy,
-    fidl::HandleBased,
-    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_process as fprocess,
-    fidl_fuchsia_test::{self as ftest},
-    fuchsia_async as fasync, fuchsia_runtime as fruntime, fuchsia_zircon as zx,
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    fidl_fuchsia_test::{self as ftest, Result_ as TestResult, Status},
+    frunner::ComponentNamespaceEntry,
+    fuchsia_zircon as zx,
     fuchsia_zircon::sys::ZX_CHANNEL_MAX_MSG_BYTES,
-    futures::io::AsyncReadExt,
     futures::TryStreamExt,
+    gtest_runner_lib::parser::*,
     rust_measure_tape_for_case::Measurable as _,
-    std::num::NonZeroUsize,
-    test_runners_lib::elf::{KernelError, SuiteServerError},
-    test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter},
+    std::collections::HashMap,
+    test_runners_lib::cases::TestCaseInfo,
+    test_runners_lib::elf::SuiteServerError,
 };
 
-const NEWLINE: u8 = b'\n';
-const PREFIXES_TO_EXCLUDE: [&[u8]; 10] = [
-    "Note: Google Test filter".as_bytes(),
-    " 1 FAILED TEST".as_bytes(),
-    "  YOU HAVE 1 DISABLED TEST".as_bytes(),
-    "[==========]".as_bytes(),
-    "[----------]".as_bytes(),
-    "[ RUN      ]".as_bytes(),
-    "[  PASSED  ]".as_bytes(),
-    "[  FAILED  ]".as_bytes(),
-    "[  SKIPPED ]".as_bytes(),
-    "[       OK ]".as_bytes(),
-];
-const SOCKET_BUFFER_SIZE: usize = 4096;
+const DYNAMIC_SKIP_RESULT: &str = "SKIPPED";
+
+const LIST_TESTS_ARG: &str = "list_tests";
+const FILTER_ARG: &str = "filter=";
+const OUTPUT_ARG: &str = "output=json:/test_data/";
 
 pub enum TestType {
     Gtest,
@@ -66,46 +56,42 @@ pub fn test_type(program: &fdata::Dictionary) -> TestType {
     }
 }
 
-/// Runs the test component with `--gunit_list_tests` and returns the parsed test cases from stdout
+/// Runs the test component with `--gunit_list_tests` and returns the parsed test cases
 /// in response to `ftest::CaseIteratorRequest::GetNext`.
 pub async fn handle_case_iterator_for_gtests(
     mut start_info: frunner::ComponentStartInfo,
     starnix_kernel: &frunner::ComponentRunnerProxy,
     mut stream: ftest::CaseIteratorRequestStream,
 ) -> Result<(), Error> {
+    // Replace the program args to get test cases in a json file.
     let test_type = test_type(start_info.program.as_ref().unwrap());
-    let list_tests_arg = match test_type {
-        TestType::Gtest => "--gtest_list_tests",
-        TestType::Gunit => "--gunit_list_tests",
-        _ => {
-            return Err(anyhow!("Unknown test type"));
-        }
-    };
-
-    let (test_stdout, stdout_client) = zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
-    let stdout_handle_info = fprocess::HandleInfo {
-        handle: test_stdout.into_handle(),
-        id: fruntime::HandleInfo::new(fruntime::HandleType::FileDescriptor, 1).as_raw(),
-    };
-
-    let (_component_controller, component_controller_server_end) =
-        create_proxy::<frunner::ComponentControllerMarker>()?;
-    let numbered_handles = Some(vec![stdout_handle_info]);
-    start_info.numbered_handles = numbered_handles;
-
-    // Replace the program args with `gunit_list_tests`.
-    replace_program_args(vec![list_tests_arg.to_string()], start_info.program.as_mut().unwrap());
+    let list_tests_arg = format_arg(&test_type, LIST_TESTS_ARG)?;
+    let output_file_name = unique_filename();
+    let output_path = format!("{}{}", OUTPUT_ARG, output_file_name);
+    let output_arg = format_arg(&test_type, &output_path)?;
+    replace_program_args(
+        vec![list_tests_arg, output_arg],
+        start_info.program.as_mut().expect("No program."),
+    );
 
     let (outgoing_dir, _outgoing_dir_server) = zx::Channel::create();
     start_info.outgoing_dir = Some(outgoing_dir.into());
+    start_info.numbered_handles = Some(vec![]);
+    let output_dir = add_output_dir_to_namespace(&mut start_info)?;
 
-    starnix_kernel.start(start_info, component_controller_server_end)?;
+    let component_controller = start_test_component(start_info, starnix_kernel)?;
+    let _ = read_result(component_controller.take_event_stream()).await;
 
-    // Parse tests out of logs from stdout.
-    let logger_stream = LoggerStream::new(fidl::Socket::from_handle(stdout_client.into_handle()))?;
-    let log_reader = LogStreamReader::new(logger_stream);
-    let logs = log_reader.get_logs().await?;
-    let mut iter = parse_gtests(&logs).into_iter();
+    // Parse tests from output file.
+    let read_content = read_file(&output_dir, &output_file_name)
+        .await
+        .expect("Failed to read tests from output file.");
+    let tests = parse_test_cases(read_content).expect("Failed to parse tests.");
+    let mut iter = tests.iter().map(|TestCaseInfo { name, enabled }| ftest::Case {
+        name: Some(name.clone()),
+        enabled: Some(*enabled),
+        ..ftest::Case::EMPTY
+    });
 
     while let Some(event) = stream.try_next().await? {
         match event {
@@ -137,234 +123,149 @@ pub async fn handle_case_iterator_for_gtests(
 /// stdout logs are filtered before they're reported to the test framework.
 ///
 /// # Parameters
-/// - `test`: The test invocation to run.
+/// - `tests`: The test invocations to run.
 /// - `start_info`: The component start info of the test to run.
 /// - `run_listener_proxy`: The proxy used to communicate results of the test run to the test
 ///                         framework.
 /// - `starnix_kernel`: The kernel in which to run the test component.
 /// - `test_type`: The type of test to run, used to determine which arguments to pass to the test.
-pub async fn run_gtest_case(
-    test: ftest::Invocation,
+pub async fn run_gtest_cases(
+    tests: Vec<ftest::Invocation>,
     mut start_info: frunner::ComponentStartInfo,
     run_listener_proxy: &ftest::RunListenerProxy,
     starnix_kernel: &frunner::ComponentRunnerProxy,
     test_type: &TestType,
 ) -> Result<(), Error> {
-    // Start a starnix kernel.
-    let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
-    // Create additional sockets to filter the test's stdout logs before reporting them to
-    // the test framework.
-    let test_name = test.name.clone().expect("No test name.");
-    let (test_framework_stdout, framework_stdout_client) =
-        zx::Socket::create(zx::SocketOpts::STREAM).unwrap();
-
+    // Hacky - report an overall case to see all of stdout/stderr.
+    let (overall_test_listener_proxy, overall_test_listener) =
+        create_proxy::<ftest::CaseListenerMarker>()?;
     run_listener_proxy.on_test_case_started(
-        test,
+        ftest::Invocation {
+            name: Some(start_info.resolved_url.clone().unwrap_or_default()),
+            tag: None,
+            ..ftest::Invocation::EMPTY
+        },
         ftest::StdHandles {
-            out: Some(framework_stdout_client),
+            out: Some(stdout_client),
             err: Some(stderr_client),
             ..ftest::StdHandles::EMPTY
         },
-        case_listener,
+        overall_test_listener,
     )?;
 
-    let test_filter_arg = match test_type {
-        TestType::Gtest => "--gtest_filter",
-        TestType::Gunit => "--gunit_filter",
-        _ => {
-            return Err(anyhow!("Unknown test type"));
-        }
-    };
+    let mut test_filter_arg = format_arg(test_type, FILTER_ARG)?;
+    let mut run_listener_proxies = HashMap::new();
+    for test in tests {
+        let test_name = test.name.clone().expect("No test name.");
+        test_filter_arg = format!("{}{}:", test_filter_arg, &test_name);
 
-    // Update program arguments to only run the test case.
+        let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
+        run_listener_proxy.on_test_case_started(
+            test,
+            ftest::StdHandles { ..ftest::StdHandles::EMPTY },
+            case_listener,
+        )?;
+
+        run_listener_proxies.insert(test_name, case_listener_proxy);
+    }
+
+    let output_file_name = unique_filename();
+    let output_path = format!("{}{}", OUTPUT_ARG, output_file_name);
+    let output_arg = format_arg(&test_type, &output_path)?;
     append_program_args(
-        vec![format!("{test_filter_arg}={test_name}")],
-        &mut start_info.program.as_mut().unwrap(),
+        vec![test_filter_arg, output_arg],
+        start_info.program.as_mut().expect("No program."),
     );
 
+    let output_dir = add_output_dir_to_namespace(&mut start_info)?;
+
     // Start the test component.
-    let component_controller = start_test_component(start_info, &starnix_kernel)?;
+    let component_controller = start_test_component(start_info, starnix_kernel)?;
+    let _ = read_result(component_controller.take_event_stream()).await;
+    overall_test_listener_proxy
+        .finished(TestResult { status: Some(Status::Passed), ..TestResult::EMPTY })?;
 
-    // Filter stdout logs to reduce spam.
-    let test_framework_stdout = fasync::Socket::from_socket(test_framework_stdout)
-        .map_err(KernelError::SocketToAsync)
-        .unwrap();
-    let mut test_framework_stdout = SocketLogWriter::new(test_framework_stdout);
-    filter_and_write_logs(fasync::Socket::from_socket(stdout_client)?, &mut test_framework_stdout)
-        .await?;
+    // Parse test results.
+    let mut read_content = read_file(&output_dir, &output_file_name)
+        .await
+        .expect("Failed to read test result file.")
+        .to_string();
+    read_content = read_content.trim().to_string();
+    let test_list: TestOutput =
+        serde_json::from_str(&read_content).expect("Failed to parse test results.");
 
-    // Read and report the result.
-    let result = read_result(component_controller.take_event_stream()).await;
-    case_listener_proxy.finished(result)?;
+    for suite in &test_list.testsuites {
+        for test in &suite.testsuite {
+            let name = format!("{}.{}", suite.name, test.name);
+            let status = match &test.status {
+                IndividualTestOutputStatus::NotRun => Status::Skipped,
+                IndividualTestOutputStatus::Run => match test.result.as_str() {
+                    DYNAMIC_SKIP_RESULT => Status::Skipped,
+                    _ => match &test.failures {
+                        Some(_failures) => Status::Failed,
+                        None => Status::Passed,
+                    },
+                },
+            };
+
+            let case_listener_proxy = run_listener_proxies
+                .remove(&name)
+                .unwrap_or_else(|| panic!("No case listener for test case {name}"));
+            case_listener_proxy
+                .finished(TestResult { status: Some(status), ..TestResult::EMPTY })?;
+        }
+    }
+
+    // Mark any tests without results as failed.
+    for (name, case_listener_proxy) in run_listener_proxies {
+        tracing::warn!("Did not receive result for {name}. Marking as failed.");
+        case_listener_proxy
+            .finished(TestResult { status: Some(Status::Failed), ..TestResult::EMPTY })?;
+    }
 
     Ok(())
 }
 
-/// Parses the bytes `tests` into gtest cases.
-fn parse_gtests(tests: &[u8]) -> Vec<ftest::Case> {
-    let test_string = String::from_utf8_lossy(tests);
-    let mut testcases = vec![];
-    let mut testsuite = "";
-    for test in test_string.split('\n') {
-        if test.starts_with("Running main() from") {
-            // Many gtest main() wrappers print the location of themselves before entering gtest, for example:
-            // https://github.com/google/googletest/blob/main/googletest/src/gtest_main.cc#L61
-            // Skip this line - it's not a test case.
-            continue;
-        }
-        let test = test.trim().split(' ').next();
-
-        match test {
-            Some(name) if !name.is_empty() => {
-                // --gunit_list_tests outputs test names in multiple lines with test suites
-                // separated from test cases.
-                // A regular test such as TestSuite.TestCase will look like
-                // TestSuite.
-                //     TestCase
-                // and a parameterized test TestSuites/TestSuite.TestCases/TestCase will look like
-                // TestSuites/TestSuite.
-                //     TestCases/TestCase
-                // Construct full test names by joining test suites with test cases.
-                if name.ends_with('.') {
-                    testsuite = name;
-                } else {
-                    testcases.push(ftest::Case {
-                        name: Some(format!("{}{}", testsuite, name)),
-                        enabled: None,
-                        ..ftest::Case::EMPTY
-                    });
-                }
-            }
-            _ => continue,
-        }
+fn format_arg(test_type: &TestType, test_arg: &str) -> Result<String, Error> {
+    match test_type {
+        TestType::Gtest => Ok(format!("--gtest_{}", test_arg)),
+        TestType::Gunit => Ok(format!("--gunit_{}", test_arg)),
+        TestType::Unknown => Err(anyhow!("Unknown test type")),
     }
-
-    testcases
 }
 
-/// Filters logs from `socket` and writes them to `writer`.
-async fn filter_and_write_logs(
-    mut socket: fasync::Socket,
-    writer: &mut SocketLogWriter,
-) -> Result<(), LogError> {
-    let mut last_line_excluded = false;
-    let mut socket_buf = vec![0u8; SOCKET_BUFFER_SIZE];
-    while let Some(bytes_read) =
-        NonZeroUsize::new(socket.read(&mut socket_buf[..]).await.map_err(LogError::Read)?)
-    {
-        let mut bytes = &socket_buf[..bytes_read.get()];
-
-        // Avoid printing trailing empty line
-        if *bytes.last().unwrap() == NEWLINE {
-            bytes = &bytes[..bytes.len() - 1];
-        }
-
-        let mut iter = bytes.split(|&x| x == NEWLINE);
-
-        while let Some(line) = iter.next() {
-            if line.len() == 0 && last_line_excluded {
-                // sometimes excluded lines print two newlines, we don't want to print blank
-                // output to user's screen.
-                continue;
-            }
-            last_line_excluded = PREFIXES_TO_EXCLUDE.iter().any(|p| line.starts_with(p));
-
-            if !last_line_excluded {
-                let line = [line, &[NEWLINE]].concat();
-                writer.write(&line).await?;
-            }
-        }
-    }
-    Ok(())
+fn unique_filename() -> String {
+    format!("test_result-{}.json", uuid::Uuid::new_v4())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+fn add_output_dir_to_namespace(
+    start_info: &mut frunner::ComponentStartInfo,
+) -> Result<fio::DirectoryProxy, Error> {
+    const TEST_DATA_DIR: &str = "/tmp/test_data";
 
-    #[fuchsia::test]
-    fn test_parse_test_cases() {
-        let stdout =
-            "TestSuite1.\n  TestCase1\n  TestCase2\nTestSuite2.\n  TestCase3\n  TestCase4\n"
-                .as_bytes();
+    let test_data_path = format!("{}/{}", TEST_DATA_DIR, uuid::Uuid::new_v4());
+    std::fs::create_dir_all(&test_data_path).expect("cannot create test output directory.");
+    let test_data_dir = fuchsia_fs::directory::open_in_namespace(
+        &test_data_path,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    )
+    .expect("Cannot open test data directory.");
 
-        assert_eq!(
-            parse_gtests(stdout),
-            vec![
-                ftest::Case {
-                    name: Some("TestSuite1.TestCase1".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-                ftest::Case {
-                    name: Some("TestSuite1.TestCase2".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-                ftest::Case {
-                    name: Some("TestSuite2.TestCase3".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-                ftest::Case {
-                    name: Some("TestSuite2.TestCase4".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-            ]
-        )
-    }
+    let (dir_client, dir_server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>()?;
+    test_data_dir
+        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, dir_server)
+        .expect("Couldn't clone output directory.");
+    let data_dir =
+        fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::new(dir_client.into_channel());
 
-    #[fuchsia::test]
-    fn test_parse_parameterized_test_cases() {
-        let stdout =
-"AllTestSuites/TestSuite1.\n
-  TestCase1/0  # GetParam() = 96-byte object <51-00 00-00 00-00 00-00 46-00 00-00 00-00 00-00 50-D2 DA-EC 50-00 00-00 01-00 00-00 01-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 70-47 0F-80 DD-03 00-00 01-B7 48-7E 01-00 00-00 01-00 00-00 00-00 00-00 00-00 00-00 00-00 ...\n
-  TestCase1/1  # GetParam() = 96-byte object <61-00 00-00 00-00 00-00 53-00 00-00 00-00 00-00 00-A3 DA-FC 50-00 00-00 01-00 00-00 01-08 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 70-47 0F-80 DD-03 00-00 01-B7 48-7E 01-00 00-00 01-08 00-00 00-00 00-00 00-00 00-00 00-00 ...\n
-  TestCase2/0  # GetParam() = 96-byte object <51-00 00-00 00-00 00-00 46-00 00-00 00-00 00-00 70-EE DA-EC 50-00 00-00 01-00 00-00 01-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 70-47 0F-80 DD-03 00-00 01-B7 48-7E 01-00 00-00 01-00 00-00 00-00 00-00 00-00 00-00 00-00 ...\n
-  TestCase2/1  # GetParam() = 96-byte object <61-00 00-00 00-00 00-00 53-00 00-00 00-00 00-00 10-91 DA-FC 50-00 00-00 01-00 00-00 01-08 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 70-47 0F-80 DD-03 00-00 01-B7 48-7E 01-00 00-00 01-08 00-00 00-00 00-00 00-00 00-00 00-00 ...\n
-AllTestSuites/TestSuite2.\n
-  TestCase3/0  # GetParam() = 96-byte object <51-00 00-00 00-00 00-00 46-00 00-00 00-00 00-00 D0-26 DC-EC 50-00 00-00 01-00 00-00 01-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 70-47 0F-80 DD-03 00-00 01-B7 48-7E 01-00 00-00 01-00 00-00 00-00 00-00 00-00 00-00 00-00 ...\n
-  TestCase3/1  # GetParam() = 96-byte object <61-00 00-00 00-00 00-00 53-00 00-00 00-00 00-00 70-3D DB-FC 50-00 00-00 01-00 00-00 01-08 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 00-00 70-47 0F-80 DD-03 00-00 01-B7 48-7E 01-00 00-00 01-08 00-00 00-00 00-00 00-00 00-00 00-00 ...\n
-".as_bytes();
+    start_info.ns.as_mut().ok_or(anyhow!("Missing namespace."))?.push(ComponentNamespaceEntry {
+        path: Some("/test_data".to_string()),
+        directory: Some(data_dir),
+        ..ComponentNamespaceEntry::EMPTY
+    });
 
-        assert_eq!(
-            parse_gtests(stdout),
-            vec![
-                ftest::Case {
-                    name: Some("AllTestSuites/TestSuite1.TestCase1/0".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-                ftest::Case {
-                    name: Some("AllTestSuites/TestSuite1.TestCase1/1".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-                ftest::Case {
-                    name: Some("AllTestSuites/TestSuite1.TestCase2/0".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-                ftest::Case {
-                    name: Some("AllTestSuites/TestSuite1.TestCase2/1".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-                ftest::Case {
-                    name: Some("AllTestSuites/TestSuite2.TestCase3/0".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-                ftest::Case {
-                    name: Some("AllTestSuites/TestSuite2.TestCase3/1".to_string()),
-                    enabled: None,
-                    ..ftest::Case::EMPTY
-                },
-            ]
-        )
-    }
+    Ok(test_data_dir)
 }

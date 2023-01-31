@@ -9,8 +9,7 @@ use {
     fidl::endpoints::create_proxy,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_test::{self as ftest},
-    futures::prelude::stream,
-    futures::{StreamExt, TryStreamExt},
+    futures::TryStreamExt,
 };
 
 /// Handles a single `ftest::SuiteRequestStream`.
@@ -67,22 +66,14 @@ pub async fn handle_suite_requests(
                 let run_listener_proxy =
                     listener.into_proxy().context("Can't convert run listener channel to proxy")?;
                 if test_type.is_gtest_like() {
-                    let num_parallel = options.parallel.unwrap_or(1);
-                    let tests = stream::iter(tests);
-                    tests
-                        .map(Ok)
-                        .try_for_each_concurrent(num_parallel as usize, |test| {
-                            let t_start_info = clone_start_info(&mut test_start_info)
-                                .expect("Failed start info clone");
-                            run_gtest_case(
-                                test,
-                                t_start_info,
-                                &run_listener_proxy,
-                                &starnix_kernel,
-                                &test_type,
-                            )
-                        })
-                        .await?;
+                    run_gtest_cases(
+                        tests,
+                        test_start_info,
+                        &run_listener_proxy,
+                        &starnix_kernel,
+                        &test_type,
+                    )
+                    .await?;
                 } else {
                     if !tests.is_empty() {
                         run_test_case(
@@ -121,7 +112,6 @@ pub async fn handle_suite_requests(
 /// - `test_url`: The URL of the test component.
 /// - `program`: The program data associated with the runner request for the test component.
 /// - `run_listener_proxy`: The listener proxy for the test run.
-/// - `namespace`: The incoming namespace to provide to the test component.
 /// - `starnix_kernel`: The instance of the starnix kernel that will run the test component.
 async fn run_test_case(
     test: ftest::Invocation,

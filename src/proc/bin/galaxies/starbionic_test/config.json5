@@ -4,6 +4,7 @@
     ],
     features: [
         "binder",
+        "test_data",
     ],
     init: [],
     init_user: "root:x:0:0",
