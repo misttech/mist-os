@@ -173,49 +173,51 @@ void Nvme::DdkInit(ddk::InitTxn txn) {
   txn.Reply(status);
 }
 
-static void PopulateVersionInspect(const VersionReg& version_reg, inspect::Inspector* inspect) {
-  auto version = inspect->GetRoot().CreateChild("version");
-  version.CreateInt("major", version_reg.major(), inspect);
-  version.CreateInt("minor", version_reg.minor(), inspect);
-  version.CreateInt("tertiary", version_reg.tertiary(), inspect);
-  inspect->emplace(std::move(version));
+static void PopulateVersionInspect(const VersionReg& version_reg, inspect::Node* inspect_node,
+                                   inspect::Inspector* inspector) {
+  auto version = inspect_node->CreateChild("version");
+  version.CreateInt("major", version_reg.major(), inspector);
+  version.CreateInt("minor", version_reg.minor(), inspector);
+  version.CreateInt("tertiary", version_reg.tertiary(), inspector);
+  inspector->emplace(std::move(version));
 }
 
 static void PopulateCapabilitiesInspect(const CapabilityReg& caps_reg,
-                                        const VersionReg& version_reg,
-                                        inspect::Inspector* inspect) {
-  auto caps = inspect->GetRoot().CreateChild("capabilities");
+                                        const VersionReg& version_reg, inspect::Node* inspect_node,
+                                        inspect::Inspector* inspector) {
+  auto caps = inspect_node->CreateChild("capabilities");
   if (version_reg >= VersionReg::FromVer(1, 4, 0)) {
     caps.CreateBool("controller_ready_independent_media_supported",
-                    caps_reg.controller_ready_independent_media_supported(), inspect);
+                    caps_reg.controller_ready_independent_media_supported(), inspector);
     caps.CreateBool("controller_ready_with_media_supported",
-                    caps_reg.controller_ready_with_media_supported(), inspect);
+                    caps_reg.controller_ready_with_media_supported(), inspector);
   }
-  caps.CreateBool("subsystem_shutdown_supported", caps_reg.subsystem_shutdown_supported(), inspect);
+  caps.CreateBool("subsystem_shutdown_supported", caps_reg.subsystem_shutdown_supported(),
+                  inspector);
   caps.CreateBool("controller_memory_buffer_supported",
-                  caps_reg.controller_memory_buffer_supported(), inspect);
+                  caps_reg.controller_memory_buffer_supported(), inspector);
   caps.CreateBool("persistent_memory_region_supported",
-                  caps_reg.persistent_memory_region_supported(), inspect);
-  caps.CreateInt("memory_page_size_max_bytes", caps_reg.memory_page_size_max_bytes(), inspect);
-  caps.CreateInt("memory_page_size_min_bytes", caps_reg.memory_page_size_min_bytes(), inspect);
-  caps.CreateInt("controller_power_scope", caps_reg.controller_power_scope(), inspect);
-  caps.CreateBool("boot_partition_support", caps_reg.boot_partition_support(), inspect);
-  caps.CreateBool("no_io_command_set_support", caps_reg.no_io_command_set_support(), inspect);
+                  caps_reg.persistent_memory_region_supported(), inspector);
+  caps.CreateInt("memory_page_size_max_bytes", caps_reg.memory_page_size_max_bytes(), inspector);
+  caps.CreateInt("memory_page_size_min_bytes", caps_reg.memory_page_size_min_bytes(), inspector);
+  caps.CreateInt("controller_power_scope", caps_reg.controller_power_scope(), inspector);
+  caps.CreateBool("boot_partition_support", caps_reg.boot_partition_support(), inspector);
+  caps.CreateBool("no_io_command_set_support", caps_reg.no_io_command_set_support(), inspector);
   caps.CreateBool("identify_io_command_set_support", caps_reg.identify_io_command_set_support(),
-                  inspect);
-  caps.CreateBool("nvm_command_set_support", caps_reg.nvm_command_set_support(), inspect);
+                  inspector);
+  caps.CreateBool("nvm_command_set_support", caps_reg.nvm_command_set_support(), inspector);
   caps.CreateBool("nvm_subsystem_reset_supported", caps_reg.nvm_subsystem_reset_supported(),
-                  inspect);
-  caps.CreateInt("doorbell_stride_bytes", caps_reg.doorbell_stride_bytes(), inspect);
+                  inspector);
+  caps.CreateInt("doorbell_stride_bytes", caps_reg.doorbell_stride_bytes(), inspector);
   // TODO(fxbug.dev/102133): interpret CRTO register if version > 1.4
-  caps.CreateInt("ready_timeout_ms", caps_reg.timeout_ms(), inspect);
+  caps.CreateInt("ready_timeout_ms", caps_reg.timeout_ms(), inspector);
   caps.CreateBool("vendor_specific_arbitration_supported",
-                  caps_reg.vendor_specific_arbitration_supported(), inspect);
+                  caps_reg.vendor_specific_arbitration_supported(), inspector);
   caps.CreateBool("weighted_round_robin_arbitration_supported",
-                  caps_reg.weighted_round_robin_arbitration_supported(), inspect);
-  caps.CreateBool("contiguous_queues_required", caps_reg.contiguous_queues_required(), inspect);
-  caps.CreateInt("max_queue_entries", caps_reg.max_queue_entries(), inspect);
-  inspect->emplace(std::move(caps));
+                  caps_reg.weighted_round_robin_arbitration_supported(), inspector);
+  caps.CreateBool("contiguous_queues_required", caps_reg.contiguous_queues_required(), inspector);
+  caps.CreateInt("max_queue_entries", caps_reg.max_queue_entries(), inspector);
+  inspector->emplace(std::move(caps));
 }
 
 static void PopulateControllerInspect(const IdentifyController& identify,
@@ -224,8 +226,8 @@ static void PopulateControllerInspect(const IdentifyController& identify,
                                       uint16_t atomic_write_unit_power_fail,
                                       bool volatile_write_cache_present,
                                       bool volatile_write_cache_enabled,
-                                      inspect::Inspector* inspect) {
-  auto controller = inspect->GetRoot().CreateChild("controller");
+                                      inspect::Node* inspect_node, inspect::Inspector* inspector) {
+  auto controller = inspect_node->CreateChild("controller");
   auto model_number = std::string(identify.model_number, sizeof(identify.model_number));
   auto serial_number = std::string(identify.serial_number, sizeof(identify.serial_number));
   auto firmware_rev = std::string(identify.firmware_rev, sizeof(identify.firmware_rev));
@@ -237,52 +239,54 @@ static void PopulateControllerInspect(const IdentifyController& identify,
   zxlogf(INFO, "Model number:  '%s'", model_number.c_str());
   zxlogf(INFO, "Serial number: '%s'", serial_number.c_str());
   zxlogf(INFO, "Firmware rev.: '%s'", firmware_rev.c_str());
-  controller.CreateString("model_number", model_number, inspect);
-  controller.CreateString("serial_number", serial_number, inspect);
-  controller.CreateString("firmware_rev", firmware_rev, inspect);
-  controller.CreateInt("max_outstanding_commands", identify.max_cmd, inspect);
-  controller.CreateInt("num_namespaces", identify.num_namespaces, inspect);
-  controller.CreateInt("max_allowed_namespaces", identify.max_allowed_namespaces, inspect);
-  controller.CreateBool("sgl_support", identify.sgl_support & 3, inspect);
-  controller.CreateInt("max_data_transfer_bytes", max_data_transfer_bytes, inspect);
-  controller.CreateInt("sanitize_caps", identify.sanicap & 3, inspect);
-  controller.CreateInt("abort_command_limit", identify.acl + 1, inspect);
-  controller.CreateInt("asynch_event_req_limit", identify.aerl + 1, inspect);
-  controller.CreateInt("firmware_slots", (identify.frmw >> 1) & 3, inspect);
-  controller.CreateBool("firmware_reset", !(identify.frmw & (1 << 4)), inspect);
-  controller.CreateBool("firmware_slot1ro", identify.frmw & 1, inspect);
-  controller.CreateInt("host_buffer_min_pages", identify.hmmin, inspect);
-  controller.CreateInt("host_buffer_preferred_pages", identify.hmpre, inspect);
-  controller.CreateInt("capacity_total", identify.tnvmcap[0], inspect);
-  controller.CreateInt("capacity_unalloc", identify.unvmcap[0], inspect);
-  controller.CreateBool("volatile_write_cache_present", volatile_write_cache_present, inspect);
-  controller.CreateBool("volatile_write_cache_enabled", volatile_write_cache_enabled, inspect);
-  controller.CreateInt("atomic_write_unit_normal_blocks", atomic_write_unit_normal, inspect);
+  controller.CreateString("model_number", model_number, inspector);
+  controller.CreateString("serial_number", serial_number, inspector);
+  controller.CreateString("firmware_rev", firmware_rev, inspector);
+  controller.CreateInt("max_outstanding_commands", identify.max_cmd, inspector);
+  controller.CreateInt("num_namespaces", identify.num_namespaces, inspector);
+  controller.CreateInt("max_allowed_namespaces", identify.max_allowed_namespaces, inspector);
+  controller.CreateBool("sgl_support", identify.sgl_support & 3, inspector);
+  controller.CreateInt("max_data_transfer_bytes", max_data_transfer_bytes, inspector);
+  controller.CreateInt("sanitize_caps", identify.sanicap & 3, inspector);
+  controller.CreateInt("abort_command_limit", identify.acl + 1, inspector);
+  controller.CreateInt("asynch_event_req_limit", identify.aerl + 1, inspector);
+  controller.CreateInt("firmware_slots", (identify.frmw >> 1) & 3, inspector);
+  controller.CreateBool("firmware_reset", !(identify.frmw & (1 << 4)), inspector);
+  controller.CreateBool("firmware_slot1ro", identify.frmw & 1, inspector);
+  controller.CreateInt("host_buffer_min_pages", identify.hmmin, inspector);
+  controller.CreateInt("host_buffer_preferred_pages", identify.hmpre, inspector);
+  controller.CreateInt("capacity_total", identify.tnvmcap[0], inspector);
+  controller.CreateInt("capacity_unalloc", identify.unvmcap[0], inspector);
+  controller.CreateBool("volatile_write_cache_present", volatile_write_cache_present, inspector);
+  controller.CreateBool("volatile_write_cache_enabled", volatile_write_cache_enabled, inspector);
+  controller.CreateInt("atomic_write_unit_normal_blocks", atomic_write_unit_normal, inspector);
   controller.CreateInt("atomic_write_unit_power_fail_blocks", atomic_write_unit_power_fail,
-                       inspect);
-  controller.CreateBool("doorbell_buffer_config", identify.doorbell_buffer_config(), inspect);
-  controller.CreateBool("virtualization_management", identify.virtualization_management(), inspect);
-  controller.CreateBool("nvme_mi_send_recv", identify.nvme_mi_send_recv(), inspect);
-  controller.CreateBool("directive_send_recv", identify.directive_send_recv(), inspect);
-  controller.CreateBool("device_self_test", identify.device_self_test(), inspect);
-  controller.CreateBool("namespace_management", identify.namespace_management(), inspect);
-  controller.CreateBool("firmware_download_commit", identify.firmware_download_commit(), inspect);
-  controller.CreateBool("format_nvm", identify.format_nvm(), inspect);
-  controller.CreateBool("security_send_recv", identify.security_send_recv(), inspect);
-  controller.CreateBool("timestamp", identify.timestamp(), inspect);
-  controller.CreateBool("reservations", identify.reservations(), inspect);
-  controller.CreateBool("save_select_nonzero", identify.save_select_nonzero(), inspect);
-  controller.CreateBool("write_uncorrectable", identify.write_uncorrectable(), inspect);
-  controller.CreateBool("compare", identify.compare(), inspect);
-  inspect->emplace(std::move(controller));
+                       inspector);
+  controller.CreateBool("doorbell_buffer_config", identify.doorbell_buffer_config(), inspector);
+  controller.CreateBool("virtualization_management", identify.virtualization_management(),
+                        inspector);
+  controller.CreateBool("nvme_mi_send_recv", identify.nvme_mi_send_recv(), inspector);
+  controller.CreateBool("directive_send_recv", identify.directive_send_recv(), inspector);
+  controller.CreateBool("device_self_test", identify.device_self_test(), inspector);
+  controller.CreateBool("namespace_management", identify.namespace_management(), inspector);
+  controller.CreateBool("firmware_download_commit", identify.firmware_download_commit(), inspector);
+  controller.CreateBool("format_nvm", identify.format_nvm(), inspector);
+  controller.CreateBool("security_send_recv", identify.security_send_recv(), inspector);
+  controller.CreateBool("timestamp", identify.timestamp(), inspector);
+  controller.CreateBool("reservations", identify.reservations(), inspector);
+  controller.CreateBool("save_select_nonzero", identify.save_select_nonzero(), inspector);
+  controller.CreateBool("write_uncorrectable", identify.write_uncorrectable(), inspector);
+  controller.CreateBool("compare", identify.compare(), inspector);
+  inspector->emplace(std::move(controller));
 }
 
 zx_status_t Nvme::Init() {
   VersionReg version_reg = VersionReg::Get().ReadFrom(&mmio_);
   CapabilityReg caps_reg = CapabilityReg::Get().ReadFrom(&mmio_);
 
-  PopulateVersionInspect(version_reg, &inspect_);
-  PopulateCapabilitiesInspect(caps_reg, version_reg, &inspect_);
+  inspect_node_ = inspector_.GetRoot().CreateChild("nvme");
+  PopulateVersionInspect(version_reg, &inspect_node_, &inspector_);
+  PopulateCapabilitiesInspect(caps_reg, version_reg, &inspect_node_, &inspector_);
 
   const size_t kPageSize = zx_system_get_page_size();
   zx_status_t status =
@@ -359,10 +363,10 @@ zx_status_t Nvme::Init() {
     return io_queue.status_value();
   }
   io_queue_ = std::move(*io_queue);
-  inspect_.GetRoot().CreateInt("io_submission_queue_size", io_queue_->submission().entry_count(),
-                               &inspect_);
-  inspect_.GetRoot().CreateInt("io_completion_queue_size", io_queue_->completion().entry_count(),
-                               &inspect_);
+  inspect_node_.CreateInt("io_submission_queue_size", io_queue_->submission().entry_count(),
+                          &inspector_);
+  inspect_node_.CreateInt("io_completion_queue_size", io_queue_->completion().entry_count(),
+                          &inspector_);
 
   // Spin up IRQ thread so we can start issuing admin commands to the device.
   int thrd_status = thrd_create_with_name(&irq_thread_, IrqThread, this, "nvme-irq-thread");
@@ -435,7 +439,7 @@ zx_status_t Nvme::Init() {
 
   PopulateControllerInspect(*identify, max_data_transfer_bytes_, atomic_write_unit_normal_,
                             atomic_write_unit_power_fail_, volatile_write_cache_present,
-                            volatile_write_cache_enabled_, &inspect_);
+                            volatile_write_cache_enabled_, &inspect_node_, &inspector_);
 
   // Set feature (number of queues) to 1 IO submission queue and 1 IO completion queue.
   SetIoQueueCountSubmission set_queue_count;
@@ -512,7 +516,8 @@ zx_status_t Nvme::Init() {
 zx_status_t Nvme::AddDevice() {
   auto cleanup = fit::defer([&] { DdkRelease(); });
 
-  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("nvme").set_inspect_vmo(inspect_.DuplicateVmo()));
+  zx_status_t status =
+      DdkAdd(ddk::DeviceAddArgs("nvme").set_inspect_vmo(inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed DdkAdd: %s", zx_status_get_string(status));
     return status;

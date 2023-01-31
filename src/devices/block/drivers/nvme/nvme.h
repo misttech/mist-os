@@ -51,7 +51,8 @@ class Nvme : public DeviceType {
   zx_status_t DoAdminCommandSync(Submission& submission,
                                  std::optional<zx::unowned_vmo> admin_data = std::nullopt);
 
-  inspect::Inspector& inspect() { return inspect_; }
+  inspect::Inspector& inspector() { return inspector_; }
+  inspect::Node& inspect_node() { return inspect_node_; }
 
   QueuePair* io_queue() const { return io_queue_.get(); }
   uint32_t max_data_transfer_bytes() const { return max_data_transfer_bytes_; }
@@ -73,7 +74,8 @@ class Nvme : public DeviceType {
   pci_interrupt_mode_t irq_mode_;
   zx::interrupt irq_;
   zx::bti bti_;
-  inspect::Inspector inspect_;
+  inspect::Inspector inspector_;
+  inspect::Node inspect_node_;
 
   // Admin submission and completion queues.
   std::unique_ptr<QueuePair> admin_queue_;

@@ -106,8 +106,10 @@ class NvmeTest : public inspect::InspectTestHelper, public zxtest::Test {
 
 TEST_F(NvmeTest, BasicTest) {
   ASSERT_NO_FATAL_FAILURE(RunInit());
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(nvme_->inspect().DuplicateVmo()));
-  const auto* controller = hierarchy().GetByPath({"controller"});
+  ASSERT_NO_FATAL_FAILURE(ReadInspect(nvme_->inspector().DuplicateVmo()));
+  const auto* nvme = hierarchy().GetByPath({"nvme"});
+  ASSERT_NE(nullptr, nvme);
+  const auto* controller = nvme->GetByPath({"controller"});
   ASSERT_NE(nullptr, controller);
   CheckStringPropertyPrefix(controller->node(), "model_number",
                             fake_nvme::FakeAdminCommands::kModelNumber);

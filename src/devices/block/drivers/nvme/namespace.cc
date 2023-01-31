@@ -195,37 +195,37 @@ static void PopulateNamespaceInspect(const IdentifyNvmeNamespace& ns,
                                      uint16_t atomic_write_unit_normal,
                                      uint16_t atomic_write_unit_power_fail,
                                      uint32_t max_transfer_bytes, uint32_t block_size_bytes,
-                                     inspect::Inspector* inspect) {
-  auto inspect_ns = inspect->GetRoot().CreateChild(namespace_name);
+                                     inspect::Node* inspect_node, inspect::Inspector* inspector) {
+  auto inspect_ns = inspect_node->CreateChild(namespace_name);
   uint16_t nawun = ns.ns_atomics() ? ns.n_aw_un + 1 : atomic_write_unit_normal;
   uint16_t nawupf = ns.ns_atomics() ? ns.n_aw_u_pf + 1 : atomic_write_unit_power_fail;
-  inspect_ns.CreateInt("atomic_write_unit_normal_blocks", nawun, inspect);
-  inspect_ns.CreateInt("atomic_write_unit_power_fail_blocks", nawupf, inspect);
-  inspect_ns.CreateInt("namespace_atomic_boundary_size_normal_blocks", ns.n_abs_n, inspect);
-  inspect_ns.CreateInt("namespace_atomic_boundary_offset_blocks", ns.n_ab_o, inspect);
-  inspect_ns.CreateInt("namespace_atomic_boundary_size_power_fail_blocks", ns.n_abs_pf, inspect);
-  inspect_ns.CreateInt("namespace_optimal_io_boundary_blocks", ns.n_oio_b, inspect);
+  inspect_ns.CreateInt("atomic_write_unit_normal_blocks", nawun, inspector);
+  inspect_ns.CreateInt("atomic_write_unit_power_fail_blocks", nawupf, inspector);
+  inspect_ns.CreateInt("namespace_atomic_boundary_size_normal_blocks", ns.n_abs_n, inspector);
+  inspect_ns.CreateInt("namespace_atomic_boundary_offset_blocks", ns.n_ab_o, inspector);
+  inspect_ns.CreateInt("namespace_atomic_boundary_size_power_fail_blocks", ns.n_abs_pf, inspector);
+  inspect_ns.CreateInt("namespace_optimal_io_boundary_blocks", ns.n_oio_b, inspector);
   // table of block formats
   for (int i = 0; i < ns.n_lba_f; i++) {
     if (ns.lba_formats[i].value) {
       auto& fmt = ns.lba_formats[i];
       inspect_ns.CreateInt(fbl::StringPrintf("lba_format_%u_block_size_bytes", i),
-                           fmt.lba_data_size_bytes(), inspect);
+                           fmt.lba_data_size_bytes(), inspector);
       inspect_ns.CreateInt(fbl::StringPrintf("lba_format_%u_relative_performance", i),
-                           fmt.relative_performance(), inspect);
+                           fmt.relative_performance(), inspector);
       inspect_ns.CreateInt(fbl::StringPrintf("lba_format_%u_metadata_size_bytes", i),
-                           fmt.metadata_size_bytes(), inspect);
+                           fmt.metadata_size_bytes(), inspector);
     }
   }
-  inspect_ns.CreateInt("active_lba_format_index", ns.lba_format_index(), inspect);
-  inspect_ns.CreateInt("data_protection_caps", ns.dpc & 0x3F, inspect);
-  inspect_ns.CreateInt("data_protection_set", ns.dps & 3, inspect);
-  inspect_ns.CreateInt("namespace_size_blocks", ns.n_sze, inspect);
-  inspect_ns.CreateInt("namespace_cap_blocks", ns.n_cap, inspect);
-  inspect_ns.CreateInt("namespace_util_blocks", ns.n_use, inspect);
-  inspect_ns.CreateInt("max_transfer_bytes", max_transfer_bytes, inspect);
-  inspect_ns.CreateInt("block_size_bytes", block_size_bytes, inspect);
-  inspect->emplace(std::move(inspect_ns));
+  inspect_ns.CreateInt("active_lba_format_index", ns.lba_format_index(), inspector);
+  inspect_ns.CreateInt("data_protection_caps", ns.dpc & 0x3F, inspector);
+  inspect_ns.CreateInt("data_protection_set", ns.dps & 3, inspector);
+  inspect_ns.CreateInt("namespace_size_blocks", ns.n_sze, inspector);
+  inspect_ns.CreateInt("namespace_cap_blocks", ns.n_cap, inspector);
+  inspect_ns.CreateInt("namespace_util_blocks", ns.n_use, inspector);
+  inspect_ns.CreateInt("max_transfer_bytes", max_transfer_bytes, inspector);
+  inspect_ns.CreateInt("block_size_bytes", block_size_bytes, inspector);
+  inspector->emplace(std::move(inspect_ns));
 }
 
 zx_status_t Namespace::Init() {
@@ -297,7 +297,8 @@ zx_status_t Namespace::Init() {
 
   PopulateNamespaceInspect(*ns, NamespaceName(), controller_->atomic_write_unit_normal(),
                            controller_->atomic_write_unit_power_fail(), max_transfer_bytes,
-                           block_info_.block_size, &controller_->inspect());
+                           block_info_.block_size, &controller_->inspect_node(),
+                           &controller_->inspector());
 
   // Spin up IO thread so we can start issuing IO commands to the namespace.
   auto name = fbl::StringPrintf("nvme-io-thread-%u", namespace_id_);
