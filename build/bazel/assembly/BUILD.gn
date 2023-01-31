@@ -42,5 +42,8 @@ if (use_bringup_assembly) {
 
 group("verifications") {
   testonly = true
-  deps = [ "product_configurations:verifications" ]
+  deps = [
+    "images_configurations:verifications",
+    "product_configurations:verifications",
+  ]
 }

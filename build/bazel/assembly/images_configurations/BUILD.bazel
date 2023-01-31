@@ -98,7 +98,7 @@ fuchsia_fvm_sparse(
     filesystems = [
         ":blobfs",
         ":internal_reserved",
-        ":empty_minfs",
+        ":empty_data",
     ],
     fvm_sparse_name = "fvm.blob.sparse",
 )
@@ -142,4 +142,5 @@ fuchsia_filesystem_empty_data(
 
 fuchsia_filesystem_reserved(
     name = "internal_reserved",
+    slices = "0",
 )
