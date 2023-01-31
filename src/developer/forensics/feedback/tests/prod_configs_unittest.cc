@@ -35,8 +35,8 @@ TEST_F(ProdConfigTest, DefaultProduct) {
   EXPECT_FALSE(config->snapshot_persistence_max_cache_size.has_value());
 }
 
-TEST_F(ProdConfigTest, WorkstationProduct) {
-  const std::optional<ProductConfig> config = ReadProductConfig("workstation.json");
+TEST_F(ProdConfigTest, LargeDiskProduct) {
+  const std::optional<ProductConfig> config = ReadProductConfig("large_disk.json");
   ASSERT_TRUE(config.has_value());
 
   EXPECT_EQ(config->persisted_logs_num_files, 8u);

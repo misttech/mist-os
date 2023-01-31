@@ -529,7 +529,7 @@ resource("prod_build_type_configs") {
 resource("prod_product_configs") {
   sources = [
     "//src/developer/forensics/feedback/configs/product/default.json",
-    "//src/developer/forensics/feedback/configs/product/workstation.json",
+    "//src/developer/forensics/feedback/configs/product/large_disk.json",
   ]
 
   outputs = [ "data/product/configs/{{source_file_part}}" ]

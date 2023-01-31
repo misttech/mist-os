@@ -44,8 +44,12 @@ group("user_configs") {
   deps = [ ":feedback_user_config" ]
 }
 
+group("large_disk_configs") {
+  deps = [ ":feedback_large_disk_product_config" ]
+}
+
 group("workstation_configs") {
-  deps = [ ":feedback_workstation_product_config" ]
+  deps = [ ":feedback_large_disk_product_config" ]
 }
 
 ###############################################################################
@@ -136,10 +140,10 @@ resource("feedback_default_product_config") {
   outputs = [ "data/product/default_config.json" ]
 }
 
-config_data("feedback_workstation_product_config") {
+config_data("feedback_large_disk_product_config") {
   for_pkg = "forensics"
 
-  sources = [ "feedback/configs/product/workstation.json" ]
+  sources = [ "feedback/configs/product/large_disk.json" ]
 
   outputs = [ "product/override_config.json" ]
 }
