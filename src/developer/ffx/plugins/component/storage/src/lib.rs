@@ -4,70 +4,61 @@
 
 use {
     anyhow::Result,
-    component_debug::storage::{copy, delete, list, make_directory},
-    errors::ffx_error,
+    component_debug::cli::{
+        storage_copy_cmd, storage_delete_cmd, storage_list_cmd, storage_make_directory_cmd,
+    },
+    errors::FfxError,
     ffx_component::rcs::connect_to_lifecycle_controller,
     ffx_component_storage_args::{StorageCommand, SubCommandEnum},
     ffx_core::ffx_plugin,
-    fidl::endpoints::ServerEnd,
-    fidl::handle::Channel,
     fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
-    fidl_fuchsia_sys2::StorageAdminProxy,
-    moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
-    std::io::{stdout, Write},
 };
 
 #[ffx_plugin()]
 pub async fn storage(remote_proxy: RemoteControlProxy, args: StorageCommand) -> Result<()> {
-    let moniker = AbsoluteMoniker::parse_str(args.provider.as_str())
-        .map_err(|e| ffx_error!("Moniker could not be parsed: {}", e))?
-        .to_string();
-
-    let mut write = Box::new(stdout());
-    let writer = &mut write;
-
     let lifecycle_controller = connect_to_lifecycle_controller(&remote_proxy).await?;
-    let (client, server) = Channel::create();
 
-    let server_end = ServerEnd::new(server);
-
-    // LifecycleController accepts RelativeMonikers only
-    let parent_moniker = format!(".{}", moniker.to_string());
-
-    let res = lifecycle_controller
-        .get_storage_admin(&parent_moniker, args.capability.as_str(), server_end)
-        .await?;
-
-    match res {
-        Ok(_) => {
-            let storage_admin =
-                StorageAdminProxy::new(fidl::AsyncChannel::from_channel(client).unwrap());
-            storage_cmd(storage_admin, args.subcommand).await
+    // All errors from component_debug library are user-visible.
+    match args.subcommand {
+        SubCommandEnum::Copy(copy_args) => {
+            storage_copy_cmd(
+                args.provider,
+                args.capability,
+                copy_args.source_path,
+                copy_args.destination_path,
+                lifecycle_controller,
+            )
+            .await
         }
-        Err(e) => {
-            writeln!(writer, "Failed to connect to service: {:?}", e)?;
-            Ok(())
+        SubCommandEnum::Delete(delete_args) => {
+            storage_delete_cmd(
+                args.provider,
+                args.capability,
+                delete_args.path,
+                lifecycle_controller,
+            )
+            .await
+        }
+        SubCommandEnum::List(list_args) => {
+            storage_list_cmd(
+                args.provider,
+                args.capability,
+                list_args.path,
+                lifecycle_controller,
+                std::io::stdout(),
+            )
+            .await
+        }
+        SubCommandEnum::MakeDirectory(make_dir_args) => {
+            storage_make_directory_cmd(
+                args.provider,
+                args.capability,
+                make_dir_args.path,
+                lifecycle_controller,
+            )
+            .await
         }
     }
-}
-
-async fn storage_cmd(storage_admin: StorageAdminProxy, subcommand: SubCommandEnum) -> Result<()> {
-    match subcommand {
-        SubCommandEnum::Copy(args) => {
-            copy(storage_admin, args.source_path, args.destination_path).await
-        }
-        SubCommandEnum::Delete(args) => delete(storage_admin, args.path).await,
-        SubCommandEnum::List(args) => print_list(storage_admin, args.path).await,
-        SubCommandEnum::MakeDirectory(args) => make_directory(storage_admin, args.path).await,
-    }
-}
-
-pub async fn print_list(storage_admin: StorageAdminProxy, path: String) -> Result<()> {
-    let entries = list(storage_admin, path).await?;
-
-    let mut writer = std::io::stdout();
-    for entry in entries {
-        writeln!(writer, "{}", entry)?;
-    }
+    .map_err(|e| FfxError::Error(e, 1))?;
     Ok(())
 }

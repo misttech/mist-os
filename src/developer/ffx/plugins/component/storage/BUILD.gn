@@ -10,12 +10,9 @@ ffx_plugin("ffx_component_storage") {
 
   deps = [
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/plugins/component/common:ffx_component",
-    "//src/lib/fidl/rust/fidl",
     "//src/sys/lib/component_debug",
-    "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
   ]
 

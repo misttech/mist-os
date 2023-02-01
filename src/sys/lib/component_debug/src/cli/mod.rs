@@ -15,6 +15,7 @@ pub mod run;
 pub mod show;
 pub mod start;
 pub mod stop;
+pub mod storage;
 
 mod format;
 
@@ -32,6 +33,7 @@ pub use {
     show::{show_cmd_print, show_cmd_serialized},
     start::start_cmd,
     stop::stop_cmd,
+    storage::{storage_copy_cmd, storage_delete_cmd, storage_list_cmd, storage_make_directory_cmd},
 };
 
 use {
