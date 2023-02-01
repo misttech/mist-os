@@ -372,7 +372,7 @@ impl MediaSessionsInner {
                 let response_timeout = active_session
                     .session_info()
                     .get_playback_rate()
-                    .reference_deadline((interval as i64).seconds());
+                    .map_or(None, |r| r.reference_deadline((interval as i64).seconds()));
                 (current_values, response_timeout)
             }
             (fidl_avrcp::NotificationEvent::TrackChanged, _) => {
@@ -727,7 +727,7 @@ pub(crate) mod tests {
             .expect("There should be an existing session with id = `id`")
             .clone();
         assert_eq!(
-            ValidPlayStatus::new(None, Some(0), Some(fidl_avrcp::PlaybackStatus::Playing)),
+            ValidPlayStatus::new(None, None, Some(fidl_avrcp::PlaybackStatus::Playing)),
             new_state.session_info().get_play_status().clone()
         );
     }

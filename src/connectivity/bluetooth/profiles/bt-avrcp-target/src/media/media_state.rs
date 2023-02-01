@@ -153,7 +153,7 @@ pub(crate) struct SessionInfo {
     play_status: ValidPlayStatus,
     player_application_settings: ValidPlayerApplicationSettings,
     media_info: MediaInfo,
-    playback_rate: PlaybackRate,
+    playback_rate: Option<PlaybackRate>,
     battery_status: fidl_avrcp::BatteryStatus,
 }
 
@@ -165,7 +165,7 @@ impl SessionInfo {
                 None, None, None, None,
             ),
             media_info: Default::default(),
-            playback_rate: Default::default(),
+            playback_rate: None,
             battery_status: fidl_avrcp::BatteryStatus::Normal,
         }
     }
@@ -173,7 +173,9 @@ impl SessionInfo {
     pub fn get_play_status(&self) -> ValidPlayStatus {
         let mut play_status = self.play_status.clone();
         // Need to update the reported time, since we only update with new info from media.
-        play_status.song_position = self.playback_rate.current_position();
+        if let Some(rate) = &self.playback_rate {
+            play_status.song_position = rate.current_position();
+        }
         play_status
     }
 
@@ -181,7 +183,7 @@ impl SessionInfo {
         &self.media_info
     }
 
-    pub fn get_playback_rate(&self) -> &PlaybackRate {
+    pub fn get_playback_rate(&self) -> &Option<PlaybackRate> {
         &self.playback_rate
     }
 
@@ -292,8 +294,12 @@ impl SessionInfo {
     ) {
         if let Some(info) = player_info {
             if let Some(timeline_fn) = info.timeline_function {
-                self.playback_rate = timeline_fn.into();
+                self.playback_rate = Some(timeline_fn.into());
             }
+            // If the `playback_rate` or `player_state` is None, then the value is unchanged from
+            // the previous value.
+            // If the `duration` is None, then it is assumed to be unknown, not applicable, or
+            // unchanged.
             self.play_status.update_play_status(
                 info.duration,
                 self.playback_rate,

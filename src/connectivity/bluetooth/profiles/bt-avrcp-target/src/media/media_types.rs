@@ -130,17 +130,24 @@ impl ValidPlayStatus {
     }
 
     /// Update the play status from updates from Media.
-    /// `duration` is in nanoseconds -> convert to millis.
+    /// If the `duration` is None, then the value is considered unknown, unavailable, or unchanged.
+    /// If the `rate` is None, then the playback rate is considered unchanged.
+    /// If the `player_state` is None, then the media player state is considered unchanged.
+    /// `duration` is received in nanoseconds and is saved as milliseconds.
     pub(crate) fn update_play_status(
         &mut self,
         duration: Option<i64>,
-        rate: PlaybackRate,
+        rate: Option<PlaybackRate>,
         player_state: Option<fidl_media::PlayerState>,
     ) {
+        // The `duration` is always the most up-to-date value so it is always used.
         self.song_length = duration.map(|d| time_nanos_to_millis(d));
-        self.song_position = rate.current_position();
-        self.playback_status =
-            player_state.and_then(|state| media_player_state_to_playback_status(state));
+        if let Some(rate) = rate {
+            self.song_position = rate.current_position();
+        }
+        if let Some(state) = player_state {
+            self.playback_status = media_player_state_to_playback_status(state);
+        }
     }
 }
 
@@ -161,9 +168,9 @@ impl PlaybackRate {
         self.0.subject_delta as f64 / self.0.reference_delta as f64
     }
 
-    /// Returns the current subject time based on the TimelineFunction, in milliseconds, if
-    /// positive.  If negative, returns None.
-    /// AVRCP does not support negative song positions.
+    /// Returns the current subject time based on the TimelineFunction, in milliseconds.
+    /// Returns Some(0) if the current position is negative.
+    /// Returns None if the current position cannot be calculated.
     pub fn current_position(&self) -> Option<u32> {
         media_timeline_fn_to_position(self.0, fasync::Time::now().into_nanos())
     }
@@ -765,36 +772,50 @@ mod tests {
         assert_eq!(play_status.get_playback_status(), fidl_avrcp::PlaybackStatus::Stopped);
 
         let player_state = Some(fidl_media::PlayerState::Buffering);
-        play_status.update_play_status(None, PlaybackRate::default(), player_state);
+        // Receive an update with only a change in player state.
+        play_status.update_play_status(None, None, player_state);
 
-        let expected_player_state = Some(fidl_avrcp::PlaybackStatus::Paused);
-        assert_eq!(None, play_status.song_length);
-        assert_eq!(Some(0), play_status.song_position);
-        assert_eq!(expected_player_state, play_status.playback_status);
-        assert_eq!(play_status.get_playback_position(), 0);
+        assert_eq!(play_status.song_length, None);
+        assert_eq!(play_status.song_position, None);
+        assert_eq!(play_status.playback_status, Some(fidl_avrcp::PlaybackStatus::Paused));
+        assert_eq!(play_status.get_playback_position(), std::u32::MAX);
         assert_eq!(play_status.get_playback_status(), fidl_avrcp::PlaybackStatus::Paused);
 
         let duration = Some(9876543210); // nanos
-        let mut timeline_fn = fidl_media_types::TimelineFunction::new_empty();
-        timeline_fn.subject_time = 1000; // nanos
-        timeline_fn.subject_delta = 1;
-        timeline_fn.reference_delta = 1;
-        timeline_fn.reference_time = 800000000; // nanos
-        let player_state = Some(fidl_media::PlayerState::Idle);
-        play_status.update_play_status(duration, timeline_fn.into(), player_state);
+        let timeline_fn = fidl_media_types::TimelineFunction {
+            subject_time: 1000,        // nanos
+            reference_time: 800000000, // nanos
+            subject_delta: 1,          // Normal playback rate
+            reference_delta: 1,        // Normal playback rate
+        };
+        let player_state = Some(fidl_media::PlayerState::Playing);
+        play_status.update_play_status(duration, Some(timeline_fn.into()), player_state);
 
         let expected_song_length = Some(9876); // millis
-        let expected_song_position = Some(100); // (100000000 + 1000) / 10^6
-        let expected_player_state = Some(fidl_avrcp::PlaybackStatus::Stopped);
-        assert_eq!(expected_song_length, play_status.song_length);
-        assert_eq!(expected_song_position, play_status.song_position);
-        assert_eq!(expected_player_state, play_status.playback_status);
-        assert_eq!(play_status.get_playback_position(), 100);
-        assert_eq!(play_status.get_playback_status(), fidl_avrcp::PlaybackStatus::Stopped);
+        let expected_song_position = 100; // (100000000 + 1000) / 10^6
+        let expected_player_state = fidl_avrcp::PlaybackStatus::Playing;
+        assert_eq!(play_status.song_length, expected_song_length);
+        assert_eq!(play_status.song_position, Some(expected_song_position));
+        assert_eq!(play_status.playback_status, Some(expected_player_state));
+        assert_eq!(play_status.get_playback_position(), expected_song_position);
+        assert_eq!(play_status.get_playback_status(), expected_player_state);
 
+        // Verifies the conversion into the AVRCP FIDL type.
         let play_status_fidl: fidl_avrcp::PlayStatus = play_status.clone().into();
-        assert_eq!(expected_song_length, play_status_fidl.song_length);
-        assert_eq!(Some(fidl_avrcp::PlaybackStatus::Stopped), play_status_fidl.playback_status);
+        let expected_avrcp_play_status = fidl_avrcp::PlayStatus {
+            song_length: expected_song_length,
+            song_position: Some(expected_song_position),
+            playback_status: Some(expected_player_state),
+            ..fidl_avrcp::PlayStatus::EMPTY
+        };
+        assert_eq!(play_status_fidl, expected_avrcp_play_status);
+
+        // An "empty" update should only affect the song length as song position and player state
+        // are assumed to be unchanged.
+        play_status.update_play_status(None, None, None);
+        assert_eq!(play_status.song_length, None);
+        assert_eq!(play_status.get_playback_position(), expected_song_position);
+        assert_eq!(play_status.get_playback_status(), expected_player_state);
     }
 
     #[fuchsia::test]
