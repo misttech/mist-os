@@ -188,8 +188,10 @@ impl PlaybackRate {
     }
 }
 
+/// Represents a timeline function for media that is currently stopped. Defined in
+/// https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.media/timeline_function.fidl;l=41?
 fn stopped_timeline_function() -> TimelineFunction {
-    TimelineFunction { subject_time: 0, reference_time: 0, subject_delta: 0, reference_delta: 0 }
+    TimelineFunction { subject_time: 0, reference_time: 0, subject_delta: 0, reference_delta: 1 }
 }
 
 impl Default for PlaybackRate {
@@ -767,9 +769,9 @@ mod tests {
 
         let expected_player_state = Some(fidl_avrcp::PlaybackStatus::Paused);
         assert_eq!(None, play_status.song_length);
-        assert_eq!(None, play_status.song_position);
+        assert_eq!(Some(0), play_status.song_position);
         assert_eq!(expected_player_state, play_status.playback_status);
-        assert_eq!(play_status.get_playback_position(), std::u32::MAX);
+        assert_eq!(play_status.get_playback_position(), 0);
         assert_eq!(play_status.get_playback_status(), fidl_avrcp::PlaybackStatus::Paused);
 
         let duration = Some(9876543210); // nanos
@@ -998,5 +1000,15 @@ mod tests {
         let event_id = fidl_avrcp::NotificationEvent::SystemStatusChanged;
         let expected: Notification = fidl_avrcp::Notification::EMPTY.into();
         assert_eq!(expected, notif.only_event(&event_id));
+    }
+
+    #[fuchsia::test]
+    fn test_default_playback_rate_song_position() {
+        let exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(900000000));
+
+        let playback_rate = PlaybackRate::default();
+        let pos = playback_rate.current_position();
+        assert_eq!(pos, Some(0));
     }
 }

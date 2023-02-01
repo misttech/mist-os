@@ -727,7 +727,7 @@ pub(crate) mod tests {
             .expect("There should be an existing session with id = `id`")
             .clone();
         assert_eq!(
-            ValidPlayStatus::new(None, None, Some(fidl_avrcp::PlaybackStatus::Playing)),
+            ValidPlayStatus::new(None, Some(0), Some(fidl_avrcp::PlaybackStatus::Playing)),
             new_state.session_info().get_play_status().clone()
         );
     }
