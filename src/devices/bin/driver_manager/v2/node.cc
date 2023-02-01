@@ -480,8 +480,8 @@ void Node::CheckForRemoval() {
     removal_tracker_->Notify(removal_id_.value(), node_state_);
   }
   LOGF(DEBUG, "Node::Remove(): %s children are empty", name().c_str());
-  if (driver_component_ && driver_component_->driver && driver_component_->driver->is_valid()) {
-    auto result = (*driver_component_->driver)->Stop();
+  if (driver_component_ && driver_component_->driver) {
+    fidl::OneWayStatus result = driver_component_->driver->Stop();
     if (result.ok()) {
       return;  // We'll now wait for the channel to close
     }
@@ -746,26 +746,14 @@ zx::result<> Node::StartDriver(
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
-  auto start =
-      (*driver_host_)
-          ->Start(std::move(endpoints->client), name_, std::move(symbols), std::move(start_info));
+  zx::result start = driver_host_.value()->Start(std::move(endpoints->client), name_,
+                                                 std::move(symbols), std::move(start_info));
   if (start.is_error()) {
     return zx::error(start.error_value());
   }
 
-  driver_component_ = DriverComponent{
-      .component_controller_ref = fidl::BindServer(
-          dispatcher_, std::move(controller), shared_from_this(),
-          [](Node* node, fidl::UnbindInfo info, auto) {
-            LOGF(WARNING, "Removing node %s because of ComponentController binding closed: %s",
-                 node->name().c_str(), info.FormatDescription().c_str());
-            node->Remove(RemovalSet::kAll, nullptr);
-          }),
-
-      .driver =
-          fidl::WireSharedClient<fuchsia_driver_host::Driver>(std::move(*start), dispatcher_, this),
-      .driver_url = std::string(url),
-  };
+  driver_component_.emplace(*this, std::string(url), std::move(controller),
+                            std::move(start.value()));
 
   return zx::ok();
 }
@@ -782,7 +770,7 @@ void Node::StopComponent() {
 
 void Node::on_fidl_error(fidl::UnbindInfo info) {
   if (driver_component_) {
-    driver_component_->driver.reset();
+    driver_component_->driver = {};
   }
   // The only valid way a driver host should shut down the Driver channel
   // is with the ZX_OK epitaph.
@@ -799,5 +787,19 @@ void Node::on_fidl_error(fidl::UnbindInfo info) {
     Remove(RemovalSet::kAll, nullptr);
   }
 }
+
+Node::DriverComponent::DriverComponent(
+    Node& node, std::string url,
+    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+    fidl::ClientEnd<fuchsia_driver_host::Driver> driver)
+    : component_controller_ref(
+          node.dispatcher_, std::move(controller), &node,
+          [](Node* node, fidl::UnbindInfo info) {
+            LOGF(WARNING, "Removing node %s because of ComponentController binding closed: %s",
+                 node->name().c_str(), info.FormatDescription().c_str());
+            node->Remove(RemovalSet::kAll, nullptr);
+          }),
+      driver(std::move(driver), node.dispatcher_, &node),
+      driver_url(std::move(url)) {}
 
 }  // namespace dfv2

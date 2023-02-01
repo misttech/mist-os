@@ -164,11 +164,15 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
  private:
   struct DriverComponent {
+    DriverComponent(Node& node, std::string url,
+                    fidl::ServerEnd<fuchsia_component_runner::ComponentController> controller,
+                    fidl::ClientEnd<fuchsia_driver_host::Driver> driver);
+
     // This represents the Driver Component within the Component Framework.
     // When this is closed with an epitaph it signals to the Component Framework
     // that this driver component has stopped.
-    fidl::ServerBindingRef<fuchsia_component_runner::ComponentController> component_controller_ref;
-    std::optional<fidl::WireSharedClient<fuchsia_driver_host::Driver>> driver;
+    fidl::ServerBinding<fuchsia_component_runner::ComponentController> component_controller_ref;
+    fidl::WireClient<fuchsia_driver_host::Driver> driver;
     std::string driver_url;
   };
   // This is called when fuchsia_driver_framework::Driver is closed.
