@@ -21,8 +21,8 @@ namespace sdmmc {
 class SdmmcBlockDevice;
 
 class RpmbDevice;
-using RpmbDeviceType =
-    ddk::Device<RpmbDevice, ddk::Messageable<fuchsia_hardware_rpmb::Rpmb>::Mixin, ddk::Unbindable>;
+using RpmbDeviceType = ddk::Device<RpmbDevice, ddk::Messageable<fuchsia_hardware_rpmb::Rpmb>::Mixin,
+                                   ddk::Initializable, ddk::Unbindable>;
 
 class RpmbDevice : public RpmbDeviceType {
  public:
@@ -39,9 +39,9 @@ class RpmbDevice : public RpmbDeviceType {
         sdmmc_parent_(sdmmc_parent),
         cid_(cid),
         rpmb_size_(ext_csd[MMC_EXT_CSD_RPMB_SIZE_MULT]),
-        reliable_write_sector_count_(ext_csd[MMC_EXT_CSD_REL_WR_SEC_C]),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
+        reliable_write_sector_count_(ext_csd[MMC_EXT_CSD_REL_WR_SEC_C]) {}
 
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
   void DdkUnbind(ddk::UnbindTxn txn);
 
@@ -54,7 +54,8 @@ class RpmbDevice : public RpmbDeviceType {
   const uint8_t rpmb_size_;
   const uint8_t reliable_write_sector_count_;
   std::optional<component::OutgoingDirectory> outgoing_;
-  async::Loop loop_;
+  fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
+  fidl::ServerBindingGroup<fuchsia_hardware_rpmb::Rpmb> bindings_;
 };
 
 }  // namespace sdmmc

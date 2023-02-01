@@ -4,7 +4,7 @@
 
 #include "sdmmc-rpmb-device.h"
 
-#include <lib/fidl-async/cpp/bind.h>
+#include <lib/fdf/dispatcher.h>
 
 #include "sdmmc-block-device.h"
 #include "sdmmc-types.h"
@@ -16,33 +16,9 @@ zx_status_t RpmbDevice::Create(zx_device_t* parent, SdmmcBlockDevice* sdmmc,
                                const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd) {
   auto device = std::make_unique<RpmbDevice>(parent, sdmmc, cid, ext_csd);
 
-  if (auto status = device->loop_.StartThread("sdmmc-rpmb-thread"); status != ZX_OK) {
-    zxlogf(ERROR, "failed to start RPMB thread: %d", status);
-    return status;
-  }
-  device->outgoing_ = component::OutgoingDirectory(device->loop_.dispatcher());
-
-  auto device_handler = [device =
-                             device.get()](fidl::ServerEnd<fuchsia_hardware_rpmb::Rpmb> request) {
-    fidl::BindServer(device->loop_.dispatcher(), std::move(request), device);
-  };
-  fuchsia_hardware_rpmb::Service::InstanceHandler handler({.device = std::move(device_handler)});
-
-  auto result = device->outgoing_->AddService<fuchsia_hardware_rpmb::Service>(std::move(handler));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service to the outgoing directory");
-    return result.status_value();
-  }
-
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
-  }
-
-  result = device->outgoing_->Serve(std::move(endpoints->server));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to serve the outgoing directory");
-    return result.status_value();
   }
 
   std::array protocol_offers = {
@@ -53,12 +29,12 @@ zx_status_t RpmbDevice::Create(zx_device_t* parent, SdmmcBlockDevice* sdmmc,
       fuchsia_hardware_rpmb::Service::Name,
   };
 
+  device->outgoing_server_end_ = std::move(endpoints->server);
   auto status = device->DdkAdd(ddk::DeviceAddArgs("rpmb")
                                    .set_flags(DEVICE_ADD_MUST_ISOLATE)
                                    .set_fidl_protocol_offers(protocol_offers)
                                    .set_fidl_service_offers(offers)
                                    .set_outgoing_dir(endpoints->client.TakeChannel()));
-
   if (status != ZX_OK) {
     zxlogf(ERROR, "failed to add RPMB partition device: %d", status);
     return status;
@@ -68,17 +44,39 @@ zx_status_t RpmbDevice::Create(zx_device_t* parent, SdmmcBlockDevice* sdmmc,
   return ZX_OK;
 }
 
-void RpmbDevice::DdkRelease() {
-  loop_.Shutdown();
-  delete this;
+void RpmbDevice::DdkInit(ddk::InitTxn txn) {
+  fdf_dispatcher_t* fdf_dispatcher = fdf_dispatcher_get_current_dispatcher();
+  ZX_ASSERT(fdf_dispatcher);
+  async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
+  outgoing_ = component::OutgoingDirectory(dispatcher);
+
+  fuchsia_hardware_rpmb::Service::InstanceHandler handler({
+      .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+  });
+  auto result = outgoing_->AddService<fuchsia_hardware_rpmb::Service>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to the outgoing directory");
+    txn.Reply(result.status_value());
+    return;
+  }
+
+  result = outgoing_->Serve(std::move(outgoing_server_end_));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve the outgoing directory");
+    txn.Reply(result.status_value());
+    return;
+  }
+
+  txn.Reply(ZX_OK);
 }
+
+void RpmbDevice::DdkRelease() { delete this; }
 
 void RpmbDevice::DdkUnbind(ddk::UnbindTxn txn) {
   auto result = outgoing_->RemoveService<fuchsia_hardware_rpmb::Service>();
   if (result.is_error()) {
     zxlogf(ERROR, "Failed to remove service from the outgoing directory");
   }
-  loop_.Quit();
   txn.Reply();
 }
 
