@@ -202,7 +202,7 @@ func (c *Context) ConnectToProtocolAtPath(path string, r fidl.ServiceRequest) er
 func (c *Connector) ConnectToProtocolAtPath(path string, r fidl.ServiceRequest) error {
 	return c.serviceRoot.Open(
 		context.Background(),
-		io.OpenFlagsRightReadable|io.OpenFlagsRightWritable,
+		io.OpenFlags(0),
 		0,
 		path,
 		io.NodeWithCtxInterfaceRequest{
