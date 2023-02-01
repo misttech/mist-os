@@ -7,7 +7,6 @@
 #include <fuchsia/hardware/usb/hub/c/banjo.h>
 #include <fuchsia/hardware/usb/hubdescriptor/c/banjo.h>
 #include <fuchsia/hardware/usb/request/c/banjo.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/synchronous-executor/executor.h>
@@ -30,6 +29,7 @@
 #include <zxtest/zxtest.h>
 
 #include "lib/fpromise/promise.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-hub/fake-device.h"
 
 namespace {
@@ -37,10 +37,24 @@ template <EmulationMode mode>
 class UsbHarness : public zxtest::Test {
  public:
   void SetUp() override {
+    parent_ = MockDevice::FakeRootParent();
     device_.emplace(mode);
-    usb_hub::UsbHubDevice::Bind(nullptr, reinterpret_cast<zx_device_t*>(&device_.value()));
-    device_->RunInit();
+
+    usb_protocol_t usb_proto;
+    usb_bus_protocol_t bus_proto;
+    ASSERT_OK(device_->GetProtocol(ZX_PROTOCOL_USB, &usb_proto));
+    ASSERT_OK(device_->GetProtocol(ZX_PROTOCOL_USB_BUS, &bus_proto));
+    parent_->AddProtocol(ZX_PROTOCOL_USB, usb_proto.ops, usb_proto.ctx);
+    parent_->AddProtocol(ZX_PROTOCOL_USB_BUS, bus_proto.ops, bus_proto.ctx);
+
+    usb_hub::UsbHubDevice::Bind(nullptr, reinterpret_cast<zx_device_t*>(parent_.get()));
+
+    device_->SetChildContext(parent_->GetLatestChild()->GetDeviceContext<usb_hub::UsbHubDevice>());
+    device()->DdkInit(ddk::InitTxn(device()->zxdev()));
+    parent_->GetLatestChild()->WaitUntilInitReplyCalled();
+    device_->InitComplete();
     ASSERT_TRUE(device_->HasOps());
+
     auto& queue = device_->GetStateChangeQueue();
     bool powered_on = false;
     bool initialized = false;
@@ -101,13 +115,14 @@ class UsbHarness : public zxtest::Test {
   usb_hub::UsbHubDevice* device() { return device_->device(); }
 
   void TearDown() override {
+    device()->DdkUnbind(ddk::UnbindTxn(device()->zxdev()));
+    parent_->GetLatestChild()->WaitUntilUnbindReplyCalled();
     device_->Unplug();
-    device_->Unbind();
-    device_->Release();
-    ASSERT_FALSE(device_->HasOps());
   }
 
  private:
+  std::shared_ptr<MockDevice> parent_;
+
   void StopDispatching() {
     dispatching_ = false;
     device_->GetStateChangeQueue().Insert(MakeSyncEntry(OperationType::kExitEventLoop));
@@ -118,6 +133,7 @@ class UsbHarness : public zxtest::Test {
   fit::function<zx_status_t(uint32_t port, usb_speed_t speed)> connect_callback_;
 };
 
+// The SyntheticHarness tests currently assume DdkInit() has not been invoked.
 class SyntheticHarness : public zxtest::Test {
  public:
   SyntheticHarness() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
@@ -128,10 +144,20 @@ class SyntheticHarness : public zxtest::Test {
     }
     auto executor = std::make_unique<async::Executor>(loop_.dispatcher());
     executor_ = executor.get();
+
+    parent_ = MockDevice::FakeRootParent();
     device_.emplace(EmulationMode::Smays);
     device_->SetSynthetic(true);
-    usb_hub::UsbHubDevice::Bind(std::move(executor),
-                                reinterpret_cast<zx_device_t*>(&device_.value()));
+
+    usb_protocol_t usb_proto;
+    usb_bus_protocol_t bus_proto;
+    ASSERT_OK(device_->GetProtocol(ZX_PROTOCOL_USB, &usb_proto));
+    ASSERT_OK(device_->GetProtocol(ZX_PROTOCOL_USB_BUS, &bus_proto));
+    parent_->AddProtocol(ZX_PROTOCOL_USB, usb_proto.ops, usb_proto.ctx);
+    parent_->AddProtocol(ZX_PROTOCOL_USB_BUS, bus_proto.ops, bus_proto.ctx);
+
+    usb_hub::UsbHubDevice::Bind(std::move(executor), reinterpret_cast<zx_device_t*>(parent_.get()));
+    device_->SetChildContext(parent_->GetLatestChild()->GetDeviceContext<usb_hub::UsbHubDevice>());
     ASSERT_TRUE(device_->HasOps());
   }
 
@@ -143,12 +169,13 @@ class SyntheticHarness : public zxtest::Test {
   usb_hub::UsbHubDevice* device() { return device_->device(); }
 
   void TearDown() override {
+    device()->DdkUnbind(ddk::UnbindTxn(device()->zxdev()));
+    parent_->GetLatestChild()->WaitUntilUnbindReplyCalled();
     loop_.Shutdown();
-    device_->Release();
-    ASSERT_FALSE(device_->HasOps());
   }
 
  private:
+  std::shared_ptr<MockDevice> parent_;
   std::optional<FakeDevice> device_;
   async::Loop loop_;
   fpromise::executor* executor_;
@@ -161,47 +188,6 @@ class SmaysHarness : public UsbHarness<EmulationMode::Smays> {
 class UnbrandedHarness : public UsbHarness<EmulationMode::Unbranded> {
  public:
 };
-
-class Binder : public fake_ddk::Bind {
- public:
-  zx_status_t DeviceGetProtocol(const zx_device_t* device, uint32_t proto_id,
-                                void* protocol) override {
-    auto context = const_cast<FakeDevice*>(reinterpret_cast<const FakeDevice*>(device));
-    return context->GetProtocol(proto_id, protocol);
-  }
-
-  zx_status_t DeviceRemove(zx_device_t* device) override { return ZX_OK; }
-
-  void DeviceInitReply(zx_device_t* device, zx_status_t status,
-                       const device_init_reply_args_t* args) override {
-    auto context = const_cast<FakeDevice*>(reinterpret_cast<const FakeDevice*>(device));
-    context->InitComplete();
-  }
-
-  void DeviceUnbindReply(zx_device_t* device) override {
-    auto context = const_cast<FakeDevice*>(reinterpret_cast<const FakeDevice*>(device));
-
-    context->NotifyRemoved();
-  }
-
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    auto context = reinterpret_cast<FakeDevice*>(parent);
-    parent_ = context;
-    context->SetOpTable(args->ops, args->ctx);
-    if (context->IsSynthetic()) {
-      return ZX_OK;
-    }
-    // zx_status_t status = fake_ddk::Bind::DeviceAdd(drv, parent, args, out);
-    *out = parent;
-    return ZX_OK;
-  }
-
- private:
-  FakeDevice* parent_;
-};
-
-static Binder bind;
 
 TEST_F(SmaysHarness, Usb2Hub) {
   auto dispatcher = StartDispatching();

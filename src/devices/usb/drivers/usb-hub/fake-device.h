@@ -6,9 +6,6 @@
 #define SRC_DEVICES_USB_DRIVERS_USB_HUB_FAKE_DEVICE_H_
 
 enum class OperationType {
-  kSetOpTable,
-  kUnbind,
-  kRelease,
   kUsbBusDeviceAdded,
   kUsbBusDeviceRemoved,
   kUsbBusSetHubInterface,
@@ -24,9 +21,9 @@ enum class OperationType {
   kUnplug,
   kPowerOnEvent,
   kInitCompleteEvent,
-  kDispatchInit,
   kExitEventLoop,
   kUnbindReplied,
+  kSetChildContext,
 };
 
 class IOQueue;
@@ -34,7 +31,6 @@ struct IOEntry;
 struct IOEntry : fbl::DoublyLinkedListable<std::unique_ptr<IOEntry>> {
   IOQueue* complete_queue;
   OperationType type;
-  const zx_protocol_device_t* ops_table;
   uint8_t ep_address;
   void* ctx;
   usb_request_t* request;
@@ -234,18 +230,6 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
     while (true) {
       auto message = outgoing_asynchronous_methods_.Wait();
       switch (message->type) {
-        case OperationType::kDispatchInit:
-          RunInitDispatch(message->ctx);
-          Complete(std::move(message));
-          break;
-        case OperationType::kRelease:
-          ReleaseDispatch();
-          Complete(std::move(message));
-          break;
-        case OperationType::kUnbind:
-          UnbindDispatch(message->ctx);
-          Complete(std::move(message));
-          break;
         case OperationType::kExitEventLoop:
           Complete(std::move(message));
           return;
@@ -320,7 +304,7 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
           Complete(std::move(message));
           return;
         case OperationType::kHasOps:
-          message->ctx = const_cast<void*>(static_cast<const void*>(ops_table_));
+          message->ctx = const_cast<void*>(static_cast<const void*>(ctx_));
           Complete(std::move(message));
           break;
         case OperationType::kInterrupt:
@@ -336,8 +320,8 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
           message->port = ResetPendingDispatch(static_cast<uint8_t>(message->port));
           Complete(std::move(message));
           break;
-        case OperationType::kSetOpTable:
-          SetOpTableDispatch(message->ops_table, message->ctx);
+        case OperationType::kSetChildContext:
+          SetChildContextDispatch(message->ctx);
           Complete(std::move(message));
           break;
         case OperationType::kUnplug:
@@ -361,27 +345,11 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
               UsbEnableEndpointDispatch(message->ep_desc, message->ss_com_desc, message->enable);
           Complete(std::move(message));
           break;
-        case OperationType::kDispatchInit:
-        case OperationType::kRelease:
-        case OperationType::kUnbind:
-          message->ctx = ctx_;
-          outgoing_asynchronous_methods_.Insert(std::move(message));
-          break;
       }
     }
   }
 
-  void SetOpTableDispatch(const zx_protocol_device_t* ops_table, void* ctx) {
-    ops_table_ = ops_table;
-    ctx_ = ctx;
-  }
-
-  void UnbindDispatch(void* ctx) { ops_table_->unbind(ctx); }
-
-  void ReleaseDispatch() {
-    ops_table_->release(ctx_);
-    ops_table_ = nullptr;
-  }
+  void SetChildContextDispatch(void* ctx) { ctx_ = ctx; }
 
   zx_status_t UsbBusConfigureHub(/* zx_device_t* */ uint64_t hub_device, usb_speed_t speed,
                                  const usb_hub_descriptor_t* desc, bool multi_tt) {
@@ -791,8 +759,6 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
 
   bool IsSynthetic() const { return synthetic_; }
 
-  void RunInitDispatch(void* ctx) { ops_table_->init(ctx); }
-
   void SendMessage(std::unique_ptr<IOEntry> entry) { queue_.Insert(std::move(entry)); }
 
   std::unique_ptr<IOEntry> SendMessageSync(std::unique_ptr<IOEntry> entry) {
@@ -801,8 +767,6 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
     queue_.Insert(std::move(entry));
     return sync_queue.Wait();
   }
-
-  void Release() { SendMessageSync(MakeSyncEntry(OperationType::kRelease)); }
 
   bool HasOps() {
     auto entry = SendMessageSync(MakeSyncEntry(OperationType::kHasOps));
@@ -820,15 +784,9 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
 
   void Unplug() { SendMessageSync(MakeSyncEntry(OperationType::kUnplug)); }
 
-  void Unbind() {
-    SendMessageSync(MakeSyncEntry(OperationType::kUnbind));
-    // TODO(fxbug.dev/82493): Validate state_change_queue
-  }
-
-  void SetOpTable(const zx_protocol_device_t* ops_table, void* ctx) {
-    auto entry = MakeSyncEntry(OperationType::kSetOpTable);
+  void SetChildContext(void* ctx) {
+    auto entry = MakeSyncEntry(OperationType::kSetChildContext);
     entry->ctx = ctx;
-    entry->ops_table = ops_table;
     SendMessageSync(std::move(entry));
   }
 
@@ -851,11 +809,6 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
   void NotifyRemoved() {
     auto entry = MakeSyncEntry(OperationType::kUnbindReplied);
     state_change_queue_.Insert(std::move(entry));
-  }
-
-  void RunInit() {
-    auto message = MakeSyncEntry(OperationType::kDispatchInit);
-    SendMessageSync(std::move(message));
   }
 
   void DisconnectDevice(uint8_t port) {
@@ -907,7 +860,6 @@ class FakeDevice : public ddk::UsbBusProtocol<FakeDevice>, public ddk::UsbProtoc
   PortStatus port_status_[7];
   // Interrupt endpoint set by UsbEnableEndpoint
   uint8_t interrupt_endpoint_ = 0;
-  const zx_protocol_device_t* ops_table_ = nullptr;
   void* ctx_;
   EmulationMetadata emulation_;
   usb_hub_interface_protocol_t hub_protocol_;

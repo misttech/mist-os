@@ -70,9 +70,7 @@ test("usb-hub-test") {
     "//sdk/lib/fit-promise",
     "//src/devices/lib/synchronous-executor",
     "//src/devices/testing/fake-bti",
-
-    # TODO(fxb/115078): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async:async-cpp",
@@ -85,6 +83,11 @@ test("usb-hub-test") {
 }
 
 fuchsia_unittest_package("usb-hub-package") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   deps = [ ":usb-hub-test" ]
 }
 
