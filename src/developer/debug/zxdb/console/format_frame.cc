@@ -10,6 +10,7 @@
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/process.h"
 #include "src/developer/debug/zxdb/client/thread.h"
+#include "src/developer/debug/zxdb/common/join_callbacks.h"
 #include "src/developer/debug/zxdb/console/command_utils.h"
 #include "src/developer/debug/zxdb/console/console.h"
 #include "src/developer/debug/zxdb/console/format_location.h"
@@ -119,6 +120,32 @@ fxl::RefPtr<AsyncOutputBuffer> ListCompletedFrames(Thread* thread, const FormatS
 
 }  // namespace
 
+FormatStackOptions FormatStackOptions::GetFrameOptions(Target* target, bool verbose, bool all_types,
+                                                       int max_depth) {
+  FormatStackOptions opts;
+
+  opts.frame.loc = FormatLocationOptions(target);
+
+  opts.frame.loc.func.name.elide_templates = true;
+  opts.frame.loc.func.name.bold_last = true;
+  opts.frame.loc.func.name.enable_pretty = true;
+  opts.frame.loc.func.params =
+      all_types ? FormatFunctionNameOptions::kParamTypes : FormatFunctionNameOptions::kElideParams;
+
+  if (verbose) {
+    opts.frame.loc.func.name.elide_templates = false;
+    opts.frame.loc.func.name.enable_pretty = false;
+    opts.frame.loc.func.params = FormatFunctionNameOptions::kParamTypes;
+  }
+
+  opts.frame.variable.verbosity = all_types ? ConsoleFormatOptions::Verbosity::kAllTypes
+                                            : ConsoleFormatOptions::Verbosity::kMinimal;
+  opts.frame.variable.pointer_expand_depth = 1;
+  opts.frame.variable.max_depth = max_depth;
+
+  return opts;
+}
+
 fxl::RefPtr<AsyncOutputBuffer> FormatStack(Thread* thread, bool force_update,
                                            const FormatStackOptions& opts) {
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
@@ -180,6 +207,44 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFrame(const Frame* frame, const FormatFrame
   }
 
   out->Complete();
+  return out;
+}
+
+fxl::RefPtr<AsyncOutputBuffer> FormatAllThreadStacks(const std::vector<Thread*>& threads,
+                                                     bool force_update,
+                                                     const FormatStackOptions& opts,
+                                                     fxl::RefPtr<CommandContext>& cmd_context) {
+  struct PackedJoinType {
+    OutputBuffer out;
+    Thread* thread;
+  };
+
+  auto joiner = fxl::MakeRefCounted<JoinCallbacks<PackedJoinType>>();
+
+  for (auto thread : threads) {
+    auto async_out = FormatStack(thread, force_update, opts);
+    if (async_out->is_complete()) {
+      auto cb = joiner->AddCallback();
+      PackedJoinType p{async_out->DestructiveFlatten(), thread};
+      cb(p);
+    } else {
+      async_out->SetCompletionCallback([async_out, cb = joiner->AddCallback(), thread]() mutable {
+        PackedJoinType p{async_out->DestructiveFlatten(), thread};
+        cb(p);
+      });
+    }
+  }
+
+  auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+  joiner->Ready([out, cmd_context](const std::vector<PackedJoinType>& results) {
+    for (const auto& result : results) {
+      out->Append(FormatThread(cmd_context->GetConsoleContext(), result.thread));
+      out->Append("\n");
+      out->Append(result.out);
+    }
+    out->Complete();
+  });
+
   return out;
 }
 

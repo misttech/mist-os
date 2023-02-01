@@ -18,8 +18,10 @@
 #include "src/developer/debug/zxdb/client/mock_thread.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/common/err.h"
+#include "src/developer/debug/zxdb/common/test_with_loop.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/console_context.h"
+#include "src/developer/debug/zxdb/console/format_frame.h"
 #include "src/developer/debug/zxdb/console/mock_console.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
 #include "src/developer/debug/zxdb/expr/expr_parser.h"
@@ -275,8 +277,8 @@ TEST(CommandUtils, AssertStoppedThreadWithFrameCommand) {
   EXPECT_EQ("\"steps\" requires a thread but there is no current thread.", err.msg());
 
   // Supply a valid thread, this should succeed.
-  cmd.set_thread(&thread);
-  cmd.set_frame(thread.GetStack()[0]);
+  cmd.add_thread(&thread);
+  cmd.add_frame(thread.GetStack()[0]);
   err = AssertStoppedThreadWithFrameCommand(&console.context(), cmd, "steps", true);
   EXPECT_FALSE(err.has_error());
 
@@ -288,6 +290,78 @@ TEST(CommandUtils, AssertStoppedThreadWithFrameCommand) {
       "To view and sync thread state with the remote system, type \"thread\".\n"
       "Or type \"pause\" to pause a running thread.",
       err.msg());
+}
+
+TEST(CommandUtils, FormatAllThreadStacks) {
+  Session session;
+  MockConsole console(&session);
+  Command cmd;
+
+  MockTarget target(&session);
+
+  MockProcess process(&target);
+
+  MockThread t1(&process);
+  MockThread t2(&process);
+
+  std::vector<std::unique_ptr<Frame>> t1_frames;
+  std::vector<std::unique_ptr<Frame>> t2_frames;
+
+  t1_frames.push_back(std::make_unique<MockFrame>(&session, &t1, 0x1001, 0x2001, "function0",
+                                                  FileLine("file0.cc", 10)));
+  t1_frames.push_back(std::make_unique<MockFrame>(&session, &t1, 0x1002, 0x2002, "function1",
+                                                  FileLine("file1.cc", 15)));
+  t1_frames.push_back(std::make_unique<MockFrame>(&session, &t1, 0x1003, 0x2003, "function2",
+                                                  FileLine("file2.cc", 20)));
+  t1.GetStack().SetFramesForTest(std::move(t1_frames), true);
+
+  t2_frames.push_back(std::make_unique<MockFrame>(&session, &t2, 0x2001, 0x4001, "function3",
+                                                  FileLine("file3.cc", 100)));
+  t2_frames.push_back(std::make_unique<MockFrame>(&session, &t2, 0x2002, 0x4002, "function4",
+                                                  FileLine("file4.cc", 150)));
+  t2_frames.push_back(std::make_unique<MockFrame>(&session, &t2, 0x2003, 0x4003, "function5",
+                                                  FileLine("file5.cc", 200)));
+  t2_frames.push_back(std::make_unique<MockFrame>(&session, &t2, 0x2004, 0x4004, "function6",
+                                                  FileLine("file6.cc", 400)));
+  t2.GetStack().SetFramesForTest(std::move(t2_frames), true);
+
+  console.context().DidCreateTarget(&target);
+  console.context().DidCreateProcess(&process, 0);
+  console.context().DidCreateThread(&t1);
+  console.context().DidCreateThread(&t2);
+
+  // Eat the "launched process" output.
+  auto event = console.GetOutputEvent();
+
+  cmd.SetNoun(Noun::kThread, Command::kWildcard);
+  cmd.SetNoun(Noun::kFrame, Command::kNoIndex);
+  cmd.add_target(&target);
+  cmd.add_thread(&t1);
+  cmd.add_thread(&t2);
+
+  fxl::RefPtr<CommandContext> cmd_context = fxl::MakeRefCounted<ConsoleCommandContext>(&console);
+  auto opts = FormatStackOptions::GetFrameOptions(&target, false, false, 4);
+  opts.pretty_stack = console.context().pretty_stack_manager();
+
+  auto out = FormatAllThreadStacks(cmd.all_threads(), false, opts, cmd_context);
+
+  // The threads have their entire stack and we are not forcing an update, so this should be
+  // synchronous.
+  FX_CHECK(out->is_complete());
+  cmd_context->Output(out->DestructiveFlatten());
+
+  event = console.GetOutputEvent();
+  EXPECT_EQ(
+      "Thread 1 state=Suspended koid=1234 name=\"test thread\"\n"
+      "▶ 0 function0() • file0.cc:10\n"
+      "  1 function1() • file1.cc:15\n"
+      "  2 function2() • file2.cc:20\n"
+      "Thread 2 state=Suspended koid=1234 name=\"test thread\"\n"
+      "▶ 0 function3() • file3.cc:100\n"
+      "  1 function4() • file4.cc:150\n"
+      "  2 function5() • file5.cc:200\n"
+      "  3 function6() • file6.cc:400\n",
+      event.output.AsString());
 }
 
 }  // namespace zxdb

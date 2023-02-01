@@ -24,7 +24,7 @@ const char kClearHelp[] =
 
   By default, "clear" will delete the current active breakpoint. Clear a named
   breakpoint by specifying the breakpoint context for the command, e.g.
-  "breakpoint 2 clear"
+  "breakpoint 2 clear" or clear all breakpoints with "breakpoint * clear".
 
   If a location is given, the command will instead clear all breakpoints at
   that location. Note that the comparison is performed based on input rather
@@ -43,6 +43,7 @@ Examples
 
   breakpoint 2 clear
   bp 2 cl
+  bp * cl
   clear
   cl
 )";
@@ -50,11 +51,25 @@ Examples
 void RunVerbClear(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   std::vector<Breakpoint*> breakpoints;
 
-  if (Err err = ResolveBreakpointsForModification(cmd, "clear", &breakpoints); err.has_error())
+  if (Err err = cmd.ValidateNouns({Noun::kBreakpoint}, true); err.has_error()) {
     return cmd_context->ReportError(err);
+  }
 
   // This is a synchronous context so the console should always be around.
   ConsoleContext* console_context = cmd_context->GetConsoleContext();
+
+  if (cmd.GetNounIndex(Noun::kBreakpoint) == Command::kWildcard) {
+    const size_t num_breakpoints = console_context->session()->system().GetBreakpoints().size();
+    console_context->session()->system().DeleteAllBreakpoints();
+    OutputBuffer out("Deleted ");
+    out.Append(std::to_string(num_breakpoints));
+    out.Append(" breakpoints.");
+    cmd_context->Output(out);
+    return;
+  } else if (Err err = ResolveBreakpointsForModification(cmd, "clear", &breakpoints);
+             err.has_error()) {
+    return cmd_context->ReportError(err);
+  }
 
   for (Breakpoint* breakpoint : breakpoints) {
     OutputBuffer desc("Deleted ");

@@ -21,10 +21,11 @@ const char kRmShortHelp[] = "rm: Remove a debugger object.";
 const char kRmHelp[] =
     R"(<object-type> [ <object-id> ] rm
 
-  Removes the given object. Specify an explicit object id ("filter 2 rm") to
-  remove that object, or omit it ("filter rm") to remove the current one (if
-  there is one). To see a list of available objects and their IDs, use the
-  object type by itself ("filter").
+  Removes the given object(s). Specify an explicit object id ("filter 2 rm") to
+  remove that object, omit it ("filter rm") to remove the current one (if
+  there is one), or a wildcard (filter * rm) to remove all objects. To see a
+  list of available objects and their IDs, use the object type by itself
+  ("filter").
 
 filter rm
 
@@ -33,17 +34,25 @@ filter rm
 process rm
 pr rm
 pr 2 rm
+pr * rm
 
-  Removes the process. The process should be disconnected first.
+  Removes the process(es). The process should be disconnected first.
 
 breakpoint rm
 breakpoint 2 rm
 bp rm
+bp * rm
 
-  Removes the breakpoint. This is equivalent to "clear".
+  Removes the breakpoint(s). This is equivalent to "clear".
 )";
 
 void RunVerbRm(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
+  if (Err err = cmd.ValidateNouns(
+          {Noun::kBreakpoint, Noun::kFilter, Noun::kFrame, Noun::kProcess, Noun::kSymServer}, true);
+      err.has_error()) {
+    return cmd_context->ReportError(err);
+  }
+
   // Require exactly one noun to be specified for the type of object.
   if (cmd.nouns().size() != 1u || !cmd.args().empty()) {
     return cmd_context->ReportError(
@@ -57,7 +66,11 @@ void RunVerbRm(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
   OutputBuffer description;
   switch (cmd.nouns().begin()->first) {
     case Noun::kFilter: {
-      if (cmd.filter()) {
+      if (cmd.GetNounIndex(Noun::kFilter) == Command::kWildcard) {
+        description = std::to_string(console_context->session()->system().GetFilters().size());
+        description.Append(" filters.");
+        console_context->session()->system().DeleteAllFilters();
+      } else if (cmd.filter()) {
         description = FormatFilter(console_context, cmd.filter());
         console_context->session()->system().DeleteFilter(cmd.filter());
       } else {
@@ -74,7 +87,11 @@ void RunVerbRm(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
       break;
     }
     case Noun::kBreakpoint: {
-      if (cmd.breakpoint()) {
+      if (cmd.GetNounIndex(Noun::kBreakpoint) == Command::kWildcard) {
+        description = std::to_string(console_context->session()->system().GetBreakpoints().size());
+        description.Append(" breakpoints.");
+        console_context->session()->system().DeleteAllBreakpoints();
+      } else if (cmd.breakpoint()) {
         description = FormatBreakpoint(console_context, cmd.breakpoint(), false);
         console_context->session()->system().DeleteBreakpoint(cmd.breakpoint());
       } else {

@@ -75,6 +75,10 @@ Examples
 )";
 
 void RunVerbStep(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
+  if (Err err = cmd.ValidateNouns({Noun::kThread}); err.has_error()) {
+    return cmd_context->ReportError(err);
+  }
+
   if (Err err = AssertStoppedThreadWithFrameCommand(cmd_context->GetConsoleContext(), cmd, "step");
       err.has_error())
     return cmd_context->ReportError(err);

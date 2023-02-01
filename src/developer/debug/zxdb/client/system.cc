@@ -629,6 +629,18 @@ void System::DeleteBreakpoint(Breakpoint* breakpoint) {
   breakpoints_.erase(found);
 }
 
+void System::DeleteAllBreakpoints() {
+  for (auto& bp : breakpoints_) {
+    // Only notify for non-internal breakpoints.
+    if (!bp.second->is_internal()) {
+      for (auto& observer : observers_)
+        observer.WillDestroyBreakpoint(bp.second.get());
+    }
+  }
+
+  breakpoints_.clear();
+}
+
 Filter* System::CreateNewFilter() {
   Filter* to_return = filters_.emplace_back(std::make_unique<Filter>(session())).get();
 
@@ -657,6 +669,19 @@ void System::DeleteFilter(Filter* filter) {
     observer.WillDestroyFilter(filter);
 
   filters_.erase(found);
+
+  SyncFilters();
+}
+
+void System::DeleteAllFilters() {
+  for (auto& filter : filters_) {
+    for (auto& observer : observers_) {
+      observer.WillDestroyFilter(filter.get());
+    }
+  }
+
+  filters_.clear();
+
   SyncFilters();
 }
 

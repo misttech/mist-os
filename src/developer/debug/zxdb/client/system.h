@@ -104,12 +104,16 @@ class System : public ClientObject,
   // Deletes the given breakpoint. The passed-in pointer will be invalid after this call. Used for
   // both internal and external breakpoints.
   void DeleteBreakpoint(Breakpoint* breakpoint);
+  // Delete all internal and external breakpoints.
+  void DeleteAllBreakpoints();
 
   // Creates a new filter. It will have no associated pattern.
   Filter* CreateNewFilter();
 
   // Delete a filter. The passed-in pointer will be invalid after this call.
   void DeleteFilter(Filter* filter);
+  // Delete all filters in the system.
+  void DeleteAllFilters();
 
   // Pauses (suspends in Zircon terms) all threads of all attached processes.
   //

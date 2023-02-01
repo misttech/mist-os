@@ -4,12 +4,13 @@
 
 #include "src/developer/debug/zxdb/console/commands/verb_backtrace.h"
 
+#include "src/developer/debug/zxdb/client/process.h"
+#include "src/developer/debug/zxdb/client/target.h"
 #include "src/developer/debug/zxdb/console/command.h"
-#include "src/developer/debug/zxdb/console/console.h"
+#include "src/developer/debug/zxdb/console/command_utils.h"
 #include "src/developer/debug/zxdb/console/format_frame.h"
 #include "src/developer/debug/zxdb/console/format_location.h"
 #include "src/developer/debug/zxdb/console/format_node_console.h"
-#include "src/developer/debug/zxdb/console/output_buffer.h"
 #include "src/developer/debug/zxdb/console/verbs.h"
 
 namespace zxdb {
@@ -56,34 +57,27 @@ Examples
 
   t 2 bt
   thread 2 backtrace
+
+  t * bt
+  all threads backtrace
 )";
 
 void RunVerbBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
-  if (Err err = cmd.ValidateNouns({Noun::kProcess, Noun::kThread}); err.has_error())
+  if (Err err = cmd.ValidateNouns({Noun::kProcess, Noun::kThread}, true); err.has_error())
     return cmd_context->ReportError(err);
 
-  if (!cmd.thread())
+  if (!cmd.thread() && cmd.GetNounIndex(Noun::kThread) != Command::kWildcard)
     return cmd_context->ReportError(Err("There is no thread to have frames."));
 
-  FormatStackOptions opts;
+  auto opts = FormatStackOptions::GetFrameOptions(cmd.target(), cmd.HasSwitch(kVerboseBacktrace),
+                                                  cmd.HasSwitch(kForceAllTypes), 3);
 
   if (!cmd.HasSwitch(kRawOutput))
     opts.pretty_stack = cmd_context->GetConsoleContext()->pretty_stack_manager();
 
-  opts.frame.loc = FormatLocationOptions(cmd.target());
-  opts.frame.loc.func.name.elide_templates = true;
-  opts.frame.loc.func.name.bold_last = true;
-  opts.frame.loc.func.name.enable_pretty = true;
-  opts.frame.loc.func.params = cmd.HasSwitch(kForceAllTypes)
-                                   ? FormatFunctionNameOptions::kParamTypes
-                                   : FormatFunctionNameOptions::kElideParams;
-
   opts.frame.detail = FormatFrameOptions::kParameters;
   if (cmd.HasSwitch(kVerboseBacktrace)) {
     opts.frame.detail = FormatFrameOptions::kVerbose;
-    opts.frame.loc.func.name.elide_templates = false;
-    opts.frame.loc.func.name.enable_pretty = false;
-    opts.frame.loc.func.params = FormatFunctionNameOptions::kParamTypes;
   }
 
   // These are minimal since there is often a lot of data.
@@ -91,8 +85,15 @@ void RunVerbBacktrace(const Command& cmd, fxl::RefPtr<CommandContext> cmd_contex
   opts.frame.variable.verbosity = cmd.HasSwitch(kForceAllTypes)
                                       ? ConsoleFormatOptions::Verbosity::kAllTypes
                                       : ConsoleFormatOptions::Verbosity::kMinimal;
-  opts.frame.variable.pointer_expand_depth = 1;
-  opts.frame.variable.max_depth = 3;
+
+  if (cmd.GetNounIndex(Noun::kThread) == Command::kWildcard) {
+    FX_DCHECK(cmd.target());
+    FX_DCHECK(cmd.target()->GetProcess());
+
+    cmd_context->Output(
+        FormatAllThreadStacks(cmd.target()->GetProcess()->GetThreads(), true, opts, cmd_context));
+    return;
+  }
 
   bool force_update = cmd.HasSwitch(kForceRefresh);
   cmd_context->Output(FormatStack(cmd.thread(), force_update, opts));

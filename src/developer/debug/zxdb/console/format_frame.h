@@ -37,6 +37,13 @@ struct FormatFrameOptions {
 };
 
 struct FormatStackOptions {
+  // Sets common settings for |frame|. All of the parameters to this function generally share
+  // the same implications across the "frame" noun and "backtrace" verb, which are the only two
+  // places the stack can be printed from. Any specific options that a command should set can be
+  // done after this function has been called.
+  static FormatStackOptions GetFrameOptions(Target* target, bool verbose, bool all_types,
+                                            int max_depth);
+
   FormatFrameOptions frame;
 
   // If non-null, will be used to shorten the frame list.
@@ -59,6 +66,11 @@ fxl::RefPtr<AsyncOutputBuffer> FormatStack(Thread* thread, bool force_update,
 // This does not append a newline at the end of the output.
 fxl::RefPtr<AsyncOutputBuffer> FormatFrame(const Frame* frame, const FormatFrameOptions& opts,
                                            int id = -1);
+
+fxl::RefPtr<AsyncOutputBuffer> FormatAllThreadStacks(const std::vector<Thread*>& threads,
+                                                     bool force_update,
+                                                     const FormatStackOptions& opts,
+                                                     fxl::RefPtr<CommandContext>& cmd_context);
 
 }  // namespace zxdb
 

@@ -70,15 +70,13 @@ bool StartsWith(const std::string& str, const std::string& starts_with) {
   return true;
 }
 
-// Returns true if the string is all numeric digits that mean it's an index
-// token.
-bool IsIndexToken(const std::string& token) {
-  for (char c : token) {
-    if (c < '0' || c > '9')
-      return false;
-  }
-  return true;
+// Returns true if the string is all numeric digits or `*` which means it's an index token.
+bool IsIndexToken(std::string_view token) {
+  return std::all_of(token.cbegin(), token.cend(),
+                     [](const char c) { return (c >= '0' && c <= '9'); });
 }
+
+bool IsWildcardToken(std::string_view token) { return token == "*"; }
 
 class Parser {
  public:
@@ -310,10 +308,14 @@ bool Parser::DoNounState() {
   return Consume(Parser::kNounIndexState);
 }
 
-// Consume optional following index if it's all integers. For example, it
-// could be "process 2 run" (with index) or "process run" (without).
+// Consume optional following index if it's an index selector. For example, it
+// could be "process 2 run" (with index) or "process run" (without) or "filter * rm" (with
+// wildcard).
 bool Parser::DoNounIndexState() {
-  if (at_end() || !IsIndexToken(token_str())) {
+  if (!at_end() && IsWildcardToken(token_str())) {
+    command_->SetNoun(noun_, Command::kWildcard);
+    return Consume(Parser::kNounState);
+  } else if (at_end() || !IsIndexToken(token_str())) {
     command_->SetNoun(noun_, Command::kNoIndex);
     return GoTo(Parser::kNounState);
   }

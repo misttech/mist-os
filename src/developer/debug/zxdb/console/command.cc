@@ -17,8 +17,6 @@
 
 namespace zxdb {
 
-const int Command::kNoIndex;
-
 Command::Command() = default;
 Command::~Command() = default;
 
@@ -36,11 +34,13 @@ void Command::SetNoun(Noun noun, int index) {
   nouns_[noun] = index;
 }
 
-Err Command::ValidateNouns(std::initializer_list<Noun> allowed_nouns) const {
+Err Command::ValidateNouns(std::initializer_list<Noun> allowed_nouns, bool allow_wildcard) const {
   for (const auto& pair : nouns_) {
     if (std::find(allowed_nouns.begin(), allowed_nouns.end(), pair.first) == allowed_nouns.end()) {
       return Err(ErrType::kInput, fxl::StringPrintf("\"%s\" may not be specified for this command.",
                                                     NounToString(pair.first).c_str()));
+    } else if (!allow_wildcard && GetNounIndex(pair.first) == kWildcard) {
+      return Err(ErrType::kInput, "Wildcard \"*\" specifier is not allowed with this command.");
     }
   }
   return Err();

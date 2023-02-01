@@ -927,11 +927,13 @@ Err ConsoleContext::FillOutTarget(Command* cmd, TargetRecord const** out_target_
     target_id = active_target_id_;
     auto found_target = id_to_target_.find(target_id);
     FX_DCHECK(found_target != id_to_target_.end());
-    cmd->set_target(found_target->second.target);
+    cmd->add_target(found_target->second.target);
 
     FX_DCHECK(cmd->target());  // Default target should always exist.
     *out_target_record = GetTargetRecord(target_id);
     return Err();
+  } else if (target_id == Command::kWildcard) {
+    return Err(ErrType::kInput, "`*` is not supported for \"process\". Did you mean `detach *`?");
   }
 
   // Explicit index given, look it up.
@@ -939,7 +941,7 @@ Err ConsoleContext::FillOutTarget(Command* cmd, TargetRecord const** out_target_
   if (found_target == id_to_target_.end()) {
     return Err(ErrType::kInput, fxl::StringPrintf("There is no process %d.", target_id));
   }
-  cmd->set_target(found_target->second.target);
+  cmd->add_target(found_target->second.target);
   *out_target_record = GetTargetRecord(target_id);
   return Err();
 }
@@ -948,6 +950,7 @@ Err ConsoleContext::FillOutThread(Command* cmd, const TargetRecord* target_recor
                                   ThreadRecord const** out_thread_record) const {
   int thread_id = cmd->GetNounIndex(Noun::kThread);
   const ThreadRecord* thread_record = nullptr;
+
   if (thread_id == Command::kNoIndex) {
     // No thread specified, use the default one.
     thread_id = target_record->active_thread_id;
@@ -958,9 +961,21 @@ Err ConsoleContext::FillOutThread(Command* cmd, const TargetRecord* target_recor
       FX_DCHECK(thread_id == 0);
     } else {
       thread_record = &found_thread->second;
-      cmd->set_thread(thread_record->thread);
+      cmd->add_thread(thread_record->thread);
     }
     *out_thread_record = thread_record;
+    return Err();
+  } else if (thread_id == Command::kWildcard) {
+    // All threads specified.
+
+    Process* process = target_record->target->GetProcess();
+    if (!process)
+      return Err(ErrType::kInput, "There is no process.");
+
+    for (auto thread : process->GetThreads()) {
+      cmd->add_thread(thread);
+    }
+
     return Err();
   }
 
@@ -975,7 +990,7 @@ Err ConsoleContext::FillOutThread(Command* cmd, const TargetRecord* target_recor
   }
 
   thread_record = &found_thread->second;
-  cmd->set_thread(thread_record->thread);
+  cmd->add_thread(thread_record->thread);
   *out_thread_record = thread_record;
   return Err();
 }
@@ -988,11 +1003,11 @@ Err ConsoleContext::FillOutFrame(Command* cmd, const ThreadRecord* thread_record
       auto& stack = thread_record->thread->GetStack();
       frame_id = thread_record->active_frame_id;
       if (frame_id >= 0 && frame_id < static_cast<int>(stack.size())) {
-        cmd->set_frame(stack[frame_id]);
+        cmd->add_frame(stack[frame_id]);
       } else if (!stack.empty()) {
         // Invalid frame index, default to 0th frame.
         frame_id = 0;
-        cmd->set_frame(stack[0]);
+        cmd->add_frame(stack[0]);
       }
     }
     return Err();
@@ -1015,7 +1030,7 @@ Err ConsoleContext::FillOutFrame(Command* cmd, const ThreadRecord* thread_record
       }
     }
     if (top_physical_frame || stack.has_all_frames()) {
-      cmd->set_frame(stack[frame_id]);
+      cmd->add_frame(stack[frame_id]);
       return Err();
     }
   }
@@ -1044,7 +1059,12 @@ Err ConsoleContext::FillOutBreakpoint(Command* cmd) const {
   int breakpoint_id = cmd->GetNounIndex(Noun::kBreakpoint);
   if (breakpoint_id == Command::kNoIndex) {
     // No index: use the active one (which may not exist).
-    cmd->set_breakpoint(GetActiveBreakpoint());
+    cmd->add_breakpoint(GetActiveBreakpoint());
+    return Err();
+  } else if (breakpoint_id == Command::kWildcard) {
+    for (auto bp : session_->system().GetBreakpoints()) {
+      cmd->add_breakpoint(bp);
+    }
     return Err();
   }
 
@@ -1053,7 +1073,7 @@ Err ConsoleContext::FillOutBreakpoint(Command* cmd) const {
   if (found_breakpoint == id_to_breakpoint_.end()) {
     return Err(ErrType::kInput, fxl::StringPrintf("There is no breakpoint %d.", breakpoint_id));
   }
-  cmd->set_breakpoint(found_breakpoint->second);
+  cmd->add_breakpoint(found_breakpoint->second);
   return Err();
 }
 
@@ -1061,7 +1081,12 @@ Err ConsoleContext::FillOutFilter(Command* cmd) const {
   int filter_id = cmd->GetNounIndex(Noun::kFilter);
   if (filter_id == Command::kNoIndex) {
     // No index: use the active one (which may not exist).
-    cmd->set_filter(GetActiveFilter());
+    cmd->add_filter(GetActiveFilter());
+    return Err();
+  } else if (filter_id == Command::kWildcard) {
+    for (auto filter : session_->system().GetFilters()) {
+      cmd->add_filter(filter);
+    }
     return Err();
   }
 
@@ -1070,7 +1095,7 @@ Err ConsoleContext::FillOutFilter(Command* cmd) const {
   if (found_filter == id_to_filter_.end()) {
     return Err(ErrType::kInput, fxl::StringPrintf("There is no filter %d.", filter_id));
   }
-  cmd->set_filter(found_filter->second);
+  cmd->add_filter(found_filter->second);
   return Err();
 }
 
@@ -1078,7 +1103,12 @@ Err ConsoleContext::FillOutSymbolServer(Command* cmd) const {
   int symbol_server_id = cmd->GetNounIndex(Noun::kSymServer);
   if (symbol_server_id == Command::kNoIndex) {
     // No index: use the active one (which may not exist).
-    cmd->set_sym_server(GetActiveSymbolServer());
+    cmd->add_sym_server(GetActiveSymbolServer());
+    return Err();
+  } else if (symbol_server_id == Command::kWildcard) {
+    for (auto ss : session_->system().GetSymbolServers()) {
+      cmd->add_sym_server(ss);
+    }
     return Err();
   }
 
@@ -1088,7 +1118,7 @@ Err ConsoleContext::FillOutSymbolServer(Command* cmd) const {
     return Err(ErrType::kInput,
                fxl::StringPrintf("There is no symbol server %d.", symbol_server_id));
   }
-  cmd->set_sym_server(found_symbol_server->second);
+  cmd->add_sym_server(found_symbol_server->second);
   return Err();
 }
 

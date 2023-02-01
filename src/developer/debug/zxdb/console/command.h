@@ -33,6 +33,10 @@ class Command {
   // For example the command "process step" specifies the process noun but
   // not an index.
   static constexpr int kNoIndex = -1;
+  // This indicates the operation should be done for all instances of this noun. Typically, this is
+  // used to remove all filters or breakpoints, or detach from all processes. Typical use is like:
+  // filter * rm
+  static constexpr int kWildcard = -2;
 
   Command();
   ~Command();
@@ -51,9 +55,11 @@ class Command {
   const std::map<Noun, int>& nouns() const { return nouns_; }
 
   // Checks the specified nouns against the parameter listing the allowed ones.
-  // If any nouns are specified that are not in the list, generates an error
-  // and returns it. Otherwise it will return an empty error.
-  Err ValidateNouns(std::initializer_list<Noun> allowed_nouns) const;
+  // If any nouns are specified that are not in the list, generates an error and
+  // returns it. If |allow_wildcard| is false, and a wildcard specifier is
+  // present, will generate an appropriate error message. Otherwise it will
+  // return an empty error.
+  Err ValidateNouns(std::initializer_list<Noun> allowed_nouns, bool allow_wildcard = false) const;
 
   Verb verb() const { return verb_; }
   void set_verb(Verb v) { verb_ = v; }
@@ -76,37 +82,52 @@ class Command {
   // objects corresponding to the indices given on the command line, and
   // default to the current one for the current command line.
   //
-  // If HasNoun() returns true, the corresponding getter here is guaranteed
-  // non-null.
-  Frame* frame() const { return frame_; }
-  void set_frame(Frame* f) { frame_ = f; }
-  Target* target() const { return target_; }
-  void set_target(Target* t) { target_ = t; }
-  Thread* thread() const { return thread_; }
-  void set_thread(Thread* t) { thread_ = t; }
-  Breakpoint* breakpoint() const { return breakpoint_; }
-  void set_breakpoint(Breakpoint* b) { breakpoint_ = b; }
-  Filter* filter() const { return filter_; }
-  void set_filter(Filter* b) { filter_ = b; }
-  SymbolServer* sym_server() const { return symbol_server_; }
-  void set_sym_server(SymbolServer* s) { symbol_server_ = s; }
+  // If |HasNoun()| returns true, the corresponding getter here is guaranteed to
+  // be non-null or have size() > 0. Most commands are interacting with a single
+  // noun, so there are convenience getters for when only a single object is
+  // needed/expected. These will only work when there is exactly one instance of
+  // that noun associated with this command.
+  Frame* frame() const { return frames_.size() == 1 ? frames_[0] : nullptr; }
+  const std::vector<Frame*>& all_frames() const { return frames_; }
+  void add_frame(Frame* f) { frames_.push_back(f); }
+  Target* target() const {
+    // Enforce at least one target exists.
+    FX_DCHECK(!targets_.empty());
+    return targets_[0];
+  }
+  const std::vector<Target*>& all_targets() const { return targets_; }
+  void add_target(Target* t) { targets_.push_back(t); }
+  Thread* thread() const { return threads_.size() == 1 ? threads_[0] : nullptr; }
+  const std::vector<Thread*>& all_threads() const { return threads_; }
+  void add_thread(Thread* t) { threads_.push_back(t); }
+  Breakpoint* breakpoint() const { return breakpoints_.size() == 1 ? breakpoints_[0] : nullptr; }
+  const std::vector<Breakpoint*>& all_breakpoints() const { return breakpoints_; }
+  void add_breakpoint(Breakpoint* b) { breakpoints_.push_back(b); }
+  Filter* filter() const { return filters_.size() == 1 ? filters_[0] : nullptr; }
+  const std::vector<Filter*>& all_filters() const { return filters_; }
+  void add_filter(Filter* f) { filters_.push_back(f); }
+  SymbolServer* sym_server() const {
+    return symbol_servers_.size() == 1 ? symbol_servers_[0] : nullptr;
+  }
+  const std::vector<SymbolServer*>& all_sym_servers() const { return symbol_servers_; }
+  void add_sym_server(SymbolServer* s) { symbol_servers_.push_back(s); }
 
  private:
-  // The nouns specified for this command. If not present here, the noun
-  // was not written on the command line. If present but there was no index
-  // given for it, the mapped value will be kNoIndex. Otherwise the mapped
-  // value will be the index specified.
+  // The nouns specified for this command. If not present here, the noun was not
+  // written on the command line. If present but there was no index given for
+  // it, the mapped value will be kNoIndex. Wildcards are represented as
+  // |kWildcard|. Otherwise the mapped value will be the index specified.
   std::map<Noun, int> nouns_;
 
-  // The effective context for the command. The explicitly specified process/
-  // thread/etc. will be reflected here, and anything that wasn't explicit
+  // The effective context for the command. The explicitly specified process(es)/
+  // thread(s)/etc. will be reflected here, and anything that wasn't explicit
   // will inherit the default.
-  Target* target_ = nullptr;               // Guaranteed non-null for valid commands.
-  Thread* thread_ = nullptr;               // Will be null if not running.
-  Frame* frame_ = nullptr;                 // Will be null if no valid thread stopped.
-  Breakpoint* breakpoint_ = nullptr;       // May be null.
-  Filter* filter_ = nullptr;               // May be null.
-  SymbolServer* symbol_server_ = nullptr;  // May be null.
+  std::vector<Target*> targets_;               // Guaranteed non-empty for valid commands.
+  std::vector<Thread*> threads_;               // Will be empty if not running.
+  std::vector<Frame*> frames_;                 // Will be empty if no valid thread stopped.
+  std::vector<Breakpoint*> breakpoints_;       // May be empty.
+  std::vector<Filter*> filters_;               // May be empty.
+  std::vector<SymbolServer*> symbol_servers_;  // May be empty.
 
   Verb verb_ = Verb::kNone;
 

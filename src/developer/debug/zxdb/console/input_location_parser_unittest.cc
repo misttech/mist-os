@@ -335,8 +335,8 @@ TEST_F(InputLocationParserTest, CompleteInputLocation) {
 
   Command command;
   command.set_verb(Verb::kBreak);
-  command.set_target(&target);
-  command.set_frame(&frame);
+  command.add_target(&target);
+  command.add_frame(&frame);
 
   // TEST CODE -------------------------------------------------------------------------------------
 

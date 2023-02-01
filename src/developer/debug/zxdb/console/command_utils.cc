@@ -24,10 +24,12 @@
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/zxdb/console/async_output_buffer.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/console.h"
 #include "src/developer/debug/zxdb/console/console_context.h"
 #include "src/developer/debug/zxdb/console/format_context.h"
+#include "src/developer/debug/zxdb/console/format_frame.h"
 #include "src/developer/debug/zxdb/console/format_location.h"
 #include "src/developer/debug/zxdb/console/format_name.h"
 #include "src/developer/debug/zxdb/console/format_node_console.h"
@@ -312,18 +314,23 @@ Err ResolveBreakpointsForModification(const Command& cmd, const char* command_na
   }
 
   // When cmd.args().size() == 0, use the command's breakpoint context.
-  Err err = cmd.ValidateNouns({Noun::kBreakpoint});
+  Err err = cmd.ValidateNouns({Noun::kBreakpoint}, true);
   if (err.has_error())
     return err;
 
-  if (!cmd.breakpoint()) {
+  if (cmd.GetNounIndex(Noun::kBreakpoint) == Command::kWildcard) {
+    for (const auto bp : cmd.all_breakpoints()) {
+      output->push_back(bp);
+    }
+  } else if (cmd.breakpoint()) {
+    output->push_back(cmd.breakpoint());
+  } else {
     return Err(
         fxl::StringPrintf("There is no active breakpoint and no breakpoint or location was given.\n"
                           "Use \"bp <index> %s\" or \"%s <location>\" to specify one.\n",
                           command_name, command_name));
   }
 
-  output->push_back(cmd.breakpoint());
   return Err();
 }
 

@@ -130,4 +130,40 @@ TEST_F(VerbNewRmTest, Breakpoint) {
   EXPECT_EQ("Removed Breakpoint 1 pending @ <no location>\n", event.output.AsString());
 }
 
+TEST_F(VerbNewRmTest, Wildcard) {
+  MockConsole console(&session());
+
+  // Remove all breakpoints.
+  console.ProcessInputLine("bp new");
+  auto event = console.GetOutputEvent();
+  EXPECT_EQ("Breakpoint 1 pending @ <no location>\n", event.output.AsString());
+
+  console.ProcessInputLine("bp new");
+  event = console.GetOutputEvent();
+  EXPECT_EQ("Breakpoint 2 pending @ <no location>\n", event.output.AsString());
+
+  console.ProcessInputLine("bp * rm");
+  event = console.GetOutputEvent();
+  EXPECT_EQ("Removed 2 breakpoints.", event.output.AsString());
+
+  // Filters should also work.
+  console.ProcessInputLine("attach foo");
+  event = console.GetOutputEvent();
+  ASSERT_EQ(
+      "Waiting for process matching \"foo\".\n"
+      "Type \"filter\" to see the current filters.",
+      event.output.AsString());
+
+  console.ProcessInputLine("attach bar");
+  event = console.GetOutputEvent();
+  ASSERT_EQ(
+      "Waiting for process matching \"bar\".\n"
+      "Type \"filter\" to see the current filters.",
+      event.output.AsString());
+
+  console.ProcessInputLine("filter * rm");
+  event = console.GetOutputEvent();
+  EXPECT_EQ("Removed 2 filters.", event.output.AsString());
+}
+
 }  // namespace zxdb

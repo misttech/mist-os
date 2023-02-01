@@ -34,7 +34,6 @@
 #include "src/developer/debug/zxdb/console/output_buffer.h"
 #include "src/developer/debug/zxdb/console/string_util.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 namespace zxdb {
 
@@ -44,6 +43,17 @@ constexpr int kForceTypes = 1;
 constexpr int kVerboseSwitch = 2;
 constexpr int kRawOutput = 3;
 constexpr int kForceRefresh = 4;
+
+// Sets formatting options commonly used for outputting stack frames for the "frame" noun.
+FormatStackOptions GetFormatStackOptions(const Command& cmd, ConsoleContext* console_context) {
+  auto opts = FormatStackOptions::GetFrameOptions(cmd.target(), cmd.HasSwitch(kVerboseSwitch),
+                                                  cmd.HasSwitch(kForceTypes), 4);
+
+  if (!cmd.HasSwitch(kRawOutput))
+    opts.pretty_stack = console_context->pretty_stack_manager();
+
+  return opts;
+}
 
 // Frames ------------------------------------------------------------------------------------------
 
@@ -99,6 +109,9 @@ Examples
 
   process 2 thread 1 frame 3
     Selects the specified process, thread, and frame.
+
+  pr 2 t * frame
+    Lists all stack frames of all threads in process 2.
 )";
 
 // Returns true if processing should stop (either a frame command or an error), false to continue
@@ -108,40 +121,24 @@ bool HandleFrameNoun(ConsoleContext* console_context, const Command& cmd,
   if (!cmd.HasNoun(Noun::kFrame))
     return false;
 
-  if (!cmd.thread()) {
+  if (cmd.all_threads().empty()) {
     cmd_context->ReportError(Err(ErrType::kInput, "There is no thread to have frames."));
     return true;
+  } else if (cmd.GetNounIndex(Noun::kThread) == Command::kWildcard) {
+    // Let |HandleThreadNoun| handle the case where we're printing the call stack for all threads.
+    return false;
   }
 
-  FormatStackOptions opts;
-
-  if (!cmd.HasSwitch(kRawOutput))
-    opts.pretty_stack = console_context->pretty_stack_manager();
-
-  opts.frame.loc = FormatLocationOptions(cmd.target());
-  opts.frame.loc.func.name.elide_templates = true;
-  opts.frame.loc.func.name.bold_last = true;
-  opts.frame.loc.func.name.enable_pretty = true;
-  opts.frame.loc.func.params = cmd.HasSwitch(kForceTypes) ? FormatFunctionNameOptions::kParamTypes
-                                                          : FormatFunctionNameOptions::kElideParams;
-
-  opts.frame.variable.verbosity = cmd.HasSwitch(kForceTypes)
-                                      ? ConsoleFormatOptions::Verbosity::kAllTypes
-                                      : ConsoleFormatOptions::Verbosity::kMinimal;
-  opts.frame.variable.pointer_expand_depth = 1;
-  opts.frame.variable.max_depth = 4;
+  FormatStackOptions opts = GetFormatStackOptions(cmd, console_context);
 
   if (cmd.GetNounIndex(Noun::kFrame) == Command::kNoIndex) {
-    // Just "frame", this lists available frames.
-    opts.frame.detail = FormatFrameOptions::kSimple;
-    if (cmd.HasSwitch(kVerboseSwitch)) {
-      opts.frame.loc.func.name.elide_templates = false;
-      opts.frame.loc.func.name.enable_pretty = false;
-      opts.frame.loc.func.params = FormatFunctionNameOptions::kParamTypes;
-    }
+    // Just "frame", this lists available frames. Simple format is the default.
 
-    bool force_refresh = cmd.HasSwitch(kForceRefresh);
-    cmd_context->Output(FormatStack(cmd.thread(), force_refresh, opts));
+    cmd_context->Output(FormatStack(cmd.thread(), cmd.HasSwitch(kForceRefresh), opts));
+    return true;
+  } else if (cmd.GetNounIndex(Noun::kFrame) == Command::kWildcard) {
+    cmd_context->ReportError(
+        Err(ErrType::kInput, "frame * is not supported, did you mean thread * frame?"));
     return true;
   }
 
@@ -208,6 +205,12 @@ bool HandleFilterNoun(ConsoleContext* console_context, const Command& cmd,
     // Just "filter", this lists available filters.
     cmd_context->Output(FormatFilterList(console_context));
     return true;
+  } else if (cmd.GetNounIndex(Noun::kFilter) == Command::kWildcard) {
+    // "filter *" doesn't make sense without a verb, which will end up calling the verb executor,
+    // and should never get here. Return an error.
+    cmd_context->ReportError(
+        Err(ErrType::kInput, "filter * can only be used with a corresponding verb."));
+    return true;
   }
 
   FX_DCHECK(cmd.filter());
@@ -232,7 +235,9 @@ const char kThreadHelp[] =
 
   With an ID and another command following it ("thread 3 step"), modifies the
   thread for that command only. This allows stepping or interrogating threads
-  regardless of which is the active one.
+  regardless of which is the active one. "*" is a special ID ("thread * ...")
+  that can be used with certain actions and "frame" to apply the operation to
+  all threads. Using the "*" ID does not change the active thread.
 
 Examples
 
@@ -256,6 +261,9 @@ Examples
 
   process 2 thread 1 step
       Steps thread 1 in process 2, regardless of the active process or thread.
+
+  thread * frame
+      Prints the stack frames for all threads. See also help backtrace.
 )";
 
 // Prints the thread list for the given process to the console.
@@ -323,6 +331,21 @@ bool HandleThreadNoun(ConsoleContext* console_context, const Command& cmd,
   if (cmd.GetNounIndex(Noun::kThread) == Command::kNoIndex) {
     // Just "thread" or "process 2 thread" specified, this lists available threads.
     ScheduleListThreads(cmd_context, process);
+    return true;
+  } else if (cmd.GetNounIndex(Noun::kThread) == Command::kWildcard) {
+    // If we get here, it means thread was specified with a wildcard, but no verb. No nouns
+    // other than "frame" makes sense in this context.
+    if (!cmd.HasNoun(Noun::kFrame)) {
+      cmd_context->ReportError(
+          Err(ErrType::kInput,
+              "thread * must be used with a verb or frame. See help thread for more."));
+      return true;
+    }
+
+    cmd_context->Output(FormatAllThreadStacks(cmd.all_threads(), cmd.HasSwitch(kForceRefresh),
+                                              GetFormatStackOptions(cmd, console_context),
+                                              cmd_context));
+
     return true;
   }
 
@@ -610,6 +633,12 @@ bool HandleBreakpointNoun(ConsoleContext* console_context, const Command& cmd,
     // individual breakpoint location.
     bool include_locations = cmd.HasSwitch(kVerboseSwitch);
     ListBreakpoints(console_context, cmd_context, include_locations);
+    return true;
+  } else if (cmd.GetNounIndex(Noun::kBreakpoint) == Command::kWildcard) {
+    // "breakpoint *" doesn't make sense without a verb, which will end up calling the verb
+    // executor, and should never get here. Return an error.
+    cmd_context->ReportError(
+        Err(ErrType::kInput, "breakpoint * can only be used with a corresponding verb."));
     return true;
   }
 

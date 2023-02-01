@@ -29,6 +29,7 @@ class Command;
 class ConsoleContext;
 class Err;
 class ExecutionScope;
+struct FormatStackOptions;
 class Frame;
 class Function;
 struct InputLocation;
