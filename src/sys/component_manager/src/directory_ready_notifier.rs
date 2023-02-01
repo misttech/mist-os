@@ -252,11 +252,9 @@ impl DirectoryReadyNotifier {
         let (node, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
         outgoing_dir
             .open(
-                // TODO(fxbug.dev/118292): remove need of WRITABLE for the diagnostics directory.
-                rights.into_legacy()
-                    | fio::OpenFlags::DESCRIBE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_READABLE,
+                // TODO(fxbug.dev/118292): we might be able to remove READABLE from here, but at the
+                // moment driver_manager fails to expose inspect if we remove it.
+                rights.into_legacy() | fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
                 fio::MODE_TYPE_DIRECTORY,
                 &canonicalized_path,
                 ServerEnd::new(server_end.into_channel()),
