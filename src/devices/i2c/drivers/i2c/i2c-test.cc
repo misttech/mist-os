@@ -32,11 +32,10 @@ class FakeI2cImpl : public DeviceType,
   }
 
   static FakeI2cImpl* Create(zx_device_t* parent, std::vector<fi2c::I2CChannel> channels) {
-    fidl::Arena<> arena;
-    fi2c::I2CBusMetadata metadata(arena);
-
     auto channels_view = fidl::VectorView<fi2c::I2CChannel>::FromExternal(channels);
-    metadata.set_channels(arena, channels_view);
+
+    fidl::Arena<> arena;
+    auto metadata = fi2c::I2CBusMetadata::Builder(arena).channels(channels_view).Build();
 
     auto bytes = fidl::Persist(metadata);
     ZX_ASSERT(bytes.is_ok());
@@ -63,10 +62,7 @@ class FakeI2cImpl : public DeviceType,
 };
 
 fi2c::I2CChannel MakeChannel(fidl::AnyArena& arena, uint32_t bus_id, uint16_t addr) {
-  fi2c::I2CChannel ret(arena);
-  ret.set_address(addr);
-  ret.set_bus_id(bus_id);
-  return ret;
+  return fi2c::I2CChannel::Builder(arena).address(addr).bus_id(bus_id).Build();
 }
 
 }  // namespace

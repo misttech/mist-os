@@ -112,8 +112,8 @@ TEST_F(I2cChildTest, Write3BytesOnce) {
   auto write_transfer = fidl_i2c::wire::DataTransfer::WithWriteData(arena, write_data);
 
   auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 1);
-  transactions[0] = fidl_i2c::wire::Transaction(arena);
-  transactions[0].set_data_transfer(arena, write_transfer);
+  transactions[0] =
+      fidl_i2c::wire::Transaction::Builder(arena).data_transfer(write_transfer).Build();
 
   auto read = client_wrap->Transfer(transactions);
 
@@ -157,8 +157,8 @@ TEST_F(I2cChildTest, Read3BytesOnce) {
   auto read_transfer = fidl_i2c::wire::DataTransfer::WithReadSize(n_bytes);
 
   auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 1);
-  transactions[0] = fidl_i2c::wire::Transaction(arena);
-  transactions[0].set_data_transfer(arena, read_transfer);
+  transactions[0] =
+      fidl_i2c::wire::Transaction::Builder(arena).data_transfer(read_transfer).Build();
 
   auto read = client_wrap->Transfer(transactions);
   ASSERT_OK(read.status());
@@ -214,19 +214,23 @@ TEST_F(I2cChildTest, Write1ByteOnceRead1Byte3Times) {
   fidl::Arena arena;
   auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 4);
 
-  transactions[0] = fidl_i2c::wire::Transaction(arena);
-  transactions[0].set_data_transfer(arena,
-                                    fidl_i2c::wire::DataTransfer::WithWriteData(arena, write_data));
+  transactions[0] =
+      fidl_i2c::wire::Transaction::Builder(arena)
+          .data_transfer(fidl_i2c::wire::DataTransfer::WithWriteData(arena, write_data))
+          .Build();
 
   // 3 read transaction expecting 1 byte each.
-  transactions[1] = fidl_i2c::wire::Transaction(arena);
-  transactions[1].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
+  transactions[1] = fidl_i2c::wire::Transaction::Builder(arena)
+                        .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                        .Build();
 
-  transactions[2] = fidl_i2c::wire::Transaction(arena);
-  transactions[2].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
+  transactions[2] = fidl_i2c::wire::Transaction::Builder(arena)
+                        .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                        .Build();
 
-  transactions[3] = fidl_i2c::wire::Transaction(arena);
-  transactions[3].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
+  transactions[3] = fidl_i2c::wire::Transaction::Builder(arena)
+                        .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                        .Build();
 
   auto read = client_wrap->Transfer(transactions);
   ASSERT_OK(read.status());
@@ -273,24 +277,28 @@ TEST_F(I2cChildTest, StopFlagPropagates) {
   fidl::Arena arena;
   auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 4);
 
-  transactions[0] = fidl_i2c::wire::Transaction(arena);
-  transactions[0].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
   // Specified and set to true: the stop flag should be set to true.
-  transactions[0].set_stop(true);
+  transactions[0] = fidl_i2c::wire::Transaction::Builder(arena)
+                        .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                        .stop(true)
+                        .Build();
 
-  transactions[1] = fidl_i2c::wire::Transaction(arena);
-  transactions[1].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
   // Specified and set to false: the stop flag should be set to false.
-  transactions[1].set_stop(false);
+  transactions[1] = fidl_i2c::wire::Transaction::Builder(arena)
+                        .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                        .stop(false)
+                        .Build();
 
-  transactions[2] = fidl_i2c::wire::Transaction(arena);
-  transactions[2].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
   // Unspecified: the stop flag should be set to false.
+  transactions[2] = fidl_i2c::wire::Transaction::Builder(arena)
+                        .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                        .Build();
 
-  transactions[3] = fidl_i2c::wire::Transaction(arena);
-  transactions[3].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
   // Final transaction: the stop flag should be set to true.
-  transactions[3].set_stop(false);
+  transactions[3] = fidl_i2c::wire::Transaction::Builder(arena)
+                        .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                        .stop(false)
+                        .Build();
 
   auto read = client_wrap->Transfer(transactions);
   ASSERT_OK(read.status());
@@ -321,11 +329,11 @@ TEST_F(I2cChildTest, BadTransfers) {
     fidl::Arena arena;
     auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 2);
 
-    transactions[0] = fidl_i2c::wire::Transaction(arena);
-    transactions[0].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
+    transactions[0] = fidl_i2c::wire::Transaction::Builder(arena)
+                          .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                          .Build();
 
-    transactions[1] = fidl_i2c::wire::Transaction(arena);
-    transactions[1].set_stop(true);
+    transactions[1] = fidl_i2c::wire::Transaction::Builder(arena).stop(true).Build();
 
     auto read = client_wrap->Transfer(transactions);
     ASSERT_OK(read.status());
@@ -337,11 +345,13 @@ TEST_F(I2cChildTest, BadTransfers) {
     fidl::Arena arena;
     auto transactions = fidl::VectorView<fidl_i2c::wire::Transaction>(arena, 2);
 
-    transactions[0] = fidl_i2c::wire::Transaction(arena);
-    transactions[0].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(1));
+    transactions[0] = fidl_i2c::wire::Transaction::Builder(arena)
+                          .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(1))
+                          .Build();
 
-    transactions[1] = fidl_i2c::wire::Transaction(arena);
-    transactions[1].set_data_transfer(arena, fidl_i2c::wire::DataTransfer::WithReadSize(0));
+    transactions[1] = fidl_i2c::wire::Transaction::Builder(arena)
+                          .data_transfer(fidl_i2c::wire::DataTransfer::WithReadSize(0))
+                          .Build();
 
     auto read = client_wrap->Transfer(transactions);
     ASSERT_OK(read.status());
@@ -358,13 +368,13 @@ TEST_F(I2cChildTest, BadTransfers) {
 
     auto write1 = fidl::VectorView<uint8_t>(arena, 0);
 
-    transactions[0] = fidl_i2c::wire::Transaction(arena);
-    transactions[0].set_data_transfer(arena,
-                                      fidl_i2c::wire::DataTransfer::WithWriteData(arena, write0));
+    transactions[0] = fidl_i2c::wire::Transaction::Builder(arena)
+                          .data_transfer(fidl_i2c::wire::DataTransfer::WithWriteData(arena, write0))
+                          .Build();
 
-    transactions[1] = fidl_i2c::wire::Transaction(arena);
-    transactions[1].set_data_transfer(arena,
-                                      fidl_i2c::wire::DataTransfer::WithWriteData(arena, write1));
+    transactions[1] = fidl_i2c::wire::Transaction::Builder(arena)
+                          .data_transfer(fidl_i2c::wire::DataTransfer::WithWriteData(arena, write1))
+                          .Build();
 
     auto read = client_wrap->Transfer(transactions);
     ASSERT_OK(read.status());
