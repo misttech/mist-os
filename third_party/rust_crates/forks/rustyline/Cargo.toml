@@ -27,7 +27,7 @@ memchr = "2.0"
 utf8parse = "0.1"
 
 [target.'cfg(all(unix, not(any(target_os = "fuchsia"))))'.dependencies]
-nix = "0.20"
+nix = "0.26"
 
 [dev-dependencies]
 tempdir = "0.3"

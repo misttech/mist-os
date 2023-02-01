@@ -29,14 +29,13 @@ use ffx_emulator_config::{
     EngineState, GuestConfig, HostConfig, NetworkingMode, ShowDetail,
 };
 use fidl_fuchsia_developer_ffx as ffx;
-use nix::sys::socket::IpAddr;
 use serde::Serialize;
 use shared_child::SharedChild;
 use std::{
     env, fs,
     fs::File,
     io::{stderr, Write},
-    net::Shutdown,
+    net::{IpAddr, Ipv4Addr, Shutdown},
     ops::Sub,
     path::{Path, PathBuf},
     process::Command,
@@ -370,7 +369,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine + SerializingEngine {
             // For user mode networking always use 127.0.0.1. This avoids any firewall
             // configurations that could interfere and use IPv4 since there is issues with
             // QEMU and IPv6.
-            let local_v4_interface = IpAddr::new_v4(127, 0, 0, 1);
+            let local_v4_interface = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
             mdns_service_info = Some(MDNSInfo::new(&emu_config.host, &local_v4_interface));
         }
 

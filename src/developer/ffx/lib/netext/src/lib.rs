@@ -8,7 +8,7 @@ use libc;
 use nix::{
     ifaddrs::{getifaddrs, InterfaceAddress},
     net::if_::InterfaceFlags,
-    sys::socket::SockAddr,
+    sys::socket::{SockaddrLike, SockaddrStorage},
 };
 use regex::Regex;
 use std::ffi::CString;
@@ -103,19 +103,13 @@ impl McastInterface {
 }
 
 fn is_local_multicast_addr(addr: &InterfaceAddress) -> bool {
-    let inet_addr = match addr.address {
-        Some(SockAddr::Inet(inet)) => inet,
-        _ => return false,
-    };
-
     if !(addr.flags.contains(InterfaceFlags::IFF_UP)
         && addr.flags.contains(InterfaceFlags::IFF_MULTICAST)
         && !addr.flags.contains(InterfaceFlags::IFF_LOOPBACK))
     {
         return false;
     }
-
-    inet_addr.ip().to_std().is_local_addr()
+    ifaddr_to_socketaddr(addr.clone()).map(|address| address.ip().is_local_addr()).unwrap_or(false)
 }
 
 #[cfg(target_os = "macos")]
@@ -129,12 +123,16 @@ fn is_not_apple_touchbar(addr: &InterfaceAddress) -> bool {
     const TOUCHBAR: IpAddr =
         IpAddr::V6(Ipv6Addr::new(0xfe80, 0, 0, 0, 0xaede, 0x48ff, 0xfe00, 0x1122));
 
-    let inet_addr = match addr.address {
-        Some(SockAddr::Inet(inet)) => inet,
-        _ => return true,
-    };
+    if let Some(address) = addr.address {
+        let inet_addr = match address.as_sockaddr_in6() {
+            Some(inet) => inet,
+            _ => return true,
+        };
 
-    inet_addr.ip().to_std() != TOUCHBAR
+        inet_addr.ip() != TOUCHBAR
+    } else {
+        true
+    }
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -142,12 +140,26 @@ fn is_not_apple_touchbar(_addr: &InterfaceAddress) -> bool {
     true
 }
 
-// ifaddr_to_socketaddr returns Some(std::net::SocketAddr) if ifaddr contains an inet addr, none otherwise.
-fn ifaddr_to_socketaddr(ifaddr: InterfaceAddress) -> Option<std::net::SocketAddr> {
-    match ifaddr.address {
-        Some(SockAddr::Inet(sockaddr)) => Some(sockaddr.to_std()),
+// Convert from nix socket storage type to standard socketaddr that we can use for safe comparison.
+fn sockaddr_storage_to_socket_addr(address: SockaddrStorage) -> Option<std::net::SocketAddr> {
+    match address.family() {
+        Some(nix::sys::socket::AddressFamily::Inet) => {
+            let sin4 = *address.as_sockaddr_in().unwrap();
+            let v4: std::net::SocketAddrV4 = sin4.into();
+            Some(v4.into())
+        }
+        Some(nix::sys::socket::AddressFamily::Inet6) => {
+            let sin6 = *address.as_sockaddr_in6().unwrap();
+            let v6: std::net::SocketAddrV6 = sin6.into();
+            Some(v6.into())
+        }
         _ => None,
     }
+}
+
+// ifaddr_to_socketaddr returns Some(std::net::SocketAddr) if ifaddr contains an inet addr, none otherwise.
+fn ifaddr_to_socketaddr(ifaddr: InterfaceAddress) -> Option<std::net::SocketAddr> {
+    ifaddr.address.and_then(sockaddr_storage_to_socket_addr)
 }
 
 /// scope_id_to_name attempts to convert a scope_id to an interface name, otherwise it returns the
@@ -296,11 +308,11 @@ pub fn get_mcast_interfaces() -> Result<Vec<McastInterface>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nix::sys::socket::InetAddr;
+    use nix::sys::socket::SockaddrStorage;
     use std::str::FromStr;
 
-    fn sockaddr(s: &str) -> SockAddr {
-        SockAddr::new_inet(InetAddr::from_std(&SocketAddr::from_str(s).unwrap()))
+    fn sockaddr(s: &str) -> SockaddrStorage {
+        std::net::SocketAddr::from_str(s).unwrap().into()
     }
 
     #[test]
@@ -368,11 +380,15 @@ mod tests {
                 continue;
             }
             assert!(interfaces.iter().find(|iface| iface.name == exiface.interface_name).is_some());
-            if let Some(SockAddr::Inet(exaddr)) = exiface.address {
+            if let Some(exaddr) = exiface.address {
                 assert!(interfaces
                     .iter()
                     .find(|iface| {
-                        iface.addrs.iter().find(|addr| **addr == exaddr.to_std()).is_some()
+                        iface
+                            .addrs
+                            .iter()
+                            .find(|addr| **addr == sockaddr_storage_to_socket_addr(exaddr).unwrap())
+                            .is_some()
                     })
                     .is_some());
             }

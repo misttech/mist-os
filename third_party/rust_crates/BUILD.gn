@@ -511,7 +511,7 @@ group("mockall") {
 import("//src/lib/fuchsia_nix/nix_visibility.gni")
 
 group("nix") {
-  public_deps = [ ":nix-v0_20_0" ]
+  public_deps = [ ":nix-v0_26_2" ]
 
   visibility = nix_visibility
 }
@@ -6118,6 +6118,32 @@ rust_library("memoffset-v0_6_3") {
   visibility = [ ":*" ]
 }
 
+rust_library("memoffset-v0_7_1") {
+  crate_name = "memoffset"
+  crate_root = "//third_party/rust_crates/vendor/memoffset-0.7.1/src/lib.rs"
+  output_name = "memoffset-67ada2534d04f1ff"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2015",
+    "-Cmetadata=67ada2534d04f1ff",
+    "-Cextra-filename=-67ada2534d04f1ff",
+    "--cfg=feature=\"default\"",
+    "--cfg=tuple_ty",
+    "--cfg=allow_clippy",
+    "--cfg=maybe_uninit",
+    "--cfg=doctests",
+    "--cfg=raw_ref_macros",
+  ]
+
+  visibility = [ ":*" ]
+}
+
 rust_library("miniz_oxide-v0_3_6") {
   crate_name = "miniz_oxide"
   crate_root = "//third_party/rust_crates/vendor/miniz_oxide-0.3.6/src/lib.rs"
@@ -6301,27 +6327,69 @@ rust_library("multimap-v0_8_3") {
   visibility = [ ":*" ]
 }
 
-rust_library("nix-v0_20_0") {
+rust_library("nix-v0_26_2") {
   crate_name = "nix"
-  crate_root = "//third_party/rust_crates/vendor/nix-0.20.0/src/lib.rs"
-  output_name = "nix-212f6cb0e58efa58"
+  crate_root = "//third_party/rust_crates/vendor/nix-0.26.2/src/lib.rs"
+  output_name = "nix-228c27518909fe5c"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":bitflags-v1_3_2" ]
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":libc-v0_2_138" ]
+  deps += [ ":pin-utils-v0_1_0" ]
+  deps += [ ":static_assertions-v1_1_0" ]
+  if (!false) {
+    deps += [ ":memoffset-v0_7_1" ]
+  }
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=212f6cb0e58efa58",
-    "-Cextra-filename=-212f6cb0e58efa58",
+    "-Cmetadata=228c27518909fe5c",
+    "-Cextra-filename=-228c27518909fe5c",
+    "--cfg=feature=\"acct\"",
+    "--cfg=feature=\"aio\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"dir\"",
+    "--cfg=feature=\"env\"",
+    "--cfg=feature=\"event\"",
+    "--cfg=feature=\"feature\"",
+    "--cfg=feature=\"fs\"",
+    "--cfg=feature=\"hostname\"",
+    "--cfg=feature=\"inotify\"",
+    "--cfg=feature=\"ioctl\"",
+    "--cfg=feature=\"kmod\"",
+    "--cfg=feature=\"memoffset\"",
+    "--cfg=feature=\"mman\"",
+    "--cfg=feature=\"mount\"",
+    "--cfg=feature=\"mqueue\"",
+    "--cfg=feature=\"net\"",
+    "--cfg=feature=\"personality\"",
+    "--cfg=feature=\"pin-utils\"",
+    "--cfg=feature=\"poll\"",
+    "--cfg=feature=\"process\"",
+    "--cfg=feature=\"pthread\"",
+    "--cfg=feature=\"ptrace\"",
+    "--cfg=feature=\"quota\"",
+    "--cfg=feature=\"reboot\"",
+    "--cfg=feature=\"resource\"",
+    "--cfg=feature=\"sched\"",
+    "--cfg=feature=\"signal\"",
+    "--cfg=feature=\"socket\"",
+    "--cfg=feature=\"term\"",
+    "--cfg=feature=\"time\"",
+    "--cfg=feature=\"ucontext\"",
+    "--cfg=feature=\"uio\"",
+    "--cfg=feature=\"user\"",
+    "--cfg=feature=\"zerocopy\"",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
+  visibility += [ "//third_party/rust_crates/compat/rustyline:*" ]
 }
 
 rust_library("nom-v5_0_0") {
@@ -9428,7 +9496,7 @@ rust_library("rustyline-v2_1_0") {
   deps += [ ":unicode-segmentation-v1_2_1" ]
   deps += [ ":unicode-width-v0_1_10" ]
   if (true && !(current_os == "fuchsia")) {
-    deps += [ ":nix-v0_20_0" ]
+    deps += [ ":nix-v0_26_2" ]
   }
   if (true) {
     deps += [ ":utf8parse-v0_1_1" ]

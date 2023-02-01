@@ -655,10 +655,9 @@ impl Term for PosixTerminal {
     // Interactive loop:
 
     fn enable_raw_mode(&mut self) -> Result<Mode> {
-        use nix::errno::Errno::ENOTTY;
         use nix::sys::termios::{ControlFlags, InputFlags, LocalFlags, SpecialCharacterIndices};
         if !self.stdin_isatty {
-            try!(Err(nix::Error::from_errno(ENOTTY)));
+            try!(Err(nix::Error::ENOTTY));
         }
         let original_mode = try!(termios::tcgetattr(STDIN_FILENO));
         let mut raw = original_mode.clone();

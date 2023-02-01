@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use nix::{
-    errno::Errno,
-    unistd::{self, Pid},
-};
+use nix::unistd::{self, Pid};
 use serde::{Deserialize, Serialize};
 use std::{
     fs::{remove_file, File, Metadata, OpenOptions},
@@ -90,7 +87,7 @@ impl LockfileCreateError {
             }
             (Some(ctx), _)
                 if unistd::getpgid(Some(Pid::from_raw(ctx.pid as i32)))
-                    == Err(nix::Error::Sys(Errno::ESRCH)) =>
+                    == Err(nix::Error::ESRCH) =>
             {
                 warn!(
                     "Lockfile {path} was created by a pid that no longer exists ({pid}), \

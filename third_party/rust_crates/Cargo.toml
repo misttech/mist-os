@@ -144,7 +144,7 @@ memoffset = "0.5.3"
 miniz_oxide = "0.3.6"
 # TODO(fxbug.dev/66092) limit to tests
 mockall = "0.9"
-nix = "0.20"
+nix = "0.26.2"
 nom = { version = "5.0.0", default-features = false, features = ["std", "regexp_macros"] }
 nom_locate = "2.0.0"
 nonzero_ext = "0.3.0"
@@ -366,6 +366,8 @@ windows_x86_64_msvc = { path = "empty/windows_x86_64_msvc" }
 fatfs = { path = "forks/fatfs" }
 hound = { path = "forks/hound" }
 libm = { path = "forks/libm" }
+# FIXME(121001): Revert once pull request is accepted and rolled into a crates.io release.
+nix = { path = "forks/nix" }
 notify = { path = "forks/notify" }
 # FIXME(118248): We can unfork once undefined behavior is resolved.
 prettytable-rs = { path = "forks/prettytable-rs" }
@@ -529,8 +531,9 @@ group_visibility = { import = "//src/lib/syslog/rust/log_visibility.gni", variab
 [gn.package.memchr."2.4.0"]
 rustflags = ["--cfg=memchr_runtime_simd", "--cfg=memchr_runtime_sse2", "--cfg=memchr_runtime_sse42", "--cfg=memchr_runtime_avx"]
 
-[gn.package.nix."0.20.0"]
+[gn.package.nix."0.26.2"]
 group_visibility = { import = "//src/lib/fuchsia_nix/nix_visibility.gni", variable = "nix_visibility" }
+visibility = [":*", "//third_party/rust_crates/compat/rustyline:*"]
 
 [gn.package.num-bigint."0.4.3"]
 rustflags = [
@@ -558,6 +561,9 @@ rustflags = ["--cfg=has_i128"]
 rustflags = ["--cfg=derive_copy", "--cfg=repr_transparent", "--cfg=native_uninit"]
 
 [gn.package.memoffset."0.6.3"]
+rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
+
+[gn.package.memoffset."0.7.1"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
 
 [gn.package.num-iter."0.1.42"]

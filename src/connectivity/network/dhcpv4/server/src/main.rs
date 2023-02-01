@@ -199,19 +199,9 @@ impl<DS: DataStore> SocketServerDispatcher for Server<DS> {
             .iter()
             .map(|name| {
                 let iface_id =
-                    fuchsia_nix::net::if_::if_nametoindex(name.as_str()).map_err(|e| match e {
-                        // We use an `as` cast because discriminant enum variants do not have From
-                        // or Into implementations, cf. https://github.com/rust-lang/rfcs/pull/3040
-                        fuchsia_nix::Error::Sys(e) => std::io::Error::from_raw_os_error(e as i32),
-                        e @ fuchsia_nix::Error::InvalidUtf8 => std::io::Error::new(
-                            std::io::ErrorKind::InvalidInput,
-                            std::string::ToString::to_string(&e),
-                        ),
-                        e @ fuchsia_nix::Error::InvalidPath
-                        | e @ fuchsia_nix::Error::UnsupportedOperation => std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            std::string::ToString::to_string(&e),
-                        ),
+                    fuchsia_nix::net::if_::if_nametoindex(name.as_str()).map_err(|e| {
+                        let e: std::io::Error = e.into();
+                        e
                     })?;
                 let socket = Self::create_socket(name, Ipv4Addr::UNSPECIFIED)?;
                 Ok(SocketWithId { socket, iface_id: iface_id.into() })
