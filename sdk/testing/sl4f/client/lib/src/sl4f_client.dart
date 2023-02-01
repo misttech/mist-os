@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 // This file is named sl4f_client.dart since the top-level dart file is names
 // sl4f.dart, which would cause problems for src files trying to import this
@@ -30,7 +29,7 @@ final _log = Logger('sl4f_client');
 /// log and move on.
 const _diagnosticTimeout = Duration(minutes: 2);
 
-bool _isNullOrEmpty(String str) => str == null || str.isEmpty;
+bool _isNullOrEmpty(String? str) => str == null || str.isEmpty;
 
 /// Starts, stops and communicates with an SL4F server on a device.
 ///
@@ -75,7 +74,7 @@ class Sl4f {
   static const _sl4fHttpDefaultPort = 80;
   static final _portSuffixRe = RegExp(r':\d+$');
 
-  HttpClient _client;
+  HttpClient? _client;
 
   /// Authority (IP, hostname, etc.) of the device under test.
   String get target {
@@ -97,12 +96,12 @@ class Sl4f {
   ///
   /// It's used by this class to start/stop the SL4F server, and by some
   /// facades to start commands and forward ports.
-  final Ssh ssh;
+  late final Ssh ssh;
 
-  TcpProxyController _proxy;
+  TcpProxyController? _proxy;
 
   /// [TcpProxyController] proxy controller used to open ports to device.
-  TcpProxyController get proxy => _proxy;
+  TcpProxyController? get proxy => _proxy;
 
   /// Create a new Sl4f instance that connects to a given [target] address and
   /// uses the [ssh] connection.
@@ -114,7 +113,7 @@ class Sl4f {
   Sl4f(String target, this.ssh,
       [int port = _sl4fHttpDefaultPort,
       List<int> proxyPorts = const [],
-      HttpClient client])
+      HttpClient? client])
       : assert(target != null && target.isNotEmpty),
         targetUrl = Uri.http('$target:$port', ''),
         _client = client ?? HttpClient() {
@@ -134,9 +133,8 @@ class Sl4f {
   /// This constructor explicitly disables SSH access to the target hosting the Sl4f server.
   /// Use this for constructing a "pure HTTP" client for talking to Sl4f servers.
   /// (The Sl4f server itself has no concept of SSH).
-  Sl4f.fromUrl(this.targetUrl, [HttpClient client])
-      : ssh = null,
-        _client = client ?? HttpClient() {
+  Sl4f.fromUrl(this.targetUrl, [HttpClient? client])
+      : _client = client ?? HttpClient() {
     if (targetUrl == null) {
       throw ArgumentError('targetUrl cannot be null');
     }
@@ -164,7 +162,7 @@ class Sl4f {
   /// comma-separated list of port numbers. Ex: '12313,12314,12315,12316'. This
   /// is the pool of device ports that can be used for listening by the
   /// TcpProxyController; if not specified then any unbound port will be used.
-  factory Sl4f.fromEnvironment({Map<String, String> environment}) {
+  factory Sl4f.fromEnvironment({Map<String, String>? environment}) {
     environment ??= Platform.environment;
     final address = environment['FUCHSIA_DEVICE_ADDR'] ??
         environment['FUCHSIA_IPV4_ADDR'] ??
@@ -176,17 +174,17 @@ class Sl4f {
     }
 
     Ssh ssh;
-    int sshPort;
+    int? sshPort;
     if (!_isNullOrEmpty(environment['FUCHSIA_SSH_PORT'])) {
-      sshPort = int.tryParse(environment['FUCHSIA_SSH_PORT']);
+      sshPort = int.tryParse(environment['FUCHSIA_SSH_PORT']!);
       if (sshPort == null || sshPort <= 0) {
         throw Sl4fException('Invalid FUCHSIA_SSH_PORT: $sshPort');
       }
     }
     if (!_isNullOrEmpty(environment['FUCHSIA_SSH_KEY'])) {
-      ssh = Ssh(address, environment['FUCHSIA_SSH_KEY'], sshPort);
+      ssh = Ssh(address!, environment['FUCHSIA_SSH_KEY']!, sshPort);
     } else if (!_isNullOrEmpty(environment['SSH_AUTH_SOCK'])) {
-      ssh = Ssh.useAgent(address, sshPort);
+      ssh = Ssh.useAgent(address!, sshPort);
     } else {
       throw Sl4fException(
           'No FUCHSIA_SSH_KEY provided and SSH_AUTH_SOCK is not defined. '
@@ -201,12 +199,12 @@ class Sl4f {
 
     int port = _sl4fHttpDefaultPort;
     if (!_isNullOrEmpty(environment['SL4F_HTTP_PORT'])) {
-      port = int.parse(environment['SL4F_HTTP_PORT']);
+      port = int.parse(environment['SL4F_HTTP_PORT']!);
     }
 
     List<int> proxyPorts = [];
     if (!_isNullOrEmpty(environment['FUCHSIA_PROXY_PORTS'])) {
-      final portList = environment['FUCHSIA_PROXY_PORTS'];
+      final portList = environment['FUCHSIA_PROXY_PORTS']!;
       try {
         proxyPorts.addAll(portList
             .split(',')
@@ -283,7 +281,7 @@ class Sl4f {
     // https://www.jsonrpc.org/specification#request_object).
     final body =
         utf8.encode(jsonEncode({'id': '', 'method': method, 'params': params}));
-    final httpRequest = await _client.postUrl(targetUrl);
+    final httpRequest = await _client!.postUrl(targetUrl);
     httpRequest
       ..headers.contentType = ContentType.json
       ..contentLength = body.length
@@ -362,7 +360,7 @@ class Sl4f {
   /// stats (kstats).
   ///
   /// [dumpName] is added as a prefix to the diagnostic files.
-  Future<void> dumpDiagnostics(String dumpName, {Dump dump}) async {
+  Future<void> dumpDiagnostics(String dumpName, {Dump? dump}) async {
     final dumper = dump ?? Dump();
     if (dumper.hasDumpDirectory) {
       // TODO(isma): Switch to [Diagnostics] instead of running ssh commands.
@@ -376,7 +374,7 @@ class Sl4f {
     await proc.stdin.close();
 
     // Pipe stdout directly to the file sink (it gets closed when done).
-    final sink = dump.openForWrite(dumpName, 'txt');
+    final sink = dump.openForWrite(dumpName, 'txt')!;
     // Create completers to signal when we are done listening to stdout and
     // stderr. This is an unfortunate necessity because cancelling a
     // StreamSubscription does not create a done signal, so (for example)

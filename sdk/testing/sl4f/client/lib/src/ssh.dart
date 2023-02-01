@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:async';
 import 'dart:io';
@@ -37,14 +36,14 @@ class Ssh {
   final String target;
 
   /// SSH port to connect to the device under test, or null for default port
-  final int sshPort;
+  final int? sshPort;
 
   /// Path to an SSH key file. By default, this can be
   /// the resolved path of `~/.ssh/fuchsia_ed25519`.
-  final String sshKeyPath;
+  final String? sshKeyPath;
 
   /// Builds an SSH object that uses the credentials from a file.
-  Ssh(this.target, this.sshKeyPath, [this.sshPort])
+  Ssh(this.target, String this.sshKeyPath, [this.sshPort])
       : assert(target != null && target.isNotEmpty),
         assert(sshKeyPath != null && sshKeyPath.isNotEmpty),
         assert(sshPort == null || sshPort > 0) {
@@ -53,7 +52,7 @@ class Ssh {
     // be world-readable when it arrives on the tester bot. Ensure that it's not
     // readable otherwise ssh will reject it. See https://fxbug.dev/53492 and
     // https://crbug.com/1092020.
-    Process.run('chmod', ['og-rwx', sshKeyPath], runInShell: true);
+    Process.run('chmod', ['og-rwx', sshKeyPath!], runInShell: true);
   }
 
   /// Builds an SSH object that uses the credentials from ssh-agent only.
@@ -80,9 +79,9 @@ class Ssh {
   ///
   /// If the exit code is nonzero, diagnostic warnings are logged.
   Future<ProcessResult> runWithOutput(String cmd,
-      {String stdin,
-      StreamConsumer<String> stdoutConsumer,
-      StreamConsumer<String> stderrConsumer}) async {
+      {String? stdin,
+      StreamConsumer<String>? stdoutConsumer,
+      StreamConsumer<String>? stderrConsumer}) async {
     final process = await start(cmd);
 
     if (stdin != null) {
@@ -152,7 +151,7 @@ class Ssh {
   ///
   /// It can optionally send input via [stdin]. If the exit code is nonzero,
   /// diagnostic warnings are logged.
-  Future<ProcessResult> run(String cmd, {String stdin}) =>
+  Future<ProcessResult> run(String cmd, {String? stdin}) =>
       runWithOutput(cmd, stdin: stdin);
 
   /// Forwards TCP connections from the local [port] to the DUT's [remotePort].
@@ -161,11 +160,11 @@ class Ssh {
   /// The return value is the local forwarded port, or [PortForwardException] is
   /// thrown in case of error.
   Future<int> forwardPort(
-      {@required int remotePort, int port, int tries = 5}) async {
+      {required int remotePort, int? port, int tries = 5}) async {
     port ??= await pickUnusedPort();
     _log.fine('Forwarding TCP port: localhost:$port -> $target:$remotePort');
     await retry(
-      () => _forwardPort(remotePort, port),
+      () => _forwardPort(remotePort, port!),
       retryIf: (e) => e is PortForwardException,
       maxAttempts: tries,
     );
@@ -190,7 +189,7 @@ class Ssh {
   ///
   /// Completes to PortForwardException in case of failure.
   Future<void> cancelPortForward(
-      {@required int remotePort, @required int port}) async {
+      {required int remotePort, required int port}) async {
     _log.fine('Canceling TCP port forward: '
         'localhost:$port -> $target:$remotePort');
 
@@ -210,7 +209,7 @@ class Ssh {
   ///
   /// [PortForwardException] is thrown in case of error.
   Future<int> forwardRemotePort(
-      {@required int remotePort, @required int port, int tries = 5}) async {
+      {required int remotePort, required int port, int tries = 5}) async {
     _log.fine('Forwarding TCP port: $target:$remotePort -> localhost:$port');
     await retry(
       () => _forwardRemotePort(remotePort, port),
@@ -238,7 +237,7 @@ class Ssh {
   ///
   /// Completes to PortForwardException in case of failure.
   Future<void> cancelRemotePortForward(
-      {@required int remotePort, @required int port}) async {
+      {required int remotePort, required int port}) async {
     _log.fine('Canceling TCP port forward: '
         '$target:$remotePort -> localhost:$port');
 
@@ -279,7 +278,7 @@ class Ssh {
         '-o', 'ServerAliveInterval=10',
         '-o', 'ServerAliveCountMax=6',
       ] +
-      (sshKeyPath != null ? ['-i', sshKeyPath] : []) +
+      (sshKeyPath != null ? ['-i', sshKeyPath!] : []) +
       (sshPort != null && sshPort != 0 ? ['-p', sshPort.toString()] : []);
 
   List<String> _makeBaseArgs() => defaultArguments + ['$_sshUser@$target'];

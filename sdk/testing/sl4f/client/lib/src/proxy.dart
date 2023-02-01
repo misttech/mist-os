@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:io';
 
@@ -27,14 +26,14 @@ class TcpProxyController {
 
   /// The pool of ports to use that are explicitly forwarded by the user. It is
   /// a FIFO circular queue that is used by [openProxy] and [dropProxy].
-  final List<int> proxyPorts;
+  final List<int>? proxyPorts;
 
   /// A map from currently proxied target ports to their proxy ports.
   final Map<int, int> _targetToProxyPorts = <int, int>{};
 
   /// Creates a TcpProxyController. If [proxyPorts] isn't provided or is empty,
   /// the proxy will pick available ports itself.
-  TcpProxyController(this._sl4f, {List<int> proxyPorts})
+  TcpProxyController(this._sl4f, {List<int>? proxyPorts})
       : proxyPorts =
             (proxyPorts != null && proxyPorts.isNotEmpty) ? proxyPorts : null;
 
@@ -48,13 +47,13 @@ class TcpProxyController {
   Future<int> openProxy(int targetPort) async {
     int wantProxyPort = 0;
     if (proxyPorts != null) {
-      if (proxyPorts.isEmpty) {
+      if (proxyPorts!.isEmpty) {
         // Halt the test and notify the user that they ran out of proxy ports.
         throw SocketException('Tcp proxy ran out of ports.');
       }
-      wantProxyPort = proxyPorts.removeAt(0);
+      wantProxyPort = proxyPorts!.removeAt(0);
     }
-    final gotProxyPort = await _sl4f
+    final int gotProxyPort = await _sl4f
         .request('proxy_facade.OpenProxy', [targetPort, wantProxyPort]);
     _targetToProxyPorts[targetPort] = gotProxyPort;
     _log.fine('Forwarding TCP ports on DUT: $targetPort -> $gotProxyPort');

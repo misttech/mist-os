@@ -5140,7 +5140,7 @@
                   "isRequiredPositional": false,
                   "name": "proxyPorts",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "List<int>"
+                  "varType": "List<int>?"
                 }
               },
               "name": "TcpProxyController",
@@ -5218,7 +5218,7 @@
               "isLate": false,
               "name": "proxyPorts",
               "type": "VariableDeclarationImpl",
-              "varType": "List<int>"
+              "varType": "List<int>?"
             }
           },
           "name": "TcpProxyController",
@@ -5812,7 +5812,7 @@
                   "isRequiredPositional": false,
                   "name": "client",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "HttpClient"
+                  "varType": "HttpClient?"
                 },
                 "port": {
                   "isConst": false,
@@ -5888,7 +5888,7 @@
                   "isRequiredPositional": false,
                   "name": "environment",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Map<String, String>"
+                  "varType": "Map<String, String>?"
                 }
               },
               "name": "Sl4f.fromEnvironment",
@@ -5914,7 +5914,7 @@
                   "isRequiredPositional": false,
                   "name": "client",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "HttpClient"
+                  "varType": "HttpClient?"
                 }
               },
               "name": "Sl4f.fromUrl",
@@ -5960,7 +5960,7 @@
                   "isRequiredPositional": false,
                   "name": "dump",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Dump"
+                  "varType": "Dump?"
                 },
                 "dumpName": {
                   "isConst": false,
@@ -6067,7 +6067,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "proxy",
-              "returnType": "TcpProxyController",
+              "returnType": "TcpProxyController?",
               "type": "MethodDeclarationImpl"
             },
             "reboot": {
@@ -6193,7 +6193,7 @@
             "ssh": {
               "isConst": false,
               "isFinal": true,
-              "isLate": false,
+              "isLate": true,
               "name": "ssh",
               "type": "VariableDeclarationImpl",
               "varType": "Ssh"
@@ -6220,8 +6220,8 @@
           "ConstructorDeclarationImpl": {
             "Ssh": {
               "FieldFormalParameterImpl": {
-                "this.sshKeyPath": {
-                  "name": "this.sshKeyPath",
+                "String this.sshKeyPath": {
+                  "name": "String this.sshKeyPath",
                   "type": "FieldFormalParameterImpl"
                 },
                 "this.sshPort": {
@@ -6257,12 +6257,12 @@
                 "port": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "port",
                   "type": "SimpleFormalParameterImpl",
@@ -6271,12 +6271,12 @@
                 "remotePort": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "remotePort",
                   "type": "SimpleFormalParameterImpl",
@@ -6297,12 +6297,12 @@
                 "port": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "port",
                   "type": "SimpleFormalParameterImpl",
@@ -6311,12 +6311,12 @@
                 "remotePort": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "remotePort",
                   "type": "SimpleFormalParameterImpl",
@@ -6370,17 +6370,17 @@
                   "isRequiredPositional": false,
                   "name": "port",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 },
                 "remotePort": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "remotePort",
                   "type": "SimpleFormalParameterImpl",
@@ -6429,12 +6429,12 @@
                 "port": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "port",
                   "type": "SimpleFormalParameterImpl",
@@ -6443,12 +6443,12 @@
                 "remotePort": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "remotePort",
                   "type": "SimpleFormalParameterImpl",
@@ -6650,7 +6650,7 @@
                   "isRequiredPositional": false,
                   "name": "stdin",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 }
               },
               "isAbstract": false,
@@ -6704,7 +6704,7 @@
                   "isRequiredPositional": false,
                   "name": "stderrConsumer",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "StreamConsumer<String>"
+                  "varType": "StreamConsumer<String>?"
                 },
                 "stdin": {
                   "isConst": false,
@@ -6718,7 +6718,7 @@
                   "isRequiredPositional": false,
                   "name": "stdin",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 },
                 "stdoutConsumer": {
                   "isConst": false,
@@ -6732,7 +6732,7 @@
                   "isRequiredPositional": false,
                   "name": "stdoutConsumer",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "StreamConsumer<String>"
+                  "varType": "StreamConsumer<String>?"
                 }
               },
               "isAbstract": false,
@@ -6792,7 +6792,7 @@
               "isLate": false,
               "name": "sshKeyPath",
               "type": "VariableDeclarationImpl",
-              "varType": "String"
+              "varType": "String?"
             },
             "sshPort": {
               "isConst": false,
@@ -6800,7 +6800,7 @@
               "isLate": false,
               "name": "sshPort",
               "type": "VariableDeclarationImpl",
-              "varType": "int"
+              "varType": "int?"
             },
             "target": {
               "isConst": false,
