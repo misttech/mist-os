@@ -264,6 +264,10 @@ TEST(MagmaSystemConnection, BadBufferImport) {
   ASSERT_TRUE(semaphore->duplicate_handle(&semaphore_handle));
 
   EXPECT_FALSE(connection.ImportBuffer(semaphore_handle, id));
+
+  zx::vmo vmo;
+  ASSERT_EQ(ZX_OK, zx::vmo::create(4096, ZX_VMO_RESIZABLE, &vmo));
+  EXPECT_FALSE(connection.ImportBuffer(vmo.release(), id));
 }
 
 TEST(MagmaSystemConnection, MapBufferGpu) {
