@@ -61,8 +61,8 @@
 
 #include "lib/fidl/cpp/wire/channel.h"
 #include "src/devices/bin/driver_manager/package_resolver.h"
+#include "src/devices/bin/driver_manager/v1/composite_node_spec_v1.h"
 #include "src/devices/bin/driver_manager/v1/driver_development.h"
-#include "src/devices/bin/driver_manager/v1/node_group_v1.h"
 #include "src/devices/lib/log/log.h"
 
 namespace {

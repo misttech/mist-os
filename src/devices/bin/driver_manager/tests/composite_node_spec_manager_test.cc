@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_manager/node_group/node_group_manager.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 
 #include <lib/fit/defer.h>
 
 #include <zxtest/zxtest.h>
 
-#include "src/devices/bin/driver_manager/node_group/node_group.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 #include "src/devices/bin/driver_manager/v2/node.h"
 
 namespace fdf = fuchsia_driver_framework;

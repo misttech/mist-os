@@ -25,13 +25,13 @@
 
 #include <fbl/intrusive_double_list.h>
 
-#include "src/devices/bin/driver_manager/node_group/composite_manager_bridge.h"
-#include "src/devices/bin/driver_manager/node_group/node_group_manager.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 #include "src/devices/bin/driver_manager/v2/composite_assembler.h"
 #include "src/devices/bin/driver_manager/v2/composite_manager.h"
+#include "src/devices/bin/driver_manager/v2/composite_node_spec_v2.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
 #include "src/devices/bin/driver_manager/v2/node.h"
-#include "src/devices/bin/driver_manager/v2/node_group_v2.h"
 #include "src/devices/bin/driver_manager/v2/node_removal_tracker.h"
 #include "src/devices/bin/driver_manager/v2/node_remover.h"
 

@@ -13,9 +13,9 @@
 #include <fbl/intrusive_double_list.h>
 
 #include "src/devices/bin/driver_manager/base_package_resolver.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 #include "src/devices/bin/driver_manager/device.h"
 #include "src/devices/bin/driver_manager/driver.h"
-#include "src/devices/bin/driver_manager/node_group/composite_manager_bridge.h"
 
 class Coordinator;
 

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V1_NODE_GROUP_V1_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_NODE_GROUP_V1_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_NODE_SPEC_V1_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_NODE_SPEC_V1_H_
 
 #include "src/devices/bin/driver_manager/composite_device.h"
 #include "src/devices/bin/driver_manager/driver_loader.h"
@@ -50,4 +50,4 @@ class NodeGroupV1 : public NodeGroup {
 
 }  // namespace node_group
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V1_NODE_GROUP_V1_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_NODE_SPEC_V1_H_

@@ -9,7 +9,7 @@
 #include <zircon/status.h>
 
 #include "src/devices/bin/driver_manager/coordinator.h"
-#include "src/devices/bin/driver_manager/v1/node_group_v1.h"
+#include "src/devices/bin/driver_manager/v1/composite_node_spec_v1.h"
 #include "src/devices/lib/log/log.h"
 
 BindDriverManager::BindDriverManager(Coordinator* coordinator) : coordinator_(coordinator) {}

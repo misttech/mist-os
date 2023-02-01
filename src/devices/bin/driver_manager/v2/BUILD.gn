@@ -11,14 +11,14 @@ source_set("driver_runner") {
     "composite_assembler.h",
     "composite_manager.cc",
     "composite_manager.h",
+    "composite_node_spec_v2.cc",
+    "composite_node_spec_v2.h",
     "driver_host.cc",
     "driver_host.h",
     "driver_runner.cc",
     "driver_runner.h",
     "node.cc",
     "node.h",
-    "node_group_v2.cc",
-    "node_group_v2.h",
     "node_removal_tracker.cc",
     "node_removal_tracker.h",
     "parent_set_collector.cc",
@@ -33,7 +33,7 @@ source_set("driver_runner") {
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/bringup/lib/mexec",
     "//src/devices/bin/driver_manager:binding",
-    "//src/devices/bin/driver_manager/node_group:lib",
+    "//src/devices/bin/driver_manager/composite_node_spec:lib",
     "//src/devices/lib/log",
     "//src/lib/fsl",
     "//src/lib/fxl",
@@ -106,7 +106,7 @@ fuchsia_unittest_component("composite-assembler-test") {
 
 executable("node_group_v2_test") {
   testonly = true
-  sources = [ "node_group_v2_test.cc" ]
+  sources = [ "composite_node_spec_v2_test.cc" ]
 
   deps = [
     ":driver_runner",

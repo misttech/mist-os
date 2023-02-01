@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V2_NODE_GROUP_V2_H_
-#define SRC_DEVICES_BIN_DRIVER_MANAGER_V2_NODE_GROUP_V2_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_MANAGER_V2_COMPOSITE_NODE_SPEC_V2_H_
+#define SRC_DEVICES_BIN_DRIVER_MANAGER_V2_COMPOSITE_NODE_SPEC_V2_H_
 
-#include "src/devices/bin/driver_manager/node_group/node_group.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec.h"
 #include "src/devices/bin/driver_manager/v2/parent_set_collector.h"
 
 namespace dfv2 {
@@ -31,4 +31,4 @@ class NodeGroupV2 : public NodeGroup {
 
 }  // namespace dfv2
 
-#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V2_NODE_GROUP_V2_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_V2_COMPOSITE_NODE_SPEC_V2_H_

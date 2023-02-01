@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/bin/driver_manager/v1/node_group_v1.h"
+#include "src/devices/bin/driver_manager/v1/composite_node_spec_v1.h"
 
 #include "src/devices/lib/log/log.h"
 

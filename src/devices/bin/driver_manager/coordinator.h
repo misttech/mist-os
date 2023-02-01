@@ -38,6 +38,7 @@
 
 #include "lib/async/dispatcher.h"
 #include "src/devices/bin/driver_manager/bind_driver_manager.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_node_spec_manager.h"
 #include "src/devices/bin/driver_manager/constants.h"
 #include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/device.h"
@@ -45,7 +46,6 @@
 #include "src/devices/bin/driver_manager/driver_host.h"
 #include "src/devices/bin/driver_manager/driver_loader.h"
 #include "src/devices/bin/driver_manager/inspect.h"
-#include "src/devices/bin/driver_manager/node_group/node_group_manager.h"
 #include "src/devices/bin/driver_manager/package_resolver.h"
 #include "src/devices/bin/driver_manager/system_state_manager.h"
 #include "src/devices/bin/driver_manager/v1/device_manager.h"

@@ -5,10 +5,10 @@
 source_set("lib") {
   sources = [
     "composite_manager_bridge.h",
-    "node_group.cc",
-    "node_group.h",
-    "node_group_manager.cc",
-    "node_group_manager.h",
+    "composite_node_spec.cc",
+    "composite_node_spec.h",
+    "composite_node_spec_manager.cc",
+    "composite_node_spec_manager.h",
   ]
   public_deps = [ "//zircon/system/ulib/fbl" ]
   deps = [
