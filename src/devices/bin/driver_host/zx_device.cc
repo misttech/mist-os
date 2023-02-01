@@ -79,8 +79,8 @@ fit::callback<void(zx_status_t)> zx_device::take_unbind_children_conn() {
   return conn;
 }
 
-void zx_device::set_rebind_drv_name(const char* drv_name) {
-  rebind_drv_name_ = std::string(drv_name);
+void zx_device::set_rebind_drv_name(std::string drv_name) {
+  rebind_drv_name_ = std::move(drv_name);
 }
 
 const zx_device::DevicePowerStates& zx_device::GetPowerStates() const { return power_states_; }
@@ -418,7 +418,7 @@ void zx_device::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::
 }
 
 void zx_device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
-  set_rebind_drv_name(std::string(request->driver.get()).c_str());
+  set_rebind_drv_name(std::string(request->driver.get()));
   zx_status_t status = device_rebind(this);
   if (status != ZX_OK) {
     completer.ReplyError(status);

@@ -268,8 +268,8 @@ struct zx_device
 
   void set_rebind_conn(fit::callback<void(zx_status_t)>);
   fit::callback<void(zx_status_t)> take_rebind_conn();
-  void set_rebind_drv_name(const char* drv_name);
-  std::optional<std::string> get_rebind_drv_name() { return rebind_drv_name_; }
+  void set_rebind_drv_name(std::string drv_name);
+  const std::string& get_rebind_drv_name() { return rebind_drv_name_; }
 
   void set_unbind_children_conn(fit::callback<void(zx_status_t)>);
   fit::callback<void(zx_status_t)> take_unbind_children_conn();
@@ -562,7 +562,7 @@ struct zx_device
 
   fit::callback<void(zx_status_t)> unbind_children_conn_ TA_GUARDED(unbind_children_conn_lock_);
 
-  std::optional<std::string> rebind_drv_name_ = std::nullopt;
+  std::string rebind_drv_name_ = {};
 
   PerformanceStates performance_states_;
   DevicePowerStates power_states_;

@@ -199,22 +199,22 @@ void DriverHostContext::FinalizeDyingDevices() {
     }
 
     if (dev->parent()) {
+      zx_device_t& parent = *dev->parent();
       // When all the children are gone, complete the pending unbind request.
-      if ((!(dev->parent()->flags() & DEV_FLAG_DEAD)) && dev->parent()->children().is_empty()) {
-        if (auto unbind_children = dev->parent()->take_unbind_children_conn(); unbind_children) {
+      if ((!(parent.flags() & DEV_FLAG_DEAD)) && parent.children().is_empty()) {
+        if (auto unbind_children = parent.take_unbind_children_conn(); unbind_children) {
           unbind_children(ZX_OK);
         }
       }
       // If the parent wants rebinding when its children are gone,
       // And the parent is not dead, And this was the last child...
-      if ((dev->parent()->flags() & DEV_FLAG_WANTS_REBIND) &&
-          (!(dev->parent()->flags() & DEV_FLAG_DEAD)) && dev->parent()->children().is_empty()) {
+      if ((parent.flags() & DEV_FLAG_WANTS_REBIND) && (!(parent.flags() & DEV_FLAG_DEAD)) &&
+          parent.children().is_empty()) {
         // Clear the wants rebind flag and request the rebind
-        dev->parent()->unset_flag(DEV_FLAG_WANTS_REBIND);
-        std::string drv = dev->parent()->get_rebind_drv_name().value_or("");
-        zx_status_t status = DeviceBind(dev->parent(), drv.c_str());
+        parent.unset_flag(DEV_FLAG_WANTS_REBIND);
+        zx_status_t status = DeviceBind(dev->parent(), parent.get_rebind_drv_name().c_str());
         if (status != ZX_OK) {
-          if (auto rebind = dev->parent()->take_rebind_conn(); rebind) {
+          if (auto rebind = parent.take_rebind_conn(); rebind) {
             rebind(status);
           }
         }
@@ -583,8 +583,7 @@ zx_status_t DriverHostContext::DeviceRebind(const fbl::RefPtr<zx_device_t>& dev)
     // request that any existing children go away
     std::ignore = ScheduleUnbindChildren(dev);
   } else {
-    std::string drv = dev->get_rebind_drv_name().value_or("");
-    return DeviceBind(dev, drv.c_str());
+    return DeviceBind(dev, dev->get_rebind_drv_name().c_str());
   }
   return ZX_OK;
 }
