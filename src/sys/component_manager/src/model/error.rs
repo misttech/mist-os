@@ -11,7 +11,6 @@ use {
         policy::PolicyError,
         resolving::ResolverError,
     },
-    anyhow::Error,
     clonable_error::ClonableError,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     moniker::{AbsoluteMoniker, ChildMoniker, MonikerError},
@@ -46,11 +45,6 @@ pub enum ModelError {
     UnexpectedComponentManagerMoniker,
     #[error("The model is not available")]
     ModelNotAvailable,
-    #[error("Namespace creation failed: {}", err)]
-    NamespaceCreationFailed {
-        #[source]
-        err: ClonableError,
-    },
     #[error("Routing error: {}", err)]
     RoutingError {
         #[from]
@@ -144,10 +138,6 @@ impl ModelError {
 
     pub fn path_invalid(path: impl Into<String>) -> ModelError {
         ModelError::PathInvalid { path: path.into() }
-    }
-
-    pub fn namespace_creation_failed(err: impl Into<Error>) -> ModelError {
-        ModelError::NamespaceCreationFailed { err: err.into().into() }
     }
 
     pub fn open_directory_error(
@@ -492,9 +482,8 @@ pub enum StartActionError {
     },
     #[error("failed to populate namespace: {}", err)]
     NamespacePopulateError {
-        // TODO(https://fxbug.dev/116855): This will get fixed when we untangle ModelError
-        #[source]
-        err: Box<ModelError>,
+        #[from]
+        err: NamespacePopulateError,
     },
     #[error("structured config error: {}", err)]
     StructuredConfigError {
@@ -663,6 +652,24 @@ impl Into<fsys::UnresolveError> for UnresolveActionError {
                 fsys::UnresolveError::InstanceNotFound
             }
             _ => fsys::UnresolveError::Internal,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error)]
+pub enum NamespacePopulateError {
+    #[error("failed to clone pkg dir: {0}")]
+    ClonePkgDirFailed(#[source] ClonableError),
+
+    #[error("component uses a instance ID based storage capability but is not in the instance ID index: {0}")]
+    InstanceNotInInstanceIdIndex(#[source] RoutingError),
+}
+
+impl NamespacePopulateError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            Self::ClonePkgDirFailed(_) => zx::Status::IO,
+            Self::InstanceNotInInstanceIdIndex(e) => e.as_zx_status(),
         }
     }
 }

@@ -245,10 +245,7 @@ async fn make_execution_runtime(
     let (outgoing_dir_client, outgoing_dir_server) = zx::Channel::create();
     let (runtime_dir_client, runtime_dir_server) = zx::Channel::create();
     let mut namespace = IncomingNamespace::new(package);
-    let ns = namespace
-        .populate(component.as_weak(), decl)
-        .await
-        .map_err(|e| StartActionError::NamespacePopulateError { err: Box::new(e) })?;
+    let ns = namespace.populate(component, decl).await?;
 
     let (controller_client, controller_server) =
         endpoints::create_endpoints::<fcrunner::ComponentControllerMarker>()

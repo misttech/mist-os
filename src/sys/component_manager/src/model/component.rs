@@ -604,7 +604,7 @@ impl ComponentInstance {
 
                 let pkg_dir = r.package().map(|p| &p.package_dir);
                 let (ns_entries, _) =
-                    populate_and_get_logsink_decl(pkg_dir, self.as_weak(), r.decl()).await.unwrap();
+                    populate_and_get_logsink_decl(pkg_dir, &self, r.decl()).await.unwrap();
 
                 Some(Box::new(fsys::ResolvedDirectories {
                     ns_entries,

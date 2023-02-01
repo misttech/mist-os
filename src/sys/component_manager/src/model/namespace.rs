@@ -7,7 +7,7 @@ use {
         constants::PKG_PATH,
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
-            error::ModelError,
+            error::NamespacePopulateError,
             routing::{
                 self, route_and_open_capability, OpenDirectoryOptions, OpenEventStreamOptions,
                 OpenOptions, OpenProtocolOptions, OpenServiceOptions, OpenStorageOptions,
@@ -18,6 +18,7 @@ use {
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
         rights::Rights, route_to_storage_decl, verify_instance_in_component_id_index, RouteRequest,
     },
+    clonable_error::ClonableError,
     cm_logger::scoped::ScopedLogger,
     cm_rust::{self, CapabilityPath, ComponentDecl, UseDecl, UseProtocolDecl},
     cm_task_scope::TaskScope,
@@ -61,9 +62,9 @@ impl IncomingNamespace {
     /// serving and install handles to pseudo directories.
     pub async fn populate<'a>(
         &mut self,
-        component: WeakComponentInstance,
+        component: &Arc<ComponentInstance>,
         decl: &'a ComponentDecl,
-    ) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, ModelError> {
+    ) -> Result<Vec<fcrunner::ComponentNamespaceEntry>, NamespacePopulateError> {
         let (mut ns, log_sink_decl) =
             populate_and_get_logsink_decl(self.package_dir.as_ref(), component, decl).await?;
 
@@ -83,9 +84,10 @@ impl IncomingNamespace {
 /// The LogSink use declaration is used by `IncomingNamespace` to create an attributed logger.
 pub async fn populate_and_get_logsink_decl<'a>(
     package_dir: Option<&fio::DirectoryProxy>,
-    component: WeakComponentInstance,
+    component: &Arc<ComponentInstance>,
     decl: &'a ComponentDecl,
-) -> Result<(Vec<fcrunner::ComponentNamespaceEntry>, Option<UseProtocolDecl>), ModelError> {
+) -> Result<(Vec<fcrunner::ComponentNamespaceEntry>, Option<UseProtocolDecl>), NamespacePopulateError>
+{
     let mut ns: Vec<fcrunner::ComponentNamespaceEntry> = vec![];
 
     // Populate the /pkg namespace.
@@ -106,14 +108,14 @@ pub async fn populate_and_get_logsink_decl<'a>(
     for use_ in &decl.uses {
         match use_ {
             cm_rust::UseDecl::Directory(_) => {
-                add_directory_helper(&mut ns, &mut directory_waiters, use_, component.clone());
+                add_directory_helper(&mut ns, &mut directory_waiters, use_, component.as_weak());
             }
             cm_rust::UseDecl::Protocol(s) => {
                 add_service_or_protocol_use(
                     &mut svc_dirs,
                     UseDecl::Protocol(s.clone()),
                     &s.target_path,
-                    component.clone(),
+                    component.as_weak(),
                 );
                 if s.source_name == LogSinkMarker::PROTOCOL_NAME {
                     log_sink_decl = Some(s.clone());
@@ -124,11 +126,11 @@ pub async fn populate_and_get_logsink_decl<'a>(
                     &mut svc_dirs,
                     UseDecl::Service(s.clone()),
                     &s.target_path,
-                    component.clone(),
+                    component.as_weak(),
                 );
             }
             cm_rust::UseDecl::Storage(_) => {
-                add_storage_use(&mut ns, &mut directory_waiters, use_, component.clone()).await?;
+                add_storage_use(&mut ns, &mut directory_waiters, use_, component).await?;
             }
             cm_rust::UseDecl::Event(_) | cm_rust::UseDecl::EventStreamDeprecated(_) => {
                 // Event capabilities are handled in model::model,
@@ -140,7 +142,7 @@ pub async fn populate_and_get_logsink_decl<'a>(
                     &mut svc_dirs,
                     UseDecl::EventStream(s.clone()),
                     &s.target_path,
-                    component.clone(),
+                    component.as_weak(),
                 );
             }
         }
@@ -148,7 +150,6 @@ pub async fn populate_and_get_logsink_decl<'a>(
 
     // Start hosting the services directories and add them to the namespace
     serve_and_install_svc_dirs(&mut ns, svc_dirs);
-    let component = component.upgrade()?;
     // The directory waiter will run in the component's nonblocking task scope, but
     // when it gets a readable signal it will spawn the routing task in the blocking scope as
     // that it blocks destruction, like service and protocol routing.
@@ -209,9 +210,11 @@ async fn get_logger_from_ns(
 fn add_pkg_directory(
     ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
     package_dir: &fio::DirectoryProxy,
-) -> Result<(), ModelError> {
-    let clone_dir_proxy = fuchsia_fs::directory::clone_no_describe(package_dir, None)
-        .map_err(|e| ModelError::namespace_creation_failed(e))?;
+) -> Result<(), NamespacePopulateError> {
+    let clone_dir_proxy =
+        fuchsia_fs::directory::clone_no_describe(package_dir, None).map_err(|e| {
+            NamespacePopulateError::ClonePkgDirFailed(ClonableError::from(anyhow::Error::from(e)))
+        })?;
     let cloned_dir = ClientEnd::new(
         clone_dir_proxy
             .into_channel()
@@ -234,8 +237,8 @@ async fn add_storage_use(
     ns: &mut Vec<fcrunner::ComponentNamespaceEntry>,
     waiters: &mut Vec<BoxFuture<'_, ()>>,
     use_: &UseDecl,
-    component: WeakComponentInstance,
-) -> Result<(), ModelError> {
+    component: &Arc<ComponentInstance>,
+) -> Result<(), NamespacePopulateError> {
     // Prevent component from using storage capability if it is restricted to the component ID
     // index, and the component isn't in the index.
     match use_ {
@@ -246,18 +249,18 @@ async fn add_storage_use(
             // children, this resolution will walk the cache-happy path.
             // TODO(dgonyeo): Eventually combine this logic with the general-purpose startup
             // capability check.
-            let instance = component.upgrade()?;
             let mut noop_mapper = ComponentInstance::new_route_mapper();
             if let Ok(source) =
-                route_to_storage_decl(use_storage_decl.clone(), &instance, &mut noop_mapper).await
+                route_to_storage_decl(use_storage_decl.clone(), &component, &mut noop_mapper).await
             {
-                verify_instance_in_component_id_index(&source, &instance)?;
+                verify_instance_in_component_id_index(&source, &component)
+                    .map_err(|e| NamespacePopulateError::InstanceNotInInstanceIdIndex(e))?;
             }
         }
         _ => unreachable!("unexpected storage decl"),
     }
 
-    add_directory_helper(ns, waiters, use_, component);
+    add_directory_helper(ns, waiters, use_, component.as_weak());
     Ok(())
 }
 
