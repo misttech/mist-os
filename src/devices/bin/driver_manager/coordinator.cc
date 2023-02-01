@@ -791,13 +791,12 @@ zx_status_t Coordinator::AddNodeGroup(
   }
 
   fidl::Arena allocator;
-  auto fidl_node_group = fdf::wire::NodeGroup::Builder(allocator)
-                             .name(fidl::StringView(allocator, name))
-                             .nodes(std::move(group_desc.nodes))
-                             .Build();
+  auto fidl_spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
+                       .name(fidl::StringView(allocator, name))
+                       .parents(std::move(group_desc.nodes))
+                       .Build();
 
-  auto result =
-      node_group_manager_->AddNodeGroup(fidl_node_group, std::move(node_group_result.value()));
+  auto result = node_group_manager_->AddNodeGroup(fidl_spec, std::move(node_group_result.value()));
   if (!result.is_ok()) {
     LOGF(ERROR, "Failed to add node group to the node group manager: %d.", result.error_value());
     return ZX_ERR_INVALID_ARGS;
@@ -983,9 +982,9 @@ void Coordinator::BindNodesForNodeGroups() {
   }
 }
 
-void Coordinator::AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::NodeGroup group,
+void Coordinator::AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
                                             AddToIndexCallback callback) {
-  driver_loader_.AddNodeGroup(group, std::move(callback));
+  driver_loader_.AddNodeGroup(spec, std::move(callback));
 }
 
 void Coordinator::RestartDriverHosts(RestartDriverHostsRequestView request,

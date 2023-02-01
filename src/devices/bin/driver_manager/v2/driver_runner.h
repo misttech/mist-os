@@ -41,7 +41,7 @@
 namespace dfv2 {
 
 class DriverRunner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner>,
-                     public fidl::WireServer<fuchsia_driver_framework::NodeGroupManager>,
+                     public fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>,
                      public CompositeManagerBridge,
                      public NodeManager,
                      public NodeRemover {
@@ -53,13 +53,12 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
                inspect::Inspector& inspector, LoaderServiceFactory loader_service_factory,
                async_dispatcher_t* dispatcher);
 
-  // fidl::WireServer<fuchsia_driver_framework::NodeGroupManager>
-  void AddNodeGroup(AddNodeGroupRequestView request,
-                    AddNodeGroupCompleter::Sync& completer) override;
+  // fidl::WireServer<fuchsia_driver_framework::CompositeNodeManager>
+  void AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) override;
 
   // CompositeManagerBridge interface
   void BindNodesForNodeGroups() override;
-  void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::NodeGroup group,
+  void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,
                                  AddToIndexCallback callback) override;
 
   fpromise::promise<inspect::Inspector> Inspect() const;
@@ -122,7 +121,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   fidl::WireClient<fuchsia_driver_index::DriverIndex> driver_index_;
   LoaderServiceFactory loader_service_factory_;
   fidl::ServerBindingGroup<fuchsia_component_runner::ComponentRunner> runner_bindings_;
-  fidl::ServerBindingGroup<fuchsia_driver_framework::NodeGroupManager> manager_bindings_;
+  fidl::ServerBindingGroup<fuchsia_driver_framework::CompositeNodeManager> manager_bindings_;
   async_dispatcher_t* const dispatcher_;
   std::shared_ptr<Node> root_node_;
 

@@ -135,12 +135,12 @@ zx_status_t Astro::LightInit() {
                         bind_fuchsia_pwm::PWM_ID_FUNCTION_AMBER_LED),
   };
 
-  auto nodes = std::vector{
-      fuchsia_driver_framework::NodeRepresentation{{
+  auto parents = std::vector{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = amber_led_gpio_bind_rules,
           .properties = amber_led_gpio_properties,
       }},
-      fuchsia_driver_framework::NodeRepresentation{{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = amber_led_pwm_bind_rules,
           .properties = amber_led_pwm_properties,
       }},
@@ -149,10 +149,11 @@ zx_status_t Astro::LightInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('LIGH');
 
-  auto node_group = fuchsia_driver_framework::NodeGroup{{.name = "light_dev", .nodes = nodes}};
+  auto composite_node_spec =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "light_dev", .parents = parents}};
 
   auto result = pbus_.buffer(arena)->AddNodeGroup(fidl::ToWire(fidl_arena, light_dev),
-                                                  fidl::ToWire(fidl_arena, node_group));
+                                                  fidl::ToWire(fidl_arena, composite_node_spec));
 
   if (!result.ok()) {
     zxlogf(ERROR, "%s: AddNodeGroup Light(light_dev) request failed: %s", __func__,

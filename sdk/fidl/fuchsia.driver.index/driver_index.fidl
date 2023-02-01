@@ -142,7 +142,7 @@ protocol DriverIndex {
     /// node group and maps it by the name. The stored node groups are
     /// included in the driver matching process.
     // TODO(fxbug.dev/111076): Return just the status.
-    AddNodeGroup(fuchsia.driver.framework.NodeGroup) -> (struct {
+    AddNodeGroup(fuchsia.driver.framework.CompositeNodeSpec) -> (struct {
         composite_driver MatchedCompositeInfo;
         node_names vector<string:MAX>:MAX;
     }) error zx.status;

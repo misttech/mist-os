@@ -145,9 +145,9 @@ bool DriverLoader::MatchesLibnameDriverIndex(const std::string& driver_url,
   return driver_path == libname;
 }
 
-void DriverLoader::AddNodeGroup(fuchsia_driver_framework::wire::NodeGroup group,
+void DriverLoader::AddNodeGroup(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
                                 AddToIndexCallback callback) {
-  auto result = driver_index_.sync()->AddNodeGroup(group);
+  auto result = driver_index_.sync()->AddNodeGroup(spec);
   if (!result.ok()) {
     LOGF(ERROR, "DriverIndex::AddNodeGroup failed %d", result.status());
     callback(zx::error(result.status()));

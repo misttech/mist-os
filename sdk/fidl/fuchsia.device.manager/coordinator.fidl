@@ -126,7 +126,7 @@ type CompositeDeviceDescriptor = struct {
 
 /// Node group parts and properties.
 type NodeGroupDescriptor = struct {
-    nodes vector<fdf.NodeRepresentation>:MAX;
+    nodes vector<fdf.ParentSpec>:MAX;
     metadata vector<DeviceMetadata>:<METADATA_MAX, optional>;
 };
 

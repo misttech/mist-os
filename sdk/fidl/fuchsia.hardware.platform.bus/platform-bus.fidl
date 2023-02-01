@@ -194,7 +194,7 @@ protocol PlatformBus {
     /// and insert a node into the device group that matches the device.
     AddNodeGroup(struct {
         node Node;
-        group fuchsia.driver.framework.NodeGroup;
+        group fuchsia.driver.framework.CompositeNodeSpec;
     }) -> () error zx.status;
 
     /// Super deprecated, use AddComposite() instead.

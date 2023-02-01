@@ -10,7 +10,7 @@ type Condition = strict enum {
     REJECT = 2;
 };
 
-/// Represents a bind rule in a node group node.
+/// Represents a bind rule in a parent specification.
 type BindRule = struct {
     /// Property key.
     key NodePropertyKey;
@@ -25,9 +25,10 @@ type BindRule = struct {
     values vector<NodePropertyValue>:MAX_PROPERTY_COUNT;
 };
 
-/// Represents a node group node.
-type NodeRepresentation = struct {
-    /// Node's bind rules. Property keys must be unique. Must not be empty.
+/// Specification for a node that parents the composite node created from the
+/// composite node specification.
+type ParentSpec = struct {
+    /// Parent's bind rules. Property keys must be unique. Must not be empty.
     bind_rules vector<BindRule>:MAX_PROPERTY_COUNT;
 
     /// Properties for matching against a composite driver's bind rules.
@@ -35,34 +36,34 @@ type NodeRepresentation = struct {
     properties vector<NodeProperty>:MAX_PROPERTY_COUNT;
 };
 
-/// Struct that represents a node group.
-type NodeGroup = table {
-    /// The node group's name.
+/// Struct that represents a composite node specification.
+type CompositeNodeSpec = table {
+    /// The composite node spec's name.
     1: name string:MAX;
 
-    /// The nodes in the node group. Must not be empty. The first node is
+    /// The nodes in the composite node spec. Must not be empty. The first node is
     /// the primary node.
-    2: nodes vector<NodeRepresentation>:MAX;
+    2: parents vector<ParentSpec>:MAX;
 };
 
-/// Error codes for the NodeGroupManager protocol.
-type NodeGroupError = strict enum {
-    /// An argument of the node group was not provided.
+/// Error codes for the CompositeNodeManager protocol.
+type CompositeNodeSpecError = strict enum {
+    /// An argument of the composite node spec was not provided.
     MISSING_ARGS = 1;
-    /// The given node group's `nodes` is empty.
+    /// The given composite node spec's `nodes` is empty.
     EMPTY_NODES = 2;
-    /// The `name` in the given node group is a duplicate of an already
-    /// created node group.
+    /// The `name` in the given composite node spec is a duplicate of an already
+    /// created composite node spec.
     ALREADY_EXISTS = 3;
 };
 
-/// Protocol through which board drivers can create node groups.
+/// Protocol through which board drivers can create composite node specs.
 ///
-/// Node groups are created at runtime to dynamically bridge the
+/// Composite node specs are created at runtime to dynamically bridge the
 /// static bind rules of a composite driver with the dynamic bind properties
 /// of nodes in the system so that the driver bind rules are more generic and reusable.
 @discoverable
-protocol NodeGroupManager {
-    /// Adds the given node group to the driver framework.
-    AddNodeGroup(NodeGroup) -> () error NodeGroupError;
+protocol CompositeNodeManager {
+    /// Adds the given composite node specification to the driver framework.
+    AddSpec(CompositeNodeSpec) -> () error CompositeNodeSpecError;
 };

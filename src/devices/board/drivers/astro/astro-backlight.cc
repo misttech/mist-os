@@ -92,17 +92,18 @@ zx_status_t Astro::BacklightInit() {
       fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
   };
 
-  auto nodes = std::vector{
-      fuchsia_driver_framework::NodeRepresentation{{
+  auto parents = std::vector{
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = bind_rules,
           .properties = properties,
       }},
   };
 
-  auto node_group = fuchsia_driver_framework::NodeGroup{{.name = "backlight", .nodes = nodes}};
+  auto composite_node_spec =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "backlight", .parents = parents}};
 
   auto result = pbus_.buffer(arena)->AddNodeGroup(fidl::ToWire(fidl_arena, backlight_dev),
-                                                  fidl::ToWire(fidl_arena, node_group));
+                                                  fidl::ToWire(fidl_arena, composite_node_spec));
 
   if (!result.ok()) {
     zxlogf(ERROR, "%s: AddNodeGroup Backlight(backlight_dev) request failed: %s", __func__,

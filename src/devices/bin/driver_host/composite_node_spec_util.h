@@ -135,7 +135,7 @@ zx::result<fuchsia_driver_framework::wire::NodeProperty> ConvertBindPropToFidl(
   return zx::ok(node_property);
 }
 
-zx::result<fuchsia_driver_framework::wire::NodeRepresentation> ConvertNodeRepresentation(
+zx::result<fuchsia_driver_framework::wire::ParentSpec> ConvertNodeRepresentation(
     fidl::AnyArena& allocator, parent_spec_t node) {
   fidl::VectorView<fuchsia_driver_framework::wire::BindRule> bind_rules(allocator,
                                                                         node.bind_rule_count);
@@ -159,7 +159,7 @@ zx::result<fuchsia_driver_framework::wire::NodeRepresentation> ConvertNodeRepres
     props[i] = std::move(prop_result.value());
   }
 
-  return zx::ok(fuchsia_driver_framework::wire::NodeRepresentation{
+  return zx::ok(fuchsia_driver_framework::wire::ParentSpec{
       .bind_rules = bind_rules,
       .properties = props,
   });

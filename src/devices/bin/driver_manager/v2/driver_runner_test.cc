@@ -1704,14 +1704,14 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
   });
   driver_index.AddNodeGroupMatch(name, match);
 
-  const fuchsia_driver_framework::NodeGroup fidl_group(
+  const fuchsia_driver_framework::CompositeNodeSpec fidl_spec(
       {.name = name,
-       .nodes = std::vector<fuchsia_driver_framework::NodeRepresentation>{
-           fuchsia_driver_framework::NodeRepresentation({
+       .parents = std::vector<fuchsia_driver_framework::ParentSpec>{
+           fuchsia_driver_framework::ParentSpec({
                .bind_rules = std::vector<fuchsia_driver_framework::BindRule>(),
                .properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
            }),
-           fuchsia_driver_framework::NodeRepresentation({
+           fuchsia_driver_framework::ParentSpec({
                .bind_rules = std::vector<fuchsia_driver_framework::BindRule>(),
                .properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
            })}});
@@ -1723,7 +1723,7 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
       },
       dispatcher(), &driver_runner);
   fidl::Arena<> arena;
-  auto added = driver_runner.node_group_manager().AddNodeGroup(fidl::ToWire(arena, fidl_group),
+  auto added = driver_runner.node_group_manager().AddNodeGroup(fidl::ToWire(arena, fidl_spec),
                                                                std::move(node_group));
   ASSERT_TRUE(added.is_ok());
 

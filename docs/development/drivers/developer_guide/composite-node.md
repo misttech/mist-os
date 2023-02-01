@@ -159,7 +159,7 @@ const ddk::BindRule kI2cBindRules[] = {
 #### Writing in Driver Framework v2 (DFv2)
 
 In DFv2, node groups are written for
-[`node_group.fidl`](/sdk/fidl/fuchsia.driver.framework/node_group.fidl) in the
+[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl) in the
 `fuchsia.driver.framework` FIDL library. The
 [`node_group.h`](/sdk/lib/driver/component/cpp/node_group.h) library in
 `sdk/lib/driver/component/cpp` can be used to simplify defining the bind rules.
@@ -204,7 +204,7 @@ const device_bind_prop_t kI2cProperties[] = {
 #### Writing in Driver Framework v2 (DFv2)
 
 In DFv2, node groups are written for
-[`node_group.fidl`](/sdk/fidl/fuchsia.driver.framework/node_group.fidl) in the
+[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl) in the
 fuchsia.driver.framework FIDL library. The
 [`node_add_args.h`](/sdk/lib/driver/component/cpp/node_add_args.h) library in
 `//sdk/lib/driver/component/cpp` can be used to simplify defining the bind
@@ -236,14 +236,14 @@ API. This applies to both DFv1 and DFv2.
 /// by |node| and insert a node into the node group that matches the device.
 AddNodeGroup(struct {
     node Node;
-    group fuchsia.driver.framework.NodeGroup;
+    group fuchsia.driver.framework.CompositeNodeSpec;
 }) -> () error zx.status;
 ```
 
 See [Defining a node group](#defining-a-composite-node-spec) for instructions.
 
 The platform bus API uses the same `NodeGroup` struct defined in
-[`node_group.fidl`](/sdk/fidl/fuchsia.driver.framework/node_group.fidl). See
+[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl). See
 [Defining a Node group](#defining-a-composite-node-spec) for instructions.
 
 For example, say we defined the following node group:
@@ -408,21 +408,21 @@ auto status =
 
 ### Driver Framework v2 (DFv2)
 
-In DFv2, we use the `NodeGroupManager` from the `fuchsia.driver.framework` FIDL
+In DFv2, we use the `CompositeNodeManager` from the `fuchsia.driver.framework` FIDL
 API to add a node group.
 
 ```
 @discoverable
-protocol NodeGroupManager {
-    /// Add the given node group to the driver manager.
-    AddNodeGroup(NodeGroup) -> () error NodeGroupError;
+protocol CompositeNodeManager {
+    /// Add the given spec to the driver manager.
+    AddSpec(CompositeNodeSpec) -> () error CompositeNodeSpecError;
 };
 ```
 
 #### Defining node groups with FIDL
 
-The `NodeGroup` struct is defined in
-[`node_group.fidl`](/sdk/fidl/fuchsia.driver.framework/node_group.fidl). You can
+The `CompositeNodeSpec` struct is defined in
+[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl). You can
 use the [`node_group.h`](/sdk/lib/driver/component/cpp/node_group.h) and
 [`node_add_args.h`](/sdk/lib/driver/component/cpp/node_add_args.h) functions in
 the `sdk/lib/driver/component/cpp` library to define the bind rules and
@@ -460,49 +460,49 @@ auto gpio_interrupt_properties[] = std::vector {
 };
 
 auto nodes = std::vector{
-      fdf::NodeRepresentation{
+      fdf::ParentSpec{
           .bind_rules = i2c_bind_rules,
           .properties = i2c_properties,
       },
-      fdf::NodeRepresentation{
+      fdf::ParentSpec{
           .bind_rules = gpio_interrupt_bind_rules,
           .properties = gpio_interrupt_properties,
       },
   };
 
-auto node_group = fdf::NodeGroup {.name = "fo", .nodes = nodes};
+auto node_group = fdf::CompositeNodeSpec {.name = "fo", .nodes = nodes};
 ```
 
 #### Adding the node group
 
-To add the node group to the `NodeGroupManager`, you need to connect to the
+To add the node group to the `CompositeNodeManager`, you need to connect to the
 service:
 
 ```
-auto client = context().incoming()->Connect<fdf::NodeGroupManager>();
+auto client = context().incoming()->Connect<fdf::CompositeNodeManager>();
 
 if (client.is_error()) {
-  FDF_LOG(ERROR, "Failed to connect to NodeGroupManager: %s",
+  FDF_LOG(ERROR, "Failed to connect to CompositeNodeManager: %s",
       zx_status_get_string(client.error_value()));
   return client.take_error();
 }
 
-fidl::SharedClient<fdf::NodeGroupManager> node_group_manager;
-node_group_manager.Bind(std::move(client.value()), dispatcher());
+fidl::SharedClient<fdf::CompositeNodeManager> composite_node_manager;
+composite_node_manager.Bind(std::move(client.value()), dispatcher());
 ```
 
 Then call the API:
 
 ```
-node_group_manager->AddNodeGroup(std::move(node_group))
+composite_node_manager->AddSpec(std::move(node_group))
     .Then([this](
-        fidl::Result<fdf::NodeGroupManager::AddNodeGroup>& create_result) {
+        fidl::Result<fdf::CompositeNodeManager::AddSpec>& create_result) {
             if (create_result.is_error()) {
-              FDF_LOG(ERROR, "AddNodeGroup failed: %s",
+              FDF_LOG(ERROR, "AddSpec failed: %s",
                   create_result.error_value().FormatDescription().c_str());
               return;
             }
-            FDF_LOG(INFO, "Succeeded adding node group");
+            FDF_LOG(INFO, "Succeeded adding spec");
         });
 ```
 

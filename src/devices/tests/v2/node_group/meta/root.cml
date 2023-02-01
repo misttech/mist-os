@@ -15,7 +15,7 @@
         { service: "fuchsia.nodegroup.test.Service" },
     ],
     use: [
-        { protocol: "fuchsia.driver.framework.NodeGroupManager" },
+        { protocol: "fuchsia.driver.framework.CompositeNodeManager" },
     ],
     expose: [
         {

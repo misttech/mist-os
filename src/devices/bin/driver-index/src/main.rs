@@ -274,7 +274,7 @@ impl Indexer {
         Ok(matched_drivers)
     }
 
-    fn add_node_group(&self, group: fdf::NodeGroup) -> fdi::DriverIndexAddNodeGroupResult {
+    fn add_node_group(&self, spec: fdf::CompositeNodeSpec) -> fdi::DriverIndexAddNodeGroupResult {
         let base_repo = self.base_repo.borrow();
         let base_repo_iter = match base_repo.deref() {
             BaseRepo::Resolved(drivers) => drivers.iter(),
@@ -301,7 +301,7 @@ impl Indexer {
             .collect::<Vec<_>>();
 
         let mut node_group_manager = self.node_group_manager.borrow_mut();
-        node_group_manager.add_node_group(group, composite_drivers)
+        node_group_manager.add_node_group(spec, composite_drivers)
     }
 
     fn get_driver_info(&self, driver_filter: Vec<String>) -> Vec<fdd::DriverInfo> {
@@ -2506,13 +2506,13 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
-                        nodes: Some(vec![fdf::NodeRepresentation {
+                        parents: Some(vec![fdf::ParentSpec {
                             bind_rules: bind_rules,
                             properties: properties,
                         }]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -2632,13 +2632,13 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
-                        nodes: Some(vec![fdf::NodeRepresentation {
+                        parents: Some(vec![fdf::ParentSpec {
                             bind_rules: bind_rules,
                             properties: properties,
                         }]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -2835,19 +2835,19 @@ mod tests {
             ];
 
             let result = proxy
-                .add_node_group(fdf::NodeGroup {
+                .add_node_group(fdf::CompositeNodeSpec {
                     name: Some("group_match".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
+                    parents: Some(vec![
+                        fdf::ParentSpec {
                             bind_rules: node_1_bind_rules.clone(),
                             properties: node_1_props_match.clone(),
                         },
-                        fdf::NodeRepresentation {
+                        fdf::ParentSpec {
                             bind_rules: node_2_bind_rules.clone(),
                             properties: node_2_props_match.clone(),
                         },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 })
                 .await
                 .unwrap()
@@ -2862,19 +2862,19 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("group_non_match_1".to_string()),
-                        nodes: Some(vec![
-                            fdf::NodeRepresentation {
+                        parents: Some(vec![
+                            fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
                                 properties: node_1_props_nonmatch,
                             },
-                            fdf::NodeRepresentation {
+                            fdf::ParentSpec {
                                 bind_rules: node_2_bind_rules.clone(),
                                 properties: node_2_props_match,
                             },
                         ]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -2888,19 +2888,19 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("group_non_match_2".to_string()),
-                        nodes: Some(vec![
-                            fdf::NodeRepresentation {
+                        parents: Some(vec![
+                            fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
                                 properties: node_1_props_match,
                             },
-                            fdf::NodeRepresentation {
+                            fdf::ParentSpec {
                                 bind_rules: node_2_bind_rules.clone(),
                                 properties: node_2_props_nonmatch,
                             },
                         ]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -3036,19 +3036,19 @@ mod tests {
             ];
 
             let result = proxy
-                .add_node_group(fdf::NodeGroup {
+                .add_node_group(fdf::CompositeNodeSpec {
                     name: Some("group_match".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
+                    parents: Some(vec![
+                        fdf::ParentSpec {
                             bind_rules: node_1_bind_rules.clone(),
                             properties: node_1_props_match.clone(),
                         },
-                        fdf::NodeRepresentation {
+                        fdf::ParentSpec {
                             bind_rules: node_2_bind_rules.clone(),
                             properties: node_2_props_match.clone(),
                         },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 })
                 .await
                 .unwrap()
@@ -3063,19 +3063,19 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("group_non_match_1".to_string()),
-                        nodes: Some(vec![
-                            fdf::NodeRepresentation {
+                        parents: Some(vec![
+                            fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
                                 properties: node_1_props_nonmatch,
                             },
-                            fdf::NodeRepresentation {
+                            fdf::ParentSpec {
                                 bind_rules: node_2_bind_rules.clone(),
                                 properties: node_2_props_match,
                             },
                         ]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -3089,19 +3089,19 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("group_non_match_2".to_string()),
-                        nodes: Some(vec![
-                            fdf::NodeRepresentation {
+                        parents: Some(vec![
+                            fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
                                 properties: node_1_props_match,
                             },
-                            fdf::NodeRepresentation {
+                            fdf::ParentSpec {
                                 bind_rules: node_2_bind_rules.clone(),
                                 properties: node_2_props_nonmatch,
                             },
                         ]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -3248,23 +3248,23 @@ mod tests {
             ];
 
             let result = proxy
-                .add_node_group(fdf::NodeGroup {
+                .add_node_group(fdf::CompositeNodeSpec {
                     name: Some("group_match".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
+                    parents: Some(vec![
+                        fdf::ParentSpec {
                             bind_rules: node_1_bind_rules.clone(),
                             properties: node_1_props_match.clone(),
                         },
-                        fdf::NodeRepresentation {
+                        fdf::ParentSpec {
                             bind_rules: optional_1_bind_rules.clone(),
                             properties: optional_1_props_match.clone(),
                         },
-                        fdf::NodeRepresentation {
+                        fdf::ParentSpec {
                             bind_rules: node_2_bind_rules.clone(),
                             properties: node_2_props_match.clone(),
                         },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 })
                 .await
                 .unwrap()
@@ -3383,19 +3383,19 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
-                        nodes: Some(vec![
-                            fdf::NodeRepresentation {
+                        parents: Some(vec![
+                            fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
                                 properties: node_1_props_match.clone(),
                             },
-                            fdf::NodeRepresentation {
+                            fdf::ParentSpec {
                                 bind_rules: node_2_bind_rules.clone(),
                                 properties: node_2_props_match,
                             },
                         ]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -3580,19 +3580,19 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
-                        nodes: Some(vec![
-                            fdf::NodeRepresentation {
+                        parents: Some(vec![
+                            fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
                                 properties: node_1_props_match.clone(),
                             },
-                            fdf::NodeRepresentation {
+                            fdf::ParentSpec {
                                 bind_rules: node_2_bind_rules.clone(),
                                 properties: node_2_props_match,
                             },
                         ]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -3788,23 +3788,23 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
-                        nodes: Some(vec![
-                            fdf::NodeRepresentation {
+                        parents: Some(vec![
+                            fdf::ParentSpec {
                                 bind_rules: node_1_bind_rules.clone(),
                                 properties: node_1_props_match.clone(),
                             },
-                            fdf::NodeRepresentation {
+                            fdf::ParentSpec {
                                 bind_rules: node_2_bind_rules.clone(),
                                 properties: node_2_props_match,
                             },
-                            fdf::NodeRepresentation {
+                            fdf::ParentSpec {
                                 bind_rules: optional_1_bind_rules.clone(),
                                 properties: optional_1_props_match,
                             },
                         ]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -3922,16 +3922,16 @@ mod tests {
             assert_eq!(
                 Err(Status::NOT_FOUND.into_raw()),
                 proxy
-                    .add_node_group(fdf::NodeGroup {
+                    .add_node_group(fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
-                        nodes: Some(vec![fdf::NodeRepresentation {
+                        parents: Some(vec![fdf::ParentSpec {
                             bind_rules: bind_rules,
                             properties: vec![fdf::NodeProperty {
                                 key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
                                 value: fdf::NodePropertyValue::StringValue("thrasher".to_string()),
                             }]
                         }]),
-                        ..fdf::NodeGroup::EMPTY
+                        ..fdf::CompositeNodeSpec::EMPTY
                     })
                     .await
                     .unwrap()
@@ -3949,13 +3949,13 @@ mod tests {
             }];
 
             let result = proxy
-                .add_node_group(fdf::NodeGroup {
+                .add_node_group(fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![fdf::NodeRepresentation {
+                    parents: Some(vec![fdf::ParentSpec {
                         bind_rules: duplicate_bind_rules,
                         properties: node_transform,
                     }]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 })
                 .await
                 .unwrap();
@@ -4026,13 +4026,13 @@ mod tests {
             }];
 
             let result = proxy
-                .add_node_group(fdf::NodeGroup {
+                .add_node_group(fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![fdf::NodeRepresentation {
+                    parents: Some(vec![fdf::ParentSpec {
                         bind_rules: bind_rules,
                         properties: node_transform,
                     }]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 })
                 .await
                 .unwrap();

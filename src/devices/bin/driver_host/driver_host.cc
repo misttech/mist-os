@@ -1262,13 +1262,13 @@ zx_status_t DriverHostContext::DeviceAddCompositeNodeSpec(const fbl::RefPtr<zx_d
   }
 
   fidl::Arena allocator;
-  auto nodes = fidl::VectorView<fdf::wire::NodeRepresentation>(allocator, spec->parent_count);
+  auto parents = fidl::VectorView<fdf::wire::ParentSpec>(allocator, spec->parent_count);
   for (size_t i = 0; i < spec->parent_count; i++) {
-    auto node_result = ConvertNodeRepresentation(allocator, spec->parents[i]);
-    if (!node_result.is_ok()) {
-      return node_result.error_value();
+    auto parent_result = ConvertNodeRepresentation(allocator, spec->parents[i]);
+    if (!parent_result.is_ok()) {
+      return parent_result.error_value();
     }
-    nodes[i] = std::move(node_result.value());
+    parents[i] = std::move(parent_result.value());
   }
 
   auto metadata = fidl::VectorView<fdm::wire::DeviceMetadata>(allocator, spec->metadata_count);
@@ -1280,7 +1280,7 @@ zx_status_t DriverHostContext::DeviceAddCompositeNodeSpec(const fbl::RefPtr<zx_d
             spec->metadata_list[i].length)};
   }
 
-  fdm::wire::NodeGroupDescriptor desc = {.nodes = nodes, .metadata = metadata};
+  fdm::wire::NodeGroupDescriptor desc = {.nodes = parents, .metadata = metadata};
 
   auto response = client.sync()->AddNodeGroup(fidl::StringView(allocator, name), std::move(desc));
   auto status = response.status();

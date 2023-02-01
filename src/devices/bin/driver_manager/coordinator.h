@@ -217,7 +217,7 @@ class Coordinator : public CompositeManagerBridge,
  private:
   // CompositeManagerBridge interface
   void BindNodesForNodeGroups() override;
-  void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::NodeGroup group,
+  void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
                                  AddToIndexCallback callback) override;
 
   // fuchsia.driver.development/DriverDevelopment interface

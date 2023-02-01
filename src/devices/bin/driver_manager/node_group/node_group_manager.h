@@ -30,8 +30,9 @@ class NodeGroupManager {
   // Adds a node group to the driver index. If it's successfully added, then the
   // NodeGroupManager stores the node group in a map. After that, it sends a call to
   // CompositeManagerBridge to bind all unbound devices.
-  fit::result<fuchsia_driver_framework::NodeGroupError> AddNodeGroup(
-      fuchsia_driver_framework::wire::NodeGroup group_info, std::unique_ptr<NodeGroup> node_group);
+  fit::result<fuchsia_driver_framework::CompositeNodeSpecError> AddNodeGroup(
+      fuchsia_driver_framework::wire::CompositeNodeSpec fidl_spec,
+      std::unique_ptr<NodeGroup> node_group);
 
   // Binds the device to one of the node group nodes that it was matched to.
   // NodeGroupManager will go through the list of node groups until it finds one with

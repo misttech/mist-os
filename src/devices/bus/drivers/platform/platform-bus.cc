@@ -665,25 +665,25 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
       ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
   };
 
-  auto node_group_desc = ddk::CompositeNodeSpec(kPDevBindRules, kPDevProperties);
+  auto composite_node_spec = ddk::CompositeNodeSpec(kPDevBindRules, kPDevProperties);
 
-  auto node_group = fidl::ToNatural(request->group);
-  for (const auto& node : node_group.nodes().value()) {
-    if (node.bind_rules().empty()) {
+  auto fidl_spec = fidl::ToNatural(request->group);
+  for (const auto& parent : fidl_spec.parents().value()) {
+    if (parent.bind_rules().empty()) {
       zxlogf(ERROR, "Node group bind rules cannot be empty");
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
 
-    if (node.properties().empty()) {
+    if (parent.properties().empty()) {
       zxlogf(ERROR, "Node representation properties cannot be empty");
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
 
     std::vector<ddk::BindRule> rules;
-    rules.reserve(node.bind_rules().size());
-    for (const auto& bind_rule : node.bind_rules()) {
+    rules.reserve(parent.bind_rules().size());
+    for (const auto& bind_rule : parent.bind_rules()) {
       auto result = ConvertFidlBindRule(bind_rule);
       if (result.is_error()) {
         completer.buffer(arena).ReplyError(result.status_value());
@@ -693,8 +693,8 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
     }
 
     std::vector<device_bind_prop_t> properties;
-    properties.reserve(node.properties().size());
-    for (const auto& property : node.properties()) {
+    properties.reserve(parent.properties().size());
+    for (const auto& property : parent.properties()) {
       auto property_value = ConvertFidlPropertyValue(property.value());
       if (property_value.is_error()) {
         zxlogf(ERROR, "Invalid property value");
@@ -707,10 +707,10 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
           .value = property_value.value(),
       });
     }
-    node_group_desc.AddParentSpec(rules, properties);
+    composite_node_spec.AddParentSpec(rules, properties);
   }
 
-  auto status = DdkAddCompositeNodeSpec(node_group.name()->c_str(), node_group_desc);
+  auto status = DdkAddCompositeNodeSpec(fidl_spec.name()->c_str(), composite_node_spec);
 
   if (status != ZX_OK) {
     zxlogf(ERROR, "DdkAddCompositeNodeSpec failed %s", zx_status_get_string(status));

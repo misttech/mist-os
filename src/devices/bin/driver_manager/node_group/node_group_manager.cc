@@ -13,18 +13,18 @@ namespace fdf = fuchsia_driver_framework;
 
 NodeGroupManager::NodeGroupManager(CompositeManagerBridge *bridge) : bridge_(bridge) {}
 
-fit::result<fdf::NodeGroupError> NodeGroupManager::AddNodeGroup(
-    fdf::wire::NodeGroup fidl_group, std::unique_ptr<NodeGroup> node_group) {
+fit::result<fdf::CompositeNodeSpecError> NodeGroupManager::AddNodeGroup(
+    fdf::wire::CompositeNodeSpec fidl_spec, std::unique_ptr<NodeGroup> node_group) {
   ZX_ASSERT(node_group);
-  ZX_ASSERT(fidl_group.has_name() && fidl_group.has_nodes() && !fidl_group.nodes().empty());
+  ZX_ASSERT(fidl_spec.has_name() && fidl_spec.has_parents() && !fidl_spec.parents().empty());
 
-  auto name = std::string(fidl_group.name().get());
+  auto name = std::string(fidl_spec.name().get());
   if (node_groups_.find(name) != node_groups_.end()) {
     LOGF(ERROR, "Duplicate node group %.*s", static_cast<int>(name.size()), name.data());
-    return fit::error(fdf::NodeGroupError::kAlreadyExists);
+    return fit::error(fdf::CompositeNodeSpecError::kAlreadyExists);
   }
 
-  auto node_count = fidl_group.nodes().count();
+  auto node_count = fidl_spec.parents().count();
   AddToIndexCallback callback =
       [this, group = std::move(node_group), name, node_count](
           zx::result<fuchsia_driver_index::DriverIndexAddNodeGroupResponse> result) mutable {
@@ -50,7 +50,7 @@ fit::result<fdf::NodeGroupError> NodeGroupManager::AddNodeGroup(
         bridge_->BindNodesForNodeGroups();
       };
 
-  bridge_->AddNodeGroupToDriverIndex(fidl_group, std::move(callback));
+  bridge_->AddNodeGroupToDriverIndex(fidl_spec, std::move(callback));
   return fit::ok();
 }
 

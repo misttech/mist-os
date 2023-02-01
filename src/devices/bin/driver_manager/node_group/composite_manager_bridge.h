@@ -20,7 +20,7 @@ class CompositeManagerBridge {
   // after a node group is matched with a composite driver.
   virtual void BindNodesForNodeGroups() = 0;
 
-  virtual void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::NodeGroup group,
+  virtual void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
                                          AddToIndexCallback callback) = 0;
 };
 

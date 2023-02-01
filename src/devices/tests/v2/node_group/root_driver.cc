@@ -25,7 +25,7 @@ const std::string_view kRightName = "right-node";
 const std::string_view kOptionalName = "optional-node";
 
 // Group 1 is created before creating both the left and right nodes.
-fdf::NodeGroup NodeGroupOne() {
+fdf::CompositeNodeSpec NodeGroupOne() {
   auto bind_rules_left = std::vector{
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_ONE_LEFT),
   };
@@ -42,22 +42,22 @@ fdf::NodeGroup NodeGroupOne() {
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
-  auto nodes = std::vector{
-      fdf::NodeRepresentation{{
+  auto parents = std::vector{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_left,
           .properties = properties_left,
       }},
-      fdf::NodeRepresentation{{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_right,
           .properties = properties_right,
       }},
   };
 
-  return {{.name = "test_group_1", .nodes = nodes}};
+  return {{.name = "test_group_1", .parents = parents}};
 }
 
 // Group 2 is created after creating the right node, but before creating the left node.
-fdf::NodeGroup NodeGroupTwo() {
+fdf::CompositeNodeSpec NodeGroupTwo() {
   auto bind_rules_left = std::vector{
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_TWO_LEFT),
   };
@@ -74,22 +74,22 @@ fdf::NodeGroup NodeGroupTwo() {
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
-  auto nodes = std::vector{
-      fdf::NodeRepresentation{{
+  auto parents = std::vector{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_left,
           .properties = properties_left,
       }},
-      fdf::NodeRepresentation{{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_right,
           .properties = properties_right,
       }},
   };
 
-  return {{.name = "test_group_2", .nodes = nodes}};
+  return {{.name = "test_group_2", .parents = parents}};
 }
 
 // Group 3 is created after creating both the left and right nodes.
-fdf::NodeGroup NodeGroupThree() {
+fdf::CompositeNodeSpec NodeGroupThree() {
   auto bind_rules_left = std::vector{
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_THREE_LEFT),
   };
@@ -106,22 +106,22 @@ fdf::NodeGroup NodeGroupThree() {
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_RIGHT),
   };
 
-  auto nodes = std::vector{
-      fdf::NodeRepresentation{{
+  auto parents = std::vector{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_left,
           .properties = properties_left,
       }},
-      fdf::NodeRepresentation{{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_right,
           .properties = properties_right,
       }},
   };
 
-  return {{.name = "test_group_3", .nodes = nodes}};
+  return {{.name = "test_group_3", .parents = parents}};
 }
 
 // Group 4 is created before creating the left, optional, and right nodes.
-fdf::NodeGroup NodeGroupFour() {
+fdf::CompositeNodeSpec NodeGroupFour() {
   auto bind_rules_left = std::vector{
       fdf::MakeAcceptBindRule(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_FOUR_LEFT),
   };
@@ -147,22 +147,22 @@ fdf::NodeGroup NodeGroupFour() {
       fdf::MakeProperty(bindlib::TEST_BIND_PROPERTY, bindlib::TEST_BIND_PROPERTY_DRIVER_OPTIONAL),
   };
 
-  auto nodes = std::vector{
-      fdf::NodeRepresentation{{
+  auto parents = std::vector{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_left,
           .properties = properties_left,
       }},
-      fdf::NodeRepresentation{{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_right,
           .properties = properties_right,
       }},
-      fdf::NodeRepresentation{{
+      fdf::ParentSpec{{
           .bind_rules = bind_rules_optional,
           .properties = properties_optional,
       }},
   };
 
-  return {{.name = "test_group_4", .nodes = nodes}};
+  return {{.name = "test_group_4", .parents = parents}};
 }
 
 class NumberServer : public fidl::WireServer<ft::Device> {
@@ -222,7 +222,7 @@ class RootDriver : public fdf::DriverBase {
     }
 
     // Setup the node group manager client.
-    auto dgm_client = context().incoming()->Connect<fdf::NodeGroupManager>();
+    auto dgm_client = context().incoming()->Connect<fdf::CompositeNodeManager>();
     if (dgm_client.is_error()) {
       FDF_LOG(ERROR, "Failed to connect to NodeGroupManager: %s",
               zx_status_get_string(dgm_client.error_value()));
@@ -230,7 +230,7 @@ class RootDriver : public fdf::DriverBase {
       return dgm_client.take_error();
     }
 
-    node_group_manager_.Bind(std::move(dgm_client.value()), dispatcher());
+    composite_node_manager_.Bind(std::move(dgm_client.value()), dispatcher());
 
     TestGroupOne();
     TestGroupTwo();
@@ -262,7 +262,7 @@ class RootDriver : public fdf::DriverBase {
       }
     };
 
-    AddNodeGroup(NodeGroupOne(), std::move(add_left_then_right));
+    AddSpec(NodeGroupOne(), std::move(add_left_then_right));
   }
 
   // Add right
@@ -278,13 +278,13 @@ class RootDriver : public fdf::DriverBase {
       }
     };
 
-    fit::closure add_node_group_then_left = [this, add_left = std::move(add_left)]() mutable {
-      AddNodeGroup(NodeGroupTwo(), std::move(add_left));
+    fit::closure add_spec_then_left = [this, add_left = std::move(add_left)]() mutable {
+      AddSpec(NodeGroupTwo(), std::move(add_left));
     };
 
     auto right_result =
         AddChild(kRightName, 2, two_right_controller_, bindlib::TEST_BIND_PROPERTY_TWO_RIGHT,
-                 std::move(add_node_group_then_left));
+                 std::move(add_spec_then_left));
     if (!right_result) {
       FDF_LOG(ERROR, "Failed to start right child.");
       DropNode();
@@ -295,13 +295,11 @@ class RootDriver : public fdf::DriverBase {
   // Add right
   // Add node group
   void TestGroupThree() {
-    fit::closure add_node_group = [this]() mutable { AddNodeGroup(NodeGroupThree(), []() {}); };
+    fit::closure add_spec = [this]() mutable { AddSpec(NodeGroupThree(), []() {}); };
 
-    fit::closure add_right_then_node_group = [this, add_node_group =
-                                                        std::move(add_node_group)]() mutable {
-      auto right_result =
-          AddChild(kRightName, 3, three_right_controller_, bindlib::TEST_BIND_PROPERTY_THREE_RIGHT,
-                   std::move(add_node_group));
+    fit::closure add_right_then_spec = [this, add_spec = std::move(add_spec)]() mutable {
+      auto right_result = AddChild(kRightName, 3, three_right_controller_,
+                                   bindlib::TEST_BIND_PROPERTY_THREE_RIGHT, std::move(add_spec));
       if (!right_result) {
         FDF_LOG(ERROR, "Failed to start right child.");
         DropNode();
@@ -310,7 +308,7 @@ class RootDriver : public fdf::DriverBase {
 
     auto left_result =
         AddChild(kLeftName, 3, three_left_controller_, bindlib::TEST_BIND_PROPERTY_THREE_LEFT,
-                 std::move(add_right_then_node_group));
+                 std::move(add_right_then_spec));
     if (!left_result) {
       FDF_LOG(ERROR, "Failed to start left child.");
       DropNode();
@@ -351,7 +349,7 @@ class RootDriver : public fdf::DriverBase {
       }
     };
 
-    AddNodeGroup(NodeGroupFour(), std::move(add_left_then_optional));
+    AddSpec(NodeGroupFour(), std::move(add_left_then_optional));
   }
 
   bool AddChild(std::string_view name, int group,
@@ -389,13 +387,13 @@ class RootDriver : public fdf::DriverBase {
     return true;
   }
 
-  void AddNodeGroup(fdf::NodeGroup dev_group, fit::closure callback) {
+  void AddSpec(fdf::CompositeNodeSpec dev_group, fit::closure callback) {
     auto dev_group_name = dev_group.name();
-    node_group_manager_->AddNodeGroup(std::move(dev_group))
+    composite_node_manager_->AddSpec(std::move(dev_group))
         .Then([this, dev_group_name, callback = std::move(callback)](
-                  fidl::Result<fdf::NodeGroupManager::AddNodeGroup>& create_result) {
+                  fidl::Result<fdf::CompositeNodeManager::AddSpec>& create_result) {
           if (create_result.is_error()) {
-            FDF_LOG(ERROR, "AddNodeGroup failed: %s",
+            FDF_LOG(ERROR, "AddSpec failed: %s",
                     create_result.error_value().FormatDescription().c_str());
             DropNode();
             return;
@@ -423,7 +421,7 @@ class RootDriver : public fdf::DriverBase {
   fidl::SharedClient<fdf::NodeController> four_optional_controller_;
 
   fidl::SharedClient<fdf::Node> node_client_;
-  fidl::SharedClient<fdf::NodeGroupManager> node_group_manager_;
+  fidl::SharedClient<fdf::CompositeNodeManager> composite_node_manager_;
 
   NumberServer left_server_ = NumberServer(1);
   NumberServer right_server_ = NumberServer(2);

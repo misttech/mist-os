@@ -890,21 +890,21 @@ zx_status_t Device::AddNodeGroup(const char* name, const composite_node_spec_t* 
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto node_group_manager =
-      driver_->driver_namespace().Connect<fuchsia_driver_framework::NodeGroupManager>();
-  if (node_group_manager.is_error()) {
-    FDF_LOG(ERROR, "Error connecting: %s", node_group_manager.status_string());
-    return node_group_manager.status_value();
+  auto composite_node_manager =
+      driver_->driver_namespace().Connect<fuchsia_driver_framework::CompositeNodeManager>();
+  if (composite_node_manager.is_error()) {
+    FDF_LOG(ERROR, "Error connecting: %s", composite_node_manager.status_string());
+    return composite_node_manager.status_value();
   }
 
   fidl::Arena allocator;
-  auto nodes = fidl::VectorView<fdf::wire::NodeRepresentation>(allocator, spec->parent_count);
+  auto parents = fidl::VectorView<fdf::wire::ParentSpec>(allocator, spec->parent_count);
   for (size_t i = 0; i < spec->parent_count; i++) {
-    auto node_result = ConvertNodeRepresentation(allocator, spec->parents[i]);
-    if (!node_result.is_ok()) {
-      return node_result.error_value();
+    auto parents_result = ConvertNodeRepresentation(allocator, spec->parents[i]);
+    if (!parents_result.is_ok()) {
+      return parents_result.error_value();
     }
-    nodes[i] = std::move(node_result.value());
+    parents[i] = std::move(parents_result.value());
   }
 
   // TODO(fxb/111891): Support metadata for AddComposite().
@@ -912,12 +912,12 @@ zx_status_t Device::AddNodeGroup(const char* name, const composite_node_spec_t* 
     FDF_LOG(WARNING, "AddNodeGroup() currently doesn't support metadata. See fxb/111891.");
   }
 
-  auto node_group = fdf::wire::NodeGroup::Builder(allocator)
-                        .name(fidl::StringView(allocator, name))
-                        .nodes(std::move(nodes))
-                        .Build();
+  auto fidl_spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
+                       .name(fidl::StringView(allocator, name))
+                       .parents(std::move(parents))
+                       .Build();
 
-  auto result = fidl::WireCall(*node_group_manager)->AddNodeGroup(std::move(node_group));
+  auto result = fidl::WireCall(*composite_node_manager)->AddSpec(std::move(fidl_spec));
   if (result.status() != ZX_OK) {
     FDF_LOG(ERROR, "Error calling connect fidl: %s", result.status_string());
     return result.status();

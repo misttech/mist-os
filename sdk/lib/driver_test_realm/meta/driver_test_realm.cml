@@ -65,7 +65,7 @@
             protocol: [
                 "fuchsia.device.composite.DeprecatedCompositeCreator",
                 "fuchsia.device.fs.Exporter",
-                "fuchsia.driver.framework.NodeGroupManager",
+                "fuchsia.driver.framework.CompositeNodeManager",
             ],
             from: "#driver_manager",
             to: [

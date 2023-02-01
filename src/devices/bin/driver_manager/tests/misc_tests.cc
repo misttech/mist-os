@@ -476,8 +476,8 @@ TEST(MiscTestCase, AddNodeGroup) {
       .value = fdf::wire::NodePropertyValue::WithIntValue(500),
   };
 
-  fidl::VectorView<fdf::wire::NodeRepresentation> nodes(allocator, 1);
-  nodes[0] = fdf::wire::NodeRepresentation{
+  fidl::VectorView<fdf::wire::ParentSpec> nodes(allocator, 1);
+  nodes[0] = fdf::wire::ParentSpec{
       .bind_rules = bind_rules,
       .properties = properties,
   };

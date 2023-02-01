@@ -177,7 +177,7 @@ mod tests {
                         vec![
                             fdd::NodeGroupInfo {
                                 name: Some("test_group".to_string()),
-                                nodes: Some(vec![fdf::NodeRepresentation {
+                                nodes: Some(vec![fdf::ParentSpec {
                                     bind_rules: vec![fdf::BindRule {
                                         key: fdf::NodePropertyKey::StringValue(
                                             "rule_key".to_string(),
@@ -207,7 +207,7 @@ mod tests {
                                     "name_two".to_string(),
                                 ]),
                                 nodes: Some(vec![
-                                    fdf::NodeRepresentation {
+                                    fdf::ParentSpec {
                                         bind_rules: vec![fdf::BindRule {
                                             key: fdf::NodePropertyKey::StringValue(
                                                 "rule_key".to_string(),
@@ -231,7 +231,7 @@ mod tests {
                                             ),
                                         }],
                                     },
-                                    fdf::NodeRepresentation {
+                                    fdf::ParentSpec {
                                         bind_rules: vec![
                                             fdf::BindRule {
                                                 key: fdf::NodePropertyKey::IntValue(0x0001),

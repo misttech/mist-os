@@ -32,7 +32,7 @@ struct MatchedComposite {
 }
 
 struct NodeGroupInfo {
-    pub nodes: Vec<fdf::NodeRepresentation>,
+    pub nodes: Vec<fdf::ParentSpec>,
 
     // The composite driver matched to the node group.
     pub matched: Option<MatchedComposite>,
@@ -57,29 +57,27 @@ impl NodeGroupManager {
 
     pub fn add_node_group(
         &mut self,
-        group: fdf::NodeGroup,
+        spec: fdf::CompositeNodeSpec,
         composite_drivers: Vec<&ResolvedDriver>,
     ) -> fdi::DriverIndexAddNodeGroupResult {
         // Get and validate the name.
-        let name = group.name.ok_or(Status::INVALID_ARGS.into_raw())?;
+        let name = spec.name.ok_or(Status::INVALID_ARGS.into_raw())?;
         if let Ok(name_regex) = Regex::new(NAME_REGEX) {
             if !name_regex.is_match(&name) {
-                log::error!(
-                    "Invalid node group name. Name can only contain [A-Za-z0-9-_] characters"
-                );
+                log::error!("Invalid spec name. Name can only contain [A-Za-z0-9-_] characters");
                 return Err(Status::INVALID_ARGS.into_raw());
             }
         } else {
             log::warn!("Regex failure. Unable to validate node group name");
         }
 
-        let nodes = group.nodes.ok_or(Status::INVALID_ARGS.into_raw())?;
+        let parents = spec.parents.ok_or(Status::INVALID_ARGS.into_raw())?;
 
         if self.node_group_list.contains_key(&name) {
             return Err(Status::ALREADY_EXISTS.into_raw());
         }
 
-        if nodes.is_empty() {
+        if parents.is_empty() {
             return Err(Status::INVALID_ARGS.into_raw());
         }
 
@@ -91,12 +89,12 @@ impl NodeGroupManager {
             NodeRepresentationBindRules,
             fdi::MatchedNodeGroupInfo,
         )> = vec![];
-        for (node_idx, node) in nodes.iter().enumerate() {
-            let properties = convert_fidl_to_bind_rules(&node.bind_rules)?;
+        for (idx, parent) in parents.iter().enumerate() {
+            let properties = convert_fidl_to_bind_rules(&parent.bind_rules)?;
             let node_group_info = fdi::MatchedNodeGroupInfo {
                 name: Some(name.clone()),
-                node_index: Some(node_idx as u32),
-                num_nodes: Some(nodes.len() as u32),
+                node_index: Some(idx as u32),
+                num_nodes: Some(parents.len() as u32),
                 ..fdi::MatchedNodeGroupInfo::EMPTY
             };
 
@@ -112,13 +110,13 @@ impl NodeGroupManager {
         }
 
         for composite_driver in composite_drivers {
-            let matched_composite = match_composite_properties(composite_driver, &nodes)?;
+            let matched_composite = match_composite_properties(composite_driver, &parents)?;
             if let Some(matched_composite) = matched_composite {
                 // Found a match so we can set this in our map.
                 self.node_group_list.insert(
                     name.clone(),
                     NodeGroupInfo {
-                        nodes,
+                        nodes: parents,
                         matched: Some(MatchedComposite {
                             info: matched_composite.info.clone(),
                             names: matched_composite.names.clone(),
@@ -130,7 +128,7 @@ impl NodeGroupManager {
             }
         }
 
-        self.node_group_list.insert(name, NodeGroupInfo { nodes, matched: None });
+        self.node_group_list.insert(name, NodeGroupInfo { nodes: parents, matched: None });
         Err(Status::NOT_FOUND.into_raw())
     }
 
@@ -352,10 +350,10 @@ fn node_property_to_symbol(value: &fdf::NodePropertyValue) -> Result<Symbol, zx_
 
 fn match_composite_properties<'a>(
     composite_driver: &'a ResolvedDriver,
-    nodes: &'a Vec<fdf::NodeRepresentation>,
+    parents: &'a Vec<fdf::ParentSpec>,
 ) -> Result<Option<MatchedComposite>, i32> {
     // The node group must have at least 1 node to match a composite driver.
-    if nodes.len() < 1 {
+    if parents.len() < 1 {
         return Ok(None);
     }
 
@@ -364,16 +362,16 @@ fn match_composite_properties<'a>(
     // The composite driver bind rules should have a total node count of more than or equal to the
     // total node count of the node group. This is to account for optional nodes in the
     // composite driver bind rules.
-    if composite.optional_nodes.len() + composite.additional_nodes.len() + 1 < nodes.len() {
+    if composite.optional_nodes.len() + composite.additional_nodes.len() + 1 < parents.len() {
         return Ok(None);
     }
 
     // First find a matching primary node.
     let mut primary_index = 0;
     let mut primary_matches = false;
-    for i in 0..nodes.len() {
+    for i in 0..parents.len() {
         primary_matches = node_matches_composite_driver(
-            &nodes[i],
+            &parents[i],
             &composite.primary_node.instructions,
             &composite.symbol_table,
         );
@@ -415,7 +413,7 @@ fn match_composite_properties<'a>(
 
     let mut names = vec![];
 
-    for i in 0..nodes.len() {
+    for i in 0..parents.len() {
         if i == primary_index as usize {
             names.push(composite.symbol_table[&composite.primary_node.name_id].clone());
             continue;
@@ -428,7 +426,7 @@ fn match_composite_properties<'a>(
         // First check if any of the additional nodes match it.
         for &j in &unmatched_additional_indices {
             let matches = node_matches_composite_driver(
-                &nodes[i],
+                &parents[i],
                 &composite.additional_nodes[j].instructions,
                 &composite.symbol_table,
             );
@@ -444,7 +442,7 @@ fn match_composite_properties<'a>(
         if matched.is_none() {
             for &j in &unmatched_optional_indices {
                 let matches = node_matches_composite_driver(
-                    &nodes[i],
+                    &parents[i],
                     &composite.optional_nodes[j].instructions,
                     &composite.symbol_table,
                 );
@@ -488,7 +486,7 @@ fn match_composite_properties<'a>(
 }
 
 fn node_matches_composite_driver(
-    node: &fdf::NodeRepresentation,
+    node: &fdf::ParentSpec,
     bind_rules_node: &Vec<u8>,
     symbol_table: &HashMap<u32, String>,
 ) -> bool {
@@ -549,7 +547,7 @@ mod tests {
     }
 
     // TODO(fxb/120270): Update tests so that they use the test data functions more often.
-    fn create_test_node_rep_1() -> fdf::NodeRepresentation {
+    fn create_test_node_rep_1() -> fdf::ParentSpec {
         let bind_rules = vec![
             make_accept(fdf::NodePropertyKey::IntValue(1), fdf::NodePropertyValue::IntValue(200)),
             make_accept(fdf::NodePropertyKey::IntValue(3), fdf::NodePropertyValue::BoolValue(true)),
@@ -564,10 +562,10 @@ mod tests {
             fdf::NodePropertyValue::BoolValue(false),
         )];
 
-        fdf::NodeRepresentation { bind_rules: bind_rules, properties: properties }
+        fdf::ParentSpec { bind_rules: bind_rules, properties: properties }
     }
 
-    fn create_test_node_rep_2() -> fdf::NodeRepresentation {
+    fn create_test_node_rep_2() -> fdf::ParentSpec {
         let bind_rules = vec![
             make_reject(
                 fdf::NodePropertyKey::StringValue("killdeer".to_string()),
@@ -588,7 +586,7 @@ mod tests {
             fdf::NodePropertyValue::BoolValue(true),
         )];
 
-        fdf::NodeRepresentation { bind_rules: bind_rules, properties: properties }
+        fdf::ParentSpec { bind_rules: bind_rules, properties: properties }
     }
 
     fn create_driver_with_rules<'a>(
@@ -643,10 +641,10 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: nodes.clone(),
-                    ..fdf::NodeGroup::EMPTY
+                    parents: nodes.clone(),
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -739,13 +737,13 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![fdf::NodeRepresentation {
+                    parents: Some(vec![fdf::ParentSpec {
                         bind_rules: bind_rules,
                         properties: properties,
                     }]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -792,13 +790,13 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![fdf::NodeRepresentation {
+                    parents: Some(vec![fdf::ParentSpec {
                         bind_rules: bind_rules,
                         properties: properties,
                     }]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -866,10 +864,10 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![create_test_node_rep_1(), create_test_node_rep_2(),]),
-                    ..fdf::NodeGroup::EMPTY
+                    parents: Some(vec![create_test_node_rep_1(), create_test_node_rep_2(),]),
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -878,19 +876,16 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group2".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
+                    parents: Some(vec![
+                        fdf::ParentSpec {
                             bind_rules: bind_rules_2_rearranged,
                             properties: properties_2,
                         },
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_3,
-                            properties: properties_3,
-                        },
+                        fdf::ParentSpec { bind_rules: bind_rules_3, properties: properties_3 },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -982,16 +977,16 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
+                    parents: Some(vec![
+                        fdf::ParentSpec {
                             bind_rules: bind_rules_1,
                             properties: properties_1.clone(),
                         },
                         create_test_node_rep_2(),
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1000,19 +995,16 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group2".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_3,
-                            properties: properties_3,
-                        },
-                        fdf::NodeRepresentation {
+                    parents: Some(vec![
+                        fdf::ParentSpec { bind_rules: bind_rules_3, properties: properties_3 },
+                        fdf::ParentSpec {
                             bind_rules: bind_rules_1_rearranged,
                             properties: properties_1,
                         },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1021,13 +1013,13 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group3".to_string()),
-                    nodes: Some(vec![fdf::NodeRepresentation {
+                    parents: Some(vec![fdf::ParentSpec {
                         bind_rules: bind_rules_4,
                         properties: properties_4,
                     }]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1096,16 +1088,13 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
+                    parents: Some(vec![
                         create_test_node_rep_1(),
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_2,
-                            properties: properties_2,
-                        },
+                        fdf::ParentSpec { bind_rules: bind_rules_2, properties: properties_2 },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1168,19 +1157,13 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_1,
-                            properties: properties_1,
-                        },
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_2,
-                            properties: properties_2,
-                        },
+                    parents: Some(vec![
+                        fdf::ParentSpec { bind_rules: bind_rules_1, properties: properties_1 },
+                        fdf::ParentSpec { bind_rules: bind_rules_2, properties: properties_2 },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1267,19 +1250,13 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_1,
-                            properties: properties_1,
-                        },
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules_2,
-                            properties: properties_2,
-                        },
+                    parents: Some(vec![
+                        fdf::ParentSpec { bind_rules: bind_rules_1, properties: properties_1 },
+                        fdf::ParentSpec { bind_rules: bind_rules_2, properties: properties_2 },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1318,13 +1295,13 @@ mod tests {
         assert_eq!(
             Err(Status::INVALID_ARGS.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![fdf::NodeRepresentation {
+                    parents: Some(vec![fdf::ParentSpec {
                         bind_rules: bind_rules,
                         properties: properties,
                     }]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1353,13 +1330,13 @@ mod tests {
         assert_eq!(
             Err(Status::INVALID_ARGS.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![fdf::NodeRepresentation {
+                    parents: Some(vec![fdf::ParentSpec {
                         bind_rules: bind_rules,
                         properties: properties,
                     },]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1393,16 +1370,13 @@ mod tests {
         assert_eq!(
             Err(Status::INVALID_ARGS.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules,
-                            properties: properties_1,
-                        },
-                        fdf::NodeRepresentation { bind_rules: vec![], properties: properties_2 },
+                    parents: Some(vec![
+                        fdf::ParentSpec { bind_rules: bind_rules, properties: properties_1 },
+                        fdf::ParentSpec { bind_rules: vec![], properties: properties_2 },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1436,16 +1410,13 @@ mod tests {
         assert_eq!(
             Err(Status::INVALID_ARGS.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: None,
-                    nodes: Some(vec![
-                        fdf::NodeRepresentation {
-                            bind_rules: bind_rules,
-                            properties: properties_1,
-                        },
-                        fdf::NodeRepresentation { bind_rules: vec![], properties: properties_2 },
+                    parents: Some(vec![
+                        fdf::ParentSpec { bind_rules: bind_rules, properties: properties_1 },
+                        fdf::ParentSpec { bind_rules: vec![], properties: properties_2 },
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1456,10 +1427,10 @@ mod tests {
         assert_eq!(
             Err(Status::INVALID_ARGS.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: None,
-                    ..fdf::NodeGroup::EMPTY
+                    parents: None,
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -1495,7 +1466,7 @@ mod tests {
         let additional_b_key_1 = "curlew";
         let additional_b_val_1 = 500;
 
-        let primary_node_representation = fdf::NodeRepresentation {
+        let primary_parent_spec = fdf::ParentSpec {
             bind_rules: primary_bind_rules,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
@@ -1511,7 +1482,7 @@ mod tests {
             },
         }];
 
-        let additional_node_representation_a = fdf::NodeRepresentation {
+        let additional_parent_spec_a = fdf::ParentSpec {
             bind_rules: additional_bind_rules_1,
             properties: vec![make_property(
                 fdf::NodePropertyKey::IntValue(additional_a_key_1),
@@ -1536,7 +1507,7 @@ mod tests {
             },
         ];
 
-        let additional_node_representation_b = fdf::NodeRepresentation {
+        let additional_parent_spec_b = fdf::ParentSpec {
             bind_rules: additional_bind_rules_2,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
@@ -1561,11 +1532,8 @@ mod tests {
             vec![],
         );
 
-        let nodes = Some(vec![
-            primary_node_representation,
-            additional_node_representation_b,
-            additional_node_representation_a,
-        ]);
+        let nodes =
+            Some(vec![primary_parent_spec, additional_parent_spec_b, additional_parent_spec_a]);
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1585,10 +1553,10 @@ mod tests {
                 ]
             )),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: nodes.clone(),
-                    ..fdf::NodeGroup::EMPTY
+                    parents: nodes.clone(),
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![&composite_driver]
             )
@@ -1673,7 +1641,7 @@ mod tests {
         let additional_b_key_1 = "curlew";
         let additional_b_val_1 = 500;
 
-        let primary_node_representation = fdf::NodeRepresentation {
+        let primary_parent_spec = fdf::ParentSpec {
             bind_rules: primary_bind_rules,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
@@ -1689,7 +1657,7 @@ mod tests {
             },
         }];
 
-        let additional_node_representation_a = fdf::NodeRepresentation {
+        let additional_parent_spec_a = fdf::ParentSpec {
             bind_rules: additional_bind_rules_1,
             properties: vec![make_property(
                 fdf::NodePropertyKey::IntValue(additional_a_key_1),
@@ -1714,7 +1682,7 @@ mod tests {
             },
         ];
 
-        let additional_node_representation_b = fdf::NodeRepresentation {
+        let additional_parent_spec_b = fdf::ParentSpec {
             bind_rules: additional_bind_rules_2,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
@@ -1739,11 +1707,8 @@ mod tests {
             vec![],
         );
 
-        let nodes = Some(vec![
-            additional_node_representation_b,
-            additional_node_representation_a,
-            primary_node_representation,
-        ]);
+        let nodes =
+            Some(vec![additional_parent_spec_b, additional_parent_spec_a, primary_parent_spec]);
 
         let mut node_group_manager = NodeGroupManager::new();
         assert_eq!(
@@ -1763,10 +1728,10 @@ mod tests {
                 ]
             )),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: nodes.clone(),
-                    ..fdf::NodeGroup::EMPTY
+                    parents: nodes.clone(),
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![&composite_driver]
             )
@@ -1854,7 +1819,7 @@ mod tests {
         let optional_a_key_1 = 200;
         let optional_a_val_1: u32 = 10;
 
-        let primary_node_representation = fdf::NodeRepresentation {
+        let primary_parent_spec = fdf::ParentSpec {
             bind_rules: primary_bind_rules,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
@@ -1870,7 +1835,7 @@ mod tests {
             },
         }];
 
-        let additional_node_representation_a = fdf::NodeRepresentation {
+        let additional_parent_spec_a = fdf::ParentSpec {
             bind_rules: additional_bind_rules_1,
             properties: vec![make_property(
                 fdf::NodePropertyKey::IntValue(additional_a_key_1),
@@ -1895,7 +1860,7 @@ mod tests {
             },
         ];
 
-        let additional_node_representation_b = fdf::NodeRepresentation {
+        let additional_parent_spec_b = fdf::ParentSpec {
             bind_rules: additional_bind_rules_2,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
@@ -1955,14 +1920,14 @@ mod tests {
                 ]
             )),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
-                        primary_node_representation,
-                        additional_node_representation_b,
-                        additional_node_representation_a,
+                    parents: Some(vec![
+                        primary_parent_spec,
+                        additional_parent_spec_b,
+                        additional_parent_spec_a,
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![&composite_driver]
             )
@@ -2035,7 +2000,7 @@ mod tests {
         let optional_a_key_1 = 200;
         let optional_a_val_1 = 10;
 
-        let primary_node_representation = fdf::NodeRepresentation {
+        let primary_parent_spec = fdf::ParentSpec {
             bind_rules: primary_bind_rules,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
@@ -2051,7 +2016,7 @@ mod tests {
             },
         }];
 
-        let additional_node_representation_a = fdf::NodeRepresentation {
+        let additional_parent_spec_a = fdf::ParentSpec {
             bind_rules: additional_bind_rules_1,
             properties: vec![make_property(
                 fdf::NodePropertyKey::IntValue(additional_a_key_1),
@@ -2076,7 +2041,7 @@ mod tests {
             },
         ];
 
-        let additional_node_representation_b = fdf::NodeRepresentation {
+        let additional_parent_spec_b = fdf::ParentSpec {
             bind_rules: additional_bind_rules_2,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
@@ -2092,7 +2057,7 @@ mod tests {
             },
         }];
 
-        let optional_node_representation_a = fdf::NodeRepresentation {
+        let optional_node_representation_a = fdf::ParentSpec {
             bind_rules: optional_bind_rules_1,
             properties: vec![make_property(
                 fdf::NodePropertyKey::IntValue(optional_a_key_1),
@@ -2145,15 +2110,15 @@ mod tests {
                 ]
             )),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
-                        primary_node_representation,
-                        additional_node_representation_b,
+                    parents: Some(vec![
+                        primary_parent_spec,
+                        additional_parent_spec_b,
                         optional_node_representation_a,
-                        additional_node_representation_a,
+                        additional_parent_spec_a,
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![&composite_driver]
             )
@@ -2260,7 +2225,7 @@ mod tests {
             },
         }];
 
-        let primary_node_representation = fdf::NodeRepresentation {
+        let primary_parent_spec = fdf::ParentSpec {
             bind_rules: primary_bind_rules,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(primary_key_1.to_string()),
@@ -2286,7 +2251,7 @@ mod tests {
             },
         ];
 
-        let additional_node_representation_a = fdf::NodeRepresentation {
+        let additional_parent_spec_a = fdf::ParentSpec {
             bind_rules: additional_bind_rules_1,
             properties: vec![make_property(
                 fdf::NodePropertyKey::StringValue(additional_b_key_1.to_string()),
@@ -2302,7 +2267,7 @@ mod tests {
             },
         }];
 
-        let additional_node_representation_b = fdf::NodeRepresentation {
+        let additional_parent_spec_b = fdf::ParentSpec {
             bind_rules: additional_bind_rules_2,
             properties: vec![make_property(
                 fdf::NodePropertyKey::IntValue(additional_a_key_1),
@@ -2323,14 +2288,14 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test_group".to_string()),
-                    nodes: Some(vec![
-                        primary_node_representation,
-                        additional_node_representation_a,
-                        additional_node_representation_b
+                    parents: Some(vec![
+                        primary_parent_spec,
+                        additional_parent_spec_a,
+                        additional_parent_spec_b
                     ]),
-                    ..fdf::NodeGroup::EMPTY
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![&composite_driver]
             )
@@ -2341,7 +2306,7 @@ mod tests {
     async fn test_valid_name() {
         let mut node_group_manager = NodeGroupManager::new();
 
-        let node = fdf::NodeRepresentation {
+        let node = fdf::ParentSpec {
             bind_rules: vec![make_accept(
                 fdf::NodePropertyKey::StringValue("wrybill".to_string()),
                 fdf::NodePropertyValue::IntValue(200),
@@ -2354,10 +2319,10 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test-group".to_string()),
-                    nodes: Some(vec![node.clone(),]),
-                    ..fdf::NodeGroup::EMPTY
+                    parents: Some(vec![node.clone()]),
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -2366,10 +2331,10 @@ mod tests {
         assert_eq!(
             Err(Status::NOT_FOUND.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("TEST_group".to_string()),
-                    nodes: Some(vec![node]),
-                    ..fdf::NodeGroup::EMPTY
+                    parents: Some(vec![node]),
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -2379,7 +2344,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_invalid_name() {
         let mut node_group_manager = NodeGroupManager::new();
-        let node = fdf::NodeRepresentation {
+        let node = fdf::ParentSpec {
             bind_rules: vec![make_accept(
                 fdf::NodePropertyKey::StringValue("wrybill".to_string()),
                 fdf::NodePropertyValue::IntValue(200),
@@ -2392,10 +2357,10 @@ mod tests {
         assert_eq!(
             Err(Status::INVALID_ARGS.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test/group".to_string()),
-                    nodes: Some(vec![node.clone(),]),
-                    ..fdf::NodeGroup::EMPTY
+                    parents: Some(vec![node.clone()]),
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )
@@ -2404,10 +2369,10 @@ mod tests {
         assert_eq!(
             Err(Status::INVALID_ARGS.into_raw()),
             node_group_manager.add_node_group(
-                fdf::NodeGroup {
+                fdf::CompositeNodeSpec {
                     name: Some("test:group".to_string()),
-                    nodes: Some(vec![node]),
-                    ..fdf::NodeGroup::EMPTY
+                    parents: Some(vec![node]),
+                    ..fdf::CompositeNodeSpec::EMPTY
                 },
                 vec![]
             )

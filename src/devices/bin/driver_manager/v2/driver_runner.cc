@@ -170,29 +170,28 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
 
 void DriverRunner::BindNodesForNodeGroups() { TryBindAllOrphansUntracked(); }
 
-void DriverRunner::AddNodeGroup(AddNodeGroupRequestView request,
-                                AddNodeGroupCompleter::Sync& completer) {
-  if (!request->has_name() || !request->has_nodes()) {
-    completer.Reply(fit::error(fdf::NodeGroupError::kMissingArgs));
+void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) {
+  if (!request->has_name() || !request->has_parents()) {
+    completer.Reply(fit::error(fdf::CompositeNodeSpecError::kMissingArgs));
     return;
   }
 
-  if (request->nodes().empty()) {
-    completer.Reply(fit::error(fdf::NodeGroupError::kEmptyNodes));
+  if (request->parents().empty()) {
+    completer.Reply(fit::error(fdf::CompositeNodeSpecError::kEmptyNodes));
     return;
   }
 
   auto node_group = std::make_unique<NodeGroupV2>(
       NodeGroupCreateInfo{
           .name = std::string(request->name().get()),
-          .size = request->nodes().count(),
+          .size = request->parents().count(),
       },
       dispatcher_, this);
   completer.Reply(node_group_manager_.AddNodeGroup(*request, std::move(node_group)));
 }
 
-void DriverRunner::AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::NodeGroup group,
-                                             AddToIndexCallback callback) {
+void DriverRunner::AddNodeGroupToDriverIndex(
+    fuchsia_driver_framework::wire::CompositeNodeSpec group, AddToIndexCallback callback) {
   driver_index_->AddNodeGroup(group).Then(
       [callback = std::move(callback)](
           fidl::WireUnownedResult<fdi::DriverIndex::AddNodeGroup>& result) mutable {
@@ -258,7 +257,7 @@ void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing
 }
 
 void DriverRunner::PublishNodeGroupManager(component::OutgoingDirectory& outgoing) {
-  auto result = outgoing.AddUnmanagedProtocol<fdf::NodeGroupManager>(
+  auto result = outgoing.AddUnmanagedProtocol<fdf::CompositeNodeManager>(
       manager_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
 }
