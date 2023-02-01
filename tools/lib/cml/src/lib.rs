@@ -1088,6 +1088,10 @@ pub struct Document {
     /// ```
     #[reference_doc(json_type = "object")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    // NB: Unlike other maps the order of these fields matters for the ABI of generated config
+    // libraries. Rather than insertion order, we explicitly sort the fields here to dissuade
+    // developers from taking a dependency on the source ordering in their manifest. In the future
+    // this will hopefully make it easier to pursue layout size optimizations.
     pub config: Option<BTreeMap<ConfigKey, ConfigValueType>>,
 }
 
@@ -1182,16 +1186,7 @@ impl Document {
         merge_from_field!(self, other, environments);
         self.merge_program(other, include_path)?;
         self.merge_facets(other, include_path)?;
-
-        // TODO(https://fxbug.dev/93679): Multiple config schemas aren't merged together
-        if self.config.is_some() && other.config.is_some() {
-            return Err(Error::validate(format!(
-                "multiple config schemas found (last import: {}). See https://fxbug.dev/93679 for more information",
-                include_path.display()
-            )));
-        } else if let Some(config) = other.config.take() {
-            self.config.replace(config);
-        }
+        self.merge_config(other, include_path)?;
 
         Ok(())
     }
@@ -1319,6 +1314,36 @@ impl Document {
         let other_facets = other.facets.as_ref().unwrap();
 
         Self::merge_maps(my_facets, other_facets, "facets", include_path)
+    }
+
+    fn merge_config(
+        &mut self,
+        other: &mut Document,
+        include_path: &path::Path,
+    ) -> Result<(), Error> {
+        if let Some(other_config) = other.config.as_mut() {
+            if let Some(self_config) = self.config.as_mut() {
+                for (key, field) in other_config {
+                    match self_config.entry(key.clone()) {
+                        std::collections::btree_map::Entry::Vacant(v) => {
+                            v.insert(field.clone());
+                        }
+                        std::collections::btree_map::Entry::Occupied(o) => {
+                            if o.get() != field {
+                                let msg = format!(
+                                    "Found conflicting entry for config key `{key}` in `{}`.",
+                                    include_path.display()
+                                );
+                                return Err(Error::validate(&msg));
+                            }
+                        }
+                    }
+                }
+            } else {
+                self.config.replace(std::mem::take(other_config));
+            }
+        }
+        Ok(())
     }
 
     pub fn includes(&self) -> Vec<String> {
@@ -1556,9 +1581,9 @@ impl ConfigKey {
     }
 }
 
-impl ToString for ConfigKey {
-    fn to_string(&self) -> String {
-        self.0.clone()
+impl std::fmt::Display for ConfigKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 
@@ -1629,7 +1654,7 @@ impl<'de> de::Deserialize<'de> for ConfigKey {
     }
 }
 
-#[derive(Deserialize, Debug, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", deny_unknown_fields, rename_all = "lowercase")]
 pub enum ConfigValueType {
     Bool,
@@ -1672,7 +1697,7 @@ impl ConfigValueType {
     }
 }
 
-#[derive(Deserialize, Debug, PartialEq, Serialize)]
+#[derive(Clone, Deserialize, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", deny_unknown_fields, rename_all = "lowercase")]
 pub enum ConfigNestedValueType {
     Bool,
@@ -3652,14 +3677,40 @@ mod tests {
     }
 
     #[test]
-    fn test_merge_from_config_error() {
+    fn test_merge_from_config() {
         let mut some = document(json!({ "config": { "foo": { "type": "bool" } } }));
         let mut other = document(json!({ "config": { "bar": { "type": "bool" } } }));
+        some.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+
+        assert_eq!(
+            some,
+            document(json!({
+                "config": {
+                    "foo": { "type": "bool" },
+                    "bar": { "type": "bool" },
+                }
+            })),
+        );
+    }
+
+    #[test]
+    fn test_merge_from_config_dedupe_identical_fields() {
+        let mut some = document(json!({ "config": { "foo": { "type": "bool" } } }));
+        let mut other = document(json!({ "config": { "foo": { "type": "bool" } } }));
+        some.merge_from(&mut other, &path::Path::new("some/path")).unwrap();
+
+        assert_eq!(some, document(json!({ "config": { "foo": { "type": "bool" } } })));
+    }
+
+    #[test]
+    fn test_merge_from_config_conflicting_keys() {
+        let mut some = document(json!({ "config": { "foo": { "type": "bool" } } }));
+        let mut other = document(json!({ "config": { "foo": { "type": "uint8" } } }));
 
         assert_matches::assert_matches!(
             some.merge_from(&mut other, &path::Path::new("some/path")),
             Err(Error::Validate { schema_name: None, err, .. })
-                if err == "multiple config schemas found (last import: some/path). See https://fxbug.dev/93679 for more information"
+                if err == "Found conflicting entry for config key `foo` in `some/path`."
         );
     }
 
