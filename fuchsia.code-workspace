@@ -114,7 +114,7 @@
     // Dart
     //
 
-    "dart.sdkPath": "${workspaceFolder/prebuilt/third_party/dart/linux-x64",
+    "dart.sdkPath": "${workspaceFolder}/prebuilt/third_party/dart/linux-x64",
 
     ////////
     // Rust
