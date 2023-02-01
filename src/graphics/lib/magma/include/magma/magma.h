@@ -211,7 +211,7 @@ MAGMA_EXPORT magma_status_t magma_connection_import_semaphore(
 /// \param start_offset Byte offset into the buffer.
 /// \param length Length (in bytes) of the region to operate on.
 ///
-MAGMA_EXPORT magma_status_t magma_connection_buffer_range_op(
+MAGMA_EXPORT magma_status_t magma_connection_perform_buffer_op(
     magma_connection_t connection,
     magma_buffer_t buffer,
     uint32_t options,

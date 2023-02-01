@@ -351,9 +351,9 @@ magma_status_t magma_connection_read_performance_counter_completion(
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
-magma_status_t magma_connection_buffer_range_op(magma_connection_t connection,
-                                                magma_buffer_t buffer, uint32_t options,
-                                                uint64_t start_offset, uint64_t length) {
+magma_status_t magma_connection_perform_buffer_op(magma_connection_t connection,
+                                                  magma_buffer_t buffer, uint32_t options,
+                                                  uint64_t start_offset, uint64_t length) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 

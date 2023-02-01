@@ -225,9 +225,9 @@ void magma_connection_unmap_buffer(magma_connection_t connection, uint64_t hw_va
   magma::PlatformConnectionClient::cast(connection)->UnmapBuffer(buffer_id, hw_va);
 }
 
-magma_status_t magma_connection_buffer_range_op(magma_connection_t connection,
-                                                magma_buffer_t buffer, uint32_t options,
-                                                uint64_t start_offset, uint64_t length) {
+magma_status_t magma_connection_perform_buffer_op(magma_connection_t connection,
+                                                  magma_buffer_t buffer, uint32_t options,
+                                                  uint64_t start_offset, uint64_t length) {
   auto platform_buffer = reinterpret_cast<magma::PlatformBuffer*>(buffer);
 
   switch (options) {

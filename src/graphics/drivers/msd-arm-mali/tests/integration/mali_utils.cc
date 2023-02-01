@@ -16,8 +16,8 @@ bool AtomHelper::InitJobBuffer(magma_buffer_t buffer, JobBufferType type, uint64
   magma_connection_map_buffer(
       connection_, *job_va, buffer, 0, magma::page_size(),
       MAGMA_MAP_FLAG_READ | MAGMA_MAP_FLAG_WRITE | kMagmaArmMaliGpuMapFlagInnerShareable);
-  magma_connection_buffer_range_op(connection_, buffer, MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0,
-                                   magma::page_size());
+  magma_connection_perform_buffer_op(connection_, buffer, MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0,
+                                     magma::page_size());
   JobDescriptorHeader* header = static_cast<JobDescriptorHeader*>(vaddr);
   memset(header, 0, sizeof(*header));
   header->job_descriptor_size = 1;  // Next job address is 64-bit.

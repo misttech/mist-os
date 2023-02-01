@@ -317,7 +317,7 @@
             },
             {
                 "ordinal": 65,
-                "name": "magma_connection_buffer_range_op",
+                "name": "magma_connection_perform_buffer_op",
                 "type": "magma_status_t",
                 "description": "Perform an operation on a range of a buffer",
                 "arguments": [

@@ -411,8 +411,8 @@ class TestConnection {
 
       if (!is_intel_or_vsi) {
         ASSERT_EQ(MAGMA_STATUS_OK,
-                  magma_connection_buffer_range_op(connection_, buffer2,
-                                                   MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0, size));
+                  magma_connection_perform_buffer_op(
+                      connection_, buffer2, MAGMA_BUFFER_RANGE_OP_POPULATE_TABLES, 0, size));
         ASSERT_EQ(MAGMA_STATUS_OK, magma_connection_get_error(connection_)) << "i " << i;
       }
 
@@ -1430,33 +1430,33 @@ TEST_F(Magma, CommitBuffer) {
   EXPECT_EQ(0u, info.committed_byte_count);
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
-            magma_connection_buffer_range_op(connection.connection(), buffer,
-                                             MAGMA_BUFFER_RANGE_OP_COMMIT, 0, page_size() + 1));
-  EXPECT_EQ(MAGMA_STATUS_MEMORY_ERROR, magma_connection_buffer_range_op(
+            magma_connection_perform_buffer_op(connection.connection(), buffer,
+                                               MAGMA_BUFFER_RANGE_OP_COMMIT, 0, page_size() + 1));
+  EXPECT_EQ(MAGMA_STATUS_MEMORY_ERROR, magma_connection_perform_buffer_op(
                                            connection.connection(), buffer,
                                            MAGMA_BUFFER_RANGE_OP_COMMIT, page_size(), buffer_size));
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
-                                                              MAGMA_BUFFER_RANGE_OP_COMMIT,
-                                                              page_size(), page_size()));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_perform_buffer_op(connection.connection(), buffer,
+                                                                MAGMA_BUFFER_RANGE_OP_COMMIT,
+                                                                page_size(), page_size()));
   EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
   EXPECT_EQ(page_size(), info.committed_byte_count);
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
-            magma_connection_buffer_range_op(connection.connection(), buffer,
-                                             MAGMA_BUFFER_RANGE_OP_DECOMMIT, 0, page_size() + 1));
+            magma_connection_perform_buffer_op(connection.connection(), buffer,
+                                               MAGMA_BUFFER_RANGE_OP_DECOMMIT, 0, page_size() + 1));
   EXPECT_EQ(
       MAGMA_STATUS_INVALID_ARGS,
-      magma_connection_buffer_range_op(connection.connection(), buffer,
-                                       MAGMA_BUFFER_RANGE_OP_DECOMMIT, page_size(), buffer_size));
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
-                                                              MAGMA_BUFFER_RANGE_OP_DECOMMIT,
-                                                              2 * page_size(), page_size()));
+      magma_connection_perform_buffer_op(connection.connection(), buffer,
+                                         MAGMA_BUFFER_RANGE_OP_DECOMMIT, page_size(), buffer_size));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_perform_buffer_op(connection.connection(), buffer,
+                                                                MAGMA_BUFFER_RANGE_OP_DECOMMIT,
+                                                                2 * page_size(), page_size()));
   EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
   EXPECT_EQ(page_size(), info.committed_byte_count);
 
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
-                                                              MAGMA_BUFFER_RANGE_OP_DECOMMIT,
-                                                              page_size(), page_size()));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_perform_buffer_op(connection.connection(), buffer,
+                                                                MAGMA_BUFFER_RANGE_OP_DECOMMIT,
+                                                                page_size(), page_size()));
   EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
   EXPECT_EQ(0u, info.committed_byte_count);
 
