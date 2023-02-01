@@ -1486,6 +1486,14 @@
   related_guides: [""]
   area: ["UI"]
 
+- term: "SDK Atom"
+  short_description: "A subset of files in the SDK."
+  full_description: "An *SDK Atom* is a collection of files that can be included
+      in an SDK. Fuchsia represents SDK Atoms using the <code>sdk_atom</code> template in GN."
+  see_also: [""]
+  related_guides: [""]
+  area: ["Build"]
+
 - term: "Sequential device driver"
   short_description: "A  <a href=\"/docs/glossary#hardware-driver\">hardware driver</a>
   that will only service a single request at a time. The

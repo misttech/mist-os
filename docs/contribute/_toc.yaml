@@ -19,8 +19,9 @@ toc:
 - title: "Platform evolution"
   section:
   - include: /docs/contribute/updatability/_toc.yaml
-- title: "Contributing to API"
-  path: /docs/contribute/contributing-to-api.md
+- title: "Contributing to the SDK"
+  section:
+  - include: /docs/contribute/sdk/_toc.yaml
 - title: "Contributing to Zircon"
   path: /docs/contribute/contributing_to_zircon.md
 - title: "Contributing to the Component Framework"

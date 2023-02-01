@@ -1,4 +1,16 @@
-# Contributing to API
+# Fuchsia SDK Contributor Guide
+
+This section includes documentation for contributing to the [Fuchsia API
+Surface][fuchsia-api-surface] and the [IDK].
+
+_Technically_, it may be more appropriate to call this the "IDK Contributor
+Guide", as the APIs and libraries that make up the API Surface are first added
+to the IDK, which is then turned into an SDK distribution. However,
+colloquially and in code, we almost exclusively say "the SDK". Regardless, if
+you're looking to "change the SDK" in some way, you're probably in the right
+place.
+
+## Contributing to an API in the SDK
 
 To contribute to the [Fuchsia API Surface][fuchsia-api-surface], do the following:
 
@@ -29,6 +41,7 @@ To contribute to the [Fuchsia API Surface][fuchsia-api-surface], do the followin
 <!-- Reference links -->
 
 [fuchsia-api-surface]: /docs/glossary/README.md#fuchsia-api-surface
+[IDK]: /docs/development/idk/
 [create-a-change-in-gerrit]: /docs/development/source_code/contribute_changes.md#create-a-change-in-gerrit
 [request-a-code-review]: /docs/development/source_code/contribute_changes.md#request-a-code-review
 [rfc]: /docs/contribute/governance/rfcs/TEMPLATE.md
