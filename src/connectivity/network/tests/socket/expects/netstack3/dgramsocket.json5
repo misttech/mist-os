@@ -1,0 +1,67 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "LocalhostTest.ConnectAFMismatchINET6",
+                "NetDatagramTest.DatagramSendtoV*RecvfromV*",
+                "NetDatagramTest.ConnectUnspecV*",
+                "NetDatagramTest.PingIpv4LoopbackAddresses",
+                "IoctlTest.IoctlGetInterfaceFlags",
+                "IOSendingMethodTests/IOSendingMethodTest*",
+
+                // Observing errors.
+                "IcmpErrorTest.ErrObservableWhenConnectedSocketSendsToConnectedAddr",
+
+                // Clearing errors.
+                "NetDatagramTest/DatagramSocketErrWithIOMethod*.ClearsErrWith*/*",
+                "NetDatagramTest/DatagramSocketErrWithNonBlockingOptionTest.ClearsErrWithGetSockOpt/*Blocking",
+
+                // IPV6_ONLY
+                "Datagram*SemanticsTests/Datagram*SendSemanticsTest.Ipv6Only/IPv6",
+
+                // SO_BROADCAST
+                "Datagram*SendSemanticsTests/Datagram*SendSemanticsTest.SoBroadcast/IPv4",
+
+                // Control messages.
+                "DatagramLinearizedSendSemanticsCmsgTests/*",
+                "NetDatagramSockets*Cmsg*Recv*",
+                "NetDatagramSockets*Cmsg*Send*AfterSocketSetup",
+            ],
+        },
+        {
+            type: "expect_pass",
+            matchers: [
+                // Exceptions to the blanket `*Cmsg*Recv*` matcher above.
+                "NetDatagramSockets*SendCmsgInvalidValues/BetweenSendAndRecv",
+                "NetDatagramSockets*FailureDoesNotResetControlLength/*BetweenSendAndRecv",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                // Tests that hang indefinitely.
+                "DatagramSocketErrTest.IcmpErrorsPropagatedDuringIOSpam*",
+                "IOReadingMethodTests/IOReadingMethodTest.DatagramSocketErrorWhileBlocked/*",
+                "NetDatagramTest/DatagramSocketErrWithIOMethodNonBlockingOptionTest.ClearsErrWithIO*/*BlockingRe*",
+                "NetDatagramTest/DatagramSocketErrWithIOMethod*Test.ClearsErrWithIOAfterDatagramReceived/Re*",
+                "NetDatagramTest/DatagramSocketErrWithIOMethodCmsgCacheInvalidationTest.ClearsErrWithIOWithCmsgCache/ValidCmsgCacheRe*",
+            ],
+        },
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                "IOSendingMethodTests/IOSendingMethodTest.*WithRxZirconSocketRemainder/*",
+            ],
+        },
+    ],
+}
