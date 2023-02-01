@@ -13,10 +13,7 @@
     },
     capabilities: [
         {
-            protocol: [
-                "fuchsia.modular.session.Launcher",
-                "fuchsia.process.lifecycle.Lifecycle",
-            ],
+            protocol: [ "fuchsia.process.lifecycle.Lifecycle" ],
         },
     ],
     use: [
@@ -52,10 +49,6 @@
         },
     ],
     expose: [
-        {
-            protocol: [ "fuchsia.modular.session.Launcher" ],
-            from: "self",
-        },
         {
             protocol: "fuchsia.component.Binder",
             from: "framework",

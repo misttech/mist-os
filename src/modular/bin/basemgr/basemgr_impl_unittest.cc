@@ -26,13 +26,9 @@ TEST_F(BasemgrImplTest, StartsSessionWithConfig) {
   entry.mutable_config()->mutable_app_config()->set_args({});
   fuchsia::modular::session::ModularConfig config;
   config.mutable_basemgr_config()->mutable_session_shell_map()->push_back(std::move(entry));
-
   auto config_json = modular::ConfigToJsonString(config);
-  auto config_buf = BufferFromString(config_json);
 
-  // Launch the session
-  auto session_launcher = GetSessionLauncher();
-  session_launcher->LaunchSessionmgr(std::move(config_buf));
+  LaunchSessionmgr(std::move(config));
 
   // sessionmgr should be started and initialized.
   RunLoopUntil([&]() { return sessionmgr.initialized(); });
@@ -64,77 +60,13 @@ TEST_F(BasemgrImplTest, StartsSessionWithConfig) {
   RunLoopUntil([&]() { return did_shut_down_; });
 }
 
-// Tests that LaunchSessionmgr closes the channel with an ZX_ERR_INVALID_ARGS epitaph if the
-// config buffer is not readable.
-TEST_F(BasemgrImplTest, LaunchSessionmgrFailsGivenUnreadableBuffer) {
-  FakeSessionmgr sessionmgr{fake_launcher_};
-
-  CreateBasemgrImpl(DefaultConfig());
-
-  // Create a configuration Buffer that has an incorrect size.
-  auto config_buf = BufferFromString("");
-  config_buf.size = 1;
-
-  // Connect to Launcher with a handler that lets us capture the error.
-  auto session_launcher = GetSessionLauncher();
-
-  bool error_handler_called{false};
-  zx_status_t error_status{ZX_OK};
-  session_launcher.set_error_handler([&](zx_status_t status) {
-    error_handler_called = true;
-    error_status = status;
-  });
-
-  session_launcher->LaunchSessionmgr(std::move(config_buf));
-
-  RunLoopUntil([&] { return error_handler_called; });
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, error_status);
-
-  basemgr_impl_->Stop();
-  RunLoopUntil([&]() { return did_shut_down_; });
-}
-
-// Tests that LaunchSessionmgr closes the channel with an ZX_ERR_INVALID_ARGS epitaph if the
-// config buffer does not contain valid Modular configuration JSON.
-TEST_F(BasemgrImplTest, LaunchSessionmgrFailsGivenInvalidConfigJson) {
-  FakeSessionmgr sessionmgr{fake_launcher_};
-
-  CreateBasemgrImpl(DefaultConfig());
-
-  // Create a configuration that is invalid JSON.
-  auto config_buf = BufferFromString("this is not valid json");
-
-  // Connect to Launcher with a handler that lets us capture the error.
-  auto session_launcher = GetSessionLauncher();
-
-  bool error_handler_called{false};
-  zx_status_t error_status{ZX_OK};
-  session_launcher.set_error_handler([&](zx_status_t status) {
-    error_handler_called = true;
-    error_status = status;
-  });
-
-  session_launcher->LaunchSessionmgr(std::move(config_buf));
-
-  RunLoopUntil([&] { return error_handler_called; });
-  EXPECT_EQ(ZX_ERR_INVALID_ARGS, error_status);
-
-  basemgr_impl_->Stop();
-  RunLoopUntil([&]() { return did_shut_down_; });
-}
-
 // Tests that basemgr starts a new sessionmgr component with a new configuration when instructed
 // to launch a new session.
 TEST_F(BasemgrImplTest, LaunchSessionmgrReplacesExistingSession) {
   FakeSessionmgr sessionmgr{fake_launcher_};
 
   CreateBasemgrImpl(DefaultConfig());
-
-  auto config_buf = BufferFromString(modular::ConfigToJsonString(DefaultConfig()));
-
-  // Launch the session
-  auto session_launcher = GetSessionLauncher();
-  session_launcher->LaunchSessionmgr(std::move(config_buf));
+  LaunchSessionmgr(DefaultConfig());
 
   // sessionmgr should be started and initialized.
   RunLoopUntil([&]() { return sessionmgr.initialized(); });
@@ -142,8 +74,7 @@ TEST_F(BasemgrImplTest, LaunchSessionmgrReplacesExistingSession) {
   EXPECT_EQ(1, sessionmgr.component()->launch_count());
 
   // Launch the session again
-  config_buf = BufferFromString(modular::ConfigToJsonString(DefaultConfig()));
-  session_launcher->LaunchSessionmgr(std::move(config_buf));
+  LaunchSessionmgr(DefaultConfig());
 
   RunLoopUntil([&] { return sessionmgr.component()->launch_count() == 2; });
 
@@ -157,21 +88,14 @@ TEST_F(BasemgrImplTest, WaitsForSessionmgrShutdown) {
   FakeSessionmgr sessionmgr{fake_launcher_, [&] { did_shut_down_sessionmgr = true; }};
 
   CreateBasemgrImpl(DefaultConfig());
-
-  auto config_buf = BufferFromString(modular::ConfigToJsonString(DefaultConfig()));
-
-  // Launch the session
-  auto session_launcher = GetSessionLauncher();
-  session_launcher->LaunchSessionmgr(std::move(config_buf));
+  LaunchSessionmgr(DefaultConfig());
 
   // sessionmgr should be started and initialized.
   RunLoopUntil([&]() { return sessionmgr.initialized(); });
 
   EXPECT_EQ(1, sessionmgr.component()->launch_count());
 
-  // Launch the session again
-  config_buf = BufferFromString(modular::ConfigToJsonString(DefaultConfig()));
-  session_launcher->LaunchSessionmgr(std::move(config_buf));
+  LaunchSessionmgr(DefaultConfig());
 
   RunLoopUntil([&] { return sessionmgr.component()->launch_count() == 2; });
 

@@ -47,11 +47,6 @@ class BasemgrImpl : public fuchsia::process::lifecycle::Lifecycle {
   using SceneOwnerPtr =
       std::variant<fuchsia::ui::policy::PresenterPtr, fuchsia::session::scene::ManagerPtr>;
 
-  using LauncherBinding =
-      fidl::Binding<fuchsia::modular::session::Launcher, std::unique_ptr<LauncherImpl>>;
-  using LauncherBindingSet =
-      fidl::BindingSet<fuchsia::modular::session::Launcher, std::unique_ptr<LauncherImpl>>;
-
   enum class State {
     // Normal mode of operation.
     RUNNING,
@@ -93,11 +88,6 @@ class BasemgrImpl : public fuchsia::process::lifecycle::Lifecycle {
   void LaunchSessionmgr(fuchsia::modular::session::ModularConfig config);
 
   State state() const { return state_; }
-
-  // Returns a function that connects the request for the |Launcher| protocol.
-  //
-  // The |Launcher| implementation delegates all calls back to this instance of |BasemgrImpl|.
-  fidl::InterfaceRequestHandler<fuchsia::modular::session::Launcher> GetLauncherHandler();
 
  private:
   using StartSessionResult = fpromise::result<void, zx_status_t>;
@@ -150,7 +140,6 @@ class BasemgrImpl : public fuchsia::process::lifecycle::Lifecycle {
 
   fit::function<void()> on_shutdown_;
 
-  LauncherBindingSet session_launcher_bindings_;
   fidl::BindingSet<fuchsia::process::lifecycle::Lifecycle> process_lifecycle_bindings_;
 
   AsyncHolder<SessionProvider> session_provider_;

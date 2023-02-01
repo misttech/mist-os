@@ -33,46 +33,6 @@
 
 namespace modular {
 
-// Implementation of the |fuchsia::modular::session::Launcher| protocol.
-class LauncherImpl : public fuchsia::modular::session::Launcher {
- public:
-  explicit LauncherImpl(modular::BasemgrImpl* basemgr_impl) : basemgr_impl_(basemgr_impl) {}
-
-  // |Launcher|
-  void LaunchSessionmgr(fuchsia::mem::Buffer config) override {
-    FX_DCHECK(binding_);
-
-    if (basemgr_impl_->state() == BasemgrImpl::State::SHUTTING_DOWN) {
-      binding_->Close(ZX_ERR_BAD_STATE);
-      return;
-    }
-
-    // Read the configuration from the buffer.
-    std::string config_str;
-    if (auto is_read_ok = fsl::StringFromVmo(config, &config_str); !is_read_ok) {
-      binding_->Close(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-
-    // Parse the configuration.
-    auto config_result = modular::ParseConfig(config_str);
-    if (config_result.is_error()) {
-      binding_->Close(ZX_ERR_INVALID_ARGS);
-      return;
-    }
-
-    basemgr_impl_->LaunchSessionmgr(config_result.take_value());
-  }
-
-  void set_binding(modular::BasemgrImpl::LauncherBinding* binding) { binding_ = binding; }
-
-  DISALLOW_COPY_ASSIGN_AND_MOVE(LauncherImpl);
-
- private:
-  modular::BasemgrImpl* basemgr_impl_;                        // Not owned.
-  modular::BasemgrImpl::LauncherBinding* binding_ = nullptr;  // Not owned.
-};
-
 BasemgrImpl::BasemgrImpl(modular::ModularConfigAccessor config_accessor,
                          std::shared_ptr<sys::OutgoingDirectory> outgoing_services,
                          bool use_flatland, fuchsia::sys::LauncherPtr launcher,
@@ -97,8 +57,6 @@ BasemgrImpl::BasemgrImpl(modular::ModularConfigAccessor config_accessor,
       weak_factory_(this) {
   outgoing_services_->AddPublicService(process_lifecycle_bindings_.GetHandler(this),
                                        "fuchsia.process.lifecycle.Lifecycle");
-  outgoing_services_->AddPublicService(GetLauncherHandler(),
-                                       fuchsia::modular::session::Launcher::Name_);
 
   LogLifetimeEvent(
       cobalt_registry::ModularLifetimeEventsMigratedMetricDimensionEventType::BootedToBaseMgr);
@@ -377,17 +335,6 @@ void BasemgrImpl::LaunchSessionmgr(fuchsia::modular::session::ModularConfig conf
   }
 
   state_ = State::RUNNING;
-}
-
-fidl::InterfaceRequestHandler<fuchsia::modular::session::Launcher>
-BasemgrImpl::GetLauncherHandler() {
-  return [this](fidl::InterfaceRequest<fuchsia::modular::session::Launcher> request) {
-    auto impl = std::make_unique<LauncherImpl>(this);
-    session_launcher_bindings_.AddBinding(std::move(impl), std::move(request),
-                                          /*dispatcher=*/nullptr);
-    const auto& binding = session_launcher_bindings_.bindings().back().get();
-    binding->impl()->set_binding(binding);
-  };
 }
 
 }  // namespace modular

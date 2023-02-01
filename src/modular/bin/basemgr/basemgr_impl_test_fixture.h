@@ -121,12 +121,6 @@ class BasemgrImplTestFixture : public gtest::RealLoopFixture {
         /*child_listener=*/nullptr, std::move(view_provider_), std::move(on_shutdown_));
   }
 
-  fuchsia::modular::session::LauncherPtr GetSessionLauncher() {
-    fuchsia::modular::session::LauncherPtr session_launcher;
-    basemgr_impl_->GetLauncherHandler()(session_launcher.NewRequest());
-    return session_launcher;
-  }
-
  protected:
   fuchsia::sys::LauncherPtr GetLauncher() {
     fuchsia::sys::LauncherPtr launcher;
@@ -134,10 +128,8 @@ class BasemgrImplTestFixture : public gtest::RealLoopFixture {
     return launcher;
   }
 
-  static fuchsia::mem::Buffer BufferFromString(std::string_view contents) {
-    fuchsia::mem::Buffer config_buf;
-    ZX_ASSERT(fsl::VmoFromString(contents, &config_buf));
-    return config_buf;
+  void LaunchSessionmgr(fuchsia::modular::session::ModularConfig config) {
+    basemgr_impl_->LaunchSessionmgr(std::move(config));
   }
 
   bool did_shut_down_ = false;

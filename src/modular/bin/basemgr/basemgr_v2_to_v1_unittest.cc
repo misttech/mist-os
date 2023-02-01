@@ -16,12 +16,7 @@ TEST_F(BasemgrV2ToV1Test, EchoServerIsUsed) {
   FakeSessionmgr sessionmgr{fake_launcher_};
 
   CreateBasemgrImpl(DefaultConfig());
-
-  auto config_buf = BufferFromString(modular::ConfigToJsonString(DefaultConfig()));
-
-  // Launch the session
-  auto session_launcher = GetSessionLauncher();
-  session_launcher->LaunchSessionmgr(std::move(config_buf));
+  LaunchSessionmgr(DefaultConfig());
 
   // sessionmgr should be started and initialized.
   RunLoopUntil([&]() { return sessionmgr.initialized(); });
