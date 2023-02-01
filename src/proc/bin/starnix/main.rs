@@ -17,6 +17,9 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
 
+#[macro_use]
+mod trace;
+
 mod auth;
 mod bpf;
 mod collections;
@@ -41,6 +44,13 @@ mod testing;
 
 #[fuchsia::main(logging_tags = ["starnix"])]
 async fn main() -> Result<(), Error> {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+    fuchsia_trace::instant!(
+        trace_category_starnix!(),
+        trace_name_start_kernel!(),
+        fuchsia_trace::Scope::Thread
+    );
+
     let galaxy = create_galaxy().await?;
 
     if let Some(lifecycle) =

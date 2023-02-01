@@ -177,6 +177,7 @@ enum ExposedServices {
 
 /// Creates a new galaxy.
 pub async fn create_galaxy() -> Result<Arc<Galaxy>, Error> {
+    fuchsia_trace::duration!(trace_category_starnix!(), trace_name_create_galaxy!());
     const DEFAULT_INIT: &str = "/galaxy/init";
     let mut config = get_config();
 

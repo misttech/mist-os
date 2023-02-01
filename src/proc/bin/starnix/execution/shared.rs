@@ -64,6 +64,11 @@ pub fn execute_syscall(
 ) -> Option<ErrorContext> {
     #[cfg(feature = "syscall_stats")]
     SyscallDecl::stats_property(syscall_decl.number).add(1);
+    fuchsia_trace::duration!(
+        trace_category_starnix!(),
+        trace_name_execute_syscall!(),
+        trace_arg_name!() => syscall_decl.name
+    );
 
     let syscall = Syscall {
         decl: syscall_decl,

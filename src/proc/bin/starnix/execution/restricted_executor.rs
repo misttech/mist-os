@@ -78,6 +78,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     // This tracks the last failing system call for debugging purposes.
     let mut error_context = None;
 
+    let mut syscall_decl = SyscallDecl::from_number(u64::MAX);
     loop {
         let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.registers);
         match unsafe {
@@ -89,10 +90,25 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             zx::sys::ZX_OK => {
                 // Wrote restricted state successfully.
             }
-            _ => return Err(format_err!("failed to zx_restricted_write_state: {:?}", state)),
+            _ => {
+                fuchsia_trace::duration_end!(
+                    trace_category_starnix!(),
+                    trace_name_run_task_loop!(),
+                    trace_arg_name!() => syscall_decl.name
+                );
+                return Err(format_err!("failed to zx_restricted_write_state: {:?}", state));
+            }
         }
+        fuchsia_trace::duration_end!(
+            trace_category_starnix!(),
+            trace_name_run_task_loop!(),
+            trace_arg_name!() => syscall_decl.name
+        );
 
-        match unsafe { restricted_enter(0, restricted_return_ptr as usize) } {
+        fuchsia_trace::duration_begin!(trace_category_starnix!(), trace_name_user_space!());
+        let status = unsafe { restricted_enter(0, restricted_return_ptr as usize) };
+        fuchsia_trace::duration_end!(trace_category_starnix!(), trace_name_user_space!());
+        match { status } {
             zx::sys::ZX_OK => {
                 // Successfully entered and exited restricted mode. At this point the task has
                 // trapped back out of restricted mode, so the restricted state contains the
@@ -101,6 +117,11 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             _ => return Err(format_err!("failed to restricted_enter: {:?}", state)),
         }
 
+        fuchsia_trace::duration_begin!(
+            trace_category_starnix!(),
+            trace_name_run_task_loop!(),
+            trace_arg_name!() => syscall_decl.name
+        );
         match unsafe {
             zx_restricted_read_state(
                 restricted_state_as_bytes(&mut state).as_mut_ptr(),
@@ -110,18 +131,30 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             zx::sys::ZX_OK => {
                 // Read restricted state successfully.
             }
-            _ => return Err(format_err!("failed to zx_restricted_read_state: {:?}", state)),
+            _ => {
+                fuchsia_trace::duration_end!(
+                    trace_category_starnix!(),
+                    trace_name_run_task_loop!(),
+                    trace_arg_name!() => syscall_decl.name
+                );
+                return Err(format_err!("failed to zx_restricted_read_state: {:?}", state));
+            }
         }
 
         // Store the new register state in the current task before dispatching the system call.
         current_task.registers = zx::sys::zx_thread_state_general_regs_t::from(&state).into();
-        let syscall_decl = SyscallDecl::from_number(state.rax);
+        syscall_decl = SyscallDecl::from_number(state.rax);
 
         if let Some(new_error_context) = execute_syscall(current_task, syscall_decl) {
             error_context = Some(new_error_context);
         }
 
         if let Some(exit_status) = process_completed_syscall(current_task, &error_context)? {
+            fuchsia_trace::duration_end!(
+                trace_category_starnix!(),
+                trace_name_run_task_loop!(),
+                trace_arg_name!() => syscall_decl.name
+            );
             return Ok(exit_status);
         }
     }

@@ -256,5 +256,22 @@ the "syscall_stats" feature):
 ffx inspect show core/starnix_manager/starbionic:root:syscall_stats
 ```
 
+## Tracing
+
+Starnix is integrated with Fuchsia's tracing system. To start a trace with an increased
+buffer size, run:
+
+```
+ffx trace start --categories starnix --buffer-size 16
+```
+
+Trace files can be visualized and queried with Perfetto. For example, to see the average
+time spent in starnix during a `clock_getres` syscall, run the query:
+
+```
+select avg(dur), count(*)
+from slice join args using (arg_set_id)
+where key='name' and display_value='clock_getres' and name='RunTaskLoop'
+```
 
 [adb.docs]: https://developer.android.com/studio/command-line/adb#copyfiles
