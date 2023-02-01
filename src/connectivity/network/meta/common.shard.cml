@@ -92,6 +92,7 @@
             to: [
                 "#dhcpd",
                 "#http-client",
+                "#reachability",
             ],
         },
         {

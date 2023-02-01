@@ -18,6 +18,7 @@
                 "fuchsia.net.debug.Diagnostics",
                 "fuchsia.net.debug.Interfaces",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.Lookup",
                 "fuchsia.net.neighbor.View",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.posix.socket.Provider",

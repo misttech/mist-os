@@ -498,6 +498,9 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     fnetemul::Capability::ChildDep(protocol_dep::<fposix_socket::ProviderMarker>(
                         constants::netstack::COMPONENT_NAME,
                     )),
+                    fnetemul::Capability::ChildDep(protocol_dep::<fnet_name::LookupMarker>(
+                        constants::dns_resolver::COMPONENT_NAME,
+                    )),
                     fnetemul::Capability::ChildDep(protocol_dep::<fnet_neighbor::ViewMarker>(
                         constants::netstack::COMPONENT_NAME,
                     )),

@@ -403,7 +403,11 @@ fn setup_reachability_env<'a>(
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
             name,
-            &[KnownServiceProvider::Reachability, KnownServiceProvider::FakeClock],
+            &[
+                KnownServiceProvider::Reachability,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::DnsResolver,
+            ],
         )
         .expect("failed to create realm");
     let controller = realm
@@ -887,7 +891,11 @@ async fn test_hanging_get_multiple_clients(name: &str) {
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
             name,
-            &[KnownServiceProvider::Reachability, KnownServiceProvider::FakeClock],
+            &[
+                KnownServiceProvider::Reachability,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::DnsResolver,
+            ],
         )
         .expect("failed to create realm");
 
@@ -923,7 +931,11 @@ async fn test_cannot_call_set_options_after_watch(name: &str) {
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
             name,
-            &[KnownServiceProvider::Reachability, KnownServiceProvider::FakeClock],
+            &[
+                KnownServiceProvider::Reachability,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::DnsResolver,
+            ],
         )
         .expect("failed to create realm");
 
@@ -948,7 +960,11 @@ async fn test_cannot_call_set_options_twice(name: &str) {
     let realm = sandbox
         .create_netstack_realm_with::<Netstack2, _, _>(
             name,
-            &[KnownServiceProvider::Reachability, KnownServiceProvider::FakeClock],
+            &[
+                KnownServiceProvider::Reachability,
+                KnownServiceProvider::FakeClock,
+                KnownServiceProvider::DnsResolver,
+            ],
         )
         .expect("failed to create realm");
 
