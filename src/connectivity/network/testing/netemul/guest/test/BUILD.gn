@@ -63,9 +63,5 @@ fuchsia_test_package("netemul-guest-self-tests") {
     # one guest at a time.
     # TODO(https://fxbug.dev/118321): Enable parallelized guest tests.
     parallel = 1
-
-    # Increase test timeout since setting up virtualized debian guests takes
-    # O(minutes).
-    timeout_secs = 1200
   }
 }
