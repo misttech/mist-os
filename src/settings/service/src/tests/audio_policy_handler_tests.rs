@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::agent::authority::Authority;
-use crate::agent::Lifespan;
+use crate::agent::{AgentRegistrar, Lifespan};
 use crate::audio::default_audio_info;
 use crate::audio::policy::audio_policy_handler::{AudioPolicyHandler, ARG_POLICY_ID};
 use crate::audio::policy::{
@@ -91,9 +91,11 @@ impl TestEnvironment {
         let (directory_proxy, _stream) = create_proxy_and_stream::<DirectoryMarker>().unwrap();
 
         agent_authority
-            .register(Arc::new(crate::agent::storage_agent::Blueprint::new(
-                storage_factory,
-                Arc::new(FidlStorageFactory::new(1, directory_proxy)),
+            .register(AgentRegistrar::Blueprint(Arc::new(
+                crate::agent::storage_agent::Blueprint::new(
+                    storage_factory,
+                    Arc::new(FidlStorageFactory::new(1, directory_proxy)),
+                ),
             )))
             .await;
         agent_authority

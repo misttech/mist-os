@@ -57,7 +57,7 @@ use vfs::mut_pseudo_directory;
 
 use crate::accessibility::accessibility_controller::AccessibilityController;
 use crate::agent::authority::Authority;
-use crate::agent::{BlueprintHandle as AgentBlueprintHandle, Lifespan};
+use crate::agent::{AgentRegistrar, BlueprintHandle as AgentBlueprintHandle, Lifespan};
 use crate::audio::audio_controller::AudioController;
 use crate::audio::policy::audio_policy_handler::AudioPolicyHandler;
 use crate::base::{Dependency, Entity, SettingType};
@@ -920,14 +920,14 @@ where
 
     // The service does not work without storage, so ensure it is always included first.
     agent_authority
-        .register(Arc::new(crate::agent::storage_agent::Blueprint::new(
+        .register(AgentRegistrar::Blueprint(Arc::new(crate::agent::storage_agent::Blueprint::new(
             device_storage_factory,
             fidl_storage_factory,
-        )))
+        ))))
         .await;
 
     for blueprint in agent_blueprints {
-        agent_authority.register(blueprint).await;
+        agent_authority.register(AgentRegistrar::Blueprint(blueprint)).await;
     }
 
     // Execute initialization agents sequentially

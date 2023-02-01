@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::{AgentError, BlueprintHandle, Context, Invocation, Lifespan, Payload};
+use crate::agent::{AgentError, AgentRegistrar, Context, Invocation, Lifespan, Payload};
 use crate::base::SettingType;
 use crate::message::base::{Audience, MessengerType};
 use crate::policy::PolicyType;
@@ -46,7 +46,7 @@ impl Authority {
         })
     }
 
-    pub(crate) async fn register(&mut self, blueprint: BlueprintHandle) {
+    pub(crate) async fn register(&mut self, blueprint: AgentRegistrar) {
         let agent_receptor = self
             .delegate
             .create(MessengerType::Unbound)
@@ -54,19 +54,26 @@ impl Authority {
             .expect("agent receptor should be created")
             .1;
         let signature = agent_receptor.get_signature();
-        blueprint
-            .create(
-                Context::new(
-                    agent_receptor,
-                    self.delegate.clone(),
-                    self.available_components.clone(),
-                    self.available_policies.clone(),
-                )
-                .await,
-            )
-            .await;
+        let context = Context::new(
+            agent_receptor,
+            self.delegate.clone(),
+            self.available_components.clone(),
+            self.available_policies.clone(),
+        )
+        .await;
 
-        self.agent_signatures.push((blueprint.debug_id(), signature));
+        let debug_id = match blueprint {
+            AgentRegistrar::Blueprint(blueprint) => {
+                blueprint.create(context).await;
+                blueprint.debug_id()
+            }
+            AgentRegistrar::Creator(creator) => {
+                creator.create(context).await;
+                creator.debug_id
+            }
+        };
+
+        self.agent_signatures.push((debug_id, signature));
     }
 
     /// Invokes each registered agent for a given lifespan. If sequential is true,
@@ -171,7 +178,7 @@ mod tests {
             .await
             .expect("Should be able to create authority");
         let agent = TestAgentBlueprint;
-        authority.register(Arc::new(agent)).await;
+        authority.register(AgentRegistrar::Blueprint(Arc::new(agent))).await;
         let result = authority
             .execute_lifespan(
                 Lifespan::Initialization,

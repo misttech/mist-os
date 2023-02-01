@@ -51,7 +51,7 @@ struct PolicyValuesInspectInfo {
 }
 
 impl PolicyValuesInspectAgent {
-    async fn create(context: Context) {
+    pub(crate) async fn create(context: Context) {
         Self::create_with_node(
             context,
             component::inspector().root().create_child(INSPECT_NODE_NAME),

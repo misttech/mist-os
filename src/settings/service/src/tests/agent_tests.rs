@@ -4,7 +4,8 @@
 
 use crate::agent::authority::Authority;
 use crate::agent::{
-    AgentError, BlueprintHandle, Context, Invocation, InvocationResult, Lifespan, Payload,
+    AgentError, AgentRegistrar, BlueprintHandle, Context, Invocation, InvocationResult, Lifespan,
+    Payload,
 };
 use crate::service;
 use crate::service_context::ServiceContext;
@@ -67,7 +68,7 @@ impl TestAgent {
     ) -> Arc<Mutex<TestAgent>> {
         let (agent, generate) = Self::create(id, lifespan_target, callback);
 
-        authority.register(generate).await;
+        authority.register(AgentRegistrar::Blueprint(generate)).await;
 
         agent
     }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::BlueprintHandle;
+use crate::agent::{AgentCreator, BlueprintHandle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -113,6 +113,52 @@ impl From<AgentType> for BlueprintHandle {
             AgentType::InspectSettingValues => {
                 crate::agent::inspect::setting_values::blueprint::create()
             }
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! create_agent {
+    ($component:ident, $create:expr) => {
+        AgentCreator {
+            debug_id: concat!(stringify!($component), "_agent"),
+            create: |c| Box::pin($create(c)),
+        }
+    };
+}
+
+impl From<AgentType> for AgentCreator {
+    fn from(agent_type: AgentType) -> AgentCreator {
+        use crate::agent::*;
+        match agent_type {
+            AgentType::CameraWatcher => {
+                create_agent!(camera_watcher, camera_watcher::CameraWatcherAgent::create)
+            }
+            AgentType::Earcons => create_agent!(earcons, earcons::agent::Agent::create),
+            AgentType::MediaButtons => {
+                create_agent!(media_buttons, media_buttons::MediaButtonsAgent::create)
+            }
+            AgentType::Restore => create_agent!(restore_agent, restore_agent::RestoreAgent::create),
+            AgentType::InspectExternalApis => create_agent!(
+                external_apis,
+                inspect::external_apis::ExternalApiInspectAgent::create
+            ),
+            AgentType::InspectSettingProxy => create_agent!(
+                setting_proxy,
+                inspect::setting_proxy::SettingProxyInspectAgent::create
+            ),
+            AgentType::InspectSettingTypeUsage => create_agent!(
+                usage_counts,
+                inspect::usage_counts::SettingTypeUsageInspectAgent::create
+            ),
+            AgentType::InspectPolicyValues => create_agent!(
+                policy_values,
+                inspect::policy_values::PolicyValuesInspectAgent::create
+            ),
+            AgentType::InspectSettingValues => create_agent!(
+                setting_values,
+                inspect::setting_values::SettingValuesInspectAgent::create
+            ),
         }
     }
 }

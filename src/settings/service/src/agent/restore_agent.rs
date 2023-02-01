@@ -28,7 +28,7 @@ pub(crate) struct RestoreAgent {
 }
 
 impl RestoreAgent {
-    async fn create(context: Context) {
+    pub(crate) async fn create(context: Context) {
         let mut agent = RestoreAgent {
             messenger: context.create_messenger().await.expect("should acquire messenger"),
             event_publisher: context.get_publisher(),

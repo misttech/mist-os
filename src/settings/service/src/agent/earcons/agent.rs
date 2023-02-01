@@ -48,7 +48,7 @@ impl Debug for CommonEarconsParams {
 }
 
 impl Agent {
-    async fn create(mut context: AgentContext) {
+    pub(crate) async fn create(mut context: AgentContext) {
         let mut agent = Agent {
             publisher: context.get_publisher(),
             sound_player_connection: Arc::new(Mutex::new(None)),

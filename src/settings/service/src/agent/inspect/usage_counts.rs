@@ -66,7 +66,7 @@ pub(crate) struct SettingTypeUsageInspectAgent {
 }
 
 impl SettingTypeUsageInspectAgent {
-    async fn create(context: Context) {
+    pub(crate) async fn create(context: Context) {
         Self::create_with_node(
             context,
             component::inspector().root().create_child("api_usage_counts"),

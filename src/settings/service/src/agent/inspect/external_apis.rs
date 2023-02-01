@@ -168,7 +168,7 @@ pub(crate) struct ExternalApiInspectAgent {
 
 impl ExternalApiInspectAgent {
     /// Creates the `ExternalApiInspectAgent` with the given `context`.
-    async fn create(context: Context) {
+    pub(crate) async fn create(context: Context) {
         Self::create_with_node(
             context,
             component::inspector().root().create_child("external_apis"),

@@ -88,6 +88,24 @@ pub trait Blueprint {
 
 pub type BlueprintHandle = Arc<dyn Blueprint + Send + Sync>;
 
+/// AgentCreator provides a simple wrapper for an async Agent creation function.
+pub struct AgentCreator {
+    pub debug_id: &'static str,
+    pub create: fn(Context) -> BoxFuture<'static, ()>,
+}
+
+impl AgentCreator {
+    fn create(&self, context: Context) -> BoxFuture<'static, ()> {
+        (self.create)(context)
+    }
+}
+
+pub enum AgentRegistrar {
+    Blueprint(BlueprintHandle),
+    #[allow(dead_code)]
+    Creator(AgentCreator),
+}
+
 /// Agent Context contains necessary parts to create an agent.
 pub struct Context {
     /// The receivor end to receive messages.
