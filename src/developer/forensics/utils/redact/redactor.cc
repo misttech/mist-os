@@ -21,7 +21,7 @@ constexpr std::string_view kUuidPattern =
     R"([0-9a-fA-F]{8}\b-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-\b[0-9a-fA-F]{12})";
 
 // http(s) urls
-constexpr std::string_view kUrlPattern = R"(https?://[^"',;!<> ]*)";
+constexpr std::string_view kUrlPattern = R"(https?://[^"',!<> ]*)";
 
 // The SSID identifier contains at most 32 pairs of hexadecimal characters, but match any number so
 // SSID identifiers with the wrong number of hexadecimal characters are also redacted.
