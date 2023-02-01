@@ -281,11 +281,12 @@ impl GuestManager {
 
                         }
                         GuestManagerRequest::Connect { controller, responder } => {
-                            // If the guest is running (see the is_guest_started function), connect
-                            // the controller (see the connect function). Respond via the responder
-                            // with either success or GuestManagerError::NotRunning.
-                            // TODO(fxbug.dev/115695): Remove this comment when done.
-                            unimplemented!();
+                            if !self.is_guest_started() {
+                                send_checked!(responder, &mut Err(GuestManagerError::NotRunning));
+                            } else {
+                                send_checked!(responder, &mut GuestManager::connect(&lifecycle, controller)
+                                          .map_err(|_| GuestManagerError::NotRunning ));
+                            }
                         }
                         GuestManagerRequest::GetInfo { responder } => {
                             let network_state = GuestManager::host_network_state().await
@@ -550,6 +551,7 @@ mod tests {
             GuestManagerMarker, GuestManagerProxy, GuestManagerRequestStream,
             HostVsockAcceptorMarker, Listener,
         },
+        fs::write,
         fuchsia_async::WaitState,
         fuchsia_fs::{file, OpenFlags},
         futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -1198,9 +1200,52 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn connect_to_vmm() {
-        // Call connect, and ensure failure. Call launch, call connect, and check for success.
-        // TODO(fxbug.dev/115695): Write this test and remove this comment.
+    async fn connect_to_vmm() {
+        let manager = ManagerFixture::new_with_defaults();
+
+        let (guest_client_end_connect_fail, guest_server_end_connect_fail) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+        let (guest_client_end_launch, guest_server_end_launch) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+        let (guest_client_end_connect_success, guest_server_end_connect_success) =
+            fidl::endpoints::create_endpoints::<GuestMarker>().unwrap();
+
+        let manager_proxy = manager.new_proxy();
+        let run_fut = manager.run().fuse();
+        futures::pin_mut!(run_fut);
+
+        // Try connect when guest isn't running and fail.
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            connection = manager_proxy.connect(guest_server_end_connect_fail).fuse() => {
+                assert_eq!(connection.unwrap(), Err(GuestManagerError::NotRunning));
+            }
+        }
+
+        // Launch guest.
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            _ = manager.run_vmm().fuse() => {
+                panic!("vmm should not complete");
+            }
+            result = manager_proxy.launch(GuestConfig::EMPTY, guest_server_end_launch).fuse() => {
+                assert!(result.is_ok());
+            }
+        }
+
+        // Try connect again and succeed.
+        select! {
+            _ = run_fut => {
+                panic!("run should not complete");
+            }
+            connection = manager_proxy.connect(guest_server_end_connect_success).fuse() => {
+                assert!(connection.unwrap().is_ok());
+            }
+        }
     }
 
     const DEFAULT_NET_DEVICE: NetSpec =
