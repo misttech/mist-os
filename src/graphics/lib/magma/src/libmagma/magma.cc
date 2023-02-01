@@ -263,8 +263,7 @@ magma_status_t magma_connection_buffer_range_op(magma_connection_t connection,
   }
 }
 
-magma_status_t magma_buffer_get_info(magma_connection_t connection, magma_buffer_t buffer,
-                                     magma_buffer_info_t* info_out) {
+magma_status_t magma_buffer_get_info(magma_buffer_t buffer, magma_buffer_info_t* info_out) {
   auto platform_buffer = reinterpret_cast<magma::PlatformBuffer*>(buffer);
   if (!platform_buffer->GetBufferInfo(info_out))
     return DRET(MAGMA_STATUS_INTERNAL_ERROR);

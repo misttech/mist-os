@@ -357,8 +357,7 @@ magma_status_t magma_connection_buffer_range_op(magma_connection_t connection,
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 
-magma_status_t magma_buffer_get_info(magma_connection_t connection, magma_buffer_t buffer,
-                                     magma_buffer_info_t* info_out) {
+magma_status_t magma_buffer_get_info(magma_buffer_t buffer, magma_buffer_info_t* info_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
 }
 

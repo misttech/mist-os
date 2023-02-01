@@ -367,12 +367,10 @@ MAGMA_EXPORT magma_status_t magma_buffer_set_name(
 
 ///
 /// \brief Get information on a magma buffer
-/// \param connection An open connection.
 /// \param buffer A valid buffer.
 /// \param info_out Pointer to struct that receives the buffer info.
 ///
 MAGMA_EXPORT magma_status_t magma_buffer_get_info(
-    magma_connection_t connection,
     magma_buffer_t buffer,
     magma_buffer_info_t* info_out);
 

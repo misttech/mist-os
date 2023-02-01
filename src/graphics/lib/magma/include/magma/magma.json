@@ -634,11 +634,6 @@
                 "description": "Get information on a magma buffer",
                 "arguments": [
                     {
-                        "name": "connection",
-                        "type": "magma_connection_t",
-                        "description": "An open connection."
-                    },
-                    {
                         "name": "buffer",
                         "type": "magma_buffer_t",
                         "description": "A valid buffer."

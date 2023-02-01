@@ -1425,7 +1425,7 @@ TEST_F(Magma, CommitBuffer) {
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_create_buffer(connection.connection(), buffer_size,
                                                             &size_out, &buffer));
   magma_buffer_info_t info;
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(connection.connection(), buffer, &info));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
   EXPECT_EQ(info.size, buffer_size);
   EXPECT_EQ(0u, info.committed_byte_count);
 
@@ -1438,7 +1438,7 @@ TEST_F(Magma, CommitBuffer) {
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
                                                               MAGMA_BUFFER_RANGE_OP_COMMIT,
                                                               page_size(), page_size()));
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(connection.connection(), buffer, &info));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
   EXPECT_EQ(page_size(), info.committed_byte_count);
 
   EXPECT_EQ(MAGMA_STATUS_INVALID_ARGS,
@@ -1451,13 +1451,13 @@ TEST_F(Magma, CommitBuffer) {
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
                                                               MAGMA_BUFFER_RANGE_OP_DECOMMIT,
                                                               2 * page_size(), page_size()));
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(connection.connection(), buffer, &info));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
   EXPECT_EQ(page_size(), info.committed_byte_count);
 
   EXPECT_EQ(MAGMA_STATUS_OK, magma_connection_buffer_range_op(connection.connection(), buffer,
                                                               MAGMA_BUFFER_RANGE_OP_DECOMMIT,
                                                               page_size(), page_size()));
-  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(connection.connection(), buffer, &info));
+  EXPECT_EQ(MAGMA_STATUS_OK, magma_buffer_get_info(buffer, &info));
   EXPECT_EQ(0u, info.committed_byte_count);
 
   magma_connection_release_buffer(connection.connection(), buffer);
