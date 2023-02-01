@@ -271,6 +271,18 @@ TEST(NumberParser, GetFloatTokenLength) {
   EXPECT_EQ(3u, GetFloatTokenLength(ExprLanguage::kC, ".14"));
   EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, ".e12"));
   EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, ".14"));
+
+  // Separators, C and Rust use different ones. They can appear anywhere but first position.
+  EXPECT_EQ(13u, GetFloatTokenLength(ExprLanguage::kRust, "123_44_.3_76_-98"));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "123_44_.3_76_-98"));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "123'44'.3'76'-98"));
+  EXPECT_EQ(13u, GetFloatTokenLength(ExprLanguage::kC, "123'44'.3'76'-98"));
+
+  // Separators can't appear first.
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "_123"));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "_123"));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kRust, "'123"));
+  EXPECT_EQ(0u, GetFloatTokenLength(ExprLanguage::kC, "'123"));
 }
 
 TEST(NumberParser, StripFloatSuffix) {

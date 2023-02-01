@@ -100,6 +100,13 @@ bool ValidForBase(ExprLanguage lang, IntegerPrefix::Base base, char c) {
 // the input.
 size_t GetDigitsLength(ExprLanguage lang, std::string_view input) {
   size_t result = 0;
+
+  // First digit doesn't allow separators.
+  if (result >= input.size() || !isdigit(input[result]))
+    return result;
+  result++;
+
+  // Continuing digits allow separators.
   while (result < input.size() && (isdigit(input[result]) || IsDigitSeparator(lang, input[result])))
     result++;
   return result;
@@ -287,7 +294,11 @@ ErrOr<IntegerSuffix> ExtractIntegerSuffix(std::string_view* s) {
 
 // The floating-point format we expect is:
 //
-//   <digits> := ("0" - "9") | "_" | "'"
+//   <digit-first> := ("0" - "9")
+//
+//   <digit-continuing> := <digit-first> | "_" | "'"
+//
+//   <digits> := <digits-first> <digits-continuing>*
 //
 //   <float> := ( <significand> [<exponent>] [<suffix>] ) |
 //              ( <digis> <exponent> [<suffix>] )

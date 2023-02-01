@@ -221,6 +221,15 @@ TEST_F(ExprParserTest, DotNumber) {
 
   // Member name.
   EXPECT_EQ("0", access->member().GetFullName());
+
+  // Test the internal "underscore" naming for tuples.
+  EXPECT_EQ(
+      "ACCESSOR(.)\n"
+      " ACCESSOR(.)\n"
+      "  IDENTIFIER(\"channel\")\n"
+      "  __0\n"
+      " handle\n",
+      GetParseString("channel.__0.handle", ExprLanguage::kRust));
 }
 
 TEST_F(ExprParserTest, DotNumberNoHex) {
