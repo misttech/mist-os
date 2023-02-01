@@ -105,6 +105,20 @@ impl<'de, const N: u16> Deserialize<'de> for Only<N> {
     }
 }
 
+impl FhoToolMetadata {
+    /// Whether or not this library is capable of running the subtool based on its
+    /// metadata (ie. the minimum fho version is met). Returns the version enum value
+    /// we can run it at.
+    pub fn is_supported(&self) -> Option<FhoDetails> {
+        // Currently we only support fho version 0.
+        if self.requires_fho == 0 {
+            Some(FhoDetails::FhoVersion0 { version: Only })
+        } else {
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

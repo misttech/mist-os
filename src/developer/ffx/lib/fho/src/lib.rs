@@ -4,18 +4,17 @@
 
 pub mod adapters;
 mod from_env;
-mod metadata;
 mod search;
 mod subtool;
 pub mod testing;
 
 pub use from_env::*;
-pub use metadata::*;
 pub use search::*;
 pub use subtool::*;
 
 // Used for deriving an FFX tool.
 pub use fho_macro::FfxTool;
+pub use fho_metadata::*;
 
 // Re-expose the Error, Result, and FfxContext types from ffx_command
 // so you don't have to pull both in all the time.

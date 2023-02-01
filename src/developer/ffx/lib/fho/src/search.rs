@@ -5,14 +5,14 @@
 use ffx_command::{FfxCommandLine, FfxToolInfo, FfxToolSource, ToolRunner, ToolSuite};
 use ffx_command::{FfxContext, MetricsSession, Result};
 use ffx_config::{EnvironmentContext, Sdk};
+use fho_metadata::FhoToolMetadata;
+
 use std::{
     collections::HashMap,
     fs::File,
     path::{Path, PathBuf},
     process::ExitStatus,
 };
-
-use crate::{FhoDetails, FhoToolMetadata, Only};
 
 /// Path information about a subtool
 #[derive(Clone, Debug)]
@@ -142,20 +142,6 @@ impl ToolSuite for ExternalSubToolSuite {
     }
 }
 
-impl FhoToolMetadata {
-    /// Whether or not this library is capable of running the subtool based on its
-    /// metadata (ie. the minimum fho version is met). Returns the version enum value
-    /// we can run it at.
-    fn is_supported(&self) -> Option<FhoDetails> {
-        // Currently we only support fho version 0.
-        if self.requires_fho == 0 {
-            Some(FhoDetails::FhoVersion0 { version: Only })
-        } else {
-            None
-        }
-    }
-}
-
 /// Searches a set of directories for tools matching the path `ffx-<name>`
 /// and returns information about them based on known abis
 fn find_workspace_tools<P>(subtool_paths: &[P]) -> impl Iterator<Item = SubToolLocation> + '_
@@ -227,6 +213,7 @@ impl SubToolLocation {
 mod tests {
     use super::*;
     use ffx_command::Ffx;
+    use fho_metadata::{FhoDetails, Only};
     use std::{collections::HashSet, io::Write};
 
     enum MockMetadata<'a> {
