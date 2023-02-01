@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.sys2/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -91,17 +92,13 @@ class FakeLifecycleController
   std::string moniker_;
 };
 
-class AdbShellTest : public zxtest::Test {
+class AdbShellTest : public zxtest::Test, public loop_fixture::RealLoop {
  public:
-  AdbShellTest()
-      : svc_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        shell_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  AdbShellTest() : shell_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
   void SetUp() override {
-    svc_loop_.StartThread("adb-shell-test-svc");
     shell_loop_.StartThread("adb-shell-test-shell");
-    incoming_ = std::make_unique<component::OutgoingDirectory>(
-        component::OutgoingDirectory(svc_loop_.dispatcher()));
+    incoming_ = std::make_unique<component::OutgoingDirectory>(dispatcher());
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
     SetupIncomingServices(std::move(svc_endpoints->server));
@@ -115,16 +112,14 @@ class AdbShellTest : public zxtest::Test {
     ASSERT_EQ(ZX_OK, endpoints.status_value());
     ASSERT_EQ(ZX_OK, incoming_
                          ->AddUnmanagedProtocol<fuchsia_dash::Launcher>(
-                             [&, dispatcher = svc_loop_.dispatcher()](
-                                 fidl::ServerEnd<fuchsia_dash::Launcher> server_end) {
-                               fake_dash_launcher_.BindServer(dispatcher, std::move(server_end));
+                             [this](fidl::ServerEnd<fuchsia_dash::Launcher> server_end) {
+                               fake_dash_launcher_.BindServer(dispatcher(), std::move(server_end));
                              })
                          .status_value());
     ASSERT_EQ(ZX_OK, incoming_
                          ->AddUnmanagedProtocol<fuchsia_sys2::LifecycleController>(
-                             [&, dispatcher = svc_loop_.dispatcher()](
-                                 fidl::ServerEnd<fuchsia_sys2::LifecycleController> server_end) {
-                               fake_lifecycle_controller_.BindServer(dispatcher,
+                             [this](fidl::ServerEnd<fuchsia_sys2::LifecycleController> server_end) {
+                               fake_lifecycle_controller_.BindServer(dispatcher(),
                                                                      std::move(server_end));
                              },
                              "fuchsia.sys2.LifecycleController.root")
@@ -141,56 +136,61 @@ class AdbShellTest : public zxtest::Test {
   FakeDashLauncher fake_dash_launcher_;
   FakeLifecycleController fake_lifecycle_controller_;
   std::unique_ptr<component::OutgoingDirectory> incoming_;
-  async::Loop svc_loop_;
   async::Loop shell_loop_;
 };
 
 TEST_F(AdbShellTest, LaunchShell) {
-  zx::socket endpoint0, endpoint1;
-  ASSERT_OK(zx::socket::create(0, &endpoint0, &endpoint1));
-  ASSERT_OK(adb_->AddShell({}, std::move(endpoint0)));
-  EXPECT_TRUE(fake_dash_launcher_.socket()->is_valid());
-  EXPECT_EQ(fake_dash_launcher_.command(), "");
-  EXPECT_EQ(fake_lifecycle_controller_.moniker(), "");
-  EXPECT_EQ(1, adb_->ActiveShellInstances());
-  EXPECT_OK(fake_dash_launcher_.SendOnTerminateEvent());
-  // Wait for the OnTerminate event to take effect.
-  while (adb_->ActiveShellInstances() > 0) {
-    shell_loop_.RunUntilIdle();
-  }
+  PerformBlockingWork([&] {
+    zx::socket endpoint0, endpoint1;
+    ASSERT_OK(zx::socket::create(0, &endpoint0, &endpoint1));
+    ASSERT_OK(adb_->AddShell({}, std::move(endpoint0)));
+    EXPECT_TRUE(fake_dash_launcher_.socket()->is_valid());
+    EXPECT_EQ(fake_dash_launcher_.command(), "");
+    EXPECT_EQ(fake_lifecycle_controller_.moniker(), "");
+    EXPECT_EQ(1, adb_->ActiveShellInstances());
+    EXPECT_OK(fake_dash_launcher_.SendOnTerminateEvent());
+    // Wait for the OnTerminate event to take effect.
+    while (adb_->ActiveShellInstances() > 0) {
+      shell_loop_.RunUntilIdle();
+    }
+  });
 }
 
 TEST_F(AdbShellTest, LaunchShellWithCommands) {
-  zx::socket endpoint0, endpoint1;
-  ASSERT_OK(zx::socket::create(0, &endpoint1, &endpoint0));
-  ASSERT_OK(adb_->AddShell("ls", std::move(endpoint0)));
-  EXPECT_TRUE(fake_dash_launcher_.socket()->is_valid());
-  EXPECT_EQ(fake_dash_launcher_.command(), "ls");
-  EXPECT_EQ(1, adb_->ActiveShellInstances());
-  EXPECT_OK(fake_dash_launcher_.SendOnTerminateEvent());
-  // Wait for the OnTerminate event to take effect.
-  while (adb_->ActiveShellInstances() > 0) {
-    shell_loop_.RunUntilIdle();
-  }
+  PerformBlockingWork([&] {
+    zx::socket endpoint0, endpoint1;
+    ASSERT_OK(zx::socket::create(0, &endpoint1, &endpoint0));
+    ASSERT_OK(adb_->AddShell("ls", std::move(endpoint0)));
+    EXPECT_TRUE(fake_dash_launcher_.socket()->is_valid());
+    EXPECT_EQ(fake_dash_launcher_.command(), "ls");
+    EXPECT_EQ(1, adb_->ActiveShellInstances());
+    EXPECT_OK(fake_dash_launcher_.SendOnTerminateEvent());
+    // Wait for the OnTerminate event to take effect.
+    while (adb_->ActiveShellInstances() > 0) {
+      shell_loop_.RunUntilIdle();
+    }
+  });
 }
 
 TEST_F(AdbShellTest, MultipleShells) {
-  zx::socket endpoint0, endpoint1;
-  ASSERT_OK(zx::socket::create(0, &endpoint0, &endpoint1));
-  ASSERT_OK(adb_->AddShell("echo 'hi'", std::move(endpoint0)));
-  EXPECT_TRUE(fake_dash_launcher_.socket()->is_valid());
-  EXPECT_EQ(fake_dash_launcher_.command(), "echo 'hi'");
-  EXPECT_EQ(1, adb_->ActiveShellInstances());
-  ASSERT_OK(adb_->AddShell("ls", std::move(endpoint1)));
-  EXPECT_TRUE(fake_dash_launcher_.socket()->is_valid());
-  EXPECT_EQ(fake_dash_launcher_.command(), "ls");
-  EXPECT_EQ(2, adb_->ActiveShellInstances());
-  EXPECT_OK(fake_dash_launcher_.SendOnTerminateEvent(0));
-  EXPECT_OK(fake_dash_launcher_.SendOnTerminateEvent(1));
-  // Wait for the OnTerminate event to take effect.
-  while (adb_->ActiveShellInstances() > 0) {
-    shell_loop_.RunUntilIdle();
-  }
+  PerformBlockingWork([&] {
+    zx::socket endpoint0, endpoint1;
+    ASSERT_OK(zx::socket::create(0, &endpoint0, &endpoint1));
+    ASSERT_OK(adb_->AddShell("echo 'hi'", std::move(endpoint0)));
+    EXPECT_TRUE(fake_dash_launcher_.socket()->is_valid());
+    EXPECT_EQ(fake_dash_launcher_.command(), "echo 'hi'");
+    EXPECT_EQ(1, adb_->ActiveShellInstances());
+    ASSERT_OK(adb_->AddShell("ls", std::move(endpoint1)));
+    EXPECT_TRUE(fake_dash_launcher_.socket()->is_valid());
+    EXPECT_EQ(fake_dash_launcher_.command(), "ls");
+    EXPECT_EQ(2, adb_->ActiveShellInstances());
+    EXPECT_OK(fake_dash_launcher_.SendOnTerminateEvent(0));
+    EXPECT_OK(fake_dash_launcher_.SendOnTerminateEvent(1));
+    // Wait for the OnTerminate event to take effect.
+    while (adb_->ActiveShellInstances() > 0) {
+      shell_loop_.RunUntilIdle();
+    }
+  });
 }
 
 }  // namespace adb_shell
