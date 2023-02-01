@@ -109,11 +109,6 @@ pub enum ModelError {
     },
     #[error("timed out after {:?}", duration)]
     Timeout { duration: zx::Duration },
-    #[error("error with discover action: {err}")]
-    DiscoverActionError {
-        #[from]
-        err: DiscoverActionError,
-    },
     #[error("error with resolve action: {err}")]
     ResolveActionError {
         #[from]
@@ -123,16 +118,6 @@ pub enum ModelError {
     StartActionError {
         #[from]
         err: StartActionError,
-    },
-    #[error("error with stop action: {err}")]
-    StopActionError {
-        #[from]
-        err: StopActionError,
-    },
-    #[error("error with destroy action: {err}")]
-    DestroyActionError {
-        #[from]
-        err: DestroyActionError,
     },
 }
 
