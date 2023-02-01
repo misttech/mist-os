@@ -181,7 +181,10 @@ async fn test_environment_startup() {
         TestAgent::create(startup_agent_id, LifespanTarget::Initialization, startup_tx);
 
     assert!(EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
-        .agents(&[service_agent_generate, agent_generate,])
+        .agents(vec![
+            AgentRegistrar::Blueprint(service_agent_generate),
+            AgentRegistrar::Blueprint(agent_generate),
+        ])
         .spawn_nested(ENV_NAME)
         .await
         .is_ok());

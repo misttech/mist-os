@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::restore_agent;
 use crate::base::SettingType;
+use crate::config::base::AgentType;
 use crate::event::{self as event, restore, Event};
 use crate::handler::base::Request;
 use crate::handler::setting_handler::{ControllerError, SettingHandlerResult};
@@ -41,7 +41,7 @@ async fn create_event_environment() -> Arc<Mutex<Option<Receptor>>> {
         .service(ServiceRegistry::serve(ServiceRegistry::create()))
         .event_subscribers(&[Blueprint::create(create_subscriber)])
         .fidl_interfaces(&[Interface::Setup])
-        .agents(&[restore_agent::blueprint::create()])
+        .agents(vec![AgentType::Restore.into()])
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();
@@ -77,7 +77,7 @@ async fn verify_restore_handling(
                     }
                 })),
             )
-            .agents(&[restore_agent::blueprint::create()])
+            .agents(vec![AgentType::Restore.into()])
             .settings(&[SettingType::Unknown])
             .spawn_nested(ENV_NAME)
             .await

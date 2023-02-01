@@ -102,7 +102,6 @@ impl AgentCreator {
 
 pub enum AgentRegistrar {
     Blueprint(BlueprintHandle),
-    #[allow(dead_code)]
     Creator(AgentCreator),
 }
 

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::restore_agent;
 use crate::audio::types::{AudioInfo, AudioSettingSource, AudioStream, AudioStreamType};
 use crate::audio::{create_default_modified_counters, default_audio_info};
 use crate::base::SettingType;
+use crate::config::base::AgentType;
 use crate::ingress::fidl::Interface;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::fakes::audio_core_service::{self, AudioCoreService};
@@ -116,7 +116,7 @@ async fn test_volume_restore() {
     let storage_factory = InMemoryStorageFactory::with_initial_data(&stored_info);
     assert!(EnvironmentBuilder::new(Arc::new(storage_factory))
         .service(Box::new(ServiceRegistry::serve(service_registry)))
-        .agents(&[restore_agent::blueprint::create()])
+        .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])
         .spawn_nested(ENV_NAME)
         .await
@@ -188,7 +188,7 @@ async fn test_persisted_values_applied_at_start() {
 
     let env = EnvironmentBuilder::new(Arc::new(storage_factory))
         .service(ServiceRegistry::serve(service_registry))
-        .agents(&[restore_agent::blueprint::create()])
+        .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
@@ -276,7 +276,7 @@ async fn test_invalid_stream_fails() {
     let storage_factory = InMemoryStorageFactory::with_initial_data(&test_audio_info);
     let env = EnvironmentBuilder::new(Arc::new(storage_factory))
         .service(ServiceRegistry::serve(service_registry))
-        .agents(&[restore_agent::blueprint::create()])
+        .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Audio])
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await

@@ -60,7 +60,7 @@ async fn create_test_environment_with_data(data: Option<&State>) -> TestEnvironm
     let connector = EnvironmentBuilder::new(storage_factory)
         .service(ServiceRegistry::serve(service_registry))
         .fidl_interfaces(&[Interface::Audio, Interface::AudioPolicy])
-        .agents(&[AgentType::Restore.into()])
+        .agents(vec![AgentType::Restore.into()])
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();

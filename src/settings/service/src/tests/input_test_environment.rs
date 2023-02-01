@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::BlueprintHandle;
+use crate::agent::AgentRegistrar;
 use crate::base::SettingType;
 use crate::config::base::AgentType;
 use crate::handler::base::{Context, GenerateHandler};
@@ -95,7 +95,7 @@ impl TestInputEnvironmentBuilder {
 
         let mut environment_builder = EnvironmentBuilder::new(Arc::clone(&storage_factory))
             .service(Box::new(ServiceRegistry::serve(service_registry)))
-            .agents(&self.agents.into_iter().map(BlueprintHandle::from).collect::<Vec<_>>())
+            .agents(self.agents.into_iter().map(AgentRegistrar::from).collect::<Vec<_>>())
             .fidl_interfaces(&[Interface::Input]);
 
         if let Some(config) = self.input_device_config {

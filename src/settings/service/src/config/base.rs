@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::{AgentCreator, BlueprintHandle};
+use crate::agent::{AgentRegistrar, BlueprintHandle};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -120,15 +120,15 @@ impl From<AgentType> for BlueprintHandle {
 #[macro_export]
 macro_rules! create_agent {
     ($component:ident, $create:expr) => {
-        AgentCreator {
+        AgentRegistrar::Creator(AgentCreator {
             debug_id: concat!(stringify!($component), "_agent"),
             create: |c| Box::pin($create(c)),
-        }
+        })
     };
 }
 
-impl From<AgentType> for AgentCreator {
-    fn from(agent_type: AgentType) -> AgentCreator {
+impl From<AgentType> for AgentRegistrar {
+    fn from(agent_type: AgentType) -> AgentRegistrar {
         use crate::agent::*;
         match agent_type {
             AgentType::CameraWatcher => {

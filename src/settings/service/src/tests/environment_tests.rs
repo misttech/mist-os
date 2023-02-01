@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use crate::agent::{
-    AgentError, Context, Invocation, InvocationResult, Lifespan, Payload as AgentPayload,
+    AgentError, AgentRegistrar, Context, Invocation, InvocationResult, Lifespan,
+    Payload as AgentPayload,
 };
 use crate::base::{Dependency, Entity, SettingType};
 use crate::blueprint_definition;
@@ -115,7 +116,7 @@ async fn test_message_hub() {
     let Environment { connector: _, delegate, .. } =
         EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
             .service(ServiceRegistry::serve(service_registry))
-            .agents(&[blueprint::create()])
+            .agents(vec![AgentRegistrar::Blueprint(blueprint::create())])
             .spawn_nested(ENV_NAME)
             .await
             .unwrap();

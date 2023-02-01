@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::restore_agent;
 use crate::base::SettingType;
-use crate::config::base::ControllerFlag;
+use crate::config::base::{AgentType, ControllerFlag};
 use crate::display::types::{DisplayInfo, LowLightMode, Theme};
 use crate::ingress::fidl::{display, Interface};
 use crate::storage::testing::InMemoryStorageFactory;
@@ -87,7 +86,7 @@ async fn validate_restore_with_storage_controller(
 
     let env = EnvironmentBuilder::new(Arc::new(storage_factory))
         .service(Box::new(ServiceRegistry::serve(service_registry)))
-        .agents(&[restore_agent::blueprint::create()])
+        .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE)])
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
@@ -160,7 +159,7 @@ async fn validate_restore_with_brightness_controller(
 
     assert!(EnvironmentBuilder::new(Arc::new(storage_factory))
         .service(Box::new(ServiceRegistry::serve(service_registry)))
-        .agents(&[restore_agent::blueprint::create()])
+        .agents(vec![AgentType::Restore.into()])
         .fidl_interfaces(&[Interface::Display(display::InterfaceFlags::BASE)])
         .flags(&[ControllerFlag::ExternalBrightnessControl])
         .spawn_and_get_protocol_connector(ENV_NAME)

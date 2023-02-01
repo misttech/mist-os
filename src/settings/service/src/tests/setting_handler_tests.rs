@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::accessibility::types::AccessibilityInfo;
-use crate::agent::{restore_agent, Blueprint};
+use crate::agent::Blueprint;
 use crate::base::{get_all_setting_types, SettingInfo, SettingType, UnknownInfo};
+use crate::config::base::AgentType;
 use crate::handler::base::{ContextBuilder, Request};
 use crate::handler::setting_handler::persist::WriteResult;
 use crate::handler::setting_handler::{
@@ -101,7 +102,7 @@ macro_rules! verify_handle {
     ($spawn:expr) => {
         assert!(EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
             .handler(SettingType::Unknown, Box::new($spawn))
-            .agents(&[restore_agent::blueprint::create()])
+            .agents(vec![AgentType::Restore.into()])
             .settings(&[SettingType::Unknown])
             .spawn_nested(ENV_NAME)
             .await
