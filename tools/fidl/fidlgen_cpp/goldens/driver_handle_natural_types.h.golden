@@ -42,9 +42,8 @@ class ClientEndWrapper {
   struct Storage_;
 
  public:
-  ClientEndWrapper(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ClientEndWrapper(::fdf::ClientEnd<::test_driverhandle::DriverProtocol> value) noexcept
-      : storage_({.value = std::move(value)}) {}
+  ClientEndWrapper(Storage_ storage) noexcept;
+  ClientEndWrapper(::fdf::ClientEnd<::test_driverhandle::DriverProtocol> value) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -67,14 +66,9 @@ class ClientEndWrapper {
   // Setter for value.
   //
 
-  ClientEndWrapper& value(::fdf::ClientEnd<::test_driverhandle::DriverProtocol> value) {
-    storage_.value = std::move(value);
-    return *this;
-  }
+  ClientEndWrapper& value(::fdf::ClientEnd<::test_driverhandle::DriverProtocol> value);
 
-  ClientEndWrapper(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ClientEndWrapper(Storage_{
-                                                                                     .value = {},
-                                                                                 }) {}
+  ClientEndWrapper(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -101,9 +95,8 @@ class ServerEndWrapper {
   struct Storage_;
 
  public:
-  ServerEndWrapper(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ServerEndWrapper(::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value) noexcept
-      : storage_({.value = std::move(value)}) {}
+  ServerEndWrapper(Storage_ storage) noexcept;
+  ServerEndWrapper(::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -126,14 +119,9 @@ class ServerEndWrapper {
   // Setter for value.
   //
 
-  ServerEndWrapper& value(::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value) {
-    storage_.value = std::move(value);
-    return *this;
-  }
+  ServerEndWrapper& value(::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value);
 
-  ServerEndWrapper(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ServerEndWrapper(Storage_{
-                                                                                     .value = {},
-                                                                                 }) {}
+  ServerEndWrapper(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -160,7 +148,7 @@ class T {
   struct Storage_;
 
  public:
-  T(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  T(Storage_ storage) noexcept;
   T() noexcept = default;
   T(T&&) noexcept = default;
   T& operator=(T&&) noexcept = default;
@@ -175,10 +163,7 @@ class T {
   // Setter for zircon_handle.
   //
 
-  T& zircon_handle(std::optional<::zx::event> value) {
-    storage_.zircon_handle = std::move(value);
-    return *this;
-  }
+  T& zircon_handle(std::optional<::zx::event> value);
 
   const std::optional<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>>& fdf_handle() const { return storage_.fdf_handle; }
   ::std::optional<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>>& fdf_handle() { return storage_.fdf_handle; }
@@ -186,17 +171,14 @@ class T {
   // Setter for fdf_handle.
   //
 
-  T& fdf_handle(std::optional<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>> value) {
-    storage_.fdf_handle = std::move(value);
-    return *this;
-  }
+  T& fdf_handle(std::optional<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>> value);
 
-  T(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : T(Storage_{}) {}
+  T(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-    ::std::optional<::zx::event> zircon_handle{};
-    ::std::optional<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>> fdf_handle{};
+    ::std::optional<::zx::event> zircon_handle;
+    ::std::optional<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>> fdf_handle;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -219,9 +201,8 @@ class HandlesInProtocolSendHandlesRequest {
   struct Storage_;
 
  public:
-  HandlesInProtocolSendHandlesRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  HandlesInProtocolSendHandlesRequest(::test_driverhandle::T t) noexcept
-      : storage_({.t = std::move(t)}) {}
+  HandlesInProtocolSendHandlesRequest(Storage_ storage) noexcept;
+  HandlesInProtocolSendHandlesRequest(::test_driverhandle::T t) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -244,14 +225,9 @@ class HandlesInProtocolSendHandlesRequest {
   // Setter for t.
   //
 
-  HandlesInProtocolSendHandlesRequest& t(::test_driverhandle::T value) {
-    storage_.t = std::move(value);
-    return *this;
-  }
+  HandlesInProtocolSendHandlesRequest& t(::test_driverhandle::T value);
 
-  HandlesInProtocolSendHandlesRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandlesInProtocolSendHandlesRequest(Storage_{
-                                                                                                        .t = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                    }) {}
+  HandlesInProtocolSendHandlesRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -266,6 +242,70 @@ class HandlesInProtocolSendHandlesRequest {
       &Storage_::t, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline ClientEndWrapper::ClientEndWrapper(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ClientEndWrapper::ClientEndWrapper(::fdf::ClientEnd<::test_driverhandle::DriverProtocol> value) noexcept
+    : storage_({.value = std::move(value)}) {}
+
+inline ClientEndWrapper::ClientEndWrapper(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ClientEndWrapper(Storage_{
+                                                                                                            .value = {},
+                                                                                                        }) {}
+inline ClientEndWrapper& ClientEndWrapper::value(::fdf::ClientEnd<::test_driverhandle::DriverProtocol> value) {
+  storage_.value = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline ServerEndWrapper::ServerEndWrapper(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ServerEndWrapper::ServerEndWrapper(::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value) noexcept
+    : storage_({.value = std::move(value)}) {}
+
+inline ServerEndWrapper::ServerEndWrapper(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ServerEndWrapper(Storage_{
+                                                                                                            .value = {},
+                                                                                                        }) {}
+inline ServerEndWrapper& ServerEndWrapper::value(::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value) {
+  storage_.value = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline T::T(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+
+inline T::T(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : T(Storage_{}) {}
+inline T& T::zircon_handle(std::optional<::zx::event> value) {
+  storage_.zircon_handle = std::move(value);
+  return *this;
+}
+inline T& T::fdf_handle(std::optional<::fdf::ClientEnd<::test_driverhandle::DriverProtocol>> value) {
+  storage_.fdf_handle = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline HandlesInProtocolSendHandlesRequest::HandlesInProtocolSendHandlesRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline HandlesInProtocolSendHandlesRequest::HandlesInProtocolSendHandlesRequest(::test_driverhandle::T t) noexcept
+    : storage_({.t = std::move(t)}) {}
+
+inline HandlesInProtocolSendHandlesRequest::HandlesInProtocolSendHandlesRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandlesInProtocolSendHandlesRequest(Storage_{
+                                                                                                                                                  .t = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                              }) {}
+inline HandlesInProtocolSendHandlesRequest& HandlesInProtocolSendHandlesRequest::t(::test_driverhandle::T value) {
+  storage_.t = std::move(value);
+  return *this;
+}
 
 #endif  // __Fuchsia__
 

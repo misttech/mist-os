@@ -60,10 +60,8 @@ class Padding1ByteEnd {
   struct Storage_;
 
  public:
-  Padding1ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding1ByteEnd(uint16_t a, uint8_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding1ByteEnd(Storage_ storage) noexcept;
+  Padding1ByteEnd(uint16_t a, uint8_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -73,11 +71,8 @@ class Padding1ByteEnd {
 
   Padding1ByteEnd(Padding1ByteEnd&&) noexcept = default;
   Padding1ByteEnd& operator=(Padding1ByteEnd&&) noexcept = default;
-  Padding1ByteEnd(const Padding1ByteEnd& other) noexcept : Padding1ByteEnd(other.CloneStorage_()) {}
-  Padding1ByteEnd& operator=(const Padding1ByteEnd& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding1ByteEnd(const Padding1ByteEnd& other) noexcept;
+  Padding1ByteEnd& operator=(const Padding1ByteEnd& other) noexcept;
 
   bool operator==(const Padding1ByteEnd& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteEnd, 4>::Equal(this, &other);
@@ -98,10 +93,7 @@ class Padding1ByteEnd {
   // Setter for a.
   //
 
-  Padding1ByteEnd& a(uint16_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding1ByteEnd& a(uint16_t value);
 
   uint8_t
   b() const {
@@ -115,15 +107,9 @@ class Padding1ByteEnd {
   // Setter for b.
   //
 
-  Padding1ByteEnd& b(uint8_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding1ByteEnd& b(uint8_t value);
 
-  Padding1ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding1ByteEnd(Storage_{
-                                                                                    .a = {},
-                                                                                    .b = {},
-                                                                                }) {}
+  Padding1ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -152,10 +138,8 @@ class Padding2ByteEnd {
   struct Storage_;
 
  public:
-  Padding2ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding2ByteEnd(uint32_t a, uint16_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding2ByteEnd(Storage_ storage) noexcept;
+  Padding2ByteEnd(uint32_t a, uint16_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -165,11 +149,8 @@ class Padding2ByteEnd {
 
   Padding2ByteEnd(Padding2ByteEnd&&) noexcept = default;
   Padding2ByteEnd& operator=(Padding2ByteEnd&&) noexcept = default;
-  Padding2ByteEnd(const Padding2ByteEnd& other) noexcept : Padding2ByteEnd(other.CloneStorage_()) {}
-  Padding2ByteEnd& operator=(const Padding2ByteEnd& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding2ByteEnd(const Padding2ByteEnd& other) noexcept;
+  Padding2ByteEnd& operator=(const Padding2ByteEnd& other) noexcept;
 
   bool operator==(const Padding2ByteEnd& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteEnd, 8>::Equal(this, &other);
@@ -190,10 +171,7 @@ class Padding2ByteEnd {
   // Setter for a.
   //
 
-  Padding2ByteEnd& a(uint32_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding2ByteEnd& a(uint32_t value);
 
   uint16_t
   b() const {
@@ -207,15 +185,9 @@ class Padding2ByteEnd {
   // Setter for b.
   //
 
-  Padding2ByteEnd& b(uint16_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding2ByteEnd& b(uint16_t value);
 
-  Padding2ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteEnd(Storage_{
-                                                                                    .a = {},
-                                                                                    .b = {},
-                                                                                }) {}
+  Padding2ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -244,10 +216,8 @@ class Padding3ByteEnd {
   struct Storage_;
 
  public:
-  Padding3ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding3ByteEnd(uint32_t a, uint8_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding3ByteEnd(Storage_ storage) noexcept;
+  Padding3ByteEnd(uint32_t a, uint8_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -257,11 +227,8 @@ class Padding3ByteEnd {
 
   Padding3ByteEnd(Padding3ByteEnd&&) noexcept = default;
   Padding3ByteEnd& operator=(Padding3ByteEnd&&) noexcept = default;
-  Padding3ByteEnd(const Padding3ByteEnd& other) noexcept : Padding3ByteEnd(other.CloneStorage_()) {}
-  Padding3ByteEnd& operator=(const Padding3ByteEnd& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding3ByteEnd(const Padding3ByteEnd& other) noexcept;
+  Padding3ByteEnd& operator=(const Padding3ByteEnd& other) noexcept;
 
   bool operator==(const Padding3ByteEnd& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteEnd, 8>::Equal(this, &other);
@@ -282,10 +249,7 @@ class Padding3ByteEnd {
   // Setter for a.
   //
 
-  Padding3ByteEnd& a(uint32_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding3ByteEnd& a(uint32_t value);
 
   uint8_t
   b() const {
@@ -299,15 +263,9 @@ class Padding3ByteEnd {
   // Setter for b.
   //
 
-  Padding3ByteEnd& b(uint8_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding3ByteEnd& b(uint8_t value);
 
-  Padding3ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding3ByteEnd(Storage_{
-                                                                                    .a = {},
-                                                                                    .b = {},
-                                                                                }) {}
+  Padding3ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -336,10 +294,8 @@ class Padding4ByteEnd {
   struct Storage_;
 
  public:
-  Padding4ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding4ByteEnd(uint64_t a, uint32_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding4ByteEnd(Storage_ storage) noexcept;
+  Padding4ByteEnd(uint64_t a, uint32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -349,11 +305,8 @@ class Padding4ByteEnd {
 
   Padding4ByteEnd(Padding4ByteEnd&&) noexcept = default;
   Padding4ByteEnd& operator=(Padding4ByteEnd&&) noexcept = default;
-  Padding4ByteEnd(const Padding4ByteEnd& other) noexcept : Padding4ByteEnd(other.CloneStorage_()) {}
-  Padding4ByteEnd& operator=(const Padding4ByteEnd& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding4ByteEnd(const Padding4ByteEnd& other) noexcept;
+  Padding4ByteEnd& operator=(const Padding4ByteEnd& other) noexcept;
 
   bool operator==(const Padding4ByteEnd& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteEnd, 16>::Equal(this, &other);
@@ -374,10 +327,7 @@ class Padding4ByteEnd {
   // Setter for a.
   //
 
-  Padding4ByteEnd& a(uint64_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding4ByteEnd& a(uint64_t value);
 
   uint32_t
   b() const {
@@ -391,15 +341,9 @@ class Padding4ByteEnd {
   // Setter for b.
   //
 
-  Padding4ByteEnd& b(uint32_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding4ByteEnd& b(uint32_t value);
 
-  Padding4ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteEnd(Storage_{
-                                                                                    .a = {},
-                                                                                    .b = {},
-                                                                                }) {}
+  Padding4ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -428,11 +372,8 @@ class Padding5ByteEnd {
   struct Storage_;
 
  public:
-  Padding5ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding5ByteEnd(uint64_t a, uint16_t b, uint8_t c) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b),
-                  .c = std::move(c)}) {}
+  Padding5ByteEnd(Storage_ storage) noexcept;
+  Padding5ByteEnd(uint64_t a, uint16_t b, uint8_t c) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -442,11 +383,8 @@ class Padding5ByteEnd {
 
   Padding5ByteEnd(Padding5ByteEnd&&) noexcept = default;
   Padding5ByteEnd& operator=(Padding5ByteEnd&&) noexcept = default;
-  Padding5ByteEnd(const Padding5ByteEnd& other) noexcept : Padding5ByteEnd(other.CloneStorage_()) {}
-  Padding5ByteEnd& operator=(const Padding5ByteEnd& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding5ByteEnd(const Padding5ByteEnd& other) noexcept;
+  Padding5ByteEnd& operator=(const Padding5ByteEnd& other) noexcept;
 
   bool operator==(const Padding5ByteEnd& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteEnd, 16>::Equal(this, &other);
@@ -467,10 +405,7 @@ class Padding5ByteEnd {
   // Setter for a.
   //
 
-  Padding5ByteEnd& a(uint64_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding5ByteEnd& a(uint64_t value);
 
   uint16_t
   b() const {
@@ -484,10 +419,7 @@ class Padding5ByteEnd {
   // Setter for b.
   //
 
-  Padding5ByteEnd& b(uint16_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding5ByteEnd& b(uint16_t value);
 
   uint8_t
   c() const {
@@ -501,16 +433,9 @@ class Padding5ByteEnd {
   // Setter for c.
   //
 
-  Padding5ByteEnd& c(uint8_t value) {
-    storage_.c = std::move(value);
-    return *this;
-  }
+  Padding5ByteEnd& c(uint8_t value);
 
-  Padding5ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding5ByteEnd(Storage_{
-                                                                                    .a = {},
-                                                                                    .b = {},
-                                                                                    .c = {},
-                                                                                }) {}
+  Padding5ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -540,10 +465,8 @@ class Padding6ByteEnd {
   struct Storage_;
 
  public:
-  Padding6ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding6ByteEnd(uint64_t a, uint16_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding6ByteEnd(Storage_ storage) noexcept;
+  Padding6ByteEnd(uint64_t a, uint16_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -553,11 +476,8 @@ class Padding6ByteEnd {
 
   Padding6ByteEnd(Padding6ByteEnd&&) noexcept = default;
   Padding6ByteEnd& operator=(Padding6ByteEnd&&) noexcept = default;
-  Padding6ByteEnd(const Padding6ByteEnd& other) noexcept : Padding6ByteEnd(other.CloneStorage_()) {}
-  Padding6ByteEnd& operator=(const Padding6ByteEnd& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding6ByteEnd(const Padding6ByteEnd& other) noexcept;
+  Padding6ByteEnd& operator=(const Padding6ByteEnd& other) noexcept;
 
   bool operator==(const Padding6ByteEnd& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteEnd, 16>::Equal(this, &other);
@@ -578,10 +498,7 @@ class Padding6ByteEnd {
   // Setter for a.
   //
 
-  Padding6ByteEnd& a(uint64_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding6ByteEnd& a(uint64_t value);
 
   uint16_t
   b() const {
@@ -595,15 +512,9 @@ class Padding6ByteEnd {
   // Setter for b.
   //
 
-  Padding6ByteEnd& b(uint16_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding6ByteEnd& b(uint16_t value);
 
-  Padding6ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding6ByteEnd(Storage_{
-                                                                                    .a = {},
-                                                                                    .b = {},
-                                                                                }) {}
+  Padding6ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -632,10 +543,8 @@ class Padding7ByteEnd {
   struct Storage_;
 
  public:
-  Padding7ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding7ByteEnd(uint64_t a, uint8_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding7ByteEnd(Storage_ storage) noexcept;
+  Padding7ByteEnd(uint64_t a, uint8_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -645,11 +554,8 @@ class Padding7ByteEnd {
 
   Padding7ByteEnd(Padding7ByteEnd&&) noexcept = default;
   Padding7ByteEnd& operator=(Padding7ByteEnd&&) noexcept = default;
-  Padding7ByteEnd(const Padding7ByteEnd& other) noexcept : Padding7ByteEnd(other.CloneStorage_()) {}
-  Padding7ByteEnd& operator=(const Padding7ByteEnd& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding7ByteEnd(const Padding7ByteEnd& other) noexcept;
+  Padding7ByteEnd& operator=(const Padding7ByteEnd& other) noexcept;
 
   bool operator==(const Padding7ByteEnd& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteEnd, 16>::Equal(this, &other);
@@ -670,10 +576,7 @@ class Padding7ByteEnd {
   // Setter for a.
   //
 
-  Padding7ByteEnd& a(uint64_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding7ByteEnd& a(uint64_t value);
 
   uint8_t
   b() const {
@@ -687,15 +590,9 @@ class Padding7ByteEnd {
   // Setter for b.
   //
 
-  Padding7ByteEnd& b(uint8_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding7ByteEnd& b(uint8_t value);
 
-  Padding7ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding7ByteEnd(Storage_{
-                                                                                    .a = {},
-                                                                                    .b = {},
-                                                                                }) {}
+  Padding7ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -724,10 +621,8 @@ class Padding1ByteMiddle {
   struct Storage_;
 
  public:
-  Padding1ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding1ByteMiddle(uint8_t a, uint16_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding1ByteMiddle(Storage_ storage) noexcept;
+  Padding1ByteMiddle(uint8_t a, uint16_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -737,11 +632,8 @@ class Padding1ByteMiddle {
 
   Padding1ByteMiddle(Padding1ByteMiddle&&) noexcept = default;
   Padding1ByteMiddle& operator=(Padding1ByteMiddle&&) noexcept = default;
-  Padding1ByteMiddle(const Padding1ByteMiddle& other) noexcept : Padding1ByteMiddle(other.CloneStorage_()) {}
-  Padding1ByteMiddle& operator=(const Padding1ByteMiddle& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding1ByteMiddle(const Padding1ByteMiddle& other) noexcept;
+  Padding1ByteMiddle& operator=(const Padding1ByteMiddle& other) noexcept;
 
   bool operator==(const Padding1ByteMiddle& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteMiddle, 4>::Equal(this, &other);
@@ -762,10 +654,7 @@ class Padding1ByteMiddle {
   // Setter for a.
   //
 
-  Padding1ByteMiddle& a(uint8_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding1ByteMiddle& a(uint8_t value);
 
   uint16_t
   b() const {
@@ -779,15 +668,9 @@ class Padding1ByteMiddle {
   // Setter for b.
   //
 
-  Padding1ByteMiddle& b(uint16_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding1ByteMiddle& b(uint16_t value);
 
-  Padding1ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding1ByteMiddle(Storage_{
-                                                                                       .a = {},
-                                                                                       .b = {},
-                                                                                   }) {}
+  Padding1ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -816,10 +699,8 @@ class Padding2ByteMiddle {
   struct Storage_;
 
  public:
-  Padding2ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding2ByteMiddle(uint16_t a, uint32_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding2ByteMiddle(Storage_ storage) noexcept;
+  Padding2ByteMiddle(uint16_t a, uint32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -829,11 +710,8 @@ class Padding2ByteMiddle {
 
   Padding2ByteMiddle(Padding2ByteMiddle&&) noexcept = default;
   Padding2ByteMiddle& operator=(Padding2ByteMiddle&&) noexcept = default;
-  Padding2ByteMiddle(const Padding2ByteMiddle& other) noexcept : Padding2ByteMiddle(other.CloneStorage_()) {}
-  Padding2ByteMiddle& operator=(const Padding2ByteMiddle& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding2ByteMiddle(const Padding2ByteMiddle& other) noexcept;
+  Padding2ByteMiddle& operator=(const Padding2ByteMiddle& other) noexcept;
 
   bool operator==(const Padding2ByteMiddle& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteMiddle, 8>::Equal(this, &other);
@@ -854,10 +732,7 @@ class Padding2ByteMiddle {
   // Setter for a.
   //
 
-  Padding2ByteMiddle& a(uint16_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding2ByteMiddle& a(uint16_t value);
 
   uint32_t
   b() const {
@@ -871,15 +746,9 @@ class Padding2ByteMiddle {
   // Setter for b.
   //
 
-  Padding2ByteMiddle& b(uint32_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding2ByteMiddle& b(uint32_t value);
 
-  Padding2ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteMiddle(Storage_{
-                                                                                       .a = {},
-                                                                                       .b = {},
-                                                                                   }) {}
+  Padding2ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -908,10 +777,8 @@ class Padding3ByteMiddle {
   struct Storage_;
 
  public:
-  Padding3ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding3ByteMiddle(uint8_t a, uint32_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding3ByteMiddle(Storage_ storage) noexcept;
+  Padding3ByteMiddle(uint8_t a, uint32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -921,11 +788,8 @@ class Padding3ByteMiddle {
 
   Padding3ByteMiddle(Padding3ByteMiddle&&) noexcept = default;
   Padding3ByteMiddle& operator=(Padding3ByteMiddle&&) noexcept = default;
-  Padding3ByteMiddle(const Padding3ByteMiddle& other) noexcept : Padding3ByteMiddle(other.CloneStorage_()) {}
-  Padding3ByteMiddle& operator=(const Padding3ByteMiddle& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding3ByteMiddle(const Padding3ByteMiddle& other) noexcept;
+  Padding3ByteMiddle& operator=(const Padding3ByteMiddle& other) noexcept;
 
   bool operator==(const Padding3ByteMiddle& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteMiddle, 8>::Equal(this, &other);
@@ -946,10 +810,7 @@ class Padding3ByteMiddle {
   // Setter for a.
   //
 
-  Padding3ByteMiddle& a(uint8_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding3ByteMiddle& a(uint8_t value);
 
   uint32_t
   b() const {
@@ -963,15 +824,9 @@ class Padding3ByteMiddle {
   // Setter for b.
   //
 
-  Padding3ByteMiddle& b(uint32_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding3ByteMiddle& b(uint32_t value);
 
-  Padding3ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding3ByteMiddle(Storage_{
-                                                                                       .a = {},
-                                                                                       .b = {},
-                                                                                   }) {}
+  Padding3ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1000,10 +855,8 @@ class Padding4ByteMiddle {
   struct Storage_;
 
  public:
-  Padding4ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding4ByteMiddle(uint32_t a, uint64_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding4ByteMiddle(Storage_ storage) noexcept;
+  Padding4ByteMiddle(uint32_t a, uint64_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1013,11 +866,8 @@ class Padding4ByteMiddle {
 
   Padding4ByteMiddle(Padding4ByteMiddle&&) noexcept = default;
   Padding4ByteMiddle& operator=(Padding4ByteMiddle&&) noexcept = default;
-  Padding4ByteMiddle(const Padding4ByteMiddle& other) noexcept : Padding4ByteMiddle(other.CloneStorage_()) {}
-  Padding4ByteMiddle& operator=(const Padding4ByteMiddle& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding4ByteMiddle(const Padding4ByteMiddle& other) noexcept;
+  Padding4ByteMiddle& operator=(const Padding4ByteMiddle& other) noexcept;
 
   bool operator==(const Padding4ByteMiddle& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteMiddle, 16>::Equal(this, &other);
@@ -1038,10 +888,7 @@ class Padding4ByteMiddle {
   // Setter for a.
   //
 
-  Padding4ByteMiddle& a(uint32_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding4ByteMiddle& a(uint32_t value);
 
   uint64_t
   b() const {
@@ -1055,15 +902,9 @@ class Padding4ByteMiddle {
   // Setter for b.
   //
 
-  Padding4ByteMiddle& b(uint64_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding4ByteMiddle& b(uint64_t value);
 
-  Padding4ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteMiddle(Storage_{
-                                                                                       .a = {},
-                                                                                       .b = {},
-                                                                                   }) {}
+  Padding4ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1092,11 +933,8 @@ class Padding5ByteMiddle {
   struct Storage_;
 
  public:
-  Padding5ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding5ByteMiddle(uint16_t a, uint8_t b, uint64_t c) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b),
-                  .c = std::move(c)}) {}
+  Padding5ByteMiddle(Storage_ storage) noexcept;
+  Padding5ByteMiddle(uint16_t a, uint8_t b, uint64_t c) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1106,11 +944,8 @@ class Padding5ByteMiddle {
 
   Padding5ByteMiddle(Padding5ByteMiddle&&) noexcept = default;
   Padding5ByteMiddle& operator=(Padding5ByteMiddle&&) noexcept = default;
-  Padding5ByteMiddle(const Padding5ByteMiddle& other) noexcept : Padding5ByteMiddle(other.CloneStorage_()) {}
-  Padding5ByteMiddle& operator=(const Padding5ByteMiddle& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding5ByteMiddle(const Padding5ByteMiddle& other) noexcept;
+  Padding5ByteMiddle& operator=(const Padding5ByteMiddle& other) noexcept;
 
   bool operator==(const Padding5ByteMiddle& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteMiddle, 16>::Equal(this, &other);
@@ -1131,10 +966,7 @@ class Padding5ByteMiddle {
   // Setter for a.
   //
 
-  Padding5ByteMiddle& a(uint16_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding5ByteMiddle& a(uint16_t value);
 
   uint8_t
   b() const {
@@ -1148,10 +980,7 @@ class Padding5ByteMiddle {
   // Setter for b.
   //
 
-  Padding5ByteMiddle& b(uint8_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding5ByteMiddle& b(uint8_t value);
 
   uint64_t
   c() const {
@@ -1165,16 +994,9 @@ class Padding5ByteMiddle {
   // Setter for c.
   //
 
-  Padding5ByteMiddle& c(uint64_t value) {
-    storage_.c = std::move(value);
-    return *this;
-  }
+  Padding5ByteMiddle& c(uint64_t value);
 
-  Padding5ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding5ByteMiddle(Storage_{
-                                                                                       .a = {},
-                                                                                       .b = {},
-                                                                                       .c = {},
-                                                                                   }) {}
+  Padding5ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1204,10 +1026,8 @@ class Padding6ByteMiddle {
   struct Storage_;
 
  public:
-  Padding6ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding6ByteMiddle(uint16_t a, uint64_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding6ByteMiddle(Storage_ storage) noexcept;
+  Padding6ByteMiddle(uint16_t a, uint64_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1217,11 +1037,8 @@ class Padding6ByteMiddle {
 
   Padding6ByteMiddle(Padding6ByteMiddle&&) noexcept = default;
   Padding6ByteMiddle& operator=(Padding6ByteMiddle&&) noexcept = default;
-  Padding6ByteMiddle(const Padding6ByteMiddle& other) noexcept : Padding6ByteMiddle(other.CloneStorage_()) {}
-  Padding6ByteMiddle& operator=(const Padding6ByteMiddle& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding6ByteMiddle(const Padding6ByteMiddle& other) noexcept;
+  Padding6ByteMiddle& operator=(const Padding6ByteMiddle& other) noexcept;
 
   bool operator==(const Padding6ByteMiddle& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteMiddle, 16>::Equal(this, &other);
@@ -1242,10 +1059,7 @@ class Padding6ByteMiddle {
   // Setter for a.
   //
 
-  Padding6ByteMiddle& a(uint16_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding6ByteMiddle& a(uint16_t value);
 
   uint64_t
   b() const {
@@ -1259,15 +1073,9 @@ class Padding6ByteMiddle {
   // Setter for b.
   //
 
-  Padding6ByteMiddle& b(uint64_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding6ByteMiddle& b(uint64_t value);
 
-  Padding6ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding6ByteMiddle(Storage_{
-                                                                                       .a = {},
-                                                                                       .b = {},
-                                                                                   }) {}
+  Padding6ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1296,10 +1104,8 @@ class Padding7ByteMiddle {
   struct Storage_;
 
  public:
-  Padding7ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding7ByteMiddle(uint8_t a, uint64_t b) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b)}) {}
+  Padding7ByteMiddle(Storage_ storage) noexcept;
+  Padding7ByteMiddle(uint8_t a, uint64_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1309,11 +1115,8 @@ class Padding7ByteMiddle {
 
   Padding7ByteMiddle(Padding7ByteMiddle&&) noexcept = default;
   Padding7ByteMiddle& operator=(Padding7ByteMiddle&&) noexcept = default;
-  Padding7ByteMiddle(const Padding7ByteMiddle& other) noexcept : Padding7ByteMiddle(other.CloneStorage_()) {}
-  Padding7ByteMiddle& operator=(const Padding7ByteMiddle& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding7ByteMiddle(const Padding7ByteMiddle& other) noexcept;
+  Padding7ByteMiddle& operator=(const Padding7ByteMiddle& other) noexcept;
 
   bool operator==(const Padding7ByteMiddle& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteMiddle, 16>::Equal(this, &other);
@@ -1334,10 +1137,7 @@ class Padding7ByteMiddle {
   // Setter for a.
   //
 
-  Padding7ByteMiddle& a(uint8_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding7ByteMiddle& a(uint8_t value);
 
   uint64_t
   b() const {
@@ -1351,15 +1151,9 @@ class Padding7ByteMiddle {
   // Setter for b.
   //
 
-  Padding7ByteMiddle& b(uint64_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding7ByteMiddle& b(uint64_t value);
 
-  Padding7ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding7ByteMiddle(Storage_{
-                                                                                       .a = {},
-                                                                                       .b = {},
-                                                                                   }) {}
+  Padding7ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1388,12 +1182,8 @@ class Padding4ByteAlignmentLength12 {
   struct Storage_;
 
  public:
-  Padding4ByteAlignmentLength12(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding4ByteAlignmentLength12(uint32_t a, uint8_t b, uint16_t c, uint16_t d) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b),
-                  .c = std::move(c),
-                  .d = std::move(d)}) {}
+  Padding4ByteAlignmentLength12(Storage_ storage) noexcept;
+  Padding4ByteAlignmentLength12(uint32_t a, uint8_t b, uint16_t c, uint16_t d) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1403,11 +1193,8 @@ class Padding4ByteAlignmentLength12 {
 
   Padding4ByteAlignmentLength12(Padding4ByteAlignmentLength12&&) noexcept = default;
   Padding4ByteAlignmentLength12& operator=(Padding4ByteAlignmentLength12&&) noexcept = default;
-  Padding4ByteAlignmentLength12(const Padding4ByteAlignmentLength12& other) noexcept : Padding4ByteAlignmentLength12(other.CloneStorage_()) {}
-  Padding4ByteAlignmentLength12& operator=(const Padding4ByteAlignmentLength12& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding4ByteAlignmentLength12(const Padding4ByteAlignmentLength12& other) noexcept;
+  Padding4ByteAlignmentLength12& operator=(const Padding4ByteAlignmentLength12& other) noexcept;
 
   bool operator==(const Padding4ByteAlignmentLength12& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteAlignmentLength12, 12>::Equal(this, &other);
@@ -1428,10 +1215,7 @@ class Padding4ByteAlignmentLength12 {
   // Setter for a.
   //
 
-  Padding4ByteAlignmentLength12& a(uint32_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding4ByteAlignmentLength12& a(uint32_t value);
 
   uint8_t
   b() const {
@@ -1445,10 +1229,7 @@ class Padding4ByteAlignmentLength12 {
   // Setter for b.
   //
 
-  Padding4ByteAlignmentLength12& b(uint8_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding4ByteAlignmentLength12& b(uint8_t value);
 
   uint16_t
   c() const {
@@ -1462,10 +1243,7 @@ class Padding4ByteAlignmentLength12 {
   // Setter for c.
   //
 
-  Padding4ByteAlignmentLength12& c(uint16_t value) {
-    storage_.c = std::move(value);
-    return *this;
-  }
+  Padding4ByteAlignmentLength12& c(uint16_t value);
 
   uint16_t
   d() const {
@@ -1479,17 +1257,9 @@ class Padding4ByteAlignmentLength12 {
   // Setter for d.
   //
 
-  Padding4ByteAlignmentLength12& d(uint16_t value) {
-    storage_.d = std::move(value);
-    return *this;
-  }
+  Padding4ByteAlignmentLength12& d(uint16_t value);
 
-  Padding4ByteAlignmentLength12(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteAlignmentLength12(Storage_{
-                                                                                                  .a = {},
-                                                                                                  .b = {},
-                                                                                                  .c = {},
-                                                                                                  .d = {},
-                                                                                              }) {}
+  Padding4ByteAlignmentLength12(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1524,11 +1294,8 @@ class Padding2ByteAlignmentLength6 {
   struct Storage_;
 
  public:
-  Padding2ByteAlignmentLength6(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Padding2ByteAlignmentLength6(uint8_t a, uint16_t b, uint8_t c) noexcept
-      : storage_({.a = std::move(a),
-                  .b = std::move(b),
-                  .c = std::move(c)}) {}
+  Padding2ByteAlignmentLength6(Storage_ storage) noexcept;
+  Padding2ByteAlignmentLength6(uint8_t a, uint16_t b, uint8_t c) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1538,11 +1305,8 @@ class Padding2ByteAlignmentLength6 {
 
   Padding2ByteAlignmentLength6(Padding2ByteAlignmentLength6&&) noexcept = default;
   Padding2ByteAlignmentLength6& operator=(Padding2ByteAlignmentLength6&&) noexcept = default;
-  Padding2ByteAlignmentLength6(const Padding2ByteAlignmentLength6& other) noexcept : Padding2ByteAlignmentLength6(other.CloneStorage_()) {}
-  Padding2ByteAlignmentLength6& operator=(const Padding2ByteAlignmentLength6& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Padding2ByteAlignmentLength6(const Padding2ByteAlignmentLength6& other) noexcept;
+  Padding2ByteAlignmentLength6& operator=(const Padding2ByteAlignmentLength6& other) noexcept;
 
   bool operator==(const Padding2ByteAlignmentLength6& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteAlignmentLength6, 6>::Equal(this, &other);
@@ -1563,10 +1327,7 @@ class Padding2ByteAlignmentLength6 {
   // Setter for a.
   //
 
-  Padding2ByteAlignmentLength6& a(uint8_t value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  Padding2ByteAlignmentLength6& a(uint8_t value);
 
   uint16_t
   b() const {
@@ -1580,10 +1341,7 @@ class Padding2ByteAlignmentLength6 {
   // Setter for b.
   //
 
-  Padding2ByteAlignmentLength6& b(uint16_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  Padding2ByteAlignmentLength6& b(uint16_t value);
 
   uint8_t
   c() const {
@@ -1597,16 +1355,9 @@ class Padding2ByteAlignmentLength6 {
   // Setter for c.
   //
 
-  Padding2ByteAlignmentLength6& c(uint8_t value) {
-    storage_.c = std::move(value);
-    return *this;
-  }
+  Padding2ByteAlignmentLength6& c(uint8_t value);
 
-  Padding2ByteAlignmentLength6(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteAlignmentLength6(Storage_{
-                                                                                                 .a = {},
-                                                                                                 .b = {},
-                                                                                                 .c = {},
-                                                                                             }) {}
+  Padding2ByteAlignmentLength6(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1632,6 +1383,404 @@ class Padding2ByteAlignmentLength6 {
                                                        .mask = 0xff00,
                                                    });
 };
+
+inline Padding1ByteEnd::Padding1ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding1ByteEnd::Padding1ByteEnd(uint16_t a, uint8_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding1ByteEnd::Padding1ByteEnd(const ::test_padding::Padding1ByteEnd& other) noexcept : ::test_padding::Padding1ByteEnd(other.CloneStorage_()) {}
+inline Padding1ByteEnd& ::test_padding::Padding1ByteEnd::operator=(const ::test_padding::Padding1ByteEnd& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding1ByteEnd::Padding1ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding1ByteEnd(Storage_{
+                                                                                                          .a = {},
+                                                                                                          .b = {},
+                                                                                                      }) {}
+inline Padding1ByteEnd& Padding1ByteEnd::a(uint16_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding1ByteEnd& Padding1ByteEnd::b(uint8_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding2ByteEnd::Padding2ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding2ByteEnd::Padding2ByteEnd(uint32_t a, uint16_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding2ByteEnd::Padding2ByteEnd(const ::test_padding::Padding2ByteEnd& other) noexcept : ::test_padding::Padding2ByteEnd(other.CloneStorage_()) {}
+inline Padding2ByteEnd& ::test_padding::Padding2ByteEnd::operator=(const ::test_padding::Padding2ByteEnd& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding2ByteEnd::Padding2ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteEnd(Storage_{
+                                                                                                          .a = {},
+                                                                                                          .b = {},
+                                                                                                      }) {}
+inline Padding2ByteEnd& Padding2ByteEnd::a(uint32_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding2ByteEnd& Padding2ByteEnd::b(uint16_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding3ByteEnd::Padding3ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding3ByteEnd::Padding3ByteEnd(uint32_t a, uint8_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding3ByteEnd::Padding3ByteEnd(const ::test_padding::Padding3ByteEnd& other) noexcept : ::test_padding::Padding3ByteEnd(other.CloneStorage_()) {}
+inline Padding3ByteEnd& ::test_padding::Padding3ByteEnd::operator=(const ::test_padding::Padding3ByteEnd& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding3ByteEnd::Padding3ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding3ByteEnd(Storage_{
+                                                                                                          .a = {},
+                                                                                                          .b = {},
+                                                                                                      }) {}
+inline Padding3ByteEnd& Padding3ByteEnd::a(uint32_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding3ByteEnd& Padding3ByteEnd::b(uint8_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding4ByteEnd::Padding4ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding4ByteEnd::Padding4ByteEnd(uint64_t a, uint32_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding4ByteEnd::Padding4ByteEnd(const ::test_padding::Padding4ByteEnd& other) noexcept : ::test_padding::Padding4ByteEnd(other.CloneStorage_()) {}
+inline Padding4ByteEnd& ::test_padding::Padding4ByteEnd::operator=(const ::test_padding::Padding4ByteEnd& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding4ByteEnd::Padding4ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteEnd(Storage_{
+                                                                                                          .a = {},
+                                                                                                          .b = {},
+                                                                                                      }) {}
+inline Padding4ByteEnd& Padding4ByteEnd::a(uint64_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding4ByteEnd& Padding4ByteEnd::b(uint32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding5ByteEnd::Padding5ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding5ByteEnd::Padding5ByteEnd(uint64_t a, uint16_t b, uint8_t c) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b),
+                .c = std::move(c)}) {}
+inline Padding5ByteEnd::Padding5ByteEnd(const ::test_padding::Padding5ByteEnd& other) noexcept : ::test_padding::Padding5ByteEnd(other.CloneStorage_()) {}
+inline Padding5ByteEnd& ::test_padding::Padding5ByteEnd::operator=(const ::test_padding::Padding5ByteEnd& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding5ByteEnd::Padding5ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding5ByteEnd(Storage_{
+                                                                                                          .a = {},
+                                                                                                          .b = {},
+                                                                                                          .c = {},
+                                                                                                      }) {}
+inline Padding5ByteEnd& Padding5ByteEnd::a(uint64_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding5ByteEnd& Padding5ByteEnd::b(uint16_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+inline Padding5ByteEnd& Padding5ByteEnd::c(uint8_t value) {
+  storage_.c = std::move(value);
+  return *this;
+}
+
+inline Padding6ByteEnd::Padding6ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding6ByteEnd::Padding6ByteEnd(uint64_t a, uint16_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding6ByteEnd::Padding6ByteEnd(const ::test_padding::Padding6ByteEnd& other) noexcept : ::test_padding::Padding6ByteEnd(other.CloneStorage_()) {}
+inline Padding6ByteEnd& ::test_padding::Padding6ByteEnd::operator=(const ::test_padding::Padding6ByteEnd& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding6ByteEnd::Padding6ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding6ByteEnd(Storage_{
+                                                                                                          .a = {},
+                                                                                                          .b = {},
+                                                                                                      }) {}
+inline Padding6ByteEnd& Padding6ByteEnd::a(uint64_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding6ByteEnd& Padding6ByteEnd::b(uint16_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding7ByteEnd::Padding7ByteEnd(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding7ByteEnd::Padding7ByteEnd(uint64_t a, uint8_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding7ByteEnd::Padding7ByteEnd(const ::test_padding::Padding7ByteEnd& other) noexcept : ::test_padding::Padding7ByteEnd(other.CloneStorage_()) {}
+inline Padding7ByteEnd& ::test_padding::Padding7ByteEnd::operator=(const ::test_padding::Padding7ByteEnd& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding7ByteEnd::Padding7ByteEnd(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding7ByteEnd(Storage_{
+                                                                                                          .a = {},
+                                                                                                          .b = {},
+                                                                                                      }) {}
+inline Padding7ByteEnd& Padding7ByteEnd::a(uint64_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding7ByteEnd& Padding7ByteEnd::b(uint8_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding1ByteMiddle::Padding1ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding1ByteMiddle::Padding1ByteMiddle(uint8_t a, uint16_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding1ByteMiddle::Padding1ByteMiddle(const ::test_padding::Padding1ByteMiddle& other) noexcept : ::test_padding::Padding1ByteMiddle(other.CloneStorage_()) {}
+inline Padding1ByteMiddle& ::test_padding::Padding1ByteMiddle::operator=(const ::test_padding::Padding1ByteMiddle& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding1ByteMiddle::Padding1ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding1ByteMiddle(Storage_{
+                                                                                                                .a = {},
+                                                                                                                .b = {},
+                                                                                                            }) {}
+inline Padding1ByteMiddle& Padding1ByteMiddle::a(uint8_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding1ByteMiddle& Padding1ByteMiddle::b(uint16_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding2ByteMiddle::Padding2ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding2ByteMiddle::Padding2ByteMiddle(uint16_t a, uint32_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding2ByteMiddle::Padding2ByteMiddle(const ::test_padding::Padding2ByteMiddle& other) noexcept : ::test_padding::Padding2ByteMiddle(other.CloneStorage_()) {}
+inline Padding2ByteMiddle& ::test_padding::Padding2ByteMiddle::operator=(const ::test_padding::Padding2ByteMiddle& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding2ByteMiddle::Padding2ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteMiddle(Storage_{
+                                                                                                                .a = {},
+                                                                                                                .b = {},
+                                                                                                            }) {}
+inline Padding2ByteMiddle& Padding2ByteMiddle::a(uint16_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding2ByteMiddle& Padding2ByteMiddle::b(uint32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding3ByteMiddle::Padding3ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding3ByteMiddle::Padding3ByteMiddle(uint8_t a, uint32_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding3ByteMiddle::Padding3ByteMiddle(const ::test_padding::Padding3ByteMiddle& other) noexcept : ::test_padding::Padding3ByteMiddle(other.CloneStorage_()) {}
+inline Padding3ByteMiddle& ::test_padding::Padding3ByteMiddle::operator=(const ::test_padding::Padding3ByteMiddle& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding3ByteMiddle::Padding3ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding3ByteMiddle(Storage_{
+                                                                                                                .a = {},
+                                                                                                                .b = {},
+                                                                                                            }) {}
+inline Padding3ByteMiddle& Padding3ByteMiddle::a(uint8_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding3ByteMiddle& Padding3ByteMiddle::b(uint32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding4ByteMiddle::Padding4ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding4ByteMiddle::Padding4ByteMiddle(uint32_t a, uint64_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding4ByteMiddle::Padding4ByteMiddle(const ::test_padding::Padding4ByteMiddle& other) noexcept : ::test_padding::Padding4ByteMiddle(other.CloneStorage_()) {}
+inline Padding4ByteMiddle& ::test_padding::Padding4ByteMiddle::operator=(const ::test_padding::Padding4ByteMiddle& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding4ByteMiddle::Padding4ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteMiddle(Storage_{
+                                                                                                                .a = {},
+                                                                                                                .b = {},
+                                                                                                            }) {}
+inline Padding4ByteMiddle& Padding4ByteMiddle::a(uint32_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding4ByteMiddle& Padding4ByteMiddle::b(uint64_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding5ByteMiddle::Padding5ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding5ByteMiddle::Padding5ByteMiddle(uint16_t a, uint8_t b, uint64_t c) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b),
+                .c = std::move(c)}) {}
+inline Padding5ByteMiddle::Padding5ByteMiddle(const ::test_padding::Padding5ByteMiddle& other) noexcept : ::test_padding::Padding5ByteMiddle(other.CloneStorage_()) {}
+inline Padding5ByteMiddle& ::test_padding::Padding5ByteMiddle::operator=(const ::test_padding::Padding5ByteMiddle& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding5ByteMiddle::Padding5ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding5ByteMiddle(Storage_{
+                                                                                                                .a = {},
+                                                                                                                .b = {},
+                                                                                                                .c = {},
+                                                                                                            }) {}
+inline Padding5ByteMiddle& Padding5ByteMiddle::a(uint16_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding5ByteMiddle& Padding5ByteMiddle::b(uint8_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+inline Padding5ByteMiddle& Padding5ByteMiddle::c(uint64_t value) {
+  storage_.c = std::move(value);
+  return *this;
+}
+
+inline Padding6ByteMiddle::Padding6ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding6ByteMiddle::Padding6ByteMiddle(uint16_t a, uint64_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding6ByteMiddle::Padding6ByteMiddle(const ::test_padding::Padding6ByteMiddle& other) noexcept : ::test_padding::Padding6ByteMiddle(other.CloneStorage_()) {}
+inline Padding6ByteMiddle& ::test_padding::Padding6ByteMiddle::operator=(const ::test_padding::Padding6ByteMiddle& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding6ByteMiddle::Padding6ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding6ByteMiddle(Storage_{
+                                                                                                                .a = {},
+                                                                                                                .b = {},
+                                                                                                            }) {}
+inline Padding6ByteMiddle& Padding6ByteMiddle::a(uint16_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding6ByteMiddle& Padding6ByteMiddle::b(uint64_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding7ByteMiddle::Padding7ByteMiddle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding7ByteMiddle::Padding7ByteMiddle(uint8_t a, uint64_t b) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b)}) {}
+inline Padding7ByteMiddle::Padding7ByteMiddle(const ::test_padding::Padding7ByteMiddle& other) noexcept : ::test_padding::Padding7ByteMiddle(other.CloneStorage_()) {}
+inline Padding7ByteMiddle& ::test_padding::Padding7ByteMiddle::operator=(const ::test_padding::Padding7ByteMiddle& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding7ByteMiddle::Padding7ByteMiddle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding7ByteMiddle(Storage_{
+                                                                                                                .a = {},
+                                                                                                                .b = {},
+                                                                                                            }) {}
+inline Padding7ByteMiddle& Padding7ByteMiddle::a(uint8_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding7ByteMiddle& Padding7ByteMiddle::b(uint64_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(uint32_t a, uint8_t b, uint16_t c, uint16_t d) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b),
+                .c = std::move(c),
+                .d = std::move(d)}) {}
+inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(const ::test_padding::Padding4ByteAlignmentLength12& other) noexcept : ::test_padding::Padding4ByteAlignmentLength12(other.CloneStorage_()) {}
+inline Padding4ByteAlignmentLength12& ::test_padding::Padding4ByteAlignmentLength12::operator=(const ::test_padding::Padding4ByteAlignmentLength12& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding4ByteAlignmentLength12::Padding4ByteAlignmentLength12(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding4ByteAlignmentLength12(Storage_{
+                                                                                                                                      .a = {},
+                                                                                                                                      .b = {},
+                                                                                                                                      .c = {},
+                                                                                                                                      .d = {},
+                                                                                                                                  }) {}
+inline Padding4ByteAlignmentLength12& Padding4ByteAlignmentLength12::a(uint32_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding4ByteAlignmentLength12& Padding4ByteAlignmentLength12::b(uint8_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+inline Padding4ByteAlignmentLength12& Padding4ByteAlignmentLength12::c(uint16_t value) {
+  storage_.c = std::move(value);
+  return *this;
+}
+inline Padding4ByteAlignmentLength12& Padding4ByteAlignmentLength12::d(uint16_t value) {
+  storage_.d = std::move(value);
+  return *this;
+}
+
+inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(uint8_t a, uint16_t b, uint8_t c) noexcept
+    : storage_({.a = std::move(a),
+                .b = std::move(b),
+                .c = std::move(c)}) {}
+inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(const ::test_padding::Padding2ByteAlignmentLength6& other) noexcept : ::test_padding::Padding2ByteAlignmentLength6(other.CloneStorage_()) {}
+inline Padding2ByteAlignmentLength6& ::test_padding::Padding2ByteAlignmentLength6::operator=(const ::test_padding::Padding2ByteAlignmentLength6& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Padding2ByteAlignmentLength6::Padding2ByteAlignmentLength6(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Padding2ByteAlignmentLength6(Storage_{
+                                                                                                                                    .a = {},
+                                                                                                                                    .b = {},
+                                                                                                                                    .c = {},
+                                                                                                                                }) {}
+inline Padding2ByteAlignmentLength6& Padding2ByteAlignmentLength6::a(uint8_t value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+inline Padding2ByteAlignmentLength6& Padding2ByteAlignmentLength6::b(uint16_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+inline Padding2ByteAlignmentLength6& Padding2ByteAlignmentLength6::c(uint8_t value) {
+  storage_.c = std::move(value);
+  return *this;
+}
 
 }  // namespace test_padding
 namespace fidl {

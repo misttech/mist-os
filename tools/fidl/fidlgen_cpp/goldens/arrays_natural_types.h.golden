@@ -40,9 +40,8 @@ class StructSmallArray {
   struct Storage_;
 
  public:
-  StructSmallArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  StructSmallArray(::std::array<uint32_t, 2> a) noexcept
-      : storage_({.a = std::move(a)}) {}
+  StructSmallArray(Storage_ storage) noexcept;
+  StructSmallArray(::std::array<uint32_t, 2> a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -52,11 +51,8 @@ class StructSmallArray {
 
   StructSmallArray(StructSmallArray&&) noexcept = default;
   StructSmallArray& operator=(StructSmallArray&&) noexcept = default;
-  StructSmallArray(const StructSmallArray& other) noexcept : StructSmallArray(other.CloneStorage_()) {}
-  StructSmallArray& operator=(const StructSmallArray& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  StructSmallArray(const StructSmallArray& other) noexcept;
+  StructSmallArray& operator=(const StructSmallArray& other) noexcept;
 
   bool operator==(const StructSmallArray& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructSmallArray, 8>::Equal(this, &other);
@@ -77,14 +73,9 @@ class StructSmallArray {
   // Setter for a.
   //
 
-  StructSmallArray& a(::std::array<uint32_t, 2> value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  StructSmallArray& a(::std::array<uint32_t, 2> value);
 
-  StructSmallArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructSmallArray(Storage_{
-                                                                                     .a = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<uint32_t, 2>>::Make(),
-                                                                                 }) {}
+  StructSmallArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -108,9 +99,8 @@ class StructLargeArray {
   struct Storage_;
 
  public:
-  StructLargeArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  StructLargeArray(::std::array<uint32_t, 100> a) noexcept
-      : storage_({.a = std::move(a)}) {}
+  StructLargeArray(Storage_ storage) noexcept;
+  StructLargeArray(::std::array<uint32_t, 100> a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -120,11 +110,8 @@ class StructLargeArray {
 
   StructLargeArray(StructLargeArray&&) noexcept = default;
   StructLargeArray& operator=(StructLargeArray&&) noexcept = default;
-  StructLargeArray(const StructLargeArray& other) noexcept : StructLargeArray(other.CloneStorage_()) {}
-  StructLargeArray& operator=(const StructLargeArray& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  StructLargeArray(const StructLargeArray& other) noexcept;
+  StructLargeArray& operator=(const StructLargeArray& other) noexcept;
 
   bool operator==(const StructLargeArray& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructLargeArray, 400>::Equal(this, &other);
@@ -145,14 +132,9 @@ class StructLargeArray {
   // Setter for a.
   //
 
-  StructLargeArray& a(::std::array<uint32_t, 100> value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  StructLargeArray& a(::std::array<uint32_t, 100> value);
 
-  StructLargeArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructLargeArray(Storage_{
-                                                                                     .a = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<uint32_t, 100>>::Make(),
-                                                                                 }) {}
+  StructLargeArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -176,15 +158,12 @@ class TableSmallArray {
   struct Storage_;
 
  public:
-  TableSmallArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  TableSmallArray(Storage_ storage) noexcept;
   TableSmallArray() noexcept = default;
   TableSmallArray(TableSmallArray&&) noexcept = default;
   TableSmallArray& operator=(TableSmallArray&&) noexcept = default;
-  TableSmallArray(const TableSmallArray& other) noexcept : TableSmallArray(other.CloneStorage_()) {}
-  TableSmallArray& operator=(const TableSmallArray& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  TableSmallArray(const TableSmallArray& other) noexcept;
+  TableSmallArray& operator=(const TableSmallArray& other) noexcept;
   bool operator==(const TableSmallArray& other) const noexcept {
     return ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableSmallArray>::Equal(this, &other);
   }
@@ -202,16 +181,13 @@ class TableSmallArray {
   // Setter for a.
   //
 
-  TableSmallArray& a(std::optional<::std::array<uint32_t, 2>> value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  TableSmallArray& a(std::optional<::std::array<uint32_t, 2>> value);
 
-  TableSmallArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableSmallArray(Storage_{}) {}
+  TableSmallArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-    ::std::optional<::std::array<uint32_t, 2>> a{};
+    ::std::optional<::std::array<uint32_t, 2>> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -230,15 +206,12 @@ class TableLargeArray {
   struct Storage_;
 
  public:
-  TableLargeArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  TableLargeArray(Storage_ storage) noexcept;
   TableLargeArray() noexcept = default;
   TableLargeArray(TableLargeArray&&) noexcept = default;
   TableLargeArray& operator=(TableLargeArray&&) noexcept = default;
-  TableLargeArray(const TableLargeArray& other) noexcept : TableLargeArray(other.CloneStorage_()) {}
-  TableLargeArray& operator=(const TableLargeArray& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  TableLargeArray(const TableLargeArray& other) noexcept;
+  TableLargeArray& operator=(const TableLargeArray& other) noexcept;
   bool operator==(const TableLargeArray& other) const noexcept {
     return ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableLargeArray>::Equal(this, &other);
   }
@@ -256,16 +229,13 @@ class TableLargeArray {
   // Setter for a.
   //
 
-  TableLargeArray& a(std::optional<::std::array<uint32_t, 100>> value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  TableLargeArray& a(std::optional<::std::array<uint32_t, 100>> value);
 
-  TableLargeArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableLargeArray(Storage_{}) {}
+  TableLargeArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-    ::std::optional<::std::array<uint32_t, 100>> a{};
+    ::std::optional<::std::array<uint32_t, 100>> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -470,6 +440,66 @@ class UnionLargeArray {
     }
   }
 };
+
+inline StructSmallArray::StructSmallArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructSmallArray::StructSmallArray(::std::array<uint32_t, 2> a) noexcept
+    : storage_({.a = std::move(a)}) {}
+inline StructSmallArray::StructSmallArray(const ::test_arrays::StructSmallArray& other) noexcept : ::test_arrays::StructSmallArray(other.CloneStorage_()) {}
+inline StructSmallArray& ::test_arrays::StructSmallArray::operator=(const ::test_arrays::StructSmallArray& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline StructSmallArray::StructSmallArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructSmallArray(Storage_{
+                                                                                                            .a = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<uint32_t, 2>>::Make(),
+                                                                                                        }) {}
+inline StructSmallArray& StructSmallArray::a(::std::array<uint32_t, 2> value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline StructLargeArray::StructLargeArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructLargeArray::StructLargeArray(::std::array<uint32_t, 100> a) noexcept
+    : storage_({.a = std::move(a)}) {}
+inline StructLargeArray::StructLargeArray(const ::test_arrays::StructLargeArray& other) noexcept : ::test_arrays::StructLargeArray(other.CloneStorage_()) {}
+inline StructLargeArray& ::test_arrays::StructLargeArray::operator=(const ::test_arrays::StructLargeArray& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline StructLargeArray::StructLargeArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructLargeArray(Storage_{
+                                                                                                            .a = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<uint32_t, 100>>::Make(),
+                                                                                                        }) {}
+inline StructLargeArray& StructLargeArray::a(::std::array<uint32_t, 100> value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline TableSmallArray::TableSmallArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline TableSmallArray::TableSmallArray(const ::test_arrays::TableSmallArray& other) noexcept : TableSmallArray(other.CloneStorage_()) {}
+inline TableSmallArray& ::test_arrays::TableSmallArray::operator=(const TableSmallArray& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline TableSmallArray::TableSmallArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableSmallArray(Storage_{}) {}
+inline TableSmallArray& TableSmallArray::a(std::optional<::std::array<uint32_t, 2>> value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline TableLargeArray::TableLargeArray(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline TableLargeArray::TableLargeArray(const ::test_arrays::TableLargeArray& other) noexcept : TableLargeArray(other.CloneStorage_()) {}
+inline TableLargeArray& ::test_arrays::TableLargeArray::operator=(const TableLargeArray& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline TableLargeArray::TableLargeArray(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableLargeArray(Storage_{}) {}
+inline TableLargeArray& TableLargeArray::a(std::optional<::std::array<uint32_t, 100>> value) {
+  storage_.a = std::move(value);
+  return *this;
+}
 
 }  // namespace test_arrays
 namespace fidl {

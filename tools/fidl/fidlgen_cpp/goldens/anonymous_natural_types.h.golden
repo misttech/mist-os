@@ -50,11 +50,8 @@ class OverrideTest {
   struct Storage_;
 
  public:
-  OverrideTest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  OverrideTest(::test_anonymous::Op op, ::fidl::Box<::test_anonymous::Expression> left, ::fidl::Box<::test_anonymous::Expression> right) noexcept
-      : storage_({.op = std::move(op),
-                  .left = std::move(left),
-                  .right = std::move(right)}) {}
+  OverrideTest(Storage_ storage) noexcept;
+  OverrideTest(::test_anonymous::Op op, ::fidl::Box<::test_anonymous::Expression> left, ::fidl::Box<::test_anonymous::Expression> right) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -64,11 +61,8 @@ class OverrideTest {
 
   OverrideTest(OverrideTest&&) noexcept = default;
   OverrideTest& operator=(OverrideTest&&) noexcept = default;
-  OverrideTest(const OverrideTest& other) noexcept : OverrideTest(other.CloneStorage_()) {}
-  OverrideTest& operator=(const OverrideTest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  OverrideTest(const OverrideTest& other) noexcept;
+  OverrideTest& operator=(const OverrideTest& other) noexcept;
 
   bool operator==(const OverrideTest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::OverrideTest, 40>::Equal(this, &other);
@@ -89,10 +83,7 @@ class OverrideTest {
   // Setter for op.
   //
 
-  OverrideTest& op(::test_anonymous::Op value) {
-    storage_.op = std::move(value);
-    return *this;
-  }
+  OverrideTest& op(::test_anonymous::Op value);
 
   const ::fidl::Box<::test_anonymous::Expression>&
   left() const {
@@ -106,10 +97,7 @@ class OverrideTest {
   // Setter for left.
   //
 
-  OverrideTest& left(::fidl::Box<::test_anonymous::Expression> value) {
-    storage_.left = std::move(value);
-    return *this;
-  }
+  OverrideTest& left(::fidl::Box<::test_anonymous::Expression> value);
 
   const ::fidl::Box<::test_anonymous::Expression>&
   right() const {
@@ -123,16 +111,9 @@ class OverrideTest {
   // Setter for right.
   //
 
-  OverrideTest& right(::fidl::Box<::test_anonymous::Expression> value) {
-    storage_.right = std::move(value);
-    return *this;
-  }
+  OverrideTest& right(::fidl::Box<::test_anonymous::Expression> value);
 
-  OverrideTest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : OverrideTest(Storage_{
-                                                                                 .op = {},
-                                                                                 .left = {},
-                                                                                 .right = {},
-                                                                             }) {}
+  OverrideTest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -162,15 +143,12 @@ class FunctionApplication {
   struct Storage_;
 
  public:
-  FunctionApplication(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  FunctionApplication(Storage_ storage) noexcept;
   FunctionApplication() noexcept = default;
   FunctionApplication(FunctionApplication&&) noexcept = default;
   FunctionApplication& operator=(FunctionApplication&&) noexcept = default;
-  FunctionApplication(const FunctionApplication& other) noexcept : FunctionApplication(other.CloneStorage_()) {}
-  FunctionApplication& operator=(const FunctionApplication& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  FunctionApplication(const FunctionApplication& other) noexcept;
+  FunctionApplication& operator=(const FunctionApplication& other) noexcept;
   bool operator==(const FunctionApplication& other) const noexcept {
     return ::fidl::internal::NaturalTableCodingTraits<::test_anonymous::FunctionApplication>::Equal(this, &other);
   }
@@ -188,10 +166,7 @@ class FunctionApplication {
   // Setter for func.
   //
 
-  FunctionApplication& func(std::optional<::std::string> value) {
-    storage_.func = std::move(value);
-    return *this;
-  }
+  FunctionApplication& func(std::optional<::std::string> value);
 
   const std::optional<::std::vector<::fidl::Box<::test_anonymous::Expression>>>& args() const { return storage_.args; }
   ::std::optional<::std::vector<::fidl::Box<::test_anonymous::Expression>>>& args() { return storage_.args; }
@@ -199,10 +174,7 @@ class FunctionApplication {
   // Setter for args.
   //
 
-  FunctionApplication& args(std::optional<::std::vector<::fidl::Box<::test_anonymous::Expression>>> value) {
-    storage_.args = std::move(value);
-    return *this;
-  }
+  FunctionApplication& args(std::optional<::std::vector<::fidl::Box<::test_anonymous::Expression>>> value);
 
   const std::optional<::test_anonymous::Flags>& flags() const { return storage_.flags; }
   ::std::optional<::test_anonymous::Flags>& flags() { return storage_.flags; }
@@ -210,18 +182,15 @@ class FunctionApplication {
   // Setter for flags.
   //
 
-  FunctionApplication& flags(std::optional<::test_anonymous::Flags> value) {
-    storage_.flags = std::move(value);
-    return *this;
-  }
+  FunctionApplication& flags(std::optional<::test_anonymous::Flags> value);
 
-  FunctionApplication(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : FunctionApplication(Storage_{}) {}
+  FunctionApplication(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-    ::std::optional<::std::string> func{};
-    ::std::optional<::std::vector<::fidl::Box<::test_anonymous::Expression>>> args{};
-    ::std::optional<::test_anonymous::Flags> flags{};
+    ::std::optional<::std::string> func;
+    ::std::optional<::std::vector<::fidl::Box<::test_anonymous::Expression>>> args;
+    ::std::optional<::test_anonymous::Flags> flags;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -493,9 +462,8 @@ class TableData {
   struct Storage_;
 
  public:
-  TableData(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  TableData(uint8_t data) noexcept
-      : storage_({.data = std::move(data)}) {}
+  TableData(Storage_ storage) noexcept;
+  TableData(uint8_t data) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -505,11 +473,8 @@ class TableData {
 
   TableData(TableData&&) noexcept = default;
   TableData& operator=(TableData&&) noexcept = default;
-  TableData(const TableData& other) noexcept : TableData(other.CloneStorage_()) {}
-  TableData& operator=(const TableData& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  TableData(const TableData& other) noexcept;
+  TableData& operator=(const TableData& other) noexcept;
 
   bool operator==(const TableData& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::TableData, 1>::Equal(this, &other);
@@ -530,14 +495,9 @@ class TableData {
   // Setter for data.
   //
 
-  TableData& data(uint8_t value) {
-    storage_.data = std::move(value);
-    return *this;
-  }
+  TableData& data(uint8_t value);
 
-  TableData(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableData(Storage_{
-                                                                              .data = {},
-                                                                          }) {}
+  TableData(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -561,15 +521,12 @@ class TableMember {
   struct Storage_;
 
  public:
-  TableMember(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  TableMember(Storage_ storage) noexcept;
   TableMember() noexcept = default;
   TableMember(TableMember&&) noexcept = default;
   TableMember& operator=(TableMember&&) noexcept = default;
-  TableMember(const TableMember& other) noexcept : TableMember(other.CloneStorage_()) {}
-  TableMember& operator=(const TableMember& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  TableMember(const TableMember& other) noexcept;
+  TableMember& operator=(const TableMember& other) noexcept;
   bool operator==(const TableMember& other) const noexcept {
     return ::fidl::internal::NaturalTableCodingTraits<::test_anonymous::TableMember>::Equal(this, &other);
   }
@@ -587,16 +544,13 @@ class TableMember {
   // Setter for table_data.
   //
 
-  TableMember& table_data(std::optional<::std::vector<::test_anonymous::TableData>> value) {
-    storage_.table_data = std::move(value);
-    return *this;
-  }
+  TableMember& table_data(std::optional<::std::vector<::test_anonymous::TableData>> value);
 
-  TableMember(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableMember(Storage_{}) {}
+  TableMember(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-    ::std::optional<::std::vector<::test_anonymous::TableData>> table_data{};
+    ::std::optional<::std::vector<::test_anonymous::TableData>> table_data;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -615,10 +569,8 @@ class SomeProtocolSomeMethodRequest {
   struct Storage_;
 
  public:
-  SomeProtocolSomeMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SomeProtocolSomeMethodRequest(::test_anonymous::UnionMember union_member, ::test_anonymous::TableMember table_member) noexcept
-      : storage_({.union_member = std::move(union_member),
-                  .table_member = std::move(table_member)}) {}
+  SomeProtocolSomeMethodRequest(Storage_ storage) noexcept;
+  SomeProtocolSomeMethodRequest(::test_anonymous::UnionMember union_member, ::test_anonymous::TableMember table_member) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -628,11 +580,8 @@ class SomeProtocolSomeMethodRequest {
 
   SomeProtocolSomeMethodRequest(SomeProtocolSomeMethodRequest&&) noexcept = default;
   SomeProtocolSomeMethodRequest& operator=(SomeProtocolSomeMethodRequest&&) noexcept = default;
-  SomeProtocolSomeMethodRequest(const SomeProtocolSomeMethodRequest& other) noexcept : SomeProtocolSomeMethodRequest(other.CloneStorage_()) {}
-  SomeProtocolSomeMethodRequest& operator=(const SomeProtocolSomeMethodRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SomeProtocolSomeMethodRequest(const SomeProtocolSomeMethodRequest& other) noexcept;
+  SomeProtocolSomeMethodRequest& operator=(const SomeProtocolSomeMethodRequest& other) noexcept;
 
   bool operator==(const SomeProtocolSomeMethodRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodRequest, 32>::Equal(this, &other);
@@ -653,10 +602,7 @@ class SomeProtocolSomeMethodRequest {
   // Setter for union_member.
   //
 
-  SomeProtocolSomeMethodRequest& union_member(::test_anonymous::UnionMember value) {
-    storage_.union_member = std::move(value);
-    return *this;
-  }
+  SomeProtocolSomeMethodRequest& union_member(::test_anonymous::UnionMember value);
 
   const ::test_anonymous::TableMember&
   table_member() const {
@@ -670,15 +616,9 @@ class SomeProtocolSomeMethodRequest {
   // Setter for table_member.
   //
 
-  SomeProtocolSomeMethodRequest& table_member(::test_anonymous::TableMember value) {
-    storage_.table_member = std::move(value);
-    return *this;
-  }
+  SomeProtocolSomeMethodRequest& table_member(::test_anonymous::TableMember value);
 
-  SomeProtocolSomeMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SomeProtocolSomeMethodRequest(Storage_{
-                                                                                                  .union_member = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                  .table_member = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                              }) {}
+  SomeProtocolSomeMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -704,9 +644,8 @@ class SomeProtocolSomeMethodResponse {
   struct Storage_;
 
  public:
-  SomeProtocolSomeMethodResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SomeProtocolSomeMethodResponse(::test_anonymous::BitsMember bits_member) noexcept
-      : storage_({.bits_member = std::move(bits_member)}) {}
+  SomeProtocolSomeMethodResponse(Storage_ storage) noexcept;
+  SomeProtocolSomeMethodResponse(::test_anonymous::BitsMember bits_member) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -716,11 +655,8 @@ class SomeProtocolSomeMethodResponse {
 
   SomeProtocolSomeMethodResponse(SomeProtocolSomeMethodResponse&&) noexcept = default;
   SomeProtocolSomeMethodResponse& operator=(SomeProtocolSomeMethodResponse&&) noexcept = default;
-  SomeProtocolSomeMethodResponse(const SomeProtocolSomeMethodResponse& other) noexcept : SomeProtocolSomeMethodResponse(other.CloneStorage_()) {}
-  SomeProtocolSomeMethodResponse& operator=(const SomeProtocolSomeMethodResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SomeProtocolSomeMethodResponse(const SomeProtocolSomeMethodResponse& other) noexcept;
+  SomeProtocolSomeMethodResponse& operator=(const SomeProtocolSomeMethodResponse& other) noexcept;
 
   bool operator==(const SomeProtocolSomeMethodResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodResponse, 4>::Equal(this, &other);
@@ -741,14 +677,9 @@ class SomeProtocolSomeMethodResponse {
   // Setter for bits_member.
   //
 
-  SomeProtocolSomeMethodResponse& bits_member(::test_anonymous::BitsMember value) {
-    storage_.bits_member = std::move(value);
-    return *this;
-  }
+  SomeProtocolSomeMethodResponse& bits_member(::test_anonymous::BitsMember value);
 
-  SomeProtocolSomeMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SomeProtocolSomeMethodResponse(Storage_{
-                                                                                                   .bits_member = {},
-                                                                                               }) {}
+  SomeProtocolSomeMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -895,9 +826,8 @@ class SomeProtocolSomeMethodTopResponse {
   struct Storage_;
 
  public:
-  SomeProtocolSomeMethodTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SomeProtocolSomeMethodTopResponse(::test_anonymous::SomeProtocolSomeMethodResult result) noexcept
-      : storage_({.result = std::move(result)}) {}
+  SomeProtocolSomeMethodTopResponse(Storage_ storage) noexcept;
+  SomeProtocolSomeMethodTopResponse(::test_anonymous::SomeProtocolSomeMethodResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -907,11 +837,8 @@ class SomeProtocolSomeMethodTopResponse {
 
   SomeProtocolSomeMethodTopResponse(SomeProtocolSomeMethodTopResponse&&) noexcept = default;
   SomeProtocolSomeMethodTopResponse& operator=(SomeProtocolSomeMethodTopResponse&&) noexcept = default;
-  SomeProtocolSomeMethodTopResponse(const SomeProtocolSomeMethodTopResponse& other) noexcept : SomeProtocolSomeMethodTopResponse(other.CloneStorage_()) {}
-  SomeProtocolSomeMethodTopResponse& operator=(const SomeProtocolSomeMethodTopResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SomeProtocolSomeMethodTopResponse(const SomeProtocolSomeMethodTopResponse& other) noexcept;
+  SomeProtocolSomeMethodTopResponse& operator=(const SomeProtocolSomeMethodTopResponse& other) noexcept;
 
   bool operator==(const SomeProtocolSomeMethodTopResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_anonymous::SomeProtocolSomeMethodTopResponse, 16>::Equal(this, &other);
@@ -932,14 +859,9 @@ class SomeProtocolSomeMethodTopResponse {
   // Setter for result.
   //
 
-  SomeProtocolSomeMethodTopResponse& result(::test_anonymous::SomeProtocolSomeMethodResult value) {
-    storage_.result = std::move(value);
-    return *this;
-  }
+  SomeProtocolSomeMethodTopResponse& result(::test_anonymous::SomeProtocolSomeMethodResult value);
 
-  SomeProtocolSomeMethodTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SomeProtocolSomeMethodTopResponse(Storage_{
-                                                                                                      .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                  }) {}
+  SomeProtocolSomeMethodTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -955,6 +877,143 @@ class SomeProtocolSomeMethodTopResponse {
       &Storage_::result, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline OverrideTest::OverrideTest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline OverrideTest::OverrideTest(::test_anonymous::Op op, ::fidl::Box<::test_anonymous::Expression> left, ::fidl::Box<::test_anonymous::Expression> right) noexcept
+    : storage_({.op = std::move(op),
+                .left = std::move(left),
+                .right = std::move(right)}) {}
+inline OverrideTest::OverrideTest(const ::test_anonymous::OverrideTest& other) noexcept : ::test_anonymous::OverrideTest(other.CloneStorage_()) {}
+inline OverrideTest& ::test_anonymous::OverrideTest::operator=(const ::test_anonymous::OverrideTest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline OverrideTest::OverrideTest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : OverrideTest(Storage_{
+                                                                                                    .op = {},
+                                                                                                    .left = {},
+                                                                                                    .right = {},
+                                                                                                }) {}
+inline OverrideTest& OverrideTest::op(::test_anonymous::Op value) {
+  storage_.op = std::move(value);
+  return *this;
+}
+inline OverrideTest& OverrideTest::left(::fidl::Box<::test_anonymous::Expression> value) {
+  storage_.left = std::move(value);
+  return *this;
+}
+inline OverrideTest& OverrideTest::right(::fidl::Box<::test_anonymous::Expression> value) {
+  storage_.right = std::move(value);
+  return *this;
+}
+
+inline FunctionApplication::FunctionApplication(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline FunctionApplication::FunctionApplication(const ::test_anonymous::FunctionApplication& other) noexcept : FunctionApplication(other.CloneStorage_()) {}
+inline FunctionApplication& ::test_anonymous::FunctionApplication::operator=(const FunctionApplication& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline FunctionApplication::FunctionApplication(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : FunctionApplication(Storage_{}) {}
+inline FunctionApplication& FunctionApplication::func(std::optional<::std::string> value) {
+  storage_.func = std::move(value);
+  return *this;
+}
+inline FunctionApplication& FunctionApplication::args(std::optional<::std::vector<::fidl::Box<::test_anonymous::Expression>>> value) {
+  storage_.args = std::move(value);
+  return *this;
+}
+inline FunctionApplication& FunctionApplication::flags(std::optional<::test_anonymous::Flags> value) {
+  storage_.flags = std::move(value);
+  return *this;
+}
+
+inline TableData::TableData(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline TableData::TableData(uint8_t data) noexcept
+    : storage_({.data = std::move(data)}) {}
+inline TableData::TableData(const ::test_anonymous::TableData& other) noexcept : ::test_anonymous::TableData(other.CloneStorage_()) {}
+inline TableData& ::test_anonymous::TableData::operator=(const ::test_anonymous::TableData& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline TableData::TableData(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableData(Storage_{
+                                                                                              .data = {},
+                                                                                          }) {}
+inline TableData& TableData::data(uint8_t value) {
+  storage_.data = std::move(value);
+  return *this;
+}
+
+inline TableMember::TableMember(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline TableMember::TableMember(const ::test_anonymous::TableMember& other) noexcept : TableMember(other.CloneStorage_()) {}
+inline TableMember& ::test_anonymous::TableMember::operator=(const TableMember& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline TableMember::TableMember(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableMember(Storage_{}) {}
+inline TableMember& TableMember::table_data(std::optional<::std::vector<::test_anonymous::TableData>> value) {
+  storage_.table_data = std::move(value);
+  return *this;
+}
+
+inline SomeProtocolSomeMethodRequest::SomeProtocolSomeMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SomeProtocolSomeMethodRequest::SomeProtocolSomeMethodRequest(::test_anonymous::UnionMember union_member, ::test_anonymous::TableMember table_member) noexcept
+    : storage_({.union_member = std::move(union_member),
+                .table_member = std::move(table_member)}) {}
+inline SomeProtocolSomeMethodRequest::SomeProtocolSomeMethodRequest(const ::test_anonymous::SomeProtocolSomeMethodRequest& other) noexcept : ::test_anonymous::SomeProtocolSomeMethodRequest(other.CloneStorage_()) {}
+inline SomeProtocolSomeMethodRequest& ::test_anonymous::SomeProtocolSomeMethodRequest::operator=(const ::test_anonymous::SomeProtocolSomeMethodRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SomeProtocolSomeMethodRequest::SomeProtocolSomeMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SomeProtocolSomeMethodRequest(Storage_{
+                                                                                                                                      .union_member = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                      .table_member = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                  }) {}
+inline SomeProtocolSomeMethodRequest& SomeProtocolSomeMethodRequest::union_member(::test_anonymous::UnionMember value) {
+  storage_.union_member = std::move(value);
+  return *this;
+}
+inline SomeProtocolSomeMethodRequest& SomeProtocolSomeMethodRequest::table_member(::test_anonymous::TableMember value) {
+  storage_.table_member = std::move(value);
+  return *this;
+}
+
+inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(::test_anonymous::BitsMember bits_member) noexcept
+    : storage_({.bits_member = std::move(bits_member)}) {}
+inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(const ::test_anonymous::SomeProtocolSomeMethodResponse& other) noexcept : ::test_anonymous::SomeProtocolSomeMethodResponse(other.CloneStorage_()) {}
+inline SomeProtocolSomeMethodResponse& ::test_anonymous::SomeProtocolSomeMethodResponse::operator=(const ::test_anonymous::SomeProtocolSomeMethodResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SomeProtocolSomeMethodResponse::SomeProtocolSomeMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SomeProtocolSomeMethodResponse(Storage_{
+                                                                                                                                        .bits_member = {},
+                                                                                                                                    }) {}
+inline SomeProtocolSomeMethodResponse& SomeProtocolSomeMethodResponse::bits_member(::test_anonymous::BitsMember value) {
+  storage_.bits_member = std::move(value);
+  return *this;
+}
+
+inline SomeProtocolSomeMethodTopResponse::SomeProtocolSomeMethodTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SomeProtocolSomeMethodTopResponse::SomeProtocolSomeMethodTopResponse(::test_anonymous::SomeProtocolSomeMethodResult result) noexcept
+    : storage_({.result = std::move(result)}) {}
+inline SomeProtocolSomeMethodTopResponse::SomeProtocolSomeMethodTopResponse(const ::test_anonymous::SomeProtocolSomeMethodTopResponse& other) noexcept : ::test_anonymous::SomeProtocolSomeMethodTopResponse(other.CloneStorage_()) {}
+inline SomeProtocolSomeMethodTopResponse& ::test_anonymous::SomeProtocolSomeMethodTopResponse::operator=(const ::test_anonymous::SomeProtocolSomeMethodTopResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SomeProtocolSomeMethodTopResponse::SomeProtocolSomeMethodTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SomeProtocolSomeMethodTopResponse(Storage_{
+                                                                                                                                              .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                          }) {}
+inline SomeProtocolSomeMethodTopResponse& SomeProtocolSomeMethodTopResponse::result(::test_anonymous::SomeProtocolSomeMethodResult value) {
+  storage_.result = std::move(value);
+  return *this;
+}
 
 }  // namespace test_anonymous
 namespace fidl {

@@ -35,9 +35,8 @@ class MyStruct {
   struct Storage_;
 
  public:
-  MyStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  MyStruct(uint8_t __reserved) noexcept
-      : storage_({.__reserved = std::move(__reserved)}) {}
+  MyStruct(Storage_ storage) noexcept;
+  MyStruct(uint8_t __reserved) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -47,11 +46,8 @@ class MyStruct {
 
   MyStruct(MyStruct&&) noexcept = default;
   MyStruct& operator=(MyStruct&&) noexcept = default;
-  MyStruct(const MyStruct& other) noexcept : MyStruct(other.CloneStorage_()) {}
-  MyStruct& operator=(const MyStruct& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  MyStruct(const MyStruct& other) noexcept;
+  MyStruct& operator=(const MyStruct& other) noexcept;
 
   bool operator==(const MyStruct& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_importedconstvalues::MyStruct, 1>::Equal(this, &other);
@@ -72,14 +68,9 @@ class MyStruct {
   // Setter for __reserved.
   //
 
-  MyStruct& __reserved(uint8_t value) {
-    storage_.__reserved = std::move(value);
-    return *this;
-  }
+  MyStruct& __reserved(uint8_t value);
 
-  MyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MyStruct(Storage_{
-                                                                             .__reserved = 0u,
-                                                                         }) {}
+  MyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -95,6 +86,23 @@ class MyStruct {
       &Storage_::__reserved, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline MyStruct::MyStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline MyStruct::MyStruct(uint8_t __reserved) noexcept
+    : storage_({.__reserved = std::move(__reserved)}) {}
+inline MyStruct::MyStruct(const ::test_importedconstvalues::MyStruct& other) noexcept : ::test_importedconstvalues::MyStruct(other.CloneStorage_()) {}
+inline MyStruct& ::test_importedconstvalues::MyStruct::operator=(const ::test_importedconstvalues::MyStruct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline MyStruct::MyStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MyStruct(Storage_{
+                                                                                            .__reserved = 0u,
+                                                                                        }) {}
+inline MyStruct& MyStruct::__reserved(uint8_t value) {
+  storage_.__reserved = std::move(value);
+  return *this;
+}
 
 }  // namespace test_importedconstvalues
 namespace fidl {

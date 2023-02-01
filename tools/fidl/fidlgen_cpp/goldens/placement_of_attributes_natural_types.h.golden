@@ -43,9 +43,8 @@ class ExampleProtocolMethodRequest {
   struct Storage_;
 
  public:
-  ExampleProtocolMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ExampleProtocolMethodRequest(::test_exampleusing::Empty arg) noexcept
-      : storage_({.arg = std::move(arg)}) {}
+  ExampleProtocolMethodRequest(Storage_ storage) noexcept;
+  ExampleProtocolMethodRequest(::test_exampleusing::Empty arg) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -55,11 +54,8 @@ class ExampleProtocolMethodRequest {
 
   ExampleProtocolMethodRequest(ExampleProtocolMethodRequest&&) noexcept = default;
   ExampleProtocolMethodRequest& operator=(ExampleProtocolMethodRequest&&) noexcept = default;
-  ExampleProtocolMethodRequest(const ExampleProtocolMethodRequest& other) noexcept : ExampleProtocolMethodRequest(other.CloneStorage_()) {}
-  ExampleProtocolMethodRequest& operator=(const ExampleProtocolMethodRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ExampleProtocolMethodRequest(const ExampleProtocolMethodRequest& other) noexcept;
+  ExampleProtocolMethodRequest& operator=(const ExampleProtocolMethodRequest& other) noexcept;
 
   bool operator==(const ExampleProtocolMethodRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_placementofattributes::ExampleProtocolMethodRequest, 1>::Equal(this, &other);
@@ -80,14 +76,9 @@ class ExampleProtocolMethodRequest {
   // Setter for arg.
   //
 
-  ExampleProtocolMethodRequest& arg(::test_exampleusing::Empty value) {
-    storage_.arg = std::move(value);
-    return *this;
-  }
+  ExampleProtocolMethodRequest& arg(::test_exampleusing::Empty value);
 
-  ExampleProtocolMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleProtocolMethodRequest(Storage_{
-                                                                                                 .arg = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                             }) {}
+  ExampleProtocolMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -111,9 +102,8 @@ class ExampleStruct {
   struct Storage_;
 
  public:
-  ExampleStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ExampleStruct(uint32_t member) noexcept
-      : storage_({.member = std::move(member)}) {}
+  ExampleStruct(Storage_ storage) noexcept;
+  ExampleStruct(uint32_t member) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -123,11 +113,8 @@ class ExampleStruct {
 
   ExampleStruct(ExampleStruct&&) noexcept = default;
   ExampleStruct& operator=(ExampleStruct&&) noexcept = default;
-  ExampleStruct(const ExampleStruct& other) noexcept : ExampleStruct(other.CloneStorage_()) {}
-  ExampleStruct& operator=(const ExampleStruct& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ExampleStruct(const ExampleStruct& other) noexcept;
+  ExampleStruct& operator=(const ExampleStruct& other) noexcept;
 
   bool operator==(const ExampleStruct& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_placementofattributes::ExampleStruct, 4>::Equal(this, &other);
@@ -148,14 +135,9 @@ class ExampleStruct {
   // Setter for member.
   //
 
-  ExampleStruct& member(uint32_t value) {
-    storage_.member = std::move(value);
-    return *this;
-  }
+  ExampleStruct& member(uint32_t value);
 
-  ExampleStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleStruct(Storage_{
-                                                                                  .member = {},
-                                                                              }) {}
+  ExampleStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -179,15 +161,12 @@ class ExampleTable {
   struct Storage_;
 
  public:
-  ExampleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  ExampleTable(Storage_ storage) noexcept;
   ExampleTable() noexcept = default;
   ExampleTable(ExampleTable&&) noexcept = default;
   ExampleTable& operator=(ExampleTable&&) noexcept = default;
-  ExampleTable(const ExampleTable& other) noexcept : ExampleTable(other.CloneStorage_()) {}
-  ExampleTable& operator=(const ExampleTable& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ExampleTable(const ExampleTable& other) noexcept;
+  ExampleTable& operator=(const ExampleTable& other) noexcept;
   bool operator==(const ExampleTable& other) const noexcept {
     return ::fidl::internal::NaturalTableCodingTraits<::test_placementofattributes::ExampleTable>::Equal(this, &other);
   }
@@ -205,16 +184,13 @@ class ExampleTable {
   // Setter for member.
   //
 
-  ExampleTable& member(std::optional<uint32_t> value) {
-    storage_.member = std::move(value);
-    return *this;
-  }
+  ExampleTable& member(std::optional<uint32_t> value);
 
-  ExampleTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleTable(Storage_{}) {}
+  ExampleTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-    ::std::optional<uint32_t> member{};
+    ::std::optional<uint32_t> member;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -422,6 +398,53 @@ class ExampleXUnion {
     }
   }
 };
+
+inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(::test_exampleusing::Empty arg) noexcept
+    : storage_({.arg = std::move(arg)}) {}
+inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(const ::test_placementofattributes::ExampleProtocolMethodRequest& other) noexcept : ::test_placementofattributes::ExampleProtocolMethodRequest(other.CloneStorage_()) {}
+inline ExampleProtocolMethodRequest& ::test_placementofattributes::ExampleProtocolMethodRequest::operator=(const ::test_placementofattributes::ExampleProtocolMethodRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ExampleProtocolMethodRequest::ExampleProtocolMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleProtocolMethodRequest(Storage_{
+                                                                                                                                    .arg = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                }) {}
+inline ExampleProtocolMethodRequest& ExampleProtocolMethodRequest::arg(::test_exampleusing::Empty value) {
+  storage_.arg = std::move(value);
+  return *this;
+}
+
+inline ExampleStruct::ExampleStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ExampleStruct::ExampleStruct(uint32_t member) noexcept
+    : storage_({.member = std::move(member)}) {}
+inline ExampleStruct::ExampleStruct(const ::test_placementofattributes::ExampleStruct& other) noexcept : ::test_placementofattributes::ExampleStruct(other.CloneStorage_()) {}
+inline ExampleStruct& ::test_placementofattributes::ExampleStruct::operator=(const ::test_placementofattributes::ExampleStruct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ExampleStruct::ExampleStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleStruct(Storage_{
+                                                                                                      .member = {},
+                                                                                                  }) {}
+inline ExampleStruct& ExampleStruct::member(uint32_t value) {
+  storage_.member = std::move(value);
+  return *this;
+}
+
+inline ExampleTable::ExampleTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ExampleTable::ExampleTable(const ::test_placementofattributes::ExampleTable& other) noexcept : ExampleTable(other.CloneStorage_()) {}
+inline ExampleTable& ::test_placementofattributes::ExampleTable::operator=(const ExampleTable& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ExampleTable::ExampleTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleTable(Storage_{}) {}
+inline ExampleTable& ExampleTable::member(std::optional<uint32_t> value) {
+  storage_.member = std::move(value);
+  return *this;
+}
 
 }  // namespace test_placementofattributes
 namespace fidl {

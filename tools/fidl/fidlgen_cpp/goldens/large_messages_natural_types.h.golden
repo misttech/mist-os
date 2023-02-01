@@ -62,9 +62,8 @@ class BoundedKnownToBeSmall {
   struct Storage_;
 
  public:
-  BoundedKnownToBeSmall(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  BoundedKnownToBeSmall(::std::vector<uint8_t> bytes) noexcept
-      : storage_({.bytes = std::move(bytes)}) {}
+  BoundedKnownToBeSmall(Storage_ storage) noexcept;
+  BoundedKnownToBeSmall(::std::vector<uint8_t> bytes) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -74,11 +73,8 @@ class BoundedKnownToBeSmall {
 
   BoundedKnownToBeSmall(BoundedKnownToBeSmall&&) noexcept = default;
   BoundedKnownToBeSmall& operator=(BoundedKnownToBeSmall&&) noexcept = default;
-  BoundedKnownToBeSmall(const BoundedKnownToBeSmall& other) noexcept : BoundedKnownToBeSmall(other.CloneStorage_()) {}
-  BoundedKnownToBeSmall& operator=(const BoundedKnownToBeSmall& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  BoundedKnownToBeSmall(const BoundedKnownToBeSmall& other) noexcept;
+  BoundedKnownToBeSmall& operator=(const BoundedKnownToBeSmall& other) noexcept;
 
   bool operator==(const BoundedKnownToBeSmall& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_largemessages::BoundedKnownToBeSmall, 16>::Equal(this, &other);
@@ -99,14 +95,9 @@ class BoundedKnownToBeSmall {
   // Setter for bytes.
   //
 
-  BoundedKnownToBeSmall& bytes(::std::vector<uint8_t> value) {
-    storage_.bytes = std::move(value);
-    return *this;
-  }
+  BoundedKnownToBeSmall& bytes(::std::vector<uint8_t> value);
 
-  BoundedKnownToBeSmall(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : BoundedKnownToBeSmall(Storage_{
-                                                                                          .bytes = {},
-                                                                                      }) {}
+  BoundedKnownToBeSmall(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -130,9 +121,8 @@ class BoundedMaybeLarge {
   struct Storage_;
 
  public:
-  BoundedMaybeLarge(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  BoundedMaybeLarge(::std::vector<uint8_t> bytes) noexcept
-      : storage_({.bytes = std::move(bytes)}) {}
+  BoundedMaybeLarge(Storage_ storage) noexcept;
+  BoundedMaybeLarge(::std::vector<uint8_t> bytes) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -142,11 +132,8 @@ class BoundedMaybeLarge {
 
   BoundedMaybeLarge(BoundedMaybeLarge&&) noexcept = default;
   BoundedMaybeLarge& operator=(BoundedMaybeLarge&&) noexcept = default;
-  BoundedMaybeLarge(const BoundedMaybeLarge& other) noexcept : BoundedMaybeLarge(other.CloneStorage_()) {}
-  BoundedMaybeLarge& operator=(const BoundedMaybeLarge& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  BoundedMaybeLarge(const BoundedMaybeLarge& other) noexcept;
+  BoundedMaybeLarge& operator=(const BoundedMaybeLarge& other) noexcept;
 
   bool operator==(const BoundedMaybeLarge& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_largemessages::BoundedMaybeLarge, 16>::Equal(this, &other);
@@ -167,14 +154,9 @@ class BoundedMaybeLarge {
   // Setter for bytes.
   //
 
-  BoundedMaybeLarge& bytes(::std::vector<uint8_t> value) {
-    storage_.bytes = std::move(value);
-    return *this;
-  }
+  BoundedMaybeLarge& bytes(::std::vector<uint8_t> value);
 
-  BoundedMaybeLarge(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : BoundedMaybeLarge(Storage_{
-                                                                                      .bytes = {},
-                                                                                  }) {}
+  BoundedMaybeLarge(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -398,9 +380,8 @@ class UnboundedMaybeLargeValue {
   struct Storage_;
 
  public:
-  UnboundedMaybeLargeValue(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  UnboundedMaybeLargeValue(::std::vector<uint8_t> bytes) noexcept
-      : storage_({.bytes = std::move(bytes)}) {}
+  UnboundedMaybeLargeValue(Storage_ storage) noexcept;
+  UnboundedMaybeLargeValue(::std::vector<uint8_t> bytes) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -410,11 +391,8 @@ class UnboundedMaybeLargeValue {
 
   UnboundedMaybeLargeValue(UnboundedMaybeLargeValue&&) noexcept = default;
   UnboundedMaybeLargeValue& operator=(UnboundedMaybeLargeValue&&) noexcept = default;
-  UnboundedMaybeLargeValue(const UnboundedMaybeLargeValue& other) noexcept : UnboundedMaybeLargeValue(other.CloneStorage_()) {}
-  UnboundedMaybeLargeValue& operator=(const UnboundedMaybeLargeValue& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  UnboundedMaybeLargeValue(const UnboundedMaybeLargeValue& other) noexcept;
+  UnboundedMaybeLargeValue& operator=(const UnboundedMaybeLargeValue& other) noexcept;
 
   bool operator==(const UnboundedMaybeLargeValue& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_largemessages::UnboundedMaybeLargeValue, 16>::Equal(this, &other);
@@ -435,14 +413,9 @@ class UnboundedMaybeLargeValue {
   // Setter for bytes.
   //
 
-  UnboundedMaybeLargeValue& bytes(::std::vector<uint8_t> value) {
-    storage_.bytes = std::move(value);
-    return *this;
-  }
+  UnboundedMaybeLargeValue& bytes(::std::vector<uint8_t> value);
 
-  UnboundedMaybeLargeValue(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : UnboundedMaybeLargeValue(Storage_{
-                                                                                             .bytes = {},
-                                                                                         }) {}
+  UnboundedMaybeLargeValue(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -468,10 +441,8 @@ class Elements {
   struct Storage_;
 
  public:
-  Elements(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Elements(::zx::handle handle, ::std::vector<uint8_t> bytes) noexcept
-      : storage_({.handle = std::move(handle),
-                  .bytes = std::move(bytes)}) {}
+  Elements(Storage_ storage) noexcept;
+  Elements(::zx::handle handle, ::std::vector<uint8_t> bytes) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -494,10 +465,7 @@ class Elements {
   // Setter for handle.
   //
 
-  Elements& handle(::zx::handle value) {
-    storage_.handle = std::move(value);
-    return *this;
-  }
+  Elements& handle(::zx::handle value);
 
   const ::std::vector<uint8_t>&
   bytes() const {
@@ -511,15 +479,9 @@ class Elements {
   // Setter for bytes.
   //
 
-  Elements& bytes(::std::vector<uint8_t> value) {
-    storage_.bytes = std::move(value);
-    return *this;
-  }
+  Elements& bytes(::std::vector<uint8_t> value);
 
-  Elements(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Elements(Storage_{
-                                                                             .handle = {},
-                                                                             .bytes = {},
-                                                                         }) {}
+  Elements(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -551,9 +513,8 @@ class UnboundedMaybeLargeResource {
   struct Storage_;
 
  public:
-  UnboundedMaybeLargeResource(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  UnboundedMaybeLargeResource(::std::array<::test_largemessages::Elements, 64> elements) noexcept
-      : storage_({.elements = std::move(elements)}) {}
+  UnboundedMaybeLargeResource(Storage_ storage) noexcept;
+  UnboundedMaybeLargeResource(::std::array<::test_largemessages::Elements, 64> elements) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -576,14 +537,9 @@ class UnboundedMaybeLargeResource {
   // Setter for elements.
   //
 
-  UnboundedMaybeLargeResource& elements(::std::array<::test_largemessages::Elements, 64> value) {
-    storage_.elements = std::move(value);
-    return *this;
-  }
+  UnboundedMaybeLargeResource& elements(::std::array<::test_largemessages::Elements, 64> value);
 
-  UnboundedMaybeLargeResource(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : UnboundedMaybeLargeResource(Storage_{
-                                                                                                .elements = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<::test_largemessages::Elements, 64>>::Make(),
-                                                                                            }) {}
+  UnboundedMaybeLargeResource(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -598,6 +554,95 @@ class UnboundedMaybeLargeResource {
       &Storage_::elements, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+#endif  // __Fuchsia__
+
+inline BoundedKnownToBeSmall::BoundedKnownToBeSmall(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline BoundedKnownToBeSmall::BoundedKnownToBeSmall(::std::vector<uint8_t> bytes) noexcept
+    : storage_({.bytes = std::move(bytes)}) {}
+inline BoundedKnownToBeSmall::BoundedKnownToBeSmall(const ::test_largemessages::BoundedKnownToBeSmall& other) noexcept : ::test_largemessages::BoundedKnownToBeSmall(other.CloneStorage_()) {}
+inline BoundedKnownToBeSmall& ::test_largemessages::BoundedKnownToBeSmall::operator=(const ::test_largemessages::BoundedKnownToBeSmall& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline BoundedKnownToBeSmall::BoundedKnownToBeSmall(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : BoundedKnownToBeSmall(Storage_{
+                                                                                                                      .bytes = {},
+                                                                                                                  }) {}
+inline BoundedKnownToBeSmall& BoundedKnownToBeSmall::bytes(::std::vector<uint8_t> value) {
+  storage_.bytes = std::move(value);
+  return *this;
+}
+
+inline BoundedMaybeLarge::BoundedMaybeLarge(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline BoundedMaybeLarge::BoundedMaybeLarge(::std::vector<uint8_t> bytes) noexcept
+    : storage_({.bytes = std::move(bytes)}) {}
+inline BoundedMaybeLarge::BoundedMaybeLarge(const ::test_largemessages::BoundedMaybeLarge& other) noexcept : ::test_largemessages::BoundedMaybeLarge(other.CloneStorage_()) {}
+inline BoundedMaybeLarge& ::test_largemessages::BoundedMaybeLarge::operator=(const ::test_largemessages::BoundedMaybeLarge& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline BoundedMaybeLarge::BoundedMaybeLarge(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : BoundedMaybeLarge(Storage_{
+                                                                                                              .bytes = {},
+                                                                                                          }) {}
+inline BoundedMaybeLarge& BoundedMaybeLarge::bytes(::std::vector<uint8_t> value) {
+  storage_.bytes = std::move(value);
+  return *this;
+}
+
+inline UnboundedMaybeLargeValue::UnboundedMaybeLargeValue(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline UnboundedMaybeLargeValue::UnboundedMaybeLargeValue(::std::vector<uint8_t> bytes) noexcept
+    : storage_({.bytes = std::move(bytes)}) {}
+inline UnboundedMaybeLargeValue::UnboundedMaybeLargeValue(const ::test_largemessages::UnboundedMaybeLargeValue& other) noexcept : ::test_largemessages::UnboundedMaybeLargeValue(other.CloneStorage_()) {}
+inline UnboundedMaybeLargeValue& ::test_largemessages::UnboundedMaybeLargeValue::operator=(const ::test_largemessages::UnboundedMaybeLargeValue& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline UnboundedMaybeLargeValue::UnboundedMaybeLargeValue(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : UnboundedMaybeLargeValue(Storage_{
+                                                                                                                            .bytes = {},
+                                                                                                                        }) {}
+inline UnboundedMaybeLargeValue& UnboundedMaybeLargeValue::bytes(::std::vector<uint8_t> value) {
+  storage_.bytes = std::move(value);
+  return *this;
+}
+
+#ifdef __Fuchsia__
+
+inline Elements::Elements(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Elements::Elements(::zx::handle handle, ::std::vector<uint8_t> bytes) noexcept
+    : storage_({.handle = std::move(handle),
+                .bytes = std::move(bytes)}) {}
+
+inline Elements::Elements(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Elements(Storage_{
+                                                                                            .handle = {},
+                                                                                            .bytes = {},
+                                                                                        }) {}
+inline Elements& Elements::handle(::zx::handle value) {
+  storage_.handle = std::move(value);
+  return *this;
+}
+inline Elements& Elements::bytes(::std::vector<uint8_t> value) {
+  storage_.bytes = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline UnboundedMaybeLargeResource::UnboundedMaybeLargeResource(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline UnboundedMaybeLargeResource::UnboundedMaybeLargeResource(::std::array<::test_largemessages::Elements, 64> elements) noexcept
+    : storage_({.elements = std::move(elements)}) {}
+
+inline UnboundedMaybeLargeResource::UnboundedMaybeLargeResource(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : UnboundedMaybeLargeResource(Storage_{
+                                                                                                                                  .elements = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<::test_largemessages::Elements, 64>>::Make(),
+                                                                                                                              }) {}
+inline UnboundedMaybeLargeResource& UnboundedMaybeLargeResource::elements(::std::array<::test_largemessages::Elements, 64> value) {
+  storage_.elements = std::move(value);
+  return *this;
+}
 
 #endif  // __Fuchsia__
 

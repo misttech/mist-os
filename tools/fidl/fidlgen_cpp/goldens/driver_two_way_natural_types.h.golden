@@ -34,10 +34,8 @@ class TwoWayAddRequest {
   struct Storage_;
 
  public:
-  TwoWayAddRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  TwoWayAddRequest(uint16_t addend1, uint16_t addend2) noexcept
-      : storage_({.addend1 = std::move(addend1),
-                  .addend2 = std::move(addend2)}) {}
+  TwoWayAddRequest(Storage_ storage) noexcept;
+  TwoWayAddRequest(uint16_t addend1, uint16_t addend2) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -47,11 +45,8 @@ class TwoWayAddRequest {
 
   TwoWayAddRequest(TwoWayAddRequest&&) noexcept = default;
   TwoWayAddRequest& operator=(TwoWayAddRequest&&) noexcept = default;
-  TwoWayAddRequest(const TwoWayAddRequest& other) noexcept : TwoWayAddRequest(other.CloneStorage_()) {}
-  TwoWayAddRequest& operator=(const TwoWayAddRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  TwoWayAddRequest(const TwoWayAddRequest& other) noexcept;
+  TwoWayAddRequest& operator=(const TwoWayAddRequest& other) noexcept;
 
   bool operator==(const TwoWayAddRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_drivertwoway::TwoWayAddRequest, 4>::Equal(this, &other);
@@ -72,10 +67,7 @@ class TwoWayAddRequest {
   // Setter for addend1.
   //
 
-  TwoWayAddRequest& addend1(uint16_t value) {
-    storage_.addend1 = std::move(value);
-    return *this;
-  }
+  TwoWayAddRequest& addend1(uint16_t value);
 
   uint16_t
   addend2() const {
@@ -89,15 +81,9 @@ class TwoWayAddRequest {
   // Setter for addend2.
   //
 
-  TwoWayAddRequest& addend2(uint16_t value) {
-    storage_.addend2 = std::move(value);
-    return *this;
-  }
+  TwoWayAddRequest& addend2(uint16_t value);
 
-  TwoWayAddRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TwoWayAddRequest(Storage_{
-                                                                                     .addend1 = {},
-                                                                                     .addend2 = {},
-                                                                                 }) {}
+  TwoWayAddRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -123,9 +109,8 @@ class TwoWayAddResponse {
   struct Storage_;
 
  public:
-  TwoWayAddResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  TwoWayAddResponse(uint16_t sum) noexcept
-      : storage_({.sum = std::move(sum)}) {}
+  TwoWayAddResponse(Storage_ storage) noexcept;
+  TwoWayAddResponse(uint16_t sum) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -135,11 +120,8 @@ class TwoWayAddResponse {
 
   TwoWayAddResponse(TwoWayAddResponse&&) noexcept = default;
   TwoWayAddResponse& operator=(TwoWayAddResponse&&) noexcept = default;
-  TwoWayAddResponse(const TwoWayAddResponse& other) noexcept : TwoWayAddResponse(other.CloneStorage_()) {}
-  TwoWayAddResponse& operator=(const TwoWayAddResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  TwoWayAddResponse(const TwoWayAddResponse& other) noexcept;
+  TwoWayAddResponse& operator=(const TwoWayAddResponse& other) noexcept;
 
   bool operator==(const TwoWayAddResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_drivertwoway::TwoWayAddResponse, 2>::Equal(this, &other);
@@ -160,14 +142,9 @@ class TwoWayAddResponse {
   // Setter for sum.
   //
 
-  TwoWayAddResponse& sum(uint16_t value) {
-    storage_.sum = std::move(value);
-    return *this;
-  }
+  TwoWayAddResponse& sum(uint16_t value);
 
-  TwoWayAddResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TwoWayAddResponse(Storage_{
-                                                                                      .sum = {},
-                                                                                  }) {}
+  TwoWayAddResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -183,6 +160,46 @@ class TwoWayAddResponse {
       &Storage_::sum, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline TwoWayAddRequest::TwoWayAddRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline TwoWayAddRequest::TwoWayAddRequest(uint16_t addend1, uint16_t addend2) noexcept
+    : storage_({.addend1 = std::move(addend1),
+                .addend2 = std::move(addend2)}) {}
+inline TwoWayAddRequest::TwoWayAddRequest(const ::test_drivertwoway::TwoWayAddRequest& other) noexcept : ::test_drivertwoway::TwoWayAddRequest(other.CloneStorage_()) {}
+inline TwoWayAddRequest& ::test_drivertwoway::TwoWayAddRequest::operator=(const ::test_drivertwoway::TwoWayAddRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline TwoWayAddRequest::TwoWayAddRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TwoWayAddRequest(Storage_{
+                                                                                                            .addend1 = {},
+                                                                                                            .addend2 = {},
+                                                                                                        }) {}
+inline TwoWayAddRequest& TwoWayAddRequest::addend1(uint16_t value) {
+  storage_.addend1 = std::move(value);
+  return *this;
+}
+inline TwoWayAddRequest& TwoWayAddRequest::addend2(uint16_t value) {
+  storage_.addend2 = std::move(value);
+  return *this;
+}
+
+inline TwoWayAddResponse::TwoWayAddResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline TwoWayAddResponse::TwoWayAddResponse(uint16_t sum) noexcept
+    : storage_({.sum = std::move(sum)}) {}
+inline TwoWayAddResponse::TwoWayAddResponse(const ::test_drivertwoway::TwoWayAddResponse& other) noexcept : ::test_drivertwoway::TwoWayAddResponse(other.CloneStorage_()) {}
+inline TwoWayAddResponse& ::test_drivertwoway::TwoWayAddResponse::operator=(const ::test_drivertwoway::TwoWayAddResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline TwoWayAddResponse::TwoWayAddResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TwoWayAddResponse(Storage_{
+                                                                                                              .sum = {},
+                                                                                                          }) {}
+inline TwoWayAddResponse& TwoWayAddResponse::sum(uint16_t value) {
+  storage_.sum = std::move(value);
+  return *this;
+}
 
 }  // namespace test_drivertwoway
 namespace fidl {

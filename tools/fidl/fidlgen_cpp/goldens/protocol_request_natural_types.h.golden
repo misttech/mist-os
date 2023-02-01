@@ -40,9 +40,8 @@ class ParentGetChildResponse {
   struct Storage_;
 
  public:
-  ParentGetChildResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ParentGetChildResponse(::fidl::ClientEnd<::test_protocolrequest::Child> c) noexcept
-      : storage_({.c = std::move(c)}) {}
+  ParentGetChildResponse(Storage_ storage) noexcept;
+  ParentGetChildResponse(::fidl::ClientEnd<::test_protocolrequest::Child> c) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -65,14 +64,9 @@ class ParentGetChildResponse {
   // Setter for c.
   //
 
-  ParentGetChildResponse& c(::fidl::ClientEnd<::test_protocolrequest::Child> value) {
-    storage_.c = std::move(value);
-    return *this;
-  }
+  ParentGetChildResponse& c(::fidl::ClientEnd<::test_protocolrequest::Child> value);
 
-  ParentGetChildResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentGetChildResponse(Storage_{
-                                                                                           .c = {},
-                                                                                       }) {}
+  ParentGetChildResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -99,9 +93,8 @@ class ParentGetChildRequestResponse {
   struct Storage_;
 
  public:
-  ParentGetChildRequestResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ParentGetChildRequestResponse(::fidl::ServerEnd<::test_protocolrequest::Child> r) noexcept
-      : storage_({.r = std::move(r)}) {}
+  ParentGetChildRequestResponse(Storage_ storage) noexcept;
+  ParentGetChildRequestResponse(::fidl::ServerEnd<::test_protocolrequest::Child> r) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -124,14 +117,9 @@ class ParentGetChildRequestResponse {
   // Setter for r.
   //
 
-  ParentGetChildRequestResponse& r(::fidl::ServerEnd<::test_protocolrequest::Child> value) {
-    storage_.r = std::move(value);
-    return *this;
-  }
+  ParentGetChildRequestResponse& r(::fidl::ServerEnd<::test_protocolrequest::Child> value);
 
-  ParentGetChildRequestResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentGetChildRequestResponse(Storage_{
-                                                                                                  .r = {},
-                                                                                              }) {}
+  ParentGetChildRequestResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -158,9 +146,8 @@ class ParentTakeChildRequest {
   struct Storage_;
 
  public:
-  ParentTakeChildRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ParentTakeChildRequest(::fidl::ClientEnd<::test_protocolrequest::Child> c) noexcept
-      : storage_({.c = std::move(c)}) {}
+  ParentTakeChildRequest(Storage_ storage) noexcept;
+  ParentTakeChildRequest(::fidl::ClientEnd<::test_protocolrequest::Child> c) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -183,14 +170,9 @@ class ParentTakeChildRequest {
   // Setter for c.
   //
 
-  ParentTakeChildRequest& c(::fidl::ClientEnd<::test_protocolrequest::Child> value) {
-    storage_.c = std::move(value);
-    return *this;
-  }
+  ParentTakeChildRequest& c(::fidl::ClientEnd<::test_protocolrequest::Child> value);
 
-  ParentTakeChildRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentTakeChildRequest(Storage_{
-                                                                                           .c = {},
-                                                                                       }) {}
+  ParentTakeChildRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -217,9 +199,8 @@ class ParentTakeChildRequestRequest {
   struct Storage_;
 
  public:
-  ParentTakeChildRequestRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ParentTakeChildRequestRequest(::fidl::ServerEnd<::test_protocolrequest::Child> r) noexcept
-      : storage_({.r = std::move(r)}) {}
+  ParentTakeChildRequestRequest(Storage_ storage) noexcept;
+  ParentTakeChildRequestRequest(::fidl::ServerEnd<::test_protocolrequest::Child> r) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -242,14 +223,9 @@ class ParentTakeChildRequestRequest {
   // Setter for r.
   //
 
-  ParentTakeChildRequestRequest& r(::fidl::ServerEnd<::test_protocolrequest::Child> value) {
-    storage_.r = std::move(value);
-    return *this;
-  }
+  ParentTakeChildRequestRequest& r(::fidl::ServerEnd<::test_protocolrequest::Child> value);
 
-  ParentTakeChildRequestRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentTakeChildRequestRequest(Storage_{
-                                                                                                  .r = {},
-                                                                                              }) {}
+  ParentTakeChildRequestRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -264,6 +240,70 @@ class ParentTakeChildRequestRequest {
       &Storage_::r, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline ParentGetChildResponse::ParentGetChildResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ParentGetChildResponse::ParentGetChildResponse(::fidl::ClientEnd<::test_protocolrequest::Child> c) noexcept
+    : storage_({.c = std::move(c)}) {}
+
+inline ParentGetChildResponse::ParentGetChildResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentGetChildResponse(Storage_{
+                                                                                                                        .c = {},
+                                                                                                                    }) {}
+inline ParentGetChildResponse& ParentGetChildResponse::c(::fidl::ClientEnd<::test_protocolrequest::Child> value) {
+  storage_.c = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline ParentGetChildRequestResponse::ParentGetChildRequestResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ParentGetChildRequestResponse::ParentGetChildRequestResponse(::fidl::ServerEnd<::test_protocolrequest::Child> r) noexcept
+    : storage_({.r = std::move(r)}) {}
+
+inline ParentGetChildRequestResponse::ParentGetChildRequestResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentGetChildRequestResponse(Storage_{
+                                                                                                                                      .r = {},
+                                                                                                                                  }) {}
+inline ParentGetChildRequestResponse& ParentGetChildRequestResponse::r(::fidl::ServerEnd<::test_protocolrequest::Child> value) {
+  storage_.r = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline ParentTakeChildRequest::ParentTakeChildRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ParentTakeChildRequest::ParentTakeChildRequest(::fidl::ClientEnd<::test_protocolrequest::Child> c) noexcept
+    : storage_({.c = std::move(c)}) {}
+
+inline ParentTakeChildRequest::ParentTakeChildRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentTakeChildRequest(Storage_{
+                                                                                                                        .c = {},
+                                                                                                                    }) {}
+inline ParentTakeChildRequest& ParentTakeChildRequest::c(::fidl::ClientEnd<::test_protocolrequest::Child> value) {
+  storage_.c = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline ParentTakeChildRequestRequest::ParentTakeChildRequestRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ParentTakeChildRequestRequest::ParentTakeChildRequestRequest(::fidl::ServerEnd<::test_protocolrequest::Child> r) noexcept
+    : storage_({.r = std::move(r)}) {}
+
+inline ParentTakeChildRequestRequest::ParentTakeChildRequestRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentTakeChildRequestRequest(Storage_{
+                                                                                                                                      .r = {},
+                                                                                                                                  }) {}
+inline ParentTakeChildRequestRequest& ParentTakeChildRequestRequest::r(::fidl::ServerEnd<::test_protocolrequest::Child> value) {
+  storage_.r = std::move(value);
+  return *this;
+}
 
 #endif  // __Fuchsia__
 

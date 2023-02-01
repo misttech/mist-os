@@ -291,9 +291,8 @@ class ProtocolRequestStrictResponseFlexibleRequest {
   struct Storage_;
 
  public:
-  ProtocolRequestStrictResponseFlexibleRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ProtocolRequestStrictResponseFlexibleRequest(::test_requestflexibleenvelope::StrictFoo s) noexcept
-      : storage_({.s = std::move(s)}) {}
+  ProtocolRequestStrictResponseFlexibleRequest(Storage_ storage) noexcept;
+  ProtocolRequestStrictResponseFlexibleRequest(::test_requestflexibleenvelope::StrictFoo s) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -303,11 +302,8 @@ class ProtocolRequestStrictResponseFlexibleRequest {
 
   ProtocolRequestStrictResponseFlexibleRequest(ProtocolRequestStrictResponseFlexibleRequest&&) noexcept = default;
   ProtocolRequestStrictResponseFlexibleRequest& operator=(ProtocolRequestStrictResponseFlexibleRequest&&) noexcept = default;
-  ProtocolRequestStrictResponseFlexibleRequest(const ProtocolRequestStrictResponseFlexibleRequest& other) noexcept : ProtocolRequestStrictResponseFlexibleRequest(other.CloneStorage_()) {}
-  ProtocolRequestStrictResponseFlexibleRequest& operator=(const ProtocolRequestStrictResponseFlexibleRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ProtocolRequestStrictResponseFlexibleRequest(const ProtocolRequestStrictResponseFlexibleRequest& other) noexcept;
+  ProtocolRequestStrictResponseFlexibleRequest& operator=(const ProtocolRequestStrictResponseFlexibleRequest& other) noexcept;
 
   bool operator==(const ProtocolRequestStrictResponseFlexibleRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, 16>::Equal(this, &other);
@@ -328,14 +324,9 @@ class ProtocolRequestStrictResponseFlexibleRequest {
   // Setter for s.
   //
 
-  ProtocolRequestStrictResponseFlexibleRequest& s(::test_requestflexibleenvelope::StrictFoo value) {
-    storage_.s = std::move(value);
-    return *this;
-  }
+  ProtocolRequestStrictResponseFlexibleRequest& s(::test_requestflexibleenvelope::StrictFoo value);
 
-  ProtocolRequestStrictResponseFlexibleRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestStrictResponseFlexibleRequest(Storage_{
-                                                                                                                 .s = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                             }) {}
+  ProtocolRequestStrictResponseFlexibleRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -359,9 +350,8 @@ class ProtocolRequestStrictResponseFlexibleResponse {
   struct Storage_;
 
  public:
-  ProtocolRequestStrictResponseFlexibleResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ProtocolRequestStrictResponseFlexibleResponse(::test_requestflexibleenvelope::FlexibleFoo f) noexcept
-      : storage_({.f = std::move(f)}) {}
+  ProtocolRequestStrictResponseFlexibleResponse(Storage_ storage) noexcept;
+  ProtocolRequestStrictResponseFlexibleResponse(::test_requestflexibleenvelope::FlexibleFoo f) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -371,11 +361,8 @@ class ProtocolRequestStrictResponseFlexibleResponse {
 
   ProtocolRequestStrictResponseFlexibleResponse(ProtocolRequestStrictResponseFlexibleResponse&&) noexcept = default;
   ProtocolRequestStrictResponseFlexibleResponse& operator=(ProtocolRequestStrictResponseFlexibleResponse&&) noexcept = default;
-  ProtocolRequestStrictResponseFlexibleResponse(const ProtocolRequestStrictResponseFlexibleResponse& other) noexcept : ProtocolRequestStrictResponseFlexibleResponse(other.CloneStorage_()) {}
-  ProtocolRequestStrictResponseFlexibleResponse& operator=(const ProtocolRequestStrictResponseFlexibleResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ProtocolRequestStrictResponseFlexibleResponse(const ProtocolRequestStrictResponseFlexibleResponse& other) noexcept;
+  ProtocolRequestStrictResponseFlexibleResponse& operator=(const ProtocolRequestStrictResponseFlexibleResponse& other) noexcept;
 
   bool operator==(const ProtocolRequestStrictResponseFlexibleResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, 16>::Equal(this, &other);
@@ -396,14 +383,9 @@ class ProtocolRequestStrictResponseFlexibleResponse {
   // Setter for f.
   //
 
-  ProtocolRequestStrictResponseFlexibleResponse& f(::test_requestflexibleenvelope::FlexibleFoo value) {
-    storage_.f = std::move(value);
-    return *this;
-  }
+  ProtocolRequestStrictResponseFlexibleResponse& f(::test_requestflexibleenvelope::FlexibleFoo value);
 
-  ProtocolRequestStrictResponseFlexibleResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestStrictResponseFlexibleResponse(Storage_{
-                                                                                                                  .f = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                              }) {}
+  ProtocolRequestStrictResponseFlexibleResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -427,9 +409,8 @@ class ProtocolRequestFlexibleResponseStrictRequest {
   struct Storage_;
 
  public:
-  ProtocolRequestFlexibleResponseStrictRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ProtocolRequestFlexibleResponseStrictRequest(::test_requestflexibleenvelope::FlexibleFoo s) noexcept
-      : storage_({.s = std::move(s)}) {}
+  ProtocolRequestFlexibleResponseStrictRequest(Storage_ storage) noexcept;
+  ProtocolRequestFlexibleResponseStrictRequest(::test_requestflexibleenvelope::FlexibleFoo s) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -439,11 +420,8 @@ class ProtocolRequestFlexibleResponseStrictRequest {
 
   ProtocolRequestFlexibleResponseStrictRequest(ProtocolRequestFlexibleResponseStrictRequest&&) noexcept = default;
   ProtocolRequestFlexibleResponseStrictRequest& operator=(ProtocolRequestFlexibleResponseStrictRequest&&) noexcept = default;
-  ProtocolRequestFlexibleResponseStrictRequest(const ProtocolRequestFlexibleResponseStrictRequest& other) noexcept : ProtocolRequestFlexibleResponseStrictRequest(other.CloneStorage_()) {}
-  ProtocolRequestFlexibleResponseStrictRequest& operator=(const ProtocolRequestFlexibleResponseStrictRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ProtocolRequestFlexibleResponseStrictRequest(const ProtocolRequestFlexibleResponseStrictRequest& other) noexcept;
+  ProtocolRequestFlexibleResponseStrictRequest& operator=(const ProtocolRequestFlexibleResponseStrictRequest& other) noexcept;
 
   bool operator==(const ProtocolRequestFlexibleResponseStrictRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, 16>::Equal(this, &other);
@@ -464,14 +442,9 @@ class ProtocolRequestFlexibleResponseStrictRequest {
   // Setter for s.
   //
 
-  ProtocolRequestFlexibleResponseStrictRequest& s(::test_requestflexibleenvelope::FlexibleFoo value) {
-    storage_.s = std::move(value);
-    return *this;
-  }
+  ProtocolRequestFlexibleResponseStrictRequest& s(::test_requestflexibleenvelope::FlexibleFoo value);
 
-  ProtocolRequestFlexibleResponseStrictRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestFlexibleResponseStrictRequest(Storage_{
-                                                                                                                 .s = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                             }) {}
+  ProtocolRequestFlexibleResponseStrictRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -495,9 +468,8 @@ class ProtocolRequestFlexibleResponseStrictResponse {
   struct Storage_;
 
  public:
-  ProtocolRequestFlexibleResponseStrictResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ProtocolRequestFlexibleResponseStrictResponse(::test_requestflexibleenvelope::StrictFoo f) noexcept
-      : storage_({.f = std::move(f)}) {}
+  ProtocolRequestFlexibleResponseStrictResponse(Storage_ storage) noexcept;
+  ProtocolRequestFlexibleResponseStrictResponse(::test_requestflexibleenvelope::StrictFoo f) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -507,11 +479,8 @@ class ProtocolRequestFlexibleResponseStrictResponse {
 
   ProtocolRequestFlexibleResponseStrictResponse(ProtocolRequestFlexibleResponseStrictResponse&&) noexcept = default;
   ProtocolRequestFlexibleResponseStrictResponse& operator=(ProtocolRequestFlexibleResponseStrictResponse&&) noexcept = default;
-  ProtocolRequestFlexibleResponseStrictResponse(const ProtocolRequestFlexibleResponseStrictResponse& other) noexcept : ProtocolRequestFlexibleResponseStrictResponse(other.CloneStorage_()) {}
-  ProtocolRequestFlexibleResponseStrictResponse& operator=(const ProtocolRequestFlexibleResponseStrictResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ProtocolRequestFlexibleResponseStrictResponse(const ProtocolRequestFlexibleResponseStrictResponse& other) noexcept;
+  ProtocolRequestFlexibleResponseStrictResponse& operator=(const ProtocolRequestFlexibleResponseStrictResponse& other) noexcept;
 
   bool operator==(const ProtocolRequestFlexibleResponseStrictResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse, 16>::Equal(this, &other);
@@ -532,14 +501,9 @@ class ProtocolRequestFlexibleResponseStrictResponse {
   // Setter for f.
   //
 
-  ProtocolRequestFlexibleResponseStrictResponse& f(::test_requestflexibleenvelope::StrictFoo value) {
-    storage_.f = std::move(value);
-    return *this;
-  }
+  ProtocolRequestFlexibleResponseStrictResponse& f(::test_requestflexibleenvelope::StrictFoo value);
 
-  ProtocolRequestFlexibleResponseStrictResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestFlexibleResponseStrictResponse(Storage_{
-                                                                                                                  .f = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                              }) {}
+  ProtocolRequestFlexibleResponseStrictResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -555,6 +519,74 @@ class ProtocolRequestFlexibleResponseStrictResponse {
       &Storage_::f, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(::test_requestflexibleenvelope::StrictFoo s) noexcept
+    : storage_({.s = std::move(s)}) {}
+inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest(other.CloneStorage_()) {}
+inline ProtocolRequestStrictResponseFlexibleRequest& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ProtocolRequestStrictResponseFlexibleRequest::ProtocolRequestStrictResponseFlexibleRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestStrictResponseFlexibleRequest(Storage_{
+                                                                                                                                                                    .s = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                                }) {}
+inline ProtocolRequestStrictResponseFlexibleRequest& ProtocolRequestStrictResponseFlexibleRequest::s(::test_requestflexibleenvelope::StrictFoo value) {
+  storage_.s = std::move(value);
+  return *this;
+}
+
+inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(::test_requestflexibleenvelope::FlexibleFoo f) noexcept
+    : storage_({.f = std::move(f)}) {}
+inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse(other.CloneStorage_()) {}
+inline ProtocolRequestStrictResponseFlexibleResponse& ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestStrictResponseFlexibleResponse(Storage_{
+                                                                                                                                                                      .f = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                                  }) {}
+inline ProtocolRequestStrictResponseFlexibleResponse& ProtocolRequestStrictResponseFlexibleResponse::f(::test_requestflexibleenvelope::FlexibleFoo value) {
+  storage_.f = std::move(value);
+  return *this;
+}
+
+inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(::test_requestflexibleenvelope::FlexibleFoo s) noexcept
+    : storage_({.s = std::move(s)}) {}
+inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest(other.CloneStorage_()) {}
+inline ProtocolRequestFlexibleResponseStrictRequest& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ProtocolRequestFlexibleResponseStrictRequest::ProtocolRequestFlexibleResponseStrictRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestFlexibleResponseStrictRequest(Storage_{
+                                                                                                                                                                    .s = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                                }) {}
+inline ProtocolRequestFlexibleResponseStrictRequest& ProtocolRequestFlexibleResponseStrictRequest::s(::test_requestflexibleenvelope::FlexibleFoo value) {
+  storage_.s = std::move(value);
+  return *this;
+}
+
+inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(::test_requestflexibleenvelope::StrictFoo f) noexcept
+    : storage_({.f = std::move(f)}) {}
+inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& other) noexcept : ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse(other.CloneStorage_()) {}
+inline ProtocolRequestFlexibleResponseStrictResponse& ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse::operator=(const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ProtocolRequestFlexibleResponseStrictResponse::ProtocolRequestFlexibleResponseStrictResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolRequestFlexibleResponseStrictResponse(Storage_{
+                                                                                                                                                                      .f = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                                  }) {}
+inline ProtocolRequestFlexibleResponseStrictResponse& ProtocolRequestFlexibleResponseStrictResponse::f(::test_requestflexibleenvelope::StrictFoo value) {
+  storage_.f = std::move(value);
+  return *this;
+}
 
 }  // namespace test_requestflexibleenvelope
 namespace fidl {

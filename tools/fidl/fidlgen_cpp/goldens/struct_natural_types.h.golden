@@ -32,10 +32,8 @@ class Simple {
   struct Storage_;
 
  public:
-  Simple(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Simple(uint8_t f1, bool f2) noexcept
-      : storage_({.f1 = std::move(f1),
-                  .f2 = std::move(f2)}) {}
+  Simple(Storage_ storage) noexcept;
+  Simple(uint8_t f1, bool f2) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -45,11 +43,8 @@ class Simple {
 
   Simple(Simple&&) noexcept = default;
   Simple& operator=(Simple&&) noexcept = default;
-  Simple(const Simple& other) noexcept : Simple(other.CloneStorage_()) {}
-  Simple& operator=(const Simple& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Simple(const Simple& other) noexcept;
+  Simple& operator=(const Simple& other) noexcept;
 
   bool operator==(const Simple& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_struct::Simple, 2>::Equal(this, &other);
@@ -70,10 +65,7 @@ class Simple {
   // Setter for f1.
   //
 
-  Simple& f1(uint8_t value) {
-    storage_.f1 = std::move(value);
-    return *this;
-  }
+  Simple& f1(uint8_t value);
 
   bool
   f2() const {
@@ -87,15 +79,9 @@ class Simple {
   // Setter for f2.
   //
 
-  Simple& f2(bool value) {
-    storage_.f2 = std::move(value);
-    return *this;
-  }
+  Simple& f2(bool value);
 
-  Simple(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Simple(Storage_{
-                                                                           .f1 = {},
-                                                                           .f2 = {},
-                                                                       }) {}
+  Simple(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -121,10 +107,8 @@ class BasicStruct {
   struct Storage_;
 
  public:
-  BasicStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  BasicStruct(uint32_t x, ::std::string y) noexcept
-      : storage_({.x = std::move(x),
-                  .y = std::move(y)}) {}
+  BasicStruct(Storage_ storage) noexcept;
+  BasicStruct(uint32_t x, ::std::string y) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -134,11 +118,8 @@ class BasicStruct {
 
   BasicStruct(BasicStruct&&) noexcept = default;
   BasicStruct& operator=(BasicStruct&&) noexcept = default;
-  BasicStruct(const BasicStruct& other) noexcept : BasicStruct(other.CloneStorage_()) {}
-  BasicStruct& operator=(const BasicStruct& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  BasicStruct(const BasicStruct& other) noexcept;
+  BasicStruct& operator=(const BasicStruct& other) noexcept;
 
   bool operator==(const BasicStruct& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_struct::BasicStruct, 24>::Equal(this, &other);
@@ -159,10 +140,7 @@ class BasicStruct {
   // Setter for x.
   //
 
-  BasicStruct& x(uint32_t value) {
-    storage_.x = std::move(value);
-    return *this;
-  }
+  BasicStruct& x(uint32_t value);
 
   const ::std::string&
   y() const {
@@ -176,15 +154,9 @@ class BasicStruct {
   // Setter for y.
   //
 
-  BasicStruct& y(::std::string value) {
-    storage_.y = std::move(value);
-    return *this;
-  }
+  BasicStruct& y(::std::string value);
 
-  BasicStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : BasicStruct(Storage_{
-                                                                                .x = {},
-                                                                                .y = {},
-                                                                            }) {}
+  BasicStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -205,6 +177,52 @@ class BasicStruct {
       .mask = 0xffffffff00000000ull,
   });
 };
+
+inline Simple::Simple(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Simple::Simple(uint8_t f1, bool f2) noexcept
+    : storage_({.f1 = std::move(f1),
+                .f2 = std::move(f2)}) {}
+inline Simple::Simple(const ::test_struct::Simple& other) noexcept : ::test_struct::Simple(other.CloneStorage_()) {}
+inline Simple& ::test_struct::Simple::operator=(const ::test_struct::Simple& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Simple::Simple(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Simple(Storage_{
+                                                                                        .f1 = {},
+                                                                                        .f2 = {},
+                                                                                    }) {}
+inline Simple& Simple::f1(uint8_t value) {
+  storage_.f1 = std::move(value);
+  return *this;
+}
+inline Simple& Simple::f2(bool value) {
+  storage_.f2 = std::move(value);
+  return *this;
+}
+
+inline BasicStruct::BasicStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline BasicStruct::BasicStruct(uint32_t x, ::std::string y) noexcept
+    : storage_({.x = std::move(x),
+                .y = std::move(y)}) {}
+inline BasicStruct::BasicStruct(const ::test_struct::BasicStruct& other) noexcept : ::test_struct::BasicStruct(other.CloneStorage_()) {}
+inline BasicStruct& ::test_struct::BasicStruct::operator=(const ::test_struct::BasicStruct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline BasicStruct::BasicStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : BasicStruct(Storage_{
+                                                                                                  .x = {},
+                                                                                                  .y = {},
+                                                                                              }) {}
+inline BasicStruct& BasicStruct::x(uint32_t value) {
+  storage_.x = std::move(value);
+  return *this;
+}
+inline BasicStruct& BasicStruct::y(::std::string value) {
+  storage_.y = std::move(value);
+  return *this;
+}
 
 }  // namespace test_struct
 namespace fidl {

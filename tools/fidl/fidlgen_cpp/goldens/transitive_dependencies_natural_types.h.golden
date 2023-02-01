@@ -31,9 +31,8 @@ class Baz {
   struct Storage_;
 
  public:
-  Baz(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Baz(::test_middle::Bar g) noexcept
-      : storage_({.g = std::move(g)}) {}
+  Baz(Storage_ storage) noexcept;
+  Baz(::test_middle::Bar g) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -43,11 +42,8 @@ class Baz {
 
   Baz(Baz&&) noexcept = default;
   Baz& operator=(Baz&&) noexcept = default;
-  Baz(const Baz& other) noexcept : Baz(other.CloneStorage_()) {}
-  Baz& operator=(const Baz& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Baz(const Baz& other) noexcept;
+  Baz& operator=(const Baz& other) noexcept;
 
   bool operator==(const Baz& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_transitivedependencies::Baz, 4>::Equal(this, &other);
@@ -68,14 +64,9 @@ class Baz {
   // Setter for g.
   //
 
-  Baz& g(::test_middle::Bar value) {
-    storage_.g = std::move(value);
-    return *this;
-  }
+  Baz& g(::test_middle::Bar value);
 
-  Baz(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Baz(Storage_{
-                                                                        .g = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                    }) {}
+  Baz(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -91,6 +82,23 @@ class Baz {
       &Storage_::g, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline Baz::Baz(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Baz::Baz(::test_middle::Bar g) noexcept
+    : storage_({.g = std::move(g)}) {}
+inline Baz::Baz(const ::test_transitivedependencies::Baz& other) noexcept : ::test_transitivedependencies::Baz(other.CloneStorage_()) {}
+inline Baz& ::test_transitivedependencies::Baz::operator=(const ::test_transitivedependencies::Baz& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Baz::Baz(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Baz(Storage_{
+                                                                                  .g = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                              }) {}
+inline Baz& Baz::g(::test_middle::Bar value) {
+  storage_.g = std::move(value);
+  return *this;
+}
 
 }  // namespace test_transitivedependencies
 namespace fidl {

@@ -143,11 +143,8 @@ class SandwichUnionSize8Alignment4 {
   struct Storage_;
 
  public:
-  SandwichUnionSize8Alignment4(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SandwichUnionSize8Alignment4(uint32_t before, ::test_unionsandwich::UnionSize8Alignment4 union_, uint32_t after) noexcept
-      : storage_({.before = std::move(before),
-                  .union_ = std::move(union_),
-                  .after = std::move(after)}) {}
+  SandwichUnionSize8Alignment4(Storage_ storage) noexcept;
+  SandwichUnionSize8Alignment4(uint32_t before, ::test_unionsandwich::UnionSize8Alignment4 union_, uint32_t after) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -157,11 +154,8 @@ class SandwichUnionSize8Alignment4 {
 
   SandwichUnionSize8Alignment4(SandwichUnionSize8Alignment4&&) noexcept = default;
   SandwichUnionSize8Alignment4& operator=(SandwichUnionSize8Alignment4&&) noexcept = default;
-  SandwichUnionSize8Alignment4(const SandwichUnionSize8Alignment4& other) noexcept : SandwichUnionSize8Alignment4(other.CloneStorage_()) {}
-  SandwichUnionSize8Alignment4& operator=(const SandwichUnionSize8Alignment4& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SandwichUnionSize8Alignment4(const SandwichUnionSize8Alignment4& other) noexcept;
+  SandwichUnionSize8Alignment4& operator=(const SandwichUnionSize8Alignment4& other) noexcept;
 
   bool operator==(const SandwichUnionSize8Alignment4& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::SandwichUnionSize8Alignment4, 32>::Equal(this, &other);
@@ -182,10 +176,7 @@ class SandwichUnionSize8Alignment4 {
   // Setter for before.
   //
 
-  SandwichUnionSize8Alignment4& before(uint32_t value) {
-    storage_.before = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize8Alignment4& before(uint32_t value);
 
   const ::test_unionsandwich::UnionSize8Alignment4&
   union_() const {
@@ -199,10 +190,7 @@ class SandwichUnionSize8Alignment4 {
   // Setter for union_.
   //
 
-  SandwichUnionSize8Alignment4& union_(::test_unionsandwich::UnionSize8Alignment4 value) {
-    storage_.union_ = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize8Alignment4& union_(::test_unionsandwich::UnionSize8Alignment4 value);
 
   uint32_t
   after() const {
@@ -216,16 +204,9 @@ class SandwichUnionSize8Alignment4 {
   // Setter for after.
   //
 
-  SandwichUnionSize8Alignment4& after(uint32_t value) {
-    storage_.after = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize8Alignment4& after(uint32_t value);
 
-  SandwichUnionSize8Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SandwichUnionSize8Alignment4(Storage_{
-                                                                                                 .before = {},
-                                                                                                 .union_ = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                 .after = {},
-                                                                                             }) {}
+  SandwichUnionSize8Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -356,11 +337,8 @@ class SandwichUnionSize12Alignment4 {
   struct Storage_;
 
  public:
-  SandwichUnionSize12Alignment4(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SandwichUnionSize12Alignment4(uint32_t before, ::test_unionsandwich::UnionSize12Alignment4 union_, int32_t after) noexcept
-      : storage_({.before = std::move(before),
-                  .union_ = std::move(union_),
-                  .after = std::move(after)}) {}
+  SandwichUnionSize12Alignment4(Storage_ storage) noexcept;
+  SandwichUnionSize12Alignment4(uint32_t before, ::test_unionsandwich::UnionSize12Alignment4 union_, int32_t after) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -370,11 +348,8 @@ class SandwichUnionSize12Alignment4 {
 
   SandwichUnionSize12Alignment4(SandwichUnionSize12Alignment4&&) noexcept = default;
   SandwichUnionSize12Alignment4& operator=(SandwichUnionSize12Alignment4&&) noexcept = default;
-  SandwichUnionSize12Alignment4(const SandwichUnionSize12Alignment4& other) noexcept : SandwichUnionSize12Alignment4(other.CloneStorage_()) {}
-  SandwichUnionSize12Alignment4& operator=(const SandwichUnionSize12Alignment4& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SandwichUnionSize12Alignment4(const SandwichUnionSize12Alignment4& other) noexcept;
+  SandwichUnionSize12Alignment4& operator=(const SandwichUnionSize12Alignment4& other) noexcept;
 
   bool operator==(const SandwichUnionSize12Alignment4& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::SandwichUnionSize12Alignment4, 32>::Equal(this, &other);
@@ -395,10 +370,7 @@ class SandwichUnionSize12Alignment4 {
   // Setter for before.
   //
 
-  SandwichUnionSize12Alignment4& before(uint32_t value) {
-    storage_.before = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize12Alignment4& before(uint32_t value);
 
   const ::test_unionsandwich::UnionSize12Alignment4&
   union_() const {
@@ -412,10 +384,7 @@ class SandwichUnionSize12Alignment4 {
   // Setter for union_.
   //
 
-  SandwichUnionSize12Alignment4& union_(::test_unionsandwich::UnionSize12Alignment4 value) {
-    storage_.union_ = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize12Alignment4& union_(::test_unionsandwich::UnionSize12Alignment4 value);
 
   int32_t
   after() const {
@@ -429,16 +398,9 @@ class SandwichUnionSize12Alignment4 {
   // Setter for after.
   //
 
-  SandwichUnionSize12Alignment4& after(int32_t value) {
-    storage_.after = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize12Alignment4& after(int32_t value);
 
-  SandwichUnionSize12Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SandwichUnionSize12Alignment4(Storage_{
-                                                                                                  .before = {},
-                                                                                                  .union_ = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                  .after = {},
-                                                                                              }) {}
+  SandwichUnionSize12Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -472,10 +434,8 @@ class StructSize16Alignment8 {
   struct Storage_;
 
  public:
-  StructSize16Alignment8(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  StructSize16Alignment8(uint64_t f1, uint64_t f2) noexcept
-      : storage_({.f1 = std::move(f1),
-                  .f2 = std::move(f2)}) {}
+  StructSize16Alignment8(Storage_ storage) noexcept;
+  StructSize16Alignment8(uint64_t f1, uint64_t f2) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -485,11 +445,8 @@ class StructSize16Alignment8 {
 
   StructSize16Alignment8(StructSize16Alignment8&&) noexcept = default;
   StructSize16Alignment8& operator=(StructSize16Alignment8&&) noexcept = default;
-  StructSize16Alignment8(const StructSize16Alignment8& other) noexcept : StructSize16Alignment8(other.CloneStorage_()) {}
-  StructSize16Alignment8& operator=(const StructSize16Alignment8& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  StructSize16Alignment8(const StructSize16Alignment8& other) noexcept;
+  StructSize16Alignment8& operator=(const StructSize16Alignment8& other) noexcept;
 
   bool operator==(const StructSize16Alignment8& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::StructSize16Alignment8, 16>::Equal(this, &other);
@@ -510,10 +467,7 @@ class StructSize16Alignment8 {
   // Setter for f1.
   //
 
-  StructSize16Alignment8& f1(uint64_t value) {
-    storage_.f1 = std::move(value);
-    return *this;
-  }
+  StructSize16Alignment8& f1(uint64_t value);
 
   uint64_t
   f2() const {
@@ -527,15 +481,9 @@ class StructSize16Alignment8 {
   // Setter for f2.
   //
 
-  StructSize16Alignment8& f2(uint64_t value) {
-    storage_.f2 = std::move(value);
-    return *this;
-  }
+  StructSize16Alignment8& f2(uint64_t value);
 
-  StructSize16Alignment8(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructSize16Alignment8(Storage_{
-                                                                                           .f1 = {},
-                                                                                           .f2 = {},
-                                                                                       }) {}
+  StructSize16Alignment8(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -658,11 +606,8 @@ class SandwichUnionSize24Alignment8 {
   struct Storage_;
 
  public:
-  SandwichUnionSize24Alignment8(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SandwichUnionSize24Alignment8(uint32_t before, ::test_unionsandwich::UnionSize24Alignment8 union_, uint32_t after) noexcept
-      : storage_({.before = std::move(before),
-                  .union_ = std::move(union_),
-                  .after = std::move(after)}) {}
+  SandwichUnionSize24Alignment8(Storage_ storage) noexcept;
+  SandwichUnionSize24Alignment8(uint32_t before, ::test_unionsandwich::UnionSize24Alignment8 union_, uint32_t after) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -672,11 +617,8 @@ class SandwichUnionSize24Alignment8 {
 
   SandwichUnionSize24Alignment8(SandwichUnionSize24Alignment8&&) noexcept = default;
   SandwichUnionSize24Alignment8& operator=(SandwichUnionSize24Alignment8&&) noexcept = default;
-  SandwichUnionSize24Alignment8(const SandwichUnionSize24Alignment8& other) noexcept : SandwichUnionSize24Alignment8(other.CloneStorage_()) {}
-  SandwichUnionSize24Alignment8& operator=(const SandwichUnionSize24Alignment8& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SandwichUnionSize24Alignment8(const SandwichUnionSize24Alignment8& other) noexcept;
+  SandwichUnionSize24Alignment8& operator=(const SandwichUnionSize24Alignment8& other) noexcept;
 
   bool operator==(const SandwichUnionSize24Alignment8& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::SandwichUnionSize24Alignment8, 32>::Equal(this, &other);
@@ -697,10 +639,7 @@ class SandwichUnionSize24Alignment8 {
   // Setter for before.
   //
 
-  SandwichUnionSize24Alignment8& before(uint32_t value) {
-    storage_.before = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize24Alignment8& before(uint32_t value);
 
   const ::test_unionsandwich::UnionSize24Alignment8&
   union_() const {
@@ -714,10 +653,7 @@ class SandwichUnionSize24Alignment8 {
   // Setter for union_.
   //
 
-  SandwichUnionSize24Alignment8& union_(::test_unionsandwich::UnionSize24Alignment8 value) {
-    storage_.union_ = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize24Alignment8& union_(::test_unionsandwich::UnionSize24Alignment8 value);
 
   uint32_t
   after() const {
@@ -731,16 +667,9 @@ class SandwichUnionSize24Alignment8 {
   // Setter for after.
   //
 
-  SandwichUnionSize24Alignment8& after(uint32_t value) {
-    storage_.after = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize24Alignment8& after(uint32_t value);
 
-  SandwichUnionSize24Alignment8(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SandwichUnionSize24Alignment8(Storage_{
-                                                                                                  .before = {},
-                                                                                                  .union_ = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                  .after = {},
-                                                                                              }) {}
+  SandwichUnionSize24Alignment8(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -871,11 +800,8 @@ class SandwichUnionSize36Alignment4 {
   struct Storage_;
 
  public:
-  SandwichUnionSize36Alignment4(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SandwichUnionSize36Alignment4(uint32_t before, ::test_unionsandwich::UnionSize36Alignment4 union_, uint32_t after) noexcept
-      : storage_({.before = std::move(before),
-                  .union_ = std::move(union_),
-                  .after = std::move(after)}) {}
+  SandwichUnionSize36Alignment4(Storage_ storage) noexcept;
+  SandwichUnionSize36Alignment4(uint32_t before, ::test_unionsandwich::UnionSize36Alignment4 union_, uint32_t after) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -885,11 +811,8 @@ class SandwichUnionSize36Alignment4 {
 
   SandwichUnionSize36Alignment4(SandwichUnionSize36Alignment4&&) noexcept = default;
   SandwichUnionSize36Alignment4& operator=(SandwichUnionSize36Alignment4&&) noexcept = default;
-  SandwichUnionSize36Alignment4(const SandwichUnionSize36Alignment4& other) noexcept : SandwichUnionSize36Alignment4(other.CloneStorage_()) {}
-  SandwichUnionSize36Alignment4& operator=(const SandwichUnionSize36Alignment4& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SandwichUnionSize36Alignment4(const SandwichUnionSize36Alignment4& other) noexcept;
+  SandwichUnionSize36Alignment4& operator=(const SandwichUnionSize36Alignment4& other) noexcept;
 
   bool operator==(const SandwichUnionSize36Alignment4& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::SandwichUnionSize36Alignment4, 32>::Equal(this, &other);
@@ -910,10 +833,7 @@ class SandwichUnionSize36Alignment4 {
   // Setter for before.
   //
 
-  SandwichUnionSize36Alignment4& before(uint32_t value) {
-    storage_.before = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize36Alignment4& before(uint32_t value);
 
   const ::test_unionsandwich::UnionSize36Alignment4&
   union_() const {
@@ -927,10 +847,7 @@ class SandwichUnionSize36Alignment4 {
   // Setter for union_.
   //
 
-  SandwichUnionSize36Alignment4& union_(::test_unionsandwich::UnionSize36Alignment4 value) {
-    storage_.union_ = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize36Alignment4& union_(::test_unionsandwich::UnionSize36Alignment4 value);
 
   uint32_t
   after() const {
@@ -944,16 +861,9 @@ class SandwichUnionSize36Alignment4 {
   // Setter for after.
   //
 
-  SandwichUnionSize36Alignment4& after(uint32_t value) {
-    storage_.after = std::move(value);
-    return *this;
-  }
+  SandwichUnionSize36Alignment4& after(uint32_t value);
 
-  SandwichUnionSize36Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SandwichUnionSize36Alignment4(Storage_{
-                                                                                                  .before = {},
-                                                                                                  .union_ = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                  .after = {},
-                                                                                              }) {}
+  SandwichUnionSize36Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -979,6 +889,145 @@ class SandwichUnionSize36Alignment4 {
                                                        .mask = 0xffffffff00000000ull,
                                                    });
 };
+
+inline SandwichUnionSize8Alignment4::SandwichUnionSize8Alignment4(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SandwichUnionSize8Alignment4::SandwichUnionSize8Alignment4(uint32_t before, ::test_unionsandwich::UnionSize8Alignment4 union_, uint32_t after) noexcept
+    : storage_({.before = std::move(before),
+                .union_ = std::move(union_),
+                .after = std::move(after)}) {}
+inline SandwichUnionSize8Alignment4::SandwichUnionSize8Alignment4(const ::test_unionsandwich::SandwichUnionSize8Alignment4& other) noexcept : ::test_unionsandwich::SandwichUnionSize8Alignment4(other.CloneStorage_()) {}
+inline SandwichUnionSize8Alignment4& ::test_unionsandwich::SandwichUnionSize8Alignment4::operator=(const ::test_unionsandwich::SandwichUnionSize8Alignment4& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SandwichUnionSize8Alignment4::SandwichUnionSize8Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SandwichUnionSize8Alignment4(Storage_{
+                                                                                                                                    .before = {},
+                                                                                                                                    .union_ = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                    .after = {},
+                                                                                                                                }) {}
+inline SandwichUnionSize8Alignment4& SandwichUnionSize8Alignment4::before(uint32_t value) {
+  storage_.before = std::move(value);
+  return *this;
+}
+inline SandwichUnionSize8Alignment4& SandwichUnionSize8Alignment4::union_(::test_unionsandwich::UnionSize8Alignment4 value) {
+  storage_.union_ = std::move(value);
+  return *this;
+}
+inline SandwichUnionSize8Alignment4& SandwichUnionSize8Alignment4::after(uint32_t value) {
+  storage_.after = std::move(value);
+  return *this;
+}
+
+inline SandwichUnionSize12Alignment4::SandwichUnionSize12Alignment4(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SandwichUnionSize12Alignment4::SandwichUnionSize12Alignment4(uint32_t before, ::test_unionsandwich::UnionSize12Alignment4 union_, int32_t after) noexcept
+    : storage_({.before = std::move(before),
+                .union_ = std::move(union_),
+                .after = std::move(after)}) {}
+inline SandwichUnionSize12Alignment4::SandwichUnionSize12Alignment4(const ::test_unionsandwich::SandwichUnionSize12Alignment4& other) noexcept : ::test_unionsandwich::SandwichUnionSize12Alignment4(other.CloneStorage_()) {}
+inline SandwichUnionSize12Alignment4& ::test_unionsandwich::SandwichUnionSize12Alignment4::operator=(const ::test_unionsandwich::SandwichUnionSize12Alignment4& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SandwichUnionSize12Alignment4::SandwichUnionSize12Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SandwichUnionSize12Alignment4(Storage_{
+                                                                                                                                      .before = {},
+                                                                                                                                      .union_ = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                      .after = {},
+                                                                                                                                  }) {}
+inline SandwichUnionSize12Alignment4& SandwichUnionSize12Alignment4::before(uint32_t value) {
+  storage_.before = std::move(value);
+  return *this;
+}
+inline SandwichUnionSize12Alignment4& SandwichUnionSize12Alignment4::union_(::test_unionsandwich::UnionSize12Alignment4 value) {
+  storage_.union_ = std::move(value);
+  return *this;
+}
+inline SandwichUnionSize12Alignment4& SandwichUnionSize12Alignment4::after(int32_t value) {
+  storage_.after = std::move(value);
+  return *this;
+}
+
+inline StructSize16Alignment8::StructSize16Alignment8(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline StructSize16Alignment8::StructSize16Alignment8(uint64_t f1, uint64_t f2) noexcept
+    : storage_({.f1 = std::move(f1),
+                .f2 = std::move(f2)}) {}
+inline StructSize16Alignment8::StructSize16Alignment8(const ::test_unionsandwich::StructSize16Alignment8& other) noexcept : ::test_unionsandwich::StructSize16Alignment8(other.CloneStorage_()) {}
+inline StructSize16Alignment8& ::test_unionsandwich::StructSize16Alignment8::operator=(const ::test_unionsandwich::StructSize16Alignment8& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline StructSize16Alignment8::StructSize16Alignment8(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructSize16Alignment8(Storage_{
+                                                                                                                        .f1 = {},
+                                                                                                                        .f2 = {},
+                                                                                                                    }) {}
+inline StructSize16Alignment8& StructSize16Alignment8::f1(uint64_t value) {
+  storage_.f1 = std::move(value);
+  return *this;
+}
+inline StructSize16Alignment8& StructSize16Alignment8::f2(uint64_t value) {
+  storage_.f2 = std::move(value);
+  return *this;
+}
+
+inline SandwichUnionSize24Alignment8::SandwichUnionSize24Alignment8(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SandwichUnionSize24Alignment8::SandwichUnionSize24Alignment8(uint32_t before, ::test_unionsandwich::UnionSize24Alignment8 union_, uint32_t after) noexcept
+    : storage_({.before = std::move(before),
+                .union_ = std::move(union_),
+                .after = std::move(after)}) {}
+inline SandwichUnionSize24Alignment8::SandwichUnionSize24Alignment8(const ::test_unionsandwich::SandwichUnionSize24Alignment8& other) noexcept : ::test_unionsandwich::SandwichUnionSize24Alignment8(other.CloneStorage_()) {}
+inline SandwichUnionSize24Alignment8& ::test_unionsandwich::SandwichUnionSize24Alignment8::operator=(const ::test_unionsandwich::SandwichUnionSize24Alignment8& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SandwichUnionSize24Alignment8::SandwichUnionSize24Alignment8(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SandwichUnionSize24Alignment8(Storage_{
+                                                                                                                                      .before = {},
+                                                                                                                                      .union_ = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                      .after = {},
+                                                                                                                                  }) {}
+inline SandwichUnionSize24Alignment8& SandwichUnionSize24Alignment8::before(uint32_t value) {
+  storage_.before = std::move(value);
+  return *this;
+}
+inline SandwichUnionSize24Alignment8& SandwichUnionSize24Alignment8::union_(::test_unionsandwich::UnionSize24Alignment8 value) {
+  storage_.union_ = std::move(value);
+  return *this;
+}
+inline SandwichUnionSize24Alignment8& SandwichUnionSize24Alignment8::after(uint32_t value) {
+  storage_.after = std::move(value);
+  return *this;
+}
+
+inline SandwichUnionSize36Alignment4::SandwichUnionSize36Alignment4(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SandwichUnionSize36Alignment4::SandwichUnionSize36Alignment4(uint32_t before, ::test_unionsandwich::UnionSize36Alignment4 union_, uint32_t after) noexcept
+    : storage_({.before = std::move(before),
+                .union_ = std::move(union_),
+                .after = std::move(after)}) {}
+inline SandwichUnionSize36Alignment4::SandwichUnionSize36Alignment4(const ::test_unionsandwich::SandwichUnionSize36Alignment4& other) noexcept : ::test_unionsandwich::SandwichUnionSize36Alignment4(other.CloneStorage_()) {}
+inline SandwichUnionSize36Alignment4& ::test_unionsandwich::SandwichUnionSize36Alignment4::operator=(const ::test_unionsandwich::SandwichUnionSize36Alignment4& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SandwichUnionSize36Alignment4::SandwichUnionSize36Alignment4(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SandwichUnionSize36Alignment4(Storage_{
+                                                                                                                                      .before = {},
+                                                                                                                                      .union_ = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                      .after = {},
+                                                                                                                                  }) {}
+inline SandwichUnionSize36Alignment4& SandwichUnionSize36Alignment4::before(uint32_t value) {
+  storage_.before = std::move(value);
+  return *this;
+}
+inline SandwichUnionSize36Alignment4& SandwichUnionSize36Alignment4::union_(::test_unionsandwich::UnionSize36Alignment4 value) {
+  storage_.union_ = std::move(value);
+  return *this;
+}
+inline SandwichUnionSize36Alignment4& SandwichUnionSize36Alignment4::after(uint32_t value) {
+  storage_.after = std::move(value);
+  return *this;
+}
 
 }  // namespace test_unionsandwich
 namespace fidl {

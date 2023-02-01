@@ -188,11 +188,8 @@ class WithAndWithoutRequestResponseNoRequestWithResponseResponse {
  private:
   struct Storage_;
  public:
-  WithAndWithoutRequestResponseNoRequestWithResponseResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithAndWithoutRequestResponseNoRequestWithResponseResponse(::std::string ret) noexcept
-    : storage_({
-      .ret = std::move(ret)
-    }) {}
+  WithAndWithoutRequestResponseNoRequestWithResponseResponse(Storage_ storage) noexcept;
+    WithAndWithoutRequestResponseNoRequestWithResponseResponse(::std::string ret) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -202,11 +199,8 @@ class WithAndWithoutRequestResponseNoRequestWithResponseResponse {
 
   WithAndWithoutRequestResponseNoRequestWithResponseResponse(WithAndWithoutRequestResponseNoRequestWithResponseResponse&&) noexcept = default;
   WithAndWithoutRequestResponseNoRequestWithResponseResponse& operator=(WithAndWithoutRequestResponseNoRequestWithResponseResponse&&) noexcept = default;
-    WithAndWithoutRequestResponseNoRequestWithResponseResponse(const WithAndWithoutRequestResponseNoRequestWithResponseResponse& other) noexcept : WithAndWithoutRequestResponseNoRequestWithResponseResponse(other.CloneStorage_()){}
-    WithAndWithoutRequestResponseNoRequestWithResponseResponse& operator=(const WithAndWithoutRequestResponseNoRequestWithResponseResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithAndWithoutRequestResponseNoRequestWithResponseResponse(const WithAndWithoutRequestResponseNoRequestWithResponseResponse& other) noexcept;
+    WithAndWithoutRequestResponseNoRequestWithResponseResponse& operator=(const WithAndWithoutRequestResponseNoRequestWithResponseResponse& other) noexcept;
 
     bool operator==(const WithAndWithoutRequestResponseNoRequestWithResponseResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse, 16>::Equal(this, &other);
@@ -228,14 +222,9 @@ class WithAndWithoutRequestResponseNoRequestWithResponseResponse {
     // Setter for ret.
     //
     
-    WithAndWithoutRequestResponseNoRequestWithResponseResponse& ret(::std::string value) {
-      storage_.ret = std::move(value);
-      return *this;
-    }
+    WithAndWithoutRequestResponseNoRequestWithResponseResponse& ret(::std::string value);
 
-  WithAndWithoutRequestResponseNoRequestWithResponseResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseNoRequestWithResponseResponse(Storage_{
-      .ret ={},
-  }) {}
+  WithAndWithoutRequestResponseNoRequestWithResponseResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -268,11 +257,8 @@ class WithAndWithoutRequestResponseWithRequestNoResponseRequest {
  private:
   struct Storage_;
  public:
-  WithAndWithoutRequestResponseWithRequestNoResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithAndWithoutRequestResponseWithRequestNoResponseRequest(::std::string arg) noexcept
-    : storage_({
-      .arg = std::move(arg)
-    }) {}
+  WithAndWithoutRequestResponseWithRequestNoResponseRequest(Storage_ storage) noexcept;
+    WithAndWithoutRequestResponseWithRequestNoResponseRequest(::std::string arg) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -282,11 +268,8 @@ class WithAndWithoutRequestResponseWithRequestNoResponseRequest {
 
   WithAndWithoutRequestResponseWithRequestNoResponseRequest(WithAndWithoutRequestResponseWithRequestNoResponseRequest&&) noexcept = default;
   WithAndWithoutRequestResponseWithRequestNoResponseRequest& operator=(WithAndWithoutRequestResponseWithRequestNoResponseRequest&&) noexcept = default;
-    WithAndWithoutRequestResponseWithRequestNoResponseRequest(const WithAndWithoutRequestResponseWithRequestNoResponseRequest& other) noexcept : WithAndWithoutRequestResponseWithRequestNoResponseRequest(other.CloneStorage_()){}
-    WithAndWithoutRequestResponseWithRequestNoResponseRequest& operator=(const WithAndWithoutRequestResponseWithRequestNoResponseRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithAndWithoutRequestResponseWithRequestNoResponseRequest(const WithAndWithoutRequestResponseWithRequestNoResponseRequest& other) noexcept;
+    WithAndWithoutRequestResponseWithRequestNoResponseRequest& operator=(const WithAndWithoutRequestResponseWithRequestNoResponseRequest& other) noexcept;
 
     bool operator==(const WithAndWithoutRequestResponseWithRequestNoResponseRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest, 16>::Equal(this, &other);
@@ -308,14 +291,9 @@ class WithAndWithoutRequestResponseWithRequestNoResponseRequest {
     // Setter for arg.
     //
     
-    WithAndWithoutRequestResponseWithRequestNoResponseRequest& arg(::std::string value) {
-      storage_.arg = std::move(value);
-      return *this;
-    }
+    WithAndWithoutRequestResponseWithRequestNoResponseRequest& arg(::std::string value);
 
-  WithAndWithoutRequestResponseWithRequestNoResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseWithRequestNoResponseRequest(Storage_{
-      .arg ={},
-  }) {}
+  WithAndWithoutRequestResponseWithRequestNoResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -348,11 +326,8 @@ class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
  private:
   struct Storage_;
  public:
-  WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(::std::string arg) noexcept
-    : storage_({
-      .arg = std::move(arg)
-    }) {}
+  WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(Storage_ storage) noexcept;
+    WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(::std::string arg) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -362,11 +337,8 @@ class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
 
   WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(WithAndWithoutRequestResponseWithRequestEmptyResponseRequest&&) noexcept = default;
   WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& operator=(WithAndWithoutRequestResponseWithRequestEmptyResponseRequest&&) noexcept = default;
-    WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(const WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& other) noexcept : WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(other.CloneStorage_()){}
-    WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& operator=(const WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(const WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& other) noexcept;
+    WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& operator=(const WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& other) noexcept;
 
     bool operator==(const WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest, 16>::Equal(this, &other);
@@ -388,14 +360,9 @@ class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
     // Setter for arg.
     //
     
-    WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& arg(::std::string value) {
-      storage_.arg = std::move(value);
-      return *this;
-    }
+    WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& arg(::std::string value);
 
-  WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(Storage_{
-      .arg ={},
-  }) {}
+  WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -428,11 +395,8 @@ class WithAndWithoutRequestResponseWithRequestWithResponseRequest {
  private:
   struct Storage_;
  public:
-  WithAndWithoutRequestResponseWithRequestWithResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithAndWithoutRequestResponseWithRequestWithResponseRequest(::std::string arg) noexcept
-    : storage_({
-      .arg = std::move(arg)
-    }) {}
+  WithAndWithoutRequestResponseWithRequestWithResponseRequest(Storage_ storage) noexcept;
+    WithAndWithoutRequestResponseWithRequestWithResponseRequest(::std::string arg) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -442,11 +406,8 @@ class WithAndWithoutRequestResponseWithRequestWithResponseRequest {
 
   WithAndWithoutRequestResponseWithRequestWithResponseRequest(WithAndWithoutRequestResponseWithRequestWithResponseRequest&&) noexcept = default;
   WithAndWithoutRequestResponseWithRequestWithResponseRequest& operator=(WithAndWithoutRequestResponseWithRequestWithResponseRequest&&) noexcept = default;
-    WithAndWithoutRequestResponseWithRequestWithResponseRequest(const WithAndWithoutRequestResponseWithRequestWithResponseRequest& other) noexcept : WithAndWithoutRequestResponseWithRequestWithResponseRequest(other.CloneStorage_()){}
-    WithAndWithoutRequestResponseWithRequestWithResponseRequest& operator=(const WithAndWithoutRequestResponseWithRequestWithResponseRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithAndWithoutRequestResponseWithRequestWithResponseRequest(const WithAndWithoutRequestResponseWithRequestWithResponseRequest& other) noexcept;
+    WithAndWithoutRequestResponseWithRequestWithResponseRequest& operator=(const WithAndWithoutRequestResponseWithRequestWithResponseRequest& other) noexcept;
 
     bool operator==(const WithAndWithoutRequestResponseWithRequestWithResponseRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest, 16>::Equal(this, &other);
@@ -468,14 +429,9 @@ class WithAndWithoutRequestResponseWithRequestWithResponseRequest {
     // Setter for arg.
     //
     
-    WithAndWithoutRequestResponseWithRequestWithResponseRequest& arg(::std::string value) {
-      storage_.arg = std::move(value);
-      return *this;
-    }
+    WithAndWithoutRequestResponseWithRequestWithResponseRequest& arg(::std::string value);
 
-  WithAndWithoutRequestResponseWithRequestWithResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseWithRequestWithResponseRequest(Storage_{
-      .arg ={},
-  }) {}
+  WithAndWithoutRequestResponseWithRequestWithResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -508,11 +464,8 @@ class WithAndWithoutRequestResponseWithRequestWithResponseResponse {
  private:
   struct Storage_;
  public:
-  WithAndWithoutRequestResponseWithRequestWithResponseResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithAndWithoutRequestResponseWithRequestWithResponseResponse(::std::string ret) noexcept
-    : storage_({
-      .ret = std::move(ret)
-    }) {}
+  WithAndWithoutRequestResponseWithRequestWithResponseResponse(Storage_ storage) noexcept;
+    WithAndWithoutRequestResponseWithRequestWithResponseResponse(::std::string ret) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -522,11 +475,8 @@ class WithAndWithoutRequestResponseWithRequestWithResponseResponse {
 
   WithAndWithoutRequestResponseWithRequestWithResponseResponse(WithAndWithoutRequestResponseWithRequestWithResponseResponse&&) noexcept = default;
   WithAndWithoutRequestResponseWithRequestWithResponseResponse& operator=(WithAndWithoutRequestResponseWithRequestWithResponseResponse&&) noexcept = default;
-    WithAndWithoutRequestResponseWithRequestWithResponseResponse(const WithAndWithoutRequestResponseWithRequestWithResponseResponse& other) noexcept : WithAndWithoutRequestResponseWithRequestWithResponseResponse(other.CloneStorage_()){}
-    WithAndWithoutRequestResponseWithRequestWithResponseResponse& operator=(const WithAndWithoutRequestResponseWithRequestWithResponseResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithAndWithoutRequestResponseWithRequestWithResponseResponse(const WithAndWithoutRequestResponseWithRequestWithResponseResponse& other) noexcept;
+    WithAndWithoutRequestResponseWithRequestWithResponseResponse& operator=(const WithAndWithoutRequestResponseWithRequestWithResponseResponse& other) noexcept;
 
     bool operator==(const WithAndWithoutRequestResponseWithRequestWithResponseResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse, 16>::Equal(this, &other);
@@ -548,14 +498,9 @@ class WithAndWithoutRequestResponseWithRequestWithResponseResponse {
     // Setter for ret.
     //
     
-    WithAndWithoutRequestResponseWithRequestWithResponseResponse& ret(::std::string value) {
-      storage_.ret = std::move(value);
-      return *this;
-    }
+    WithAndWithoutRequestResponseWithRequestWithResponseResponse& ret(::std::string value);
 
-  WithAndWithoutRequestResponseWithRequestWithResponseResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseWithRequestWithResponseResponse(Storage_{
-      .ret ={},
-  }) {}
+  WithAndWithoutRequestResponseWithRequestWithResponseResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -588,11 +533,8 @@ class WithAndWithoutRequestResponseOnWithResponseRequest {
  private:
   struct Storage_;
  public:
-  WithAndWithoutRequestResponseOnWithResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithAndWithoutRequestResponseOnWithResponseRequest(::std::string ret) noexcept
-    : storage_({
-      .ret = std::move(ret)
-    }) {}
+  WithAndWithoutRequestResponseOnWithResponseRequest(Storage_ storage) noexcept;
+    WithAndWithoutRequestResponseOnWithResponseRequest(::std::string ret) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -602,11 +544,8 @@ class WithAndWithoutRequestResponseOnWithResponseRequest {
 
   WithAndWithoutRequestResponseOnWithResponseRequest(WithAndWithoutRequestResponseOnWithResponseRequest&&) noexcept = default;
   WithAndWithoutRequestResponseOnWithResponseRequest& operator=(WithAndWithoutRequestResponseOnWithResponseRequest&&) noexcept = default;
-    WithAndWithoutRequestResponseOnWithResponseRequest(const WithAndWithoutRequestResponseOnWithResponseRequest& other) noexcept : WithAndWithoutRequestResponseOnWithResponseRequest(other.CloneStorage_()){}
-    WithAndWithoutRequestResponseOnWithResponseRequest& operator=(const WithAndWithoutRequestResponseOnWithResponseRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithAndWithoutRequestResponseOnWithResponseRequest(const WithAndWithoutRequestResponseOnWithResponseRequest& other) noexcept;
+    WithAndWithoutRequestResponseOnWithResponseRequest& operator=(const WithAndWithoutRequestResponseOnWithResponseRequest& other) noexcept;
 
     bool operator==(const WithAndWithoutRequestResponseOnWithResponseRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest, 16>::Equal(this, &other);
@@ -628,14 +567,9 @@ class WithAndWithoutRequestResponseOnWithResponseRequest {
     // Setter for ret.
     //
     
-    WithAndWithoutRequestResponseOnWithResponseRequest& ret(::std::string value) {
-      storage_.ret = std::move(value);
-      return *this;
-    }
+    WithAndWithoutRequestResponseOnWithResponseRequest& ret(::std::string value);
 
-  WithAndWithoutRequestResponseOnWithResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseOnWithResponseRequest(Storage_{
-      .ret ={},
-  }) {}
+  WithAndWithoutRequestResponseOnWithResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -674,13 +608,8 @@ class WithErrorSyntaxResponseAsStructResponse {
  private:
   struct Storage_;
  public:
-  WithErrorSyntaxResponseAsStructResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithErrorSyntaxResponseAsStructResponse(int64_t a, int64_t b, int64_t c) noexcept
-    : storage_({
-      .a = std::move(a), 
-      .b = std::move(b), 
-      .c = std::move(c)
-    }) {}
+  WithErrorSyntaxResponseAsStructResponse(Storage_ storage) noexcept;
+    WithErrorSyntaxResponseAsStructResponse(int64_t a, int64_t b, int64_t c) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -690,11 +619,8 @@ class WithErrorSyntaxResponseAsStructResponse {
 
   WithErrorSyntaxResponseAsStructResponse(WithErrorSyntaxResponseAsStructResponse&&) noexcept = default;
   WithErrorSyntaxResponseAsStructResponse& operator=(WithErrorSyntaxResponseAsStructResponse&&) noexcept = default;
-    WithErrorSyntaxResponseAsStructResponse(const WithErrorSyntaxResponseAsStructResponse& other) noexcept : WithErrorSyntaxResponseAsStructResponse(other.CloneStorage_()){}
-    WithErrorSyntaxResponseAsStructResponse& operator=(const WithErrorSyntaxResponseAsStructResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithErrorSyntaxResponseAsStructResponse(const WithErrorSyntaxResponseAsStructResponse& other) noexcept;
+    WithErrorSyntaxResponseAsStructResponse& operator=(const WithErrorSyntaxResponseAsStructResponse& other) noexcept;
 
     bool operator==(const WithErrorSyntaxResponseAsStructResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructResponse, 24>::Equal(this, &other);
@@ -716,10 +642,7 @@ class WithErrorSyntaxResponseAsStructResponse {
     // Setter for a.
     //
     
-    WithErrorSyntaxResponseAsStructResponse& a(int64_t value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxResponseAsStructResponse& a(int64_t value);
     
       int64_t
     b() const {
@@ -734,10 +657,7 @@ class WithErrorSyntaxResponseAsStructResponse {
     // Setter for b.
     //
     
-    WithErrorSyntaxResponseAsStructResponse& b(int64_t value) {
-      storage_.b = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxResponseAsStructResponse& b(int64_t value);
     
       int64_t
     c() const {
@@ -752,16 +672,9 @@ class WithErrorSyntaxResponseAsStructResponse {
     // Setter for c.
     //
     
-    WithErrorSyntaxResponseAsStructResponse& c(int64_t value) {
-      storage_.c = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxResponseAsStructResponse& c(int64_t value);
 
-  WithErrorSyntaxResponseAsStructResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxResponseAsStructResponse(Storage_{
-      .a ={},
-      .b ={},
-      .c ={},
-  }) {}
+  WithErrorSyntaxResponseAsStructResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -934,11 +847,8 @@ class WithErrorSyntaxResponseAsStructTopResponse {
  private:
   struct Storage_;
  public:
-  WithErrorSyntaxResponseAsStructTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithErrorSyntaxResponseAsStructTopResponse(::test_protocols::WithErrorSyntaxResponseAsStructResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  WithErrorSyntaxResponseAsStructTopResponse(Storage_ storage) noexcept;
+    WithErrorSyntaxResponseAsStructTopResponse(::test_protocols::WithErrorSyntaxResponseAsStructResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -948,11 +858,8 @@ class WithErrorSyntaxResponseAsStructTopResponse {
 
   WithErrorSyntaxResponseAsStructTopResponse(WithErrorSyntaxResponseAsStructTopResponse&&) noexcept = default;
   WithErrorSyntaxResponseAsStructTopResponse& operator=(WithErrorSyntaxResponseAsStructTopResponse&&) noexcept = default;
-    WithErrorSyntaxResponseAsStructTopResponse(const WithErrorSyntaxResponseAsStructTopResponse& other) noexcept : WithErrorSyntaxResponseAsStructTopResponse(other.CloneStorage_()){}
-    WithErrorSyntaxResponseAsStructTopResponse& operator=(const WithErrorSyntaxResponseAsStructTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithErrorSyntaxResponseAsStructTopResponse(const WithErrorSyntaxResponseAsStructTopResponse& other) noexcept;
+    WithErrorSyntaxResponseAsStructTopResponse& operator=(const WithErrorSyntaxResponseAsStructTopResponse& other) noexcept;
 
     bool operator==(const WithErrorSyntaxResponseAsStructTopResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxResponseAsStructTopResponse, 16>::Equal(this, &other);
@@ -974,14 +881,9 @@ class WithErrorSyntaxResponseAsStructTopResponse {
     // Setter for result.
     //
     
-    WithErrorSyntaxResponseAsStructTopResponse& result(::test_protocols::WithErrorSyntaxResponseAsStructResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxResponseAsStructTopResponse& result(::test_protocols::WithErrorSyntaxResponseAsStructResult value);
 
-  WithErrorSyntaxResponseAsStructTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxResponseAsStructTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  WithErrorSyntaxResponseAsStructTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1014,11 +916,8 @@ class WithErrorSyntaxErrorAsPrimitiveResponse {
  private:
   struct Storage_;
  public:
-  WithErrorSyntaxErrorAsPrimitiveResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithErrorSyntaxErrorAsPrimitiveResponse(uint8_t __reserved) noexcept
-    : storage_({
-      .__reserved = std::move(__reserved)
-    }) {}
+  WithErrorSyntaxErrorAsPrimitiveResponse(Storage_ storage) noexcept;
+    WithErrorSyntaxErrorAsPrimitiveResponse(uint8_t __reserved) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1028,11 +927,8 @@ class WithErrorSyntaxErrorAsPrimitiveResponse {
 
   WithErrorSyntaxErrorAsPrimitiveResponse(WithErrorSyntaxErrorAsPrimitiveResponse&&) noexcept = default;
   WithErrorSyntaxErrorAsPrimitiveResponse& operator=(WithErrorSyntaxErrorAsPrimitiveResponse&&) noexcept = default;
-    WithErrorSyntaxErrorAsPrimitiveResponse(const WithErrorSyntaxErrorAsPrimitiveResponse& other) noexcept : WithErrorSyntaxErrorAsPrimitiveResponse(other.CloneStorage_()){}
-    WithErrorSyntaxErrorAsPrimitiveResponse& operator=(const WithErrorSyntaxErrorAsPrimitiveResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithErrorSyntaxErrorAsPrimitiveResponse(const WithErrorSyntaxErrorAsPrimitiveResponse& other) noexcept;
+    WithErrorSyntaxErrorAsPrimitiveResponse& operator=(const WithErrorSyntaxErrorAsPrimitiveResponse& other) noexcept;
 
     bool operator==(const WithErrorSyntaxErrorAsPrimitiveResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse, 1>::Equal(this, &other);
@@ -1054,14 +950,9 @@ class WithErrorSyntaxErrorAsPrimitiveResponse {
     // Setter for __reserved.
     //
     
-    WithErrorSyntaxErrorAsPrimitiveResponse& __reserved(uint8_t value) {
-      storage_.__reserved = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxErrorAsPrimitiveResponse& __reserved(uint8_t value);
 
-  WithErrorSyntaxErrorAsPrimitiveResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsPrimitiveResponse(Storage_{
-      .__reserved =0u,
-  }) {}
+  WithErrorSyntaxErrorAsPrimitiveResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1226,11 +1117,8 @@ class WithErrorSyntaxErrorAsPrimitiveTopResponse {
  private:
   struct Storage_;
  public:
-  WithErrorSyntaxErrorAsPrimitiveTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithErrorSyntaxErrorAsPrimitiveTopResponse(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  WithErrorSyntaxErrorAsPrimitiveTopResponse(Storage_ storage) noexcept;
+    WithErrorSyntaxErrorAsPrimitiveTopResponse(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1240,11 +1128,8 @@ class WithErrorSyntaxErrorAsPrimitiveTopResponse {
 
   WithErrorSyntaxErrorAsPrimitiveTopResponse(WithErrorSyntaxErrorAsPrimitiveTopResponse&&) noexcept = default;
   WithErrorSyntaxErrorAsPrimitiveTopResponse& operator=(WithErrorSyntaxErrorAsPrimitiveTopResponse&&) noexcept = default;
-    WithErrorSyntaxErrorAsPrimitiveTopResponse(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept : WithErrorSyntaxErrorAsPrimitiveTopResponse(other.CloneStorage_()){}
-    WithErrorSyntaxErrorAsPrimitiveTopResponse& operator=(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithErrorSyntaxErrorAsPrimitiveTopResponse(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept;
+    WithErrorSyntaxErrorAsPrimitiveTopResponse& operator=(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept;
 
     bool operator==(const WithErrorSyntaxErrorAsPrimitiveTopResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse, 16>::Equal(this, &other);
@@ -1266,14 +1151,9 @@ class WithErrorSyntaxErrorAsPrimitiveTopResponse {
     // Setter for result.
     //
     
-    WithErrorSyntaxErrorAsPrimitiveTopResponse& result(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxErrorAsPrimitiveTopResponse& result(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult value);
 
-  WithErrorSyntaxErrorAsPrimitiveTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsPrimitiveTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  WithErrorSyntaxErrorAsPrimitiveTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1306,11 +1186,8 @@ class WithErrorSyntaxErrorAsEnumResponse {
  private:
   struct Storage_;
  public:
-  WithErrorSyntaxErrorAsEnumResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithErrorSyntaxErrorAsEnumResponse(uint8_t __reserved) noexcept
-    : storage_({
-      .__reserved = std::move(__reserved)
-    }) {}
+  WithErrorSyntaxErrorAsEnumResponse(Storage_ storage) noexcept;
+    WithErrorSyntaxErrorAsEnumResponse(uint8_t __reserved) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1320,11 +1197,8 @@ class WithErrorSyntaxErrorAsEnumResponse {
 
   WithErrorSyntaxErrorAsEnumResponse(WithErrorSyntaxErrorAsEnumResponse&&) noexcept = default;
   WithErrorSyntaxErrorAsEnumResponse& operator=(WithErrorSyntaxErrorAsEnumResponse&&) noexcept = default;
-    WithErrorSyntaxErrorAsEnumResponse(const WithErrorSyntaxErrorAsEnumResponse& other) noexcept : WithErrorSyntaxErrorAsEnumResponse(other.CloneStorage_()){}
-    WithErrorSyntaxErrorAsEnumResponse& operator=(const WithErrorSyntaxErrorAsEnumResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithErrorSyntaxErrorAsEnumResponse(const WithErrorSyntaxErrorAsEnumResponse& other) noexcept;
+    WithErrorSyntaxErrorAsEnumResponse& operator=(const WithErrorSyntaxErrorAsEnumResponse& other) noexcept;
 
     bool operator==(const WithErrorSyntaxErrorAsEnumResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumResponse, 1>::Equal(this, &other);
@@ -1346,14 +1220,9 @@ class WithErrorSyntaxErrorAsEnumResponse {
     // Setter for __reserved.
     //
     
-    WithErrorSyntaxErrorAsEnumResponse& __reserved(uint8_t value) {
-      storage_.__reserved = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxErrorAsEnumResponse& __reserved(uint8_t value);
 
-  WithErrorSyntaxErrorAsEnumResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsEnumResponse(Storage_{
-      .__reserved =0u,
-  }) {}
+  WithErrorSyntaxErrorAsEnumResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1518,11 +1387,8 @@ class WithErrorSyntaxErrorAsEnumTopResponse {
  private:
   struct Storage_;
  public:
-  WithErrorSyntaxErrorAsEnumTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithErrorSyntaxErrorAsEnumTopResponse(::test_protocols::WithErrorSyntaxErrorAsEnumResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  WithErrorSyntaxErrorAsEnumTopResponse(Storage_ storage) noexcept;
+    WithErrorSyntaxErrorAsEnumTopResponse(::test_protocols::WithErrorSyntaxErrorAsEnumResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1532,11 +1398,8 @@ class WithErrorSyntaxErrorAsEnumTopResponse {
 
   WithErrorSyntaxErrorAsEnumTopResponse(WithErrorSyntaxErrorAsEnumTopResponse&&) noexcept = default;
   WithErrorSyntaxErrorAsEnumTopResponse& operator=(WithErrorSyntaxErrorAsEnumTopResponse&&) noexcept = default;
-    WithErrorSyntaxErrorAsEnumTopResponse(const WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept : WithErrorSyntaxErrorAsEnumTopResponse(other.CloneStorage_()){}
-    WithErrorSyntaxErrorAsEnumTopResponse& operator=(const WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    WithErrorSyntaxErrorAsEnumTopResponse(const WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept;
+    WithErrorSyntaxErrorAsEnumTopResponse& operator=(const WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept;
 
     bool operator==(const WithErrorSyntaxErrorAsEnumTopResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse, 16>::Equal(this, &other);
@@ -1558,14 +1421,9 @@ class WithErrorSyntaxErrorAsEnumTopResponse {
     // Setter for result.
     //
     
-    WithErrorSyntaxErrorAsEnumTopResponse& result(::test_protocols::WithErrorSyntaxErrorAsEnumResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxErrorAsEnumTopResponse& result(::test_protocols::WithErrorSyntaxErrorAsEnumResult value);
 
-  WithErrorSyntaxErrorAsEnumTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsEnumTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  WithErrorSyntaxErrorAsEnumTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1600,11 +1458,8 @@ class WithErrorSyntaxHandleInResultResponse {
  private:
   struct Storage_;
  public:
-  WithErrorSyntaxHandleInResultResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithErrorSyntaxHandleInResultResponse(::zx::handle h) noexcept
-    : storage_({
-      .h = std::move(h)
-    }) {}
+  WithErrorSyntaxHandleInResultResponse(Storage_ storage) noexcept;
+    WithErrorSyntaxHandleInResultResponse(::zx::handle h) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1628,14 +1483,9 @@ class WithErrorSyntaxHandleInResultResponse {
     // Setter for h.
     //
     
-    WithErrorSyntaxHandleInResultResponse& h(::zx::handle value) {
-      storage_.h = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxHandleInResultResponse& h(::zx::handle value);
 
-  WithErrorSyntaxHandleInResultResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxHandleInResultResponse(Storage_{
-      .h ={},
-  }) {}
+  WithErrorSyntaxHandleInResultResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1793,11 +1643,8 @@ class WithErrorSyntaxHandleInResultTopResponse {
  private:
   struct Storage_;
  public:
-  WithErrorSyntaxHandleInResultTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithErrorSyntaxHandleInResultTopResponse(::test_protocols::WithErrorSyntaxHandleInResultResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  WithErrorSyntaxHandleInResultTopResponse(Storage_ storage) noexcept;
+    WithErrorSyntaxHandleInResultTopResponse(::test_protocols::WithErrorSyntaxHandleInResultResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1821,14 +1668,9 @@ class WithErrorSyntaxHandleInResultTopResponse {
     // Setter for result.
     //
     
-    WithErrorSyntaxHandleInResultTopResponse& result(::test_protocols::WithErrorSyntaxHandleInResultResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    WithErrorSyntaxHandleInResultTopResponse& result(::test_protocols::WithErrorSyntaxHandleInResultResult value);
 
-  WithErrorSyntaxHandleInResultTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxHandleInResultTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  WithErrorSyntaxHandleInResultTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1866,12 +1708,8 @@ class ChannelProtocolMethodARequest {
  private:
   struct Storage_;
  public:
-  ChannelProtocolMethodARequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ChannelProtocolMethodARequest(int64_t a, int64_t b) noexcept
-    : storage_({
-      .a = std::move(a), 
-      .b = std::move(b)
-    }) {}
+  ChannelProtocolMethodARequest(Storage_ storage) noexcept;
+    ChannelProtocolMethodARequest(int64_t a, int64_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1881,11 +1719,8 @@ class ChannelProtocolMethodARequest {
 
   ChannelProtocolMethodARequest(ChannelProtocolMethodARequest&&) noexcept = default;
   ChannelProtocolMethodARequest& operator=(ChannelProtocolMethodARequest&&) noexcept = default;
-    ChannelProtocolMethodARequest(const ChannelProtocolMethodARequest& other) noexcept : ChannelProtocolMethodARequest(other.CloneStorage_()){}
-    ChannelProtocolMethodARequest& operator=(const ChannelProtocolMethodARequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ChannelProtocolMethodARequest(const ChannelProtocolMethodARequest& other) noexcept;
+    ChannelProtocolMethodARequest& operator=(const ChannelProtocolMethodARequest& other) noexcept;
 
     bool operator==(const ChannelProtocolMethodARequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodARequest, 16>::Equal(this, &other);
@@ -1907,10 +1742,7 @@ class ChannelProtocolMethodARequest {
     // Setter for a.
     //
     
-    ChannelProtocolMethodARequest& a(int64_t value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    ChannelProtocolMethodARequest& a(int64_t value);
     
       int64_t
     b() const {
@@ -1925,15 +1757,9 @@ class ChannelProtocolMethodARequest {
     // Setter for b.
     //
     
-    ChannelProtocolMethodARequest& b(int64_t value) {
-      storage_.b = std::move(value);
-      return *this;
-    }
+    ChannelProtocolMethodARequest& b(int64_t value);
 
-  ChannelProtocolMethodARequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMethodARequest(Storage_{
-      .a ={},
-      .b ={},
-  }) {}
+  ChannelProtocolMethodARequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1971,12 +1797,8 @@ class ChannelProtocolEventARequest {
  private:
   struct Storage_;
  public:
-  ChannelProtocolEventARequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ChannelProtocolEventARequest(int64_t a, int64_t b) noexcept
-    : storage_({
-      .a = std::move(a), 
-      .b = std::move(b)
-    }) {}
+  ChannelProtocolEventARequest(Storage_ storage) noexcept;
+    ChannelProtocolEventARequest(int64_t a, int64_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1986,11 +1808,8 @@ class ChannelProtocolEventARequest {
 
   ChannelProtocolEventARequest(ChannelProtocolEventARequest&&) noexcept = default;
   ChannelProtocolEventARequest& operator=(ChannelProtocolEventARequest&&) noexcept = default;
-    ChannelProtocolEventARequest(const ChannelProtocolEventARequest& other) noexcept : ChannelProtocolEventARequest(other.CloneStorage_()){}
-    ChannelProtocolEventARequest& operator=(const ChannelProtocolEventARequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ChannelProtocolEventARequest(const ChannelProtocolEventARequest& other) noexcept;
+    ChannelProtocolEventARequest& operator=(const ChannelProtocolEventARequest& other) noexcept;
 
     bool operator==(const ChannelProtocolEventARequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolEventARequest, 16>::Equal(this, &other);
@@ -2012,10 +1831,7 @@ class ChannelProtocolEventARequest {
     // Setter for a.
     //
     
-    ChannelProtocolEventARequest& a(int64_t value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    ChannelProtocolEventARequest& a(int64_t value);
     
       int64_t
     b() const {
@@ -2030,15 +1846,9 @@ class ChannelProtocolEventARequest {
     // Setter for b.
     //
     
-    ChannelProtocolEventARequest& b(int64_t value) {
-      storage_.b = std::move(value);
-      return *this;
-    }
+    ChannelProtocolEventARequest& b(int64_t value);
 
-  ChannelProtocolEventARequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolEventARequest(Storage_{
-      .a ={},
-      .b ={},
-  }) {}
+  ChannelProtocolEventARequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2076,12 +1886,8 @@ class ChannelProtocolMethodBRequest {
  private:
   struct Storage_;
  public:
-  ChannelProtocolMethodBRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ChannelProtocolMethodBRequest(int64_t a, int64_t b) noexcept
-    : storage_({
-      .a = std::move(a), 
-      .b = std::move(b)
-    }) {}
+  ChannelProtocolMethodBRequest(Storage_ storage) noexcept;
+    ChannelProtocolMethodBRequest(int64_t a, int64_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2091,11 +1897,8 @@ class ChannelProtocolMethodBRequest {
 
   ChannelProtocolMethodBRequest(ChannelProtocolMethodBRequest&&) noexcept = default;
   ChannelProtocolMethodBRequest& operator=(ChannelProtocolMethodBRequest&&) noexcept = default;
-    ChannelProtocolMethodBRequest(const ChannelProtocolMethodBRequest& other) noexcept : ChannelProtocolMethodBRequest(other.CloneStorage_()){}
-    ChannelProtocolMethodBRequest& operator=(const ChannelProtocolMethodBRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ChannelProtocolMethodBRequest(const ChannelProtocolMethodBRequest& other) noexcept;
+    ChannelProtocolMethodBRequest& operator=(const ChannelProtocolMethodBRequest& other) noexcept;
 
     bool operator==(const ChannelProtocolMethodBRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodBRequest, 16>::Equal(this, &other);
@@ -2117,10 +1920,7 @@ class ChannelProtocolMethodBRequest {
     // Setter for a.
     //
     
-    ChannelProtocolMethodBRequest& a(int64_t value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    ChannelProtocolMethodBRequest& a(int64_t value);
     
       int64_t
     b() const {
@@ -2135,15 +1935,9 @@ class ChannelProtocolMethodBRequest {
     // Setter for b.
     //
     
-    ChannelProtocolMethodBRequest& b(int64_t value) {
-      storage_.b = std::move(value);
-      return *this;
-    }
+    ChannelProtocolMethodBRequest& b(int64_t value);
 
-  ChannelProtocolMethodBRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMethodBRequest(Storage_{
-      .a ={},
-      .b ={},
-  }) {}
+  ChannelProtocolMethodBRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2181,11 +1975,8 @@ class ChannelProtocolMethodBResponse {
  private:
   struct Storage_;
  public:
-  ChannelProtocolMethodBResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ChannelProtocolMethodBResponse(int64_t result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  ChannelProtocolMethodBResponse(Storage_ storage) noexcept;
+    ChannelProtocolMethodBResponse(int64_t result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2195,11 +1986,8 @@ class ChannelProtocolMethodBResponse {
 
   ChannelProtocolMethodBResponse(ChannelProtocolMethodBResponse&&) noexcept = default;
   ChannelProtocolMethodBResponse& operator=(ChannelProtocolMethodBResponse&&) noexcept = default;
-    ChannelProtocolMethodBResponse(const ChannelProtocolMethodBResponse& other) noexcept : ChannelProtocolMethodBResponse(other.CloneStorage_()){}
-    ChannelProtocolMethodBResponse& operator=(const ChannelProtocolMethodBResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ChannelProtocolMethodBResponse(const ChannelProtocolMethodBResponse& other) noexcept;
+    ChannelProtocolMethodBResponse& operator=(const ChannelProtocolMethodBResponse& other) noexcept;
 
     bool operator==(const ChannelProtocolMethodBResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ChannelProtocolMethodBResponse, 8>::Equal(this, &other);
@@ -2221,14 +2009,9 @@ class ChannelProtocolMethodBResponse {
     // Setter for result.
     //
     
-    ChannelProtocolMethodBResponse& result(int64_t value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    ChannelProtocolMethodBResponse& result(int64_t value);
 
-  ChannelProtocolMethodBResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMethodBResponse(Storage_{
-      .result ={},
-  }) {}
+  ChannelProtocolMethodBResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2264,11 +2047,8 @@ class ChannelProtocolTakeHandleRequest {
  private:
   struct Storage_;
  public:
-  ChannelProtocolTakeHandleRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ChannelProtocolTakeHandleRequest(::zx::handle h) noexcept
-    : storage_({
-      .h = std::move(h)
-    }) {}
+  ChannelProtocolTakeHandleRequest(Storage_ storage) noexcept;
+    ChannelProtocolTakeHandleRequest(::zx::handle h) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2292,14 +2072,9 @@ class ChannelProtocolTakeHandleRequest {
     // Setter for h.
     //
     
-    ChannelProtocolTakeHandleRequest& h(::zx::handle value) {
-      storage_.h = std::move(value);
-      return *this;
-    }
+    ChannelProtocolTakeHandleRequest& h(::zx::handle value);
 
-  ChannelProtocolTakeHandleRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolTakeHandleRequest(Storage_{
-      .h ={},
-  }) {}
+  ChannelProtocolTakeHandleRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2336,11 +2111,8 @@ class ChannelProtocolMutateSocketRequest {
  private:
   struct Storage_;
  public:
-  ChannelProtocolMutateSocketRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ChannelProtocolMutateSocketRequest(::zx::socket a) noexcept
-    : storage_({
-      .a = std::move(a)
-    }) {}
+  ChannelProtocolMutateSocketRequest(Storage_ storage) noexcept;
+    ChannelProtocolMutateSocketRequest(::zx::socket a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2364,14 +2136,9 @@ class ChannelProtocolMutateSocketRequest {
     // Setter for a.
     //
     
-    ChannelProtocolMutateSocketRequest& a(::zx::socket value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    ChannelProtocolMutateSocketRequest& a(::zx::socket value);
 
-  ChannelProtocolMutateSocketRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMutateSocketRequest(Storage_{
-      .a ={},
-  }) {}
+  ChannelProtocolMutateSocketRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2408,11 +2175,8 @@ class ChannelProtocolMutateSocketResponse {
  private:
   struct Storage_;
  public:
-  ChannelProtocolMutateSocketResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ChannelProtocolMutateSocketResponse(::zx::socket b) noexcept
-    : storage_({
-      .b = std::move(b)
-    }) {}
+  ChannelProtocolMutateSocketResponse(Storage_ storage) noexcept;
+    ChannelProtocolMutateSocketResponse(::zx::socket b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2436,14 +2200,9 @@ class ChannelProtocolMutateSocketResponse {
     // Setter for b.
     //
     
-    ChannelProtocolMutateSocketResponse& b(::zx::socket value) {
-      storage_.b = std::move(value);
-      return *this;
-    }
+    ChannelProtocolMutateSocketResponse& b(::zx::socket value);
 
-  ChannelProtocolMutateSocketResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMutateSocketResponse(Storage_{
-      .b ={},
-  }) {}
+  ChannelProtocolMutateSocketResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2481,12 +2240,8 @@ class SyscallProtocolMethodCRequest {
  private:
   struct Storage_;
  public:
-  SyscallProtocolMethodCRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    SyscallProtocolMethodCRequest(int64_t a, int64_t b) noexcept
-    : storage_({
-      .a = std::move(a), 
-      .b = std::move(b)
-    }) {}
+  SyscallProtocolMethodCRequest(Storage_ storage) noexcept;
+    SyscallProtocolMethodCRequest(int64_t a, int64_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2496,11 +2251,8 @@ class SyscallProtocolMethodCRequest {
 
   SyscallProtocolMethodCRequest(SyscallProtocolMethodCRequest&&) noexcept = default;
   SyscallProtocolMethodCRequest& operator=(SyscallProtocolMethodCRequest&&) noexcept = default;
-    SyscallProtocolMethodCRequest(const SyscallProtocolMethodCRequest& other) noexcept : SyscallProtocolMethodCRequest(other.CloneStorage_()){}
-    SyscallProtocolMethodCRequest& operator=(const SyscallProtocolMethodCRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    SyscallProtocolMethodCRequest(const SyscallProtocolMethodCRequest& other) noexcept;
+    SyscallProtocolMethodCRequest& operator=(const SyscallProtocolMethodCRequest& other) noexcept;
 
     bool operator==(const SyscallProtocolMethodCRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::SyscallProtocolMethodCRequest, 16>::Equal(this, &other);
@@ -2522,10 +2274,7 @@ class SyscallProtocolMethodCRequest {
     // Setter for a.
     //
     
-    SyscallProtocolMethodCRequest& a(int64_t value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    SyscallProtocolMethodCRequest& a(int64_t value);
     
       int64_t
     b() const {
@@ -2540,15 +2289,9 @@ class SyscallProtocolMethodCRequest {
     // Setter for b.
     //
     
-    SyscallProtocolMethodCRequest& b(int64_t value) {
-      storage_.b = std::move(value);
-      return *this;
-    }
+    SyscallProtocolMethodCRequest& b(int64_t value);
 
-  SyscallProtocolMethodCRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SyscallProtocolMethodCRequest(Storage_{
-      .a ={},
-      .b ={},
-  }) {}
+  SyscallProtocolMethodCRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2586,11 +2329,8 @@ class TransitionalRequestRequest {
  private:
   struct Storage_;
  public:
-  TransitionalRequestRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    TransitionalRequestRequest(int64_t x) noexcept
-    : storage_({
-      .x = std::move(x)
-    }) {}
+  TransitionalRequestRequest(Storage_ storage) noexcept;
+    TransitionalRequestRequest(int64_t x) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2600,11 +2340,8 @@ class TransitionalRequestRequest {
 
   TransitionalRequestRequest(TransitionalRequestRequest&&) noexcept = default;
   TransitionalRequestRequest& operator=(TransitionalRequestRequest&&) noexcept = default;
-    TransitionalRequestRequest(const TransitionalRequestRequest& other) noexcept : TransitionalRequestRequest(other.CloneStorage_()){}
-    TransitionalRequestRequest& operator=(const TransitionalRequestRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    TransitionalRequestRequest(const TransitionalRequestRequest& other) noexcept;
+    TransitionalRequestRequest& operator=(const TransitionalRequestRequest& other) noexcept;
 
     bool operator==(const TransitionalRequestRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::TransitionalRequestRequest, 8>::Equal(this, &other);
@@ -2626,14 +2363,9 @@ class TransitionalRequestRequest {
     // Setter for x.
     //
     
-    TransitionalRequestRequest& x(int64_t value) {
-      storage_.x = std::move(value);
-      return *this;
-    }
+    TransitionalRequestRequest& x(int64_t value);
 
-  TransitionalRequestRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TransitionalRequestRequest(Storage_{
-      .x ={},
-  }) {}
+  TransitionalRequestRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2667,11 +2399,8 @@ class TransitionalRequestResponse {
  private:
   struct Storage_;
  public:
-  TransitionalRequestResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    TransitionalRequestResponse(int64_t y) noexcept
-    : storage_({
-      .y = std::move(y)
-    }) {}
+  TransitionalRequestResponse(Storage_ storage) noexcept;
+    TransitionalRequestResponse(int64_t y) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2681,11 +2410,8 @@ class TransitionalRequestResponse {
 
   TransitionalRequestResponse(TransitionalRequestResponse&&) noexcept = default;
   TransitionalRequestResponse& operator=(TransitionalRequestResponse&&) noexcept = default;
-    TransitionalRequestResponse(const TransitionalRequestResponse& other) noexcept : TransitionalRequestResponse(other.CloneStorage_()){}
-    TransitionalRequestResponse& operator=(const TransitionalRequestResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    TransitionalRequestResponse(const TransitionalRequestResponse& other) noexcept;
+    TransitionalRequestResponse& operator=(const TransitionalRequestResponse& other) noexcept;
 
     bool operator==(const TransitionalRequestResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::TransitionalRequestResponse, 8>::Equal(this, &other);
@@ -2707,14 +2433,9 @@ class TransitionalRequestResponse {
     // Setter for y.
     //
     
-    TransitionalRequestResponse& y(int64_t value) {
-      storage_.y = std::move(value);
-      return *this;
-    }
+    TransitionalRequestResponse& y(int64_t value);
 
-  TransitionalRequestResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TransitionalRequestResponse(Storage_{
-      .y ={},
-  }) {}
+  TransitionalRequestResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2748,11 +2469,8 @@ class TransitionalOneWayRequest {
  private:
   struct Storage_;
  public:
-  TransitionalOneWayRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    TransitionalOneWayRequest(int64_t x) noexcept
-    : storage_({
-      .x = std::move(x)
-    }) {}
+  TransitionalOneWayRequest(Storage_ storage) noexcept;
+    TransitionalOneWayRequest(int64_t x) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2762,11 +2480,8 @@ class TransitionalOneWayRequest {
 
   TransitionalOneWayRequest(TransitionalOneWayRequest&&) noexcept = default;
   TransitionalOneWayRequest& operator=(TransitionalOneWayRequest&&) noexcept = default;
-    TransitionalOneWayRequest(const TransitionalOneWayRequest& other) noexcept : TransitionalOneWayRequest(other.CloneStorage_()){}
-    TransitionalOneWayRequest& operator=(const TransitionalOneWayRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    TransitionalOneWayRequest(const TransitionalOneWayRequest& other) noexcept;
+    TransitionalOneWayRequest& operator=(const TransitionalOneWayRequest& other) noexcept;
 
     bool operator==(const TransitionalOneWayRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::TransitionalOneWayRequest, 8>::Equal(this, &other);
@@ -2788,14 +2503,9 @@ class TransitionalOneWayRequest {
     // Setter for x.
     //
     
-    TransitionalOneWayRequest& x(int64_t value) {
-      storage_.x = std::move(value);
-      return *this;
-    }
+    TransitionalOneWayRequest& x(int64_t value);
 
-  TransitionalOneWayRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TransitionalOneWayRequest(Storage_{
-      .x ={},
-  }) {}
+  TransitionalOneWayRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2829,11 +2539,8 @@ class TransitionalEventRequest {
  private:
   struct Storage_;
  public:
-  TransitionalEventRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    TransitionalEventRequest(int64_t x) noexcept
-    : storage_({
-      .x = std::move(x)
-    }) {}
+  TransitionalEventRequest(Storage_ storage) noexcept;
+    TransitionalEventRequest(int64_t x) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2843,11 +2550,8 @@ class TransitionalEventRequest {
 
   TransitionalEventRequest(TransitionalEventRequest&&) noexcept = default;
   TransitionalEventRequest& operator=(TransitionalEventRequest&&) noexcept = default;
-    TransitionalEventRequest(const TransitionalEventRequest& other) noexcept : TransitionalEventRequest(other.CloneStorage_()){}
-    TransitionalEventRequest& operator=(const TransitionalEventRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    TransitionalEventRequest(const TransitionalEventRequest& other) noexcept;
+    TransitionalEventRequest& operator=(const TransitionalEventRequest& other) noexcept;
 
     bool operator==(const TransitionalEventRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::TransitionalEventRequest, 8>::Equal(this, &other);
@@ -2869,14 +2573,9 @@ class TransitionalEventRequest {
     // Setter for x.
     //
     
-    TransitionalEventRequest& x(int64_t value) {
-      storage_.x = std::move(value);
-      return *this;
-    }
+    TransitionalEventRequest& x(int64_t value);
 
-  TransitionalEventRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TransitionalEventRequest(Storage_{
-      .x ={},
-  }) {}
+  TransitionalEventRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2921,11 +2620,8 @@ class HandleRightsProtocolNoResponseMethodRequest {
  private:
   struct Storage_;
  public:
-  HandleRightsProtocolNoResponseMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    HandleRightsProtocolNoResponseMethodRequest(::zx::socket h) noexcept
-    : storage_({
-      .h = std::move(h)
-    }) {}
+  HandleRightsProtocolNoResponseMethodRequest(Storage_ storage) noexcept;
+    HandleRightsProtocolNoResponseMethodRequest(::zx::socket h) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2949,14 +2645,9 @@ class HandleRightsProtocolNoResponseMethodRequest {
     // Setter for h.
     //
     
-    HandleRightsProtocolNoResponseMethodRequest& h(::zx::socket value) {
-      storage_.h = std::move(value);
-      return *this;
-    }
+    HandleRightsProtocolNoResponseMethodRequest& h(::zx::socket value);
 
-  HandleRightsProtocolNoResponseMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandleRightsProtocolNoResponseMethodRequest(Storage_{
-      .h ={},
-  }) {}
+  HandleRightsProtocolNoResponseMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2993,11 +2684,8 @@ class HandleRightsProtocolResponseMethodRequest {
  private:
   struct Storage_;
  public:
-  HandleRightsProtocolResponseMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    HandleRightsProtocolResponseMethodRequest(::zx::socket h) noexcept
-    : storage_({
-      .h = std::move(h)
-    }) {}
+  HandleRightsProtocolResponseMethodRequest(Storage_ storage) noexcept;
+    HandleRightsProtocolResponseMethodRequest(::zx::socket h) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3021,14 +2709,9 @@ class HandleRightsProtocolResponseMethodRequest {
     // Setter for h.
     //
     
-    HandleRightsProtocolResponseMethodRequest& h(::zx::socket value) {
-      storage_.h = std::move(value);
-      return *this;
-    }
+    HandleRightsProtocolResponseMethodRequest& h(::zx::socket value);
 
-  HandleRightsProtocolResponseMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandleRightsProtocolResponseMethodRequest(Storage_{
-      .h ={},
-  }) {}
+  HandleRightsProtocolResponseMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3065,11 +2748,8 @@ class HandleRightsProtocolResponseMethodResponse {
  private:
   struct Storage_;
  public:
-  HandleRightsProtocolResponseMethodResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    HandleRightsProtocolResponseMethodResponse(::zx::socket h) noexcept
-    : storage_({
-      .h = std::move(h)
-    }) {}
+  HandleRightsProtocolResponseMethodResponse(Storage_ storage) noexcept;
+    HandleRightsProtocolResponseMethodResponse(::zx::socket h) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3093,14 +2773,9 @@ class HandleRightsProtocolResponseMethodResponse {
     // Setter for h.
     //
     
-    HandleRightsProtocolResponseMethodResponse& h(::zx::socket value) {
-      storage_.h = std::move(value);
-      return *this;
-    }
+    HandleRightsProtocolResponseMethodResponse& h(::zx::socket value);
 
-  HandleRightsProtocolResponseMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandleRightsProtocolResponseMethodResponse(Storage_{
-      .h ={},
-  }) {}
+  HandleRightsProtocolResponseMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3137,11 +2812,8 @@ class HandleRightsProtocolAnEventRequest {
  private:
   struct Storage_;
  public:
-  HandleRightsProtocolAnEventRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    HandleRightsProtocolAnEventRequest(::zx::socket h) noexcept
-    : storage_({
-      .h = std::move(h)
-    }) {}
+  HandleRightsProtocolAnEventRequest(Storage_ storage) noexcept;
+    HandleRightsProtocolAnEventRequest(::zx::socket h) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3165,14 +2837,9 @@ class HandleRightsProtocolAnEventRequest {
     // Setter for h.
     //
     
-    HandleRightsProtocolAnEventRequest& h(::zx::socket value) {
-      storage_.h = std::move(value);
-      return *this;
-    }
+    HandleRightsProtocolAnEventRequest& h(::zx::socket value);
 
-  HandleRightsProtocolAnEventRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandleRightsProtocolAnEventRequest(Storage_{
-      .h ={},
-  }) {}
+  HandleRightsProtocolAnEventRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3212,14 +2879,8 @@ class ProtocolEnds {
  private:
   struct Storage_;
  public:
-  ProtocolEnds(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ProtocolEnds(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> client, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> server, ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> client_opt, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> server_opt) noexcept
-    : storage_({
-      .client = std::move(client), 
-      .server = std::move(server), 
-      .client_opt = std::move(client_opt), 
-      .server_opt = std::move(server_opt)
-    }) {}
+  ProtocolEnds(Storage_ storage) noexcept;
+    ProtocolEnds(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> client, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> server, ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> client_opt, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> server_opt) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3243,10 +2904,7 @@ class ProtocolEnds {
     // Setter for client.
     //
     
-    ProtocolEnds& client(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value) {
-      storage_.client = std::move(value);
-      return *this;
-    }
+    ProtocolEnds& client(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value);
     
       const ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> &
     server() const {
@@ -3261,10 +2919,7 @@ class ProtocolEnds {
     // Setter for server.
     //
     
-    ProtocolEnds& server(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value) {
-      storage_.server = std::move(value);
-      return *this;
-    }
+    ProtocolEnds& server(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value);
     
       const ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> &
     client_opt() const {
@@ -3279,10 +2934,7 @@ class ProtocolEnds {
     // Setter for client_opt.
     //
     
-    ProtocolEnds& client_opt(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value) {
-      storage_.client_opt = std::move(value);
-      return *this;
-    }
+    ProtocolEnds& client_opt(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value);
     
       const ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> &
     server_opt() const {
@@ -3297,17 +2949,9 @@ class ProtocolEnds {
     // Setter for server_opt.
     //
     
-    ProtocolEnds& server_opt(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value) {
-      storage_.server_opt = std::move(value);
-      return *this;
-    }
+    ProtocolEnds& server_opt(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value);
 
-  ProtocolEnds(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolEnds(Storage_{
-      .client ={},
-      .server ={},
-      .client_opt ={},
-      .server_opt ={},
-  }) {}
+  ProtocolEnds(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3353,11 +2997,8 @@ class WithProtocolEndsClientEndsRequest {
  private:
   struct Storage_;
  public:
-  WithProtocolEndsClientEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithProtocolEndsClientEndsRequest(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> in) noexcept
-    : storage_({
-      .in = std::move(in)
-    }) {}
+  WithProtocolEndsClientEndsRequest(Storage_ storage) noexcept;
+    WithProtocolEndsClientEndsRequest(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> in) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3381,14 +3022,9 @@ class WithProtocolEndsClientEndsRequest {
     // Setter for in.
     //
     
-    WithProtocolEndsClientEndsRequest& in(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value) {
-      storage_.in = std::move(value);
-      return *this;
-    }
+    WithProtocolEndsClientEndsRequest& in(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value);
 
-  WithProtocolEndsClientEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsClientEndsRequest(Storage_{
-      .in ={},
-  }) {}
+  WithProtocolEndsClientEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3425,11 +3061,8 @@ class WithProtocolEndsClientEndsResponse {
  private:
   struct Storage_;
  public:
-  WithProtocolEndsClientEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithProtocolEndsClientEndsResponse(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> out) noexcept
-    : storage_({
-      .out = std::move(out)
-    }) {}
+  WithProtocolEndsClientEndsResponse(Storage_ storage) noexcept;
+    WithProtocolEndsClientEndsResponse(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> out) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3453,14 +3086,9 @@ class WithProtocolEndsClientEndsResponse {
     // Setter for out.
     //
     
-    WithProtocolEndsClientEndsResponse& out(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value) {
-      storage_.out = std::move(value);
-      return *this;
-    }
+    WithProtocolEndsClientEndsResponse& out(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value);
 
-  WithProtocolEndsClientEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsClientEndsResponse(Storage_{
-      .out ={},
-  }) {}
+  WithProtocolEndsClientEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3497,11 +3125,8 @@ class WithProtocolEndsServerEndsRequest {
  private:
   struct Storage_;
  public:
-  WithProtocolEndsServerEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithProtocolEndsServerEndsRequest(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> in) noexcept
-    : storage_({
-      .in = std::move(in)
-    }) {}
+  WithProtocolEndsServerEndsRequest(Storage_ storage) noexcept;
+    WithProtocolEndsServerEndsRequest(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> in) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3525,14 +3150,9 @@ class WithProtocolEndsServerEndsRequest {
     // Setter for in.
     //
     
-    WithProtocolEndsServerEndsRequest& in(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value) {
-      storage_.in = std::move(value);
-      return *this;
-    }
+    WithProtocolEndsServerEndsRequest& in(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value);
 
-  WithProtocolEndsServerEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsServerEndsRequest(Storage_{
-      .in ={},
-  }) {}
+  WithProtocolEndsServerEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3569,11 +3189,8 @@ class WithProtocolEndsServerEndsResponse {
  private:
   struct Storage_;
  public:
-  WithProtocolEndsServerEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithProtocolEndsServerEndsResponse(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> out) noexcept
-    : storage_({
-      .out = std::move(out)
-    }) {}
+  WithProtocolEndsServerEndsResponse(Storage_ storage) noexcept;
+    WithProtocolEndsServerEndsResponse(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> out) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3597,14 +3214,9 @@ class WithProtocolEndsServerEndsResponse {
     // Setter for out.
     //
     
-    WithProtocolEndsServerEndsResponse& out(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value) {
-      storage_.out = std::move(value);
-      return *this;
-    }
+    WithProtocolEndsServerEndsResponse& out(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value);
 
-  WithProtocolEndsServerEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsServerEndsResponse(Storage_{
-      .out ={},
-  }) {}
+  WithProtocolEndsServerEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3641,11 +3253,8 @@ class WithProtocolEndsStructContainingEndsRequest {
  private:
   struct Storage_;
  public:
-  WithProtocolEndsStructContainingEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithProtocolEndsStructContainingEndsRequest(::test_protocols::ProtocolEnds in) noexcept
-    : storage_({
-      .in = std::move(in)
-    }) {}
+  WithProtocolEndsStructContainingEndsRequest(Storage_ storage) noexcept;
+    WithProtocolEndsStructContainingEndsRequest(::test_protocols::ProtocolEnds in) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3669,14 +3278,9 @@ class WithProtocolEndsStructContainingEndsRequest {
     // Setter for in.
     //
     
-    WithProtocolEndsStructContainingEndsRequest& in(::test_protocols::ProtocolEnds value) {
-      storage_.in = std::move(value);
-      return *this;
-    }
+    WithProtocolEndsStructContainingEndsRequest& in(::test_protocols::ProtocolEnds value);
 
-  WithProtocolEndsStructContainingEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsStructContainingEndsRequest(Storage_{
-      .in =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  WithProtocolEndsStructContainingEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3713,11 +3317,8 @@ class WithProtocolEndsStructContainingEndsResponse {
  private:
   struct Storage_;
  public:
-  WithProtocolEndsStructContainingEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    WithProtocolEndsStructContainingEndsResponse(::test_protocols::ProtocolEnds out) noexcept
-    : storage_({
-      .out = std::move(out)
-    }) {}
+  WithProtocolEndsStructContainingEndsResponse(Storage_ storage) noexcept;
+    WithProtocolEndsStructContainingEndsResponse(::test_protocols::ProtocolEnds out) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3741,14 +3342,9 @@ class WithProtocolEndsStructContainingEndsResponse {
     // Setter for out.
     //
     
-    WithProtocolEndsStructContainingEndsResponse& out(::test_protocols::ProtocolEnds value) {
-      storage_.out = std::move(value);
-      return *this;
-    }
+    WithProtocolEndsStructContainingEndsResponse& out(::test_protocols::ProtocolEnds value);
 
-  WithProtocolEndsStructContainingEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsStructContainingEndsResponse(Storage_{
-      .out =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  WithProtocolEndsStructContainingEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3786,25 +3382,8 @@ class ManyParametersFifteenRequest {
  private:
   struct Storage_;
  public:
-  ManyParametersFifteenRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ManyParametersFifteenRequest(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) noexcept
-    : storage_({
-      .p1 = std::move(p1), 
-      .p2 = std::move(p2), 
-      .p3 = std::move(p3), 
-      .p4 = std::move(p4), 
-      .p5 = std::move(p5), 
-      .p6 = std::move(p6), 
-      .p7 = std::move(p7), 
-      .p8 = std::move(p8), 
-      .p9 = std::move(p9), 
-      .p10 = std::move(p10), 
-      .p11 = std::move(p11), 
-      .p12 = std::move(p12), 
-      .p13 = std::move(p13), 
-      .p14 = std::move(p14), 
-      .p15 = std::move(p15)
-    }) {}
+  ManyParametersFifteenRequest(Storage_ storage) noexcept;
+    ManyParametersFifteenRequest(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3814,11 +3393,8 @@ class ManyParametersFifteenRequest {
 
   ManyParametersFifteenRequest(ManyParametersFifteenRequest&&) noexcept = default;
   ManyParametersFifteenRequest& operator=(ManyParametersFifteenRequest&&) noexcept = default;
-    ManyParametersFifteenRequest(const ManyParametersFifteenRequest& other) noexcept : ManyParametersFifteenRequest(other.CloneStorage_()){}
-    ManyParametersFifteenRequest& operator=(const ManyParametersFifteenRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ManyParametersFifteenRequest(const ManyParametersFifteenRequest& other) noexcept;
+    ManyParametersFifteenRequest& operator=(const ManyParametersFifteenRequest& other) noexcept;
 
     bool operator==(const ManyParametersFifteenRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::ManyParametersFifteenRequest, 15>::Equal(this, &other);
@@ -3840,10 +3416,7 @@ class ManyParametersFifteenRequest {
     // Setter for p1.
     //
     
-    ManyParametersFifteenRequest& p1(bool value) {
-      storage_.p1 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p1(bool value);
     
       bool
     p2() const {
@@ -3858,10 +3431,7 @@ class ManyParametersFifteenRequest {
     // Setter for p2.
     //
     
-    ManyParametersFifteenRequest& p2(bool value) {
-      storage_.p2 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p2(bool value);
     
       bool
     p3() const {
@@ -3876,10 +3446,7 @@ class ManyParametersFifteenRequest {
     // Setter for p3.
     //
     
-    ManyParametersFifteenRequest& p3(bool value) {
-      storage_.p3 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p3(bool value);
     
       bool
     p4() const {
@@ -3894,10 +3461,7 @@ class ManyParametersFifteenRequest {
     // Setter for p4.
     //
     
-    ManyParametersFifteenRequest& p4(bool value) {
-      storage_.p4 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p4(bool value);
     
       bool
     p5() const {
@@ -3912,10 +3476,7 @@ class ManyParametersFifteenRequest {
     // Setter for p5.
     //
     
-    ManyParametersFifteenRequest& p5(bool value) {
-      storage_.p5 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p5(bool value);
     
       bool
     p6() const {
@@ -3930,10 +3491,7 @@ class ManyParametersFifteenRequest {
     // Setter for p6.
     //
     
-    ManyParametersFifteenRequest& p6(bool value) {
-      storage_.p6 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p6(bool value);
     
       bool
     p7() const {
@@ -3948,10 +3506,7 @@ class ManyParametersFifteenRequest {
     // Setter for p7.
     //
     
-    ManyParametersFifteenRequest& p7(bool value) {
-      storage_.p7 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p7(bool value);
     
       bool
     p8() const {
@@ -3966,10 +3521,7 @@ class ManyParametersFifteenRequest {
     // Setter for p8.
     //
     
-    ManyParametersFifteenRequest& p8(bool value) {
-      storage_.p8 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p8(bool value);
     
       bool
     p9() const {
@@ -3984,10 +3536,7 @@ class ManyParametersFifteenRequest {
     // Setter for p9.
     //
     
-    ManyParametersFifteenRequest& p9(bool value) {
-      storage_.p9 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p9(bool value);
     
       bool
     p10() const {
@@ -4002,10 +3551,7 @@ class ManyParametersFifteenRequest {
     // Setter for p10.
     //
     
-    ManyParametersFifteenRequest& p10(bool value) {
-      storage_.p10 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p10(bool value);
     
       bool
     p11() const {
@@ -4020,10 +3566,7 @@ class ManyParametersFifteenRequest {
     // Setter for p11.
     //
     
-    ManyParametersFifteenRequest& p11(bool value) {
-      storage_.p11 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p11(bool value);
     
       bool
     p12() const {
@@ -4038,10 +3581,7 @@ class ManyParametersFifteenRequest {
     // Setter for p12.
     //
     
-    ManyParametersFifteenRequest& p12(bool value) {
-      storage_.p12 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p12(bool value);
     
       bool
     p13() const {
@@ -4056,10 +3596,7 @@ class ManyParametersFifteenRequest {
     // Setter for p13.
     //
     
-    ManyParametersFifteenRequest& p13(bool value) {
-      storage_.p13 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p13(bool value);
     
       bool
     p14() const {
@@ -4074,10 +3611,7 @@ class ManyParametersFifteenRequest {
     // Setter for p14.
     //
     
-    ManyParametersFifteenRequest& p14(bool value) {
-      storage_.p14 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p14(bool value);
     
       bool
     p15() const {
@@ -4092,28 +3626,9 @@ class ManyParametersFifteenRequest {
     // Setter for p15.
     //
     
-    ManyParametersFifteenRequest& p15(bool value) {
-      storage_.p15 = std::move(value);
-      return *this;
-    }
+    ManyParametersFifteenRequest& p15(bool value);
 
-  ManyParametersFifteenRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ManyParametersFifteenRequest(Storage_{
-      .p1 ={},
-      .p2 ={},
-      .p3 ={},
-      .p4 ={},
-      .p5 ={},
-      .p6 ={},
-      .p7 ={},
-      .p8 ={},
-      .p9 ={},
-      .p10 ={},
-      .p11 ={},
-      .p12 ={},
-      .p13 ={},
-      .p14 ={},
-      .p15 ={},
-  }) {}
+  ManyParametersFifteenRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -4314,11 +3829,8 @@ class MethodWithUnionUnionMethodRequest {
  private:
   struct Storage_;
  public:
-  MethodWithUnionUnionMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    MethodWithUnionUnionMethodRequest(::test_protocols::TheUnion u) noexcept
-    : storage_({
-      .u = std::move(u)
-    }) {}
+  MethodWithUnionUnionMethodRequest(Storage_ storage) noexcept;
+    MethodWithUnionUnionMethodRequest(::test_protocols::TheUnion u) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -4328,11 +3840,8 @@ class MethodWithUnionUnionMethodRequest {
 
   MethodWithUnionUnionMethodRequest(MethodWithUnionUnionMethodRequest&&) noexcept = default;
   MethodWithUnionUnionMethodRequest& operator=(MethodWithUnionUnionMethodRequest&&) noexcept = default;
-    MethodWithUnionUnionMethodRequest(const MethodWithUnionUnionMethodRequest& other) noexcept : MethodWithUnionUnionMethodRequest(other.CloneStorage_()){}
-    MethodWithUnionUnionMethodRequest& operator=(const MethodWithUnionUnionMethodRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    MethodWithUnionUnionMethodRequest(const MethodWithUnionUnionMethodRequest& other) noexcept;
+    MethodWithUnionUnionMethodRequest& operator=(const MethodWithUnionUnionMethodRequest& other) noexcept;
 
     bool operator==(const MethodWithUnionUnionMethodRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::MethodWithUnionUnionMethodRequest, 16>::Equal(this, &other);
@@ -4354,14 +3863,9 @@ class MethodWithUnionUnionMethodRequest {
     // Setter for u.
     //
     
-    MethodWithUnionUnionMethodRequest& u(::test_protocols::TheUnion value) {
-      storage_.u = std::move(value);
-      return *this;
-    }
+    MethodWithUnionUnionMethodRequest& u(::test_protocols::TheUnion value);
 
-  MethodWithUnionUnionMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MethodWithUnionUnionMethodRequest(Storage_{
-      .u =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  MethodWithUnionUnionMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -4394,11 +3898,8 @@ class MethodWithUnionUnionMethodResponse {
  private:
   struct Storage_;
  public:
-  MethodWithUnionUnionMethodResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    MethodWithUnionUnionMethodResponse(::fidl::Box<::test_protocols::TheUnion> u) noexcept
-    : storage_({
-      .u = std::move(u)
-    }) {}
+  MethodWithUnionUnionMethodResponse(Storage_ storage) noexcept;
+    MethodWithUnionUnionMethodResponse(::fidl::Box<::test_protocols::TheUnion> u) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -4408,11 +3909,8 @@ class MethodWithUnionUnionMethodResponse {
 
   MethodWithUnionUnionMethodResponse(MethodWithUnionUnionMethodResponse&&) noexcept = default;
   MethodWithUnionUnionMethodResponse& operator=(MethodWithUnionUnionMethodResponse&&) noexcept = default;
-    MethodWithUnionUnionMethodResponse(const MethodWithUnionUnionMethodResponse& other) noexcept : MethodWithUnionUnionMethodResponse(other.CloneStorage_()){}
-    MethodWithUnionUnionMethodResponse& operator=(const MethodWithUnionUnionMethodResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    MethodWithUnionUnionMethodResponse(const MethodWithUnionUnionMethodResponse& other) noexcept;
+    MethodWithUnionUnionMethodResponse& operator=(const MethodWithUnionUnionMethodResponse& other) noexcept;
 
     bool operator==(const MethodWithUnionUnionMethodResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocols::MethodWithUnionUnionMethodResponse, 16>::Equal(this, &other);
@@ -4434,14 +3932,9 @@ class MethodWithUnionUnionMethodResponse {
     // Setter for u.
     //
     
-    MethodWithUnionUnionMethodResponse& u(::fidl::Box<::test_protocols::TheUnion> value) {
-      storage_.u = std::move(value);
-      return *this;
-    }
+    MethodWithUnionUnionMethodResponse& u(::fidl::Box<::test_protocols::TheUnion> value);
 
-  MethodWithUnionUnionMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MethodWithUnionUnionMethodResponse(Storage_{
-      .u ={},
-  }) {}
+  MethodWithUnionUnionMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -4462,6 +3955,1218 @@ class MethodWithUnionUnionMethodResponse {
 
 
   
+  
+  
+  
+  
+
+
+  
+  
+
+  
+
+  inline WithAndWithoutRequestResponseNoRequestWithResponseResponse::WithAndWithoutRequestResponseNoRequestWithResponseResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithAndWithoutRequestResponseNoRequestWithResponseResponse::WithAndWithoutRequestResponseNoRequestWithResponseResponse(::std::string ret) noexcept
+    : storage_({
+      .ret = std::move(ret)
+    }) {}
+    inline WithAndWithoutRequestResponseNoRequestWithResponseResponse::WithAndWithoutRequestResponseNoRequestWithResponseResponse(const ::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse& other) noexcept : ::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse(other.CloneStorage_()){}
+    inline WithAndWithoutRequestResponseNoRequestWithResponseResponse& ::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse::operator=(const ::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithAndWithoutRequestResponseNoRequestWithResponseResponse::WithAndWithoutRequestResponseNoRequestWithResponseResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseNoRequestWithResponseResponse(Storage_{
+      .ret ={},
+  }) {}
+    inline WithAndWithoutRequestResponseNoRequestWithResponseResponse& WithAndWithoutRequestResponseNoRequestWithResponseResponse::ret(::std::string value) {
+      storage_.ret = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline WithAndWithoutRequestResponseWithRequestNoResponseRequest::WithAndWithoutRequestResponseWithRequestNoResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithAndWithoutRequestResponseWithRequestNoResponseRequest::WithAndWithoutRequestResponseWithRequestNoResponseRequest(::std::string arg) noexcept
+    : storage_({
+      .arg = std::move(arg)
+    }) {}
+    inline WithAndWithoutRequestResponseWithRequestNoResponseRequest::WithAndWithoutRequestResponseWithRequestNoResponseRequest(const ::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest& other) noexcept : ::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest(other.CloneStorage_()){}
+    inline WithAndWithoutRequestResponseWithRequestNoResponseRequest& ::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest::operator=(const ::test_protocols::WithAndWithoutRequestResponseWithRequestNoResponseRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithAndWithoutRequestResponseWithRequestNoResponseRequest::WithAndWithoutRequestResponseWithRequestNoResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseWithRequestNoResponseRequest(Storage_{
+      .arg ={},
+  }) {}
+    inline WithAndWithoutRequestResponseWithRequestNoResponseRequest& WithAndWithoutRequestResponseWithRequestNoResponseRequest::arg(::std::string value) {
+      storage_.arg = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(::std::string arg) noexcept
+    : storage_({
+      .arg = std::move(arg)
+    }) {}
+    inline WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(const ::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& other) noexcept : ::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(other.CloneStorage_()){}
+    inline WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& ::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::operator=(const ::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseWithRequestEmptyResponseRequest(Storage_{
+      .arg ={},
+  }) {}
+    inline WithAndWithoutRequestResponseWithRequestEmptyResponseRequest& WithAndWithoutRequestResponseWithRequestEmptyResponseRequest::arg(::std::string value) {
+      storage_.arg = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline WithAndWithoutRequestResponseWithRequestWithResponseRequest::WithAndWithoutRequestResponseWithRequestWithResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithAndWithoutRequestResponseWithRequestWithResponseRequest::WithAndWithoutRequestResponseWithRequestWithResponseRequest(::std::string arg) noexcept
+    : storage_({
+      .arg = std::move(arg)
+    }) {}
+    inline WithAndWithoutRequestResponseWithRequestWithResponseRequest::WithAndWithoutRequestResponseWithRequestWithResponseRequest(const ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest& other) noexcept : ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest(other.CloneStorage_()){}
+    inline WithAndWithoutRequestResponseWithRequestWithResponseRequest& ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest::operator=(const ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithAndWithoutRequestResponseWithRequestWithResponseRequest::WithAndWithoutRequestResponseWithRequestWithResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseWithRequestWithResponseRequest(Storage_{
+      .arg ={},
+  }) {}
+    inline WithAndWithoutRequestResponseWithRequestWithResponseRequest& WithAndWithoutRequestResponseWithRequestWithResponseRequest::arg(::std::string value) {
+      storage_.arg = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline WithAndWithoutRequestResponseWithRequestWithResponseResponse::WithAndWithoutRequestResponseWithRequestWithResponseResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithAndWithoutRequestResponseWithRequestWithResponseResponse::WithAndWithoutRequestResponseWithRequestWithResponseResponse(::std::string ret) noexcept
+    : storage_({
+      .ret = std::move(ret)
+    }) {}
+    inline WithAndWithoutRequestResponseWithRequestWithResponseResponse::WithAndWithoutRequestResponseWithRequestWithResponseResponse(const ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse& other) noexcept : ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse(other.CloneStorage_()){}
+    inline WithAndWithoutRequestResponseWithRequestWithResponseResponse& ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse::operator=(const ::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithAndWithoutRequestResponseWithRequestWithResponseResponse::WithAndWithoutRequestResponseWithRequestWithResponseResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseWithRequestWithResponseResponse(Storage_{
+      .ret ={},
+  }) {}
+    inline WithAndWithoutRequestResponseWithRequestWithResponseResponse& WithAndWithoutRequestResponseWithRequestWithResponseResponse::ret(::std::string value) {
+      storage_.ret = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline WithAndWithoutRequestResponseOnWithResponseRequest::WithAndWithoutRequestResponseOnWithResponseRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithAndWithoutRequestResponseOnWithResponseRequest::WithAndWithoutRequestResponseOnWithResponseRequest(::std::string ret) noexcept
+    : storage_({
+      .ret = std::move(ret)
+    }) {}
+    inline WithAndWithoutRequestResponseOnWithResponseRequest::WithAndWithoutRequestResponseOnWithResponseRequest(const ::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest& other) noexcept : ::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest(other.CloneStorage_()){}
+    inline WithAndWithoutRequestResponseOnWithResponseRequest& ::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest::operator=(const ::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithAndWithoutRequestResponseOnWithResponseRequest::WithAndWithoutRequestResponseOnWithResponseRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithAndWithoutRequestResponseOnWithResponseRequest(Storage_{
+      .ret ={},
+  }) {}
+    inline WithAndWithoutRequestResponseOnWithResponseRequest& WithAndWithoutRequestResponseOnWithResponseRequest::ret(::std::string value) {
+      storage_.ret = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline WithErrorSyntaxResponseAsStructResponse::WithErrorSyntaxResponseAsStructResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithErrorSyntaxResponseAsStructResponse::WithErrorSyntaxResponseAsStructResponse(int64_t a, int64_t b, int64_t c) noexcept
+    : storage_({
+      .a = std::move(a), 
+      .b = std::move(b), 
+      .c = std::move(c)
+    }) {}
+    inline WithErrorSyntaxResponseAsStructResponse::WithErrorSyntaxResponseAsStructResponse(const ::test_protocols::WithErrorSyntaxResponseAsStructResponse& other) noexcept : ::test_protocols::WithErrorSyntaxResponseAsStructResponse(other.CloneStorage_()){}
+    inline WithErrorSyntaxResponseAsStructResponse& ::test_protocols::WithErrorSyntaxResponseAsStructResponse::operator=(const ::test_protocols::WithErrorSyntaxResponseAsStructResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithErrorSyntaxResponseAsStructResponse::WithErrorSyntaxResponseAsStructResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxResponseAsStructResponse(Storage_{
+      .a ={},
+      .b ={},
+      .c ={},
+  }) {}
+    inline WithErrorSyntaxResponseAsStructResponse& WithErrorSyntaxResponseAsStructResponse::a(int64_t value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+    inline WithErrorSyntaxResponseAsStructResponse& WithErrorSyntaxResponseAsStructResponse::b(int64_t value) {
+      storage_.b = std::move(value);
+      return *this;
+    }
+    inline WithErrorSyntaxResponseAsStructResponse& WithErrorSyntaxResponseAsStructResponse::c(int64_t value) {
+      storage_.c = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline WithErrorSyntaxResponseAsStructTopResponse::WithErrorSyntaxResponseAsStructTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithErrorSyntaxResponseAsStructTopResponse::WithErrorSyntaxResponseAsStructTopResponse(::test_protocols::WithErrorSyntaxResponseAsStructResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline WithErrorSyntaxResponseAsStructTopResponse::WithErrorSyntaxResponseAsStructTopResponse(const ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse& other) noexcept : ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse(other.CloneStorage_()){}
+    inline WithErrorSyntaxResponseAsStructTopResponse& ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse::operator=(const ::test_protocols::WithErrorSyntaxResponseAsStructTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithErrorSyntaxResponseAsStructTopResponse::WithErrorSyntaxResponseAsStructTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxResponseAsStructTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline WithErrorSyntaxResponseAsStructTopResponse& WithErrorSyntaxResponseAsStructTopResponse::result(::test_protocols::WithErrorSyntaxResponseAsStructResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline WithErrorSyntaxErrorAsPrimitiveResponse::WithErrorSyntaxErrorAsPrimitiveResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithErrorSyntaxErrorAsPrimitiveResponse::WithErrorSyntaxErrorAsPrimitiveResponse(uint8_t __reserved) noexcept
+    : storage_({
+      .__reserved = std::move(__reserved)
+    }) {}
+    inline WithErrorSyntaxErrorAsPrimitiveResponse::WithErrorSyntaxErrorAsPrimitiveResponse(const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse& other) noexcept : ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse(other.CloneStorage_()){}
+    inline WithErrorSyntaxErrorAsPrimitiveResponse& ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse::operator=(const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithErrorSyntaxErrorAsPrimitiveResponse::WithErrorSyntaxErrorAsPrimitiveResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsPrimitiveResponse(Storage_{
+      .__reserved =0u,
+  }) {}
+    inline WithErrorSyntaxErrorAsPrimitiveResponse& WithErrorSyntaxErrorAsPrimitiveResponse::__reserved(uint8_t value) {
+      storage_.__reserved = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline WithErrorSyntaxErrorAsPrimitiveTopResponse::WithErrorSyntaxErrorAsPrimitiveTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithErrorSyntaxErrorAsPrimitiveTopResponse::WithErrorSyntaxErrorAsPrimitiveTopResponse(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline WithErrorSyntaxErrorAsPrimitiveTopResponse::WithErrorSyntaxErrorAsPrimitiveTopResponse(const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept : ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse(other.CloneStorage_()){}
+    inline WithErrorSyntaxErrorAsPrimitiveTopResponse& ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse::operator=(const ::test_protocols::WithErrorSyntaxErrorAsPrimitiveTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithErrorSyntaxErrorAsPrimitiveTopResponse::WithErrorSyntaxErrorAsPrimitiveTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsPrimitiveTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline WithErrorSyntaxErrorAsPrimitiveTopResponse& WithErrorSyntaxErrorAsPrimitiveTopResponse::result(::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline WithErrorSyntaxErrorAsEnumResponse::WithErrorSyntaxErrorAsEnumResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithErrorSyntaxErrorAsEnumResponse::WithErrorSyntaxErrorAsEnumResponse(uint8_t __reserved) noexcept
+    : storage_({
+      .__reserved = std::move(__reserved)
+    }) {}
+    inline WithErrorSyntaxErrorAsEnumResponse::WithErrorSyntaxErrorAsEnumResponse(const ::test_protocols::WithErrorSyntaxErrorAsEnumResponse& other) noexcept : ::test_protocols::WithErrorSyntaxErrorAsEnumResponse(other.CloneStorage_()){}
+    inline WithErrorSyntaxErrorAsEnumResponse& ::test_protocols::WithErrorSyntaxErrorAsEnumResponse::operator=(const ::test_protocols::WithErrorSyntaxErrorAsEnumResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithErrorSyntaxErrorAsEnumResponse::WithErrorSyntaxErrorAsEnumResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsEnumResponse(Storage_{
+      .__reserved =0u,
+  }) {}
+    inline WithErrorSyntaxErrorAsEnumResponse& WithErrorSyntaxErrorAsEnumResponse::__reserved(uint8_t value) {
+      storage_.__reserved = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline WithErrorSyntaxErrorAsEnumTopResponse::WithErrorSyntaxErrorAsEnumTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithErrorSyntaxErrorAsEnumTopResponse::WithErrorSyntaxErrorAsEnumTopResponse(::test_protocols::WithErrorSyntaxErrorAsEnumResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline WithErrorSyntaxErrorAsEnumTopResponse::WithErrorSyntaxErrorAsEnumTopResponse(const ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept : ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse(other.CloneStorage_()){}
+    inline WithErrorSyntaxErrorAsEnumTopResponse& ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse::operator=(const ::test_protocols::WithErrorSyntaxErrorAsEnumTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline WithErrorSyntaxErrorAsEnumTopResponse::WithErrorSyntaxErrorAsEnumTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxErrorAsEnumTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline WithErrorSyntaxErrorAsEnumTopResponse& WithErrorSyntaxErrorAsEnumTopResponse::result(::test_protocols::WithErrorSyntaxErrorAsEnumResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline WithErrorSyntaxHandleInResultResponse::WithErrorSyntaxHandleInResultResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithErrorSyntaxHandleInResultResponse::WithErrorSyntaxHandleInResultResponse(::zx::handle h) noexcept
+    : storage_({
+      .h = std::move(h)
+    }) {}
+
+  inline WithErrorSyntaxHandleInResultResponse::WithErrorSyntaxHandleInResultResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxHandleInResultResponse(Storage_{
+      .h ={},
+  }) {}
+    inline WithErrorSyntaxHandleInResultResponse& WithErrorSyntaxHandleInResultResponse::h(::zx::handle value) {
+      storage_.h = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline WithErrorSyntaxHandleInResultTopResponse::WithErrorSyntaxHandleInResultTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithErrorSyntaxHandleInResultTopResponse::WithErrorSyntaxHandleInResultTopResponse(::test_protocols::WithErrorSyntaxHandleInResultResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+
+  inline WithErrorSyntaxHandleInResultTopResponse::WithErrorSyntaxHandleInResultTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithErrorSyntaxHandleInResultTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline WithErrorSyntaxHandleInResultTopResponse& WithErrorSyntaxHandleInResultTopResponse::result(::test_protocols::WithErrorSyntaxHandleInResultResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+  
+  
+
+  
+
+  inline ChannelProtocolMethodARequest::ChannelProtocolMethodARequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ChannelProtocolMethodARequest::ChannelProtocolMethodARequest(int64_t a, int64_t b) noexcept
+    : storage_({
+      .a = std::move(a), 
+      .b = std::move(b)
+    }) {}
+    inline ChannelProtocolMethodARequest::ChannelProtocolMethodARequest(const ::test_protocols::ChannelProtocolMethodARequest& other) noexcept : ::test_protocols::ChannelProtocolMethodARequest(other.CloneStorage_()){}
+    inline ChannelProtocolMethodARequest& ::test_protocols::ChannelProtocolMethodARequest::operator=(const ::test_protocols::ChannelProtocolMethodARequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ChannelProtocolMethodARequest::ChannelProtocolMethodARequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMethodARequest(Storage_{
+      .a ={},
+      .b ={},
+  }) {}
+    inline ChannelProtocolMethodARequest& ChannelProtocolMethodARequest::a(int64_t value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+    inline ChannelProtocolMethodARequest& ChannelProtocolMethodARequest::b(int64_t value) {
+      storage_.b = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline ChannelProtocolEventARequest::ChannelProtocolEventARequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ChannelProtocolEventARequest::ChannelProtocolEventARequest(int64_t a, int64_t b) noexcept
+    : storage_({
+      .a = std::move(a), 
+      .b = std::move(b)
+    }) {}
+    inline ChannelProtocolEventARequest::ChannelProtocolEventARequest(const ::test_protocols::ChannelProtocolEventARequest& other) noexcept : ::test_protocols::ChannelProtocolEventARequest(other.CloneStorage_()){}
+    inline ChannelProtocolEventARequest& ::test_protocols::ChannelProtocolEventARequest::operator=(const ::test_protocols::ChannelProtocolEventARequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ChannelProtocolEventARequest::ChannelProtocolEventARequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolEventARequest(Storage_{
+      .a ={},
+      .b ={},
+  }) {}
+    inline ChannelProtocolEventARequest& ChannelProtocolEventARequest::a(int64_t value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+    inline ChannelProtocolEventARequest& ChannelProtocolEventARequest::b(int64_t value) {
+      storage_.b = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline ChannelProtocolMethodBRequest::ChannelProtocolMethodBRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ChannelProtocolMethodBRequest::ChannelProtocolMethodBRequest(int64_t a, int64_t b) noexcept
+    : storage_({
+      .a = std::move(a), 
+      .b = std::move(b)
+    }) {}
+    inline ChannelProtocolMethodBRequest::ChannelProtocolMethodBRequest(const ::test_protocols::ChannelProtocolMethodBRequest& other) noexcept : ::test_protocols::ChannelProtocolMethodBRequest(other.CloneStorage_()){}
+    inline ChannelProtocolMethodBRequest& ::test_protocols::ChannelProtocolMethodBRequest::operator=(const ::test_protocols::ChannelProtocolMethodBRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ChannelProtocolMethodBRequest::ChannelProtocolMethodBRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMethodBRequest(Storage_{
+      .a ={},
+      .b ={},
+  }) {}
+    inline ChannelProtocolMethodBRequest& ChannelProtocolMethodBRequest::a(int64_t value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+    inline ChannelProtocolMethodBRequest& ChannelProtocolMethodBRequest::b(int64_t value) {
+      storage_.b = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline ChannelProtocolMethodBResponse::ChannelProtocolMethodBResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ChannelProtocolMethodBResponse::ChannelProtocolMethodBResponse(int64_t result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ChannelProtocolMethodBResponse::ChannelProtocolMethodBResponse(const ::test_protocols::ChannelProtocolMethodBResponse& other) noexcept : ::test_protocols::ChannelProtocolMethodBResponse(other.CloneStorage_()){}
+    inline ChannelProtocolMethodBResponse& ::test_protocols::ChannelProtocolMethodBResponse::operator=(const ::test_protocols::ChannelProtocolMethodBResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ChannelProtocolMethodBResponse::ChannelProtocolMethodBResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMethodBResponse(Storage_{
+      .result ={},
+  }) {}
+    inline ChannelProtocolMethodBResponse& ChannelProtocolMethodBResponse::result(int64_t value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline ChannelProtocolTakeHandleRequest::ChannelProtocolTakeHandleRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ChannelProtocolTakeHandleRequest::ChannelProtocolTakeHandleRequest(::zx::handle h) noexcept
+    : storage_({
+      .h = std::move(h)
+    }) {}
+
+  inline ChannelProtocolTakeHandleRequest::ChannelProtocolTakeHandleRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolTakeHandleRequest(Storage_{
+      .h ={},
+  }) {}
+    inline ChannelProtocolTakeHandleRequest& ChannelProtocolTakeHandleRequest::h(::zx::handle value) {
+      storage_.h = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline ChannelProtocolMutateSocketRequest::ChannelProtocolMutateSocketRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ChannelProtocolMutateSocketRequest::ChannelProtocolMutateSocketRequest(::zx::socket a) noexcept
+    : storage_({
+      .a = std::move(a)
+    }) {}
+
+  inline ChannelProtocolMutateSocketRequest::ChannelProtocolMutateSocketRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMutateSocketRequest(Storage_{
+      .a ={},
+  }) {}
+    inline ChannelProtocolMutateSocketRequest& ChannelProtocolMutateSocketRequest::a(::zx::socket value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline ChannelProtocolMutateSocketResponse::ChannelProtocolMutateSocketResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ChannelProtocolMutateSocketResponse::ChannelProtocolMutateSocketResponse(::zx::socket b) noexcept
+    : storage_({
+      .b = std::move(b)
+    }) {}
+
+  inline ChannelProtocolMutateSocketResponse::ChannelProtocolMutateSocketResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChannelProtocolMutateSocketResponse(Storage_{
+      .b ={},
+  }) {}
+    inline ChannelProtocolMutateSocketResponse& ChannelProtocolMutateSocketResponse::b(::zx::socket value) {
+      storage_.b = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+  
+  
+
+  
+
+  inline SyscallProtocolMethodCRequest::SyscallProtocolMethodCRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline SyscallProtocolMethodCRequest::SyscallProtocolMethodCRequest(int64_t a, int64_t b) noexcept
+    : storage_({
+      .a = std::move(a), 
+      .b = std::move(b)
+    }) {}
+    inline SyscallProtocolMethodCRequest::SyscallProtocolMethodCRequest(const ::test_protocols::SyscallProtocolMethodCRequest& other) noexcept : ::test_protocols::SyscallProtocolMethodCRequest(other.CloneStorage_()){}
+    inline SyscallProtocolMethodCRequest& ::test_protocols::SyscallProtocolMethodCRequest::operator=(const ::test_protocols::SyscallProtocolMethodCRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline SyscallProtocolMethodCRequest::SyscallProtocolMethodCRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SyscallProtocolMethodCRequest(Storage_{
+      .a ={},
+      .b ={},
+  }) {}
+    inline SyscallProtocolMethodCRequest& SyscallProtocolMethodCRequest::a(int64_t value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+    inline SyscallProtocolMethodCRequest& SyscallProtocolMethodCRequest::b(int64_t value) {
+      storage_.b = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline TransitionalRequestRequest::TransitionalRequestRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TransitionalRequestRequest::TransitionalRequestRequest(int64_t x) noexcept
+    : storage_({
+      .x = std::move(x)
+    }) {}
+    inline TransitionalRequestRequest::TransitionalRequestRequest(const ::test_protocols::TransitionalRequestRequest& other) noexcept : ::test_protocols::TransitionalRequestRequest(other.CloneStorage_()){}
+    inline TransitionalRequestRequest& ::test_protocols::TransitionalRequestRequest::operator=(const ::test_protocols::TransitionalRequestRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline TransitionalRequestRequest::TransitionalRequestRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TransitionalRequestRequest(Storage_{
+      .x ={},
+  }) {}
+    inline TransitionalRequestRequest& TransitionalRequestRequest::x(int64_t value) {
+      storage_.x = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline TransitionalRequestResponse::TransitionalRequestResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TransitionalRequestResponse::TransitionalRequestResponse(int64_t y) noexcept
+    : storage_({
+      .y = std::move(y)
+    }) {}
+    inline TransitionalRequestResponse::TransitionalRequestResponse(const ::test_protocols::TransitionalRequestResponse& other) noexcept : ::test_protocols::TransitionalRequestResponse(other.CloneStorage_()){}
+    inline TransitionalRequestResponse& ::test_protocols::TransitionalRequestResponse::operator=(const ::test_protocols::TransitionalRequestResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline TransitionalRequestResponse::TransitionalRequestResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TransitionalRequestResponse(Storage_{
+      .y ={},
+  }) {}
+    inline TransitionalRequestResponse& TransitionalRequestResponse::y(int64_t value) {
+      storage_.y = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline TransitionalOneWayRequest::TransitionalOneWayRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TransitionalOneWayRequest::TransitionalOneWayRequest(int64_t x) noexcept
+    : storage_({
+      .x = std::move(x)
+    }) {}
+    inline TransitionalOneWayRequest::TransitionalOneWayRequest(const ::test_protocols::TransitionalOneWayRequest& other) noexcept : ::test_protocols::TransitionalOneWayRequest(other.CloneStorage_()){}
+    inline TransitionalOneWayRequest& ::test_protocols::TransitionalOneWayRequest::operator=(const ::test_protocols::TransitionalOneWayRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline TransitionalOneWayRequest::TransitionalOneWayRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TransitionalOneWayRequest(Storage_{
+      .x ={},
+  }) {}
+    inline TransitionalOneWayRequest& TransitionalOneWayRequest::x(int64_t value) {
+      storage_.x = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline TransitionalEventRequest::TransitionalEventRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TransitionalEventRequest::TransitionalEventRequest(int64_t x) noexcept
+    : storage_({
+      .x = std::move(x)
+    }) {}
+    inline TransitionalEventRequest::TransitionalEventRequest(const ::test_protocols::TransitionalEventRequest& other) noexcept : ::test_protocols::TransitionalEventRequest(other.CloneStorage_()){}
+    inline TransitionalEventRequest& ::test_protocols::TransitionalEventRequest::operator=(const ::test_protocols::TransitionalEventRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline TransitionalEventRequest::TransitionalEventRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TransitionalEventRequest(Storage_{
+      .x ={},
+  }) {}
+    inline TransitionalEventRequest& TransitionalEventRequest::x(int64_t value) {
+      storage_.x = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline HandleRightsProtocolNoResponseMethodRequest::HandleRightsProtocolNoResponseMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline HandleRightsProtocolNoResponseMethodRequest::HandleRightsProtocolNoResponseMethodRequest(::zx::socket h) noexcept
+    : storage_({
+      .h = std::move(h)
+    }) {}
+
+  inline HandleRightsProtocolNoResponseMethodRequest::HandleRightsProtocolNoResponseMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandleRightsProtocolNoResponseMethodRequest(Storage_{
+      .h ={},
+  }) {}
+    inline HandleRightsProtocolNoResponseMethodRequest& HandleRightsProtocolNoResponseMethodRequest::h(::zx::socket value) {
+      storage_.h = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline HandleRightsProtocolResponseMethodRequest::HandleRightsProtocolResponseMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline HandleRightsProtocolResponseMethodRequest::HandleRightsProtocolResponseMethodRequest(::zx::socket h) noexcept
+    : storage_({
+      .h = std::move(h)
+    }) {}
+
+  inline HandleRightsProtocolResponseMethodRequest::HandleRightsProtocolResponseMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandleRightsProtocolResponseMethodRequest(Storage_{
+      .h ={},
+  }) {}
+    inline HandleRightsProtocolResponseMethodRequest& HandleRightsProtocolResponseMethodRequest::h(::zx::socket value) {
+      storage_.h = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline HandleRightsProtocolResponseMethodResponse::HandleRightsProtocolResponseMethodResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline HandleRightsProtocolResponseMethodResponse::HandleRightsProtocolResponseMethodResponse(::zx::socket h) noexcept
+    : storage_({
+      .h = std::move(h)
+    }) {}
+
+  inline HandleRightsProtocolResponseMethodResponse::HandleRightsProtocolResponseMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandleRightsProtocolResponseMethodResponse(Storage_{
+      .h ={},
+  }) {}
+    inline HandleRightsProtocolResponseMethodResponse& HandleRightsProtocolResponseMethodResponse::h(::zx::socket value) {
+      storage_.h = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline HandleRightsProtocolAnEventRequest::HandleRightsProtocolAnEventRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline HandleRightsProtocolAnEventRequest::HandleRightsProtocolAnEventRequest(::zx::socket h) noexcept
+    : storage_({
+      .h = std::move(h)
+    }) {}
+
+  inline HandleRightsProtocolAnEventRequest::HandleRightsProtocolAnEventRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandleRightsProtocolAnEventRequest(Storage_{
+      .h ={},
+  }) {}
+    inline HandleRightsProtocolAnEventRequest& HandleRightsProtocolAnEventRequest::h(::zx::socket value) {
+      storage_.h = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline ProtocolEnds::ProtocolEnds(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ProtocolEnds::ProtocolEnds(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> client, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> server, ::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> client_opt, ::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> server_opt) noexcept
+    : storage_({
+      .client = std::move(client), 
+      .server = std::move(server), 
+      .client_opt = std::move(client_opt), 
+      .server_opt = std::move(server_opt)
+    }) {}
+
+  inline ProtocolEnds::ProtocolEnds(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ProtocolEnds(Storage_{
+      .client ={},
+      .server ={},
+      .client_opt ={},
+      .server_opt ={},
+  }) {}
+    inline ProtocolEnds& ProtocolEnds::client(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value) {
+      storage_.client = std::move(value);
+      return *this;
+    }
+    inline ProtocolEnds& ProtocolEnds::server(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value) {
+      storage_.server = std::move(value);
+      return *this;
+    }
+    inline ProtocolEnds& ProtocolEnds::client_opt(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value) {
+      storage_.client_opt = std::move(value);
+      return *this;
+    }
+    inline ProtocolEnds& ProtocolEnds::server_opt(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value) {
+      storage_.server_opt = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline WithProtocolEndsClientEndsRequest::WithProtocolEndsClientEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithProtocolEndsClientEndsRequest::WithProtocolEndsClientEndsRequest(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> in) noexcept
+    : storage_({
+      .in = std::move(in)
+    }) {}
+
+  inline WithProtocolEndsClientEndsRequest::WithProtocolEndsClientEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsClientEndsRequest(Storage_{
+      .in ={},
+  }) {}
+    inline WithProtocolEndsClientEndsRequest& WithProtocolEndsClientEndsRequest::in(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value) {
+      storage_.in = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline WithProtocolEndsClientEndsResponse::WithProtocolEndsClientEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithProtocolEndsClientEndsResponse::WithProtocolEndsClientEndsResponse(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> out) noexcept
+    : storage_({
+      .out = std::move(out)
+    }) {}
+
+  inline WithProtocolEndsClientEndsResponse::WithProtocolEndsClientEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsClientEndsResponse(Storage_{
+      .out ={},
+  }) {}
+    inline WithProtocolEndsClientEndsResponse& WithProtocolEndsClientEndsResponse::out(::fidl::ClientEnd<::test_protocols::DiscoverableProtocol> value) {
+      storage_.out = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline WithProtocolEndsServerEndsRequest::WithProtocolEndsServerEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithProtocolEndsServerEndsRequest::WithProtocolEndsServerEndsRequest(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> in) noexcept
+    : storage_({
+      .in = std::move(in)
+    }) {}
+
+  inline WithProtocolEndsServerEndsRequest::WithProtocolEndsServerEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsServerEndsRequest(Storage_{
+      .in ={},
+  }) {}
+    inline WithProtocolEndsServerEndsRequest& WithProtocolEndsServerEndsRequest::in(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value) {
+      storage_.in = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline WithProtocolEndsServerEndsResponse::WithProtocolEndsServerEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithProtocolEndsServerEndsResponse::WithProtocolEndsServerEndsResponse(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> out) noexcept
+    : storage_({
+      .out = std::move(out)
+    }) {}
+
+  inline WithProtocolEndsServerEndsResponse::WithProtocolEndsServerEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsServerEndsResponse(Storage_{
+      .out ={},
+  }) {}
+    inline WithProtocolEndsServerEndsResponse& WithProtocolEndsServerEndsResponse::out(::fidl::ServerEnd<::test_protocols::DiscoverableProtocol> value) {
+      storage_.out = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline WithProtocolEndsStructContainingEndsRequest::WithProtocolEndsStructContainingEndsRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithProtocolEndsStructContainingEndsRequest::WithProtocolEndsStructContainingEndsRequest(::test_protocols::ProtocolEnds in) noexcept
+    : storage_({
+      .in = std::move(in)
+    }) {}
+
+  inline WithProtocolEndsStructContainingEndsRequest::WithProtocolEndsStructContainingEndsRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsStructContainingEndsRequest(Storage_{
+      .in =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline WithProtocolEndsStructContainingEndsRequest& WithProtocolEndsStructContainingEndsRequest::in(::test_protocols::ProtocolEnds value) {
+      storage_.in = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+
+  
+#ifdef __Fuchsia__
+
+
+  inline WithProtocolEndsStructContainingEndsResponse::WithProtocolEndsStructContainingEndsResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline WithProtocolEndsStructContainingEndsResponse::WithProtocolEndsStructContainingEndsResponse(::test_protocols::ProtocolEnds out) noexcept
+    : storage_({
+      .out = std::move(out)
+    }) {}
+
+  inline WithProtocolEndsStructContainingEndsResponse::WithProtocolEndsStructContainingEndsResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : WithProtocolEndsStructContainingEndsResponse(Storage_{
+      .out =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline WithProtocolEndsStructContainingEndsResponse& WithProtocolEndsStructContainingEndsResponse::out(::test_protocols::ProtocolEnds value) {
+      storage_.out = std::move(value);
+      return *this;
+    }
+
+  
+
+#endif  // __Fuchsia__
+
+  
+  
+  
+  
+  
+
+  
+
+  inline ManyParametersFifteenRequest::ManyParametersFifteenRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ManyParametersFifteenRequest::ManyParametersFifteenRequest(bool p1, bool p2, bool p3, bool p4, bool p5, bool p6, bool p7, bool p8, bool p9, bool p10, bool p11, bool p12, bool p13, bool p14, bool p15) noexcept
+    : storage_({
+      .p1 = std::move(p1), 
+      .p2 = std::move(p2), 
+      .p3 = std::move(p3), 
+      .p4 = std::move(p4), 
+      .p5 = std::move(p5), 
+      .p6 = std::move(p6), 
+      .p7 = std::move(p7), 
+      .p8 = std::move(p8), 
+      .p9 = std::move(p9), 
+      .p10 = std::move(p10), 
+      .p11 = std::move(p11), 
+      .p12 = std::move(p12), 
+      .p13 = std::move(p13), 
+      .p14 = std::move(p14), 
+      .p15 = std::move(p15)
+    }) {}
+    inline ManyParametersFifteenRequest::ManyParametersFifteenRequest(const ::test_protocols::ManyParametersFifteenRequest& other) noexcept : ::test_protocols::ManyParametersFifteenRequest(other.CloneStorage_()){}
+    inline ManyParametersFifteenRequest& ::test_protocols::ManyParametersFifteenRequest::operator=(const ::test_protocols::ManyParametersFifteenRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ManyParametersFifteenRequest::ManyParametersFifteenRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ManyParametersFifteenRequest(Storage_{
+      .p1 ={},
+      .p2 ={},
+      .p3 ={},
+      .p4 ={},
+      .p5 ={},
+      .p6 ={},
+      .p7 ={},
+      .p8 ={},
+      .p9 ={},
+      .p10 ={},
+      .p11 ={},
+      .p12 ={},
+      .p13 ={},
+      .p14 ={},
+      .p15 ={},
+  }) {}
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p1(bool value) {
+      storage_.p1 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p2(bool value) {
+      storage_.p2 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p3(bool value) {
+      storage_.p3 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p4(bool value) {
+      storage_.p4 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p5(bool value) {
+      storage_.p5 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p6(bool value) {
+      storage_.p6 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p7(bool value) {
+      storage_.p7 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p8(bool value) {
+      storage_.p8 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p9(bool value) {
+      storage_.p9 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p10(bool value) {
+      storage_.p10 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p11(bool value) {
+      storage_.p11 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p12(bool value) {
+      storage_.p12 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p13(bool value) {
+      storage_.p13 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p14(bool value) {
+      storage_.p14 = std::move(value);
+      return *this;
+    }
+    inline ManyParametersFifteenRequest& ManyParametersFifteenRequest::p15(bool value) {
+      storage_.p15 = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline MethodWithUnionUnionMethodRequest::MethodWithUnionUnionMethodRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MethodWithUnionUnionMethodRequest::MethodWithUnionUnionMethodRequest(::test_protocols::TheUnion u) noexcept
+    : storage_({
+      .u = std::move(u)
+    }) {}
+    inline MethodWithUnionUnionMethodRequest::MethodWithUnionUnionMethodRequest(const ::test_protocols::MethodWithUnionUnionMethodRequest& other) noexcept : ::test_protocols::MethodWithUnionUnionMethodRequest(other.CloneStorage_()){}
+    inline MethodWithUnionUnionMethodRequest& ::test_protocols::MethodWithUnionUnionMethodRequest::operator=(const ::test_protocols::MethodWithUnionUnionMethodRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MethodWithUnionUnionMethodRequest::MethodWithUnionUnionMethodRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MethodWithUnionUnionMethodRequest(Storage_{
+      .u =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline MethodWithUnionUnionMethodRequest& MethodWithUnionUnionMethodRequest::u(::test_protocols::TheUnion value) {
+      storage_.u = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline MethodWithUnionUnionMethodResponse::MethodWithUnionUnionMethodResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MethodWithUnionUnionMethodResponse::MethodWithUnionUnionMethodResponse(::fidl::Box<::test_protocols::TheUnion> u) noexcept
+    : storage_({
+      .u = std::move(u)
+    }) {}
+    inline MethodWithUnionUnionMethodResponse::MethodWithUnionUnionMethodResponse(const ::test_protocols::MethodWithUnionUnionMethodResponse& other) noexcept : ::test_protocols::MethodWithUnionUnionMethodResponse(other.CloneStorage_()){}
+    inline MethodWithUnionUnionMethodResponse& ::test_protocols::MethodWithUnionUnionMethodResponse::operator=(const ::test_protocols::MethodWithUnionUnionMethodResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MethodWithUnionUnionMethodResponse::MethodWithUnionUnionMethodResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MethodWithUnionUnionMethodResponse(Storage_{
+      .u ={},
+  }) {}
+    inline MethodWithUnionUnionMethodResponse& MethodWithUnionUnionMethodResponse::u(::fidl::Box<::test_protocols::TheUnion> value) {
+      storage_.u = std::move(value);
+      return *this;
+    }
+
   
   
   

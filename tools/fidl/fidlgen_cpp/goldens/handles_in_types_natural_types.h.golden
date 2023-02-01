@@ -44,7 +44,7 @@ class TableWithHandle {
   struct Storage_;
 
  public:
-  TableWithHandle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  TableWithHandle(Storage_ storage) noexcept;
   TableWithHandle() noexcept = default;
   TableWithHandle(TableWithHandle&&) noexcept = default;
   TableWithHandle& operator=(TableWithHandle&&) noexcept = default;
@@ -59,16 +59,13 @@ class TableWithHandle {
   // Setter for h.
   //
 
-  TableWithHandle& h(std::optional<::zx::vmo> value) {
-    storage_.h = std::move(value);
-    return *this;
-  }
+  TableWithHandle& h(std::optional<::zx::vmo> value);
 
-  TableWithHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableWithHandle(Storage_{}) {}
+  TableWithHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-    ::std::optional<::zx::vmo> h{};
+    ::std::optional<::zx::vmo> h;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -179,14 +176,8 @@ class HandlesInTypes {
   struct Storage_;
 
  public:
-  HandlesInTypes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  HandlesInTypes(::zx::vmo normal_handle, ::std::vector<::zx::vmo> handle_in_vec, ::std::array<::zx::vmo, 5> handle_in_array, ::std::vector<::std::array<::zx::vmo, 5>> handle_in_mixed_vec_array, ::test_handlesintypes::TableWithHandle table_with_handle, ::test_handlesintypes::UnionWithHandle union_with_handle) noexcept
-      : storage_({.normal_handle = std::move(normal_handle),
-                  .handle_in_vec = std::move(handle_in_vec),
-                  .handle_in_array = std::move(handle_in_array),
-                  .handle_in_mixed_vec_array = std::move(handle_in_mixed_vec_array),
-                  .table_with_handle = std::move(table_with_handle),
-                  .union_with_handle = std::move(union_with_handle)}) {}
+  HandlesInTypes(Storage_ storage) noexcept;
+  HandlesInTypes(::zx::vmo normal_handle, ::std::vector<::zx::vmo> handle_in_vec, ::std::array<::zx::vmo, 5> handle_in_array, ::std::vector<::std::array<::zx::vmo, 5>> handle_in_mixed_vec_array, ::test_handlesintypes::TableWithHandle table_with_handle, ::test_handlesintypes::UnionWithHandle union_with_handle) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -209,10 +200,7 @@ class HandlesInTypes {
   // Setter for normal_handle.
   //
 
-  HandlesInTypes& normal_handle(::zx::vmo value) {
-    storage_.normal_handle = std::move(value);
-    return *this;
-  }
+  HandlesInTypes& normal_handle(::zx::vmo value);
 
   const ::std::vector<::zx::vmo>&
   handle_in_vec() const {
@@ -226,10 +214,7 @@ class HandlesInTypes {
   // Setter for handle_in_vec.
   //
 
-  HandlesInTypes& handle_in_vec(::std::vector<::zx::vmo> value) {
-    storage_.handle_in_vec = std::move(value);
-    return *this;
-  }
+  HandlesInTypes& handle_in_vec(::std::vector<::zx::vmo> value);
 
   const ::std::array<::zx::vmo, 5>&
   handle_in_array() const {
@@ -243,10 +228,7 @@ class HandlesInTypes {
   // Setter for handle_in_array.
   //
 
-  HandlesInTypes& handle_in_array(::std::array<::zx::vmo, 5> value) {
-    storage_.handle_in_array = std::move(value);
-    return *this;
-  }
+  HandlesInTypes& handle_in_array(::std::array<::zx::vmo, 5> value);
 
   const ::std::vector<::std::array<::zx::vmo, 5>>&
   handle_in_mixed_vec_array() const {
@@ -260,10 +242,7 @@ class HandlesInTypes {
   // Setter for handle_in_mixed_vec_array.
   //
 
-  HandlesInTypes& handle_in_mixed_vec_array(::std::vector<::std::array<::zx::vmo, 5>> value) {
-    storage_.handle_in_mixed_vec_array = std::move(value);
-    return *this;
-  }
+  HandlesInTypes& handle_in_mixed_vec_array(::std::vector<::std::array<::zx::vmo, 5>> value);
 
   const ::test_handlesintypes::TableWithHandle&
   table_with_handle() const {
@@ -277,10 +256,7 @@ class HandlesInTypes {
   // Setter for table_with_handle.
   //
 
-  HandlesInTypes& table_with_handle(::test_handlesintypes::TableWithHandle value) {
-    storage_.table_with_handle = std::move(value);
-    return *this;
-  }
+  HandlesInTypes& table_with_handle(::test_handlesintypes::TableWithHandle value);
 
   const ::test_handlesintypes::UnionWithHandle&
   union_with_handle() const {
@@ -294,19 +270,9 @@ class HandlesInTypes {
   // Setter for union_with_handle.
   //
 
-  HandlesInTypes& union_with_handle(::test_handlesintypes::UnionWithHandle value) {
-    storage_.union_with_handle = std::move(value);
-    return *this;
-  }
+  HandlesInTypes& union_with_handle(::test_handlesintypes::UnionWithHandle value);
 
-  HandlesInTypes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandlesInTypes(Storage_{
-                                                                                   .normal_handle = {},
-                                                                                   .handle_in_vec = {},
-                                                                                   .handle_in_array = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<::zx::vmo, 5>>::Make(),
-                                                                                   .handle_in_mixed_vec_array = {},
-                                                                                   .table_with_handle = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                   .union_with_handle = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                               }) {}
+  HandlesInTypes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -346,9 +312,8 @@ class EmptyResourceStruct {
   struct Storage_;
 
  public:
-  EmptyResourceStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  EmptyResourceStruct(uint8_t __reserved) noexcept
-      : storage_({.__reserved = std::move(__reserved)}) {}
+  EmptyResourceStruct(Storage_ storage) noexcept;
+  EmptyResourceStruct(uint8_t __reserved) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -371,14 +336,9 @@ class EmptyResourceStruct {
   // Setter for __reserved.
   //
 
-  EmptyResourceStruct& __reserved(uint8_t value) {
-    storage_.__reserved = std::move(value);
-    return *this;
-  }
+  EmptyResourceStruct& __reserved(uint8_t value);
 
-  EmptyResourceStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyResourceStruct(Storage_{
-                                                                                        .__reserved = 0u,
-                                                                                    }) {}
+  EmptyResourceStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -405,7 +365,7 @@ class EmptyResourceTable {
   struct Storage_;
 
  public:
-  EmptyResourceTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  EmptyResourceTable(Storage_ storage) noexcept;
   EmptyResourceTable() noexcept = default;
   EmptyResourceTable(EmptyResourceTable&&) noexcept = default;
   EmptyResourceTable& operator=(EmptyResourceTable&&) noexcept = default;
@@ -414,7 +374,7 @@ class EmptyResourceTable {
     return true;
   }
 
-  EmptyResourceTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyResourceTable(Storage_{}) {}
+  EmptyResourceTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -489,6 +449,88 @@ class EmptyResourceUnion {
     }
   }
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline TableWithHandle::TableWithHandle(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+
+inline TableWithHandle::TableWithHandle(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TableWithHandle(Storage_{}) {}
+inline TableWithHandle& TableWithHandle::h(std::optional<::zx::vmo> value) {
+  storage_.h = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline HandlesInTypes::HandlesInTypes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline HandlesInTypes::HandlesInTypes(::zx::vmo normal_handle, ::std::vector<::zx::vmo> handle_in_vec, ::std::array<::zx::vmo, 5> handle_in_array, ::std::vector<::std::array<::zx::vmo, 5>> handle_in_mixed_vec_array, ::test_handlesintypes::TableWithHandle table_with_handle, ::test_handlesintypes::UnionWithHandle union_with_handle) noexcept
+    : storage_({.normal_handle = std::move(normal_handle),
+                .handle_in_vec = std::move(handle_in_vec),
+                .handle_in_array = std::move(handle_in_array),
+                .handle_in_mixed_vec_array = std::move(handle_in_mixed_vec_array),
+                .table_with_handle = std::move(table_with_handle),
+                .union_with_handle = std::move(union_with_handle)}) {}
+
+inline HandlesInTypes::HandlesInTypes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : HandlesInTypes(Storage_{
+                                                                                                        .normal_handle = {},
+                                                                                                        .handle_in_vec = {},
+                                                                                                        .handle_in_array = ::fidl::internal::DefaultConstructPossiblyInvalidObject<::std::array<::zx::vmo, 5>>::Make(),
+                                                                                                        .handle_in_mixed_vec_array = {},
+                                                                                                        .table_with_handle = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                        .union_with_handle = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                    }) {}
+inline HandlesInTypes& HandlesInTypes::normal_handle(::zx::vmo value) {
+  storage_.normal_handle = std::move(value);
+  return *this;
+}
+inline HandlesInTypes& HandlesInTypes::handle_in_vec(::std::vector<::zx::vmo> value) {
+  storage_.handle_in_vec = std::move(value);
+  return *this;
+}
+inline HandlesInTypes& HandlesInTypes::handle_in_array(::std::array<::zx::vmo, 5> value) {
+  storage_.handle_in_array = std::move(value);
+  return *this;
+}
+inline HandlesInTypes& HandlesInTypes::handle_in_mixed_vec_array(::std::vector<::std::array<::zx::vmo, 5>> value) {
+  storage_.handle_in_mixed_vec_array = std::move(value);
+  return *this;
+}
+inline HandlesInTypes& HandlesInTypes::table_with_handle(::test_handlesintypes::TableWithHandle value) {
+  storage_.table_with_handle = std::move(value);
+  return *this;
+}
+inline HandlesInTypes& HandlesInTypes::union_with_handle(::test_handlesintypes::UnionWithHandle value) {
+  storage_.union_with_handle = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline EmptyResourceStruct::EmptyResourceStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline EmptyResourceStruct::EmptyResourceStruct(uint8_t __reserved) noexcept
+    : storage_({.__reserved = std::move(__reserved)}) {}
+
+inline EmptyResourceStruct::EmptyResourceStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyResourceStruct(Storage_{
+                                                                                                                  .__reserved = 0u,
+                                                                                                              }) {}
+inline EmptyResourceStruct& EmptyResourceStruct::__reserved(uint8_t value) {
+  storage_.__reserved = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline EmptyResourceTable::EmptyResourceTable(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+
+inline EmptyResourceTable::EmptyResourceTable(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyResourceTable(Storage_{}) {}
 
 #endif  // __Fuchsia__
 

@@ -54,6 +54,11 @@ fidl/{{ .LibraryDots }}/cpp/natural_types.h
   {{ if Eq .Kind Kinds.Union }}{{ template "Union:NaturalTypesHeader" . }}{{ end }}
 {{- end }}
 
+{{ range .Decls }}
+  {{ if Eq .Kind Kinds.Struct }}{{ template "Struct:InlineDefinition:NaturalTypesHeader" . }}{{ end }}
+  {{ if Eq .Kind Kinds.Table }}{{ template "Table:InlineDefinition:NaturalTypesHeader" . }}{{ end }}
+{{- end }}
+
 {{ EnsureNamespace "fidl" }}
 {{ range .Structs }}{{ template "Struct:Traits:NaturalTypesHeader" . }}{{ end }}
 {{ range .Tables }}{{ template "Table:Traits:NaturalTypesHeader" . }}{{ end }}

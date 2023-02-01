@@ -36,9 +36,8 @@ class ParentFirstRequest {
   struct Storage_;
 
  public:
-  ParentFirstRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ParentFirstRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) noexcept
-      : storage_({.request = std::move(request)}) {}
+  ParentFirstRequest(Storage_ storage) noexcept;
+  ParentFirstRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -61,14 +60,9 @@ class ParentFirstRequest {
   // Setter for request.
   //
 
-  ParentFirstRequest& request(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> value) {
-    storage_.request = std::move(value);
-    return *this;
-  }
+  ParentFirstRequest& request(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> value);
 
-  ParentFirstRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentFirstRequest(Storage_{
-                                                                                       .request = {},
-                                                                                   }) {}
+  ParentFirstRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -95,9 +89,8 @@ class ChildSecondRequest {
   struct Storage_;
 
  public:
-  ChildSecondRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ChildSecondRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) noexcept
-      : storage_({.request = std::move(request)}) {}
+  ChildSecondRequest(Storage_ storage) noexcept;
+  ChildSecondRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -120,14 +113,9 @@ class ChildSecondRequest {
   // Setter for request.
   //
 
-  ChildSecondRequest& request(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> value) {
-    storage_.request = std::move(value);
-    return *this;
-  }
+  ChildSecondRequest& request(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> value);
 
-  ChildSecondRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChildSecondRequest(Storage_{
-                                                                                       .request = {},
-                                                                                   }) {}
+  ChildSecondRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -142,6 +130,38 @@ class ChildSecondRequest {
       &Storage_::request, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline ParentFirstRequest::ParentFirstRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ParentFirstRequest::ParentFirstRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) noexcept
+    : storage_({.request = std::move(request)}) {}
+
+inline ParentFirstRequest::ParentFirstRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ParentFirstRequest(Storage_{
+                                                                                                                .request = {},
+                                                                                                            }) {}
+inline ParentFirstRequest& ParentFirstRequest::request(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> value) {
+  storage_.request = std::move(value);
+  return *this;
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
+inline ChildSecondRequest::ChildSecondRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ChildSecondRequest::ChildSecondRequest(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request) noexcept
+    : storage_({.request = std::move(request)}) {}
+
+inline ChildSecondRequest::ChildSecondRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ChildSecondRequest(Storage_{
+                                                                                                                .request = {},
+                                                                                                            }) {}
+inline ChildSecondRequest& ChildSecondRequest::request(::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> value) {
+  storage_.request = std::move(value);
+  return *this;
+}
 
 #endif  // __Fuchsia__
 

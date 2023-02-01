@@ -176,9 +176,8 @@ class DenyEachBindingOnlyDenyDartRequest {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyDartRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyDartRequest(bool a) noexcept
-      : storage_({.a = std::move(a)}) {}
+  DenyEachBindingOnlyDenyDartRequest(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyDartRequest(bool a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -188,11 +187,8 @@ class DenyEachBindingOnlyDenyDartRequest {
 
   DenyEachBindingOnlyDenyDartRequest(DenyEachBindingOnlyDenyDartRequest&&) noexcept = default;
   DenyEachBindingOnlyDenyDartRequest& operator=(DenyEachBindingOnlyDenyDartRequest&&) noexcept = default;
-  DenyEachBindingOnlyDenyDartRequest(const DenyEachBindingOnlyDenyDartRequest& other) noexcept : DenyEachBindingOnlyDenyDartRequest(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyDartRequest& operator=(const DenyEachBindingOnlyDenyDartRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyDartRequest(const DenyEachBindingOnlyDenyDartRequest& other) noexcept;
+  DenyEachBindingOnlyDenyDartRequest& operator=(const DenyEachBindingOnlyDenyDartRequest& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyDartRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest, 1>::Equal(this, &other);
@@ -213,14 +209,9 @@ class DenyEachBindingOnlyDenyDartRequest {
   // Setter for a.
   //
 
-  DenyEachBindingOnlyDenyDartRequest& a(bool value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyDartRequest& a(bool value);
 
-  DenyEachBindingOnlyDenyDartRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyDartRequest(Storage_{
-                                                                                                       .a = {},
-                                                                                                   }) {}
+  DenyEachBindingOnlyDenyDartRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -244,9 +235,8 @@ class DenyEachBindingOnlyDenyDartResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyDartResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyDartResponse(int32_t b) noexcept
-      : storage_({.b = std::move(b)}) {}
+  DenyEachBindingOnlyDenyDartResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyDartResponse(int32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -256,11 +246,8 @@ class DenyEachBindingOnlyDenyDartResponse {
 
   DenyEachBindingOnlyDenyDartResponse(DenyEachBindingOnlyDenyDartResponse&&) noexcept = default;
   DenyEachBindingOnlyDenyDartResponse& operator=(DenyEachBindingOnlyDenyDartResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyDartResponse(const DenyEachBindingOnlyDenyDartResponse& other) noexcept : DenyEachBindingOnlyDenyDartResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyDartResponse& operator=(const DenyEachBindingOnlyDenyDartResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyDartResponse(const DenyEachBindingOnlyDenyDartResponse& other) noexcept;
+  DenyEachBindingOnlyDenyDartResponse& operator=(const DenyEachBindingOnlyDenyDartResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyDartResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse, 4>::Equal(this, &other);
@@ -281,14 +268,9 @@ class DenyEachBindingOnlyDenyDartResponse {
   // Setter for b.
   //
 
-  DenyEachBindingOnlyDenyDartResponse& b(int32_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyDartResponse& b(int32_t value);
 
-  DenyEachBindingOnlyDenyDartResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyDartResponse(Storage_{
-                                                                                                        .b = {},
-                                                                                                    }) {}
+  DenyEachBindingOnlyDenyDartResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -435,9 +417,8 @@ class DenyEachBindingOnlyDenyDartTopResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyDartTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyDartTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult result) noexcept
-      : storage_({.result = std::move(result)}) {}
+  DenyEachBindingOnlyDenyDartTopResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyDartTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -447,11 +428,8 @@ class DenyEachBindingOnlyDenyDartTopResponse {
 
   DenyEachBindingOnlyDenyDartTopResponse(DenyEachBindingOnlyDenyDartTopResponse&&) noexcept = default;
   DenyEachBindingOnlyDenyDartTopResponse& operator=(DenyEachBindingOnlyDenyDartTopResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyDartTopResponse(const DenyEachBindingOnlyDenyDartTopResponse& other) noexcept : DenyEachBindingOnlyDenyDartTopResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyDartTopResponse& operator=(const DenyEachBindingOnlyDenyDartTopResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyDartTopResponse(const DenyEachBindingOnlyDenyDartTopResponse& other) noexcept;
+  DenyEachBindingOnlyDenyDartTopResponse& operator=(const DenyEachBindingOnlyDenyDartTopResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyDartTopResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse, 16>::Equal(this, &other);
@@ -472,14 +450,9 @@ class DenyEachBindingOnlyDenyDartTopResponse {
   // Setter for result.
   //
 
-  DenyEachBindingOnlyDenyDartTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult value) {
-    storage_.result = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyDartTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult value);
 
-  DenyEachBindingOnlyDenyDartTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyDartTopResponse(Storage_{
-                                                                                                           .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                       }) {}
+  DenyEachBindingOnlyDenyDartTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -503,9 +476,8 @@ class DenyEachBindingOnlyDenyGoRequest {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyGoRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyGoRequest(bool a) noexcept
-      : storage_({.a = std::move(a)}) {}
+  DenyEachBindingOnlyDenyGoRequest(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyGoRequest(bool a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -515,11 +487,8 @@ class DenyEachBindingOnlyDenyGoRequest {
 
   DenyEachBindingOnlyDenyGoRequest(DenyEachBindingOnlyDenyGoRequest&&) noexcept = default;
   DenyEachBindingOnlyDenyGoRequest& operator=(DenyEachBindingOnlyDenyGoRequest&&) noexcept = default;
-  DenyEachBindingOnlyDenyGoRequest(const DenyEachBindingOnlyDenyGoRequest& other) noexcept : DenyEachBindingOnlyDenyGoRequest(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyGoRequest& operator=(const DenyEachBindingOnlyDenyGoRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyGoRequest(const DenyEachBindingOnlyDenyGoRequest& other) noexcept;
+  DenyEachBindingOnlyDenyGoRequest& operator=(const DenyEachBindingOnlyDenyGoRequest& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyGoRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest, 1>::Equal(this, &other);
@@ -540,14 +509,9 @@ class DenyEachBindingOnlyDenyGoRequest {
   // Setter for a.
   //
 
-  DenyEachBindingOnlyDenyGoRequest& a(bool value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyGoRequest& a(bool value);
 
-  DenyEachBindingOnlyDenyGoRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyGoRequest(Storage_{
-                                                                                                     .a = {},
-                                                                                                 }) {}
+  DenyEachBindingOnlyDenyGoRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -571,9 +535,8 @@ class DenyEachBindingOnlyDenyGoResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyGoResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyGoResponse(int32_t b) noexcept
-      : storage_({.b = std::move(b)}) {}
+  DenyEachBindingOnlyDenyGoResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyGoResponse(int32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -583,11 +546,8 @@ class DenyEachBindingOnlyDenyGoResponse {
 
   DenyEachBindingOnlyDenyGoResponse(DenyEachBindingOnlyDenyGoResponse&&) noexcept = default;
   DenyEachBindingOnlyDenyGoResponse& operator=(DenyEachBindingOnlyDenyGoResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyGoResponse(const DenyEachBindingOnlyDenyGoResponse& other) noexcept : DenyEachBindingOnlyDenyGoResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyGoResponse& operator=(const DenyEachBindingOnlyDenyGoResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyGoResponse(const DenyEachBindingOnlyDenyGoResponse& other) noexcept;
+  DenyEachBindingOnlyDenyGoResponse& operator=(const DenyEachBindingOnlyDenyGoResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyGoResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse, 4>::Equal(this, &other);
@@ -608,14 +568,9 @@ class DenyEachBindingOnlyDenyGoResponse {
   // Setter for b.
   //
 
-  DenyEachBindingOnlyDenyGoResponse& b(int32_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyGoResponse& b(int32_t value);
 
-  DenyEachBindingOnlyDenyGoResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyGoResponse(Storage_{
-                                                                                                      .b = {},
-                                                                                                  }) {}
+  DenyEachBindingOnlyDenyGoResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -762,9 +717,8 @@ class DenyEachBindingOnlyDenyGoTopResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyGoTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyGoTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult result) noexcept
-      : storage_({.result = std::move(result)}) {}
+  DenyEachBindingOnlyDenyGoTopResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyGoTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -774,11 +728,8 @@ class DenyEachBindingOnlyDenyGoTopResponse {
 
   DenyEachBindingOnlyDenyGoTopResponse(DenyEachBindingOnlyDenyGoTopResponse&&) noexcept = default;
   DenyEachBindingOnlyDenyGoTopResponse& operator=(DenyEachBindingOnlyDenyGoTopResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyGoTopResponse(const DenyEachBindingOnlyDenyGoTopResponse& other) noexcept : DenyEachBindingOnlyDenyGoTopResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyGoTopResponse& operator=(const DenyEachBindingOnlyDenyGoTopResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyGoTopResponse(const DenyEachBindingOnlyDenyGoTopResponse& other) noexcept;
+  DenyEachBindingOnlyDenyGoTopResponse& operator=(const DenyEachBindingOnlyDenyGoTopResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyGoTopResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse, 16>::Equal(this, &other);
@@ -799,14 +750,9 @@ class DenyEachBindingOnlyDenyGoTopResponse {
   // Setter for result.
   //
 
-  DenyEachBindingOnlyDenyGoTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult value) {
-    storage_.result = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyGoTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult value);
 
-  DenyEachBindingOnlyDenyGoTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyGoTopResponse(Storage_{
-                                                                                                         .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                     }) {}
+  DenyEachBindingOnlyDenyGoTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -830,9 +776,8 @@ class DenyEachBindingOnlyDenyLibfuzzerRequest {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyLibfuzzerRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyLibfuzzerRequest(bool a) noexcept
-      : storage_({.a = std::move(a)}) {}
+  DenyEachBindingOnlyDenyLibfuzzerRequest(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyLibfuzzerRequest(bool a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -842,11 +787,8 @@ class DenyEachBindingOnlyDenyLibfuzzerRequest {
 
   DenyEachBindingOnlyDenyLibfuzzerRequest(DenyEachBindingOnlyDenyLibfuzzerRequest&&) noexcept = default;
   DenyEachBindingOnlyDenyLibfuzzerRequest& operator=(DenyEachBindingOnlyDenyLibfuzzerRequest&&) noexcept = default;
-  DenyEachBindingOnlyDenyLibfuzzerRequest(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept : DenyEachBindingOnlyDenyLibfuzzerRequest(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyLibfuzzerRequest& operator=(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyLibfuzzerRequest(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept;
+  DenyEachBindingOnlyDenyLibfuzzerRequest& operator=(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyLibfuzzerRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest, 1>::Equal(this, &other);
@@ -867,14 +809,9 @@ class DenyEachBindingOnlyDenyLibfuzzerRequest {
   // Setter for a.
   //
 
-  DenyEachBindingOnlyDenyLibfuzzerRequest& a(bool value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyLibfuzzerRequest& a(bool value);
 
-  DenyEachBindingOnlyDenyLibfuzzerRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyLibfuzzerRequest(Storage_{
-                                                                                                            .a = {},
-                                                                                                        }) {}
+  DenyEachBindingOnlyDenyLibfuzzerRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -898,9 +835,8 @@ class DenyEachBindingOnlyDenyLibfuzzerResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyLibfuzzerResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyLibfuzzerResponse(int32_t b) noexcept
-      : storage_({.b = std::move(b)}) {}
+  DenyEachBindingOnlyDenyLibfuzzerResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyLibfuzzerResponse(int32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -910,11 +846,8 @@ class DenyEachBindingOnlyDenyLibfuzzerResponse {
 
   DenyEachBindingOnlyDenyLibfuzzerResponse(DenyEachBindingOnlyDenyLibfuzzerResponse&&) noexcept = default;
   DenyEachBindingOnlyDenyLibfuzzerResponse& operator=(DenyEachBindingOnlyDenyLibfuzzerResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyLibfuzzerResponse(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept : DenyEachBindingOnlyDenyLibfuzzerResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyLibfuzzerResponse& operator=(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyLibfuzzerResponse(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept;
+  DenyEachBindingOnlyDenyLibfuzzerResponse& operator=(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyLibfuzzerResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse, 4>::Equal(this, &other);
@@ -935,14 +868,9 @@ class DenyEachBindingOnlyDenyLibfuzzerResponse {
   // Setter for b.
   //
 
-  DenyEachBindingOnlyDenyLibfuzzerResponse& b(int32_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyLibfuzzerResponse& b(int32_t value);
 
-  DenyEachBindingOnlyDenyLibfuzzerResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyLibfuzzerResponse(Storage_{
-                                                                                                             .b = {},
-                                                                                                         }) {}
+  DenyEachBindingOnlyDenyLibfuzzerResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1089,9 +1017,8 @@ class DenyEachBindingOnlyDenyLibfuzzerTopResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyLibfuzzerTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyLibfuzzerTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult result) noexcept
-      : storage_({.result = std::move(result)}) {}
+  DenyEachBindingOnlyDenyLibfuzzerTopResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyLibfuzzerTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1101,11 +1028,8 @@ class DenyEachBindingOnlyDenyLibfuzzerTopResponse {
 
   DenyEachBindingOnlyDenyLibfuzzerTopResponse(DenyEachBindingOnlyDenyLibfuzzerTopResponse&&) noexcept = default;
   DenyEachBindingOnlyDenyLibfuzzerTopResponse& operator=(DenyEachBindingOnlyDenyLibfuzzerTopResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyLibfuzzerTopResponse(const DenyEachBindingOnlyDenyLibfuzzerTopResponse& other) noexcept : DenyEachBindingOnlyDenyLibfuzzerTopResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyLibfuzzerTopResponse& operator=(const DenyEachBindingOnlyDenyLibfuzzerTopResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyLibfuzzerTopResponse(const DenyEachBindingOnlyDenyLibfuzzerTopResponse& other) noexcept;
+  DenyEachBindingOnlyDenyLibfuzzerTopResponse& operator=(const DenyEachBindingOnlyDenyLibfuzzerTopResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyLibfuzzerTopResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse, 16>::Equal(this, &other);
@@ -1126,14 +1050,9 @@ class DenyEachBindingOnlyDenyLibfuzzerTopResponse {
   // Setter for result.
   //
 
-  DenyEachBindingOnlyDenyLibfuzzerTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult value) {
-    storage_.result = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyLibfuzzerTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult value);
 
-  DenyEachBindingOnlyDenyLibfuzzerTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyLibfuzzerTopResponse(Storage_{
-                                                                                                                .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                            }) {}
+  DenyEachBindingOnlyDenyLibfuzzerTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1157,9 +1076,8 @@ class DenyEachBindingOnlyDenyRustRequest {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyRustRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyRustRequest(bool a) noexcept
-      : storage_({.a = std::move(a)}) {}
+  DenyEachBindingOnlyDenyRustRequest(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyRustRequest(bool a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1169,11 +1087,8 @@ class DenyEachBindingOnlyDenyRustRequest {
 
   DenyEachBindingOnlyDenyRustRequest(DenyEachBindingOnlyDenyRustRequest&&) noexcept = default;
   DenyEachBindingOnlyDenyRustRequest& operator=(DenyEachBindingOnlyDenyRustRequest&&) noexcept = default;
-  DenyEachBindingOnlyDenyRustRequest(const DenyEachBindingOnlyDenyRustRequest& other) noexcept : DenyEachBindingOnlyDenyRustRequest(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyRustRequest& operator=(const DenyEachBindingOnlyDenyRustRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyRustRequest(const DenyEachBindingOnlyDenyRustRequest& other) noexcept;
+  DenyEachBindingOnlyDenyRustRequest& operator=(const DenyEachBindingOnlyDenyRustRequest& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyRustRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest, 1>::Equal(this, &other);
@@ -1194,14 +1109,9 @@ class DenyEachBindingOnlyDenyRustRequest {
   // Setter for a.
   //
 
-  DenyEachBindingOnlyDenyRustRequest& a(bool value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyRustRequest& a(bool value);
 
-  DenyEachBindingOnlyDenyRustRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyRustRequest(Storage_{
-                                                                                                       .a = {},
-                                                                                                   }) {}
+  DenyEachBindingOnlyDenyRustRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1225,9 +1135,8 @@ class DenyEachBindingOnlyDenyRustResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyRustResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyRustResponse(int32_t b) noexcept
-      : storage_({.b = std::move(b)}) {}
+  DenyEachBindingOnlyDenyRustResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyRustResponse(int32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1237,11 +1146,8 @@ class DenyEachBindingOnlyDenyRustResponse {
 
   DenyEachBindingOnlyDenyRustResponse(DenyEachBindingOnlyDenyRustResponse&&) noexcept = default;
   DenyEachBindingOnlyDenyRustResponse& operator=(DenyEachBindingOnlyDenyRustResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyRustResponse(const DenyEachBindingOnlyDenyRustResponse& other) noexcept : DenyEachBindingOnlyDenyRustResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyRustResponse& operator=(const DenyEachBindingOnlyDenyRustResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyRustResponse(const DenyEachBindingOnlyDenyRustResponse& other) noexcept;
+  DenyEachBindingOnlyDenyRustResponse& operator=(const DenyEachBindingOnlyDenyRustResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyRustResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse, 4>::Equal(this, &other);
@@ -1262,14 +1168,9 @@ class DenyEachBindingOnlyDenyRustResponse {
   // Setter for b.
   //
 
-  DenyEachBindingOnlyDenyRustResponse& b(int32_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyRustResponse& b(int32_t value);
 
-  DenyEachBindingOnlyDenyRustResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyRustResponse(Storage_{
-                                                                                                        .b = {},
-                                                                                                    }) {}
+  DenyEachBindingOnlyDenyRustResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1416,9 +1317,8 @@ class DenyEachBindingOnlyDenyRustTopResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenyRustTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenyRustTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult result) noexcept
-      : storage_({.result = std::move(result)}) {}
+  DenyEachBindingOnlyDenyRustTopResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenyRustTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1428,11 +1328,8 @@ class DenyEachBindingOnlyDenyRustTopResponse {
 
   DenyEachBindingOnlyDenyRustTopResponse(DenyEachBindingOnlyDenyRustTopResponse&&) noexcept = default;
   DenyEachBindingOnlyDenyRustTopResponse& operator=(DenyEachBindingOnlyDenyRustTopResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenyRustTopResponse(const DenyEachBindingOnlyDenyRustTopResponse& other) noexcept : DenyEachBindingOnlyDenyRustTopResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenyRustTopResponse& operator=(const DenyEachBindingOnlyDenyRustTopResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenyRustTopResponse(const DenyEachBindingOnlyDenyRustTopResponse& other) noexcept;
+  DenyEachBindingOnlyDenyRustTopResponse& operator=(const DenyEachBindingOnlyDenyRustTopResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenyRustTopResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse, 16>::Equal(this, &other);
@@ -1453,14 +1350,9 @@ class DenyEachBindingOnlyDenyRustTopResponse {
   // Setter for result.
   //
 
-  DenyEachBindingOnlyDenyRustTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult value) {
-    storage_.result = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenyRustTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult value);
 
-  DenyEachBindingOnlyDenyRustTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyRustTopResponse(Storage_{
-                                                                                                           .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                       }) {}
+  DenyEachBindingOnlyDenyRustTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1484,9 +1376,8 @@ class DenyEachBindingOnlyDenySyzkallerRequest {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenySyzkallerRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenySyzkallerRequest(bool a) noexcept
-      : storage_({.a = std::move(a)}) {}
+  DenyEachBindingOnlyDenySyzkallerRequest(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenySyzkallerRequest(bool a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1496,11 +1387,8 @@ class DenyEachBindingOnlyDenySyzkallerRequest {
 
   DenyEachBindingOnlyDenySyzkallerRequest(DenyEachBindingOnlyDenySyzkallerRequest&&) noexcept = default;
   DenyEachBindingOnlyDenySyzkallerRequest& operator=(DenyEachBindingOnlyDenySyzkallerRequest&&) noexcept = default;
-  DenyEachBindingOnlyDenySyzkallerRequest(const DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept : DenyEachBindingOnlyDenySyzkallerRequest(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenySyzkallerRequest& operator=(const DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenySyzkallerRequest(const DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept;
+  DenyEachBindingOnlyDenySyzkallerRequest& operator=(const DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenySyzkallerRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest, 1>::Equal(this, &other);
@@ -1521,14 +1409,9 @@ class DenyEachBindingOnlyDenySyzkallerRequest {
   // Setter for a.
   //
 
-  DenyEachBindingOnlyDenySyzkallerRequest& a(bool value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenySyzkallerRequest& a(bool value);
 
-  DenyEachBindingOnlyDenySyzkallerRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenySyzkallerRequest(Storage_{
-                                                                                                            .a = {},
-                                                                                                        }) {}
+  DenyEachBindingOnlyDenySyzkallerRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1552,9 +1435,8 @@ class DenyEachBindingOnlyDenySyzkallerResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenySyzkallerResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenySyzkallerResponse(int32_t b) noexcept
-      : storage_({.b = std::move(b)}) {}
+  DenyEachBindingOnlyDenySyzkallerResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenySyzkallerResponse(int32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1564,11 +1446,8 @@ class DenyEachBindingOnlyDenySyzkallerResponse {
 
   DenyEachBindingOnlyDenySyzkallerResponse(DenyEachBindingOnlyDenySyzkallerResponse&&) noexcept = default;
   DenyEachBindingOnlyDenySyzkallerResponse& operator=(DenyEachBindingOnlyDenySyzkallerResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenySyzkallerResponse(const DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept : DenyEachBindingOnlyDenySyzkallerResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenySyzkallerResponse& operator=(const DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenySyzkallerResponse(const DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept;
+  DenyEachBindingOnlyDenySyzkallerResponse& operator=(const DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenySyzkallerResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse, 4>::Equal(this, &other);
@@ -1589,14 +1468,9 @@ class DenyEachBindingOnlyDenySyzkallerResponse {
   // Setter for b.
   //
 
-  DenyEachBindingOnlyDenySyzkallerResponse& b(int32_t value) {
-    storage_.b = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenySyzkallerResponse& b(int32_t value);
 
-  DenyEachBindingOnlyDenySyzkallerResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenySyzkallerResponse(Storage_{
-                                                                                                             .b = {},
-                                                                                                         }) {}
+  DenyEachBindingOnlyDenySyzkallerResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1743,9 +1617,8 @@ class DenyEachBindingOnlyDenySyzkallerTopResponse {
   struct Storage_;
 
  public:
-  DenyEachBindingOnlyDenySyzkallerTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DenyEachBindingOnlyDenySyzkallerTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult result) noexcept
-      : storage_({.result = std::move(result)}) {}
+  DenyEachBindingOnlyDenySyzkallerTopResponse(Storage_ storage) noexcept;
+  DenyEachBindingOnlyDenySyzkallerTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1755,11 +1628,8 @@ class DenyEachBindingOnlyDenySyzkallerTopResponse {
 
   DenyEachBindingOnlyDenySyzkallerTopResponse(DenyEachBindingOnlyDenySyzkallerTopResponse&&) noexcept = default;
   DenyEachBindingOnlyDenySyzkallerTopResponse& operator=(DenyEachBindingOnlyDenySyzkallerTopResponse&&) noexcept = default;
-  DenyEachBindingOnlyDenySyzkallerTopResponse(const DenyEachBindingOnlyDenySyzkallerTopResponse& other) noexcept : DenyEachBindingOnlyDenySyzkallerTopResponse(other.CloneStorage_()) {}
-  DenyEachBindingOnlyDenySyzkallerTopResponse& operator=(const DenyEachBindingOnlyDenySyzkallerTopResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DenyEachBindingOnlyDenySyzkallerTopResponse(const DenyEachBindingOnlyDenySyzkallerTopResponse& other) noexcept;
+  DenyEachBindingOnlyDenySyzkallerTopResponse& operator=(const DenyEachBindingOnlyDenySyzkallerTopResponse& other) noexcept;
 
   bool operator==(const DenyEachBindingOnlyDenySyzkallerTopResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse, 16>::Equal(this, &other);
@@ -1780,14 +1650,9 @@ class DenyEachBindingOnlyDenySyzkallerTopResponse {
   // Setter for result.
   //
 
-  DenyEachBindingOnlyDenySyzkallerTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult value) {
-    storage_.result = std::move(value);
-    return *this;
-  }
+  DenyEachBindingOnlyDenySyzkallerTopResponse& result(::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult value);
 
-  DenyEachBindingOnlyDenySyzkallerTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenySyzkallerTopResponse(Storage_{
-                                                                                                                .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                            }) {}
+  DenyEachBindingOnlyDenySyzkallerTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1811,9 +1676,8 @@ class MemberOnlyAppearsInImportingLibrary {
   struct Storage_;
 
  public:
-  MemberOnlyAppearsInImportingLibrary(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  MemberOnlyAppearsInImportingLibrary(bool a) noexcept
-      : storage_({.a = std::move(a)}) {}
+  MemberOnlyAppearsInImportingLibrary(Storage_ storage) noexcept;
+  MemberOnlyAppearsInImportingLibrary(bool a) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1823,11 +1687,8 @@ class MemberOnlyAppearsInImportingLibrary {
 
   MemberOnlyAppearsInImportingLibrary(MemberOnlyAppearsInImportingLibrary&&) noexcept = default;
   MemberOnlyAppearsInImportingLibrary& operator=(MemberOnlyAppearsInImportingLibrary&&) noexcept = default;
-  MemberOnlyAppearsInImportingLibrary(const MemberOnlyAppearsInImportingLibrary& other) noexcept : MemberOnlyAppearsInImportingLibrary(other.CloneStorage_()) {}
-  MemberOnlyAppearsInImportingLibrary& operator=(const MemberOnlyAppearsInImportingLibrary& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  MemberOnlyAppearsInImportingLibrary(const MemberOnlyAppearsInImportingLibrary& other) noexcept;
+  MemberOnlyAppearsInImportingLibrary& operator=(const MemberOnlyAppearsInImportingLibrary& other) noexcept;
 
   bool operator==(const MemberOnlyAppearsInImportingLibrary& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary, 1>::Equal(this, &other);
@@ -1848,14 +1709,9 @@ class MemberOnlyAppearsInImportingLibrary {
   // Setter for a.
   //
 
-  MemberOnlyAppearsInImportingLibrary& a(bool value) {
-    storage_.a = std::move(value);
-    return *this;
-  }
+  MemberOnlyAppearsInImportingLibrary& a(bool value);
 
-  MemberOnlyAppearsInImportingLibrary(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MemberOnlyAppearsInImportingLibrary(Storage_{
-                                                                                                        .a = {},
-                                                                                                    }) {}
+  MemberOnlyAppearsInImportingLibrary(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1879,9 +1735,8 @@ class OnlyAppearsInImportingLibrary {
   struct Storage_;
 
  public:
-  OnlyAppearsInImportingLibrary(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  OnlyAppearsInImportingLibrary(::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary member_only_appears_in_importing_library) noexcept
-      : storage_({.member_only_appears_in_importing_library = std::move(member_only_appears_in_importing_library)}) {}
+  OnlyAppearsInImportingLibrary(Storage_ storage) noexcept;
+  OnlyAppearsInImportingLibrary(::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary member_only_appears_in_importing_library) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1891,11 +1746,8 @@ class OnlyAppearsInImportingLibrary {
 
   OnlyAppearsInImportingLibrary(OnlyAppearsInImportingLibrary&&) noexcept = default;
   OnlyAppearsInImportingLibrary& operator=(OnlyAppearsInImportingLibrary&&) noexcept = default;
-  OnlyAppearsInImportingLibrary(const OnlyAppearsInImportingLibrary& other) noexcept : OnlyAppearsInImportingLibrary(other.CloneStorage_()) {}
-  OnlyAppearsInImportingLibrary& operator=(const OnlyAppearsInImportingLibrary& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  OnlyAppearsInImportingLibrary(const OnlyAppearsInImportingLibrary& other) noexcept;
+  OnlyAppearsInImportingLibrary& operator=(const OnlyAppearsInImportingLibrary& other) noexcept;
 
   bool operator==(const OnlyAppearsInImportingLibrary& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_bindingsdenylist::OnlyAppearsInImportingLibrary, 1>::Equal(this, &other);
@@ -1916,14 +1768,9 @@ class OnlyAppearsInImportingLibrary {
   // Setter for member_only_appears_in_importing_library.
   //
 
-  OnlyAppearsInImportingLibrary& member_only_appears_in_importing_library(::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary value) {
-    storage_.member_only_appears_in_importing_library = std::move(value);
-    return *this;
-  }
+  OnlyAppearsInImportingLibrary& member_only_appears_in_importing_library(::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary value);
 
-  OnlyAppearsInImportingLibrary(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : OnlyAppearsInImportingLibrary(Storage_{
-                                                                                                  .member_only_appears_in_importing_library = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                              }) {}
+  OnlyAppearsInImportingLibrary(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1939,6 +1786,295 @@ class OnlyAppearsInImportingLibrary {
       &Storage_::member_only_appears_in_importing_library, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(bool a) noexcept
+    : storage_({.a = std::move(a)}) {}
+inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyDartRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyDartRequest::DenyEachBindingOnlyDenyDartRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyDartRequest(Storage_{
+                                                                                                                                                .a = {},
+                                                                                                                                            }) {}
+inline DenyEachBindingOnlyDenyDartRequest& DenyEachBindingOnlyDenyDartRequest::a(bool value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(int32_t b) noexcept
+    : storage_({.b = std::move(b)}) {}
+inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyDartResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyDartResponse::DenyEachBindingOnlyDenyDartResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyDartResponse(Storage_{
+                                                                                                                                                  .b = {},
+                                                                                                                                              }) {}
+inline DenyEachBindingOnlyDenyDartResponse& DenyEachBindingOnlyDenyDartResponse::b(int32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyDartTopResponse::DenyEachBindingOnlyDenyDartTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyDartTopResponse::DenyEachBindingOnlyDenyDartTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult result) noexcept
+    : storage_({.result = std::move(result)}) {}
+inline DenyEachBindingOnlyDenyDartTopResponse::DenyEachBindingOnlyDenyDartTopResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyDartTopResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartTopResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyDartTopResponse::DenyEachBindingOnlyDenyDartTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyDartTopResponse(Storage_{
+                                                                                                                                                        .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                    }) {}
+inline DenyEachBindingOnlyDenyDartTopResponse& DenyEachBindingOnlyDenyDartTopResponse::result(::test_bindingsdenylist::DenyEachBindingOnlyDenyDartResult value) {
+  storage_.result = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(bool a) noexcept
+    : storage_({.a = std::move(a)}) {}
+inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyGoRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyGoRequest::DenyEachBindingOnlyDenyGoRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyGoRequest(Storage_{
+                                                                                                                                            .a = {},
+                                                                                                                                        }) {}
+inline DenyEachBindingOnlyDenyGoRequest& DenyEachBindingOnlyDenyGoRequest::a(bool value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(int32_t b) noexcept
+    : storage_({.b = std::move(b)}) {}
+inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyGoResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyGoResponse::DenyEachBindingOnlyDenyGoResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyGoResponse(Storage_{
+                                                                                                                                              .b = {},
+                                                                                                                                          }) {}
+inline DenyEachBindingOnlyDenyGoResponse& DenyEachBindingOnlyDenyGoResponse::b(int32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyGoTopResponse::DenyEachBindingOnlyDenyGoTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyGoTopResponse::DenyEachBindingOnlyDenyGoTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult result) noexcept
+    : storage_({.result = std::move(result)}) {}
+inline DenyEachBindingOnlyDenyGoTopResponse::DenyEachBindingOnlyDenyGoTopResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyGoTopResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyGoTopResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyGoTopResponse::DenyEachBindingOnlyDenyGoTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyGoTopResponse(Storage_{
+                                                                                                                                                    .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                }) {}
+inline DenyEachBindingOnlyDenyGoTopResponse& DenyEachBindingOnlyDenyGoTopResponse::result(::test_bindingsdenylist::DenyEachBindingOnlyDenyGoResult value) {
+  storage_.result = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(bool a) noexcept
+    : storage_({.a = std::move(a)}) {}
+inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyLibfuzzerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyLibfuzzerRequest::DenyEachBindingOnlyDenyLibfuzzerRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyLibfuzzerRequest(Storage_{
+                                                                                                                                                          .a = {},
+                                                                                                                                                      }) {}
+inline DenyEachBindingOnlyDenyLibfuzzerRequest& DenyEachBindingOnlyDenyLibfuzzerRequest::a(bool value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(int32_t b) noexcept
+    : storage_({.b = std::move(b)}) {}
+inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyLibfuzzerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyLibfuzzerResponse::DenyEachBindingOnlyDenyLibfuzzerResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyLibfuzzerResponse(Storage_{
+                                                                                                                                                            .b = {},
+                                                                                                                                                        }) {}
+inline DenyEachBindingOnlyDenyLibfuzzerResponse& DenyEachBindingOnlyDenyLibfuzzerResponse::b(int32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyLibfuzzerTopResponse::DenyEachBindingOnlyDenyLibfuzzerTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyLibfuzzerTopResponse::DenyEachBindingOnlyDenyLibfuzzerTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult result) noexcept
+    : storage_({.result = std::move(result)}) {}
+inline DenyEachBindingOnlyDenyLibfuzzerTopResponse::DenyEachBindingOnlyDenyLibfuzzerTopResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyLibfuzzerTopResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerTopResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyLibfuzzerTopResponse::DenyEachBindingOnlyDenyLibfuzzerTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyLibfuzzerTopResponse(Storage_{
+                                                                                                                                                                  .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                              }) {}
+inline DenyEachBindingOnlyDenyLibfuzzerTopResponse& DenyEachBindingOnlyDenyLibfuzzerTopResponse::result(::test_bindingsdenylist::DenyEachBindingOnlyDenyLibfuzzerResult value) {
+  storage_.result = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(bool a) noexcept
+    : storage_({.a = std::move(a)}) {}
+inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyRustRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyRustRequest::DenyEachBindingOnlyDenyRustRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyRustRequest(Storage_{
+                                                                                                                                                .a = {},
+                                                                                                                                            }) {}
+inline DenyEachBindingOnlyDenyRustRequest& DenyEachBindingOnlyDenyRustRequest::a(bool value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(int32_t b) noexcept
+    : storage_({.b = std::move(b)}) {}
+inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyRustResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyRustResponse::DenyEachBindingOnlyDenyRustResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyRustResponse(Storage_{
+                                                                                                                                                  .b = {},
+                                                                                                                                              }) {}
+inline DenyEachBindingOnlyDenyRustResponse& DenyEachBindingOnlyDenyRustResponse::b(int32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyRustTopResponse::DenyEachBindingOnlyDenyRustTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenyRustTopResponse::DenyEachBindingOnlyDenyRustTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult result) noexcept
+    : storage_({.result = std::move(result)}) {}
+inline DenyEachBindingOnlyDenyRustTopResponse::DenyEachBindingOnlyDenyRustTopResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenyRustTopResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenyRustTopResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenyRustTopResponse::DenyEachBindingOnlyDenyRustTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenyRustTopResponse(Storage_{
+                                                                                                                                                        .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                    }) {}
+inline DenyEachBindingOnlyDenyRustTopResponse& DenyEachBindingOnlyDenyRustTopResponse::result(::test_bindingsdenylist::DenyEachBindingOnlyDenyRustResult value) {
+  storage_.result = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkallerRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkallerRequest(bool a) noexcept
+    : storage_({.a = std::move(a)}) {}
+inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkallerRequest(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenySyzkallerRequest& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenySyzkallerRequest::DenyEachBindingOnlyDenySyzkallerRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenySyzkallerRequest(Storage_{
+                                                                                                                                                          .a = {},
+                                                                                                                                                      }) {}
+inline DenyEachBindingOnlyDenySyzkallerRequest& DenyEachBindingOnlyDenySyzkallerRequest::a(bool value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkallerResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkallerResponse(int32_t b) noexcept
+    : storage_({.b = std::move(b)}) {}
+inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkallerResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenySyzkallerResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenySyzkallerResponse::DenyEachBindingOnlyDenySyzkallerResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenySyzkallerResponse(Storage_{
+                                                                                                                                                            .b = {},
+                                                                                                                                                        }) {}
+inline DenyEachBindingOnlyDenySyzkallerResponse& DenyEachBindingOnlyDenySyzkallerResponse::b(int32_t value) {
+  storage_.b = std::move(value);
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenySyzkallerTopResponse::DenyEachBindingOnlyDenySyzkallerTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DenyEachBindingOnlyDenySyzkallerTopResponse::DenyEachBindingOnlyDenySyzkallerTopResponse(::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult result) noexcept
+    : storage_({.result = std::move(result)}) {}
+inline DenyEachBindingOnlyDenySyzkallerTopResponse::DenyEachBindingOnlyDenySyzkallerTopResponse(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& other) noexcept : ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse(other.CloneStorage_()) {}
+inline DenyEachBindingOnlyDenySyzkallerTopResponse& ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse::operator=(const ::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerTopResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DenyEachBindingOnlyDenySyzkallerTopResponse::DenyEachBindingOnlyDenySyzkallerTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DenyEachBindingOnlyDenySyzkallerTopResponse(Storage_{
+                                                                                                                                                                  .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                                              }) {}
+inline DenyEachBindingOnlyDenySyzkallerTopResponse& DenyEachBindingOnlyDenySyzkallerTopResponse::result(::test_bindingsdenylist::DenyEachBindingOnlyDenySyzkallerResult value) {
+  storage_.result = std::move(value);
+  return *this;
+}
+
+inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(bool a) noexcept
+    : storage_({.a = std::move(a)}) {}
+inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary& other) noexcept : ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary(other.CloneStorage_()) {}
+inline MemberOnlyAppearsInImportingLibrary& ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline MemberOnlyAppearsInImportingLibrary::MemberOnlyAppearsInImportingLibrary(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MemberOnlyAppearsInImportingLibrary(Storage_{
+                                                                                                                                                  .a = {},
+                                                                                                                                              }) {}
+inline MemberOnlyAppearsInImportingLibrary& MemberOnlyAppearsInImportingLibrary::a(bool value) {
+  storage_.a = std::move(value);
+  return *this;
+}
+
+inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary member_only_appears_in_importing_library) noexcept
+    : storage_({.member_only_appears_in_importing_library = std::move(member_only_appears_in_importing_library)}) {}
+inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary& other) noexcept : ::test_bindingsdenylist::OnlyAppearsInImportingLibrary(other.CloneStorage_()) {}
+inline OnlyAppearsInImportingLibrary& ::test_bindingsdenylist::OnlyAppearsInImportingLibrary::operator=(const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline OnlyAppearsInImportingLibrary::OnlyAppearsInImportingLibrary(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : OnlyAppearsInImportingLibrary(Storage_{
+                                                                                                                                      .member_only_appears_in_importing_library = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                  }) {}
+inline OnlyAppearsInImportingLibrary& OnlyAppearsInImportingLibrary::member_only_appears_in_importing_library(::test_bindingsdenylist::MemberOnlyAppearsInImportingLibrary value) {
+  storage_.member_only_appears_in_importing_library = std::move(value);
+  return *this;
+}
 
 }  // namespace test_bindingsdenylist
 namespace fidl {

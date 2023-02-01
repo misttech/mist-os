@@ -22,22 +22,19 @@ class {{ .Name }} {
  private:
   struct Storage_;
  public:
-  {{ .Name }}(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  {{ .Name }}(Storage_ storage) noexcept;
   {{ .Name }}() noexcept = default;
   {{ .Name }}({{ .Name }}&&) noexcept = default;
   {{ .Name }}& operator=({{ .Name }}&&) noexcept = default;
   {{- if not .IsResourceType }}
-    {{ .Name }}(const {{ .Name }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
-    {{ .Name }}& operator=(const {{ .Name }}& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    {{ .Name }}(const {{ .Name }}& other) noexcept;
+    {{ .Name }}& operator=(const {{ .Name }}& other) noexcept;
+    bool operator==(const {{.Name }}& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
     }
-  bool operator==(const {{.Name }}& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
-  }
-  bool operator!=(const {{.Name }}& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
-  }
+    bool operator!=(const {{.Name }}& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<{{ . }}>::Equal(this, &other);
+    }
   {{- end }}
 
   bool IsEmpty() const {
@@ -63,19 +60,16 @@ class {{ .Name }} {
     // Setter for {{ .Name }}.
     //
     {{ .Docs }}
-    {{ $.Name }}& {{ .Name }}(std::optional<{{ .Type }}> value) {
-      storage_.{{ .Name }} = std::move(value);
-      return *this;
-    }
+    {{ $.Name }}& {{ .Name }}(std::optional<{{ .Type }}> value);
   {{- end }}
 
-  {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{}) {}
+  {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
     {{- range .Members -}}
       {{ .Docs }}
-      ::std::optional<{{ .Type }}> {{ .Name }} {};
+      ::std::optional<{{ .Type }}> {{ .Name }};
     {{- end }}
   };
 
@@ -98,6 +92,37 @@ class {{ .Name }} {
 {{ if .IsResourceType }}
 {{- EndifFuchsia -}}
 {{- end }}
+{{- end }}
+
+
+{{- define "Table:InlineDefinition:NaturalTypesHeader" }}
+  {{ EnsureNamespace . }}
+  {{ if .IsResourceType }}
+    {{- IfdefFuchsia -}}
+  {{- end }}
+
+  inline {{ .Name }}::{{ .Name }}(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+
+  {{- if not .IsResourceType }}
+    inline {{ .Name }}::{{ .Name }}(const {{ . }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
+    inline {{ .Name }}& {{ . }}::operator=(const {{ .Name }}& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+  {{- end }}
+
+  inline {{ .Name }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{}) {}
+
+  {{- range .Members }}
+    inline {{ $.Name }}& {{ $.Name }}::{{ .Name }}(std::optional<{{ .Type }}> value) {
+      storage_.{{ .Name }} = std::move(value);
+      return *this;
+    }
+  {{- end }}
+
+  {{ if .IsResourceType }}
+    {{- EndifFuchsia -}}
+  {{- end }}
 {{- end }}
 
 

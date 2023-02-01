@@ -38,9 +38,8 @@ class ExampleFooRequest {
   struct Storage_;
 
  public:
-  ExampleFooRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ExampleFooRequest(::std::string s) noexcept
-      : storage_({.s = std::move(s)}) {}
+  ExampleFooRequest(Storage_ storage) noexcept;
+  ExampleFooRequest(::std::string s) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -50,11 +49,8 @@ class ExampleFooRequest {
 
   ExampleFooRequest(ExampleFooRequest&&) noexcept = default;
   ExampleFooRequest& operator=(ExampleFooRequest&&) noexcept = default;
-  ExampleFooRequest(const ExampleFooRequest& other) noexcept : ExampleFooRequest(other.CloneStorage_()) {}
-  ExampleFooRequest& operator=(const ExampleFooRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ExampleFooRequest(const ExampleFooRequest& other) noexcept;
+  ExampleFooRequest& operator=(const ExampleFooRequest& other) noexcept;
 
   bool operator==(const ExampleFooRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_error::ExampleFooRequest, 16>::Equal(this, &other);
@@ -75,14 +71,9 @@ class ExampleFooRequest {
   // Setter for s.
   //
 
-  ExampleFooRequest& s(::std::string value) {
-    storage_.s = std::move(value);
-    return *this;
-  }
+  ExampleFooRequest& s(::std::string value);
 
-  ExampleFooRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleFooRequest(Storage_{
-                                                                                      .s = {},
-                                                                                  }) {}
+  ExampleFooRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -106,9 +97,8 @@ class ExampleFooResponse {
   struct Storage_;
 
  public:
-  ExampleFooResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ExampleFooResponse(int64_t y) noexcept
-      : storage_({.y = std::move(y)}) {}
+  ExampleFooResponse(Storage_ storage) noexcept;
+  ExampleFooResponse(int64_t y) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -118,11 +108,8 @@ class ExampleFooResponse {
 
   ExampleFooResponse(ExampleFooResponse&&) noexcept = default;
   ExampleFooResponse& operator=(ExampleFooResponse&&) noexcept = default;
-  ExampleFooResponse(const ExampleFooResponse& other) noexcept : ExampleFooResponse(other.CloneStorage_()) {}
-  ExampleFooResponse& operator=(const ExampleFooResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ExampleFooResponse(const ExampleFooResponse& other) noexcept;
+  ExampleFooResponse& operator=(const ExampleFooResponse& other) noexcept;
 
   bool operator==(const ExampleFooResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_error::ExampleFooResponse, 8>::Equal(this, &other);
@@ -143,14 +130,9 @@ class ExampleFooResponse {
   // Setter for y.
   //
 
-  ExampleFooResponse& y(int64_t value) {
-    storage_.y = std::move(value);
-    return *this;
-  }
+  ExampleFooResponse& y(int64_t value);
 
-  ExampleFooResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleFooResponse(Storage_{
-                                                                                       .y = {},
-                                                                                   }) {}
+  ExampleFooResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -297,9 +279,8 @@ class ExampleFooTopResponse {
   struct Storage_;
 
  public:
-  ExampleFooTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ExampleFooTopResponse(::test_error::ExampleFooResult result) noexcept
-      : storage_({.result = std::move(result)}) {}
+  ExampleFooTopResponse(Storage_ storage) noexcept;
+  ExampleFooTopResponse(::test_error::ExampleFooResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -309,11 +290,8 @@ class ExampleFooTopResponse {
 
   ExampleFooTopResponse(ExampleFooTopResponse&&) noexcept = default;
   ExampleFooTopResponse& operator=(ExampleFooTopResponse&&) noexcept = default;
-  ExampleFooTopResponse(const ExampleFooTopResponse& other) noexcept : ExampleFooTopResponse(other.CloneStorage_()) {}
-  ExampleFooTopResponse& operator=(const ExampleFooTopResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ExampleFooTopResponse(const ExampleFooTopResponse& other) noexcept;
+  ExampleFooTopResponse& operator=(const ExampleFooTopResponse& other) noexcept;
 
   bool operator==(const ExampleFooTopResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_error::ExampleFooTopResponse, 16>::Equal(this, &other);
@@ -334,14 +312,9 @@ class ExampleFooTopResponse {
   // Setter for result.
   //
 
-  ExampleFooTopResponse& result(::test_error::ExampleFooResult value) {
-    storage_.result = std::move(value);
-    return *this;
-  }
+  ExampleFooTopResponse& result(::test_error::ExampleFooResult value);
 
-  ExampleFooTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleFooTopResponse(Storage_{
-                                                                                          .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                      }) {}
+  ExampleFooTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -357,6 +330,57 @@ class ExampleFooTopResponse {
       &Storage_::result, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline ExampleFooRequest::ExampleFooRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ExampleFooRequest::ExampleFooRequest(::std::string s) noexcept
+    : storage_({.s = std::move(s)}) {}
+inline ExampleFooRequest::ExampleFooRequest(const ::test_error::ExampleFooRequest& other) noexcept : ::test_error::ExampleFooRequest(other.CloneStorage_()) {}
+inline ExampleFooRequest& ::test_error::ExampleFooRequest::operator=(const ::test_error::ExampleFooRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ExampleFooRequest::ExampleFooRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleFooRequest(Storage_{
+                                                                                                              .s = {},
+                                                                                                          }) {}
+inline ExampleFooRequest& ExampleFooRequest::s(::std::string value) {
+  storage_.s = std::move(value);
+  return *this;
+}
+
+inline ExampleFooResponse::ExampleFooResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ExampleFooResponse::ExampleFooResponse(int64_t y) noexcept
+    : storage_({.y = std::move(y)}) {}
+inline ExampleFooResponse::ExampleFooResponse(const ::test_error::ExampleFooResponse& other) noexcept : ::test_error::ExampleFooResponse(other.CloneStorage_()) {}
+inline ExampleFooResponse& ::test_error::ExampleFooResponse::operator=(const ::test_error::ExampleFooResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ExampleFooResponse::ExampleFooResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleFooResponse(Storage_{
+                                                                                                                .y = {},
+                                                                                                            }) {}
+inline ExampleFooResponse& ExampleFooResponse::y(int64_t value) {
+  storage_.y = std::move(value);
+  return *this;
+}
+
+inline ExampleFooTopResponse::ExampleFooTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ExampleFooTopResponse::ExampleFooTopResponse(::test_error::ExampleFooResult result) noexcept
+    : storage_({.result = std::move(result)}) {}
+inline ExampleFooTopResponse::ExampleFooTopResponse(const ::test_error::ExampleFooTopResponse& other) noexcept : ::test_error::ExampleFooTopResponse(other.CloneStorage_()) {}
+inline ExampleFooTopResponse& ::test_error::ExampleFooTopResponse::operator=(const ::test_error::ExampleFooTopResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ExampleFooTopResponse::ExampleFooTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ExampleFooTopResponse(Storage_{
+                                                                                                                      .result = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                  }) {}
+inline ExampleFooTopResponse& ExampleFooTopResponse::result(::test_error::ExampleFooResult value) {
+  storage_.result = std::move(value);
+  return *this;
+}
 
 }  // namespace test_error
 namespace fidl {

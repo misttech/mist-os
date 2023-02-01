@@ -49,9 +49,8 @@ class DocCommentWithQuotes {
   struct Storage_;
 
  public:
-  DocCommentWithQuotes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  DocCommentWithQuotes(uint8_t __reserved) noexcept
-      : storage_({.__reserved = std::move(__reserved)}) {}
+  DocCommentWithQuotes(Storage_ storage) noexcept;
+  DocCommentWithQuotes(uint8_t __reserved) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -61,11 +60,8 @@ class DocCommentWithQuotes {
 
   DocCommentWithQuotes(DocCommentWithQuotes&&) noexcept = default;
   DocCommentWithQuotes& operator=(DocCommentWithQuotes&&) noexcept = default;
-  DocCommentWithQuotes(const DocCommentWithQuotes& other) noexcept : DocCommentWithQuotes(other.CloneStorage_()) {}
-  DocCommentWithQuotes& operator=(const DocCommentWithQuotes& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  DocCommentWithQuotes(const DocCommentWithQuotes& other) noexcept;
+  DocCommentWithQuotes& operator=(const DocCommentWithQuotes& other) noexcept;
 
   bool operator==(const DocCommentWithQuotes& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_escaping::DocCommentWithQuotes, 1>::Equal(this, &other);
@@ -86,14 +82,9 @@ class DocCommentWithQuotes {
   // Setter for __reserved.
   //
 
-  DocCommentWithQuotes& __reserved(uint8_t value) {
-    storage_.__reserved = std::move(value);
-    return *this;
-  }
+  DocCommentWithQuotes& __reserved(uint8_t value);
 
-  DocCommentWithQuotes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DocCommentWithQuotes(Storage_{
-                                                                                         .__reserved = 0u,
-                                                                                     }) {}
+  DocCommentWithQuotes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -109,6 +100,23 @@ class DocCommentWithQuotes {
       &Storage_::__reserved, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline DocCommentWithQuotes::DocCommentWithQuotes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline DocCommentWithQuotes::DocCommentWithQuotes(uint8_t __reserved) noexcept
+    : storage_({.__reserved = std::move(__reserved)}) {}
+inline DocCommentWithQuotes::DocCommentWithQuotes(const ::test_escaping::DocCommentWithQuotes& other) noexcept : ::test_escaping::DocCommentWithQuotes(other.CloneStorage_()) {}
+inline DocCommentWithQuotes& ::test_escaping::DocCommentWithQuotes::operator=(const ::test_escaping::DocCommentWithQuotes& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline DocCommentWithQuotes::DocCommentWithQuotes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : DocCommentWithQuotes(Storage_{
+                                                                                                                    .__reserved = 0u,
+                                                                                                                }) {}
+inline DocCommentWithQuotes& DocCommentWithQuotes::__reserved(uint8_t value) {
+  storage_.__reserved = std::move(value);
+  return *this;
+}
 
 }  // namespace test_escaping
 namespace fidl {

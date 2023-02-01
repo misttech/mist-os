@@ -162,11 +162,8 @@ class Pizza {
  private:
   struct Storage_;
  public:
-  Pizza(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    Pizza(::std::vector<::std::string> toppings) noexcept
-    : storage_({
-      .toppings = std::move(toppings)
-    }) {}
+  Pizza(Storage_ storage) noexcept;
+    Pizza(::std::vector<::std::string> toppings) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -176,11 +173,8 @@ class Pizza {
 
   Pizza(Pizza&&) noexcept = default;
   Pizza& operator=(Pizza&&) noexcept = default;
-    Pizza(const Pizza& other) noexcept : Pizza(other.CloneStorage_()){}
-    Pizza& operator=(const Pizza& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    Pizza(const Pizza& other) noexcept;
+    Pizza& operator=(const Pizza& other) noexcept;
 
     bool operator==(const Pizza& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_union::Pizza, 16>::Equal(this, &other);
@@ -202,14 +196,9 @@ class Pizza {
     // Setter for toppings.
     //
     
-    Pizza& toppings(::std::vector<::std::string> value) {
-      storage_.toppings = std::move(value);
-      return *this;
-    }
+    Pizza& toppings(::std::vector<::std::string> value);
 
-  Pizza(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Pizza(Storage_{
-      .toppings ={},
-  }) {}
+  Pizza(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -242,11 +231,8 @@ class Pasta {
  private:
   struct Storage_;
  public:
-  Pasta(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    Pasta(::std::string sauce) noexcept
-    : storage_({
-      .sauce = std::move(sauce)
-    }) {}
+  Pasta(Storage_ storage) noexcept;
+    Pasta(::std::string sauce) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -256,11 +242,8 @@ class Pasta {
 
   Pasta(Pasta&&) noexcept = default;
   Pasta& operator=(Pasta&&) noexcept = default;
-    Pasta(const Pasta& other) noexcept : Pasta(other.CloneStorage_()){}
-    Pasta& operator=(const Pasta& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    Pasta(const Pasta& other) noexcept;
+    Pasta& operator=(const Pasta& other) noexcept;
 
     bool operator==(const Pasta& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_union::Pasta, 16>::Equal(this, &other);
@@ -282,14 +265,9 @@ class Pasta {
     // Setter for sauce.
     //
     
-    Pasta& sauce(::std::string value) {
-      storage_.sauce = std::move(value);
-      return *this;
-    }
+    Pasta& sauce(::std::string value);
 
-  Pasta(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Pasta(Storage_{
-      .sauce ={},
-  }) {}
+  Pasta(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1690,11 +1668,8 @@ class NullableUnionStruct {
  private:
   struct Storage_;
  public:
-  NullableUnionStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    NullableUnionStruct(::fidl::Box<::test_union::Union> the_union) noexcept
-    : storage_({
-      .the_union = std::move(the_union)
-    }) {}
+  NullableUnionStruct(Storage_ storage) noexcept;
+    NullableUnionStruct(::fidl::Box<::test_union::Union> the_union) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1704,11 +1679,8 @@ class NullableUnionStruct {
 
   NullableUnionStruct(NullableUnionStruct&&) noexcept = default;
   NullableUnionStruct& operator=(NullableUnionStruct&&) noexcept = default;
-    NullableUnionStruct(const NullableUnionStruct& other) noexcept : NullableUnionStruct(other.CloneStorage_()){}
-    NullableUnionStruct& operator=(const NullableUnionStruct& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    NullableUnionStruct(const NullableUnionStruct& other) noexcept;
+    NullableUnionStruct& operator=(const NullableUnionStruct& other) noexcept;
 
     bool operator==(const NullableUnionStruct& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_union::NullableUnionStruct, 16>::Equal(this, &other);
@@ -1730,14 +1702,9 @@ class NullableUnionStruct {
     // Setter for the_union.
     //
     
-    NullableUnionStruct& the_union(::fidl::Box<::test_union::Union> value) {
-      storage_.the_union = std::move(value);
-      return *this;
-    }
+    NullableUnionStruct& the_union(::fidl::Box<::test_union::Union> value);
 
-  NullableUnionStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : NullableUnionStruct(Storage_{
-      .the_union ={},
-  }) {}
+  NullableUnionStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2751,11 +2718,8 @@ class Empty {
  private:
   struct Storage_;
  public:
-  Empty(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    Empty(uint8_t __reserved) noexcept
-    : storage_({
-      .__reserved = std::move(__reserved)
-    }) {}
+  Empty(Storage_ storage) noexcept;
+    Empty(uint8_t __reserved) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2765,11 +2729,8 @@ class Empty {
 
   Empty(Empty&&) noexcept = default;
   Empty& operator=(Empty&&) noexcept = default;
-    Empty(const Empty& other) noexcept : Empty(other.CloneStorage_()){}
-    Empty& operator=(const Empty& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    Empty(const Empty& other) noexcept;
+    Empty& operator=(const Empty& other) noexcept;
 
     bool operator==(const Empty& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_union::Empty, 1>::Equal(this, &other);
@@ -2791,14 +2752,9 @@ class Empty {
     // Setter for __reserved.
     //
     
-    Empty& __reserved(uint8_t value) {
-      storage_.__reserved = std::move(value);
-      return *this;
-    }
+    Empty& __reserved(uint8_t value);
 
-  Empty(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Empty(Storage_{
-      .__reserved =0u,
-  }) {}
+  Empty(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3045,11 +3001,8 @@ class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse {
  private:
   struct Storage_;
  public:
-  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::test_union::StrictBoundedXUnion xu) noexcept
-    : storage_({
-      .xu = std::move(xu)
-    }) {}
+  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(Storage_ storage) noexcept;
+    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::test_union::StrictBoundedXUnion xu) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3059,11 +3012,8 @@ class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse {
 
   TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse&&) noexcept = default;
   TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& operator=(TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse&&) noexcept = default;
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept : TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(other.CloneStorage_()){}
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& operator=(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept;
+    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& operator=(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept;
 
     bool operator==(const TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse, 16>::Equal(this, &other);
@@ -3085,14 +3035,9 @@ class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse {
     // Setter for xu.
     //
     
-    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& xu(::test_union::StrictBoundedXUnion value) {
-      storage_.xu = std::move(value);
-      return *this;
-    }
+    TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& xu(::test_union::StrictBoundedXUnion value);
 
-  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(Storage_{
-      .xu =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3125,11 +3070,8 @@ class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
  private:
   struct Storage_;
  public:
-  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::test_union::OlderSimpleUnion xu) noexcept
-    : storage_({
-      .xu = std::move(xu)
-    }) {}
+  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(Storage_ storage) noexcept;
+    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::test_union::OlderSimpleUnion xu) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3139,11 +3081,8 @@ class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
 
   TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse&&) noexcept = default;
   TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& operator=(TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse&&) noexcept = default;
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept : TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(other.CloneStorage_()){}
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& operator=(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept;
+    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& operator=(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept;
 
     bool operator==(const TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse, 16>::Equal(this, &other);
@@ -3165,14 +3104,9 @@ class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse {
     // Setter for xu.
     //
     
-    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& xu(::test_union::OlderSimpleUnion value) {
-      storage_.xu = std::move(value);
-      return *this;
-    }
+    TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& xu(::test_union::OlderSimpleUnion value);
 
-  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(Storage_{
-      .xu =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3208,11 +3142,8 @@ class StructWithNullableXUnion {
  private:
   struct Storage_;
  public:
-  StructWithNullableXUnion(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    StructWithNullableXUnion(::fidl::Box<::test_union::OlderSimpleUnion> x1) noexcept
-    : storage_({
-      .x1 = std::move(x1)
-    }) {}
+  StructWithNullableXUnion(Storage_ storage) noexcept;
+    StructWithNullableXUnion(::fidl::Box<::test_union::OlderSimpleUnion> x1) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3222,11 +3153,8 @@ class StructWithNullableXUnion {
 
   StructWithNullableXUnion(StructWithNullableXUnion&&) noexcept = default;
   StructWithNullableXUnion& operator=(StructWithNullableXUnion&&) noexcept = default;
-    StructWithNullableXUnion(const StructWithNullableXUnion& other) noexcept : StructWithNullableXUnion(other.CloneStorage_()){}
-    StructWithNullableXUnion& operator=(const StructWithNullableXUnion& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    StructWithNullableXUnion(const StructWithNullableXUnion& other) noexcept;
+    StructWithNullableXUnion& operator=(const StructWithNullableXUnion& other) noexcept;
 
     bool operator==(const StructWithNullableXUnion& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_union::StructWithNullableXUnion, 16>::Equal(this, &other);
@@ -3248,14 +3176,9 @@ class StructWithNullableXUnion {
     // Setter for x1.
     //
     
-    StructWithNullableXUnion& x1(::fidl::Box<::test_union::OlderSimpleUnion> value) {
-      storage_.x1 = std::move(value);
-      return *this;
-    }
+    StructWithNullableXUnion& x1(::fidl::Box<::test_union::OlderSimpleUnion> value);
 
-  StructWithNullableXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableXUnion(Storage_{
-      .x1 ={},
-  }) {}
+  StructWithNullableXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3422,13 +3345,8 @@ class UnionSandwich {
  private:
   struct Storage_;
  public:
-  UnionSandwich(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    UnionSandwich(uint32_t a, ::test_union::ExplicitXUnion u, uint32_t b) noexcept
-    : storage_({
-      .a = std::move(a), 
-      .u = std::move(u), 
-      .b = std::move(b)
-    }) {}
+  UnionSandwich(Storage_ storage) noexcept;
+    UnionSandwich(uint32_t a, ::test_union::ExplicitXUnion u, uint32_t b) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3438,11 +3356,8 @@ class UnionSandwich {
 
   UnionSandwich(UnionSandwich&&) noexcept = default;
   UnionSandwich& operator=(UnionSandwich&&) noexcept = default;
-    UnionSandwich(const UnionSandwich& other) noexcept : UnionSandwich(other.CloneStorage_()){}
-    UnionSandwich& operator=(const UnionSandwich& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    UnionSandwich(const UnionSandwich& other) noexcept;
+    UnionSandwich& operator=(const UnionSandwich& other) noexcept;
 
     bool operator==(const UnionSandwich& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_union::UnionSandwich, 32>::Equal(this, &other);
@@ -3464,10 +3379,7 @@ class UnionSandwich {
     // Setter for a.
     //
     
-    UnionSandwich& a(uint32_t value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    UnionSandwich& a(uint32_t value);
     
       const ::test_union::ExplicitXUnion &
     u() const {
@@ -3482,10 +3394,7 @@ class UnionSandwich {
     // Setter for u.
     //
     
-    UnionSandwich& u(::test_union::ExplicitXUnion value) {
-      storage_.u = std::move(value);
-      return *this;
-    }
+    UnionSandwich& u(::test_union::ExplicitXUnion value);
     
       uint32_t
     b() const {
@@ -3500,16 +3409,9 @@ class UnionSandwich {
     // Setter for b.
     //
     
-    UnionSandwich& b(uint32_t value) {
-      storage_.b = std::move(value);
-      return *this;
-    }
+    UnionSandwich& b(uint32_t value);
 
-  UnionSandwich(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : UnionSandwich(Storage_{
-      .a ={},
-      .u =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-      .b ={},
-  }) {}
+  UnionSandwich(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3817,6 +3719,276 @@ class OnlyReservedFlexibleUnion {
 };
 
 
+
+
+  
+  
+
+  
+
+  inline Pizza::Pizza(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline Pizza::Pizza(::std::vector<::std::string> toppings) noexcept
+    : storage_({
+      .toppings = std::move(toppings)
+    }) {}
+    inline Pizza::Pizza(const ::test_union::Pizza& other) noexcept : ::test_union::Pizza(other.CloneStorage_()){}
+    inline Pizza& ::test_union::Pizza::operator=(const ::test_union::Pizza& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline Pizza::Pizza(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Pizza(Storage_{
+      .toppings ={},
+  }) {}
+    inline Pizza& Pizza::toppings(::std::vector<::std::string> value) {
+      storage_.toppings = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline Pasta::Pasta(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline Pasta::Pasta(::std::string sauce) noexcept
+    : storage_({
+      .sauce = std::move(sauce)
+    }) {}
+    inline Pasta::Pasta(const ::test_union::Pasta& other) noexcept : ::test_union::Pasta(other.CloneStorage_()){}
+    inline Pasta& ::test_union::Pasta::operator=(const ::test_union::Pasta& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline Pasta::Pasta(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Pasta(Storage_{
+      .sauce ={},
+  }) {}
+    inline Pasta& Pasta::sauce(::std::string value) {
+      storage_.sauce = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline NullableUnionStruct::NullableUnionStruct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline NullableUnionStruct::NullableUnionStruct(::fidl::Box<::test_union::Union> the_union) noexcept
+    : storage_({
+      .the_union = std::move(the_union)
+    }) {}
+    inline NullableUnionStruct::NullableUnionStruct(const ::test_union::NullableUnionStruct& other) noexcept : ::test_union::NullableUnionStruct(other.CloneStorage_()){}
+    inline NullableUnionStruct& ::test_union::NullableUnionStruct::operator=(const ::test_union::NullableUnionStruct& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline NullableUnionStruct::NullableUnionStruct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : NullableUnionStruct(Storage_{
+      .the_union ={},
+  }) {}
+    inline NullableUnionStruct& NullableUnionStruct::the_union(::fidl::Box<::test_union::Union> value) {
+      storage_.the_union = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline Empty::Empty(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline Empty::Empty(uint8_t __reserved) noexcept
+    : storage_({
+      .__reserved = std::move(__reserved)
+    }) {}
+    inline Empty::Empty(const ::test_union::Empty& other) noexcept : ::test_union::Empty(other.CloneStorage_()){}
+    inline Empty& ::test_union::Empty::operator=(const ::test_union::Empty& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline Empty::Empty(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Empty(Storage_{
+      .__reserved =0u,
+  }) {}
+    inline Empty& Empty::__reserved(uint8_t value) {
+      storage_.__reserved = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::test_union::StrictBoundedXUnion xu) noexcept
+    : storage_({
+      .xu = std::move(xu)
+    }) {}
+    inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(const ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept : ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(other.CloneStorage_()){}
+    inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::operator=(const ::test_union::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse(Storage_{
+      .xu =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse& TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse::xu(::test_union::StrictBoundedXUnion value) {
+      storage_.xu = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::test_union::OlderSimpleUnion xu) noexcept
+    : storage_({
+      .xu = std::move(xu)
+    }) {}
+    inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(const ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept : ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(other.CloneStorage_()){}
+    inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::operator=(const ::test_union::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse(Storage_{
+      .xu =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse& TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse::xu(::test_union::OlderSimpleUnion value) {
+      storage_.xu = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline StructWithNullableXUnion::StructWithNullableXUnion(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline StructWithNullableXUnion::StructWithNullableXUnion(::fidl::Box<::test_union::OlderSimpleUnion> x1) noexcept
+    : storage_({
+      .x1 = std::move(x1)
+    }) {}
+    inline StructWithNullableXUnion::StructWithNullableXUnion(const ::test_union::StructWithNullableXUnion& other) noexcept : ::test_union::StructWithNullableXUnion(other.CloneStorage_()){}
+    inline StructWithNullableXUnion& ::test_union::StructWithNullableXUnion::operator=(const ::test_union::StructWithNullableXUnion& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline StructWithNullableXUnion::StructWithNullableXUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : StructWithNullableXUnion(Storage_{
+      .x1 ={},
+  }) {}
+    inline StructWithNullableXUnion& StructWithNullableXUnion::x1(::fidl::Box<::test_union::OlderSimpleUnion> value) {
+      storage_.x1 = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline UnionSandwich::UnionSandwich(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline UnionSandwich::UnionSandwich(uint32_t a, ::test_union::ExplicitXUnion u, uint32_t b) noexcept
+    : storage_({
+      .a = std::move(a), 
+      .u = std::move(u), 
+      .b = std::move(b)
+    }) {}
+    inline UnionSandwich::UnionSandwich(const ::test_union::UnionSandwich& other) noexcept : ::test_union::UnionSandwich(other.CloneStorage_()){}
+    inline UnionSandwich& ::test_union::UnionSandwich::operator=(const ::test_union::UnionSandwich& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline UnionSandwich::UnionSandwich(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : UnionSandwich(Storage_{
+      .a ={},
+      .u =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+      .b ={},
+  }) {}
+    inline UnionSandwich& UnionSandwich::a(uint32_t value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+    inline UnionSandwich& UnionSandwich::u(::test_union::ExplicitXUnion value) {
+      storage_.u = std::move(value);
+      return *this;
+    }
+    inline UnionSandwich& UnionSandwich::b(uint32_t value) {
+      storage_.b = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+  
 
 }  // namespace test_union
 namespace fidl {

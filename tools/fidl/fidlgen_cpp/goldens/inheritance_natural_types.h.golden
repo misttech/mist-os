@@ -34,9 +34,8 @@ class SuperFooRequest {
   struct Storage_;
 
  public:
-  SuperFooRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SuperFooRequest(::std::string s) noexcept
-      : storage_({.s = std::move(s)}) {}
+  SuperFooRequest(Storage_ storage) noexcept;
+  SuperFooRequest(::std::string s) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -46,11 +45,8 @@ class SuperFooRequest {
 
   SuperFooRequest(SuperFooRequest&&) noexcept = default;
   SuperFooRequest& operator=(SuperFooRequest&&) noexcept = default;
-  SuperFooRequest(const SuperFooRequest& other) noexcept : SuperFooRequest(other.CloneStorage_()) {}
-  SuperFooRequest& operator=(const SuperFooRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SuperFooRequest(const SuperFooRequest& other) noexcept;
+  SuperFooRequest& operator=(const SuperFooRequest& other) noexcept;
 
   bool operator==(const SuperFooRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_inheritance::SuperFooRequest, 16>::Equal(this, &other);
@@ -71,14 +67,9 @@ class SuperFooRequest {
   // Setter for s.
   //
 
-  SuperFooRequest& s(::std::string value) {
-    storage_.s = std::move(value);
-    return *this;
-  }
+  SuperFooRequest& s(::std::string value);
 
-  SuperFooRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SuperFooRequest(Storage_{
-                                                                                    .s = {},
-                                                                                }) {}
+  SuperFooRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -102,9 +93,8 @@ class SuperFooResponse {
   struct Storage_;
 
  public:
-  SuperFooResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  SuperFooResponse(int64_t y) noexcept
-      : storage_({.y = std::move(y)}) {}
+  SuperFooResponse(Storage_ storage) noexcept;
+  SuperFooResponse(int64_t y) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -114,11 +104,8 @@ class SuperFooResponse {
 
   SuperFooResponse(SuperFooResponse&&) noexcept = default;
   SuperFooResponse& operator=(SuperFooResponse&&) noexcept = default;
-  SuperFooResponse(const SuperFooResponse& other) noexcept : SuperFooResponse(other.CloneStorage_()) {}
-  SuperFooResponse& operator=(const SuperFooResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  SuperFooResponse(const SuperFooResponse& other) noexcept;
+  SuperFooResponse& operator=(const SuperFooResponse& other) noexcept;
 
   bool operator==(const SuperFooResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_inheritance::SuperFooResponse, 8>::Equal(this, &other);
@@ -139,14 +126,9 @@ class SuperFooResponse {
   // Setter for y.
   //
 
-  SuperFooResponse& y(int64_t value) {
-    storage_.y = std::move(value);
-    return *this;
-  }
+  SuperFooResponse& y(int64_t value);
 
-  SuperFooResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SuperFooResponse(Storage_{
-                                                                                     .y = {},
-                                                                                 }) {}
+  SuperFooResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -162,6 +144,40 @@ class SuperFooResponse {
       &Storage_::y, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline SuperFooRequest::SuperFooRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SuperFooRequest::SuperFooRequest(::std::string s) noexcept
+    : storage_({.s = std::move(s)}) {}
+inline SuperFooRequest::SuperFooRequest(const ::test_inheritance::SuperFooRequest& other) noexcept : ::test_inheritance::SuperFooRequest(other.CloneStorage_()) {}
+inline SuperFooRequest& ::test_inheritance::SuperFooRequest::operator=(const ::test_inheritance::SuperFooRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SuperFooRequest::SuperFooRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SuperFooRequest(Storage_{
+                                                                                                          .s = {},
+                                                                                                      }) {}
+inline SuperFooRequest& SuperFooRequest::s(::std::string value) {
+  storage_.s = std::move(value);
+  return *this;
+}
+
+inline SuperFooResponse::SuperFooResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline SuperFooResponse::SuperFooResponse(int64_t y) noexcept
+    : storage_({.y = std::move(y)}) {}
+inline SuperFooResponse::SuperFooResponse(const ::test_inheritance::SuperFooResponse& other) noexcept : ::test_inheritance::SuperFooResponse(other.CloneStorage_()) {}
+inline SuperFooResponse& ::test_inheritance::SuperFooResponse::operator=(const ::test_inheritance::SuperFooResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline SuperFooResponse::SuperFooResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : SuperFooResponse(Storage_{
+                                                                                                            .y = {},
+                                                                                                        }) {}
+inline SuperFooResponse& SuperFooResponse::y(int64_t value) {
+  storage_.y = std::move(value);
+  return *this;
+}
 
 }  // namespace test_inheritance
 namespace fidl {

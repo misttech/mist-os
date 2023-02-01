@@ -40,9 +40,8 @@ class Struct {
   struct Storage_;
 
  public:
-  Struct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Struct(uint32_t x) noexcept
-      : storage_({.x = std::move(x)}) {}
+  Struct(Storage_ storage) noexcept;
+  Struct(uint32_t x) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -52,11 +51,8 @@ class Struct {
 
   Struct(Struct&&) noexcept = default;
   Struct& operator=(Struct&&) noexcept = default;
-  Struct(const Struct& other) noexcept : Struct(other.CloneStorage_()) {}
-  Struct& operator=(const Struct& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Struct(const Struct& other) noexcept;
+  Struct& operator=(const Struct& other) noexcept;
 
   bool operator==(const Struct& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_versions::Struct, 4>::Equal(this, &other);
@@ -77,14 +73,9 @@ class Struct {
   // Setter for x.
   //
 
-  Struct& x(uint32_t value) {
-    storage_.x = std::move(value);
-    return *this;
-  }
+  Struct& x(uint32_t value);
 
-  Struct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Struct(Storage_{
-                                                                           .x = {},
-                                                                       }) {}
+  Struct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -108,15 +99,12 @@ class Table {
   struct Storage_;
 
  public:
-  Table(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  Table(Storage_ storage) noexcept;
   Table() noexcept = default;
   Table(Table&&) noexcept = default;
   Table& operator=(Table&&) noexcept = default;
-  Table(const Table& other) noexcept : Table(other.CloneStorage_()) {}
-  Table& operator=(const Table& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Table(const Table& other) noexcept;
+  Table& operator=(const Table& other) noexcept;
   bool operator==(const Table& other) const noexcept {
     return ::fidl::internal::NaturalTableCodingTraits<::test_versions::Table>::Equal(this, &other);
   }
@@ -134,16 +122,13 @@ class Table {
   // Setter for x.
   //
 
-  Table& x(std::optional<uint32_t> value) {
-    storage_.x = std::move(value);
-    return *this;
-  }
+  Table& x(std::optional<uint32_t> value);
 
-  Table(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Table(Storage_{}) {}
+  Table(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-    ::std::optional<uint32_t> x{};
+    ::std::optional<uint32_t> x;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -254,6 +239,36 @@ class Union {
     }
   }
 };
+
+inline Struct::Struct(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Struct::Struct(uint32_t x) noexcept
+    : storage_({.x = std::move(x)}) {}
+inline Struct::Struct(const ::test_versions::Struct& other) noexcept : ::test_versions::Struct(other.CloneStorage_()) {}
+inline Struct& ::test_versions::Struct::operator=(const ::test_versions::Struct& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Struct::Struct(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Struct(Storage_{
+                                                                                        .x = {},
+                                                                                    }) {}
+inline Struct& Struct::x(uint32_t value) {
+  storage_.x = std::move(value);
+  return *this;
+}
+
+inline Table::Table(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Table::Table(const ::test_versions::Table& other) noexcept : Table(other.CloneStorage_()) {}
+inline Table& ::test_versions::Table::operator=(const Table& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Table::Table(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Table(Storage_{}) {}
+inline Table& Table::x(std::optional<uint32_t> value) {
+  storage_.x = std::move(value);
+  return *this;
+}
 
 }  // namespace test_versions
 namespace fidl {

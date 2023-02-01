@@ -21,20 +21,14 @@ class {{ .Name }} {
  private:
   struct Storage_;
  public:
-  {{ .Name }}(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  {{ .Name }}(Storage_ storage) noexcept;
 
   {{- if len .Members }}
     {{ .Name }}(
     {{- range $i, $m := .Members }}
       {{- if $i }}, {{ end }}
       {{- $m.Type }} {{ $m.Name }}
-    {{- end }}) noexcept
-    : storage_({
-    {{- range $i, $m := .Members }}
-      {{- if $i }}, {{ end }}
-      .{{ $m.Name }} = std::move({{ $m.Name}})
-    {{- end }}
-    }) {}
+    {{- end }}) noexcept;
   {{- end }}
 
 #pragma clang diagnostic push
@@ -46,11 +40,8 @@ class {{ .Name }} {
   {{ .Name }}({{ .Name }}&&) noexcept = default;
   {{ .Name }}& operator=({{ .Name }}&&) noexcept = default;
   {{- if not .IsResourceType }}
-    {{ .Name }}(const {{ .Name }}& other) noexcept : {{ .Name }}(other.CloneStorage_()){}
-    {{ .Name }}& operator=(const {{ .Name }}& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    {{ .Name }}(const {{ .Name }}& other) noexcept;
+    {{ .Name }}& operator=(const {{ .Name }}& other) noexcept;
 
     bool operator==(const {{ .Name }}& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<{{ . }}, {{ .TypeShapeV2.InlineSize }}>::Equal(this, &other);
@@ -79,22 +70,10 @@ class {{ .Name }} {
     // Setter for {{ .Name }}.
     //
     {{ .Docs }}
-    {{ $.Name }}& {{ .Name }}({{ .Type }} value) {
-      storage_.{{ .Name }} = std::move(value);
-      return *this;
-    }
+    {{ $.Name }}& {{ .Name }}({{ .Type }} value);
   {{- end }}
 
-  {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{
-    {{- range .Members }}
-      .{{ .Name }} =
-      {{- if .DefaultValue.IsSet }}
-        {{- .DefaultValue }}
-      {{- else }}
-        {{- .NaturalPossiblyInvalidDefaultInitializer }}
-      {{- end }},
-    {{- end }}
-  }) {}
+  {{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -141,6 +120,60 @@ class {{ .Name }} {
 {{ if .IsResourceType }}
 {{- EndifFuchsia -}}
 {{- end }}
+{{- end }}
+
+
+{{- define "Struct:InlineDefinition:NaturalTypesHeader" }}
+  {{ EnsureNamespace . }}
+  {{ if .IsResourceType }}
+    {{- IfdefFuchsia -}}
+  {{- end }}
+
+  inline {{ .Name }}::{{ .Name }}(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+
+  {{- if len .Members }}
+    inline {{ .Name }}::{{ .Name }}(
+    {{- range $i, $m := .Members }}
+      {{- if $i }}, {{ end }}
+      {{- $m.Type }} {{ $m.Name }}
+    {{- end }}) noexcept
+    : storage_({
+    {{- range $i, $m := .Members }}
+      {{- if $i }}, {{ end }}
+      .{{ $m.Name }} = std::move({{ $m.Name}})
+    {{- end }}
+    }) {}
+  {{- end }}
+
+  {{- if not .IsResourceType }}
+    inline {{ .Name }}::{{ .Name }}(const {{ . }}& other) noexcept : {{ . }}(other.CloneStorage_()){}
+    inline {{ .Name }}& {{ . }}::operator=(const {{ . }}& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+  {{- end }}
+
+  inline {{ .Name }}::{{ .Name }}(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : {{ .Name }}(Storage_{
+    {{- range .Members }}
+      .{{ .Name }} =
+      {{- if .DefaultValue.IsSet }}
+        {{- .DefaultValue }}
+      {{- else }}
+        {{- .NaturalPossiblyInvalidDefaultInitializer }}
+      {{- end }},
+    {{- end }}
+  }) {}
+
+  {{- range .Members }}
+    inline {{ $.Name }}& {{ $.Name }}::{{ .Name }}({{ .Type }} value) {
+      storage_.{{ .Name }} = std::move(value);
+      return *this;
+    }
+  {{- end }}
+
+  {{ if .IsResourceType }}
+    {{- EndifFuchsia -}}
+  {{- end }}
 {{- end }}
 
 

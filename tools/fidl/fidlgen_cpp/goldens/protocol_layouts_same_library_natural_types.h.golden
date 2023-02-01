@@ -167,21 +167,18 @@ class TablePayload {
  private:
   struct Storage_;
  public:
-  TablePayload(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  TablePayload(Storage_ storage) noexcept;
   TablePayload() noexcept = default;
   TablePayload(TablePayload&&) noexcept = default;
   TablePayload& operator=(TablePayload&&) noexcept = default;
-    TablePayload(const TablePayload& other) noexcept : TablePayload(other.CloneStorage_()){}
-    TablePayload& operator=(const TablePayload& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    TablePayload(const TablePayload& other) noexcept;
+    TablePayload& operator=(const TablePayload& other) noexcept;
+    bool operator==(const TablePayload& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::TablePayload>::Equal(this, &other);
     }
-  bool operator==(const TablePayload& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::TablePayload>::Equal(this, &other);
-  }
-  bool operator!=(const TablePayload& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::TablePayload>::Equal(this, &other);
-  }
+    bool operator!=(const TablePayload& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::TablePayload>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -194,16 +191,13 @@ class TablePayload {
     // Setter for a.
     //
     
-    TablePayload& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    TablePayload& a(std::optional<uint16_t> value);
 
-  TablePayload(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TablePayload(Storage_{}) {}
+  TablePayload(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -334,21 +328,18 @@ class ComposedProtocolOneWayAnonComposedRequest {
  private:
   struct Storage_;
  public:
-  ComposedProtocolOneWayAnonComposedRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  ComposedProtocolOneWayAnonComposedRequest(Storage_ storage) noexcept;
   ComposedProtocolOneWayAnonComposedRequest() noexcept = default;
   ComposedProtocolOneWayAnonComposedRequest(ComposedProtocolOneWayAnonComposedRequest&&) noexcept = default;
   ComposedProtocolOneWayAnonComposedRequest& operator=(ComposedProtocolOneWayAnonComposedRequest&&) noexcept = default;
-    ComposedProtocolOneWayAnonComposedRequest(const ComposedProtocolOneWayAnonComposedRequest& other) noexcept : ComposedProtocolOneWayAnonComposedRequest(other.CloneStorage_()){}
-    ComposedProtocolOneWayAnonComposedRequest& operator=(const ComposedProtocolOneWayAnonComposedRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    ComposedProtocolOneWayAnonComposedRequest(const ComposedProtocolOneWayAnonComposedRequest& other) noexcept;
+    ComposedProtocolOneWayAnonComposedRequest& operator=(const ComposedProtocolOneWayAnonComposedRequest& other) noexcept;
+    bool operator==(const ComposedProtocolOneWayAnonComposedRequest& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest>::Equal(this, &other);
     }
-  bool operator==(const ComposedProtocolOneWayAnonComposedRequest& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest>::Equal(this, &other);
-  }
-  bool operator!=(const ComposedProtocolOneWayAnonComposedRequest& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest>::Equal(this, &other);
-  }
+    bool operator!=(const ComposedProtocolOneWayAnonComposedRequest& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -361,16 +352,13 @@ class ComposedProtocolOneWayAnonComposedRequest {
     // Setter for a.
     //
     
-    ComposedProtocolOneWayAnonComposedRequest& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    ComposedProtocolOneWayAnonComposedRequest& a(std::optional<uint16_t> value);
 
-  ComposedProtocolOneWayAnonComposedRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolOneWayAnonComposedRequest(Storage_{}) {}
+  ComposedProtocolOneWayAnonComposedRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -501,21 +489,18 @@ class ComposedProtocolTwoWayAnonComposedResponse {
  private:
   struct Storage_;
  public:
-  ComposedProtocolTwoWayAnonComposedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  ComposedProtocolTwoWayAnonComposedResponse(Storage_ storage) noexcept;
   ComposedProtocolTwoWayAnonComposedResponse() noexcept = default;
   ComposedProtocolTwoWayAnonComposedResponse(ComposedProtocolTwoWayAnonComposedResponse&&) noexcept = default;
   ComposedProtocolTwoWayAnonComposedResponse& operator=(ComposedProtocolTwoWayAnonComposedResponse&&) noexcept = default;
-    ComposedProtocolTwoWayAnonComposedResponse(const ComposedProtocolTwoWayAnonComposedResponse& other) noexcept : ComposedProtocolTwoWayAnonComposedResponse(other.CloneStorage_()){}
-    ComposedProtocolTwoWayAnonComposedResponse& operator=(const ComposedProtocolTwoWayAnonComposedResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    ComposedProtocolTwoWayAnonComposedResponse(const ComposedProtocolTwoWayAnonComposedResponse& other) noexcept;
+    ComposedProtocolTwoWayAnonComposedResponse& operator=(const ComposedProtocolTwoWayAnonComposedResponse& other) noexcept;
+    bool operator==(const ComposedProtocolTwoWayAnonComposedResponse& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse>::Equal(this, &other);
     }
-  bool operator==(const ComposedProtocolTwoWayAnonComposedResponse& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse>::Equal(this, &other);
-  }
-  bool operator!=(const ComposedProtocolTwoWayAnonComposedResponse& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse>::Equal(this, &other);
-  }
+    bool operator!=(const ComposedProtocolTwoWayAnonComposedResponse& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -528,16 +513,13 @@ class ComposedProtocolTwoWayAnonComposedResponse {
     // Setter for a.
     //
     
-    ComposedProtocolTwoWayAnonComposedResponse& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    ComposedProtocolTwoWayAnonComposedResponse& a(std::optional<uint16_t> value);
 
-  ComposedProtocolTwoWayAnonComposedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolTwoWayAnonComposedResponse(Storage_{}) {}
+  ComposedProtocolTwoWayAnonComposedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -563,21 +545,18 @@ class ComposedProtocolTwoWayAnonComposedWithErrorRequest {
  private:
   struct Storage_;
  public:
-  ComposedProtocolTwoWayAnonComposedWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  ComposedProtocolTwoWayAnonComposedWithErrorRequest(Storage_ storage) noexcept;
   ComposedProtocolTwoWayAnonComposedWithErrorRequest() noexcept = default;
   ComposedProtocolTwoWayAnonComposedWithErrorRequest(ComposedProtocolTwoWayAnonComposedWithErrorRequest&&) noexcept = default;
   ComposedProtocolTwoWayAnonComposedWithErrorRequest& operator=(ComposedProtocolTwoWayAnonComposedWithErrorRequest&&) noexcept = default;
-    ComposedProtocolTwoWayAnonComposedWithErrorRequest(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) noexcept : ComposedProtocolTwoWayAnonComposedWithErrorRequest(other.CloneStorage_()){}
-    ComposedProtocolTwoWayAnonComposedWithErrorRequest& operator=(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    ComposedProtocolTwoWayAnonComposedWithErrorRequest(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) noexcept;
+    ComposedProtocolTwoWayAnonComposedWithErrorRequest& operator=(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) noexcept;
+    bool operator==(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest>::Equal(this, &other);
     }
-  bool operator==(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest>::Equal(this, &other);
-  }
-  bool operator!=(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest>::Equal(this, &other);
-  }
+    bool operator!=(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -590,16 +569,13 @@ class ComposedProtocolTwoWayAnonComposedWithErrorRequest {
     // Setter for a.
     //
     
-    ComposedProtocolTwoWayAnonComposedWithErrorRequest& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    ComposedProtocolTwoWayAnonComposedWithErrorRequest& a(std::optional<uint16_t> value);
 
-  ComposedProtocolTwoWayAnonComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolTwoWayAnonComposedWithErrorRequest(Storage_{}) {}
+  ComposedProtocolTwoWayAnonComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -860,11 +836,8 @@ class ComposedProtocolTwoWayAnonComposedWithErrorTopResponse {
  private:
   struct Storage_;
  public:
-  ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(Storage_ storage) noexcept;
+    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -874,11 +847,8 @@ class ComposedProtocolTwoWayAnonComposedWithErrorTopResponse {
 
   ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(ComposedProtocolTwoWayAnonComposedWithErrorTopResponse&&) noexcept = default;
   ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& operator=(ComposedProtocolTwoWayAnonComposedWithErrorTopResponse&&) noexcept = default;
-    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(const ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& other) noexcept : ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(other.CloneStorage_()){}
-    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& operator=(const ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(const ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& other) noexcept;
+    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& operator=(const ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& other) noexcept;
 
     bool operator==(const ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse, 16>::Equal(this, &other);
@@ -900,14 +870,9 @@ class ComposedProtocolTwoWayAnonComposedWithErrorTopResponse {
     // Setter for result.
     //
     
-    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& result(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& result(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult value);
 
-  ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1046,21 +1011,18 @@ class ComposedProtocolOnAnonComposedWithErrorResponse {
  private:
   struct Storage_;
  public:
-  ComposedProtocolOnAnonComposedWithErrorResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  ComposedProtocolOnAnonComposedWithErrorResponse(Storage_ storage) noexcept;
   ComposedProtocolOnAnonComposedWithErrorResponse() noexcept = default;
   ComposedProtocolOnAnonComposedWithErrorResponse(ComposedProtocolOnAnonComposedWithErrorResponse&&) noexcept = default;
   ComposedProtocolOnAnonComposedWithErrorResponse& operator=(ComposedProtocolOnAnonComposedWithErrorResponse&&) noexcept = default;
-    ComposedProtocolOnAnonComposedWithErrorResponse(const ComposedProtocolOnAnonComposedWithErrorResponse& other) noexcept : ComposedProtocolOnAnonComposedWithErrorResponse(other.CloneStorage_()){}
-    ComposedProtocolOnAnonComposedWithErrorResponse& operator=(const ComposedProtocolOnAnonComposedWithErrorResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    ComposedProtocolOnAnonComposedWithErrorResponse(const ComposedProtocolOnAnonComposedWithErrorResponse& other) noexcept;
+    ComposedProtocolOnAnonComposedWithErrorResponse& operator=(const ComposedProtocolOnAnonComposedWithErrorResponse& other) noexcept;
+    bool operator==(const ComposedProtocolOnAnonComposedWithErrorResponse& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse>::Equal(this, &other);
     }
-  bool operator==(const ComposedProtocolOnAnonComposedWithErrorResponse& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse>::Equal(this, &other);
-  }
-  bool operator!=(const ComposedProtocolOnAnonComposedWithErrorResponse& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse>::Equal(this, &other);
-  }
+    bool operator!=(const ComposedProtocolOnAnonComposedWithErrorResponse& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -1073,16 +1035,13 @@ class ComposedProtocolOnAnonComposedWithErrorResponse {
     // Setter for a.
     //
     
-    ComposedProtocolOnAnonComposedWithErrorResponse& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    ComposedProtocolOnAnonComposedWithErrorResponse& a(std::optional<uint16_t> value);
 
-  ComposedProtocolOnAnonComposedWithErrorResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolOnAnonComposedWithErrorResponse(Storage_{}) {}
+  ComposedProtocolOnAnonComposedWithErrorResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -1238,11 +1197,8 @@ class ComposedProtocolOnAnonComposedWithErrorRequest {
  private:
   struct Storage_;
  public:
-  ComposedProtocolOnAnonComposedWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ComposedProtocolOnAnonComposedWithErrorRequest(::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  ComposedProtocolOnAnonComposedWithErrorRequest(Storage_ storage) noexcept;
+    ComposedProtocolOnAnonComposedWithErrorRequest(::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1252,11 +1208,8 @@ class ComposedProtocolOnAnonComposedWithErrorRequest {
 
   ComposedProtocolOnAnonComposedWithErrorRequest(ComposedProtocolOnAnonComposedWithErrorRequest&&) noexcept = default;
   ComposedProtocolOnAnonComposedWithErrorRequest& operator=(ComposedProtocolOnAnonComposedWithErrorRequest&&) noexcept = default;
-    ComposedProtocolOnAnonComposedWithErrorRequest(const ComposedProtocolOnAnonComposedWithErrorRequest& other) noexcept : ComposedProtocolOnAnonComposedWithErrorRequest(other.CloneStorage_()){}
-    ComposedProtocolOnAnonComposedWithErrorRequest& operator=(const ComposedProtocolOnAnonComposedWithErrorRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ComposedProtocolOnAnonComposedWithErrorRequest(const ComposedProtocolOnAnonComposedWithErrorRequest& other) noexcept;
+    ComposedProtocolOnAnonComposedWithErrorRequest& operator=(const ComposedProtocolOnAnonComposedWithErrorRequest& other) noexcept;
 
     bool operator==(const ComposedProtocolOnAnonComposedWithErrorRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest, 16>::Equal(this, &other);
@@ -1278,14 +1231,9 @@ class ComposedProtocolOnAnonComposedWithErrorRequest {
     // Setter for result.
     //
     
-    ComposedProtocolOnAnonComposedWithErrorRequest& result(::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    ComposedProtocolOnAnonComposedWithErrorRequest& result(::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult value);
 
-  ComposedProtocolOnAnonComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolOnAnonComposedWithErrorRequest(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  ComposedProtocolOnAnonComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1449,11 +1397,8 @@ class ComposedProtocolTwoWayNamedComposedWithErrorTopResponse {
  private:
   struct Storage_;
  public:
-  ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(Storage_ storage) noexcept;
+    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1463,11 +1408,8 @@ class ComposedProtocolTwoWayNamedComposedWithErrorTopResponse {
 
   ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(ComposedProtocolTwoWayNamedComposedWithErrorTopResponse&&) noexcept = default;
   ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& operator=(ComposedProtocolTwoWayNamedComposedWithErrorTopResponse&&) noexcept = default;
-    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(const ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& other) noexcept : ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(other.CloneStorage_()){}
-    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& operator=(const ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(const ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& other) noexcept;
+    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& operator=(const ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& other) noexcept;
 
     bool operator==(const ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse, 16>::Equal(this, &other);
@@ -1489,14 +1431,9 @@ class ComposedProtocolTwoWayNamedComposedWithErrorTopResponse {
     // Setter for result.
     //
     
-    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& result(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& result(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult value);
 
-  ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1660,11 +1597,8 @@ class ComposedProtocolOnNamedComposedWithErrorRequest {
  private:
   struct Storage_;
  public:
-  ComposedProtocolOnNamedComposedWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    ComposedProtocolOnNamedComposedWithErrorRequest(::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  ComposedProtocolOnNamedComposedWithErrorRequest(Storage_ storage) noexcept;
+    ComposedProtocolOnNamedComposedWithErrorRequest(::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1674,11 +1608,8 @@ class ComposedProtocolOnNamedComposedWithErrorRequest {
 
   ComposedProtocolOnNamedComposedWithErrorRequest(ComposedProtocolOnNamedComposedWithErrorRequest&&) noexcept = default;
   ComposedProtocolOnNamedComposedWithErrorRequest& operator=(ComposedProtocolOnNamedComposedWithErrorRequest&&) noexcept = default;
-    ComposedProtocolOnNamedComposedWithErrorRequest(const ComposedProtocolOnNamedComposedWithErrorRequest& other) noexcept : ComposedProtocolOnNamedComposedWithErrorRequest(other.CloneStorage_()){}
-    ComposedProtocolOnNamedComposedWithErrorRequest& operator=(const ComposedProtocolOnNamedComposedWithErrorRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    ComposedProtocolOnNamedComposedWithErrorRequest(const ComposedProtocolOnNamedComposedWithErrorRequest& other) noexcept;
+    ComposedProtocolOnNamedComposedWithErrorRequest& operator=(const ComposedProtocolOnNamedComposedWithErrorRequest& other) noexcept;
 
     bool operator==(const ComposedProtocolOnNamedComposedWithErrorRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest, 16>::Equal(this, &other);
@@ -1700,14 +1631,9 @@ class ComposedProtocolOnNamedComposedWithErrorRequest {
     // Setter for result.
     //
     
-    ComposedProtocolOnNamedComposedWithErrorRequest& result(::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    ComposedProtocolOnNamedComposedWithErrorRequest& result(::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult value);
 
-  ComposedProtocolOnNamedComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolOnNamedComposedWithErrorRequest(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  ComposedProtocolOnNamedComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -1874,11 +1800,8 @@ class MainProtocolTwoWayLocalWithErrorTopResponse {
  private:
   struct Storage_;
  public:
-  MainProtocolTwoWayLocalWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    MainProtocolTwoWayLocalWithErrorTopResponse(::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  MainProtocolTwoWayLocalWithErrorTopResponse(Storage_ storage) noexcept;
+    MainProtocolTwoWayLocalWithErrorTopResponse(::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -1888,11 +1811,8 @@ class MainProtocolTwoWayLocalWithErrorTopResponse {
 
   MainProtocolTwoWayLocalWithErrorTopResponse(MainProtocolTwoWayLocalWithErrorTopResponse&&) noexcept = default;
   MainProtocolTwoWayLocalWithErrorTopResponse& operator=(MainProtocolTwoWayLocalWithErrorTopResponse&&) noexcept = default;
-    MainProtocolTwoWayLocalWithErrorTopResponse(const MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept : MainProtocolTwoWayLocalWithErrorTopResponse(other.CloneStorage_()){}
-    MainProtocolTwoWayLocalWithErrorTopResponse& operator=(const MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    MainProtocolTwoWayLocalWithErrorTopResponse(const MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept;
+    MainProtocolTwoWayLocalWithErrorTopResponse& operator=(const MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept;
 
     bool operator==(const MainProtocolTwoWayLocalWithErrorTopResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse, 16>::Equal(this, &other);
@@ -1914,14 +1834,9 @@ class MainProtocolTwoWayLocalWithErrorTopResponse {
     // Setter for result.
     //
     
-    MainProtocolTwoWayLocalWithErrorTopResponse& result(::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    MainProtocolTwoWayLocalWithErrorTopResponse& result(::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult value);
 
-  MainProtocolTwoWayLocalWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayLocalWithErrorTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  MainProtocolTwoWayLocalWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2085,11 +2000,8 @@ class MainProtocolOnLocalWithErrorRequest {
  private:
   struct Storage_;
  public:
-  MainProtocolOnLocalWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    MainProtocolOnLocalWithErrorRequest(::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  MainProtocolOnLocalWithErrorRequest(Storage_ storage) noexcept;
+    MainProtocolOnLocalWithErrorRequest(::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2099,11 +2011,8 @@ class MainProtocolOnLocalWithErrorRequest {
 
   MainProtocolOnLocalWithErrorRequest(MainProtocolOnLocalWithErrorRequest&&) noexcept = default;
   MainProtocolOnLocalWithErrorRequest& operator=(MainProtocolOnLocalWithErrorRequest&&) noexcept = default;
-    MainProtocolOnLocalWithErrorRequest(const MainProtocolOnLocalWithErrorRequest& other) noexcept : MainProtocolOnLocalWithErrorRequest(other.CloneStorage_()){}
-    MainProtocolOnLocalWithErrorRequest& operator=(const MainProtocolOnLocalWithErrorRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    MainProtocolOnLocalWithErrorRequest(const MainProtocolOnLocalWithErrorRequest& other) noexcept;
+    MainProtocolOnLocalWithErrorRequest& operator=(const MainProtocolOnLocalWithErrorRequest& other) noexcept;
 
     bool operator==(const MainProtocolOnLocalWithErrorRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest, 16>::Equal(this, &other);
@@ -2125,14 +2034,9 @@ class MainProtocolOnLocalWithErrorRequest {
     // Setter for result.
     //
     
-    MainProtocolOnLocalWithErrorRequest& result(::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    MainProtocolOnLocalWithErrorRequest& result(::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult value);
 
-  MainProtocolOnLocalWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnLocalWithErrorRequest(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  MainProtocolOnLocalWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2166,21 +2070,18 @@ class MainProtocolOneWayAnonRequest {
  private:
   struct Storage_;
  public:
-  MainProtocolOneWayAnonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  MainProtocolOneWayAnonRequest(Storage_ storage) noexcept;
   MainProtocolOneWayAnonRequest() noexcept = default;
   MainProtocolOneWayAnonRequest(MainProtocolOneWayAnonRequest&&) noexcept = default;
   MainProtocolOneWayAnonRequest& operator=(MainProtocolOneWayAnonRequest&&) noexcept = default;
-    MainProtocolOneWayAnonRequest(const MainProtocolOneWayAnonRequest& other) noexcept : MainProtocolOneWayAnonRequest(other.CloneStorage_()){}
-    MainProtocolOneWayAnonRequest& operator=(const MainProtocolOneWayAnonRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    MainProtocolOneWayAnonRequest(const MainProtocolOneWayAnonRequest& other) noexcept;
+    MainProtocolOneWayAnonRequest& operator=(const MainProtocolOneWayAnonRequest& other) noexcept;
+    bool operator==(const MainProtocolOneWayAnonRequest& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest>::Equal(this, &other);
     }
-  bool operator==(const MainProtocolOneWayAnonRequest& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolOneWayAnonRequest& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest>::Equal(this, &other);
-  }
+    bool operator!=(const MainProtocolOneWayAnonRequest& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -2193,16 +2094,13 @@ class MainProtocolOneWayAnonRequest {
     // Setter for a.
     //
     
-    MainProtocolOneWayAnonRequest& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    MainProtocolOneWayAnonRequest& a(std::optional<uint16_t> value);
 
-  MainProtocolOneWayAnonRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOneWayAnonRequest(Storage_{}) {}
+  MainProtocolOneWayAnonRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -2336,21 +2234,18 @@ class MainProtocolTwoWayAnonResponse {
  private:
   struct Storage_;
  public:
-  MainProtocolTwoWayAnonResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  MainProtocolTwoWayAnonResponse(Storage_ storage) noexcept;
   MainProtocolTwoWayAnonResponse() noexcept = default;
   MainProtocolTwoWayAnonResponse(MainProtocolTwoWayAnonResponse&&) noexcept = default;
   MainProtocolTwoWayAnonResponse& operator=(MainProtocolTwoWayAnonResponse&&) noexcept = default;
-    MainProtocolTwoWayAnonResponse(const MainProtocolTwoWayAnonResponse& other) noexcept : MainProtocolTwoWayAnonResponse(other.CloneStorage_()){}
-    MainProtocolTwoWayAnonResponse& operator=(const MainProtocolTwoWayAnonResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    MainProtocolTwoWayAnonResponse(const MainProtocolTwoWayAnonResponse& other) noexcept;
+    MainProtocolTwoWayAnonResponse& operator=(const MainProtocolTwoWayAnonResponse& other) noexcept;
+    bool operator==(const MainProtocolTwoWayAnonResponse& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse>::Equal(this, &other);
     }
-  bool operator==(const MainProtocolTwoWayAnonResponse& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayAnonResponse& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse>::Equal(this, &other);
-  }
+    bool operator!=(const MainProtocolTwoWayAnonResponse& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -2363,16 +2258,13 @@ class MainProtocolTwoWayAnonResponse {
     // Setter for a.
     //
     
-    MainProtocolTwoWayAnonResponse& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    MainProtocolTwoWayAnonResponse& a(std::optional<uint16_t> value);
 
-  MainProtocolTwoWayAnonResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonResponse(Storage_{}) {}
+  MainProtocolTwoWayAnonResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -2398,21 +2290,18 @@ class MainProtocolTwoWayAnonWithErrorRequest {
  private:
   struct Storage_;
  public:
-  MainProtocolTwoWayAnonWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  MainProtocolTwoWayAnonWithErrorRequest(Storage_ storage) noexcept;
   MainProtocolTwoWayAnonWithErrorRequest() noexcept = default;
   MainProtocolTwoWayAnonWithErrorRequest(MainProtocolTwoWayAnonWithErrorRequest&&) noexcept = default;
   MainProtocolTwoWayAnonWithErrorRequest& operator=(MainProtocolTwoWayAnonWithErrorRequest&&) noexcept = default;
-    MainProtocolTwoWayAnonWithErrorRequest(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept : MainProtocolTwoWayAnonWithErrorRequest(other.CloneStorage_()){}
-    MainProtocolTwoWayAnonWithErrorRequest& operator=(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    MainProtocolTwoWayAnonWithErrorRequest(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept;
+    MainProtocolTwoWayAnonWithErrorRequest& operator=(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept;
+    bool operator==(const MainProtocolTwoWayAnonWithErrorRequest& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest>::Equal(this, &other);
     }
-  bool operator==(const MainProtocolTwoWayAnonWithErrorRequest& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolTwoWayAnonWithErrorRequest& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest>::Equal(this, &other);
-  }
+    bool operator!=(const MainProtocolTwoWayAnonWithErrorRequest& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -2425,16 +2314,13 @@ class MainProtocolTwoWayAnonWithErrorRequest {
     // Setter for a.
     //
     
-    MainProtocolTwoWayAnonWithErrorRequest& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    MainProtocolTwoWayAnonWithErrorRequest& a(std::optional<uint16_t> value);
 
-  MainProtocolTwoWayAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonWithErrorRequest(Storage_{}) {}
+  MainProtocolTwoWayAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -2698,11 +2584,8 @@ class MainProtocolTwoWayAnonWithErrorTopResponse {
  private:
   struct Storage_;
  public:
-  MainProtocolTwoWayAnonWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    MainProtocolTwoWayAnonWithErrorTopResponse(::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  MainProtocolTwoWayAnonWithErrorTopResponse(Storage_ storage) noexcept;
+    MainProtocolTwoWayAnonWithErrorTopResponse(::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -2712,11 +2595,8 @@ class MainProtocolTwoWayAnonWithErrorTopResponse {
 
   MainProtocolTwoWayAnonWithErrorTopResponse(MainProtocolTwoWayAnonWithErrorTopResponse&&) noexcept = default;
   MainProtocolTwoWayAnonWithErrorTopResponse& operator=(MainProtocolTwoWayAnonWithErrorTopResponse&&) noexcept = default;
-    MainProtocolTwoWayAnonWithErrorTopResponse(const MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept : MainProtocolTwoWayAnonWithErrorTopResponse(other.CloneStorage_()){}
-    MainProtocolTwoWayAnonWithErrorTopResponse& operator=(const MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    MainProtocolTwoWayAnonWithErrorTopResponse(const MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept;
+    MainProtocolTwoWayAnonWithErrorTopResponse& operator=(const MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept;
 
     bool operator==(const MainProtocolTwoWayAnonWithErrorTopResponse& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse, 16>::Equal(this, &other);
@@ -2738,14 +2618,9 @@ class MainProtocolTwoWayAnonWithErrorTopResponse {
     // Setter for result.
     //
     
-    MainProtocolTwoWayAnonWithErrorTopResponse& result(::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    MainProtocolTwoWayAnonWithErrorTopResponse& result(::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult value);
 
-  MainProtocolTwoWayAnonWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonWithErrorTopResponse(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  MainProtocolTwoWayAnonWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -2887,21 +2762,18 @@ class MainProtocolOnAnonWithErrorResponse {
  private:
   struct Storage_;
  public:
-  MainProtocolOnAnonWithErrorResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+  MainProtocolOnAnonWithErrorResponse(Storage_ storage) noexcept;
   MainProtocolOnAnonWithErrorResponse() noexcept = default;
   MainProtocolOnAnonWithErrorResponse(MainProtocolOnAnonWithErrorResponse&&) noexcept = default;
   MainProtocolOnAnonWithErrorResponse& operator=(MainProtocolOnAnonWithErrorResponse&&) noexcept = default;
-    MainProtocolOnAnonWithErrorResponse(const MainProtocolOnAnonWithErrorResponse& other) noexcept : MainProtocolOnAnonWithErrorResponse(other.CloneStorage_()){}
-    MainProtocolOnAnonWithErrorResponse& operator=(const MainProtocolOnAnonWithErrorResponse& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
+    MainProtocolOnAnonWithErrorResponse(const MainProtocolOnAnonWithErrorResponse& other) noexcept;
+    MainProtocolOnAnonWithErrorResponse& operator=(const MainProtocolOnAnonWithErrorResponse& other) noexcept;
+    bool operator==(const MainProtocolOnAnonWithErrorResponse& other) const noexcept {
+      return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse>::Equal(this, &other);
     }
-  bool operator==(const MainProtocolOnAnonWithErrorResponse& other) const noexcept {
-    return ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse>::Equal(this, &other);
-  }
-  bool operator!=(const MainProtocolOnAnonWithErrorResponse& other) const noexcept {
-    return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse>::Equal(this, &other);
-  }
+    bool operator!=(const MainProtocolOnAnonWithErrorResponse& other) const noexcept {
+      return !::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse>::Equal(this, &other);
+    }
 
   bool IsEmpty() const {
       return !(storage_.a.has_value()
@@ -2914,16 +2786,13 @@ class MainProtocolOnAnonWithErrorResponse {
     // Setter for a.
     //
     
-    MainProtocolOnAnonWithErrorResponse& a(std::optional<uint16_t> value) {
-      storage_.a = std::move(value);
-      return *this;
-    }
+    MainProtocolOnAnonWithErrorResponse& a(std::optional<uint16_t> value);
 
-  MainProtocolOnAnonWithErrorResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnAnonWithErrorResponse(Storage_{}) {}
+  MainProtocolOnAnonWithErrorResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
-      ::std::optional<uint16_t> a {};
+      ::std::optional<uint16_t> a;
   };
 
   // TODO(https://fxbug.dev/91252): Box the storage.
@@ -3079,11 +2948,8 @@ class MainProtocolOnAnonWithErrorRequest {
  private:
   struct Storage_;
  public:
-  MainProtocolOnAnonWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-    MainProtocolOnAnonWithErrorRequest(::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult result) noexcept
-    : storage_({
-      .result = std::move(result)
-    }) {}
+  MainProtocolOnAnonWithErrorRequest(Storage_ storage) noexcept;
+    MainProtocolOnAnonWithErrorRequest(::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult result) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -3093,11 +2959,8 @@ class MainProtocolOnAnonWithErrorRequest {
 
   MainProtocolOnAnonWithErrorRequest(MainProtocolOnAnonWithErrorRequest&&) noexcept = default;
   MainProtocolOnAnonWithErrorRequest& operator=(MainProtocolOnAnonWithErrorRequest&&) noexcept = default;
-    MainProtocolOnAnonWithErrorRequest(const MainProtocolOnAnonWithErrorRequest& other) noexcept : MainProtocolOnAnonWithErrorRequest(other.CloneStorage_()){}
-    MainProtocolOnAnonWithErrorRequest& operator=(const MainProtocolOnAnonWithErrorRequest& other) noexcept {
-      storage_ = other.CloneStorage_();
-      return *this;
-    }
+    MainProtocolOnAnonWithErrorRequest(const MainProtocolOnAnonWithErrorRequest& other) noexcept;
+    MainProtocolOnAnonWithErrorRequest& operator=(const MainProtocolOnAnonWithErrorRequest& other) noexcept;
 
     bool operator==(const MainProtocolOnAnonWithErrorRequest& other) const noexcept {
       return ::fidl::internal::NaturalStructCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest, 16>::Equal(this, &other);
@@ -3119,14 +2982,9 @@ class MainProtocolOnAnonWithErrorRequest {
     // Setter for result.
     //
     
-    MainProtocolOnAnonWithErrorRequest& result(::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult value) {
-      storage_.result = std::move(value);
-      return *this;
-    }
+    MainProtocolOnAnonWithErrorRequest& result(::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult value);
 
-  MainProtocolOnAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnAnonWithErrorRequest(Storage_{
-      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-  }) {}
+  MainProtocolOnAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -3147,6 +3005,430 @@ class MainProtocolOnAnonWithErrorRequest {
 
 
   
+  
+  
+  
+  
+
+
+  
+  
+  
+
+  
+
+  inline TablePayload::TablePayload(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline TablePayload::TablePayload(const ::test_protocollayoutssamelibrary::TablePayload& other) noexcept : TablePayload(other.CloneStorage_()){}
+    inline TablePayload& ::test_protocollayoutssamelibrary::TablePayload::operator=(const TablePayload& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline TablePayload::TablePayload(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : TablePayload(Storage_{}) {}
+    inline TablePayload& TablePayload::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ComposedProtocolOneWayAnonComposedRequest::ComposedProtocolOneWayAnonComposedRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ComposedProtocolOneWayAnonComposedRequest::ComposedProtocolOneWayAnonComposedRequest(const ::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest& other) noexcept : ComposedProtocolOneWayAnonComposedRequest(other.CloneStorage_()){}
+    inline ComposedProtocolOneWayAnonComposedRequest& ::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest::operator=(const ComposedProtocolOneWayAnonComposedRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ComposedProtocolOneWayAnonComposedRequest::ComposedProtocolOneWayAnonComposedRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolOneWayAnonComposedRequest(Storage_{}) {}
+    inline ComposedProtocolOneWayAnonComposedRequest& ComposedProtocolOneWayAnonComposedRequest::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ComposedProtocolTwoWayAnonComposedResponse::ComposedProtocolTwoWayAnonComposedResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ComposedProtocolTwoWayAnonComposedResponse::ComposedProtocolTwoWayAnonComposedResponse(const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse& other) noexcept : ComposedProtocolTwoWayAnonComposedResponse(other.CloneStorage_()){}
+    inline ComposedProtocolTwoWayAnonComposedResponse& ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse::operator=(const ComposedProtocolTwoWayAnonComposedResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ComposedProtocolTwoWayAnonComposedResponse::ComposedProtocolTwoWayAnonComposedResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolTwoWayAnonComposedResponse(Storage_{}) {}
+    inline ComposedProtocolTwoWayAnonComposedResponse& ComposedProtocolTwoWayAnonComposedResponse::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline ComposedProtocolTwoWayAnonComposedWithErrorRequest::ComposedProtocolTwoWayAnonComposedWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ComposedProtocolTwoWayAnonComposedWithErrorRequest::ComposedProtocolTwoWayAnonComposedWithErrorRequest(const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) noexcept : ComposedProtocolTwoWayAnonComposedWithErrorRequest(other.CloneStorage_()){}
+    inline ComposedProtocolTwoWayAnonComposedWithErrorRequest& ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest::operator=(const ComposedProtocolTwoWayAnonComposedWithErrorRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ComposedProtocolTwoWayAnonComposedWithErrorRequest::ComposedProtocolTwoWayAnonComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolTwoWayAnonComposedWithErrorRequest(Storage_{}) {}
+    inline ComposedProtocolTwoWayAnonComposedWithErrorRequest& ComposedProtocolTwoWayAnonComposedWithErrorRequest::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& other) noexcept : ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(other.CloneStorage_()){}
+    inline ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::operator=(const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolTwoWayAnonComposedWithErrorTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ComposedProtocolTwoWayAnonComposedWithErrorTopResponse& ComposedProtocolTwoWayAnonComposedWithErrorTopResponse::result(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ComposedProtocolOnAnonComposedWithErrorResponse::ComposedProtocolOnAnonComposedWithErrorResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ComposedProtocolOnAnonComposedWithErrorResponse::ComposedProtocolOnAnonComposedWithErrorResponse(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse& other) noexcept : ComposedProtocolOnAnonComposedWithErrorResponse(other.CloneStorage_()){}
+    inline ComposedProtocolOnAnonComposedWithErrorResponse& ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse::operator=(const ComposedProtocolOnAnonComposedWithErrorResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ComposedProtocolOnAnonComposedWithErrorResponse::ComposedProtocolOnAnonComposedWithErrorResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolOnAnonComposedWithErrorResponse(Storage_{}) {}
+    inline ComposedProtocolOnAnonComposedWithErrorResponse& ComposedProtocolOnAnonComposedWithErrorResponse::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+
+  
+
+  inline ComposedProtocolOnAnonComposedWithErrorRequest::ComposedProtocolOnAnonComposedWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ComposedProtocolOnAnonComposedWithErrorRequest::ComposedProtocolOnAnonComposedWithErrorRequest(::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ComposedProtocolOnAnonComposedWithErrorRequest::ComposedProtocolOnAnonComposedWithErrorRequest(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& other) noexcept : ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest(other.CloneStorage_()){}
+    inline ComposedProtocolOnAnonComposedWithErrorRequest& ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest::operator=(const ::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ComposedProtocolOnAnonComposedWithErrorRequest::ComposedProtocolOnAnonComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolOnAnonComposedWithErrorRequest(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ComposedProtocolOnAnonComposedWithErrorRequest& ComposedProtocolOnAnonComposedWithErrorRequest::result(::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& other) noexcept : ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(other.CloneStorage_()){}
+    inline ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::operator=(const ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolTwoWayNamedComposedWithErrorTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ComposedProtocolTwoWayNamedComposedWithErrorTopResponse& ComposedProtocolTwoWayNamedComposedWithErrorTopResponse::result(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline ComposedProtocolOnNamedComposedWithErrorRequest::ComposedProtocolOnNamedComposedWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline ComposedProtocolOnNamedComposedWithErrorRequest::ComposedProtocolOnNamedComposedWithErrorRequest(::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline ComposedProtocolOnNamedComposedWithErrorRequest::ComposedProtocolOnNamedComposedWithErrorRequest(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& other) noexcept : ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest(other.CloneStorage_()){}
+    inline ComposedProtocolOnNamedComposedWithErrorRequest& ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest::operator=(const ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline ComposedProtocolOnNamedComposedWithErrorRequest::ComposedProtocolOnNamedComposedWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ComposedProtocolOnNamedComposedWithErrorRequest(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline ComposedProtocolOnNamedComposedWithErrorRequest& ComposedProtocolOnNamedComposedWithErrorRequest::result(::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline MainProtocolTwoWayLocalWithErrorTopResponse::MainProtocolTwoWayLocalWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MainProtocolTwoWayLocalWithErrorTopResponse::MainProtocolTwoWayLocalWithErrorTopResponse(::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline MainProtocolTwoWayLocalWithErrorTopResponse::MainProtocolTwoWayLocalWithErrorTopResponse(const ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept : ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse(other.CloneStorage_()){}
+    inline MainProtocolTwoWayLocalWithErrorTopResponse& ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse::operator=(const ::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MainProtocolTwoWayLocalWithErrorTopResponse::MainProtocolTwoWayLocalWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayLocalWithErrorTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline MainProtocolTwoWayLocalWithErrorTopResponse& MainProtocolTwoWayLocalWithErrorTopResponse::result(::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline MainProtocolOnLocalWithErrorRequest::MainProtocolOnLocalWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MainProtocolOnLocalWithErrorRequest::MainProtocolOnLocalWithErrorRequest(::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline MainProtocolOnLocalWithErrorRequest::MainProtocolOnLocalWithErrorRequest(const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest& other) noexcept : ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest(other.CloneStorage_()){}
+    inline MainProtocolOnLocalWithErrorRequest& ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest::operator=(const ::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MainProtocolOnLocalWithErrorRequest::MainProtocolOnLocalWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnLocalWithErrorRequest(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline MainProtocolOnLocalWithErrorRequest& MainProtocolOnLocalWithErrorRequest::result(::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+
+  
+
+  inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(const ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest& other) noexcept : MainProtocolOneWayAnonRequest(other.CloneStorage_()){}
+    inline MainProtocolOneWayAnonRequest& ::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest::operator=(const MainProtocolOneWayAnonRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MainProtocolOneWayAnonRequest::MainProtocolOneWayAnonRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOneWayAnonRequest(Storage_{}) {}
+    inline MainProtocolOneWayAnonRequest& MainProtocolOneWayAnonRequest::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(const ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse& other) noexcept : MainProtocolTwoWayAnonResponse(other.CloneStorage_()){}
+    inline MainProtocolTwoWayAnonResponse& ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse::operator=(const MainProtocolTwoWayAnonResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MainProtocolTwoWayAnonResponse::MainProtocolTwoWayAnonResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonResponse(Storage_{}) {}
+    inline MainProtocolTwoWayAnonResponse& MainProtocolTwoWayAnonResponse::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+
+  
+
+  inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(const ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest& other) noexcept : MainProtocolTwoWayAnonWithErrorRequest(other.CloneStorage_()){}
+    inline MainProtocolTwoWayAnonWithErrorRequest& ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest::operator=(const MainProtocolTwoWayAnonWithErrorRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MainProtocolTwoWayAnonWithErrorRequest::MainProtocolTwoWayAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonWithErrorRequest(Storage_{}) {}
+    inline MainProtocolTwoWayAnonWithErrorRequest& MainProtocolTwoWayAnonWithErrorRequest::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline MainProtocolTwoWayAnonWithErrorTopResponse::MainProtocolTwoWayAnonWithErrorTopResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MainProtocolTwoWayAnonWithErrorTopResponse::MainProtocolTwoWayAnonWithErrorTopResponse(::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline MainProtocolTwoWayAnonWithErrorTopResponse::MainProtocolTwoWayAnonWithErrorTopResponse(const ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept : ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse(other.CloneStorage_()){}
+    inline MainProtocolTwoWayAnonWithErrorTopResponse& ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse::operator=(const ::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorTopResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MainProtocolTwoWayAnonWithErrorTopResponse::MainProtocolTwoWayAnonWithErrorTopResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolTwoWayAnonWithErrorTopResponse(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline MainProtocolTwoWayAnonWithErrorTopResponse& MainProtocolTwoWayAnonWithErrorTopResponse::result(::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+  
+  
+
+  
+
+  inline MainProtocolOnAnonWithErrorResponse::MainProtocolOnAnonWithErrorResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MainProtocolOnAnonWithErrorResponse::MainProtocolOnAnonWithErrorResponse(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse& other) noexcept : MainProtocolOnAnonWithErrorResponse(other.CloneStorage_()){}
+    inline MainProtocolOnAnonWithErrorResponse& ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse::operator=(const MainProtocolOnAnonWithErrorResponse& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MainProtocolOnAnonWithErrorResponse::MainProtocolOnAnonWithErrorResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnAnonWithErrorResponse(Storage_{}) {}
+    inline MainProtocolOnAnonWithErrorResponse& MainProtocolOnAnonWithErrorResponse::a(std::optional<uint16_t> value) {
+      storage_.a = std::move(value);
+      return *this;
+    }
+
+  
+  
+  
+  
+  
+
+  
+
+  inline MainProtocolOnAnonWithErrorRequest::MainProtocolOnAnonWithErrorRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+    inline MainProtocolOnAnonWithErrorRequest::MainProtocolOnAnonWithErrorRequest(::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult result) noexcept
+    : storage_({
+      .result = std::move(result)
+    }) {}
+    inline MainProtocolOnAnonWithErrorRequest::MainProtocolOnAnonWithErrorRequest(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest& other) noexcept : ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest(other.CloneStorage_()){}
+    inline MainProtocolOnAnonWithErrorRequest& ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest::operator=(const ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRequest& other) noexcept {
+      storage_ = other.CloneStorage_();
+      return *this;
+    }
+
+  inline MainProtocolOnAnonWithErrorRequest::MainProtocolOnAnonWithErrorRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : MainProtocolOnAnonWithErrorRequest(Storage_{
+      .result =::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+  }) {}
+    inline MainProtocolOnAnonWithErrorRequest& MainProtocolOnAnonWithErrorRequest::result(::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult value) {
+      storage_.result = std::move(value);
+      return *this;
+    }
+
   
   
   

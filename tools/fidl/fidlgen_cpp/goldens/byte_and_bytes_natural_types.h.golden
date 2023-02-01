@@ -30,9 +30,8 @@ class ByteAndBytes {
   struct Storage_;
 
  public:
-  ByteAndBytes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  ByteAndBytes(uint8_t single_byte) noexcept
-      : storage_({.single_byte = std::move(single_byte)}) {}
+  ByteAndBytes(Storage_ storage) noexcept;
+  ByteAndBytes(uint8_t single_byte) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -42,11 +41,8 @@ class ByteAndBytes {
 
   ByteAndBytes(ByteAndBytes&&) noexcept = default;
   ByteAndBytes& operator=(ByteAndBytes&&) noexcept = default;
-  ByteAndBytes(const ByteAndBytes& other) noexcept : ByteAndBytes(other.CloneStorage_()) {}
-  ByteAndBytes& operator=(const ByteAndBytes& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  ByteAndBytes(const ByteAndBytes& other) noexcept;
+  ByteAndBytes& operator=(const ByteAndBytes& other) noexcept;
 
   bool operator==(const ByteAndBytes& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_byteandbytes::ByteAndBytes, 1>::Equal(this, &other);
@@ -67,14 +63,9 @@ class ByteAndBytes {
   // Setter for single_byte.
   //
 
-  ByteAndBytes& single_byte(uint8_t value) {
-    storage_.single_byte = std::move(value);
-    return *this;
-  }
+  ByteAndBytes& single_byte(uint8_t value);
 
-  ByteAndBytes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ByteAndBytes(Storage_{
-                                                                                 .single_byte = {},
-                                                                             }) {}
+  ByteAndBytes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -90,6 +81,23 @@ class ByteAndBytes {
       &Storage_::single_byte, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline ByteAndBytes::ByteAndBytes(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline ByteAndBytes::ByteAndBytes(uint8_t single_byte) noexcept
+    : storage_({.single_byte = std::move(single_byte)}) {}
+inline ByteAndBytes::ByteAndBytes(const ::test_byteandbytes::ByteAndBytes& other) noexcept : ::test_byteandbytes::ByteAndBytes(other.CloneStorage_()) {}
+inline ByteAndBytes& ::test_byteandbytes::ByteAndBytes::operator=(const ::test_byteandbytes::ByteAndBytes& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline ByteAndBytes::ByteAndBytes(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : ByteAndBytes(Storage_{
+                                                                                                    .single_byte = {},
+                                                                                                }) {}
+inline ByteAndBytes& ByteAndBytes::single_byte(uint8_t value) {
+  storage_.single_byte = std::move(value);
+  return *this;
+}
 
 }  // namespace test_byteandbytes
 namespace fidl {

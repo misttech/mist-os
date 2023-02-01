@@ -40,9 +40,8 @@ class Empty {
   struct Storage_;
 
  public:
-  Empty(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  Empty(uint8_t __reserved) noexcept
-      : storage_({.__reserved = std::move(__reserved)}) {}
+  Empty(Storage_ storage) noexcept;
+  Empty(uint8_t __reserved) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -52,11 +51,8 @@ class Empty {
 
   Empty(Empty&&) noexcept = default;
   Empty& operator=(Empty&&) noexcept = default;
-  Empty(const Empty& other) noexcept : Empty(other.CloneStorage_()) {}
-  Empty& operator=(const Empty& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  Empty(const Empty& other) noexcept;
+  Empty& operator=(const Empty& other) noexcept;
 
   bool operator==(const Empty& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::Empty, 1>::Equal(this, &other);
@@ -77,14 +73,9 @@ class Empty {
   // Setter for __reserved.
   //
 
-  Empty& __reserved(uint8_t value) {
-    storage_.__reserved = std::move(value);
-    return *this;
-  }
+  Empty& __reserved(uint8_t value);
 
-  Empty(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Empty(Storage_{
-                                                                          .__reserved = 0u,
-                                                                      }) {}
+  Empty(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -108,9 +99,8 @@ class EmptyProtocolSendRequest {
   struct Storage_;
 
  public:
-  EmptyProtocolSendRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  EmptyProtocolSendRequest(::test_emptystruct::Empty e) noexcept
-      : storage_({.e = std::move(e)}) {}
+  EmptyProtocolSendRequest(Storage_ storage) noexcept;
+  EmptyProtocolSendRequest(::test_emptystruct::Empty e) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -120,11 +110,8 @@ class EmptyProtocolSendRequest {
 
   EmptyProtocolSendRequest(EmptyProtocolSendRequest&&) noexcept = default;
   EmptyProtocolSendRequest& operator=(EmptyProtocolSendRequest&&) noexcept = default;
-  EmptyProtocolSendRequest(const EmptyProtocolSendRequest& other) noexcept : EmptyProtocolSendRequest(other.CloneStorage_()) {}
-  EmptyProtocolSendRequest& operator=(const EmptyProtocolSendRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  EmptyProtocolSendRequest(const EmptyProtocolSendRequest& other) noexcept;
+  EmptyProtocolSendRequest& operator=(const EmptyProtocolSendRequest& other) noexcept;
 
   bool operator==(const EmptyProtocolSendRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendRequest, 1>::Equal(this, &other);
@@ -145,14 +132,9 @@ class EmptyProtocolSendRequest {
   // Setter for e.
   //
 
-  EmptyProtocolSendRequest& e(::test_emptystruct::Empty value) {
-    storage_.e = std::move(value);
-    return *this;
-  }
+  EmptyProtocolSendRequest& e(::test_emptystruct::Empty value);
 
-  EmptyProtocolSendRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyProtocolSendRequest(Storage_{
-                                                                                             .e = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                         }) {}
+  EmptyProtocolSendRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -176,9 +158,8 @@ class EmptyProtocolReceiveRequest {
   struct Storage_;
 
  public:
-  EmptyProtocolReceiveRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  EmptyProtocolReceiveRequest(::test_emptystruct::Empty e) noexcept
-      : storage_({.e = std::move(e)}) {}
+  EmptyProtocolReceiveRequest(Storage_ storage) noexcept;
+  EmptyProtocolReceiveRequest(::test_emptystruct::Empty e) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -188,11 +169,8 @@ class EmptyProtocolReceiveRequest {
 
   EmptyProtocolReceiveRequest(EmptyProtocolReceiveRequest&&) noexcept = default;
   EmptyProtocolReceiveRequest& operator=(EmptyProtocolReceiveRequest&&) noexcept = default;
-  EmptyProtocolReceiveRequest(const EmptyProtocolReceiveRequest& other) noexcept : EmptyProtocolReceiveRequest(other.CloneStorage_()) {}
-  EmptyProtocolReceiveRequest& operator=(const EmptyProtocolReceiveRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  EmptyProtocolReceiveRequest(const EmptyProtocolReceiveRequest& other) noexcept;
+  EmptyProtocolReceiveRequest& operator=(const EmptyProtocolReceiveRequest& other) noexcept;
 
   bool operator==(const EmptyProtocolReceiveRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolReceiveRequest, 1>::Equal(this, &other);
@@ -213,14 +191,9 @@ class EmptyProtocolReceiveRequest {
   // Setter for e.
   //
 
-  EmptyProtocolReceiveRequest& e(::test_emptystruct::Empty value) {
-    storage_.e = std::move(value);
-    return *this;
-  }
+  EmptyProtocolReceiveRequest& e(::test_emptystruct::Empty value);
 
-  EmptyProtocolReceiveRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyProtocolReceiveRequest(Storage_{
-                                                                                                .e = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                            }) {}
+  EmptyProtocolReceiveRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -244,9 +217,8 @@ class EmptyProtocolSendAndReceiveRequest {
   struct Storage_;
 
  public:
-  EmptyProtocolSendAndReceiveRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  EmptyProtocolSendAndReceiveRequest(::test_emptystruct::Empty e) noexcept
-      : storage_({.e = std::move(e)}) {}
+  EmptyProtocolSendAndReceiveRequest(Storage_ storage) noexcept;
+  EmptyProtocolSendAndReceiveRequest(::test_emptystruct::Empty e) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -256,11 +228,8 @@ class EmptyProtocolSendAndReceiveRequest {
 
   EmptyProtocolSendAndReceiveRequest(EmptyProtocolSendAndReceiveRequest&&) noexcept = default;
   EmptyProtocolSendAndReceiveRequest& operator=(EmptyProtocolSendAndReceiveRequest&&) noexcept = default;
-  EmptyProtocolSendAndReceiveRequest(const EmptyProtocolSendAndReceiveRequest& other) noexcept : EmptyProtocolSendAndReceiveRequest(other.CloneStorage_()) {}
-  EmptyProtocolSendAndReceiveRequest& operator=(const EmptyProtocolSendAndReceiveRequest& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  EmptyProtocolSendAndReceiveRequest(const EmptyProtocolSendAndReceiveRequest& other) noexcept;
+  EmptyProtocolSendAndReceiveRequest& operator=(const EmptyProtocolSendAndReceiveRequest& other) noexcept;
 
   bool operator==(const EmptyProtocolSendAndReceiveRequest& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest, 1>::Equal(this, &other);
@@ -281,14 +250,9 @@ class EmptyProtocolSendAndReceiveRequest {
   // Setter for e.
   //
 
-  EmptyProtocolSendAndReceiveRequest& e(::test_emptystruct::Empty value) {
-    storage_.e = std::move(value);
-    return *this;
-  }
+  EmptyProtocolSendAndReceiveRequest& e(::test_emptystruct::Empty value);
 
-  EmptyProtocolSendAndReceiveRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyProtocolSendAndReceiveRequest(Storage_{
-                                                                                                       .e = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                   }) {}
+  EmptyProtocolSendAndReceiveRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -312,9 +276,8 @@ class EmptyProtocolSendAndReceiveResponse {
   struct Storage_;
 
  public:
-  EmptyProtocolSendAndReceiveResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
-  EmptyProtocolSendAndReceiveResponse(::test_emptystruct::Empty e) noexcept
-      : storage_({.e = std::move(e)}) {}
+  EmptyProtocolSendAndReceiveResponse(Storage_ storage) noexcept;
+  EmptyProtocolSendAndReceiveResponse(::test_emptystruct::Empty e) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdefaulted-function-deleted"
@@ -324,11 +287,8 @@ class EmptyProtocolSendAndReceiveResponse {
 
   EmptyProtocolSendAndReceiveResponse(EmptyProtocolSendAndReceiveResponse&&) noexcept = default;
   EmptyProtocolSendAndReceiveResponse& operator=(EmptyProtocolSendAndReceiveResponse&&) noexcept = default;
-  EmptyProtocolSendAndReceiveResponse(const EmptyProtocolSendAndReceiveResponse& other) noexcept : EmptyProtocolSendAndReceiveResponse(other.CloneStorage_()) {}
-  EmptyProtocolSendAndReceiveResponse& operator=(const EmptyProtocolSendAndReceiveResponse& other) noexcept {
-    storage_ = other.CloneStorage_();
-    return *this;
-  }
+  EmptyProtocolSendAndReceiveResponse(const EmptyProtocolSendAndReceiveResponse& other) noexcept;
+  EmptyProtocolSendAndReceiveResponse& operator=(const EmptyProtocolSendAndReceiveResponse& other) noexcept;
 
   bool operator==(const EmptyProtocolSendAndReceiveResponse& other) const noexcept {
     return ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveResponse, 1>::Equal(this, &other);
@@ -349,14 +309,9 @@ class EmptyProtocolSendAndReceiveResponse {
   // Setter for e.
   //
 
-  EmptyProtocolSendAndReceiveResponse& e(::test_emptystruct::Empty value) {
-    storage_.e = std::move(value);
-    return *this;
-  }
+  EmptyProtocolSendAndReceiveResponse& e(::test_emptystruct::Empty value);
 
-  EmptyProtocolSendAndReceiveResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyProtocolSendAndReceiveResponse(Storage_{
-                                                                                                        .e = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
-                                                                                                    }) {}
+  EmptyProtocolSendAndReceiveResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag);
 
  private:
   struct Storage_ final {
@@ -372,6 +327,91 @@ class EmptyProtocolSendAndReceiveResponse {
       &Storage_::e, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
+
+inline Empty::Empty(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline Empty::Empty(uint8_t __reserved) noexcept
+    : storage_({.__reserved = std::move(__reserved)}) {}
+inline Empty::Empty(const ::test_emptystruct::Empty& other) noexcept : ::test_emptystruct::Empty(other.CloneStorage_()) {}
+inline Empty& ::test_emptystruct::Empty::operator=(const ::test_emptystruct::Empty& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline Empty::Empty(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : Empty(Storage_{
+                                                                                      .__reserved = 0u,
+                                                                                  }) {}
+inline Empty& Empty::__reserved(uint8_t value) {
+  storage_.__reserved = std::move(value);
+  return *this;
+}
+
+inline EmptyProtocolSendRequest::EmptyProtocolSendRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline EmptyProtocolSendRequest::EmptyProtocolSendRequest(::test_emptystruct::Empty e) noexcept
+    : storage_({.e = std::move(e)}) {}
+inline EmptyProtocolSendRequest::EmptyProtocolSendRequest(const ::test_emptystruct::EmptyProtocolSendRequest& other) noexcept : ::test_emptystruct::EmptyProtocolSendRequest(other.CloneStorage_()) {}
+inline EmptyProtocolSendRequest& ::test_emptystruct::EmptyProtocolSendRequest::operator=(const ::test_emptystruct::EmptyProtocolSendRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline EmptyProtocolSendRequest::EmptyProtocolSendRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyProtocolSendRequest(Storage_{
+                                                                                                                            .e = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                        }) {}
+inline EmptyProtocolSendRequest& EmptyProtocolSendRequest::e(::test_emptystruct::Empty value) {
+  storage_.e = std::move(value);
+  return *this;
+}
+
+inline EmptyProtocolReceiveRequest::EmptyProtocolReceiveRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline EmptyProtocolReceiveRequest::EmptyProtocolReceiveRequest(::test_emptystruct::Empty e) noexcept
+    : storage_({.e = std::move(e)}) {}
+inline EmptyProtocolReceiveRequest::EmptyProtocolReceiveRequest(const ::test_emptystruct::EmptyProtocolReceiveRequest& other) noexcept : ::test_emptystruct::EmptyProtocolReceiveRequest(other.CloneStorage_()) {}
+inline EmptyProtocolReceiveRequest& ::test_emptystruct::EmptyProtocolReceiveRequest::operator=(const ::test_emptystruct::EmptyProtocolReceiveRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline EmptyProtocolReceiveRequest::EmptyProtocolReceiveRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyProtocolReceiveRequest(Storage_{
+                                                                                                                                  .e = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                              }) {}
+inline EmptyProtocolReceiveRequest& EmptyProtocolReceiveRequest::e(::test_emptystruct::Empty value) {
+  storage_.e = std::move(value);
+  return *this;
+}
+
+inline EmptyProtocolSendAndReceiveRequest::EmptyProtocolSendAndReceiveRequest(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline EmptyProtocolSendAndReceiveRequest::EmptyProtocolSendAndReceiveRequest(::test_emptystruct::Empty e) noexcept
+    : storage_({.e = std::move(e)}) {}
+inline EmptyProtocolSendAndReceiveRequest::EmptyProtocolSendAndReceiveRequest(const ::test_emptystruct::EmptyProtocolSendAndReceiveRequest& other) noexcept : ::test_emptystruct::EmptyProtocolSendAndReceiveRequest(other.CloneStorage_()) {}
+inline EmptyProtocolSendAndReceiveRequest& ::test_emptystruct::EmptyProtocolSendAndReceiveRequest::operator=(const ::test_emptystruct::EmptyProtocolSendAndReceiveRequest& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline EmptyProtocolSendAndReceiveRequest::EmptyProtocolSendAndReceiveRequest(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyProtocolSendAndReceiveRequest(Storage_{
+                                                                                                                                                .e = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                            }) {}
+inline EmptyProtocolSendAndReceiveRequest& EmptyProtocolSendAndReceiveRequest::e(::test_emptystruct::Empty value) {
+  storage_.e = std::move(value);
+  return *this;
+}
+
+inline EmptyProtocolSendAndReceiveResponse::EmptyProtocolSendAndReceiveResponse(Storage_ storage) noexcept : storage_(std::move(storage)) {}
+inline EmptyProtocolSendAndReceiveResponse::EmptyProtocolSendAndReceiveResponse(::test_emptystruct::Empty e) noexcept
+    : storage_({.e = std::move(e)}) {}
+inline EmptyProtocolSendAndReceiveResponse::EmptyProtocolSendAndReceiveResponse(const ::test_emptystruct::EmptyProtocolSendAndReceiveResponse& other) noexcept : ::test_emptystruct::EmptyProtocolSendAndReceiveResponse(other.CloneStorage_()) {}
+inline EmptyProtocolSendAndReceiveResponse& ::test_emptystruct::EmptyProtocolSendAndReceiveResponse::operator=(const ::test_emptystruct::EmptyProtocolSendAndReceiveResponse& other) noexcept {
+  storage_ = other.CloneStorage_();
+  return *this;
+}
+
+inline EmptyProtocolSendAndReceiveResponse::EmptyProtocolSendAndReceiveResponse(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag) : EmptyProtocolSendAndReceiveResponse(Storage_{
+                                                                                                                                                  .e = ::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{},
+                                                                                                                                              }) {}
+inline EmptyProtocolSendAndReceiveResponse& EmptyProtocolSendAndReceiveResponse::e(::test_emptystruct::Empty value) {
+  storage_.e = std::move(value);
+  return *this;
+}
 
 }  // namespace test_emptystruct
 namespace fidl {
