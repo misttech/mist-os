@@ -16,11 +16,7 @@ pub struct DiagnosticsConfig {
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ArchivistConfig {
-    NoDetectService,
-    NoService,
-    Bringup,
-    DefaultService,
-    #[serde(rename = "low-mem-default-service-config")]
+    Default,
     LowMem,
 }
 
@@ -32,40 +28,16 @@ mod tests {
     use assembly_util as util;
 
     #[test]
-    fn test_diagnostics_archivist_no_service() {
-        let json5 = r#""no-service""#;
-        let mut cursor = std::io::Cursor::new(json5);
-        let archivist: ArchivistConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(archivist, ArchivistConfig::NoService);
-    }
-
-    #[test]
-    fn test_diagnostics_archivist_no_detect_service() {
-        let json5 = r#""no-detect-service""#;
-        let mut cursor = std::io::Cursor::new(json5);
-        let archivist: ArchivistConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(archivist, ArchivistConfig::NoDetectService);
-    }
-
-    #[test]
     fn test_diagnostics_archivist_default_service() {
-        let json5 = r#""default-service""#;
+        let json5 = r#""default""#;
         let mut cursor = std::io::Cursor::new(json5);
         let archivist: ArchivistConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(archivist, ArchivistConfig::DefaultService);
-    }
-
-    #[test]
-    fn test_diagnostics_archivist_bringup() {
-        let json5 = r#""bringup""#;
-        let mut cursor = std::io::Cursor::new(json5);
-        let archivist: ArchivistConfig = util::from_reader(&mut cursor).unwrap();
-        assert_eq!(archivist, ArchivistConfig::Bringup);
+        assert_eq!(archivist, ArchivistConfig::Default);
     }
 
     #[test]
     fn test_diagnostics_archivist_low_mem() {
-        let json5 = r#""low-mem-default-service-config""#;
+        let json5 = r#""low-mem""#;
         let mut cursor = std::io::Cursor::new(json5);
         let archivist: ArchivistConfig = util::from_reader(&mut cursor).unwrap();
         assert_eq!(archivist, ArchivistConfig::LowMem);

@@ -9,15 +9,6 @@ use assembly_config_schema::platform_config::diagnostics_config::{
 use assembly_config_schema::{BuildType, FeatureSupportLevel};
 use std::collections::BTreeSet;
 
-impl DefaultByBuildType for ArchivistConfig {
-    fn default_by_build_type(build_type: &BuildType) -> Self {
-        match build_type {
-            BuildType::Eng | BuildType::UserDebug => Self::DefaultService,
-            BuildType::User => Self::NoDetectService,
-        }
-    }
-}
-
 pub(crate) struct DiagnosticsSubsystem;
 impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
     fn define_configuration(
@@ -27,7 +18,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
     ) -> anyhow::Result<()> {
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
-            "fuchsia.component.DetectBinder",
             "fuchsia.component.KcounterBinder",
             "fuchsia.component.LogStatsBinder",
             "fuchsia.component.PersistenceBinder",
@@ -38,24 +28,28 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         let mut logs_max_cached_original_bytes = 4194304;
         let mut archivist_config = builder.bootfs().component("meta/archivist.cm")?;
 
-        let default_config = ArchivistConfig::default_by_build_type(context.build_type);
-        match diagnostics_config.archivist.as_ref().unwrap_or(&default_config) {
-            ArchivistConfig::NoDetectService => {
-                bind_services.remove("fuchsia.component.DetectBinder");
-            }
-            ArchivistConfig::NoService | ArchivistConfig::Bringup => {
+        match (context.build_type, context.feature_set_level) {
+            (_, FeatureSupportLevel::Empty) => return Ok(()),
+            // Always clear bind_services for bringup.
+            (_, FeatureSupportLevel::Bringup) => {
                 bind_services.clear();
             }
-            ArchivistConfig::DefaultService => {}
-            ArchivistConfig::LowMem => {
+            // Detect isn't present on user builds.
+            (BuildType::User, FeatureSupportLevel::Minimal) => {}
+            (_, FeatureSupportLevel::Minimal) => {
+                bind_services.insert("fuchsia.component.DetectBinder");
+            }
+        };
+
+        match diagnostics_config.archivist {
+            Some(ArchivistConfig::Default) | None => {}
+            Some(ArchivistConfig::LowMem) => {
                 num_threads = 2;
                 logs_max_cached_original_bytes = 2097152;
                 maximum_concurrent_snapshots_per_reader = 2;
             }
         }
-        if matches!(context.feature_set_level, FeatureSupportLevel::Bringup) {
-            bind_services.clear();
-        }
+
         archivist_config
             .field("bind_services", bind_services.into_iter().collect::<Vec<_>>())?
             .field("enable_component_event_provider", true)?
@@ -93,7 +87,7 @@ mod tests {
             build_type: &BuildType::Eng,
             board_info: None,
         };
-        let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::DefaultService) };
+        let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::Default) };
         let mut builder = ConfigurationBuilderImpl::default();
 
         DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
@@ -133,62 +127,6 @@ mod tests {
             Some(&Value::String("/config/data".to_string()))
         );
         assert_eq!(archivist_fields.get("serve_unattributed_logs"), Some(&Value::Bool(false)));
-    }
-
-    #[test]
-    fn test_define_configuration_bringup() {
-        let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
-            build_type: &BuildType::Eng,
-            board_info: None,
-        };
-        let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::Bringup) };
-        let mut builder = ConfigurationBuilderImpl::default();
-
-        DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
-        let config = builder.build();
-        let archivist_fields = &config.bootfs.components.get("meta/archivist.cm").unwrap().fields;
-        assert_eq!(archivist_fields.get("bind_services"), Some(&Value::Array(vec![])));
-    }
-
-    #[test]
-    fn test_define_configuration_no_service() {
-        let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
-            build_type: &BuildType::Eng,
-            board_info: None,
-        };
-        let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::NoService) };
-        let mut builder = ConfigurationBuilderImpl::default();
-
-        DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
-        let config = builder.build();
-        let archivist_fields = &config.bootfs.components.get("meta/archivist.cm").unwrap().fields;
-        assert_eq!(archivist_fields.get("bind_services"), Some(&Value::Array(vec![])));
-    }
-
-    #[test]
-    fn test_define_configuration_no_detect() {
-        let context = ConfigurationContext {
-            feature_set_level: &FeatureSupportLevel::Minimal,
-            build_type: &BuildType::Eng,
-            board_info: None,
-        };
-        let diagnostics = DiagnosticsConfig { archivist: Some(ArchivistConfig::NoDetectService) };
-        let mut builder = ConfigurationBuilderImpl::default();
-
-        DiagnosticsSubsystem::define_configuration(&context, &diagnostics, &mut builder).unwrap();
-        let config = builder.build();
-        let archivist_fields = &config.bootfs.components.get("meta/archivist.cm").unwrap().fields;
-        assert_eq!(
-            archivist_fields.get("bind_services"),
-            Some(&Value::Array(vec![
-                "fuchsia.component.KcounterBinder".into(),
-                "fuchsia.component.LogStatsBinder".into(),
-                "fuchsia.component.PersistenceBinder".into(),
-                "fuchsia.component.SamplerBinder".into(),
-            ]))
-        );
     }
 
     #[test]
