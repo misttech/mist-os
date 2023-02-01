@@ -1,413 +1,228 @@
 # Copy files to and from a component
 
-Use `ffx component copy` to copy files to and from Fuchsia components on a device.
-
-Note: If you need to copy to isolated storage that doesn't currently exist, see [Copy to an isolated storage](#copy-to-non-existent-storage).
+The `ffx component copy` command can copy files to and from Fuchsia components running
+on a target device.
 
 ## Concepts
 
-Every Fuchsia component has a [namespace][namespace]. A Fuchsia component can
-use persistent storage via [storage capabilities][storage-capabilities]. All
-the examples in this guide select the `data` directory, which provides
-persistent storage on the device.
+The `ffx component copy` command can transfer files in the following ways:
 
-Before you upload files to (or download files from) a Fuchsia component,
-you need to identify the [absolute moniker][absolute-moniker] of your
-target component on the device. To find a component's absolute moniker,
-use the [`ffx component show`][ffx-component-show] command,
-for example:
+-  From a component on the device to the host machine.
+-  From the host machine to a component on the device.
+-  Between components on the  device.
 
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component show stash_secure
-               Moniker: /core/stash_secure
-                   URL: fuchsia-pkg://fuchsia.com/stash#meta/stash_secure.cm
-                  Type: CML static component
-       Component State: Resolved
-           Instance ID: c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4
-           ...
-```
+Capabilities such as [storage][storage-capabilities] and
+[directory][directory-capabilities] provide persistent or ephemeral storage in a Fuchsia
+system where files belong to a specific component can be stored and accessed. Every Fuchsia
+component has a [namespace][namespace] where a component can access all of its available
+capabilities. A component's [moniker][component-moniker] indicates its position in
+the component topology, which often functions as an identifier for the component and its
+namespace.
 
-The example above shows the moniker of the `stash_secure` component is
-`/core/stash_secure`.
+Therefore, to access files in a component's namespace, you first need to identify the
+[absolute moniker][absolute-moniker] of your target component. For example, the absolute
+moniker of the `stash_secure` component is `/core/stash_secure`. (To discover a component's
+absolute moniker, see the [`ffx component show`][ffx-component-show] command.)
 
-Once you identify your target component's moniker, use this
-moniker (as a parameter to the `ffx component copy`) to access
-the component's namespace on the device. For the examples below, use
-`/core/stash_secure`.
+## Copy a file to and from a component's namespace {:#copy-a-file-to-and-from-a-components-namespace}
 
-## Download a file from the device {:#download-a-file-from-the-device}
+To copy a file to and from a component running on a Fuchsia device, run the following
+command:
 
-To download a file from a Fuchsia device to your host machine, run the
-following command:
-
-```
-ffx component copy "<MONIKER>::<PATH_TO_FILE>" "<DESTINATION>"
+```posix-terminal
+ffx component copy {{ '<var>' }}SOURCE{{ '</var>' }} {{ '<var>' }}DESTINATION{{ '</var>'}}
 ```
 
 Replace the following:
 
-<table class="responsive">
-   <tr>
-      <th>Argument</th>
-      <th>Value</th>
-   </tr>
-   <tr>
-      <td>MONIKER</td>
-      <td>The absolute moniker of your target component.
-         For example, <code>/core/stash_secure</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>PATH_TO_FILE</td>
-      <td>The path and filename on the target component where you want
-         to save the file. For example, <br> <code>/data/stash_secure.store</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>DESTINATION</td>
-      <td>The path to a local directory where you want to save the file.</td>
-   </tr>
-</table>
+*  <var>SOURCE</var>: The path of the file(s) to be copied. This path can refer
+   to either the host machine or a Fuchsia component on the target device.
 
+*  <var>DESTINATION</var>: The destination path for the file(s). This path can
+   refer to either the host machine or a Fuchsia component on the target device.
 
-The following downloads `stash_secure.store` from the target
-component to the host machine:
+   If <var>SOURCE</var> or <var>DESTINATION</var> is a Fuchsia component,
+   use the syntax below to represent the component and path:
 
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component copy /core/stash_secure::/data/stash_secure.store ./stash_secure.store
-```
+   ```none {:.devsite-disable-click-to-copy}
+   {{ '<var>' }}MONIKER{{ '</var>' }}::{{ '<var>' }}PATH_IN_NAMESPACE{{ '</var>' }}
+   ```
 
-## Upload a file to the device {:#upload-a-file-to-the-device}
+   For example, `/core/stash_secure::/data/examples.txt` means that the `example.txt` file
+   is located in the `/data` directory of the `/core/stash_secure` component.
 
-To setup your environment to use the example below, please run the following commands:
+See example commands below:
 
-``` none {:.devsite-disable-click-to-copy}
-$ cd $FUCHSIA_DIR
-$ LOCAL_RESOURCE_DIR=src/developer/ffx/plugins/component/copy/test-driver/resources
-```
+*  Download the `stash_secure.store` file from the `/core/stash_secure`
+   component to the host machine:
 
-To upload a file from your host machine to a Fuchsia device, run the
-following command:
+   ```none {:.devsite-disable-click-to-copy}
+   $ ffx component copy /core/stash_secure::/data/stash_secure.store ./copy_of_stash_secure.store
+   ```
 
-```
-ffx component copy "<SOURCE>" "<MONIKER>::<PATH_TO_FILE>"
+*  Upload the `example.txt` file from the host machine to the `/core/stash_secure`
+   component:
+
+   ```none {:.devsite-disable-click-to-copy}
+   $ ffx component copy ./my_example_dir/example.txt /core/stash_secure::/data/copy_of_example.txt
+   ```
+
+*  Copy the `stash_secure.store` file from the `/core/stash_secure` component to
+   the `/core/feedback` component:
+
+   ```none {:.devsite-disable-click-to-copy}
+   $ ffx component copy /core/stash_secure::/data/stash_secure.store /core/feedback::/data/copy_of_stash_secure.store
+   ```
+
+## Copy multiple files to and from a component's namespace {:#copy-multiple-files-to-and-from-a-components-namespace}
+
+The `ffx component copy` command supports the use of the wildcard `*` to copy multiple files at once.
+When the wildcard is used, the paths on the host machine are interpreted by the terminal while the
+paths on the Fuchsia device are interpreted by the `ffx component copy` command.
+
+Note: In [`Zsh`][zsh]{:.external} and [`fish`][fish]{:.external}, you may run into issues when
+using `*` for the paths on the device. A workaround is to wrap the path with `*` in single quotes
+(`''`). For example, replace `/data/*` with `'/data/*'`.
+
+See example commands below:
+
+*  Download all files in the `/data` directory of the `/core/stash_secure`
+   component to the host machine:
+
+   ```none {:.devsite-disable-click-to-copy}
+   $ ffx component copy /core/stash_secure::/data/* ./my_example_dir/
+   ```
+
+*  Upload all files in the `./my_example_dir` directory of the host machine to
+   the `/core/stash_secure` component:
+
+   ```none {:.devsite-disable-click-to-copy}
+   $ ffx component copy ./my_example_dir/* /core/stash_secure::/data/
+   ```
+
+*  Copy all files in the `/data` directory of the `/core/stash_secure` component to
+   the `/core/feedback` component:
+
+   ```none {:.devsite-disable-click-to-copy}
+   $ ffx component copy /core/stash_secure::/data/* /core/feedback::/data/
+   ```
+
+*  Copy all files in the `data` directory of the `/core/feedback/` component and the
+   `example.txt` file on the host machine to the `/core/stash_secure` component:
+
+   ``` none {:.devsite-disable-click-to-copy}
+   $ ffx component copy /core/feedback::/data/* ./my_example_dir/example.txt /core/stash_secure::/data/
+   ```
+
+## Appendices
+
+### Copy a file to and from a component's isolated storage {:#copy-a-file-to-and-from-a-components-isolated-storage}
+
+A Fuchsia component can allocate per-component *isolated* storage on a device using
+[storage capabilities][storage-capabilities]. This type of storage is isolated within
+the component, preventing other components from accessing files in the storage.
+
+Unlike `ffx component copy`, the `ffx component storage` command works exclusively with
+storage capabilities. Instead of an absolute moniker, this command uses a component's
+[instance ID][component-id-index] as an identifier. By default, the `ffx component storage`
+command connects to the component's `data` storage.
+
+To copy a file to and from a component's isolated storage, run the following command:
+
+```posix-terminal
+ffx component storage copy {{ '<var>' }}SOURCE{{ '</var>' }} {{ '<var>' }}DESTINATION{{ '</var>'}}
 ```
 
 Replace the following:
 
-<table class="responsive">
-   <tr>
-      <th>Argument</th>
-      <th>Value</th>
-   </tr>
-   <tr>
-      <td>SOURCE</td>
-      <td>The path to a file you want to copy to the device.</td>
-   </tr>
-   <tr>
-      <td>MONIKER</td>
-      <td>The absolute moniker of your target component. For example,
-         <code>/core/stash_secure</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>PATH_TO_FILE</td>
-      <td>The path and filename on the target component where you want
-         to save the file. For example, <br> <code>/data/foo.txt</code>.
-      </td>
-   </tr>
-</table>
+*  <var>SOURCE</var>: The path of the file(s) to be copied. This path can refer
+   to either the host machine or a Fuchsia component on the target device.
 
-The following uploads `foo.txt` from the host machine to the
-target component running on the device:
+*  <var>DESTINATION</var>: The destination path for the file(s). This path can
+   refer to either the host machine or a Fuchsia component on the target device.
 
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component copy $LOCAL_RESOURCE_DIR/foo.txt /core/stash_secure::/data/foo.txt
-```
+   If <var>SOURCE</var> or <var>DESTINATION</var> is a Fuchsia component,
+   use the syntax below to represent the component and path:
 
-## Upload a file to the device from another device {:#copy-device-to-device}
+   ```none {:.devsite-disable-click-to-copy}
+   {{ '<var>' }}INSTANCE_ID{{ '</var>' }}::{{ '<var>' }}PATH_IN_STORAGE{{ '</var>' }}
+   ```
 
-To upload a file from a Fuchsia device to another Fuchsia device, run the
-following command:
+   For example, `c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/examples.txt`
+   means that the `example.txt` file is located in the default `/data` directory of the
+   `/core/stash_secure` component.
 
-```
-ffx component copy "<MONIKER>::<PATH_TO_FILE>" "<MONIKER>::<PATH_TO_FILE>"
+See example commands below:
+
+*  Upload the `example.txt` file from the host machine to the `/core/stash_secure`
+   component:
+
+   ```none {:.devsite-disable-click-to-copy}
+   $ ffx component storage copy ./my_example_dir/example.txt c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/copy_of_example.txt
+   ```
+
+*  Download the `stash_secure.store` file from the target componnet to the host machine:
+
+   ```none {:.devsite-disable-click-to-copy}
+   $ ffx component storage copy c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/stash_secure.store ./my_example_dir/copy_of_example.txt
+   ```
+
+### List all directories and files in a component's isolated storage {:#list-all-directories-and-files-in-a-components-isolated-storage}
+
+To list all directories and files in a component's
+[isolated storage](#copy-a-file-to-and-from-a-components-isolated-storage),
+run the following command:
+
+```posix-terminal
+ffx component storage list {{ '<var>' }}INSTANCE_ID{{ '</var>' }}::{{ '<var>' }}PATH{{ '</var>' }}
 ```
 
 Replace the following:
 
-<table class="responsive">
-   <tr>
-      <th>Argument</th>
-      <th>Value</th>
-   </tr>
-   <tr>
-      <td>SOURCE</td>
-      <td>The path to a file you want to copy to the device.</td>
-   </tr>
-   <tr>
-      <td>MONIKER</td>
-      <td>The absolute moniker of your target component. For example,
-         <code>/core/stash_secure</code> for the first moniker, and
-         <code>/core/feedback</code> as the second moniker.
-      </td>
-   </tr>
-   <tr>
-      <td>PATH_TO_FILE</td>
-      <td>The path and filename on the target component where you want
-         to save the file. For example, <br> <code>/data/stash_secure.store</code>
-         as both paths.
-      </td>
-   </tr>
-</table>
+*  <var>INSTANCE_ID</var>: The instance ID of the target component.
+   For example, `c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4`.
 
-The following snippet uploads `stash_secure.store` from the component `/core/stash_secure` to the target component `/core/feedback`.
+*  <var>PATH</var>: A path on the target component.
 
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component copy /core/stash_secure::/data/stash_secure.store /core/feedback::/data/stash_secure.store
-```
+The example command below shows all directories and files in the root (`/`) directory
+of the target component:
 
-## Wildcard Support and Multiple Files
-
-To setup your environment to use the example below, please run the following commands:
-
-``` none {:.devsite-disable-click-to-copy}
-$ cd $FUCHSIA_DIR
-$ LOCAL_RESOURCE_DIR=src/developer/ffx/plugins/component/copy/test-driver/resources
-```
-
-`ffx component copy` supports the use of the wildcard `*` to copy multiple files at once. Host paths
-are expanded by the shell while remote paths are expanded by `ffx component copy`.
-
-Note: [Z shell][zsh] and [fish][fish] both run into issues when expanding `*` for remote paths. This is fixed
-by wrapping `*` with a `''`. Therefore we want to replace `*` with `'*'`. This issue does not
-occur on bash.
-
-Upload multiple files to device:
-
-```
-ffx component copy "<SOURCE_DIRECTORY>/*" "<MONIKER>::<PATH_TO_DIRECTORY>"
-```
-
-Upload multiple files from device:
-
-```
-ffx component copy "<MONIKER>::<PATH_TO_DIRECTORY>/*" "<SOURCE_DIRECTORY>"
-```
-
-You can also pass in multiple paths manually with any source path type. As an example:
-
-```
-ffx component copy "<MONIKER>::<PATH_TO_DIRECTORY>/*" "<SOURCE>" "<MONIKER>::<PATH_TO_DIRECTORY>"
-```
-
-For the desired command, replace the following:
-
-<table class="responsive">
-   <tr>
-      <th>Argument</th>
-      <th>Value</th>
-   </tr>
-   <tr>
-      <td>SOURCE_DIRECTORY</td>
-      <td>A path to your desired directory. For example,
-         <code>$LOCAL_RESOURCE_DIR</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>MONIKER</td>
-      <td>The absolute moniker of your target component.  For example,
-         <code>/core/feedback</code> for the first moniker, and
-         <code>/core/stash_secure</code> as the second moniker.
-      </td>
-   </tr>
-   <tr>
-      <td>PATH_TO_DIRECTORY</td>
-      <td>The directory of the target component where you like to expand a wildcard.
-         For example, <br> <code>/data</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>PATH_TO_FILE</td>
-      <td>The path of a filename on a component. For example, <br> <code>/data/device_id.txt</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>SOURCE</td>
-      <td>The path to a file you want to copy to the device.
-         For example, <code>$LOCAL_RESOURCE_DIR/flower.jpeg</code>
-      </td>
-   </tr>
-</table>
-
-The following snippet uploads all files in the `data` directory from the component `/core/feedback/` to the `data`
-directory of the target component `/core/stash_secure`.
-
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component copy /core/feedback::/data/* /core/stash_secure::/data/
-```
-
-The following snippet uploads all files in `$LOCAL_RESOURCE_DIR` to the `data` directory of the
-target component `/core/stash_secure`.
-
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component copy $LOCAL_RESOURCE_DIR/* /core/stash_secure::/data/
-```
-
-The following snippet uploads all files in the `data` directory from the component `/core/feedback/`, and the host file
-`$LOCAL_RESOURCE_DIR/flower.jpeg` to the target component `/core/stash_secure`.
-
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component copy /core/feedback::/data/* $LOCAL_RESOURCE_DIR/flower.jpeg /core/stash_secure::/data/
-```
-
-## Copying to an isolated storage that currently does not exist {:#copy-to-non-existent-storage}
-
-To setup your environment to use the example below, please run the following commands:
-
-``` none {:.devsite-disable-click-to-copy}
-$ cd $FUCHSIA_DIR
-$ LOCAL_RESOURCE_DIR=src/developer/ffx/plugins/component/copy/test-driver/resources
-```
-
-If you're trying to copy to an isolated storage that doesn't currently exist,
-you need to use <br> `ffx component storage copy`. Instead of an absolute
-moniker, this command uses a component's [instance id][component-id-index].<br>
-By default, `ffx component storage` connects to the persistent
-isolated storage `data`.
-
-Upload a file to device:
-
-```
-ffx component storage copy "<SOURCE>" "<INSTANCE_ID>::<PATH_TO_FILE>"
-```
-
-Download a file from device:
-
-```
-ffx component storage copy "<INSTANCE_ID>::<PATH_TO_FILE>" "<DESTINATION>"
-```
-
-For the desired command, replace the following:
-
-<table class="responsive">
-   <tr>
-      <th>Argument</th>
-      <th>Value</th>
-   </tr>
-   <tr>
-      <td>INSTANCE_ID</td>
-      <td>An instance ID of a component to be created later. For example,
-         <code>c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>PATH_TO_FILE</td>
-      <td>The path and filename on the target component where you want
-         to save the file. For example, <br> <code>/my-example.file</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>SOURCE</td>
-      <td>The path to a file you want to copy to the device.</td>
-   </tr>
-   <tr>
-      <td>DESTINATION</td>
-      <td>The path to a local directory where you want to save the
-         file.
-      </td>
-   </tr>
-</table>
-
-The following snippet uploads `$LOCAL_RESOURCE_DIR/flower.jpeg` to the target component `/core/stash_secure`:
-
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component storage copy $LOCAL_RESOURCE_DIR/flower.jpeg c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/flower.jpeg
-```
-
-The following snippet downloads `stash_secure.store` from the target componnet to `LOCAL_RESOURCE_DIR`:
-
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component storage copy c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/stash_secure.store $LOCAL_RESOURCE_DIR/stash_secure.store
-```
-
-## List all directories and files {:#list-all-directories-and-files}
-
-To list all directories and files in a component's storage, run
-the following command:
-
-```
-ffx component storage list "<INSTANCE_ID>::<PATH>"
-```
-
-
-Replace the following:
-
-<table class="responsive">
-   <tr>
-      <th>Argument</th>
-      <th>Value</th>
-   </tr>
-   <tr>
-      <td>INSTANCE_ID</td>
-      <td>An instance ID of a component to be created later. For example,
-         <code>c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>PATH</td>
-      <td>A path on the target component.For example, <code>/</code> or <code>/my/path/</code>.
-      </td>
-   </tr>
-</table>
-
-The following snippet shows all directories and files in the root (`/`)
-directory of the target component:
-
-``` none {:.devsite-disable-click-to-copy}
+```none {:.devsite-disable-click-to-copy}
 $ ffx component storage list c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/
-my-example.file
+copy_of_example.txt
 stash_secure.store
 ```
 
-## Create a new directory {:#create-a-new-directory}
+### Create a new directory in a component's isolated storage {:#create-a-new-directory-in-a-components-isolated-storage}
 
-To create a new directory in a component's storage, run the
-following command:
+To create a new directory in a component's
+[isolated storage](#copy-a-file-to-and-from-a-components-isolated-storage),
+run the following command:
 
-```
-ffx component storage make-directory "<INSTANCE_ID>::<NEW_PATH>"
+```posix-terminal
+ffx component storage make-directory {{ '<var>' }}INSTANCE_ID{{ '</var>' }}::{{ '<var>' }}NEW_PATH{{ '</var>' }}
 ```
 
 Replace the following:
 
-<table class="responsive">
-   <tr>
-      <th>Argument</th>
-      <th>Value</th>
-   </tr>
-   <tr>
-      <td>INSTANCE_ID</td>
-      <td>An instance ID of a component to be created later. For example,
-         <code>c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4</code>.
-      </td>
-   </tr>
-   <tr>
-      <td>PATH</td>
-      <td>The name of a new directory on the target component. For example, <code>/my-new-path</code>.
-      </td>
-   </tr>
-</table>
+*  <var>INSTANCE_ID</var>: The instance ID  of the target component.
+   For example, `c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4`.
 
-The following snippet shows creates a new directory named `my-new-path` on
+*  <var>NEW_PATH</var>: The name of the new directory to be created on the target
+   component.
+
+The example command below creates a new directory named `my-new-example-dir` on
 the target component:
 
-``` none {:.devsite-disable-click-to-copy}
-$ ffx component storage make-directory c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/my-new-path
+```none {:.devsite-disable-click-to-copy}
+$ ffx component storage make-directory c1a6d0aebbf7c092c53e8e696636af8ec0629ff39b7f2e548430b0034d809da4::/my-new-example-dir
 ```
 
 <!-- Reference links -->
+
 [storage-capabilities]: /docs/concepts/components/v2/capabilities/storage.md
+[directory-capabilities]: /docs/concepts/components/v2/capabilities/directory.md
+[component-moniker]: /docs/concepts/components/v2/identifiers.md#monikers
 [ffx-component-storage]: https://fuchsia.dev/reference/tools/sdk/ffx#storage
 [ffx-component-show]: ./view-component-information.md#get-detailed-information-from-a-component
 [component-id-index]: /docs/development/components/component_id_index.md
