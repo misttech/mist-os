@@ -6,11 +6,14 @@
 
 package provider
 
-import syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
+import (
+	"go.fuchsia.dev/fuchsia/src/lib/component"
+	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
+)
 
 const tag = "trace-provider"
 
-func Create() error {
+func Create(*component.Context) error {
 	_ = syslog.InfoTf(tag, "tracing is disabled")
 	return nil
 }

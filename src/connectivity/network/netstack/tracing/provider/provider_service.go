@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"syscall/zx"
-	"syscall/zx/fdio"
 	"syscall/zx/fidl"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/tracing/trace"
@@ -30,8 +29,6 @@ import (
 )
 
 const tag = "trace-provider"
-
-const registryServicePath = "/svc/fuchsia.tracing.provider.Registry"
 
 var _ fidlprovider.ProviderWithCtx = (*providerImpl)(nil)
 
@@ -71,14 +68,12 @@ func (*providerImpl) GetKnownCategories(fidl.Context) ([]fidltracing.KnownCatego
 	return nil, nil
 }
 
-func Create() error {
+func Create(componentCtx *component.Context) error {
 	registryReq, registryInterface, err := fidlprovider.NewRegistryWithCtxInterfaceRequest()
 	if err != nil {
 		return fmt.Errorf("failed to make a registry request/interface channel: %w", err)
 	}
-	if err := fdio.ServiceConnect(registryServicePath, zx.Handle(registryReq.Channel)); err != nil {
-		return fmt.Errorf("failed to connect to %s: %w", registryServicePath, err)
-	}
+	componentCtx.ConnectToEnvService(registryReq)
 
 	providerReq, providerInterface, err := fidlprovider.NewProviderWithCtxInterfaceRequest()
 	if err != nil {

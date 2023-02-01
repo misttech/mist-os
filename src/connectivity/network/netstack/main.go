@@ -452,7 +452,7 @@ func Main() {
 
 	dnsWatchers := newDnsServerWatcherCollection(ns.dnsConfig.GetServersCacheAndChannel)
 
-	if err := tracingprovider.Create(); err != nil {
+	if err := tracingprovider.Create(componentCtx); err != nil {
 		syslog.Warnf("could not create a trace provider: %s", err)
 		// Trace manager can not be running, or not available in the namespace. We can continue.
 	}
