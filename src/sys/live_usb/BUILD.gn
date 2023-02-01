@@ -2,60 +2,36 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
-import("//build/dist/component_manifest_resources.gni")
-import("//build/dist/resource.gni")
 import("//build/rust/rustc_binary.gni")
-import("//build/zbi/kernel_cmdline.gni")
 import("//src/storage/testing/driver_test_realm.gni")
-import("//tools/cmc/build/cml.gni")
-
-declare_args() {
-  # Whether or not to include the live_usb component in the build.
-  with_live_usb = false
-}
-
-if (with_live_usb) {
-  bootfs_files_for_assembly("bootfs") {
-    deps = [
-      ":bin",
-      ":meta",
-    ]
-  }
-} else {
-  bootfs_files_for_assembly("bootfs") {
-    deps = [ ":empty_manifest" ]
-  }
-}
 
 group("tests") {
   testonly = true
   deps = [ ":live-usb-unittests" ]
 }
 
-component_manifest_resources("meta") {
-  sources = [ "meta/live-usb.cml" ]
-}
-
 # This is a hack, because component_manager doesn't currently support modifying root.cml on a
-# per-product basis. As a result, bringup depends on "//src/sys/live_usb:empty_manifest", which
-# brings in an empty live_usb component. Any products which actually use this component must remove
-# that dependency from product_bootfs_labels and instead depend on "//src/sys/live_usb:bootfs".
-cm("meta_empty") {
+# per-product basis. Assembly chooses the right package based on a live_usb.enabled product config.
+fuchsia_package("empty_package") {
+  package_name = "live-usb"
+  deps = [ ":empty_component" ]
+}
+
+fuchsia_component("empty_component") {
+  component_name = "live-usb"
   manifest = "meta/empty.cml"
-  output_name = "empty.cm"
 }
 
-resource("empty_manifest") {
-  sources = get_target_outputs(":meta_empty")
-  deps = [ ":meta_empty" ]
-  outputs = [ "meta/live-usb.cm" ]
+fuchsia_package("package") {
+  package_name = "live-usb"
+  deps = [ ":component" ]
 }
 
-kernel_cmdline("live_usb_is_system") {
-  args = [ "live_usb.is_system=true" ]
-  deps = [ "//build/validate:non_production_tag" ]
+fuchsia_component("component") {
+  component_name = "live-usb"
+  manifest = "meta/live-usb.cml"
+  deps = [ ":bin" ]
 }
 
 rustc_binary("bin") {

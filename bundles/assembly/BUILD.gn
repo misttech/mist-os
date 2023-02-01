@@ -77,7 +77,6 @@ assembly_input_bundle("common_bringup") {
     "//src/power/power-manager:bootfs",
     "//src/sys/bootstrap:bootfs",
     "//src/sys/component_manager:bootfs",
-    "//src/sys/live_usb:bootfs",
   ]
   bootfs_packages = [
     "//src/bringup/bin/svchost:pkg",
@@ -435,6 +434,16 @@ assembly_input_bundle("wlan_softmac_support") {
       driver_components = [ "meta/wlansoftmac.cm" ]
     },
   ]
+}
+
+assembly_input_bundle("live_usb") {
+  bootfs_packages = [ "//src/sys/live_usb:package" ]
+
+  kernel_cmdline = [ "live_usb.is_system=true" ]
+}
+
+assembly_input_bundle("empty_live_usb") {
+  bootfs_packages = [ "//src/sys/live_usb:empty_package" ]
 }
 
 # Example assembly input bundle for testing

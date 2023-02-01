@@ -29,6 +29,7 @@ mod identity;
 mod input;
 mod session;
 mod starnix;
+mod storage;
 mod swd;
 mod virtualization;
 
@@ -138,6 +139,13 @@ pub fn define_configuration(
         &mut builder,
     )
     .context("Configuring the 'input' subsystem")?;
+
+    storage::StorageSubsystemConfig::define_configuration(
+        &context,
+        &config.platform.storage,
+        &mut builder,
+    )
+    .context("Configuring the 'storage' subsystem")?;
 
     session::SessionConfig::define_configuration(
         &context,

@@ -3,14 +3,14 @@
 # found in the LICENSE file.
 
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
-load(":providers.bzl", "FuchsiaAssembledPackageInfo", "FuchsiaConfigData")
+load(":providers.bzl", "FuchsiaAssembledPackageInfo", "FuchsiaConfigDataInfo")
 
 def _fuchsia_assemble_package_impl(ctx):
     configs = []
     files = []
     for config_file in ctx.attr.configs:
         f = config_file.files.to_list()[0]
-        configs.append(FuchsiaConfigData(
+        configs.append(FuchsiaConfigDataInfo(
             source = f,
             destination = ctx.attr.configs[config_file],
         ))
@@ -23,7 +23,7 @@ def _fuchsia_assemble_package_impl(ctx):
         FuchsiaAssembledPackageInfo(
             package = package,
             configs = configs,
-            files = files
+            files = files,
         ),
     ]
 

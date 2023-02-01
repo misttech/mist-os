@@ -22,6 +22,9 @@ workstation_platform_config = {
       "touchscreen",
     ]
   }
+  storage = {
+    live_usb_enabled = true
+  }
 }
 
 workstation_product_config = {

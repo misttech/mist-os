@@ -12,7 +12,7 @@ FuchsiaAssembledArtifactInfo = provider(
     },
 )
 
-FuchsiaConfigData = provider(
+FuchsiaConfigDataInfo = provider(
     "The  config data which is used in assembly.",
     fields = {
         "source": "Config file on host",

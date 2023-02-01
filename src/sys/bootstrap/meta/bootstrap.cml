@@ -55,7 +55,7 @@
         },
         {
             name: "live_usb",
-            url: "fuchsia-boot:///#meta/live-usb.cm",
+            url: "fuchsia-boot:///live-usb#meta/live-usb.cm",
             startup: "eager",
         },
         {

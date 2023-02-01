@@ -15,7 +15,7 @@ FuchsiaAssembledPackageInfo = provider(
     },
 )
 
-FuchsiaConfigData = provider(
+FuchsiaConfigDataInfo = provider(
     "The  config data which is used in assembly.",
     fields = {
         "source": "Config file on host",
@@ -49,6 +49,13 @@ FuchsiaStarnixConfigInfo = provider(
     doc = "Platform starnix options for the starnix area.",
     fields = {
         "enabled": "Whether starnix support should be included",
+    },
+)
+
+FuchsiaStorageConfigInfo = provider(
+    doc = "Platform configuration options for the storage area.",
+    fields = {
+        "live_usb_enabled": "Whether live_usb should be enabled",
     },
 )
 

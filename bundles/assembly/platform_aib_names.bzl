@@ -9,6 +9,8 @@ PLATFORM_AIB_NAMES = [
     "common_bringup",
     "common_minimal",
     "common_minimal_userdebug",
+    "empty_live_usb",
+    "live_usb",
     "starnix_support",
     "emulator_support",
     "omaha_client",
