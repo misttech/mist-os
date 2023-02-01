@@ -41,9 +41,9 @@ fuchsia_driver("test-board-driver") {
   sources = [
     "test-board.cc",
     "test-clock.cc",
+    "test-composite-node-spec.cc",
     "test-gpio.cc",
     "test-i2c.cc",
-    "test-node-group.cc",
     "test-pci.cc",
     "test-power-sensor.cc",
     "test-power.cc",
@@ -360,9 +360,9 @@ fuchsia_driver_component("test-vreg") {
   colocate = true
 }
 
-driver_bind_rules("test-node-group-bind") {
-  rules = "test/test-node-group.bind"
-  header_output = "test-node-group-bind.h"
+driver_bind_rules("test-composite-node-spec-bind") {
+  rules = "test/test-composite-node-spec.bind"
+  header_output = "test-composite-node-spec-bind.h"
   deps = [
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test",
@@ -370,12 +370,12 @@ driver_bind_rules("test-node-group-bind") {
   ]
 }
 
-fuchsia_driver("test-node-group-driver") {
-  output_name = "test-node-group"
+fuchsia_driver("test-composite-node-spec-driver") {
+  output_name = "test-composite-node-spec"
   configs += [ "//build/config:all_source" ]
-  sources = [ "test/node-group.cc" ]
+  sources = [ "test/composite-node-spec.cc" ]
   deps = [
-    ":test-node-group-bind",
+    ":test-composite-node-spec-bind",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
@@ -383,9 +383,9 @@ fuchsia_driver("test-node-group-driver") {
   ]
 }
 
-fuchsia_driver_component("test-node-group") {
-  component_name = "test-node-group"
-  deps = [ ":test-node-group-driver" ]
+fuchsia_driver_component("test-composite-node-spec") {
+  component_name = "test-composite-node-spec"
+  deps = [ ":test-composite-node-spec-driver" ]
   info = "test-driver-info.json"
   colocate = true
 }
@@ -495,9 +495,9 @@ fuchsia_unittest_package("platform-bus-test") {
     ":test-child-2.proxy",
     ":test-clock",
     ":test-composite",
+    ":test-composite-node-spec",
     ":test-gpio",
     ":test-i2c",
-    ":test-node-group",
     ":test-pci",
     ":test-power",
     ":test-power-sensor",

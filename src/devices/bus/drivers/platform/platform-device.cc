@@ -64,8 +64,9 @@ void RestrictPlatformBus::AddComposite(AddCompositeRequestView request, fdf::Are
                                        AddCompositeCompleter::Sync& completer) {
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
-void RestrictPlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& arena,
-                                       AddNodeGroupCompleter::Sync& completer) {
+void RestrictPlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
+                                               fdf::Arena& arena,
+                                               AddCompositeNodeSpecCompleter::Sync& completer) {
   completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 

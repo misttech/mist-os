@@ -125,7 +125,7 @@
 //src/devices/bus/drivers/platform/test:test-composite-driver
 //src/devices/bus/drivers/platform/test:test-gpio-driver
 //src/devices/bus/drivers/platform/test:test-i2c-driver
-//src/devices/bus/drivers/platform/test:test-node-group-driver
+//src/devices/bus/drivers/platform/test:test-composite-node-spec-driver
 //src/devices/bus/drivers/platform/test:test-parent-driver
 //src/devices/bus/drivers/platform/test:test-pci-driver
 //src/devices/bus/drivers/platform/test:test-power-driver

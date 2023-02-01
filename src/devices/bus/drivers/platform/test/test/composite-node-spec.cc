@@ -9,21 +9,21 @@
 
 #include <ddktl/device.h>
 
-#include "src/devices/bus/drivers/platform/test/test-node-group-bind.h"
+#include "src/devices/bus/drivers/platform/test/test-composite-node-spec-bind.h"
 
-namespace node_group {
+namespace test_composite_node_spec {
 
-class TestNodeGroup;
-using DeviceType = ddk::Device<TestNodeGroup>;
+class TestCompositeNodeSpec;
+using DeviceType = ddk::Device<TestCompositeNodeSpec>;
 
-class TestNodeGroup : public DeviceType {
+class TestCompositeNodeSpec : public DeviceType {
  public:
   static zx_status_t Create(void* ctx, zx_device_t* parent) {
-    auto dev = std::make_unique<TestNodeGroup>(parent);
+    auto dev = std::make_unique<TestCompositeNodeSpec>(parent);
 
-    zxlogf(INFO, "TestNodeGroup::Create: test-node-group");
+    zxlogf(INFO, "TestCompositeNodeSpec::Create: test-composite-node-spec");
 
-    auto status = dev->DdkAdd("test-node-group");
+    auto status = dev->DdkAdd("test-composite-node-spec");
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s: DdkAdd failed: %d", __func__, status);
       return status;
@@ -34,7 +34,7 @@ class TestNodeGroup : public DeviceType {
     return ZX_OK;
   }
 
-  explicit TestNodeGroup(zx_device_t* parent) : DeviceType(parent) {}
+  explicit TestCompositeNodeSpec(zx_device_t* parent) : DeviceType(parent) {}
 
   void DdkRelease() { delete this; }
 };
@@ -42,10 +42,10 @@ class TestNodeGroup : public DeviceType {
 constexpr zx_driver_ops_t driver_ops = []() {
   zx_driver_ops_t driver_ops = {};
   driver_ops.version = DRIVER_OPS_VERSION;
-  driver_ops.bind = TestNodeGroup::Create;
+  driver_ops.bind = TestCompositeNodeSpec::Create;
   return driver_ops;
 }();
 
-}  // namespace node_group
+}  // namespace test_composite_node_spec
 
-ZIRCON_DRIVER(test_node_group, node_group::driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(test_composite_node_spec, test_composite_node_spec::driver_ops, "zircon", "0.1");

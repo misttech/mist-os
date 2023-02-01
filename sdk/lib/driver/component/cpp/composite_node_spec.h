@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_COMPONENT_CPP_NODE_GROUP_H_
-#define LIB_DRIVER_COMPONENT_CPP_NODE_GROUP_H_
+#ifndef LIB_DRIVER_COMPONENT_CPP_COMPOSITE_NODE_SPEC_H_
+#define LIB_DRIVER_COMPONENT_CPP_COMPOSITE_NODE_SPEC_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 
@@ -214,4 +214,4 @@ inline fuchsia_driver_framework::BindRule MakeRejectBindRule(const std::string_v
 
 }  // namespace fdf
 
-#endif  // LIB_DRIVER_COMPONENT_CPP_NODE_GROUP_H_
+#endif  // LIB_DRIVER_COMPONENT_CPP_COMPOSITE_NODE_SPEC_H_

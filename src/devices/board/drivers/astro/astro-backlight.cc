@@ -8,8 +8,8 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/component/cpp/node_group.h>
 #include <zircon/compiler.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -102,16 +102,16 @@ zx_status_t Astro::BacklightInit() {
   auto composite_node_spec =
       fuchsia_driver_framework::CompositeNodeSpec{{.name = "backlight", .parents = parents}};
 
-  auto result = pbus_.buffer(arena)->AddNodeGroup(fidl::ToWire(fidl_arena, backlight_dev),
-                                                  fidl::ToWire(fidl_arena, composite_node_spec));
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, backlight_dev), fidl::ToWire(fidl_arena, composite_node_spec));
 
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddNodeGroup Backlight(backlight_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddNodeGroup Backlight(backlight_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

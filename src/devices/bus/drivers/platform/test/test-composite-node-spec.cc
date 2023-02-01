@@ -7,8 +7,8 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/component/cpp/node_group.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
@@ -18,12 +18,12 @@
 
 namespace board_test {
 
-zx_status_t TestBoard::NodeGroupInit() {
+zx_status_t TestBoard::CompositeNodeSpecInit() {
   fuchsia_hardware_platform_bus::Node dev;
   dev.name() = "node_a";
   dev.vid() = bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST;
   dev.pid() = bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_PBUS_TEST;
-  dev.did() = bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_NODE_GROUP;
+  dev.did() = bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_COMPOSITE_NODE_SPEC;
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('DVGP');
@@ -33,9 +33,8 @@ zx_status_t TestBoard::NodeGroupInit() {
                               bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
                               bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_PBUS_TEST),
-      fdf::MakeAcceptBindRule(
-          bind_fuchsia::PLATFORM_DEV_DID,
-          bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_NODE_REPRESENTATION),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_PARENT_SPEC),
   };
 
   auto properties = std::vector{
@@ -51,16 +50,16 @@ zx_status_t TestBoard::NodeGroupInit() {
 
   auto composite_node_spec =
       fuchsia_driver_framework::CompositeNodeSpec{{.name = "test_composite", .parents = parents}};
-  auto result = pbus_.buffer(arena)->AddNodeGroup(fidl::ToWire(fidl_arena, dev),
-                                                  fidl::ToWire(fidl_arena, composite_node_spec));
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, dev), fidl::ToWire(fidl_arena, composite_node_spec));
 
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddNodeGroup node_group(dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec test_composite(dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddNodeGroup node_group(dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec test_composite(dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

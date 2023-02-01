@@ -643,8 +643,8 @@ void PlatformBus::AddComposite(AddCompositeRequestView request, fdf::Arena& aren
   completer.buffer(arena).ReplySuccess();
 }
 
-void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& arena,
-                               AddNodeGroupCompleter::Sync& completer) {
+void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, fdf::Arena& arena,
+                                       AddCompositeNodeSpecCompleter::Sync& completer) {
   // Create the pdev fragments
   auto vid = request->node.has_vid() ? request->node.vid() : 0;
   auto pid = request->node.has_pid() ? request->node.pid() : 0;
@@ -667,16 +667,16 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
 
   auto composite_node_spec = ddk::CompositeNodeSpec(kPDevBindRules, kPDevProperties);
 
-  auto fidl_spec = fidl::ToNatural(request->group);
+  auto fidl_spec = fidl::ToNatural(request->spec);
   for (const auto& parent : fidl_spec.parents().value()) {
     if (parent.bind_rules().empty()) {
-      zxlogf(ERROR, "Node group bind rules cannot be empty");
+      zxlogf(ERROR, "Parent spec bind rules cannot be empty");
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
 
     if (parent.properties().empty()) {
-      zxlogf(ERROR, "Node representation properties cannot be empty");
+      zxlogf(ERROR, "Parent spec properties cannot be empty");
       completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }

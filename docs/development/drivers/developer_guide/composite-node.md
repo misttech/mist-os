@@ -161,7 +161,7 @@ const ddk::BindRule kI2cBindRules[] = {
 In DFv2, node groups are written for
 [`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl) in the
 `fuchsia.driver.framework` FIDL library. The
-[`node_group.h`](/sdk/lib/driver/component/cpp/node_group.h) library in
+[`composite_node_spec.h`](/sdk/lib/driver/component/cpp/composite_node_spec.h) library in
 `sdk/lib/driver/component/cpp` can be used to simplify defining the bind rules.
 
 Using that library and bind libraries codegen values, we can write the
@@ -295,7 +295,7 @@ if (endpoints.is_error()) {
 
 fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus =
     endpoints->client;
-auto result = pbus.buffer(arena)->AddNodeGroup(
+auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
 fidl::ToWire(fidl_arena, dev),
 fidl::ToWire(fidl_arena, node_group), false);
 
@@ -423,7 +423,7 @@ protocol CompositeNodeManager {
 
 The `CompositeNodeSpec` struct is defined in
 [`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl). You can
-use the [`node_group.h`](/sdk/lib/driver/component/cpp/node_group.h) and
+use the [`node_group.h`](/sdk/lib/driver/component/cpp/composite_node_spec.h) and
 [`node_add_args.h`](/sdk/lib/driver/component/cpp/node_add_args.h) functions in
 the `sdk/lib/driver/component/cpp` library to define the bind rules and
 properties for the node representations.

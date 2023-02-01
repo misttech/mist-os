@@ -18,6 +18,7 @@ sdk_source_set("cpp") {
 
   sources = [
     "basic_factory.h",
+    "composite_node_spec.h",
     "driver_base.h",
     "driver_context.cc",
     "driver_context.h",
@@ -25,7 +26,6 @@ sdk_source_set("cpp") {
     "lifecycle.h",
     "node_add_args.cc",
     "node_add_args.h",
-    "node_group.h",
     "prepare_stop_completer.cc",
     "prepare_stop_completer.h",
     "start_args.h",

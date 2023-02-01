@@ -84,9 +84,9 @@ int TestBoard::Thread() {
     zxlogf(ERROR, "%s: PowerSensorInit failed: %d", __func__, status);
   }
 
-  status = NodeGroupInit();
+  status = CompositeNodeSpecInit();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: NodeGroupInit failed: %d", __func__, status);
+    zxlogf(ERROR, "%s: CompositeNodeSpecInit failed: %d", __func__, status);
   }
 
   return 0;

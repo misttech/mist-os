@@ -9,8 +9,8 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
-#include <lib/driver/component/cpp/node_group.h>
 
 #include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
 #include <bind/fuchsia/ams/platform/cpp/bind.h>
@@ -152,16 +152,16 @@ zx_status_t Astro::LightInit() {
   auto composite_node_spec =
       fuchsia_driver_framework::CompositeNodeSpec{{.name = "light_dev", .parents = parents}};
 
-  auto result = pbus_.buffer(arena)->AddNodeGroup(fidl::ToWire(fidl_arena, light_dev),
-                                                  fidl::ToWire(fidl_arena, composite_node_spec));
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, light_dev), fidl::ToWire(fidl_arena, composite_node_spec));
 
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddNodeGroup Light(light_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Light(light_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddNodeGroup Light(light_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Light(light_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
