@@ -9,14 +9,14 @@
             url: "#meta/element-manager-test.cm",
         },
         {
-            name: "test_realm",
-            url: "fuchsia.element_test_realm#meta/default.cm",
+            name: "reference-session",
+            url: "#meta/reference-session.cm",
         },
     ],
     offer: [
         {
             protocol: "fuchsia.element.Manager",
-            from: "#test_realm",
+            from: "#reference-session",
             to: [ "#element-manager-test" ],
         },
         {
@@ -24,7 +24,7 @@
             from: "parent",
             to: [
                 "#element-manager-test",
-                "#test_realm",
+                "#reference-session",
             ],
         },
     ],

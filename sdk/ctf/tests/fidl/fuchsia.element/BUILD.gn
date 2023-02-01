@@ -34,13 +34,17 @@ ctf_fuchsia_component("element-manager-test") {
 }
 
 ctf_fuchsia_test_package("fuchsia-element-tests") {
-  enable_ctf_test_realms = true
   plasa_element = "fidl/fuchsia.element/Manager"
   package_name = "fuchsia-element-tests"
   test_components = [ ":fuchsia-element-test" ]
   deps = [
     ":element-manager-test",
+    ":reference-element",
+    ":reference-graphical-presenter",
+    ":reference-scenic",
     ":reference-session",
+    "//src/session/bin/element_manager:element_manager_comp",
+    "//src/session/bin/element_manager:sc_values",
   ]
 }
 
@@ -112,11 +116,6 @@ ctf_executable("reference-session-bin") {
   sources = [ "reference_session.cc" ]
 
   deps = [
-    ":reference-element",
-    ":reference-graphical-presenter",
-    ":reference-scenic",
-    "//src/session/bin/element_manager:element_manager_comp",
-    "//src/session/bin/element_manager:sc_values",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
