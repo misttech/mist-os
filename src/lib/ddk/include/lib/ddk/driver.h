@@ -589,34 +589,33 @@ typedef enum {
 } device_bind_rule_condition;
 
 // Represents the a property in a node group node.
-typedef struct node_group_bind_rule {
+typedef struct bind_rule {
   device_bind_prop_key_t key;
   device_bind_rule_condition condition;
 
   const device_bind_prop_value_t* values;
   size_t values_count;
-} node_group_bind_rule_t;
+} bind_rule_t;
 
-typedef struct node_representation {
-  const node_group_bind_rule_t* bind_rules;
+typedef struct parent_spec {
+  const bind_rule_t* bind_rules;
   size_t bind_rule_count;
 
   const device_bind_prop_t* properties;
   size_t property_count;
 
-} node_representation_t;
+} parent_spec_t;
 
-typedef struct node_group_desc {
-  // The first node is the primary node.
-  const node_representation_t* nodes;
-  size_t nodes_count;
+typedef struct composite_node_spec {
+  const parent_spec_t* parents;
+  size_t parent_count;
 
   const device_metadata_t* metadata_list;
   size_t metadata_count;
-} node_group_desc_t;
+} composite_node_spec_t;
 
-zx_status_t device_add_group(zx_device_t* dev, const char* name,
-                             const node_group_desc_t* group_desc);
+zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
+                                      const composite_node_spec_t* spec);
 
 // Protocol Identifiers
 #define DDK_PROTOCOL_DEF(tag, val, name, flags) ZX_PROTOCOL_##tag = val,

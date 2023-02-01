@@ -18,7 +18,7 @@
 #include <zircon/errors.h>
 
 #include "driver.h"
-#include "src/devices/bin/driver_host/node_group_desc_util.h"
+#include "src/devices/bin/driver_host/composite_node_spec_util.h"
 #include "src/devices/misc/drivers/compat/composite.h"
 
 namespace fdf {
@@ -877,16 +877,16 @@ zx_status_t Device::AddComposite(const char* name, const composite_device_desc_t
   return ZX_OK;
 }
 
-zx_status_t Device::AddNodeGroup(const char* name, const node_group_desc_t* group_desc) {
-  if (!name || !group_desc) {
+zx_status_t Device::AddNodeGroup(const char* name, const composite_node_spec_t* spec) {
+  if (!name || !spec) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!group_desc->nodes || group_desc->nodes_count == 0) {
+  if (!spec->parents || spec->parent_count == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!group_desc->metadata_list && group_desc->metadata_count > 0) {
+  if (!spec->metadata_list && spec->metadata_count > 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -898,9 +898,9 @@ zx_status_t Device::AddNodeGroup(const char* name, const node_group_desc_t* grou
   }
 
   fidl::Arena allocator;
-  auto nodes = fidl::VectorView<fdf::wire::NodeRepresentation>(allocator, group_desc->nodes_count);
-  for (size_t i = 0; i < group_desc->nodes_count; i++) {
-    auto node_result = ConvertNodeRepresentation(allocator, group_desc->nodes[i]);
+  auto nodes = fidl::VectorView<fdf::wire::NodeRepresentation>(allocator, spec->parent_count);
+  for (size_t i = 0; i < spec->parent_count; i++) {
+    auto node_result = ConvertNodeRepresentation(allocator, spec->parents[i]);
     if (!node_result.is_ok()) {
       return node_result.error_value();
     }
@@ -908,7 +908,7 @@ zx_status_t Device::AddNodeGroup(const char* name, const node_group_desc_t* grou
   }
 
   // TODO(fxb/111891): Support metadata for AddComposite().
-  if (group_desc->metadata_count > 0) {
+  if (spec->metadata_count > 0) {
     FDF_LOG(WARNING, "AddNodeGroup() currently doesn't support metadata. See fxb/111891.");
   }
 

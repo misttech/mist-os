@@ -371,7 +371,7 @@ TEST_F(CoreTest, RebindHasMultipleChildren) {
   }
 }
 
-TEST_F(CoreTest, AddNodeGroup) {
+TEST_F(CoreTest, AddCompositeNodeSpec) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
 
@@ -388,141 +388,141 @@ TEST_F(CoreTest, AddNodeGroup) {
         auto node_result_1 = node_group.nodes.at(0);
         ASSERT_EQ(2, node_result_1.bind_rules.count());
 
-        auto node_1_bind_rule_1_result = node_result_1.bind_rules.at(0);
-        EXPECT_EQ(2, node_1_bind_rule_1_result.key.int_value());
+        auto parent_1_bind_rule_1_result = node_result_1.bind_rules.at(0);
+        EXPECT_EQ(2, parent_1_bind_rule_1_result.key.int_value());
         EXPECT_EQ(fdf::wire::Condition::kAccept, node_result_1.bind_rules.at(0).condition);
-        ASSERT_EQ(2, node_1_bind_rule_1_result.values.count());
-        EXPECT_EQ(1, node_1_bind_rule_1_result.values.at(0).int_value());
-        EXPECT_EQ(30, node_1_bind_rule_1_result.values.at(1).int_value());
+        ASSERT_EQ(2, parent_1_bind_rule_1_result.values.count());
+        EXPECT_EQ(1, parent_1_bind_rule_1_result.values.at(0).int_value());
+        EXPECT_EQ(30, parent_1_bind_rule_1_result.values.at(1).int_value());
 
-        auto node_1_bind_rule_2_result = node_result_1.bind_rules.at(1);
-        EXPECT_EQ(10, node_1_bind_rule_2_result.key.int_value());
+        auto parent_1_bind_rule_2_result = node_result_1.bind_rules.at(1);
+        EXPECT_EQ(10, parent_1_bind_rule_2_result.key.int_value());
         EXPECT_EQ(fdf::wire::Condition::kReject, node_result_1.bind_rules.at(1).condition);
-        ASSERT_EQ(1, node_1_bind_rule_2_result.values.count());
-        EXPECT_EQ(3, node_1_bind_rule_2_result.values.at(0).int_value());
+        ASSERT_EQ(1, parent_1_bind_rule_2_result.values.count());
+        EXPECT_EQ(3, parent_1_bind_rule_2_result.values.at(0).int_value());
 
-        auto node_1_props_result = node_result_1.properties;
-        EXPECT_EQ(2, node_1_props_result.count());
-        ASSERT_EQ(100, node_1_props_result.at(0).key.int_value());
-        ASSERT_FALSE(node_1_props_result.at(0).value.bool_value());
-        ASSERT_STREQ("kinglet", node_1_props_result.at(1).key.string_value());
-        ASSERT_EQ(20, node_1_props_result.at(1).value.int_value());
+        auto parent_1_props_result = node_result_1.properties;
+        EXPECT_EQ(2, parent_1_props_result.count());
+        ASSERT_EQ(100, parent_1_props_result.at(0).key.int_value());
+        ASSERT_FALSE(parent_1_props_result.at(0).value.bool_value());
+        ASSERT_STREQ("kinglet", parent_1_props_result.at(1).key.string_value());
+        ASSERT_EQ(20, parent_1_props_result.at(1).value.int_value());
 
         // Check the second node.
         auto node_result_2 = node_group.nodes.at(1);
         ASSERT_EQ(2, node_result_2.bind_rules.count());
 
-        auto node_2_bind_rule_1 = node_result_2.bind_rules.at(0);
-        EXPECT_EQ(12, node_2_bind_rule_1.key.int_value());
-        EXPECT_EQ(fdf::wire::Condition::kReject, node_2_bind_rule_1.condition);
-        ASSERT_EQ(1, node_2_bind_rule_1.values.count());
-        EXPECT_EQ(false, node_2_bind_rule_1.values.at(0).bool_value());
+        auto parent_2_bind_rule_1 = node_result_2.bind_rules.at(0);
+        EXPECT_EQ(12, parent_2_bind_rule_1.key.int_value());
+        EXPECT_EQ(fdf::wire::Condition::kReject, parent_2_bind_rule_1.condition);
+        ASSERT_EQ(1, parent_2_bind_rule_1.values.count());
+        EXPECT_EQ(false, parent_2_bind_rule_1.values.at(0).bool_value());
 
-        auto node_2_bind_rule_2 = node_result_2.bind_rules.at(1);
-        EXPECT_STREQ("curlew", node_2_bind_rule_2.key.string_value().get());
-        EXPECT_EQ(fdf::wire::Condition::kReject, node_2_bind_rule_2.condition);
-        ASSERT_EQ(2, node_2_bind_rule_2.values.count());
-        EXPECT_STREQ("willet", node_2_bind_rule_2.values.at(0).string_value().get());
-        EXPECT_STREQ("sanderling", node_2_bind_rule_2.values.at(1).string_value().get());
+        auto parent_2_bind_rule_2 = node_result_2.bind_rules.at(1);
+        EXPECT_STREQ("curlew", parent_2_bind_rule_2.key.string_value().get());
+        EXPECT_EQ(fdf::wire::Condition::kReject, parent_2_bind_rule_2.condition);
+        ASSERT_EQ(2, parent_2_bind_rule_2.values.count());
+        EXPECT_STREQ("willet", parent_2_bind_rule_2.values.at(0).string_value().get());
+        EXPECT_STREQ("sanderling", parent_2_bind_rule_2.values.at(1).string_value().get());
 
-        auto node_2_prop_result = node_result_2.properties;
-        EXPECT_EQ(1, node_2_prop_result.count());
-        ASSERT_EQ(100, node_2_prop_result.at(0).key.int_value());
-        ASSERT_TRUE(node_2_prop_result.at(0).value.bool_value());
+        auto parent_2_prop_result = node_result_2.properties;
+        EXPECT_EQ(1, parent_2_prop_result.count());
+        ASSERT_EQ(100, parent_2_prop_result.at(0).key.int_value());
+        ASSERT_TRUE(parent_2_prop_result.at(0).value.bool_value());
       };
 
   coordinator_.set_node_group_callback(std::move(test_callback));
 
-  const device_bind_prop_value_t node_1_bind_rules_values_1[] = {
+  const device_bind_prop_value_t parent_1_bind_rules_values_1[] = {
       device_bind_prop_int_val(1),
       device_bind_prop_int_val(30),
   };
 
-  const device_bind_prop_value_t node_1_bind_rules_values_2[] = {
+  const device_bind_prop_value_t parent_1_bind_rules_values_2[] = {
       device_bind_prop_int_val(3),
   };
 
-  const node_group_bind_rule_t node_1_bind_rules[] = {
+  const bind_rule_t parent_1_bind_rules[] = {
       {
           .key = device_bind_prop_int_key(2),
           .condition = DEVICE_BIND_RULE_CONDITION_ACCEPT,
-          .values = node_1_bind_rules_values_1,
-          .values_count = std::size(node_1_bind_rules_values_1),
+          .values = parent_1_bind_rules_values_1,
+          .values_count = std::size(parent_1_bind_rules_values_1),
       },
       {
           .key = device_bind_prop_int_key(10),
           .condition = DEVICE_BIND_RULE_CONDITION_REJECT,
-          .values = node_1_bind_rules_values_2,
-          .values_count = std::size(node_1_bind_rules_values_2),
+          .values = parent_1_bind_rules_values_2,
+          .values_count = std::size(parent_1_bind_rules_values_2),
       },
   };
 
-  const device_bind_prop_t node_1_properties[] = {{
-                                                      .key = device_bind_prop_int_key(100),
-                                                      .value = device_bind_prop_bool_val(false),
-                                                  },
+  const device_bind_prop_t parent_1_properties[] = {{
+                                                        .key = device_bind_prop_int_key(100),
+                                                        .value = device_bind_prop_bool_val(false),
+                                                    },
 
-                                                  {
-                                                      .key = device_bind_prop_str_key("kinglet"),
-                                                      .value = device_bind_prop_int_val(20),
-                                                  }};
+                                                    {
+                                                        .key = device_bind_prop_str_key("kinglet"),
+                                                        .value = device_bind_prop_int_val(20),
+                                                    }};
 
-  const node_representation_t node_1{
-      .bind_rules = node_1_bind_rules,
-      .bind_rule_count = std::size(node_1_bind_rules),
-      .properties = node_1_properties,
-      .property_count = std::size(node_1_properties),
+  const parent_spec_t parent_1{
+      .bind_rules = parent_1_bind_rules,
+      .bind_rule_count = std::size(parent_1_bind_rules),
+      .properties = parent_1_properties,
+      .property_count = std::size(parent_1_properties),
   };
 
-  const device_bind_prop_value_t node_2_props_values_1[] = {
+  const device_bind_prop_value_t parent_2_props_values_1[] = {
       device_bind_prop_bool_val(false),
   };
 
-  const device_bind_prop_value_t node_2_props_values_2[] = {
+  const device_bind_prop_value_t parent_2_props_values_2[] = {
       device_bind_prop_str_val("willet"),
       device_bind_prop_str_val("sanderling"),
   };
 
-  const node_group_bind_rule_t node_2_props[] = {
+  const bind_rule_t parent_2_props[] = {
       {
           .key = device_bind_prop_int_key(12),
           .condition = DEVICE_BIND_RULE_CONDITION_REJECT,
-          .values = node_2_props_values_1,
-          .values_count = std::size(node_2_props_values_1),
+          .values = parent_2_props_values_1,
+          .values_count = std::size(parent_2_props_values_1),
       },
       {
           .key = device_bind_prop_str_key("curlew"),
           .condition = DEVICE_BIND_RULE_CONDITION_REJECT,
-          .values = node_2_props_values_2,
-          .values_count = std::size(node_2_props_values_2),
+          .values = parent_2_props_values_2,
+          .values_count = std::size(parent_2_props_values_2),
       },
   };
 
-  const device_bind_prop_t node_2_properties[] = {{
+  const device_bind_prop_t parent_2_properties[] = {{
       .key = device_bind_prop_int_key(100),
       .value = device_bind_prop_bool_val(true),
   }};
 
-  const node_representation_t node_2{
-      .bind_rules = node_2_props,
-      .bind_rule_count = std::size(node_2_props),
-      .properties = node_2_properties,
-      .property_count = std::size(node_2_properties),
+  const parent_spec_t parent_2{
+      .bind_rules = parent_2_props,
+      .bind_rule_count = std::size(parent_2_props),
+      .properties = parent_2_properties,
+      .property_count = std::size(parent_2_properties),
   };
 
-  const node_representation_t nodes[] = {
-      node_1,
-      node_2,
+  const parent_spec_t parents[] = {
+      parent_1,
+      parent_2,
   };
 
-  const node_group_desc group_desc = {
-      .nodes = nodes,
-      .nodes_count = std::size(nodes),
+  const composite_node_spec_t spec = {
+      .parents = parents,
+      .parent_count = std::size(parents),
       .metadata_list = nullptr,
       .metadata_count = 0,
   };
 
-  EXPECT_EQ(ZX_OK, device_add_group(dev.get(), "node_group", &group_desc));
+  EXPECT_EQ(ZX_OK, device_add_composite_spec(dev.get(), "test_composite", &spec));
 
   // Join the thread running in the background, then run the rest of the tasks locally.
   ctx_.loop().Quit();

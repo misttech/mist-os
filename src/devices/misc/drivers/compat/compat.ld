@@ -23,7 +23,7 @@
     device_get_metadata_size;
     device_add_metadata;
     device_add_composite;
-    device_add_group;
+    device_add_composite_spec;
     driver_log_severity_enabled_internal;
     driver_logvf_internal;
     driver_logf_internal;

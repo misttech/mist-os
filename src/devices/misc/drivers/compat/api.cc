@@ -127,9 +127,9 @@ __EXPORT zx_status_t device_add_composite(zx_device_t* dev, const char* name,
   return dev->AddComposite(name, comp_desc);
 }
 
-__EXPORT zx_status_t device_add_group(zx_device_t* dev, const char* name,
-                                      const node_group_desc_t* group_desc) {
-  return dev->AddNodeGroup(name, group_desc);
+__EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
+                                               const composite_node_spec_t* spec) {
+  return dev->AddNodeGroup(name, spec);
 }
 
 __EXPORT bool driver_log_severity_enabled_internal(const zx_driver_t* drv,

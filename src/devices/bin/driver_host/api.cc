@@ -597,12 +597,12 @@ __EXPORT zx_status_t device_get_variable(zx_device_t* device, const char* name, 
   return ZX_OK;
 }
 
-__EXPORT zx_status_t device_add_group(zx_device_t* dev, const char* name,
-                                      const node_group_desc_t* group_desc) {
+__EXPORT zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
+                                               const composite_node_spec_t* spec) {
   ZX_DEBUG_ASSERT_MSG(dev && dev->magic == DEV_MAGIC, "Dev pointer '%p' is not a real device", dev);
   fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
   auto dev_ref = fbl::RefPtr(dev);
-  return internal::ContextForApi()->DeviceAddGroup(dev_ref, name, group_desc);
+  return internal::ContextForApi()->DeviceAddCompositeNodeSpec(dev_ref, name, spec);
 }
 
 __EXPORT zx_status_t device_connect_fidl_protocol2(zx_device_t* device, const char* service_name,

@@ -34,7 +34,7 @@ source_set("lib") {
   deps = [
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:symbols",
-    "//src/devices/bin/driver_host:node_group_desc_util",
+    "//src/devices/bin/driver_host:composite_node_spec_util",
     "//src/devices/lib/fidl",
     "//src/devices/lib/fidl:devfs_fidl",
   ]

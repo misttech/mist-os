@@ -401,10 +401,10 @@ TEST_F(CompositeNodeSpecTest, CreateSpec) {
   }
 
   auto spec = composite_node_spec.get();
-  ASSERT_EQ(2, spec.nodes_count);
+  ASSERT_EQ(2, spec.parent_count);
 
   // Verify the bind properties in the first parent.
-  auto parent_1 = spec.nodes[0];
+  auto parent_1 = spec.parents[0];
   ASSERT_EQ(1, parent_1.property_count);
   VerifyPropertyKey(device_bind_prop_str_key("test"), parent_1.properties[0].key);
   VerifyPropertyValue(device_bind_prop_int_val(10), parent_1.properties[0].value);
@@ -417,7 +417,7 @@ TEST_F(CompositeNodeSpecTest, CreateSpec) {
   VerifyPropertyValue(device_bind_prop_int_val(10), parent_1.bind_rules[0].values[0]);
 
   // Verify the bind properties in the second parent.
-  auto parent_2 = spec.nodes[1];
+  auto parent_2 = spec.parents[1];
   ASSERT_EQ(2, parent_2.property_count);
   VerifyPropertyKey(device_bind_prop_str_key("test"), parent_2.properties[0].key);
   VerifyPropertyValue(device_bind_prop_int_val(10), parent_2.properties[0].value);

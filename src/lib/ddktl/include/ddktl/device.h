@@ -476,7 +476,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
   }
 
   zx_status_t DdkAddCompositeNodeSpec(const char* name, CompositeNodeSpec spec) {
-    return device_add_group(this->parent_, name, &spec.get());
+    return device_add_composite_spec(this->parent_, name, &spec.get());
   }
 
   // Schedules the removal of the device and its descendents.

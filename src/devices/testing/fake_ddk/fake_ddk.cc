@@ -402,8 +402,8 @@ zx_status_t device_add_composite(zx_device_t* dev, const char* name,
 }
 
 __EXPORT
-zx_status_t device_add_group(zx_device_t* dev, const char* name,
-                             const node_group_desc_t* group_desc) {
+zx_status_t device_add_composite_spec(zx_device_t* dev, const char* name,
+                                      const composite_node_spec_t* spec) {
   return ZX_OK;
 }
 

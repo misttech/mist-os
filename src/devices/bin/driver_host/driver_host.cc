@@ -47,13 +47,13 @@
 #include <fbl/string_printf.h>
 
 #include "src/devices/bin/driver_host/composite_device.h"
+#include "src/devices/bin/driver_host/composite_node_spec_util.h"
 #include "src/devices/bin/driver_host/device_controller_connection.h"
 #include "src/devices/bin/driver_host/driver.h"
 #include "src/devices/bin/driver_host/env.h"
 #include "src/devices/bin/driver_host/fidl_proxy_device.h"
 #include "src/devices/bin/driver_host/log.h"
 #include "src/devices/bin/driver_host/main.h"
-#include "src/devices/bin/driver_host/node_group_desc_util.h"
 #include "src/devices/bin/driver_host/proxy_iostate.h"
 #include "src/devices/bin/driver_host/scheduler_profile.h"
 #include "src/devices/bin/driver_host/tracing.h"
@@ -685,9 +685,8 @@ StatusOrConn DriverHostControllerConnection::CreateProxyDevice(CreateDeviceReque
       .coordinator_client = coordinator.Clone(),
   };
 
-  status =
-      drv->CreateOp(&creation_context, creation_context.parent->driver, creation_context.parent,
-                    "proxy", "", proxy.parent_proxy.release());
+  status = drv->CreateOp(&creation_context, creation_context.parent->driver,
+                         creation_context.parent, "proxy", "", proxy.parent_proxy.release());
 
   // Suppress a warning about dummy device being in a bad state.  The
   // message is spurious in this case, since the dummy parent never
@@ -1242,18 +1241,18 @@ zx_status_t DriverHostContext::DeviceAddComposite(const fbl::RefPtr<zx_device_t>
   return log_rpc_result(dev, "create-composite", status, call_status);
 }
 
-zx_status_t DriverHostContext::DeviceAddGroup(const fbl::RefPtr<zx_device_t>& dev,
-                                              std::string_view name,
-                                              const node_group_desc_t* group_desc) {
-  if (name.empty() || !group_desc) {
+zx_status_t DriverHostContext::DeviceAddCompositeNodeSpec(const fbl::RefPtr<zx_device_t>& dev,
+                                                          std::string_view name,
+                                                          const composite_node_spec_t* spec) {
+  if (name.empty() || !spec) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!group_desc->nodes || group_desc->nodes_count == 0) {
+  if (!spec->parents || spec->parent_count == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!group_desc->metadata_list && group_desc->metadata_count > 0) {
+  if (!spec->metadata_list && spec->metadata_count > 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1263,23 +1262,22 @@ zx_status_t DriverHostContext::DeviceAddGroup(const fbl::RefPtr<zx_device_t>& de
   }
 
   fidl::Arena allocator;
-  auto nodes = fidl::VectorView<fdf::wire::NodeRepresentation>(allocator, group_desc->nodes_count);
-  for (size_t i = 0; i < group_desc->nodes_count; i++) {
-    auto node_result = ConvertNodeRepresentation(allocator, group_desc->nodes[i]);
+  auto nodes = fidl::VectorView<fdf::wire::NodeRepresentation>(allocator, spec->parent_count);
+  for (size_t i = 0; i < spec->parent_count; i++) {
+    auto node_result = ConvertNodeRepresentation(allocator, spec->parents[i]);
     if (!node_result.is_ok()) {
       return node_result.error_value();
     }
     nodes[i] = std::move(node_result.value());
   }
 
-  auto metadata =
-      fidl::VectorView<fdm::wire::DeviceMetadata>(allocator, group_desc->metadata_count);
-  for (size_t i = 0; i < group_desc->metadata_count; i++) {
+  auto metadata = fidl::VectorView<fdm::wire::DeviceMetadata>(allocator, spec->metadata_count);
+  for (size_t i = 0; i < spec->metadata_count; i++) {
     metadata[i] = fdm::wire::DeviceMetadata{
-        .key = group_desc->metadata_list[i].type,
+        .key = spec->metadata_list[i].type,
         .data = fidl::VectorView<uint8_t>::FromExternal(
-            reinterpret_cast<uint8_t*>(const_cast<void*>(group_desc->metadata_list[i].data)),
-            group_desc->metadata_list[i].length)};
+            reinterpret_cast<uint8_t*>(const_cast<void*>(spec->metadata_list[i].data)),
+            spec->metadata_list[i].length)};
   }
 
   fdm::wire::NodeGroupDescriptor desc = {.nodes = nodes, .metadata = metadata};

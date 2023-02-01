@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_BIN_DRIVER_HOST_NODE_GROUP_DESC_UTIL_H_
-#define SRC_DEVICES_BIN_DRIVER_HOST_NODE_GROUP_DESC_UTIL_H_
+#ifndef SRC_DEVICES_BIN_DRIVER_HOST_COMPOSITE_NODE_SPEC_UTIL_H_
+#define SRC_DEVICES_BIN_DRIVER_HOST_COMPOSITE_NODE_SPEC_UTIL_H_
 
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <lib/ddk/device.h>
 
 zx::result<fuchsia_driver_framework::wire::BindRule> ConvertBindRuleToFidl(
-    fidl::AnyArena& allocator, node_group_bind_rule_t bind_rule) {
+    fidl::AnyArena& allocator, bind_rule_t bind_rule) {
   fuchsia_driver_framework::wire::NodePropertyKey property_key;
 
   switch (bind_rule.key.key_type) {
@@ -136,7 +136,7 @@ zx::result<fuchsia_driver_framework::wire::NodeProperty> ConvertBindPropToFidl(
 }
 
 zx::result<fuchsia_driver_framework::wire::NodeRepresentation> ConvertNodeRepresentation(
-    fidl::AnyArena& allocator, node_representation_t node) {
+    fidl::AnyArena& allocator, parent_spec_t node) {
   fidl::VectorView<fuchsia_driver_framework::wire::BindRule> bind_rules(allocator,
                                                                         node.bind_rule_count);
   for (size_t i = 0; i < node.bind_rule_count; i++) {
@@ -165,4 +165,4 @@ zx::result<fuchsia_driver_framework::wire::NodeRepresentation> ConvertNodeRepres
   });
 }
 
-#endif  // SRC_DEVICES_BIN_DRIVER_HOST_NODE_GROUP_DESC_UTIL_H_
+#endif  // SRC_DEVICES_BIN_DRIVER_HOST_COMPOSITE_NODE_SPEC_UTIL_H_

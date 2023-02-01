@@ -36,7 +36,7 @@ class BindRule {
   BindRule(device_bind_prop_key_t key, device_bind_rule_condition condition,
            device_bind_prop_value_t value) {
     value_data_.push_back(value);
-    rule_ = node_group_bind_rule_t{
+    rule_ = bind_rule_t{
         .key = key,
         .condition = condition,
         .values = value_data_.data(),
@@ -47,7 +47,7 @@ class BindRule {
   BindRule(device_bind_prop_key_t key, device_bind_rule_condition condition,
            std::vector<device_bind_prop_value_t> values)
       : value_data_(values) {
-    rule_ = node_group_bind_rule_t{
+    rule_ = bind_rule_t{
         .key = key,
         .condition = condition,
         .values = value_data_.data(),
@@ -61,7 +61,7 @@ class BindRule {
       value_data_.push_back(other.value_data_[i]);
     }
 
-    rule_ = node_group_bind_rule_t{
+    rule_ = bind_rule_t{
         .key = other.rule_.key,
         .condition = other.rule_.condition,
         .values = value_data_.data(),
@@ -73,7 +73,7 @@ class BindRule {
 
   BindRule(const BindRule& other) { *this = other; }
 
-  const node_group_bind_rule_t& get() const { return rule_; }
+  const bind_rule_t& get() const { return rule_; }
 
   std::vector<device_bind_prop_value_t> value_data() const { return value_data_; }
 
@@ -81,7 +81,7 @@ class BindRule {
   // Contains the data for bind property values.
   std::vector<device_bind_prop_value_t> value_data_;
 
-  node_group_bind_rule_t rule_;
+  bind_rule_t rule_;
 };
 
 // Factory functions to create a BindRule.
@@ -269,7 +269,7 @@ class CompositeNodeSpec {
   CompositeNodeSpec(cpp20::span<const BindRule> bind_rules,
                     cpp20::span<const device_bind_prop_t> properties) {
     AddParentSpec(bind_rules, properties);
-    specs_.nodes = parent_specs_.data();
+    specs_.parents = parent_specs_.data();
   }
 
   CompositeNodeSpec& operator=(const CompositeNodeSpec& other) {
@@ -283,7 +283,7 @@ class CompositeNodeSpec {
       AddParentSpec(other.parent_specs_[i]);
     }
 
-    specs_.nodes = parent_specs_.data();
+    specs_.parents = parent_specs_.data();
     return *this;
   }
 
@@ -293,7 +293,7 @@ class CompositeNodeSpec {
   CompositeNodeSpec& AddParentSpec(cpp20::span<const BindRule> rules,
                                    cpp20::span<const device_bind_prop_t> properties) {
     auto bind_rule_count = rules.size();
-    auto bind_rules = std::vector<node_group_bind_rule_t>(bind_rule_count);
+    auto bind_rules = std::vector<bind_rule_t>(bind_rule_count);
     for (size_t i = 0; i < bind_rule_count; i++) {
       bind_rules[i] = rules[i].get();
 
@@ -308,7 +308,7 @@ class CompositeNodeSpec {
       props.push_back(properties[i]);
     }
 
-    parent_specs_.push_back(node_representation_t{
+    parent_specs_.push_back(parent_spec_t{
         .bind_rules = bind_rules.data(),
         .bind_rule_count = bind_rule_count,
         .properties = props.data(),
@@ -318,8 +318,8 @@ class CompositeNodeSpec {
     bind_rules_data_.push_back(std::move(bind_rules));
     properties_data_.push_back(std::move(props));
 
-    specs_.nodes = parent_specs_.data();
-    specs_.nodes_count = std::size(parent_specs_);
+    specs_.parents = parent_specs_.data();
+    specs_.parent_count = std::size(parent_specs_);
 
     return *this;
   }
@@ -330,48 +330,48 @@ class CompositeNodeSpec {
     return *this;
   }
 
-  const node_group_desc_t& get() const { return specs_; }
+  const composite_node_spec_t& get() const { return specs_; }
 
  private:
   // Add a node to |parent_specs_| and store the property data in |prop_data_|.
-  void AddParentSpec(const node_representation_t& node) {
-    auto bind_rule_count = node.bind_rule_count;
-    auto bind_rules = std::vector<node_group_bind_rule_t>(bind_rule_count);
+  void AddParentSpec(const parent_spec_t& parent) {
+    auto bind_rule_count = parent.bind_rule_count;
+    auto bind_rules = std::vector<bind_rule_t>(bind_rule_count);
     for (size_t i = 0; i < bind_rule_count; i++) {
-      auto node_rules = node.bind_rules[i];
-      auto bind_rule_values = std::vector<device_bind_prop_value_t>(node_rules.values_count);
-      for (size_t k = 0; k < node_rules.values_count; k++) {
-        bind_rule_values[k] = node_rules.values[k];
+      auto parent_rules = parent.bind_rules[i];
+      auto bind_rule_values = std::vector<device_bind_prop_value_t>(parent_rules.values_count);
+      for (size_t k = 0; k < parent_rules.values_count; k++) {
+        bind_rule_values[k] = parent_rules.values[k];
       }
 
-      bind_rules[i] = node_rules;
+      bind_rules[i] = parent_rules;
       bind_rules[i].values = bind_rule_values.data();
       bind_rules_values_data_.push_back(std::move(bind_rule_values));
     }
 
-    auto property_count = node.property_count;
+    auto property_count = parent.property_count;
     auto properties = std::vector<device_bind_prop_t>();
     for (size_t i = 0; i < property_count; i++) {
-      properties.push_back(node.properties[i]);
+      properties.push_back(parent.properties[i]);
     }
 
-    parent_specs_.push_back(node_representation_t{
+    parent_specs_.push_back(parent_spec_t{
         .bind_rules = bind_rules.data(),
         .bind_rule_count = bind_rule_count,
         .properties = properties.data(),
         .property_count = property_count,
     });
-    specs_.nodes = parent_specs_.data();
-    specs_.nodes_count = std::size(parent_specs_);
+    specs_.parents = parent_specs_.data();
+    specs_.parent_count = std::size(parent_specs_);
 
     bind_rules_data_.push_back(std::move(bind_rules));
     properties_data_.push_back(std::move(properties));
   }
 
-  std::vector<node_representation_t> parent_specs_;
+  std::vector<parent_spec_t> parent_specs_;
 
   // Stores all the bind rules data in |parent_specs_|.
-  std::vector<std::vector<node_group_bind_rule_t>> bind_rules_data_;
+  std::vector<std::vector<bind_rule_t>> bind_rules_data_;
 
   // Store all bind rule values data in |parent_specs_|.
   std::vector<std::vector<device_bind_prop_value_t>> bind_rules_values_data_;
@@ -379,7 +379,7 @@ class CompositeNodeSpec {
   // Stores all properties data in |parent_specs_|.
   std::vector<std::vector<device_bind_prop_t>> properties_data_;
 
-  node_group_desc_t specs_ = {};
+  composite_node_spec_t specs_ = {};
 };
 
 }  // namespace ddk
