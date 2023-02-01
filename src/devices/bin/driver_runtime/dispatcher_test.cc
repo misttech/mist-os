@@ -3181,3 +3181,44 @@ TEST_F(DispatcherTest, UnsynchronizedDispatcherWrapper) {
     ASSERT_OK(completion.Wait());
   }
 }
+
+TEST_F(DispatcherTest, SetDefaultDispatcher) {
+  auto fake_driver = CreateFakeDriver();
+  libsync::Completion shutdown_completion;
+  auto destructed_handler = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion.Signal(); };
+  auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      fake_driver, {}, "dispatcher", destructed_handler);
+  ASSERT_FALSE(dispatcher.is_error());
+
+  ASSERT_OK(fdf_testing_set_default_dispatcher(dispatcher->get()));
+  ASSERT_EQ(fdf_dispatcher_get_current_dispatcher(), dispatcher->get());
+
+  // This thread has a default dispatcher, so we should be able to create
+  // a dispatcher without using the env library.
+  libsync::Completion shutdown_completion2;
+  auto destructed_handler2 = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion2.Signal(); };
+  auto dispatcher2 = fdf::SynchronizedDispatcher::Create({}, "", destructed_handler2);
+  ASSERT_FALSE(dispatcher2.is_error());
+
+  libsync::Completion task_completion;
+  ASSERT_OK(async::PostTask(dispatcher2->async_dispatcher(), [&] {
+    // We are running on a managed thread.
+    ASSERT_NOT_OK(fdf_testing_set_default_dispatcher(dispatcher->get()));
+    ASSERT_EQ(fdf_dispatcher_get_current_dispatcher(), dispatcher2->get());
+    task_completion.Signal();
+  }));
+  ASSERT_OK(task_completion.Wait());
+
+  ASSERT_EQ(fdf_dispatcher_get_current_dispatcher(), dispatcher->get());
+
+  dispatcher->ShutdownAsync();
+  dispatcher2->ShutdownAsync();
+  ASSERT_OK(shutdown_completion.Wait());
+  ASSERT_OK(shutdown_completion2.Wait());
+
+  ASSERT_OK(fdf_testing_set_default_dispatcher(nullptr));
+  // A default dispatcher has not been set, so creating a dispatcher should fail.
+  auto dispatcher3 =
+      fdf::SynchronizedDispatcher::Create({}, "", [&](fdf_dispatcher_t* dispatcher) {});
+  ASSERT_TRUE(dispatcher3.is_error());
+}

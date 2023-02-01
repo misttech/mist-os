@@ -19,7 +19,7 @@ struct Entry {
 };
 
 static thread_local std::vector<Entry> g_driver_call_stack;
-static thread_local driver_runtime::Dispatcher* g_default_testing_dispatcher = nullptr;
+static thread_local Entry g_default_testing_state = {nullptr, nullptr};
 // The latest generation seen by this thread.
 static thread_local uint32_t g_cached_irqs_generation = 0;
 
@@ -42,16 +42,18 @@ void PopDriver() {
 }
 
 const void* GetCurrentDriver() {
-  return g_driver_call_stack.empty() ? nullptr : g_driver_call_stack.back().driver;
+  return g_driver_call_stack.empty() ? g_default_testing_state.driver
+                                     : g_driver_call_stack.back().driver;
 }
 
 driver_runtime::Dispatcher* GetCurrentDispatcher() {
-  return g_driver_call_stack.empty() ? g_default_testing_dispatcher
+  return g_driver_call_stack.empty() ? g_default_testing_state.dispatcher
                                      : g_driver_call_stack.back().dispatcher;
 }
 
 void SetDefaultTestingDispatcher(driver_runtime::Dispatcher* dispatcher) {
-  g_default_testing_dispatcher = dispatcher;
+  g_default_testing_state.dispatcher = dispatcher;
+  g_default_testing_state.driver = dispatcher ? dispatcher->owner() : nullptr;
 }
 
 bool IsDriverInCallStack(const void* driver) {

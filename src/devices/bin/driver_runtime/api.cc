@@ -229,7 +229,7 @@ __EXPORT void fdf_testing_wait_until_all_dispatchers_destroyed() {
 }
 
 __EXPORT zx_status_t fdf_testing_set_default_dispatcher(fdf_dispatcher_t* dispatcher) {
-  if (driver_runtime::DispatcherCoordinator::HasManagedThreads()) {
+  if (!driver_context::IsCallStackEmpty()) {
     return ZX_ERR_BAD_STATE;
   }
 
