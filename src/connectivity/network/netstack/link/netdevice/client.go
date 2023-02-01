@@ -195,7 +195,7 @@ func (c *Client) prepareTxDescriptor(descriptorIndex uint16, port network.PortId
 		}
 	}
 	// Pad tx frame to device requirements.
-	for ; n < int(c.deviceInfo.MinTxBufferLength); n++ {
+	for ; n < int(c.deviceInfo.BaseInfo.MinTxBufferLength); n++ {
 		data[n] = 0
 	}
 	descriptor.port_id.base = C.uchar(port.Base)
@@ -804,18 +804,19 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 	}
 	if !(deviceInfo.HasMinDescriptorLength() &&
 		deviceInfo.HasDescriptorVersion() &&
-		deviceInfo.HasRxDepth() &&
-		deviceInfo.HasTxDepth() &&
-		deviceInfo.HasBufferAlignment() &&
-		deviceInfo.HasMinRxBufferLength() &&
-		deviceInfo.HasMinTxBufferLength() &&
-		deviceInfo.HasMinTxBufferHead() &&
-		deviceInfo.HasMinTxBufferTail() &&
-		deviceInfo.HasMaxBufferParts()) {
+		deviceInfo.HasBaseInfo() &&
+		deviceInfo.BaseInfo.HasRxDepth() &&
+		deviceInfo.BaseInfo.HasTxDepth() &&
+		deviceInfo.BaseInfo.HasBufferAlignment() &&
+		deviceInfo.BaseInfo.HasMinRxBufferLength() &&
+		deviceInfo.BaseInfo.HasMinTxBufferLength() &&
+		deviceInfo.BaseInfo.HasMinTxBufferHead() &&
+		deviceInfo.BaseInfo.HasMinTxBufferTail() &&
+		deviceInfo.BaseInfo.HasMaxBufferParts()) {
 		return nil, fmt.Errorf("incomplete DeviceInfo: %#v", deviceInfo)
 	}
-	if deviceInfo.HasMaxBufferLength() && deviceInfo.MaxBufferLength == 0 {
-		return nil, fmt.Errorf("invalid MaxBufferLength: %d, expected != 0", deviceInfo.MaxBufferLength)
+	if deviceInfo.BaseInfo.HasMaxBufferLength() && deviceInfo.BaseInfo.MaxBufferLength == 0 {
+		return nil, fmt.Errorf("invalid MaxBufferLength: %d, expected != 0", deviceInfo.BaseInfo.MaxBufferLength)
 	}
 
 	config, err := sessionConfigFactory.MakeSessionConfig(deviceInfo)
@@ -867,8 +868,8 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 		data:        mappedDataVmo,
 		descriptors: mappedDescVmo,
 
-		txDepth: uint32(deviceInfo.TxDepth),
-		rxDepth: uint32(deviceInfo.RxDepth),
+		txDepth: uint32(deviceInfo.BaseInfo.TxDepth),
+		rxDepth: uint32(deviceInfo.BaseInfo.RxDepth),
 		rxFifo:  sessionResult.Response.Fifos.Rx,
 		txFifo:  sessionResult.Response.Fifos.Tx,
 	}
@@ -884,8 +885,8 @@ func NewClient(ctx context.Context, dev *network.DeviceWithCtxInterface, session
 		panic(fmt.Sprintf("bad handler tx queue size: %d, expected %d", entries, c.config.RxDescriptorCount))
 	}
 
-	c.stats.tx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.TxDepth))
-	c.stats.rx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.RxDepth))
+	c.stats.tx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.BaseInfo.TxDepth))
+	c.stats.rx.FifoStats = fifo.MakeFifoStats(uint32(c.deviceInfo.BaseInfo.RxDepth))
 
 	descriptorIndex := uint16(0)
 	vmoOffset := uint64(0)

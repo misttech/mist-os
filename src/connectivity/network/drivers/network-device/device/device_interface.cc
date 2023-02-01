@@ -357,9 +357,13 @@ void DeviceInterface::GetInfo(GetInfoCompleter::Sync& completer) {
       accel_tx_.data(), device_info_.tx_accel_count);
   auto rx_accel = fidl::VectorView<netdev::wire::RxAcceleration>::FromExternal(
       accel_rx_.data(), device_info_.rx_accel_count);
-  device_info.set_min_descriptor_length(min_descriptor_length)
-      .set_descriptor_version(descriptor_version)
-      .set_rx_depth(rx_depth)
+
+  fidl::WireTableFrame<netdev::wire::DeviceBaseInfo> base_info_frame;
+  netdev::wire::DeviceBaseInfo device_base_info(
+      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::DeviceBaseInfo>>::FromExternal(
+          &base_info_frame));
+
+  device_base_info.set_rx_depth(rx_depth)
       .set_tx_depth(tx_depth)
       .set_buffer_alignment(device_info_.buffer_alignment)
       .set_max_buffer_parts(device_info_.max_buffer_parts)
@@ -371,8 +375,12 @@ void DeviceInterface::GetInfo(GetInfoCompleter::Sync& completer) {
       .set_rx_accel(fidl::ObjectView<decltype(rx_accel)>::FromExternal(&rx_accel));
 
   if (device_info_.max_buffer_length != 0) {
-    device_info.set_max_buffer_length(device_info_.max_buffer_length);
+    device_base_info.set_max_buffer_length(device_info_.max_buffer_length);
   }
+  device_info.set_min_descriptor_length(min_descriptor_length)
+      .set_descriptor_version(descriptor_version)
+      .set_base_info(
+          fidl::ObjectView<netdev::wire::DeviceBaseInfo>::FromExternal(&device_base_info));
 
   completer.Reply(device_info);
 }

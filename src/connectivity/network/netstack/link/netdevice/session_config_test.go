@@ -18,7 +18,8 @@ import (
 func TestMakeSessionConfig(t *testing.T) {
 	const txBufferHead = 16
 	const txBufferTail = 8
-	var baseInfo network.DeviceInfo
+
+	var baseInfo network.DeviceBaseInfo
 	baseInfo.SetMaxBufferLength(16 * 1024)
 	baseInfo.SetMinRxBufferLength(0)
 	baseInfo.SetRxDepth(16)
@@ -26,6 +27,9 @@ func TestMakeSessionConfig(t *testing.T) {
 	baseInfo.SetBufferAlignment(1)
 	baseInfo.SetMinTxBufferHead(txBufferHead)
 	baseInfo.SetMinTxBufferTail(txBufferTail)
+
+	var defaultInfo network.DeviceInfo
+	defaultInfo.SetBaseInfo(baseInfo)
 
 	factory := SimpleSessionConfigFactory{}
 
@@ -50,7 +54,7 @@ func TestMakeSessionConfig(t *testing.T) {
 		{
 			name: "respect max buffer length",
 			updateInfo: func(info *network.DeviceInfo) {
-				info.SetMaxBufferLength(DefaultBufferLength / 4)
+				info.BaseInfo.SetMaxBufferLength(DefaultBufferLength / 4)
 			},
 			expectedConfig: SessionConfig{
 				BufferLength:      DefaultBufferLength / 4,
@@ -66,7 +70,7 @@ func TestMakeSessionConfig(t *testing.T) {
 		{
 			name: "respect min buffer length",
 			updateInfo: func(info *network.DeviceInfo) {
-				info.SetMinRxBufferLength(DefaultBufferLength * 2)
+				info.BaseInfo.SetMinRxBufferLength(DefaultBufferLength * 2)
 			},
 			expectedConfig: SessionConfig{
 				BufferLength:      DefaultBufferLength * 2,
@@ -82,8 +86,8 @@ func TestMakeSessionConfig(t *testing.T) {
 		{
 			name: "buffer alignment",
 			updateInfo: func(info *network.DeviceInfo) {
-				info.SetBufferAlignment(64)
-				info.SetMinRxBufferLength(DefaultBufferLength + 112)
+				info.BaseInfo.SetBufferAlignment(64)
+				info.BaseInfo.SetMinRxBufferLength(DefaultBufferLength + 112)
 			},
 			expectedConfig: SessionConfig{
 				BufferLength:      DefaultBufferLength + 112,
@@ -99,9 +103,9 @@ func TestMakeSessionConfig(t *testing.T) {
 		{
 			name: "align up",
 			updateInfo: func(info *network.DeviceInfo) {
-				info.SetBufferAlignment(8)
-				info.SetMinRxBufferLength(1500)
-				info.SetMaxBufferLength(1500)
+				info.BaseInfo.SetBufferAlignment(8)
+				info.BaseInfo.SetMinRxBufferLength(1500)
+				info.BaseInfo.SetMaxBufferLength(1500)
 			},
 			expectedConfig: SessionConfig{
 				BufferLength:      1500,
@@ -118,7 +122,7 @@ func TestMakeSessionConfig(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			info := baseInfo
+			info := defaultInfo
 			if test.updateInfo != nil {
 				test.updateInfo(&info)
 			}

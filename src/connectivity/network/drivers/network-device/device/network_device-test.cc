@@ -318,32 +318,34 @@ TEST_F(NetworkDeviceTest, GetInfo) {
   fidl::WireResult rsp = connection->GetInfo();
   ASSERT_OK(rsp.status());
   auto& info = rsp.value().info;
-  ASSERT_TRUE(info.has_tx_depth());
-  EXPECT_EQ(info.tx_depth(), impl_.info().tx_depth * 2);
-  ASSERT_TRUE(info.has_rx_depth());
-  EXPECT_EQ(info.rx_depth(), impl_.info().rx_depth * 2);
-  ASSERT_TRUE(info.has_min_rx_buffer_length());
-  EXPECT_EQ(info.min_rx_buffer_length(), impl_.info().min_rx_buffer_length);
-  ASSERT_TRUE(info.has_min_tx_buffer_length());
-  EXPECT_EQ(info.min_tx_buffer_length(), impl_.info().min_tx_buffer_length);
-  ASSERT_TRUE(info.has_max_buffer_length());
-  EXPECT_EQ(info.max_buffer_length(), impl_.info().max_buffer_length);
-  ASSERT_TRUE(info.has_max_buffer_parts());
-  EXPECT_EQ(info.max_buffer_parts(), impl_.info().max_buffer_parts);
-  ASSERT_TRUE(info.has_min_tx_buffer_tail());
-  EXPECT_EQ(info.min_tx_buffer_tail(), impl_.info().tx_tail_length);
-  ASSERT_TRUE(info.has_min_tx_buffer_head());
-  EXPECT_EQ(info.min_tx_buffer_head(), impl_.info().tx_head_length);
   ASSERT_TRUE(info.has_descriptor_version());
   EXPECT_EQ(info.descriptor_version(), NETWORK_DEVICE_DESCRIPTOR_VERSION);
-  ASSERT_TRUE(info.has_buffer_alignment());
-  EXPECT_EQ(info.buffer_alignment(), impl_.info().buffer_alignment);
   ASSERT_TRUE(info.has_min_descriptor_length());
   EXPECT_EQ(info.min_descriptor_length(), sizeof(buffer_descriptor_t) / sizeof(uint64_t));
-  ASSERT_TRUE(info.has_tx_accel());
-  EXPECT_EQ(info.tx_accel().count(), impl_.info().tx_accel_count);
-  ASSERT_TRUE(info.has_rx_accel());
-  EXPECT_EQ(info.rx_accel().count(), impl_.info().rx_accel_count);
+  ASSERT_TRUE(info.has_base_info());
+  const auto& base_info = info.base_info();
+  ASSERT_TRUE(base_info.has_tx_depth());
+  EXPECT_EQ(base_info.tx_depth(), impl_.info().tx_depth * 2);
+  ASSERT_TRUE(base_info.has_rx_depth());
+  EXPECT_EQ(base_info.rx_depth(), impl_.info().rx_depth * 2);
+  ASSERT_TRUE(base_info.has_min_rx_buffer_length());
+  EXPECT_EQ(base_info.min_rx_buffer_length(), impl_.info().min_rx_buffer_length);
+  ASSERT_TRUE(base_info.has_min_tx_buffer_length());
+  EXPECT_EQ(base_info.min_tx_buffer_length(), impl_.info().min_tx_buffer_length);
+  ASSERT_TRUE(base_info.has_max_buffer_length());
+  EXPECT_EQ(base_info.max_buffer_length(), impl_.info().max_buffer_length);
+  ASSERT_TRUE(base_info.has_max_buffer_parts());
+  EXPECT_EQ(base_info.max_buffer_parts(), impl_.info().max_buffer_parts);
+  ASSERT_TRUE(base_info.has_min_tx_buffer_tail());
+  EXPECT_EQ(base_info.min_tx_buffer_tail(), impl_.info().tx_tail_length);
+  ASSERT_TRUE(base_info.has_min_tx_buffer_head());
+  EXPECT_EQ(base_info.min_tx_buffer_head(), impl_.info().tx_head_length);
+  ASSERT_TRUE(base_info.has_buffer_alignment());
+  EXPECT_EQ(base_info.buffer_alignment(), impl_.info().buffer_alignment);
+  ASSERT_TRUE(base_info.has_tx_accel());
+  EXPECT_EQ(base_info.tx_accel().count(), impl_.info().tx_accel_count);
+  ASSERT_TRUE(base_info.has_rx_accel());
+  EXPECT_EQ(base_info.rx_accel().count(), impl_.info().rx_accel_count);
 }
 
 TEST_F(NetworkDeviceTest, OptionalMaxBufferLength) {
@@ -353,8 +355,9 @@ TEST_F(NetworkDeviceTest, OptionalMaxBufferLength) {
   fidl::WireResult rsp = connection->GetInfo();
   ASSERT_OK(rsp.status());
   auto& info = rsp.value().info;
-  ASSERT_FALSE(info.has_max_buffer_length())
-      << "Unexpected buffer length " << info.max_buffer_length();
+  ASSERT_TRUE(info.has_base_info());
+  ASSERT_FALSE(info.base_info().has_max_buffer_length())
+      << "Unexpected buffer length " << info.base_info().max_buffer_length();
 }
 
 TEST_F(NetworkDeviceTest, MinReportedBufferAlignment) {
@@ -2872,7 +2875,10 @@ TEST_F(NetworkDeviceTest, CloneDevice) {
   fidl::WireSyncClient connection2{std::move(client_end)};
   fidl::WireResult result = connection2->GetInfo();
   ASSERT_OK(result.status());
-  ASSERT_EQ(result.value().info.min_rx_buffer_length(), impl_.info().min_rx_buffer_length);
+  ASSERT_TRUE(result.value().info.has_base_info());
+  const auto& base_info = result.value().info.base_info();
+  ASSERT_TRUE(base_info.has_min_rx_buffer_length());
+  ASSERT_EQ(base_info.min_rx_buffer_length(), impl_.info().min_rx_buffer_length);
 }
 
 TEST_F(NetworkDeviceTest, ClonePort) {
@@ -2914,7 +2920,10 @@ TEST_F(NetworkDeviceTest, PortGetDevice) {
   fidl::WireSyncClient device_connection{std::move(client_end)};
   fidl::WireResult result = device_connection->GetInfo();
   ASSERT_OK(result.status());
-  ASSERT_EQ(result.value().info.min_rx_buffer_length(), impl_.info().min_rx_buffer_length);
+  ASSERT_TRUE(result.value().info.has_base_info());
+  const auto& base_info = result.value().info.base_info();
+  ASSERT_TRUE(base_info.has_min_rx_buffer_length());
+  ASSERT_EQ(base_info.min_rx_buffer_length(), impl_.info().min_rx_buffer_length);
 }
 
 TEST_F(NetworkDeviceTest, PortIdSaltChangesOnFlap) {

@@ -27,6 +27,65 @@ const MAX_SESSION_NAME uint32 = 64;
 @available(added=HEAD)
 const MAX_ACCEL_FLAGS uint32 = 16;
 
+/// Network device base info.
+@available(added=HEAD)
+type DeviceBaseInfo = table {
+    /// Maximum number of items in rx FIFO (per session). Required.
+    ///
+    /// `rx_depth` is calculated based on the size of the actual backing
+    /// hardware rx queue.
+    1: rx_depth uint16;
+    /// Maximum number of items in tx FIFO (per session). Required.
+    ///
+    /// `tx_depth` is calculated based on the size of the actual backing
+    /// hardware tx queue.
+    2: tx_depth uint16;
+    /// Alignment requirement for buffers in the data VMO.
+    ///
+    /// All buffers in the data VMO *must* be aligned to `buffer_alignment`
+    /// relative to the start of the VMO. `buffer_alignment == 0` is never
+    /// reported. Required.
+    3: buffer_alignment uint32;
+    /// Maximum supported length of buffers in the data VMO, in bytes.
+    ///
+    /// Absent if no maximum buffer length is defined. Must be nonzero.
+    4: max_buffer_length uint32;
+    /// The minimum rx buffer length required for device. Required.
+    5: min_rx_buffer_length uint32;
+    /// The minimum tx buffer length required for the device. Required.
+    ///
+    /// This value accounts only for tx payload length, `min_tx_buffer_head` and
+    /// `min_tx_buffer_tail` are not part of this value.
+    ///
+    /// Clients must zero pad outgoing frames to meet the required minimum
+    /// length.
+    6: min_tx_buffer_length uint32;
+    /// The number of bytes the device requests be free as `head` space in a tx
+    /// buffer. Required.
+    7: min_tx_buffer_head uint16;
+    /// The amount of bytes the device requests be free as `tail` space in a tx
+    /// buffer. Required.
+    8: min_tx_buffer_tail uint16;
+    /// Maximum descriptor chain length accepted by the device. Required.
+    9: max_buffer_parts uint8;
+    /// Available rx acceleration flags for this device.
+    ///
+    /// `rx_accel` maps the `RX_ACCEL_*` flags in the frame descriptors with
+    /// semantic acceleration features described by [`RxAcceleration`]. Position
+    /// `n` of `rx_accel` conveys the meaning of the `RX_ACCEL_n` flag.
+    ///
+    /// Interpreted as empty if not provided.
+   10: rx_accel vector<RxAcceleration>:MAX_ACCEL_FLAGS;
+    /// Available tx acceleration flags for this device.
+    ///
+    /// `tx_accel` maps the `TX_ACCEL_*` flags in the frame descriptors with
+    /// semantic acceleration features described by [`TxAcceleration`]. Position
+    /// `n` of `tx_accel` conveys the meaning of the `TX_ACCEL_n` flag.
+    ///
+    /// Interpreted as empty if not provided.
+   11: tx_accel vector<TxAcceleration>:MAX_ACCEL_FLAGS;
+};
+
 /// Network device information.
 @available(added=HEAD)
 type DeviceInfo = table {
@@ -39,60 +98,8 @@ type DeviceInfo = table {
     1: min_descriptor_length uint8;
     /// Accepted descriptor version. Required.
     2: descriptor_version uint8;
-    /// Maximum number of items in rx FIFO (per session). Required.
-    ///
-    /// `rx_depth` is calculated based on the size of the actual backing
-    /// hardware rx queue.
-    3: rx_depth uint16;
-    /// Maximum number of items in tx FIFO (per session). Required.
-    ///
-    /// `tx_depth` is calculated based on the size of the actual backing
-    /// hardware tx queue.
-    4: tx_depth uint16;
-    /// Alignment requirement for buffers in the data VMO.
-    ///
-    /// All buffers in the data VMO *must* be aligned to `buffer_alignment`
-    /// relative to the start of the VMO. `buffer_alignment == 0` is never
-    /// reported. Required.
-    5: buffer_alignment uint32;
-    /// Maximum supported length of buffers in the data VMO, in bytes.
-    ///
-    /// Absent if no maximum buffer length is defined. Must be nonzero.
-    6: max_buffer_length uint32;
-    /// The minimum rx buffer length required for device. Required.
-    7: min_rx_buffer_length uint32;
-    /// The minimum tx buffer length required for the device. Required.
-    ///
-    /// This value accounts only for tx payload length, `min_tx_buffer_head` and
-    /// `min_tx_buffer_tail` are not part of this value.
-    ///
-    /// Clients must zero pad outgoing frames to meet the required minimum
-    /// length.
-    8: min_tx_buffer_length uint32;
-    /// The number of bytes the device requests be free as `head` space in a tx
-    /// buffer. Required.
-    9: min_tx_buffer_head uint16;
-    /// The amount of bytes the device requests be free as `tail` space in a tx
-    /// buffer. Required.
-   10: min_tx_buffer_tail uint16;
-    /// Maximum descriptor chain length accepted by the device. Required.
-   11: max_buffer_parts uint8;
-    /// Available rx acceleration flags for this device.
-    ///
-    /// `rx_accel` maps the `RX_ACCEL_*` flags in the frame descriptors with
-    /// semantic acceleration features described by [`RxAcceleration`]. Position
-    /// `n` of `rx_accel` conveys the meaning of the `RX_ACCEL_n` flag.
-    ///
-    /// Interpreted as empty if not provided.
-   12: rx_accel vector<RxAcceleration>:MAX_ACCEL_FLAGS;
-    /// Available tx acceleration flags for this device.
-    ///
-    /// `tx_accel` maps the `TX_ACCEL_*` flags in the frame descriptors with
-    /// semantic acceleration features described by [`TxAcceleration`]. Position
-    /// `n` of `tx_accel` conveys the meaning of the `TX_ACCEL_n` flag.
-    ///
-    /// Interpreted as empty if not provided.
-   13: tx_accel vector<TxAcceleration>:MAX_ACCEL_FLAGS;
+    /// Device base info. Required.
+    3: base_info DeviceBaseInfo;
 };
 
 /// A Network Device.

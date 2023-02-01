@@ -26,15 +26,23 @@ constexpr zx_signals_t kFifoWaitWrites = ZX_FIFO_WRITABLE;
 }  // namespace
 
 zx::result<DeviceInfo> DeviceInfo::Create(const netdev::wire::DeviceInfo& fidl) {
-  if (!(fidl.has_min_descriptor_length() && fidl.has_descriptor_version() && fidl.has_rx_depth() &&
-        fidl.has_tx_depth() && fidl.has_buffer_alignment() && fidl.has_min_rx_buffer_length() &&
-        fidl.has_min_tx_buffer_length() && fidl.has_min_tx_buffer_head() &&
-        fidl.has_min_tx_buffer_tail() && fidl.has_max_buffer_parts())) {
+  if (!(fidl.has_min_descriptor_length() && fidl.has_descriptor_version() &&
+        fidl.has_base_info())) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+
+  const netdev::wire::DeviceBaseInfo& base_info = fidl.base_info();
+
+  if (!(base_info.has_rx_depth() && base_info.has_tx_depth() && base_info.has_buffer_alignment() &&
+        base_info.has_min_rx_buffer_length() && base_info.has_min_tx_buffer_length() &&
+        base_info.has_min_tx_buffer_head() && base_info.has_min_tx_buffer_tail() &&
+        base_info.has_max_buffer_parts())) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
   uint32_t max_buffer_length = std::numeric_limits<uint32_t>::max();
-  if (fidl.has_max_buffer_length()) {
-    max_buffer_length = fidl.max_buffer_length();
+  if (base_info.has_max_buffer_length()) {
+    max_buffer_length = base_info.max_buffer_length();
     if (max_buffer_length == 0) {
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
@@ -43,23 +51,23 @@ zx::result<DeviceInfo> DeviceInfo::Create(const netdev::wire::DeviceInfo& fidl) 
   DeviceInfo info = {
       .min_descriptor_length = fidl.min_descriptor_length(),
       .descriptor_version = fidl.descriptor_version(),
-      .rx_depth = fidl.rx_depth(),
-      .tx_depth = fidl.tx_depth(),
-      .buffer_alignment = fidl.buffer_alignment(),
+      .rx_depth = base_info.rx_depth(),
+      .tx_depth = base_info.tx_depth(),
+      .buffer_alignment = base_info.buffer_alignment(),
       .max_buffer_length = max_buffer_length,
-      .min_rx_buffer_length = fidl.min_rx_buffer_length(),
-      .min_tx_buffer_length = fidl.min_tx_buffer_length(),
-      .min_tx_buffer_head = fidl.min_tx_buffer_head(),
-      .min_tx_buffer_tail = fidl.min_tx_buffer_tail(),
-      .max_buffer_parts = fidl.max_buffer_parts(),
+      .min_rx_buffer_length = base_info.min_rx_buffer_length(),
+      .min_tx_buffer_length = base_info.min_tx_buffer_length(),
+      .min_tx_buffer_head = base_info.min_tx_buffer_head(),
+      .min_tx_buffer_tail = base_info.min_tx_buffer_tail(),
+      .max_buffer_parts = base_info.max_buffer_parts(),
   };
 
-  if (fidl.has_rx_accel()) {
-    auto& rx_accel = fidl.rx_accel();
+  if (base_info.has_rx_accel()) {
+    auto& rx_accel = base_info.rx_accel();
     std::copy(rx_accel.begin(), rx_accel.end(), std::back_inserter(info.rx_accel));
   }
-  if (fidl.has_tx_accel()) {
-    auto& tx_accel = fidl.tx_accel();
+  if (base_info.has_tx_accel()) {
+    auto& tx_accel = base_info.tx_accel();
     std::copy(tx_accel.begin(), tx_accel.end(), std::back_inserter(info.tx_accel));
   }
 

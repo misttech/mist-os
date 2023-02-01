@@ -89,7 +89,7 @@ async fn network_device_send(
 ) {
     let info = client.device_info().await.expect("get device info");
     let (session, task) = client
-        .primary_session("test", info.max_buffer_length.unwrap().get() as usize)
+        .primary_session("test", info.base_info.max_buffer_length.unwrap().get() as usize)
         .await
         .expect("open primary session");
     let _task_handle = fuchsia_async::Task::spawn(task.map(|r| r.expect("session task failed")));

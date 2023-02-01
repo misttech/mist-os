@@ -237,11 +237,16 @@ class SimpleClient {
       return info_result.status();
     }
     fuchsia_hardware_network::wire::DeviceInfo& device_info = info_result.value().info;
-    if (!(device_info.has_tx_depth() && device_info.has_rx_depth())) {
+    if (!device_info.has_base_info()) {
       return ZX_ERR_INTERNAL;
     }
-    const uint16_t tx_depth = device_info.tx_depth();
-    const uint16_t rx_depth = device_info.rx_depth();
+    const fuchsia_hardware_network::wire::DeviceBaseInfo& device_base_info =
+        device_info.base_info();
+    if (!(device_base_info.has_tx_depth() && device_base_info.has_rx_depth())) {
+      return ZX_ERR_INTERNAL;
+    }
+    const uint16_t tx_depth = device_base_info.tx_depth();
+    const uint16_t rx_depth = device_base_info.rx_depth();
     const uint16_t total_buffers = tx_depth + rx_depth;
     zx_status_t status;
     if ((status = data_.CreateAndMap(total_buffers * kBufferSize,

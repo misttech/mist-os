@@ -47,24 +47,24 @@ type SimpleSessionConfigFactory struct{}
 // MakeSessionConfig implements SessionConfigFactory.
 func (c *SimpleSessionConfigFactory) MakeSessionConfig(deviceInfo network.DeviceInfo) (SessionConfig, error) {
 	bufferLength := DefaultBufferLength
-	if deviceInfo.HasMaxBufferLength() && bufferLength > deviceInfo.MaxBufferLength {
-		bufferLength = deviceInfo.MaxBufferLength
+	if deviceInfo.BaseInfo.HasMaxBufferLength() && bufferLength > deviceInfo.BaseInfo.MaxBufferLength {
+		bufferLength = deviceInfo.BaseInfo.MaxBufferLength
 	}
-	if bufferLength < deviceInfo.MinRxBufferLength {
-		bufferLength = deviceInfo.MinRxBufferLength
+	if bufferLength < deviceInfo.BaseInfo.MinRxBufferLength {
+		bufferLength = deviceInfo.BaseInfo.MinRxBufferLength
 	}
 
 	config := SessionConfig{
 		BufferLength:      bufferLength,
 		BufferStride:      bufferLength,
 		DescriptorLength:  DescriptorLength,
-		TxHeaderLength:    deviceInfo.MinTxBufferHead,
-		TxTailLength:      deviceInfo.MinTxBufferTail,
-		RxDescriptorCount: deviceInfo.RxDepth,
-		TxDescriptorCount: deviceInfo.TxDepth,
+		TxHeaderLength:    deviceInfo.BaseInfo.MinTxBufferHead,
+		TxTailLength:      deviceInfo.BaseInfo.MinTxBufferTail,
+		RxDescriptorCount: deviceInfo.BaseInfo.RxDepth,
+		TxDescriptorCount: deviceInfo.BaseInfo.TxDepth,
 		Options:           network.SessionFlagsPrimary,
 	}
-	align := deviceInfo.BufferAlignment
+	align := deviceInfo.BaseInfo.BufferAlignment
 	if config.BufferStride%align != 0 {
 		// Align up.
 		config.BufferStride += align - (config.BufferStride % align)

@@ -291,14 +291,10 @@ struct BufferLayout {
     length: usize,
 }
 
-/// Network device information with all required fields.
+/// Network device base info with all required fields.
 #[derive(Debug, Clone, ValidFidlTable)]
-#[fidl_table_src(netdev::DeviceInfo)]
-pub struct DeviceInfo {
-    /// Minimum descriptor length, in 64-bit words.
-    pub min_descriptor_length: u8,
-    /// Accepted descriptor version.
-    pub descriptor_version: u8,
+#[fidl_table_src(netdev::DeviceBaseInfo)]
+pub struct DeviceBaseInfo {
     /// Maximum number of items in rx FIFO (per session).
     pub rx_depth: u16,
     /// Maximum number of items in tx FIFO (per session).
@@ -324,6 +320,18 @@ pub struct DeviceInfo {
     pub tx_accel: Vec<netdev::TxAcceleration>,
 }
 
+/// Network device information with all required fields.
+#[derive(Debug, Clone, ValidFidlTable)]
+#[fidl_table_src(netdev::DeviceInfo)]
+pub struct DeviceInfo {
+    /// Minimum descriptor length, in 64-bit words.
+    pub min_descriptor_length: u8,
+    /// Accepted descriptor version.
+    pub descriptor_version: u8,
+    /// Device base info.
+    pub base_info: DeviceBaseInfo,
+}
+
 impl DeviceInfo {
     /// Create a new session config from the device information.
     ///
@@ -337,16 +345,19 @@ impl DeviceInfo {
         let DeviceInfo {
             min_descriptor_length,
             descriptor_version,
-            rx_depth,
-            tx_depth,
-            buffer_alignment,
-            max_buffer_length,
-            min_rx_buffer_length,
-            min_tx_buffer_length,
-            min_tx_buffer_head,
-            min_tx_buffer_tail,
-            rx_accel: _,
-            tx_accel: _,
+            base_info:
+                DeviceBaseInfo {
+                    rx_depth,
+                    tx_depth,
+                    buffer_alignment,
+                    max_buffer_length,
+                    min_rx_buffer_length,
+                    min_tx_buffer_length,
+                    min_tx_buffer_head,
+                    min_tx_buffer_tail,
+                    rx_accel: _,
+                    tx_accel: _,
+                },
         } = self;
         if NETWORK_DEVICE_DESCRIPTOR_VERSION != *descriptor_version {
             return Err(Error::Config(format!(
@@ -619,12 +630,10 @@ mod tests {
 
     use super::{
         buffer::NETWORK_DEVICE_DESCRIPTOR_LENGTH, buffer::NETWORK_DEVICE_DESCRIPTOR_VERSION,
-        BufferLayout, Config, DeviceInfo, Error,
+        BufferLayout, Config, DeviceBaseInfo, DeviceInfo, Error,
     };
 
-    const BASE_DEVICE_INFO: DeviceInfo = DeviceInfo {
-        min_descriptor_length: 0,
-        descriptor_version: 1,
+    const DEFAULT_DEVICE_BASE_INFO: DeviceBaseInfo = DeviceBaseInfo {
         rx_depth: 1,
         tx_depth: 1,
         buffer_alignment: 1,
@@ -637,55 +646,82 @@ mod tests {
         tx_accel: Vec::new(),
     };
 
+    const DEFAULT_DEVICE_INFO: DeviceInfo = DeviceInfo {
+        min_descriptor_length: 0,
+        descriptor_version: 1,
+        base_info: DEFAULT_DEVICE_BASE_INFO,
+    };
+
     const DEFAULT_BUFFER_LENGTH: usize = 2048;
 
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
         min_descriptor_length: u8::MAX,
-        ..BASE_DEVICE_INFO
+        ..DEFAULT_DEVICE_INFO
     }, format!("descriptor length too small: {} < {}", NETWORK_DEVICE_DESCRIPTOR_LENGTH, u8::MAX))]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
         descriptor_version: 42,
-        ..BASE_DEVICE_INFO
+        ..DEFAULT_DEVICE_INFO
     }, format!("descriptor version mismatch: {} != {}", NETWORK_DEVICE_DESCRIPTOR_VERSION, 42))]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
-        tx_depth: 0,
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            tx_depth: 0,
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, "no TX buffers")]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
-        rx_depth: 0,
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            rx_depth: 0,
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, "no RX buffers")]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
-        tx_depth: u16::MAX,
-        rx_depth: u16::MAX,
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            tx_depth: u16::MAX,
+            rx_depth: u16::MAX,
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, format!("too many buffers requested: {} + {} > u16::MAX", u16::MAX, u16::MAX))]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
-        min_tx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 + 1,
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            min_tx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 + 1,
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, format!(
         "buffer_length smaller than minimum TX requirement: {} < {}",
         DEFAULT_BUFFER_LENGTH, DEFAULT_BUFFER_LENGTH + 1))]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
-        min_tx_buffer_head: DEFAULT_BUFFER_LENGTH as u16 + 1,
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            min_tx_buffer_head: DEFAULT_BUFFER_LENGTH as u16 + 1,
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, format!(
         "buffer length {} does not meet minimum tx buffer head/tail requirement {}/0",
         DEFAULT_BUFFER_LENGTH, DEFAULT_BUFFER_LENGTH + 1))]
     #[test_case(DEFAULT_BUFFER_LENGTH, DeviceInfo {
-        min_tx_buffer_tail: DEFAULT_BUFFER_LENGTH as u16 + 1,
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            min_tx_buffer_tail: DEFAULT_BUFFER_LENGTH as u16 + 1,
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, format!(
         "buffer length {} does not meet minimum tx buffer head/tail requirement 0/{}",
         DEFAULT_BUFFER_LENGTH, DEFAULT_BUFFER_LENGTH + 1))]
-    #[test_case(0, BASE_DEVICE_INFO, "buffer_stride is zero")]
-    #[test_case(usize::MAX, BASE_DEVICE_INFO,
+    #[test_case(0, DEFAULT_DEVICE_INFO, "buffer_stride is zero")]
+    #[test_case(usize::MAX, DEFAULT_DEVICE_INFO,
     format!(
         "too much memory required for the buffers: {} * {} > isize::MAX",
         usize::MAX, 2))]
     #[test_case(usize::MAX, DeviceInfo {
-        buffer_alignment: 2,
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            buffer_alignment: 2,
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, format!(
         "not possible to align {} to {} under usize::MAX",
         usize::MAX, 2))]
@@ -701,17 +737,26 @@ mod tests {
     }
 
     #[test_case(DeviceInfo {
-        min_rx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 + 1,
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            min_rx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 + 1,
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, DEFAULT_BUFFER_LENGTH + 1; "default below min")]
     #[test_case(DeviceInfo {
-        max_buffer_length: NonZeroU32::new(DEFAULT_BUFFER_LENGTH as u32 - 1),
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            max_buffer_length: NonZeroU32::new(DEFAULT_BUFFER_LENGTH as u32 - 1),
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, DEFAULT_BUFFER_LENGTH - 1; "default above max")]
     #[test_case(DeviceInfo {
-        min_rx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 - 1,
-        max_buffer_length: NonZeroU32::new(DEFAULT_BUFFER_LENGTH as u32 + 1),
-        ..BASE_DEVICE_INFO
+        base_info: DeviceBaseInfo {
+            min_rx_buffer_length: DEFAULT_BUFFER_LENGTH as u32 - 1,
+            max_buffer_length: NonZeroU32::new(DEFAULT_BUFFER_LENGTH as u32 + 1),
+            ..DEFAULT_DEVICE_BASE_INFO
+        },
+        ..DEFAULT_DEVICE_INFO
     }, DEFAULT_BUFFER_LENGTH; "default in bounds")]
     fn configs_from_device_buffer_length(info: DeviceInfo, expected_length: usize) {
         let config = info.primary_config(DEFAULT_BUFFER_LENGTH).expect("is valid");

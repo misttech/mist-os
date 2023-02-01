@@ -36,18 +36,21 @@ type fakeNetworkDeviceImpl struct {
 const fakeDepth = 128
 
 func (f *fakeNetworkDeviceImpl) GetInfo(fidl.Context) (network.DeviceInfo, error) {
+	var baseInfo network.DeviceBaseInfo
+	baseInfo.SetRxDepth(fakeDepth)
+	baseInfo.SetTxDepth(fakeDepth)
+	baseInfo.SetBufferAlignment(1)
+	baseInfo.SetMaxBufferLength(2048)
+	baseInfo.SetMinRxBufferLength(2048)
+	baseInfo.SetMinTxBufferLength(0)
+	baseInfo.SetMinTxBufferHead(0)
+	baseInfo.SetMinTxBufferTail(0)
+	baseInfo.SetMaxBufferParts(1)
+
 	var info network.DeviceInfo
 	info.SetMinDescriptorLength(uint8(netdevice.DescriptorLength / 8))
 	info.SetDescriptorVersion(netdevice.DescriptorVersion)
-	info.SetRxDepth(fakeDepth)
-	info.SetTxDepth(fakeDepth)
-	info.SetBufferAlignment(1)
-	info.SetMaxBufferLength(2048)
-	info.SetMinRxBufferLength(2048)
-	info.SetMinTxBufferLength(0)
-	info.SetMinTxBufferHead(0)
-	info.SetMinTxBufferTail(0)
-	info.SetMaxBufferParts(1)
+	info.SetBaseInfo(baseInfo)
 	return info, nil
 }
 

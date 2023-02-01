@@ -1098,7 +1098,7 @@ func TestPairExchangePackets(t *testing.T) {
 	defer rDispatcher.release()
 	lPort.Attach(&lDispatcher)
 	rPort.Attach(&rDispatcher)
-	packetCount := lClient.deviceInfo.RxDepth * 4
+	packetCount := lClient.deviceInfo.BaseInfo.RxDepth * 4
 
 	if err := lPort.Up(); err != nil {
 		t.Fatalf("lPort.Up() =  %s", err)

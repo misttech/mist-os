@@ -82,7 +82,8 @@ pub async fn start_session(
     let (session, task) = client
         .primary_session(
             "wlan-test",
-            info.max_buffer_length.expect("buffer length not set in DeviceInfo").get() as usize,
+            info.base_info.max_buffer_length.expect("buffer length not set in DeviceInfo").get()
+                as usize,
         )
         .await
         .expect("open primary session");
