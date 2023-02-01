@@ -235,18 +235,22 @@ zx_status_t BanjoDevice::PciGetBar(uint32_t bar_id, pci_bar_t* out_bar) {
   // MMIO Bars have an associated VMO for the driver to map, whereas IO bars
   // have a Resource corresponding to an IO range for the driver to access.
   // These are mutually exclusive, so only one handle is ever needed.
+  ZX_DEBUG_ASSERT(bar->allocation);
   zx::result<zx::handle> result;
-  if (bar->is_mmio) {
-    result = bar->allocation->CreateVmo();
-    if (result.is_ok()) {
-      out_bar->result.vmo = result.value().release();
-    }
-  } else {  // Bar using IOports
-    result = bar->allocation->CreateResource();
-    if (result.is_ok()) {
-      out_bar->result.io.resource = result.value().release();
-      out_bar->result.io.address = bar->address;
-    }
+  switch (bar->allocation->type()) {
+    case PCI_ADDRESS_SPACE_MEMORY: {
+      result = bar->allocation->CreateVmo();
+      if (result.is_ok()) {
+        out_bar->result.vmo = result.value().release();
+      }
+    } break;
+    case PCI_ADDRESS_SPACE_IO: {
+      result = bar->allocation->CreateResource();
+      if (result.is_ok()) {
+        out_bar->result.io.resource = result.value().release();
+        out_bar->result.io.address = bar->address;
+      }
+    } break;
   }
 
   if (result.is_error()) {

@@ -36,13 +36,26 @@ class LogSink : public zxtest::LogSink {
     va_start(args, format);
     vsnprintf(line_buf.data(), line_buf.size(), format, args);
     va_end(args);
-    line_buf[line_buf.size() - 1] = 0;
+    line_buf[line_buf.size() - 1] = '\0';
     zxlogf(INFO, "%s", line_buf.data());
   }
   void Flush() override {}
 };
 
 ProtocolTestDriver* ProtocolTestDriver::instance_;
+
+namespace {
+class PciProtocolTests : public zxtest::Test {
+ public:
+  const ddk::PciProtocolClient& pci() { return drv_->pci(); }
+
+ protected:
+  PciProtocolTests() : drv_(ProtocolTestDriver::GetInstance()) {}
+  void GetBarTestHelper(uint32_t bar_id);
+
+ private:
+  ProtocolTestDriver* drv_;
+};
 
 TEST_F(PciProtocolTests, TestResetDeviceUnsupported) {
   EXPECT_EQ(pci().ResetDevice(), ZX_ERR_NOT_SUPPORTED);
@@ -215,33 +228,40 @@ TEST_F(PciProtocolTests, GetBarArgumentCheck) {
 // stored in test_device.h. If that configuration is changed in a way that
 // affects the expected BAR information then these tests also need to be
 // updated.
-TEST_F(PciProtocolTests, GetBar0) {
-  pci_bar_t info = {};
-  zx::vmo vmo;
-  size_t size;
+void PciProtocolTests::GetBarTestHelper(uint32_t bar_id) {
+  pci_bar_t info{};
+  const test_bar_info_t& test_bar = kTestDeviceBars[bar_id];
+  ASSERT_OK(pci().GetBar(bar_id, &info));
+  EXPECT_EQ(info.bar_id, bar_id);
+  EXPECT_EQ(info.type, test_bar.type);
 
-  // BAR 0 (32-bit mmio, non-pf, size 16M)
-  ASSERT_OK(pci().GetBar(0, &info));
-  ASSERT_EQ(info.bar_id, 0);
-  ASSERT_EQ(info.type, ZX_PCI_BAR_TYPE_MMIO);
-  vmo.reset(info.result.vmo);
-  vmo.get_size(&size);
-  ASSERT_EQ(size, kTestDeviceBars[0].size);
+  pci_address_space_t io_type = PCI_ADDRESS_SPACE_NONE;
+#ifdef __x86_64__
+  io_type = PCI_ADDRESS_SPACE_IO;
+#elif defined(__aarch64__)
+  io_type = PCI_ADDRESS_SPACE_MEMORY;
+#endif
+  ASSERT_NE(io_type, PCI_ADDRESS_SPACE_NONE);
+  // ARM uses MMIO for both types of BARs
+  if (info.type == PCI_ADDRESS_SPACE_MEMORY ||
+      (info.type == PCI_ADDRESS_SPACE_IO && io_type == PCI_ADDRESS_SPACE_MEMORY)) {
+    size_t size = 0;
+    zx::vmo vmo(info.result.vmo);
+    ASSERT_OK(vmo.get_size(&size));
+    EXPECT_EQ(size, test_bar.size);
+  } else {
+    EXPECT_EQ(info.size, test_bar.size);
+    EXPECT_EQ(info.result.io.address, test_bar.address);
+    EXPECT_NE(info.result.io.resource, ZX_HANDLE_INVALID);
+  }
 }
 
-TEST_F(PciProtocolTests, GetBar1) {
-  pci_bar_t info = {};
-  zx::vmo vmo;
-  size_t size;
-
-  // BAR 1 (32-bit mmio, pf, size 256M)
-  ASSERT_OK(pci().GetBar(1, &info));
-  ASSERT_EQ(info.bar_id, 1);
-  ASSERT_EQ(info.type, ZX_PCI_BAR_TYPE_MMIO);
-  vmo.reset(info.result.vmo);
-  vmo.get_size(&size);
-  ASSERT_EQ(size, kTestDeviceBars[1].size);
-}
+// Standard MMIO bars of varying size and 64bit-ness.
+TEST_F(PciProtocolTests, GetBar0) { ASSERT_NO_FAILURES(GetBarTestHelper(0)); }
+TEST_F(PciProtocolTests, GetBar1) { ASSERT_NO_FAILURES(GetBarTestHelper(1)); }
+TEST_F(PciProtocolTests, GetBar3) { ASSERT_NO_FAILURES(GetBarTestHelper(3)); }
+// An IO bar which behaves differently according to platform
+TEST_F(PciProtocolTests, GetBar5) { ASSERT_NO_FAILURES(GetBarTestHelper(5)); }
 
 TEST_F(PciProtocolTests, GetBar2) {
   pci_bar_t info = {};
@@ -249,35 +269,10 @@ TEST_F(PciProtocolTests, GetBar2) {
   ASSERT_EQ(ZX_ERR_ACCESS_DENIED, pci().GetBar(2, &info));
 }
 
-TEST_F(PciProtocolTests, GetBar3) {
-  pci_bar_t info = {};
-  zx::vmo vmo;
-  size_t size;
-
-  // BAR 3 (64-bit mmio, pf, size 32M)
-  ASSERT_OK(pci().GetBar(3, &info));
-  ASSERT_EQ(info.bar_id, 3);
-  ASSERT_EQ(info.type, ZX_PCI_BAR_TYPE_MMIO);
-  vmo.reset(info.result.vmo);
-  vmo.get_size(&size);
-  ASSERT_EQ(size, kTestDeviceBars[3].size);
-}
-
 TEST_F(PciProtocolTests, GetBar4) {
   pci_bar_t info = {};
   // BAR 4 (Bar 3 second half, should be NOT_FOUND)
   ASSERT_EQ(ZX_ERR_NOT_FOUND, pci().GetBar(4, &info));
-}
-
-TEST_F(PciProtocolTests, GetBar5) {
-  pci_bar_t info = {};
-  // BAR 5 (I/O ports @ 0x2000, size 128)
-  ASSERT_STATUS(ZX_OK, pci().GetBar(5, &info));
-  //   // TODO(61631): If the resource is sorted out we can verify the other fields.
-  ASSERT_EQ(info.type, ZX_PCI_BAR_TYPE_PIO);
-  ASSERT_EQ(info.bar_id, 5);
-  ASSERT_EQ(info.result.io.address, kTestDeviceBars[5].address);
-  ASSERT_EQ(info.size, kTestDeviceBars[5].size);
 }
 
 TEST_F(PciProtocolTests, GetCapabilities) {
@@ -583,6 +578,7 @@ TEST_F(PciProtocolTests, GetBti) {
   zx::bti bti;
   ASSERT_STATUS(pci().GetBti(0, &bti), ZX_ERR_NOT_SUPPORTED);
 }
+}  // namespace
 
 void ProtocolTestDriver::RunTests(RunTestsCompleter::Sync& completer) {
   auto* driver = ProtocolTestDriver::GetInstance();

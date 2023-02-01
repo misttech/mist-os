@@ -339,16 +339,22 @@ constexpr size_t kFakeQuadroMsiXIrqCnt = 5;
 // BAR metadata for the fake Quadro. Refer to the BAR lines above for an
 // explanation.
 static constexpr struct test_bar_info_t {
+    pci_bar_type_t type;
     bool is_upper_half;
     uint16_t address;
     uint32_t size;
 } kTestDeviceBars[6] = {
-    { .is_upper_half = false, .address = UINT16_MAX, .size = 16 * 1024 * 1024 },
-    { .is_upper_half = false, .address = UINT16_MAX, .size = 256 * 1024 * 1024 },
-    { .is_upper_half = false, .address = UINT16_MAX, .size = 1 * 1024 * 1024  },
-    { .is_upper_half = false, .address = UINT16_MAX, .size = 32 * 1024 * 1024 },
-    { .is_upper_half = true,  .address = UINT16_MAX, .size = 0 },
-    { .is_upper_half = false, .address = 0x2000,     .size = 128 },
+    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = false, .address = UINT16_MAX, .size = 16 * 1024 * 1024 },
+    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = false, .address = UINT16_MAX, .size = 256 * 1024 * 1024 },
+    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = false, .address = UINT16_MAX, .size = 1 * 1024 * 1024  },
+    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = false, .address = UINT16_MAX, .size = 32 * 1024 * 1024 },
+    { .type = PCI_BAR_TYPE_MMIO, .is_upper_half = true,  .address = UINT16_MAX, .size = 0 },
+#ifdef __x86_64__
+    { .type = PCI_BAR_TYPE_IO, .is_upper_half = false, .address = 0x2000,     .size = 128 },
+#elif defined(__aarch64__)
+    { .type = PCI_BAR_TYPE_IO, .is_upper_half = false, .address = 0x2000,     .size = 4096 },
+#endif
+
 };
 
 // This is the configuration space dump of a virtio-input device. It should

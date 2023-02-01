@@ -56,6 +56,7 @@ class FakeAllocation : public PciAllocation {
 // |FailNextAllocation|.
 class FakeAllocator : public PciAllocator {
  public:
+  explicit FakeAllocator(pci_address_space_t type) : PciAllocator(type) {}
   void FailNextAllocation(bool enable) { fail_next_allocation_ = enable; }
   zx::result<std::unique_ptr<PciAllocation>> Allocate(std::optional<zx_paddr_t> in_base,
                                                       size_t size) final {

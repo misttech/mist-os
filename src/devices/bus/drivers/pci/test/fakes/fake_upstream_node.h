@@ -12,7 +12,17 @@ namespace pci {
 
 class FakeUpstreamNode : public UpstreamNode {
  public:
-  FakeUpstreamNode(Type type, uint32_t mbus_id) : UpstreamNode(type, mbus_id) {}
+  FakeUpstreamNode(Type type, uint32_t mbus_id)
+      : UpstreamNode(type, mbus_id),
+        pf_mmio_alloc_(PCI_ADDRESS_SPACE_MEMORY),
+        mmio_alloc_(PCI_ADDRESS_SPACE_MEMORY),
+#ifdef __x86_64__
+        pio_alloc_(PCI_ADDRESS_SPACE_IO)
+#elif defined(__aarch64__)
+        pio_alloc_(PCI_ADDRESS_SPACE_MEMORY)
+#endif
+  {
+  }
 
   PciAllocator& pf_mmio_regions() final { return pf_mmio_alloc_; }
   PciAllocator& mmio_regions() final { return mmio_alloc_; }

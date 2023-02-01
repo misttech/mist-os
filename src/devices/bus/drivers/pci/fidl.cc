@@ -7,6 +7,7 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
+#include <lib/fit/defer.h>
 #include <zircon/errors.h>
 
 #include <bind/fuchsia/acpi/cpp/bind.h>
@@ -206,33 +207,35 @@ void FidlDevice::GetBar(GetBarRequestView request, GetBarCompleter::Sync& comple
     bar_size = result.value();
   }
 
-  zx_status_t status = ZX_OK;
-  if (bar->is_mmio) {
-    zx::result<zx::vmo> result = bar->allocation->CreateVmo();
-    if (result.is_ok()) {
-      completer.ReplySuccess({.bar_id = request->bar_id,
-                              .size = bar_size,
-                              .result = fpci::wire::BarResult::WithVmo(std::move(result.value()))});
-      RETURN_DEBUG(ZX_OK, "%u", request->bar_id);
-    }
-    status = result.status_value();
-  } else {
-    zx::result<zx::resource> result = bar->allocation->CreateResource();
-    if (status == ZX_OK) {
-      fidl::Arena arena;
-      completer.ReplySuccess(
-          {.bar_id = request->bar_id,
-           .size = bar_size,
-           .result = fpci::wire::BarResult::WithIo(
-               arena, fuchsia_hardware_pci::wire::IoBar{.address = bar->address,
-                                                        .resource = std::move(result.value())})});
-      RETURN_DEBUG(ZX_OK, "%u", request->bar_id);
-    }
-    status = result.status_value();
+  ZX_DEBUG_ASSERT(bar->allocation);
+  switch (bar->allocation->type()) {
+    case PCI_ADDRESS_SPACE_MEMORY: {
+      zx::result<zx::vmo> result = bar->allocation->CreateVmo();
+      if (result.is_ok()) {
+        completer.ReplySuccess(
+            {.bar_id = request->bar_id,
+             .size = bar_size,
+             .result = fpci::wire::BarResult::WithVmo(std::move(result.value()))});
+        RETURN_DEBUG(ZX_OK, "%u", request->bar_id);
+      }
+    } break;
+    case PCI_ADDRESS_SPACE_IO: {
+      zx::result<zx::resource> result = bar->allocation->CreateResource();
+      if (result.is_ok()) {
+        fidl::Arena arena;
+        completer.ReplySuccess(
+            {.bar_id = request->bar_id,
+             .size = bar_size,
+             .result = fpci::wire::BarResult::WithIo(
+                 arena, fuchsia_hardware_pci::wire::IoBar{.address = bar->address,
+                                                          .resource = std::move(result.value())})});
+        RETURN_DEBUG(ZX_OK, "%u", request->bar_id);
+      }
+    } break;
   }
 
-  completer.ReplyError(status);
-  RETURN_DEBUG(status, "%u", request->bar_id);
+  completer.ReplyError(ZX_ERR_BAD_STATE);
+  RETURN_DEBUG(ZX_ERR_BAD_STATE, "%u", request->bar_id);
 }
 
 void FidlDevice::SetBusMastering(SetBusMasteringRequestView request,

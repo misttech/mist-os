@@ -59,15 +59,4 @@ class ProtocolTestDriver : public ProtocolTestDriverType, public TestObserver {
   ddk::PciProtocolClient pci_;
 };
 
-class PciProtocolTests : public zxtest::Test {
- public:
-  const ddk::PciProtocolClient& pci() { return drv_->pci(); }
-
- protected:
-  PciProtocolTests() : drv_(ProtocolTestDriver::GetInstance()) {}
-
- private:
-  ProtocolTestDriver* drv_;
-};
-
 #endif  // SRC_DEVICES_BUS_DRIVERS_PCI_TEST_DRIVER_PROTOCOL_TEST_DRIVER_H_
