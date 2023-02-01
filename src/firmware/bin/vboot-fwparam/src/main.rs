@@ -32,11 +32,8 @@ enum IncomingRequest {
 async fn find_nvram_device() -> Result<fnvram::DeviceProxy, anyhow::Error> {
     // The RTC houses the nvram where nvdata is stored.
     let nvram_path = "/dev/class/rtc";
-    let proxy = fuchsia_fs::directory::open_in_namespace(
-        nvram_path,
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-    )
-    .context("Opening /dev/class/rtc")?;
+    let proxy = fuchsia_fs::directory::open_in_namespace(nvram_path, OpenFlags::RIGHT_READABLE)
+        .context("Opening /dev/class/rtc")?;
     let contents =
         fuchsia_fs::directory::readdir(&proxy).await.context("Reading /dev/class/rtc")?;
     if contents.len() > 1 {
@@ -56,11 +53,8 @@ async fn find_nvram_device() -> Result<fnvram::DeviceProxy, anyhow::Error> {
 async fn find_flashmap_device() -> Result<FlashmapProxy, anyhow::Error> {
     // Look for the first flash device.
     let nand_path = "/dev/class/nand";
-    let proxy = fuchsia_fs::directory::open_in_namespace(
-        nand_path,
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-    )
-    .context("Opening /dev/class/nand")?;
+    let proxy = fuchsia_fs::directory::open_in_namespace(nand_path, OpenFlags::RIGHT_READABLE)
+        .context("Opening /dev/class/nand")?;
     let contents =
         fuchsia_fs::directory::readdir(&proxy).await.context("Reading /dev/class/nand")?;
     if contents.len() > 1 {
@@ -100,11 +94,8 @@ async fn find_flashmap_device() -> Result<FlashmapProxy, anyhow::Error> {
 /// Find and connect to the ChromeOS ACPI device.
 async fn find_chromeos_acpi_device() -> Result<chrome_acpi::DeviceProxy, anyhow::Error> {
     const ACPI_PATH: &str = "/dev/class/chromeos-acpi";
-    let proxy = fuchsia_fs::directory::open_in_namespace(
-        ACPI_PATH,
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-    )
-    .with_context(|| format!("Opening {}", ACPI_PATH))?;
+    let proxy = fuchsia_fs::directory::open_in_namespace(ACPI_PATH, OpenFlags::RIGHT_READABLE)
+        .with_context(|| format!("Opening {}", ACPI_PATH))?;
 
     let path = device_watcher::watch_for_files(&proxy)
         .await
