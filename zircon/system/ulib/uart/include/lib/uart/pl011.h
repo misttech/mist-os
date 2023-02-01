@@ -15,9 +15,7 @@
 // PrimeCell® UART (PL011) Technical Reference Manual
 // Revision: r1p5
 // URL: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0183g/index.html
-
-namespace uart {
-namespace pl011 {
+namespace uart::pl011 {
 
 // This is where QEMU puts its emulated PL011.
 constexpr zbi_dcfg_simple_t kQemuConfig{.mmio_phys = 0x09000000, .irq = 33};
@@ -196,30 +194,30 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_PL011_UART, zbi_dcfg
     cr.set_rx_enable(true).WriteTo(io.io());
   }
 
-  template <class IoProvider, typename Tx, typename Rx>
-  void Interrupt(IoProvider& io, Tx&& tx, Rx&& rx) {
+  template <class IoProvider, typename Sync, typename Tx, typename Rx>
+  void Interrupt(IoProvider& io, Sync& sync, Tx&& tx, Rx&& rx) {
     auto misr = InterruptMaskedStatusRegister::Get().ReadFrom(io.io());
     if (misr.rx_timeout() || misr.rx()) {
       bool full = false;
       while (!full && !FlagRegister::Get().ReadFrom(io.io()).rx_fifo_empty()) {
         // Read the character if there's a place to put it.
-        rx([&]() { return DataRegister::Get().ReadFrom(io.io()).data(); },
-           [&]() {
-             // If the buffer is full, disable the receive interrupt instead
-             // and stop checking.
-             EnableRxInterrupt(io, false);
-             full = true;
-           });
+        rx(
+            sync,  //
+            [&]() { return DataRegister::Get().ReadFrom(io.io()).data(); },
+            [&]() {
+              // If the buffer is full, disable the receive interrupt instead
+              // and stop checking.
+              EnableRxInterrupt(io, false);
+              full = true;
+            });
       }
     }
     if (misr.tx()) {
-      tx();
-      EnableTxInterrupt(io, false);
+      tx(sync, [&]() { EnableTxInterrupt(io, false); });
     }
   }
 };
 
-}  // namespace pl011
-}  // namespace uart
+}  // namespace uart::pl011
 
 #endif  // LIB_UART_PL011_H_

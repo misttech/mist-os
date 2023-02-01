@@ -233,12 +233,15 @@ class DriverBase {
     static_assert(Uninstantiated<IoProvider>, "derived class is missing EnableTxInterrupt");
   }
 
-  // Service an interrupt.  Call tx() if transmit has become ready.
-  // If receive has become ready, call rx(read_char, full) one or more
+  // Service an interrupt.
+  // Call tx(sync, disable_tx_irq) if transmission has become ready.
+  // If receiving has become ready, call rx(sync, read_char, full) one or more
   // times, where read_char() -> uint8_t if there is receive buffer
   // space and full() -> void if there is no space.
-  template <typename IoProvider, typename Tx, typename Rx>
-  void Interrupt(IoProvider& io, Tx&& tx, Rx&& rx) {
+  // |sync| provides access to the environment specific synchronization primitives(if any),
+  // and synchronization related data structures(if any).
+  template <typename IoProvider, typename Sync, typename Tx, typename Rx>
+  void Interrupt(IoProvider& io, Sync& sync, Tx&& tx, Rx&& rx) {
     static_assert(Uninstantiated<IoProvider>, "derived class is missing Interrupt");
   }
 };
@@ -420,7 +423,17 @@ class KernelDriver {
     uart_.SetLineControl(io_, data_bits, parity, stop_bits);
   }
 
-  // TODO(mcgrathr): Add InitInterrupt for enabling interrupt-based i/o.
+  void InitInterrupt() {
+    Guard lock(sync_);
+    uart_.InitInterrupt(io_);
+  }
+
+  template <typename Tx, typename Rx>
+  void Interrupt(Tx&& tx, Rx&& rx) TA_NO_THREAD_SAFETY_ANALYSIS {
+    // Interrupt is responsible for properly acquiring and releasing sync
+    // where needed.
+    uart_.Interrupt(io_, sync_, std::forward<Tx>(tx), std::forward<Rx>(rx));
+  }
 
   // This is the FILE-compatible API: `FILE::stdout_ = FILE{&driver};`.
   int Write(std::string_view str) {
