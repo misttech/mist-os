@@ -302,6 +302,16 @@
           "type": "ClassDeclarationImpl"
         }
       },
+      "VariableDeclarationImpl": {
+        "modeTypeNone": {
+          "isConst": true,
+          "isFinal": false,
+          "isLate": false,
+          "name": "modeTypeNone",
+          "type": "VariableDeclarationImpl",
+          "varType": "int"
+        }
+      },
       "name": "incoming.dart",
       "type": "file"
     },

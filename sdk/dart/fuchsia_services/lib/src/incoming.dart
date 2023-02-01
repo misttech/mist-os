@@ -175,3 +175,6 @@ class IncomingStateException implements Exception {
   @override
   String toString() => 'IncomingStateException: $message';
 }
+
+// TODO(https://fxbug.dev/120673): Remove this after soft transition.
+const int modeTypeNone = 0;
