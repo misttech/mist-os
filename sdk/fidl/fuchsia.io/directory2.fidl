@@ -62,7 +62,6 @@ protocol Directory2 {
     /// * error `ZX_ERR_ACCESS_DENIED` if the requested rights exceeds
     ///   what is allowed.
     /// * error `ZX_ERR_BAD_PATH` if `path` is invalid.
-    @transitional
     @selector("fuchsia.io/Directory.Open")
     Open2(resource struct {
         /// Identifies the node to open.
@@ -245,7 +244,6 @@ protocol Directory2 {
     ///
     /// This method requires the [`Rights.ENUMERATE`] right. If this right is
     /// absent, `iterator` will be closed with a `ZX_ERR_ACCESS_DENIED` epitaph.
-    @transitional
     @selector("fuchsia.io/Directory.Enumerate")
     Enumerate(resource struct {
         options @generated_name("DirectoryEnumerateOptions") table {};

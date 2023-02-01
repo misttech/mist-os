@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use {
+    assert_matches::assert_matches,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    futures::TryStreamExt as _,
     io_conformance_util::{flags::build_flag_combinations, test_harness::TestHarness, *},
 };
 
@@ -155,4 +157,74 @@ async fn clone_directory_with_additional_rights() {
             assert_eq!(status, zx::Status::ACCESS_DENIED);
         }
     }
+}
+
+#[fuchsia::test]
+async fn reopen_file_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![file(TEST_FILE, vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let file_proxy =
+        open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+
+    // fuchsia.io/Node.Reopen
+    let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    file_proxy.reopen(None, reopen_server).unwrap();
+    assert_matches!(
+        reopen_proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+    );
+}
+
+#[fuchsia::test]
+async fn reopen_file_node_reference_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![file(TEST_FILE, vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let file_proxy =
+        open_file_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
+
+    // fuchsia.io/Node.Reopen
+    let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    file_proxy.reopen(None, reopen_server).unwrap();
+    assert_matches!(
+        reopen_proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+    );
+}
+
+#[fuchsia::test]
+async fn reopen_directory_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
+
+    // fuchsia.io/Node.Reopen
+    let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    dir_proxy.reopen(None, reopen_server).unwrap();
+    assert_matches!(
+        reopen_proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+    );
+}
+
+#[fuchsia::test]
+async fn reopen_directory_node_reference_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
+
+    // fuchsia.io/Node.Reopen
+    let (reopen_proxy, reopen_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    dir_proxy.reopen(None, reopen_server).unwrap();
+    assert_matches!(
+        reopen_proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+    );
 }

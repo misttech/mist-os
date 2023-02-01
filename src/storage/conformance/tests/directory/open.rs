@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use {
+    assert_matches::assert_matches,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
+    futures::stream::TryStreamExt as _,
     io_conformance_util::{test_harness::TestHarness, *},
 };
 
@@ -511,4 +513,27 @@ async fn open_file_with_extra_rights() {
             );
         }
     }
+}
+
+#[fuchsia::test]
+async fn open2_directory_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
+
+    // fuchsia.io/Directory.Open2
+    let (open2_proxy, open2_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
+    dir_proxy
+        .open2(
+            ".",
+            &mut fio::ConnectionProtocols::Node(fio::NodeOptions::EMPTY),
+            open2_server.into_channel(),
+        )
+        .unwrap();
+    assert_matches!(
+        open2_proxy.take_event_stream().try_next().await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+    );
 }

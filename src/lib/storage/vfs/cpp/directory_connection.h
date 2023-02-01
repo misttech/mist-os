@@ -43,6 +43,18 @@ class DirectoryConnection final : public Connection,
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
   void GetFlags(GetFlagsCompleter::Sync& completer) final;
   void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) final;
+  void GetAttributes(fuchsia_io::wire::Node2GetAttributesRequest* request,
+                     GetAttributesCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void UpdateAttributes(fuchsia_io::wire::MutableNodeAttributes* request,
+                        UpdateAttributesCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
+              ReopenCompleter::Sync& completer) final {
+    request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
+  }
 
   //
   // |fuchsia.io/Directory| operations.
@@ -59,6 +71,15 @@ class DirectoryConnection final : public Connection,
   void AddInotifyFilter(AddInotifyFilterRequestView request,
                         AddInotifyFilterCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
+  void Open2(fuchsia_io::wire::Directory2Open2Request* request,
+             Open2Completer::Sync& completer) final {
+    fidl::ServerEnd<fuchsia_io::Node>(std::move(request->object_request))
+        .Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void Enumerate(fuchsia_io::wire::Directory2EnumerateRequest* request,
+                 EnumerateCompleter::Sync& completer) final {
+    request->iterator.Close(ZX_ERR_NOT_SUPPORTED);
+  }
 
   //
   // |fuchsia.io/AdvisoryLocking| operations.

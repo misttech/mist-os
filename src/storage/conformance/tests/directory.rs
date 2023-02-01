@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod create;
+mod enumerate;
 mod get_token;
 mod link;
 mod open;

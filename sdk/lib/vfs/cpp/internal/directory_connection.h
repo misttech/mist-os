@@ -61,6 +61,27 @@ class DirectoryConnection final : public Connection, public fuchsia::io::Directo
   void QueryFilesystem(QueryFilesystemCallback callback) override {
     callback(ZX_ERR_NOT_SUPPORTED, nullptr);
   }
+  void Enumerate(fuchsia::io::DirectoryEnumerateOptions options,
+                 fidl::InterfaceRequest<fuchsia::io::DirectoryIterator> iterator) override {
+    iterator.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void GetAttributes(fuchsia::io::NodeAttributesQuery query,
+                     GetAttributesCallback callback) override {
+    callback(fuchsia::io::Node2_GetAttributes_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
+  void Reopen(std::unique_ptr<::fuchsia::io::RightsRequest> rights_request,
+              fidl::InterfaceRequest<::fuchsia::io::Node> object_request) override {
+    object_request.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void UpdateAttributes(fuchsia::io::MutableNodeAttributes MutableNodeAttributes,
+                        UpdateAttributesCallback callback) override {
+    callback(fuchsia::io::Node2_UpdateAttributes_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
+  void Open2(std::string path, fuchsia::io::ConnectionProtocols protocols,
+             zx::channel object_request) override {
+    fidl::InterfaceRequest<fuchsia::io::Node>(std::move(object_request))
+        .Close(ZX_ERR_NOT_SUPPORTED);
+  }
 
  protected:
   // |Connection| Implementation:

@@ -18,7 +18,7 @@ use crate::{
 
 use {
     anyhow::Error,
-    fidl::{endpoints::ServerEnd, Handle},
+    fidl::{endpoints::ServerEnd, epitaph::ChannelEpitaphExt as _},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::channel::oneshot,
     pin_project::pin_project,
@@ -172,10 +172,15 @@ where
                 fuchsia_trace::duration!("storage", "Directory::Clone");
                 self.handle_clone(flags, 0, object);
             }
-            fio::DirectoryRequest::Reopen { rights_request, object_request, control_handle: _ } => {
+            fio::DirectoryRequest::Reopen {
+                rights_request: _,
+                object_request,
+                control_handle: _,
+            } => {
                 fuchsia_trace::duration!("storage", "Directory::Reopen");
-                let _ = object_request;
-                todo!("https://fxbug.dev/77623: rights_request={:?}", rights_request);
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // Suppress any errors in the event a bad `object_request` channel was provided.
+                let _: Result<_, _> = object_request.close_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
             fio::DirectoryRequest::Close { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::Close");
@@ -214,13 +219,14 @@ where
                 };
                 responder.send(status, &mut attrs)?;
             }
-            fio::DirectoryRequest::GetAttributes { query, responder } => {
+            fio::DirectoryRequest::GetAttributes { query: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::GetAttributes");
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: query={:?}", query);
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::UpdateAttributes { payload: _, responder } => {
                 fuchsia_trace::duration!("storage", "Directory::UpdateAttributes");
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::DirectoryRequest::GetFlags { responder } => {
@@ -235,10 +241,16 @@ where
                 fuchsia_trace::duration!("storage", "Directory::Open");
                 self.handle_open(flags, mode, path, object);
             }
-            fio::DirectoryRequest::Open2 { path, protocols, object_request, control_handle: _ } => {
+            fio::DirectoryRequest::Open2 {
+                path: _,
+                protocols: _,
+                object_request,
+                control_handle: _,
+            } => {
                 fuchsia_trace::duration!("storage", "Directory::Open2");
-                let _ = object_request;
-                todo!("https://fxbug.dev/77623: path={} protocols={:?}", path, protocols);
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // Suppress any errors in the event a bad `object_request` channel was provided.
+                let _: Result<_, _> = object_request.close_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
             fio::DirectoryRequest::AddInotifyFilter {
                 path,
@@ -265,10 +277,11 @@ where
                 let (status, entries) = self.handle_read_dirents(max_bytes).await;
                 responder.send(status.into_raw(), entries.as_slice())?;
             }
-            fio::DirectoryRequest::Enumerate { options, iterator, control_handle: _ } => {
+            fio::DirectoryRequest::Enumerate { options: _, iterator, control_handle: _ } => {
                 fuchsia_trace::duration!("storage", "Directory::Enumerate");
-                let _ = iterator;
-                todo!("https://fxbug.dev/77623: options={:?}", options);
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // Suppress any errors in the event a bad `iterator` channel was provided.
+                let _ = iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
             fio::DirectoryRequest::Rewind { responder } => {
                 fuchsia_trace::duration!("storage", "Directory::Rewind");
@@ -421,7 +434,7 @@ where
     async fn handle_link(
         &self,
         source_name: &str,
-        target_parent_token: Handle,
+        target_parent_token: zx::Handle,
         target_name: String,
     ) -> Result<(), zx::Status> {
         if source_name.contains('/') || target_name.contains('/') {

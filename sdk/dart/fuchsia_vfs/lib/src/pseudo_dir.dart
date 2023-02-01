@@ -556,6 +556,37 @@ class _DirConnection extends Directory {
   Future<Directory$QueryFilesystem$Response> queryFilesystem() async {
     return Directory$QueryFilesystem$Response(ZX.ERR_NOT_SUPPORTED, null);
   }
+
+  @override
+  Future<void> reopen(RightsRequest? rightsRequest,
+      fidl.InterfaceRequest<Node> objectRequest) async {
+    // TODO(https://fxbug.dev/77623): Close `objectRequest` with epitaph.
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
+
+  @override
+  Future<Directory$GetAttributes$Response> getAttributes(
+      NodeAttributesQuery query) async {
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
+
+  @override
+  Future<void> updateAttributes(MutableNodeAttributes payload) async {
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
+
+  @override
+  Future<void> open2(
+      String path, ConnectionProtocols protocols, Channel objectRequest) async {
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
+
+  @override
+  Future<void> enumerate(DirectoryEnumerateOptions options,
+      fidl.InterfaceRequest<DirectoryIterator> iterator) async {
+    // TODO(https://fxbug.dev/77623): Close `iterator` with epitaph.
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
 }
 
 /// _Entry class to store in pseudo directory.

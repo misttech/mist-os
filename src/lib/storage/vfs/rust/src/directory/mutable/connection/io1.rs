@@ -136,14 +136,6 @@ impl MutableConnection {
                 responder
                     .send(&mut this.base.directory.sync().await.map_err(zx::Status::into_raw))?;
             }
-            fio::DirectoryRequest::SetFlags { flags, responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: flags={:?}", flags);
-            }
-            fio::DirectoryRequest::UpdateAttributes { payload, responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: payload={:?}", payload);
-            }
             request @ (fio::DirectoryRequest::AddInotifyFilter { .. }
             | fio::DirectoryRequest::AdvisoryLock { .. }
             | fio::DirectoryRequest::Clone { .. }
@@ -161,6 +153,8 @@ impl MutableConnection {
             | fio::DirectoryRequest::ReadDirents { .. }
             | fio::DirectoryRequest::Reopen { .. }
             | fio::DirectoryRequest::Rewind { .. }
+            | fio::DirectoryRequest::SetFlags { .. }
+            | fio::DirectoryRequest::UpdateAttributes { .. }
             | fio::DirectoryRequest::Watch { .. }) => {
                 return this.as_mut().base.handle_request(request).await;
             }

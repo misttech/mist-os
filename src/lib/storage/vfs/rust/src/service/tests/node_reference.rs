@@ -20,10 +20,12 @@ use crate::{
 };
 
 use {
+    assert_matches::assert_matches,
     fidl::endpoints::create_proxy,
     fidl_fuchsia_io as fio,
     fuchsia_async::TestExecutor,
-    fuchsia_zircon::sys::ZX_OK,
+    fuchsia_zircon::Status,
+    futures::StreamExt,
     libc::{S_IRUSR, S_IWUSR},
 };
 
@@ -76,7 +78,7 @@ fn describe() {
         server.open(scope, flags, 0, Path::dot(), server_end.into_channel().into());
 
         assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
-            assert_eq!(s, ZX_OK);
+            assert_eq!(s, Status::OK.into_raw());
             assert_eq!(info, Some(Box::new(fio::NodeInfoDeprecated::Service(fio::Service))));
         });
     });
@@ -190,6 +192,41 @@ fn clone_same_rights() {
 
             assert_close!(second_proxy);
             assert_close!(first_proxy);
+        },
+    );
+}
+
+#[test]
+fn attributes_not_supported() {
+    run_server_client(
+        fio::OpenFlags::NODE_REFERENCE,
+        endpoint(|_scope, _channel| ()),
+        |node_proxy| async move {
+            let response =
+                node_proxy.get_attributes(fio::NodeAttributesQuery::ABILITIES).await.unwrap();
+            assert_eq!(response, Err(Status::NOT_SUPPORTED.into_raw()));
+            let response =
+                node_proxy.update_attributes(fio::MutableNodeAttributes::EMPTY).await.unwrap();
+            assert_eq!(response, Err(Status::NOT_SUPPORTED.into_raw()));
+        },
+    );
+}
+
+#[test]
+fn reopen_not_supported() {
+    run_server_client(
+        fio::OpenFlags::NODE_REFERENCE,
+        endpoint(|_scope, _channel| ()),
+        |node_proxy| async move {
+            let (client_end, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
+
+            node_proxy.reopen(None, server_end).unwrap();
+
+            let mut event_stream = client_end.take_event_stream();
+            assert_matches!(
+                event_stream.next().await,
+                Some(Err(fidl::Error::ClientChannelClosed { status: Status::NOT_SUPPORTED, .. }))
+            );
         },
     );
 }

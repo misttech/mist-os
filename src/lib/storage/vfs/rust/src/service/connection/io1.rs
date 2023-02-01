@@ -129,9 +129,10 @@ impl Connection {
             fio::NodeRequest::Clone { flags, object, control_handle: _ } => {
                 self.handle_clone(flags, object);
             }
-            fio::NodeRequest::Reopen { rights_request, object_request, control_handle: _ } => {
-                let _ = object_request;
-                todo!("https://fxbug.dev/77623: rights_request={:?}", rights_request);
+            fio::NodeRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // Suppress any errors in the event a bad `object_request` channel was provided.
+                let _: Result<_, _> = object_request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::NodeRequest::Close { responder } => {
                 responder.send(&mut Ok(()))?;
@@ -160,13 +161,13 @@ impl Connection {
             fio::NodeRequest::SetAttr { flags: _, attributes: _, responder } => {
                 responder.send(ZX_ERR_NOT_SUPPORTED)?;
             }
-            fio::NodeRequest::GetAttributes { query, responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: query={:?}", query);
+            fio::NodeRequest::GetAttributes { query: _, responder } => {
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
             }
-            fio::NodeRequest::UpdateAttributes { payload, responder } => {
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: payload={:?}", payload);
+            fio::NodeRequest::UpdateAttributes { payload: _, responder } => {
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED))?;
             }
             fio::NodeRequest::GetFlags { responder } => {
                 responder.send(ZX_OK, fio::OpenFlags::NODE_REFERENCE)?;

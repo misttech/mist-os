@@ -39,6 +39,18 @@ class NodeConnection final : public Connection, public fuchsia::io::Node {
   void GetFlags(GetFlagsCallback callback) override;
   void SetFlags(fuchsia::io::OpenFlags flags, SetFlagsCallback callback) override;
   void QueryFilesystem(QueryFilesystemCallback callback) override;
+  void GetAttributes(fuchsia::io::NodeAttributesQuery query,
+                     GetAttributesCallback callback) override {
+    callback(fuchsia::io::Node2_GetAttributes_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
+  void Reopen(std::unique_ptr<::fuchsia::io::RightsRequest> rights_request,
+              ::fidl::InterfaceRequest<::fuchsia::io::Node> object_request) override {
+    object_request.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  void UpdateAttributes(fuchsia::io::MutableNodeAttributes MutableNodeAttributes,
+                        UpdateAttributesCallback callback) override {
+    callback(fuchsia::io::Node2_UpdateAttributes_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
 
  protected:
   // |Connection| Implementation:

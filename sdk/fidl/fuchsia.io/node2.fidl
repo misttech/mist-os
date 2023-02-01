@@ -41,7 +41,6 @@ protocol Node2 {
     /// + `object_request` is the server end of a channel created for the new
     ///   connection. The caller may proceed to send messages on the
     ///   corresponding client end right away.
-    @transitional
     @selector("fuchsia.io/Node.Reopen")
     Reopen(resource struct {
         /// Requests rights on the new connection according to the specified rules.
@@ -147,7 +146,6 @@ protocol Node2 {
     /// - `attributes` the returned attributes.
     ///
     /// This method requires the [`Rights.GET_ATTRIBUTES`] right.
-    @transitional
     @selector("fuchsia.io/Node.GetAttributes")
     GetAttributes(struct {
         /// Set the corresponding bit to one to query that particular attribute.
@@ -213,7 +211,6 @@ protocol Node2 {
     /// the intent to update the corresponding attribute.
     ///
     /// This method requires the [`Rights.UPDATE_ATTRIBUTES`] right.
-    @transitional
     @selector("fuchsia.io/Node.UpdateAttributes")
     UpdateAttributes(MutableNodeAttributes) -> () error zx.status;
 

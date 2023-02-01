@@ -509,4 +509,21 @@ class _FileConnection extends File {
   Future<File$QueryFilesystem$Response> queryFilesystem() async {
     return File$QueryFilesystem$Response(ZX.ERR_NOT_SUPPORTED, null);
   }
+
+  @override
+  Future<void> reopen(RightsRequest? rightsRequest,
+      fidl.InterfaceRequest<Node> objectRequest) async {
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
+
+  @override
+  Future<File$GetAttributes$Response> getAttributes(
+      NodeAttributesQuery query) async {
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
+
+  @override
+  Future<void> updateAttributes(MutableNodeAttributes payload) async {
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
 }

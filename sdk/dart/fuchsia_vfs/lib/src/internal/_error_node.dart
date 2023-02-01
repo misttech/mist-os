@@ -92,4 +92,23 @@ class ErrorNodeForSendingEvent extends Node {
     throw UnsupportedError(
         'ErrorNodeForSendingEvent.queryFilesystem is unreachable.');
   }
+
+  @override
+  Future<void> reopen(RightsRequest? rightsRequest,
+      InterfaceRequest<Node> objectRequest) async {
+    throw UnsupportedError('ErrorNodeForSendingEvent.reopen is unreachable.');
+  }
+
+  @override
+  Future<Node$GetAttributes$Response> getAttributes(
+      NodeAttributesQuery query) async {
+    throw UnsupportedError(
+        'ErrorNodeForSendingEvent.getAttributes is unreachable.');
+  }
+
+  @override
+  Future<void> updateAttributes(MutableNodeAttributes payload) async {
+    throw UnsupportedError(
+        'ErrorNodeForSendingEvent.updateAttributes is unreachable.');
+  }
 }

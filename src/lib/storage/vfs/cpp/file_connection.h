@@ -46,6 +46,18 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void GetAttr(GetAttrCompleter::Sync& completer) final;
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
+  void GetAttributes(fuchsia_io::wire::Node2GetAttributesRequest* request,
+                     GetAttributesCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void UpdateAttributes(fuchsia_io::wire::MutableNodeAttributes* request,
+                        UpdateAttributesCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
+              ReopenCompleter::Sync& completer) final {
+    request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
+  }
 
   //
   // |fuchsia.io/File| operations.

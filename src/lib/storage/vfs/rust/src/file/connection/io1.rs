@@ -657,10 +657,11 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 fuchsia_trace::duration!("storage", "File::Clone");
                 self.handle_clone(self.flags, flags, object);
             }
-            fio::FileRequest::Reopen { rights_request, object_request, control_handle: _ } => {
+            fio::FileRequest::Reopen { rights_request: _, object_request, control_handle: _ } => {
                 fuchsia_trace::duration!("storage", "File::Reopen");
-                let _ = object_request;
-                todo!("https://fxbug.dev/77623: rights_request={:?}", rights_request);
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                // Suppress any errors in the event a bad `object_request` channel was provided.
+                let _: Result<_, _> = object_request.close_with_epitaph(zx::Status::NOT_SUPPORTED);
             }
             fio::FileRequest::Close { responder } => {
                 fuchsia_trace::duration!("storage", "File::Close");
@@ -698,15 +699,15 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 let status = self.handle_set_attr(flags, attributes).await;
                 responder.send(status.into_raw())?;
             }
-            fio::FileRequest::GetAttributes { query, responder } => {
+            fio::FileRequest::GetAttributes { query: _, responder } => {
                 fuchsia_trace::duration!("storage", "File::GetAttributes");
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: query={:?}", query);
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
-            fio::FileRequest::UpdateAttributes { payload, responder } => {
+            fio::FileRequest::UpdateAttributes { payload: _, responder } => {
                 fuchsia_trace::duration!("storage", "File::UpdateAttributes");
-                let _ = responder;
-                todo!("https://fxbug.dev/77623: payload={:?}", payload);
+                // TODO(https://fxbug.dev/77623): Handle unimplemented io2 method.
+                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
             fio::FileRequest::Read { count, responder } => {
                 fuchsia_trace::duration!("storage", "File::Read", "bytes" => count);
@@ -778,7 +779,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                 )?;
             }
             fio::FileRequest::QueryFilesystem { responder } => {
-                fuchsia_trace::duration!("storage", "Directory::QueryFilesystem");
+                fuchsia_trace::duration!("storage", "File::QueryFilesystem");
                 match self.file.query_filesystem() {
                     Err(status) => responder.send(status.into_raw(), None)?,
                     Ok(mut info) => responder.send(0, Some(&mut info))?,

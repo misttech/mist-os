@@ -134,3 +134,89 @@ async fn set_attr_directory_with_insufficient_rights() {
         assert_eq!(zx::Status::from_raw(status), zx::Status::BAD_HANDLE);
     }
 }
+
+#[fuchsia::test]
+async fn get_update_attributes_file_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![file(TEST_FILE, vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let file_proxy =
+        open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+
+    // fuchsia.io/Node.GetAttributes
+    assert_eq!(
+        file_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+
+    // fuchsia.io/Node.UpdateAttributes
+    assert_eq!(
+        file_proxy.update_attributes(fio::MutableNodeAttributes::EMPTY).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+}
+
+#[fuchsia::test]
+async fn get_update_attributes_file_node_reference_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![file(TEST_FILE, vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let file_proxy =
+        open_file_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
+
+    // fuchsia.io/Node.GetAttributes
+    assert_eq!(
+        file_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+
+    // fuchsia.io/Node.UpdateAttributes
+    assert_eq!(
+        file_proxy.update_attributes(fio::MutableNodeAttributes::EMPTY).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+}
+
+#[fuchsia::test]
+async fn get_update_attributes_directory_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
+
+    // fuchsia.io/Node.GetAttributes
+    assert_eq!(
+        dir_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+
+    // fuchsia.io/Node.UpdateAttributes
+    assert_eq!(
+        dir_proxy.update_attributes(fio::MutableNodeAttributes::EMPTY).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+}
+
+#[fuchsia::test]
+async fn get_update_attributes_directory_node_reference_unsupported() {
+    let harness = TestHarness::new().await;
+
+    let root = root_directory(vec![directory("dir", vec![])]);
+    let test_dir = harness.get_directory(root, harness.dir_rights.all());
+    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
+
+    // fuchsia.io/Node.GetAttributes
+    assert_eq!(
+        dir_proxy.get_attributes(fio::NodeAttributesQuery::empty()).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+
+    // fuchsia.io/Node.UpdateAttributes
+    assert_eq!(
+        dir_proxy.update_attributes(fio::MutableNodeAttributes::EMPTY).await.unwrap(),
+        Err(zx::Status::NOT_SUPPORTED.into_raw())
+    );
+}
