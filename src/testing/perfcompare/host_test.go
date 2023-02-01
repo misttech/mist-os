@@ -24,7 +24,7 @@ func TestPerfcompare(t *testing.T) {
 	// on the bots, where vpython is also used by Fuchsia infra.
 	// vpython is used for downloading Python library dependencies
 	// for perfcompare.py.
-	cmd := exec.Command("vpython", pytest)
+	cmd := exec.Command("vpython3", pytest)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Errorf("perfcompare_test failed: %v", err)

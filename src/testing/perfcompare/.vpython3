@@ -5,9 +5,6 @@
 # vpython is described here:
 # https://chromium.googlesource.com/infra/infra/+/HEAD/doc/users/vpython.md
 
-# TODO(fxbug.dev/89307): Delete this file once recipes invoke perfcompare.py
-# using vpython3.
-
 python_version: "3.8"
 
 wheel <
