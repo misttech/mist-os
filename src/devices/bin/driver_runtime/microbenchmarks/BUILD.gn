@@ -10,6 +10,7 @@ executable("bin") {
   sources = [
     "arena.cc",
     "channels.cc",
+    "dispatchers.cc",
     "handle.cc",
     "one_way.cc",
     "round_trips.cc",
