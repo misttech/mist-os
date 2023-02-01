@@ -27,11 +27,18 @@ pub struct ReachabilityHandler {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ReachabilityState {
     pub internet_available: bool,
+    pub gateway_reachable: bool,
+    pub dns_active: bool,
 }
 
 impl From<ReachabilityState> for freachability::Snapshot {
     fn from(state: ReachabilityState) -> Self {
-        Self { internet_available: Some(state.internet_available), ..Self::EMPTY }
+        Self {
+            internet_available: Some(state.internet_available),
+            gateway_reachable: Some(state.gateway_reachable),
+            dns_active: Some(state.dns_active),
+            ..Self::EMPTY
+        }
     }
 }
 
@@ -45,7 +52,11 @@ impl ReachabilityHandler {
                     false
                 }
             });
-        let state = ReachabilityState { internet_available: false };
+        let state = ReachabilityState {
+            internet_available: false,
+            gateway_reachable: false,
+            dns_active: false,
+        };
         let broker = hanging_get::HangingGet::new(state.clone().into(), notify_fn);
         let publisher = broker.new_publisher();
         Self {
@@ -55,10 +66,13 @@ impl ReachabilityHandler {
         }
     }
 
-    pub async fn set_state(&mut self, new_state: ReachabilityState) {
+    pub async fn update_state(&mut self, update_callback: impl FnOnce(&mut ReachabilityState)) {
         let mut current_state_guard = self.state.lock().await;
-        if *current_state_guard != new_state {
-            *current_state_guard = new_state;
+        let previous_state = current_state_guard.clone();
+
+        update_callback(&mut current_state_guard);
+
+        if *current_state_guard != previous_state {
             self.publisher
                 .lock()
                 .await
@@ -183,17 +197,31 @@ mod tests {
 
         assert_matches!(
             client.get_reachability_state(&mut executor),
-            Ok(Some(freachability::Snapshot { internet_available: Some(false), .. }))
+            Ok(Some(freachability::Snapshot {
+                internet_available: Some(false),
+                gateway_reachable: Some(false),
+                dns_active: Some(false),
+                ..
+            }))
         );
 
+        // Verify no response as state hasn't changed.
         assert_matches!(client.get_reachability_state(&mut executor), Ok(None));
 
-        executor
-            .run_singlethreaded(handler.set_state(ReachabilityState { internet_available: true }));
+        executor.run_singlethreaded(handler.update_state(|state| {
+            state.internet_available = true;
+            state.gateway_reachable = true;
+            state.dns_active = true;
+        }));
 
         assert_matches!(
             client.get_reachability_state(&mut executor),
-            Ok(Some(freachability::Snapshot { internet_available: Some(true), .. }))
+            Ok(Some(freachability::Snapshot {
+                internet_available: Some(true),
+                gateway_reachable: Some(true),
+                dns_active: Some(true),
+                ..
+            }))
         );
     }
 
@@ -210,12 +238,56 @@ mod tests {
 
         assert_matches!(
             client1.get_reachability_state(&mut executor),
-            Ok(Some(freachability::Snapshot { internet_available: Some(false), .. }))
+            Ok(Some(freachability::Snapshot {
+                internet_available: Some(false),
+                gateway_reachable: Some(false),
+                dns_active: Some(false),
+                ..
+            }))
         );
         assert_matches!(
             client2.get_reachability_state(&mut executor),
-            Ok(Some(freachability::Snapshot { internet_available: Some(false), .. }))
+            Ok(Some(freachability::Snapshot {
+                internet_available: Some(false),
+                gateway_reachable: Some(false),
+                dns_active: Some(false),
+                ..
+            }))
         );
+
+        assert_matches!(client1.get_reachability_state(&mut executor), Ok(None));
+        assert_matches!(client2.get_reachability_state(&mut executor), Ok(None));
+
+        executor.run_singlethreaded(handler.update_state(|state| {
+            state.internet_available = true;
+            state.gateway_reachable = true;
+        }));
+
+        assert_matches!(
+            client1.get_reachability_state(&mut executor),
+            Ok(Some(freachability::Snapshot {
+                internet_available: Some(true),
+                gateway_reachable: Some(true),
+                dns_active: Some(false),
+                ..
+            }))
+        );
+        assert_matches!(
+            client2.get_reachability_state(&mut executor),
+            Ok(Some(freachability::Snapshot {
+                internet_available: Some(true),
+                gateway_reachable: Some(true),
+                dns_active: Some(false),
+                ..
+            }))
+        );
+
+        // An update that does not change the current state should not be published.
+        executor.run_singlethreaded(handler.update_state(|state| {
+            state.internet_available = true;
+            state.gateway_reachable = true;
+            state.dns_active = false;
+        }));
 
         assert_matches!(client1.get_reachability_state(&mut executor), Ok(None));
         assert_matches!(client2.get_reachability_state(&mut executor), Ok(None));

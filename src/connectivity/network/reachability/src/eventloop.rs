@@ -19,7 +19,7 @@ use {
     futures::{future::FusedFuture, pin_mut, prelude::*, select},
     named_timer::NamedTimeoutExt,
     reachability_core::{watchdog, InterfaceView, Monitor, NeighborCache, FIDL_TIMEOUT_ID},
-    reachability_handler::{ReachabilityHandler, ReachabilityState},
+    reachability_handler::ReachabilityHandler,
     std::collections::HashMap,
     tracing::{debug, error},
 };
@@ -259,11 +259,10 @@ impl EventLoop {
                                     &self.neighbor_cache
                                 ).await;
                                 let () = probe_futures.push(stream.into_future());
-                                self.handler.set_state(
-                                    ReachabilityState {
-                                        internet_available: self.monitor.state().system_has_internet()
-                                    }
-                                ).await;
+                                self.handler.update_state(|state| {
+                                    state.internet_available = self.monitor.state().system_has_internet();
+                                    state.gateway_reachable = self.monitor.state().system_has_gateway();
+                                }).await;
                             }
                         }
                         Some((None, _)) => {
@@ -305,6 +304,9 @@ impl EventLoop {
                             self.latest_dns_addresses = Vec::new();
                         }
                     }
+                    self.handler.update_state(|state| {
+                        state.dns_active = !self.latest_dns_addresses.is_empty();
+                    }).await;
                 }
             }
         }
