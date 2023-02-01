@@ -15,9 +15,8 @@ use fuchsia_inspect::{self as inspect, component};
 use fuchsia_syslog::{self as syslog, fx_log_info, fx_log_warn};
 use futures::lock::Mutex;
 use lazy_static::lazy_static;
-use settings::agent::BlueprintHandle as AgentBlueprintHandle;
 use settings::base::get_default_interfaces;
-use settings::config::base::{get_default_agent_types, AgentType};
+use settings::config::base::get_default_agent_types;
 use settings::config::default_settings::DefaultSetting;
 use settings::handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
 use settings::inspect::listener_logger::ListenerInspectLogger;
@@ -109,7 +108,6 @@ fn main() -> Result<(), Error> {
 
     EnvironmentBuilder::new(Arc::new(storage_factory))
         .configuration(configuration)
-        .agent_mapping(<AgentBlueprintHandle as From<AgentType>>::from)
         .setting_proxy_inspect_info(
             SETTING_PROXY_INSPECT_INFO.node(),
             LISTENER_INSPECT_LOGGER.clone(),

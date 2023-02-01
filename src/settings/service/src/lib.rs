@@ -272,7 +272,6 @@ fn init_storage_dir() -> DirectoryProxy {
 pub struct EnvironmentBuilder<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> {
     configuration: Option<ServiceConfiguration>,
     agent_blueprints: Vec<AgentBlueprintHandle>,
-    agent_mapping_func: Option<Box<dyn Fn(AgentType) -> AgentBlueprintHandle>>,
     event_subscriber_blueprints: Vec<event::subscriber::BlueprintHandle>,
     storage_factory: Arc<T>,
     generate_service: Option<GenerateService>,
@@ -294,7 +293,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
         EnvironmentBuilder {
             configuration: None,
             agent_blueprints: vec![],
-            agent_mapping_func: None,
             event_subscriber_blueprints: vec![],
             storage_factory,
             generate_service: None,
@@ -372,15 +370,6 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
             c.set_controller_flags(controller_flags.iter().copied().collect());
         }
 
-        self
-    }
-
-    /// Sets the mapping function used to generate an [AgentBlueprintHandle] from an [AgentType].
-    pub fn agent_mapping<F>(mut self, agent_mapping_func: F) -> EnvironmentBuilder<T>
-    where
-        F: Fn(AgentType) -> AgentBlueprintHandle + 'static,
-    {
-        self.agent_mapping_func = Some(Box::new(agent_mapping_func));
         self
     }
 
@@ -572,10 +561,11 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
             handler_factory.register(setting_type, handler);
         }
 
-        let agent_blueprints = self
-            .agent_mapping_func
-            .map(|agent_mapping_func| agent_types.into_iter().map(agent_mapping_func).collect())
-            .unwrap_or(self.agent_blueprints);
+        let agent_blueprints = if agent_types.is_empty() {
+            self.agent_blueprints
+        } else {
+            agent_types.into_iter().map(AgentBlueprintHandle::from).collect()
+        };
 
         let job_manager_signature = Manager::spawn(&delegate).await;
         let job_seeder = Seeder::new(&delegate, job_manager_signature).await;
