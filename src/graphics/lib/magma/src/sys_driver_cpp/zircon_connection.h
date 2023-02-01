@@ -149,6 +149,7 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
                   msd_connection_handle_wait_complete_t completer, void* wait_context,
                   zx::unowned_handle handle) override;
   void HandleWaitCancel(void* cancel_token) override;
+  async_dispatcher_t* GetAsyncDispatcher() override { return async_loop_.dispatcher(); }
 
  private:
   static void AsyncWaitHandlerStatic(async_dispatcher_t* dispatcher, async_wait_t* async_wait,

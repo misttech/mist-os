@@ -69,6 +69,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
                   msd_connection_handle_wait_complete_t completer, void* wait_context,
                   zx::unowned_handle handle) override;
   void HandleWaitCancel(void* cancel_token) override;
+  async_dispatcher_t* GetAsyncDispatcher() override;
 
   // Create a buffer from the handle and add it to the map,
   // on success |id_out| contains the id to be used to query the map

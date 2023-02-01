@@ -23,6 +23,10 @@ class StubNotificationHandler : public NotificationHandler {
     assert(false);
   }
   void HandleWaitCancel(void* cancel_token) override { assert(false); }
+  async_dispatcher_t* GetAsyncDispatcher() override {
+    assert(false);
+    return nullptr;
+  }
 };
 
 }  // namespace msd::testing

@@ -14,6 +14,7 @@ source_set("magma_system_tests") {
     "test_magma_system_connection.cc",
     "test_magma_system_context.cc",
     "test_magma_system_device.cc",
+    "test_notification_handler.cc",
     "test_zircon_connection.cc",
   ]
   assert_no_deps = [ "//src/graphics/lib/magma/src/sys_driver" ]
@@ -29,6 +30,7 @@ source_set("magma_system_tests") {
     "$magma_build_root/tests/mock:msd_cpp",
     "//sdk/lib/fit",
     "//third_party/googletest:gtest",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 
   if (is_fuchsia) {

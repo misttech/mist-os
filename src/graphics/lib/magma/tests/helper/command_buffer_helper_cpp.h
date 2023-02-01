@@ -143,6 +143,7 @@ class CommandBufferHelper final : public msd::NotificationHandler {
     async::PostTask(loop_.dispatcher(),
                     [this, cancel_token]() { EXPECT_EQ(cancel_token, &cancel_token_); });
   }
+  async_dispatcher_t* GetAsyncDispatcher() override { return loop_.dispatcher(); }
 
  private:
   CommandBufferHelper(std::unique_ptr<msd::Driver> msd_drv, std::shared_ptr<MagmaSystemDevice> dev,

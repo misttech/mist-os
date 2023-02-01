@@ -5,6 +5,7 @@
 #ifndef SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_CC_H_
 #define SRC_GRAPHICS_LIB_MAGMA_INCLUDE_MSD_MSD_CC_H_
 
+#include <lib/async/dispatcher.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/event.h>
 #include <lib/zx/vmo.h>
@@ -95,6 +96,10 @@ class NotificationHandler {
                           msd_connection_handle_wait_complete_t completer, void* wait_context,
                           zx::unowned_handle handle) = 0;
   virtual void HandleWaitCancel(void* cancel_token) = 0;
+  // Returns an async_dispatcher_t that runs commands serialized with this
+  // Connection. This dispatcher will be shut down before the Connection is
+  // destroyed.
+  virtual async_dispatcher_t* GetAsyncDispatcher() = 0;
 };
 
 class PerfCountPool {

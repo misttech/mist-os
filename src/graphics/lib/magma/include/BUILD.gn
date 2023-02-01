@@ -53,6 +53,7 @@ source_set("msd_cc") {
   public_deps = [
     ":msd_defs",
     "//sdk/lib/stdcompat",
+    "//zircon/system/ulib/async",
     "//zircon/system/ulib/zx",
   ]
 }

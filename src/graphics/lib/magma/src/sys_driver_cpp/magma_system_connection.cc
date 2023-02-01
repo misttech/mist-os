@@ -264,6 +264,11 @@ void MagmaSystemConnection::HandleWaitCancel(void* cancel_token) {
   notification_handler_->HandleWaitCancel(cancel_token);
 }
 
+async_dispatcher_t* MagmaSystemConnection::GetAsyncDispatcher() {
+  DASSERT(notification_handler_);
+  return notification_handler_->GetAsyncDispatcher();
+}
+
 magma::Status MagmaSystemConnection::ImportObject(uint32_t handle,
                                                   magma::PlatformObject::Type object_type,
                                                   uint64_t client_id) {
