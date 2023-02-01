@@ -34,7 +34,7 @@ int main(int argc, char** argv) {
   // Set up the Perfetto environment and task runner.
   auto platform = perfetto::Platform::GetDefaultPlatform();
   auto perfetto_task_runner = platform->CreateTaskRunner({.name_for_debugging = "Perfetto"});
-  trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "perfetto-bridge");
+  trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "perfetto");
 
   // Start up the Perfetto service and IPC host.
   perfetto::ipc::Host* producer_host_ptr = nullptr;

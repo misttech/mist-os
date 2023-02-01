@@ -11,13 +11,13 @@ use {
     ffx_writer::Writer,
     fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy},
     fidl_fuchsia_tracing::KnownCategory,
-    fidl_fuchsia_tracing_controller::{ControllerProxy, ProviderInfo, TraceConfig},
+    fidl_fuchsia_tracing_controller::{ControllerProxy, ProviderInfo, ProviderSpec, TraceConfig},
     futures::future::{BoxFuture, FutureExt},
     lazy_static::lazy_static,
     regex::Regex,
     serde::{Deserialize, Serialize},
     serde_json::Value,
-    std::collections::BTreeSet,
+    std::collections::{BTreeSet, HashMap},
     std::future::Future,
     std::io::{stdin, Stdin},
     std::path::{Component, PathBuf},
@@ -184,6 +184,39 @@ async fn expand_categories(categories: Vec<String>) -> Result<Vec<String>> {
     Ok(expanded_categories.into_iter().collect())
 }
 
+fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
+    let mut provider_specific_categories = HashMap::<&str, Vec<String>>::new();
+    let mut umbrella_categories = vec![];
+    for category in categories {
+        if let Some((provider_name, category)) = category.split_once("/") {
+            provider_specific_categories
+                .entry(provider_name)
+                .and_modify(|categories| categories.push(category.to_string()))
+                .or_insert(vec![category.to_string()]);
+        } else {
+            umbrella_categories.push(category.clone());
+        }
+    }
+
+    let mut trace_config = TraceConfig::EMPTY;
+    if !categories.is_empty() {
+        trace_config.categories = Some(umbrella_categories.clone());
+    }
+    if !provider_specific_categories.is_empty() {
+        trace_config.provider_specs = Some(
+            provider_specific_categories
+                .into_iter()
+                .map(|(name, categories)| ProviderSpec {
+                    name: Some(name.to_string()),
+                    categories: Some(categories),
+                    ..ProviderSpec::EMPTY
+                })
+                .collect(),
+        );
+    }
+    trace_config
+}
+
 // Print as a grid that fills the width of the terminal. Falls back to one value
 // per line if any value is wider than the terminal.
 fn print_grid(writer: &Writer, values: Vec<String>) -> Result<()> {
@@ -276,7 +309,7 @@ pub async fn trace(
                 buffer_size_megabytes_hint: Some(opts.buffer_size),
                 categories: Some(expanded_categories.clone()),
                 buffering_mode: Some(opts.buffering_mode),
-                ..TraceConfig::EMPTY
+                ..map_categories_to_providers(&expanded_categories)
             };
             let output = canonical_path(opts.output)?;
             let res = proxy
@@ -517,6 +550,7 @@ mod tests {
         fidl_fuchsia_developer_ffx as ffx, fidl_fuchsia_tracing as tracing,
         fidl_fuchsia_tracing_controller as tracing_controller,
         futures::TryStreamExt,
+        pretty_assertions::assert_eq,
         regex::Regex,
         serde_json::json,
         std::matches,
@@ -1119,5 +1153,48 @@ Current tracing status:
             let category_group = get_category_group(category_group_name).await.unwrap();
             assert_ne!(0, category_group.len());
         }
+    }
+
+    #[test]
+    fn test_map_categories_to_providers() {
+        let expected_trace_config = TraceConfig {
+            categories: Some(vec!["talon".to_string(), "beak".to_string()]),
+            provider_specs: Some(vec![
+                ProviderSpec {
+                    name: Some("falcon".to_string()),
+                    categories: Some(vec!["prairie".to_string(), "peregrine".to_string()]),
+                    ..ProviderSpec::EMPTY
+                },
+                ProviderSpec {
+                    name: Some("owl".to_string()),
+                    categories: Some(vec![
+                        "screech".to_string(),
+                        "elf".to_string(),
+                        "snowy".to_string(),
+                    ]),
+                    ..ProviderSpec::EMPTY
+                },
+            ]),
+            ..TraceConfig::EMPTY
+        };
+
+        let mut actual_trace_config = map_categories_to_providers(&vec![
+            "owl/screech".to_string(),
+            "owl/elf".to_string(),
+            "owl/snowy".to_string(),
+            "falcon/prairie".to_string(),
+            "talon".to_string(),
+            "beak".to_string(),
+            "falcon/peregrine".to_string(),
+        ]);
+
+        // Lexicographically sort the provider specs on names to ensure a stable test.
+        // The order doesn't matter, but it can vary with different platforms and compiler flags.
+        actual_trace_config
+            .provider_specs
+            .as_mut()
+            .unwrap()
+            .sort_unstable_by_key(|s| s.name.clone().unwrap());
+        assert_eq!(expected_trace_config, actual_trace_config);
     }
 }

@@ -40,5 +40,8 @@ ffx_plugin("ffx_trace") {
     "//sdk/fidl/fuchsia.tracing:fuchsia.tracing_rust",
   ]
 
-  test_deps = [ "//third_party/rust_crates:regex" ]
+  test_deps = [
+    "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:regex",
+  ]
 }
