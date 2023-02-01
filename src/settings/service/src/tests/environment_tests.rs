@@ -3,11 +3,10 @@
 // found in the LICENSE file.
 
 use crate::agent::{
-    AgentError, AgentRegistrar, Context, Invocation, InvocationResult, Lifespan,
+    AgentCreator, AgentError, AgentRegistrar, Context, Invocation, InvocationResult, Lifespan,
     Payload as AgentPayload,
 };
 use crate::base::{Dependency, Entity, SettingType};
-use crate::blueprint_definition;
 use crate::event::{Event, Payload as EventPayload};
 use crate::ingress::fidl;
 use crate::ingress::registration;
@@ -44,7 +43,6 @@ const ENV_NAME: &str = "settings_service_environment_test";
 const TEST_PAYLOAD: &str = "test_payload";
 const TEST_REPLY: &str = "test_reply";
 
-blueprint_definition!("test_agent", TestAgent::create);
 // A test agent to send an event to the message hub. Required so that we can test that
 // a message sent on the message hub returned from environment creation is received by
 // other components attached to the message hub.
@@ -116,7 +114,7 @@ async fn test_message_hub() {
     let Environment { connector: _, delegate, .. } =
         EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
             .service(ServiceRegistry::serve(service_registry))
-            .agents(vec![AgentRegistrar::Blueprint(blueprint::create())])
+            .agents(vec![crate::create_agent!(test_agent, TestAgent::create)])
             .spawn_nested(ENV_NAME)
             .await
             .unwrap();

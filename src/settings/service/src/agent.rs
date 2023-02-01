@@ -148,37 +148,6 @@ impl Context {
     }
 }
 
-#[macro_export]
-macro_rules! blueprint_definition {
-    ($component:literal, $create:expr) => {
-        pub(crate) mod blueprint {
-            #[allow(unused_imports)]
-            use super::*;
-            use futures::future::BoxFuture;
-            use std::sync::Arc;
-            use $crate::agent::{Blueprint, BlueprintHandle, Context};
-
-            pub(crate) fn create() -> BlueprintHandle {
-                Arc::new(BlueprintImpl)
-            }
-
-            struct BlueprintImpl;
-
-            impl Blueprint for BlueprintImpl {
-                fn debug_id(&self) -> &'static str {
-                    $component
-                }
-
-                fn create(&self, context: Context) -> BoxFuture<'static, ()> {
-                    Box::pin(async move {
-                        $create(context).await;
-                    })
-                }
-            }
-        }
-    };
-}
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum Payload {
     Invocation(Invocation),
