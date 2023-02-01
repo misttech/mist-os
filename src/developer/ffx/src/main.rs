@@ -11,7 +11,7 @@ use ffx_command::{
 use ffx_config::EnvironmentContext;
 use ffx_lib_args::FfxBuiltIn;
 use ffx_lib_sub_command::SubCommand;
-use fho::ExternalSubToolSuite;
+use fho_search::ExternalSubToolSuite;
 use std::{os::unix::process::ExitStatusExt, process::ExitStatus, sync::Arc};
 
 /// The command to be invoked and everything it needs to invoke

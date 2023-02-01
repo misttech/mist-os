@@ -4,12 +4,10 @@
 
 pub mod adapters;
 mod from_env;
-mod search;
 mod subtool;
 pub mod testing;
 
 pub use from_env::*;
-pub use search::*;
 pub use subtool::*;
 
 // Used for deriving an FFX tool.
