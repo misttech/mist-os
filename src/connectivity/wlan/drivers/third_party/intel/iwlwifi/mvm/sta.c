@@ -1699,7 +1699,7 @@ zx_status_t iwl_mvm_add_sta(struct iwl_mvm_vif* mvmvif, struct iwl_mvm_sta* mvm_
   mvm_sta->sta_id = sta_id;
   mvm_sta->mac_id_n_color = FW_CMD_ID_AND_COLOR(mvmvif->id, mvmvif->color);
   mvm_sta->mvmvif = mvmvif;
-  if (!mvmvif->mvm->trans->cfg->gen2) {
+  if (!mvmvif->mvm->trans->trans_cfg->gen2) {
     mvm_sta->max_agg_bufsize = LINK_QUAL_AGG_FRAME_LIMIT_DEF;
   } else {
     mvm_sta->max_agg_bufsize = LINK_QUAL_AGG_FRAME_LIMIT_GEN2_DEF;
@@ -2077,7 +2077,7 @@ void iwl_mvm_dealloc_int_sta(struct iwl_mvm* mvm, struct iwl_mvm_int_sta* sta) {
 
 static void iwl_mvm_enable_aux_snif_queue(struct iwl_mvm* mvm, uint16_t* queue, uint8_t sta_id,
                                           uint8_t fifo) {
-  unsigned int wdg_timeout = iwlmvm_mod_params.tfd_q_hang_detect ? mvm->cfg->base_params->wd_timeout
+  unsigned int wdg_timeout = iwlmvm_mod_params.tfd_q_hang_detect ? mvm->trans->trans_cfg->base_params->wd_timeout
                                                                  : IWL_WATCHDOG_DISABLED;
 
   if (iwl_mvm_has_new_tx_api(mvm)) {

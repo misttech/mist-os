@@ -151,11 +151,9 @@ static void FakeEchoWrite32(struct iwl_trans* trans, uint32_t ofs, uint32_t val)
   //
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wthread-safety-analysis"
-  mtx_unlock(&trans_pcie->reg_lock);
   mtx_unlock(&txq->lock);
   iwl_pcie_hcmd_complete(trans, &rxcb);
   mtx_lock(&txq->lock);
-  mtx_lock(&trans_pcie->reg_lock);
 
   iwl_iobuf_release(io_buf);
   io_buf = nullptr;
@@ -185,9 +183,10 @@ class PcieTest : public zxtest::Test {
     trans_ops_.ref = ref_wrapper;
     trans_ops_.unref = unref_wrapper;
 
-    cfg_.base_params = &base_params_;
-    trans_ =
-        iwl_trans_alloc(sizeof(struct iwl_trans_pcie_wrapper), &pci_dev_.dev, &cfg_, &trans_ops_);
+    trans_cfg_.base_params = &base_params_;
+    trans_ = iwl_trans_alloc(sizeof(struct iwl_trans_pcie_wrapper), &pci_dev_.dev, &trans_ops_,
+                             &trans_cfg_);
+    trans_->cfg = &cfg_;
     ASSERT_NE(trans_, nullptr);
     auto wrapper = reinterpret_cast<iwl_trans_pcie_wrapper*>(IWL_TRANS_GET_PCIE_TRANS(trans_));
     wrapper->test = this;
@@ -275,11 +274,11 @@ class PcieTest : public zxtest::Test {
     }
   }
 
-  mock_function::MockFunction<bool, unsigned long*> mock_grab_nic_access_;
-  static bool grab_nic_access_wrapper(struct iwl_trans* trans, unsigned long* flags) {
+  mock_function::MockFunction<bool> mock_grab_nic_access_;
+  static bool grab_nic_access_wrapper(struct iwl_trans* trans) {
     auto wrapper = reinterpret_cast<iwl_trans_pcie_wrapper*>(IWL_TRANS_GET_PCIE_TRANS(trans));
     if (wrapper->test->mock_grab_nic_access_.HasExpectations()) {
-      return wrapper->test->mock_grab_nic_access_.Call(flags);
+      return wrapper->test->mock_grab_nic_access_.Call();
     } else {
       return true;
     }
@@ -365,6 +364,7 @@ class PcieTest : public zxtest::Test {
   struct iwl_trans_pcie* trans_pcie_ = {};
   struct iwl_base_params base_params_ = {};
   struct iwl_cfg cfg_ = {};
+  struct iwl_cfg_trans_params trans_cfg_ = {};
   struct iwl_trans_ops trans_ops_ = {};
   struct iwl_op_mode op_mode_ = {};
   struct iwl_op_mode_ops op_mode_ops_ = {};
@@ -422,7 +422,9 @@ TEST_F(PcieTest, RxInit) {
 
 // Test the multipe Rx queues initialization.
 TEST_F(PcieTest, MqRxInit) {
-  cfg_.mq_rx_supported = true;
+  trans_cfg_.mq_rx_supported = true;  // The new code uses this flag (instead of chip version) to
+                                      // decide initialize the single or multiple queues. Since this
+                                      // test is to test the multi-queue code, manually assert it.
   trans_->num_rx_queues = 16;
   trans_pcie_->rx_buf_size = IWL_AMSDU_2K;
 
@@ -930,23 +932,19 @@ TEST_F(TxTest, UnmapCmdQueue) {
   int half = (txq->n_window + 1) / 2;
   for (int i = 0; i < half; ++i) {
     ASSERT_OK(iwl_trans_pcie_send_hcmd(trans_, &hcmd));
-    EXPECT_TRUE(trans_pcie->ref_cmd_in_flight);
   }
   iwl_pcie_txq_unmap(trans_, trans_pcie->cmd_queue);
-  EXPECT_FALSE(trans_pcie->ref_cmd_in_flight);
 
   // Adds another half and plus one to ensure wrapping.
   for (int i = 0; i < half + 1; ++i) {
     ASSERT_OK(iwl_trans_pcie_send_hcmd(trans_, &hcmd));
-    EXPECT_TRUE(trans_pcie->ref_cmd_in_flight);
   }
   iwl_pcie_txq_unmap(trans_, trans_pcie->cmd_queue);
-  EXPECT_FALSE(trans_pcie->ref_cmd_in_flight);
 
   // All num_tbs should have been cleared to zero.
   for (int index = 0; index < txq->n_window; ++index) {
     void* tfd = iwl_pcie_get_tfd(trans_, txq, index);
-    if (trans_->cfg->use_tfh) {
+    if (trans_->trans_cfg->use_tfh) {
       struct iwl_tfh_tfd* tfd_fh = static_cast<struct iwl_tfh_tfd*>(tfd);
       EXPECT_EQ(0, tfd_fh->num_tbs);
     } else {
@@ -1004,7 +1002,7 @@ TEST_F(TxTest, ReclaimCmdQueueInvalidIndex) {
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, iwl_pcie_cmdq_reclaim_locked(trans_, txq_id, 1));
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, iwl_pcie_cmdq_reclaim_locked(trans_, txq_id, 2));
 
-  uint32_t idx = trans_->cfg->base_params->max_tfd_queue_size + 1;
+  uint32_t idx = trans_->trans_cfg->base_params->max_tfd_queue_size + 1;
   ASSERT_EQ(ZX_ERR_OUT_OF_RANGE, iwl_pcie_cmdq_reclaim_locked(trans_, txq_id, idx));
 
   ASSERT_EQ(ZX_OK, iwl_pcie_cmdq_reclaim_locked(trans_, txq_id, 0));
@@ -1031,9 +1029,13 @@ TEST_F(TxTest, ReclaimCmdQueueMultiReclaim) {
 }
 
 //
-// Ensure the inflight flag is cleared (or not) as appropriate.
+// Ensure the hold NIC awake flag is set as appropriate.
 //
-TEST_F(TxTest, ReclaimCmdQueueInFlightFlag) {
+TEST_F(TxTest, ReclaimCmdHoldNicAwakeFlag) {
+
+  // Remove this workaround once we no longer use iwl7265_2ac_cfg in test/sim-trans.cc.
+  base_params_.apmg_wake_up_wa = true;
+
   ASSERT_OK(iwl_pcie_tx_init(trans_));
 
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans_);
@@ -1042,15 +1044,15 @@ TEST_F(TxTest, ReclaimCmdQueueInFlightFlag) {
   txq->wd_timeout = 0;
   txq->read_ptr = 2;
   txq->write_ptr = 4;
-  trans_pcie->ref_cmd_in_flight = true;
+  trans_pcie->cmd_hold_nic_awake = true;
 
   iwl_pcie_cmdq_reclaim_locked(trans_, txq_id, 2);
-  ASSERT_TRUE(trans_pcie->ref_cmd_in_flight);
+  ASSERT_TRUE(trans_pcie->cmd_hold_nic_awake);
 
   // Once index 3 is reclaimed, the readptr will move to 4 which should
   // make it equal to the write_ptr. This will clear the inflight flag.
   iwl_pcie_cmdq_reclaim_locked(trans_, txq_id, 3);
-  ASSERT_FALSE(trans_pcie->ref_cmd_in_flight);
+  ASSERT_FALSE(trans_pcie->cmd_hold_nic_awake);
 }
 
 TEST_F(TxTest, TxDataCornerCaseUnusedQueue) {
@@ -1096,13 +1098,13 @@ TEST_F(TxTest, TxSoManyPackets) {
   for (int i = 0; i < TFD_QUEUE_SIZE_MAX * 2; i++) {
     ASSERT_EQ(ZX_OK, iwl_trans_pcie_tx(trans_, wlan_pkt_->mac_pkt(), &dev_cmd_, txq_id_));
   }
+  op_mode_queue_full_.VerifyAndClear();
 
   op_mode_queue_not_full_.ExpectCall(txq_id_);
   // reclaim
   iwl_trans_pcie_reclaim(trans_, txq_id_, /*ssn*/ TFD_QUEUE_SIZE_MAX - TX_RESERVED_SPACE);
   // We don't have much to check. But at least we can ensure the call doesn't crash.
   op_mode_queue_not_full_.VerifyAndClear();
-  op_mode_queue_full_.VerifyAndClear();
 }
 
 //

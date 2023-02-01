@@ -52,15 +52,31 @@ enum iwl_debug_cmds {
    * &struct iwl_dbg_mem_access_rsp
    */
   UMAC_RD_WR = 0x1,
-#ifdef CPTCFG_IWLWIFI_DEBUG_HOST_CMD_ENABLED
   /**
-   * @DEBUG_HOST_NTF:
-   * &struct iwl_adwell_fine_tune_metrics_report or
-   * &struct iwl_channel_dwell_report or
-   * &struct iwl_profiling_notification
+	 * @HOST_EVENT_CFG:
+	 * updates the enabled event severities
+	 * &struct iwl_dbg_host_event_cfg_cmd
    */
-  DEBUG_HOST_NTF = 0xFC,
-#endif
+	HOST_EVENT_CFG = 0x3,
+	/**
+	 * @DBGC_SUSPEND_RESUME:
+	 * DBGC suspend/resume commad. Uses a single dword as data:
+	 * 0 - resume DBGC recording
+	 * 1 - suspend DBGC recording
+	 */
+	DBGC_SUSPEND_RESUME = 0x7,
+	/**
+	 * @BUFFER_ALLOCATION:
+	 * passes DRAM buffers to a DBGC
+	 * &struct iwl_buf_alloc_cmd
+	 */
+	BUFFER_ALLOCATION = 0x8,
+	/**
+	 * @FW_DUMP_COMPLETE_CMD:
+	 * sends command to fw once dump collection completed
+	 * &struct iwl_dbg_dump_complete_cmd
+	 */
+	FW_DUMP_COMPLETE_CMD = 0xB,
   /**
    * @MFU_ASSERT_DUMP_NTF:
    * &struct iwl_mfu_assert_dump_notif
@@ -81,6 +97,16 @@ enum {
   FW_ERR_OBSOLETE_FUNC = 0x12,
   FW_ERR_UNEXPECTED = 0xFE,
   FW_ERR_FATAL = 0xFF
+};
+
+/** enum iwl_dbg_suspend_resume_cmds - dbgc suspend resume operations
+ * dbgc suspend resume command operations
+ * @DBGC_RESUME_CMD: resume dbgc recording
+ * @DBGC_SUSPEND_CMD: stop dbgc recording
+ */
+enum iwl_dbg_suspend_resume_cmds {
+	DBGC_RESUME_CMD,
+	DBGC_SUSPEND_CMD,
 };
 
 /**
@@ -336,6 +362,15 @@ struct iwl_continuous_record_mode {
 struct iwl_continuous_record_cmd {
   struct iwl_continuous_record_mode record_mode;
   uint8_t pad[CONT_REC_COMMAND_SIZE - sizeof(struct iwl_continuous_record_mode)];
+} __packed;
+
+/**
+ * struct iwl_dbg_suspend_resume_cmd - dbgc suspend resume command
+ * @operation: suspend or resume operation, uses
+ *	&enum iwl_dbg_suspend_resume_cmds
+ */
+struct iwl_dbg_suspend_resume_cmd {
+	__le32 operation;
 } __packed;
 
 /* maximum fragments to be allocated per target of allocationId */

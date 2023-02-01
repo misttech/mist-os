@@ -1476,7 +1476,7 @@ void iwl_mvm_rx_mpdu_mq(struct iwl_mvm* mvm, struct napi_struct* napi,
     return;
   }
 
-  if (mvm->trans->cfg->device_family >= IWL_DEVICE_FAMILY_22560) {
+  if (mvm->trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
     rate_n_flags = le32_to_cpu(desc->v3.rate_n_flags);
     channel = desc->v3.channel;
     // gp2_on_air_rise = le32_to_cpu(desc->v3.gp2_on_air_rise);

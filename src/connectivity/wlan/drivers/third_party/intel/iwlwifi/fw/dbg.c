@@ -39,6 +39,7 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/debug.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/debugfs.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/runtime.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-csr.h"
@@ -47,6 +48,14 @@
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-prph.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-trans.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/debug.h"
+
+
+// TODO(fxbug.dev/119415): review these once we refactor (or reorder) the functions.
+static zx_status_t iwl_fw_dbg_restart_recording(struct iwl_trans *trans,
+					struct iwl_fw_dbg_params *params);
+void iwl_fw_dbg_stop_restart_recording(struct iwl_fw_runtime *fwrt,
+               struct iwl_fw_dbg_params *params,
+               bool stop);
 
 /**
  * struct iwl_fw_dump_ptrs - set of pointers needed for the fw-error-dump
@@ -396,6 +405,12 @@ static const struct iwl_prph_range iwl_prph_dump_addr_22000[] = {
     {.start = 0x00a0c1a0, .end = 0x00a0c1a8}, {.start = 0x00a0c1b0, .end = 0x00a0c1b8},
 };
 
+static const struct iwl_prph_range iwl_prph_dump_addr_ax210[] = {
+	{ .start = 0x00d03c00, .end = 0x00d03c64 },
+	{ .start = 0x00d05c18, .end = 0x00d05c1c },
+	{ .start = 0x00d0c000, .end = 0x00d0c174 },
+};
+
 static void iwl_read_prph_block(struct iwl_trans* trans, uint32_t start, uint32_t len_bytes,
                                 __le32* data) {
   uint32_t i;
@@ -468,14 +483,18 @@ static void iwl_fw_prph_handler(struct iwl_fw_runtime* fwrt, void* ptr,
                                                 const struct iwl_prph_range*, uint32_t, void*)) {
   uint32_t range_len;
 
-  if (fwrt->trans->cfg->device_family >= IWL_DEVICE_FAMILY_22000) {
+	if (fwrt->trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
+		range_len = ARRAY_SIZE(iwl_prph_dump_addr_ax210);
+		handler(fwrt, iwl_prph_dump_addr_ax210, range_len, ptr);
+	} else if (fwrt->trans->trans_cfg->device_family >=
+		   IWL_DEVICE_FAMILY_22000) {
     range_len = ARRAY_SIZE(iwl_prph_dump_addr_22000);
     handler(fwrt, iwl_prph_dump_addr_22000, range_len, ptr);
   } else {
     range_len = ARRAY_SIZE(iwl_prph_dump_addr_comm);
     handler(fwrt, iwl_prph_dump_addr_comm, range_len, ptr);
 
-    if (fwrt->trans->cfg->mq_rx_supported) {
+    if (fwrt->trans->trans_cfg->mq_rx_supported) {
       range_len = ARRAY_SIZE(iwl_prph_dump_addr_9000);
       handler(fwrt, iwl_prph_dump_addr_9000, range_len, ptr);
     }
@@ -647,8 +666,9 @@ static struct iwl_fw_error_dump_file* _iwl_fw_error_dump(struct iwl_fw_runtime* 
       iwl_fw_prph_handler(fwrt, &prph_len, iwl_fw_get_prph_len);
     }
 
-    if (fwrt->trans->cfg->device_family == IWL_DEVICE_FAMILY_7000 &&
-        iwl_fw_dbg_type_on(fwrt, IWL_FW_ERROR_DUMP_RADIO_REG)) {
+		if (fwrt->trans->trans_cfg->device_family ==
+		    IWL_DEVICE_FAMILY_7000 &&
+		    iwl_fw_dbg_type_on(fwrt, IWL_FW_ERROR_DUMP_RADIO_REG)) {
       radio_len = sizeof(*dump_data) + RADIO_REG_MAX_READ;
     }
   }
@@ -712,10 +732,10 @@ static struct iwl_fw_error_dump_file* _iwl_fw_error_dump(struct iwl_fw_runtime* 
     dump_data->type = cpu_to_le32(IWL_FW_ERROR_DUMP_DEV_FW_INFO);
     dump_data->len = cpu_to_le32(sizeof(*dump_info));
     dump_info = (void*)dump_data->data;
-    dump_info->device_family = fwrt->trans->cfg->device_family == IWL_DEVICE_FAMILY_7000
-                                   ? cpu_to_le32(IWL_FW_ERROR_DUMP_FAMILY_7)
-                                   : cpu_to_le32(IWL_FW_ERROR_DUMP_FAMILY_8);
-    dump_info->hw_step = cpu_to_le32(CSR_HW_REV_STEP(fwrt->trans->hw_rev));
+		dump_info->hw_type =
+			cpu_to_le32(CSR_HW_REV_TYPE(fwrt->trans->hw_rev));
+		dump_info->hw_step =
+			cpu_to_le32(fwrt->trans->hw_rev_step);
     memcpy(dump_info->fw_human_readable, fwrt->fw->human_readable,
            sizeof(dump_info->fw_human_readable));
     strncpy((char*)dump_info->dev_human_readable, fwrt->trans->cfg->name,
@@ -1341,67 +1361,6 @@ IWL_EXPORT_SYMBOL(iwl_fw_start_dbg_conf);
 
 #endif  // NEEDS_PORTING
 
-static int iwl_fw_dbg_start_stop_hcmd(struct iwl_fw_runtime* fwrt, bool start) {
-  struct iwl_continuous_record_cmd cont_rec = {};
-  struct iwl_host_cmd hcmd = {
-      .data[0] = &cont_rec,
-      .flags = CMD_ASYNC,
-      .id = LDBG_CONFIG_CMD,
-      .len[0] = sizeof(cont_rec),
-  };
-
-  cont_rec.record_mode.enable_recording =
-      start ? cpu_to_le16(START_DEBUG_RECORDING) : cpu_to_le16(STOP_DEBUG_RECORDING);
-
-  return iwl_trans_send_cmd(fwrt->trans, &hcmd);
-}
-
-static inline void _iwl_fw_dbg_stop_recording(struct iwl_trans* trans,
-                                              struct iwl_fw_dbg_params* params) {
-  if (trans->cfg->device_family == IWL_DEVICE_FAMILY_7000) {
-    iwl_set_bits_prph(trans, MON_BUFF_SAMPLE_CTL, 0x100);
-    return;
-  }
-
-  if (params) {
-    params->in_sample = iwl_read_prph(trans, DBGC_IN_SAMPLE);
-    params->out_ctrl = iwl_read_prph(trans, DBGC_OUT_CTRL);
-  }
-
-  iwl_write_prph(trans, DBGC_IN_SAMPLE, 0);
-  zx_nanosleep(zx_deadline_after(ZX_USEC(100)));
-  iwl_write_prph(trans, DBGC_OUT_CTRL, 0);
-#ifdef CPTCFG_IWLWIFI_DEBUGFS
-  trans->dbg_rec_on = false;
-#endif
-}
-
-static inline void iwl_fw_dbg_stop_recording(struct iwl_fw_runtime* fwrt,
-                                             struct iwl_fw_dbg_params* params) {
-  if (fwrt->trans->cfg->device_family < IWL_DEVICE_FAMILY_22560) {
-    _iwl_fw_dbg_stop_recording(fwrt->trans, params);
-  } else {
-    iwl_fw_dbg_start_stop_hcmd(fwrt, false);
-  }
-}
-
-static inline void _iwl_fw_dbg_restart_recording(struct iwl_trans* trans,
-                                                 struct iwl_fw_dbg_params* params) {
-  if (WARN_ON(!params)) {
-    return;
-  }
-
-  if (trans->cfg->device_family == IWL_DEVICE_FAMILY_7000) {
-    iwl_clear_bits_prph(trans, MON_BUFF_SAMPLE_CTL, 0x100);
-    iwl_clear_bits_prph(trans, MON_BUFF_SAMPLE_CTL, 0x1);
-    iwl_set_bits_prph(trans, MON_BUFF_SAMPLE_CTL, 0x1);
-  } else {
-    iwl_write_prph(trans, DBGC_IN_SAMPLE, params->in_sample);
-    zx_nanosleep(zx_deadline_after(ZX_USEC(100)));
-    iwl_write_prph(trans, DBGC_OUT_CTRL, params->out_ctrl);
-  }
-}
-
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
 static inline void iwl_fw_set_dbg_rec_on(struct iwl_fw_runtime* fwrt) {
   if (fwrt->fw->dbg.dest_tlv && fwrt->cur_fw_img == IWL_UCODE_REGULAR) {
@@ -1409,18 +1368,6 @@ static inline void iwl_fw_set_dbg_rec_on(struct iwl_fw_runtime* fwrt) {
   }
 }
 #endif
-
-static inline void iwl_fw_dbg_restart_recording(struct iwl_fw_runtime* fwrt,
-                                                struct iwl_fw_dbg_params* params) {
-  if (fwrt->trans->cfg->device_family < IWL_DEVICE_FAMILY_22560) {
-    _iwl_fw_dbg_restart_recording(fwrt->trans, params);
-  } else {
-    iwl_fw_dbg_start_stop_hcmd(fwrt, true);
-  }
-#ifdef CPTCFG_IWLWIFI_DEBUGFS
-  iwl_fw_set_dbg_rec_on(fwrt);
-#endif
-}
 
 /* this function assumes dump_start was called beforehand and dump_end will be
  * called afterwards
@@ -1439,7 +1386,7 @@ void iwl_fw_dbg_collect_sync(struct iwl_fw_runtime* fwrt) {
     return;
   }
 
-  iwl_fw_dbg_stop_recording(fwrt, &params);
+  iwl_fw_dbg_stop_restart_recording(fwrt, &params, true);
 
   iwl_fw_error_dump(fwrt);
 
@@ -1447,7 +1394,7 @@ void iwl_fw_dbg_collect_sync(struct iwl_fw_runtime* fwrt) {
   if (!test_bit(STATUS_FW_ERROR, &fwrt->trans->status) && fwrt->fw->dbg.dest_tlv) {
     /* wait before we collect the data till the DBGC stop */
     zx_nanosleep(zx_deadline_after(ZX_USEC(500)));
-    iwl_fw_dbg_restart_recording(fwrt, &params);
+    iwl_fw_dbg_restart_recording(fwrt->trans, &params);
   }
 }
 IWL_EXPORT_SYMBOL(iwl_fw_dbg_collect_sync)
@@ -1499,3 +1446,84 @@ void iwl_fw_dbg_read_d3_debug_data(struct iwl_fw_runtime *fwrt)
 IWL_EXPORT_SYMBOL(iwl_fw_dbg_read_d3_debug_data);
 
 #endif  // NEEDS_PORTING
+
+static int iwl_fw_dbg_suspend_resume_hcmd(struct iwl_trans *trans, bool suspend)
+{
+	struct iwl_dbg_suspend_resume_cmd cmd = {
+		.operation = suspend ?
+			cpu_to_le32(DBGC_SUSPEND_CMD) :
+			cpu_to_le32(DBGC_RESUME_CMD),
+	};
+	struct iwl_host_cmd hcmd = {
+		.id = WIDE_ID(DEBUG_GROUP, DBGC_SUSPEND_RESUME),
+		.data[0] = &cmd,
+		.len[0] = sizeof(cmd),
+	};
+
+	return iwl_trans_send_cmd(trans, &hcmd);
+}
+
+static void iwl_fw_dbg_stop_recording(struct iwl_trans *trans,
+				      struct iwl_fw_dbg_params *params)
+{
+	if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_7000) {
+		iwl_set_bits_prph(trans, MON_BUFF_SAMPLE_CTL, 0x100);
+		return;
+	}
+
+	if (params) {
+		params->in_sample = iwl_read_umac_prph(trans, DBGC_IN_SAMPLE);
+		params->out_ctrl = iwl_read_umac_prph(trans, DBGC_OUT_CTRL);
+	}
+
+	iwl_write_umac_prph(trans, DBGC_IN_SAMPLE, 0);
+	/* wait for the DBGC to finish writing the internal buffer to DRAM to
+	 * avoid halting the HW while writing
+	 */
+	zx_nanosleep(zx_deadline_after(ZX_USEC(1000)));
+	iwl_write_umac_prph(trans, DBGC_OUT_CTRL, 0);
+}
+
+static zx_status_t iwl_fw_dbg_restart_recording(struct iwl_trans *trans,
+					struct iwl_fw_dbg_params *params)
+{
+	if (!params)
+		return ZX_ERR_IO;
+
+	if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_7000) {
+		iwl_clear_bits_prph(trans, MON_BUFF_SAMPLE_CTL, 0x100);
+		iwl_clear_bits_prph(trans, MON_BUFF_SAMPLE_CTL, 0x1);
+		iwl_set_bits_prph(trans, MON_BUFF_SAMPLE_CTL, 0x1);
+	} else {
+		iwl_write_umac_prph(trans, DBGC_IN_SAMPLE, params->in_sample);
+		iwl_write_umac_prph(trans, DBGC_OUT_CTRL, params->out_ctrl);
+	}
+
+	return ZX_OK;
+}
+
+void iwl_fw_dbg_stop_restart_recording(struct iwl_fw_runtime *fwrt,
+				       struct iwl_fw_dbg_params *params,
+				       bool stop)
+{
+	int ret __maybe_unused = 0;
+
+	if (test_bit(STATUS_FW_ERROR, &fwrt->trans->status))
+		return;
+
+	if (fw_has_capa(&fwrt->fw->ucode_capa,
+			IWL_UCODE_TLV_CAPA_DBG_SUSPEND_RESUME_CMD_SUPP))
+		ret = iwl_fw_dbg_suspend_resume_hcmd(fwrt->trans, stop);
+	else if (stop)
+		iwl_fw_dbg_stop_recording(fwrt->trans, params);
+	else
+		ret = iwl_fw_dbg_restart_recording(fwrt->trans, params);
+#ifdef CONFIG_IWLWIFI_DEBUGFS
+	if (!ret) {
+		if (stop)
+			fwrt->trans->dbg.rec_on = false;
+		else
+			iwl_fw_set_dbg_rec_on(fwrt);
+	}
+#endif
+}

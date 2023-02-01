@@ -747,7 +747,7 @@ static void iwl_init_sbands(struct iwl_trans* trans, struct iwl_nvm_data* data,
   sband->n_bitrates = N_RATES_24;
   n_used += iwl_init_sband_channels(data, sband, n_channels, WLAN_BAND_TWO_GHZ);
 
-  iwl_init_ht_hw_capab(cfg, data, &sband->ht_cap, WLAN_BAND_TWO_GHZ, tx_chains, rx_chains);
+  iwl_init_ht_hw_capab(trans, data, &sband->ht_cap, WLAN_BAND_TWO_GHZ, tx_chains, rx_chains);
 
 #if 0   // NEEDS_PORTING
   // TODO(84773): HE support.
@@ -762,7 +762,7 @@ static void iwl_init_sbands(struct iwl_trans* trans, struct iwl_nvm_data* data,
   sband->n_bitrates = N_RATES_52;
   n_used += iwl_init_sband_channels(data, sband, n_channels, WLAN_BAND_FIVE_GHZ);
 
-  iwl_init_ht_hw_capab(cfg, data, &sband->ht_cap, WLAN_BAND_FIVE_GHZ, tx_chains, rx_chains);
+  iwl_init_ht_hw_capab(trans, data, &sband->ht_cap, WLAN_BAND_FIVE_GHZ, tx_chains, rx_chains);
 
 #if 0   // NEEDS_PORTING
   // TODO(36684): Supports VHT (802.11ac)
@@ -867,8 +867,10 @@ static void iwl_flip_hw_address(__le32 mac_addr0, __le32 mac_addr1, uint8_t* des
 }
 
 static void iwl_set_hw_address_from_csr(struct iwl_trans* trans, struct iwl_nvm_data* data) {
-  __le32 mac_addr0 = cpu_to_le32(iwl_read32(trans, trans->cfg->csr->mac_addr0_strap));
-  __le32 mac_addr1 = cpu_to_le32(iwl_read32(trans, trans->cfg->csr->mac_addr1_strap));
+	__le32 mac_addr0 = cpu_to_le32(iwl_read32(trans,
+						  CSR_MAC_ADDR0_STRAP(trans)));
+	__le32 mac_addr1 = cpu_to_le32(iwl_read32(trans,
+						  CSR_MAC_ADDR1_STRAP(trans)));
 
   iwl_flip_hw_address(mac_addr0, mac_addr1, data->hw_addr);
   /*
@@ -879,8 +881,8 @@ static void iwl_set_hw_address_from_csr(struct iwl_trans* trans, struct iwl_nvm_
     return;
   }
 
-  mac_addr0 = cpu_to_le32(iwl_read32(trans, trans->cfg->csr->mac_addr0_otp));
-  mac_addr1 = cpu_to_le32(iwl_read32(trans, trans->cfg->csr->mac_addr1_otp));
+	mac_addr0 = cpu_to_le32(iwl_read32(trans, CSR_MAC_ADDR0_OTP(trans)));
+	mac_addr1 = cpu_to_le32(iwl_read32(trans, CSR_MAC_ADDR1_OTP(trans)));
 
   iwl_flip_hw_address(mac_addr0, mac_addr1, data->hw_addr);
 }
@@ -967,7 +969,7 @@ static zx_status_t iwl_set_hw_address(struct iwl_trans* trans, const struct iwl_
   return ZX_OK;
 }
 
-static bool iwl_nvm_no_wide_in_5ghz(struct device* dev, const struct iwl_cfg* cfg,
+static bool iwl_nvm_no_wide_in_5ghz(struct iwl_trans *trans, const struct iwl_cfg* cfg,
                                     const __be16* nvm_hw) {
   /*
    * Workaround a bug in Indonesia SKUs where the regulatory in
@@ -978,7 +980,7 @@ static bool iwl_nvm_no_wide_in_5ghz(struct device* dev, const struct iwl_cfg* cf
    * in 5GHz otherwise the FW will throw a sysassert when we try
    * to use them.
    */
-  if (cfg->device_family == IWL_DEVICE_FAMILY_7000) {
+  if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_7000) {
     /*
      * Unlike the other sections in the NVM, the hw
      * section uses big-endian.
@@ -1001,7 +1003,6 @@ struct iwl_nvm_data* iwl_parse_nvm_data(struct iwl_trans* trans, const struct iw
                                         const __le16* mac_override, const __le16* phy_sku,
                                         uint8_t tx_chains, uint8_t rx_chains,
                                         bool lar_fw_supported) {
-  struct device* dev = trans->dev;
   struct iwl_nvm_data* data;
   bool lar_enabled;
   uint32_t sku, radio_cfg;
@@ -1086,7 +1087,7 @@ struct iwl_nvm_data* iwl_parse_nvm_data(struct iwl_trans* trans, const struct iw
     sbands_flags |= IWL_NVM_SBANDS_FLAGS_LAR;
   }
 
-  if (iwl_nvm_no_wide_in_5ghz(dev, cfg, nvm_hw)) {
+  if (iwl_nvm_no_wide_in_5ghz(trans, cfg, nvm_hw)) {
     sbands_flags |= IWL_NVM_SBANDS_FLAGS_NO_WIDE_IN_5GHZ;
   }
 

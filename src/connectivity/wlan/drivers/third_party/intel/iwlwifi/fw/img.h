@@ -84,6 +84,9 @@ struct iwl_ucode_capabilities {
 #endif
   unsigned long _api[BITS_TO_LONGS(NUM_IWL_UCODE_TLV_API)];
   unsigned long _capa[BITS_TO_LONGS(NUM_IWL_UCODE_TLV_CAPA)];
+
+	const struct iwl_fw_cmd_version *cmd_versions;
+	u32 n_cmd_versions;
 };
 
 static inline bool fw_has_api(const struct iwl_ucode_capabilities* capabilities,
@@ -303,5 +306,13 @@ static inline const struct fw_img* iwl_get_ucode_image(const struct iwl_fw* fw,
 
   return &fw->img[ucode_type];
 }
+
+u8 iwl_fw_lookup_cmd_ver(const struct iwl_fw *fw, u32 cmd_id, u8 def);
+
+u8 iwl_fw_lookup_notif_ver(const struct iwl_fw *fw, u8 grp, u8 cmd, u8 def);
+const char *iwl_fw_lookup_assert_desc(u32 num);
+
+#define FW_SYSASSERT_CPU_MASK		0xf0000000
+#define FW_SYSASSERT_PNVM_MISSING	0x0010070d
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_IMG_H_

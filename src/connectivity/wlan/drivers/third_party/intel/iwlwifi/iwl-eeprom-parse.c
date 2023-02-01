@@ -685,9 +685,10 @@ size_t iwl_init_sband_channels(struct iwl_nvm_data* data, struct ieee80211_suppo
 #define MAX_BIT_RATE_40_MHZ 150 /* Mbps */
 #define MAX_BIT_RATE_20_MHZ 72  /* Mbps */
 
-void iwl_init_ht_hw_capab(const struct iwl_cfg* cfg, struct iwl_nvm_data* data,
+void iwl_init_ht_hw_capab(struct iwl_trans *trans, struct iwl_nvm_data* data,
                           struct ieee80211_sta_ht_cap* ht_info, wlan_band_t band, uint8_t tx_chains,
                           uint8_t rx_chains) {
+  const struct iwl_cfg *cfg = trans->cfg;
   int max_bit_rate = 0;
 
   tx_chains = hweight8(tx_chains);
@@ -722,12 +723,12 @@ void iwl_init_ht_hw_capab(const struct iwl_cfg* cfg, struct iwl_nvm_data* data,
     ht_info->cap |= IEEE80211_HT_CAP_LDPC_CODING;
   }
 
-  if ((cfg->mq_rx_supported && iwlwifi_mod_params.amsdu_size == IWL_AMSDU_DEF) ||
+  if ((trans->trans_cfg->mq_rx_supported && iwlwifi_mod_params.amsdu_size == IWL_AMSDU_DEF) ||
       iwlwifi_mod_params.amsdu_size >= IWL_AMSDU_8K) {
     ht_info->cap |= IEEE80211_HT_CAP_MAX_AMSDU;
   }
 
-  ht_info->ampdu_factor = cfg->max_ht_ampdu_exponent;
+  ht_info->ampdu_factor = IEEE80211_HT_MAX_AMPDU_64K;
   ht_info->ampdu_density = IEEE80211_HT_MPDU_DENSITY_4;
 
   ht_info->mcs.rx_mask[0] = 0xFF;

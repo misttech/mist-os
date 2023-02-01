@@ -72,7 +72,7 @@ enum iwl_mvm_dqa_txq {
   IWL_MVM_DQA_MAX_MGMT_QUEUE = 8,
   IWL_MVM_DQA_AP_PROBE_RESP_QUEUE = 9,
   IWL_MVM_DQA_MIN_DATA_QUEUE = 10,
-  IWL_MVM_DQA_MAX_DATA_QUEUE = 31,
+	IWL_MVM_DQA_MAX_DATA_QUEUE = 30,
 };
 
 enum iwl_mvm_tx_fifo {
@@ -106,8 +106,11 @@ enum iwl_tx_queue_cfg_actions {
   TX_QUEUE_CFG_TFD_SHORT_FORMAT = BIT(1),
 };
 
+#define IWL_DEFAULT_QUEUE_SIZE_EHT (1024 * 4)
+#define IWL_DEFAULT_QUEUE_SIZE_HE 1024
 #define IWL_DEFAULT_QUEUE_SIZE 256
 #define IWL_MGMT_QUEUE_SIZE 16
+#define IWL_CMD_QUEUE_SIZE 32
 /**
  * struct iwl_tx_queue_cfg_cmd - txq hw scheduler config command
  * @sta_id: station id

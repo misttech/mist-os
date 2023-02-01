@@ -30,6 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *****************************************************************************/
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/system.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/dbg.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/debugfs.h"
 #include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/runtime.h"
@@ -60,3 +61,50 @@ void iwl_fw_runtime_free(struct iwl_fw_runtime* fwrt) {
 void iwl_fw_runtime_suspend(struct iwl_fw_runtime* fwrt) { iwl_fw_suspend_timestamp(fwrt); }
 
 void iwl_fw_runtime_resume(struct iwl_fw_runtime* fwrt) { iwl_fw_resume_timestamp(fwrt); }
+
+/* set device type and latency */
+zx_status_t iwl_set_soc_latency(struct iwl_fw_runtime *fwrt)
+{
+	struct iwl_soc_configuration_cmd cmd = {};
+	struct iwl_host_cmd hcmd = {
+		.id = WIDE_ID(SYSTEM_GROUP, SOC_CONFIGURATION_CMD),
+		.data[0] = &cmd,
+		.len[0] = sizeof(cmd),
+	};
+	zx_status_t ret;
+
+	/*
+	 * In VER_1 of this command, the discrete value is considered
+	 * an integer; In VER_2, it's a bitmask.  Since we have only 2
+	 * values in VER_1, this is backwards-compatible with VER_2,
+	 * as long as we don't set any other bits.
+	 */
+	if (!fwrt->trans->trans_cfg->integrated)
+		cmd.flags = cpu_to_le32(SOC_CONFIG_CMD_FLAGS_DISCRETE);
+
+	BUILD_BUG_ON(IWL_CFG_TRANS_LTR_DELAY_NONE !=
+		     SOC_FLAGS_LTR_APPLY_DELAY_NONE);
+	BUILD_BUG_ON(IWL_CFG_TRANS_LTR_DELAY_200US !=
+		     SOC_FLAGS_LTR_APPLY_DELAY_200);
+	BUILD_BUG_ON(IWL_CFG_TRANS_LTR_DELAY_2500US !=
+		     SOC_FLAGS_LTR_APPLY_DELAY_2500);
+	BUILD_BUG_ON(IWL_CFG_TRANS_LTR_DELAY_1820US !=
+		     SOC_FLAGS_LTR_APPLY_DELAY_1820);
+
+	if (fwrt->trans->trans_cfg->ltr_delay != IWL_CFG_TRANS_LTR_DELAY_NONE &&
+	    !WARN_ON(!fwrt->trans->trans_cfg->integrated))
+		cmd.flags |= le32_encode_bits(fwrt->trans->trans_cfg->ltr_delay,
+					      SOC_FLAGS_LTR_APPLY_DELAY_MASK);
+
+	if (iwl_fw_lookup_cmd_ver(fwrt->fw, SCAN_REQ_UMAC,
+				  IWL_FW_CMD_VER_UNKNOWN) >= 2 &&
+	    fwrt->trans->trans_cfg->low_latency_xtal)
+		cmd.flags |= cpu_to_le32(SOC_CONFIG_CMD_FLAGS_LOW_LATENCY);
+
+	cmd.latency = cpu_to_le32(fwrt->trans->trans_cfg->xtal_latency);
+
+	ret = iwl_trans_send_cmd(fwrt->trans, &hcmd);
+	if (ret != ZX_OK)
+		IWL_ERR(fwrt, "Failed to set soc latency: %d\n", ret);
+	return ret;
+}

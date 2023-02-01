@@ -175,9 +175,11 @@ static void iwl_sim_trans_configure(struct iwl_trans* trans,
 
 static void iwl_sim_trans_set_pmi(struct iwl_trans* trans, bool state) {}
 
-static void iwl_sim_trans_sw_reset(struct iwl_trans* trans) {}
+static zx_status_t iwl_sim_trans_sw_reset(struct iwl_trans* trans, bool retake_ownership) {
+  return ZX_OK;
+}
 
-static bool iwl_sim_trans_grab_nic_access(struct iwl_trans* trans, unsigned long* flags) {
+static bool iwl_sim_trans_grab_nic_access(struct iwl_trans* trans) {
   return false;
 }
 
@@ -255,29 +257,38 @@ static struct iwl_trans_ops trans_ops_sim_trans = {
 
 // iwl_trans_alloc() will allocate memory containing iwl_trans + sim_trans_priv.
 static struct iwl_trans* iwl_sim_trans_transport_alloc(struct device* dev,
-                                                       const struct iwl_cfg* cfg, SimMvm* fw) {
+                                                       const struct iwl_cfg_trans_params* trans_cfg,
+                                                       SimMvm* fw) {
   struct iwl_trans* iwl_trans =
-      iwl_trans_alloc(sizeof(struct sim_trans_priv), dev, cfg, &trans_ops_sim_trans);
+      iwl_trans_alloc(sizeof(struct sim_trans_priv), dev, &trans_ops_sim_trans, trans_cfg);
 
   IWL_TRANS_GET_SIM_TRANS(iwl_trans)->fw = fw;
 
   return iwl_trans;
 }
 
-// This function intends to be like this because we want to mimic the transport_pcie_bind().
-// But definitely can be refactored into the SimTransport::Init().
-// 'out_trans' is used to return the new allocated 'struct iwl_trans'.
+// This function intends to be like this because we want to mimic the PcieDevice::DdkInit().
+// The goal is to allocate transportation layer resources and bind them together.
+//
+// We also determine the chip we want to simulate in this function. Currently we choose AX201.
+//
+// A 'struct iwl_trans' instance will returned in 'out_trans'.
+//
 static zx_status_t sim_transport_bind(SimMvm* fw, struct device* dev,
                                       struct iwl_trans** out_iwl_trans,
                                       wlan::iwlwifi::WlanPhyImplDevice** out_device,
                                       async_dispatcher_t* driver_dispatcher) {
   zx_status_t status = ZX_OK;
   const struct iwl_cfg* cfg = &iwl7265_2ac_cfg;
+  const struct iwl_cfg_trans_params* trans_cfg = (const struct iwl_cfg_trans_params*)cfg;
+  // We can force the cast above because the 'trans_cfg' is not used when 'cfg' is assigned.
 
-  struct iwl_trans* iwl_trans = iwl_sim_trans_transport_alloc(dev, cfg, fw);
+  struct iwl_trans* iwl_trans = iwl_sim_trans_transport_alloc(dev, trans_cfg, fw);
   if (!iwl_trans) {
     return ZX_ERR_INTERNAL;
   }
+  iwl_trans->cfg = cfg;  // Assign the lagecy 'cfg' pointer. The production code assigns this value
+                         // iwl_pci_probe(). However, the unittest code doesn't have that code path.
   ZX_ASSERT(out_iwl_trans);
 
   std::unique_ptr<SimTransDevice> device;

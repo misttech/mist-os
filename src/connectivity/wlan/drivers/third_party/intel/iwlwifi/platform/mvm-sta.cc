@@ -122,7 +122,7 @@ zx_status_t MvmSta::SetKey(const fuchsia_wlan_softmac::wire::WlanKeyConfig* key_
   }
 
   uint8_t key_type = static_cast<uint8_t>(key_config->key_type());
-  if (mvm->trans->cfg->gen2 || iwl_mvm_has_new_tx_api(mvm)) {
+  if (mvm->trans->trans_cfg->gen2 || iwl_mvm_has_new_tx_api(mvm)) {
     // The new firmwares (for starting with the 22000 series) have different packet generation
     // requirements than mentioned below.
     return ZX_ERR_NOT_SUPPORTED;

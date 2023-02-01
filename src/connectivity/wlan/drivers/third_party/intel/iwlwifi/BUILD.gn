@@ -10,8 +10,10 @@ visibility = [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/*" ]
 # Common configuration for builds on Fuchsia.
 config("fuchsia_config") {
   defines = [
+    "CONFIG_IWLMVM=1",
     "CPTCFG_IWL_TIMEOUT_FACTOR=1",
     "CPTCFG_IWLMVM=1",
+    "CPTCFG_IWLWIFI_D0I3_DEFAULT_DISABLE=",
   ]
 }
 

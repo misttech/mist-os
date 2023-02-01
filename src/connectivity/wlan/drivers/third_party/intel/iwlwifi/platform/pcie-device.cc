@@ -109,6 +109,8 @@ void PcieDevice::DdkInit(::ddk::InitTxn txn) {
 
     IWL_INFO(nullptr, "Device ID: %04x Subsystem Device ID: %04x\n", pci_info.device_id,
              subsystem_device_id);
+    pci_dev_.device = pci_info.device_id;
+    pci_dev_.subsystem_device = subsystem_device_id;
 
     if ((status = iwl_drv_init()) != ZX_OK) {
       IWL_ERR(nullptr, "Failed to init driver: %s\n", zx_status_get_string(status));

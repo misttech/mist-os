@@ -119,10 +119,9 @@ static const struct iwl_ht_params iwl7000_ht_params = {
 };
 
 #define IWL_DEVICE_7000_COMMON                                                             \
-  .device_family = IWL_DEVICE_FAMILY_7000, .base_params = &iwl7000_base_params,            \
+  .trans.device_family = IWL_DEVICE_FAMILY_7000, .trans.base_params = &iwl7000_base_params,            \
   .led_mode = IWL_LED_RF_STATE, .nvm_hw_section_num = 0, .non_shared_ant = ANT_A,          \
-  .max_ht_ampdu_exponent = IEEE80211_HT_MAX_AMPDU_64K, .dccm_offset = IWL7000_DCCM_OFFSET, \
-  .csr = &iwl_csr_v1
+  .dccm_offset = IWL7000_DCCM_OFFSET \
 
 #define IWL_DEVICE_7000                                           \
   IWL_DEVICE_7000_COMMON, .ucode_api_max = IWL7260_UCODE_API_MAX, \

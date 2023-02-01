@@ -63,23 +63,6 @@ struct iwl_mvm_alive_data {
   uint32_t scd_base_addr;
 };
 
-/* set device type and latency */
-static zx_status_t iwl_set_soc_latency(struct iwl_mvm* mvm) {
-  struct iwl_soc_configuration_cmd cmd;
-  zx_status_t ret;
-
-  cmd.device_type = (mvm->trans->cfg->integrated) ? cpu_to_le32(SOC_CONFIG_CMD_INTEGRATED)
-                                                  : cpu_to_le32(SOC_CONFIG_CMD_DISCRETE);
-  cmd.soc_latency = cpu_to_le32(mvm->trans->cfg->soc_latency);
-
-  ret = iwl_mvm_send_cmd_pdu(mvm, iwl_cmd_id(SOC_CONFIGURATION_CMD, SYSTEM_GROUP, 0), 0,
-                             sizeof(cmd), &cmd);
-  if (ret) {
-    IWL_ERR(mvm, "Failed to set soc latency: %d\n", ret);
-  }
-  return ret;
-}
-
 static int iwl_send_tx_ant_cfg(struct iwl_mvm* mvm, uint8_t valid_tx_ant) {
   struct iwl_tx_ant_cfg_cmd tx_ant_cmd = {
       .valid = cpu_to_le32(valid_tx_ant),
@@ -301,11 +284,11 @@ static zx_status_t iwl_mvm_load_ucode_wait_alive(struct iwl_mvm* mvm,
   if (ret != ZX_OK) {
     struct iwl_trans* trans = mvm->trans;
 
-    if (trans->cfg->device_family >= IWL_DEVICE_FAMILY_22000)
+    if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_22000)
       IWL_ERR(mvm, "SecBoot CPU1 Status: 0x%x, CPU2 Status: 0x%x\n",
               iwl_read_prph(trans, UMAG_SB_CPU_1_STATUS),
               iwl_read_prph(trans, UMAG_SB_CPU_2_STATUS));
-    else if (trans->cfg->device_family >= IWL_DEVICE_FAMILY_8000)
+    else if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_8000)
       IWL_ERR(mvm, "SecBoot CPU1 Status: 0x%x, CPU2 Status: 0x%x\n",
               iwl_read_prph(trans, SB_CPU_1_STATUS), iwl_read_prph(trans, SB_CPU_2_STATUS));
     iwl_fw_set_current_image(&mvm->fwrt, old_type);
@@ -359,7 +342,7 @@ static int iwl_run_unified_mvm_ucode(struct iwl_mvm* mvm, bool read_nvm) {
     };
     int ret;
 
-	if (mvm->trans->cfg->tx_with_siso_diversity)
+	if (mvm->trans->trans_cfg->tx_with_siso_diversity)
 		init_cfg.init_flags |= cpu_to_le32(BIT(IWL_INIT_PHY));
 
     iwl_assert_lock_held(&mvm->mutex);
@@ -455,7 +438,7 @@ static zx_status_t iwl_send_phy_cfg_cmd(struct iwl_mvm* mvm) {
   phy_cfg_cmd.phy_cfg = cpu_to_le32(iwl_mvm_get_phy_config(mvm));
 
   /* set flags extra PHY configuration flags from the device's cfg */
-  phy_cfg_cmd.phy_cfg |= cpu_to_le32(mvm->cfg->extra_phy_cfg_flags);
+  phy_cfg_cmd.phy_cfg |= cpu_to_le32(mvm->trans->trans_cfg->extra_phy_cfg_flags);
 
   phy_cfg_cmd.calib_control.event_trigger = mvm->fw->default_calib[ucode_type].event_trigger;
   phy_cfg_cmd.calib_control.flow_trigger = mvm->fw->default_calib[ucode_type].flow_trigger;
@@ -552,7 +535,7 @@ zx_status_t iwl_run_init_mvm_ucode(struct iwl_mvm* mvm, bool read_nvm) {
   iwl_dnt_start(mvm->trans);
 #endif
 
-  if (mvm->cfg->device_family < IWL_DEVICE_FAMILY_8000) {
+  if (mvm->trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_8000) {
     ret = iwl_mvm_send_bt_init_conf(mvm);
     if (ret != ZX_OK) {
       goto remove_notif;
@@ -1411,7 +1394,7 @@ zx_status_t iwl_mvm_up(struct iwl_mvm* mvm) {
   }
 
   if (fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_SOC_LATENCY_SUPPORT)) {
-    ret = iwl_set_soc_latency(mvm);
+    ret = iwl_set_soc_latency(&mvm->fwrt);
     if (ret != ZX_OK) {
       IWL_ERR(mvm, "send soc latency failed: %s\n", zx_status_get_string(ret));
       goto error;

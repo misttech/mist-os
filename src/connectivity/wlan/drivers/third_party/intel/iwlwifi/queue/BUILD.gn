@@ -4,15 +4,11 @@
 
 visibility = [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/*" ]
 
-source_set("cfg") {
+source_set("queue") {
   sources = [
-    "7000.c",
-    "8000.c",
-    "9000.c",
-    "22000.c",
+    "tx.c",
   ]
   deps = [
     "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:core",
-    "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw:api",
   ]
 }

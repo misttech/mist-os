@@ -137,8 +137,7 @@ static void iwl_mvm_nic_config(struct iwl_op_mode* op_mode) {
   radio_cfg_dash = (phy_config & FW_PHY_CFG_RADIO_DASH) >> FW_PHY_CFG_RADIO_DASH_POS;
 
   /* SKU control */
-  reg_val |= CSR_HW_REV_STEP(mvm->trans->hw_rev) << CSR_HW_IF_CONFIG_REG_POS_MAC_STEP;
-  reg_val |= CSR_HW_REV_DASH(mvm->trans->hw_rev) << CSR_HW_IF_CONFIG_REG_POS_MAC_DASH;
+	reg_val = CSR_HW_REV_STEP_DASH(mvm->trans->hw_rev);
 
   /* radio configuration */
   reg_val |= radio_cfg_type << CSR_HW_IF_CONFIG_REG_POS_PHY_TYPE;
@@ -156,7 +155,7 @@ static void iwl_mvm_nic_config(struct iwl_op_mode* op_mode) {
    * unrelated errors. Need to further investigate this, but for now
    * we'll separate cases.
    */
-  if (mvm->trans->cfg->device_family < IWL_DEVICE_FAMILY_8000) {
+  if (mvm->trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_8000) {
     reg_val |= CSR_HW_IF_CONFIG_REG_BIT_RADIO_SI;
   }
 
@@ -164,12 +163,14 @@ static void iwl_mvm_nic_config(struct iwl_op_mode* op_mode) {
     reg_val |= CSR_HW_IF_CONFIG_REG_D3_DEBUG;
   }
 
-  iwl_trans_set_bits_mask(
-      mvm->trans, CSR_HW_IF_CONFIG_REG,
-      CSR_HW_IF_CONFIG_REG_MSK_MAC_DASH | CSR_HW_IF_CONFIG_REG_MSK_MAC_STEP |
-          CSR_HW_IF_CONFIG_REG_MSK_PHY_TYPE | CSR_HW_IF_CONFIG_REG_MSK_PHY_STEP |
-          CSR_HW_IF_CONFIG_REG_MSK_PHY_DASH | CSR_HW_IF_CONFIG_REG_BIT_RADIO_SI |
-          CSR_HW_IF_CONFIG_REG_BIT_MAC_SI | CSR_HW_IF_CONFIG_REG_D3_DEBUG,
+	iwl_trans_set_bits_mask(mvm->trans, CSR_HW_IF_CONFIG_REG,
+				CSR_HW_IF_CONFIG_REG_MSK_MAC_STEP_DASH |
+				CSR_HW_IF_CONFIG_REG_MSK_PHY_TYPE |
+				CSR_HW_IF_CONFIG_REG_MSK_PHY_STEP |
+				CSR_HW_IF_CONFIG_REG_MSK_PHY_DASH |
+				CSR_HW_IF_CONFIG_REG_BIT_RADIO_SI |
+				CSR_HW_IF_CONFIG_REG_BIT_MAC_SI   |
+				CSR_HW_IF_CONFIG_REG_D3_DEBUG,
       reg_val);
 
   IWL_DEBUG_INFO(mvm, "Radio type=0x%x-0x%x-0x%x\n", radio_cfg_type, radio_cfg_step,
@@ -686,7 +687,6 @@ static struct iwl_op_mode* iwl_op_mode_mvm_start(struct iwl_trans* trans, const 
   };
   int err, scan_size;
   uint32_t min_backoff;
-  enum iwl_amsdu_size rb_size_default;
 
   /*
    * We use IWL_MVM_STATION_COUNT to check the validity of the station
@@ -734,7 +734,7 @@ static struct iwl_op_mode* iwl_op_mode_mvm_start(struct iwl_trans* trans, const 
 
   if (iwl_mvm_has_new_rx_api(mvm)) {
     op_mode->ops = &iwl_mvm_ops_mq;
-    trans->rx_mpdu_cmd_hdr_size = (trans->cfg->device_family >= IWL_DEVICE_FAMILY_22560)
+    trans->rx_mpdu_cmd_hdr_size = (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210)
                                       ? sizeof(struct iwl_rx_mpdu_desc)
                                       : IWL_RX_DESC_SIZE_V1;
   } else {
@@ -818,15 +818,9 @@ static struct iwl_op_mode* iwl_op_mode_mvm_start(struct iwl_trans* trans, const 
   trans_cfg.no_reclaim_cmds = no_reclaim_cmds;
   trans_cfg.n_no_reclaim_cmds = ARRAY_SIZE(no_reclaim_cmds);
 
-  if (mvm->trans->cfg->device_family >= IWL_DEVICE_FAMILY_22560) {
-    rb_size_default = IWL_AMSDU_2K;
-  } else {
-    rb_size_default = IWL_AMSDU_4K;
-  }
-
   switch (iwlwifi_mod_params.amsdu_size) {
     case IWL_AMSDU_DEF:
-      trans_cfg.rx_buf_size = rb_size_default;
+      trans_cfg.rx_buf_size = IWL_AMSDU_4K;
       break;
     case IWL_AMSDU_4K:
       trans_cfg.rx_buf_size = IWL_AMSDU_4K;
@@ -840,11 +834,11 @@ static struct iwl_op_mode* iwl_op_mode_mvm_start(struct iwl_trans* trans, const 
     default:
       zxlogf(ERROR, "%s: Unsupported amsdu_size: %d", KBUILD_MODNAME,
              iwlwifi_mod_params.amsdu_size);
-      trans_cfg.rx_buf_size = rb_size_default;
+		trans_cfg.rx_buf_size = IWL_AMSDU_4K;
   }
 
   trans->wide_cmd_header = true;
-  trans_cfg.bc_table_dword = mvm->trans->cfg->device_family < IWL_DEVICE_FAMILY_22560;
+  trans_cfg.bc_table_dword = mvm->trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_AX210;
 
   trans_cfg.command_groups = iwl_mvm_groups;
   trans_cfg.command_groups_size = ARRAY_SIZE(iwl_mvm_groups);

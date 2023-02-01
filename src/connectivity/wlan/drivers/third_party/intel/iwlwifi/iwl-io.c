@@ -158,10 +158,12 @@ uint32_t iwl_read_prph(struct iwl_trans* trans, uint32_t ofs) {
   return val;
 }
 
-void iwl_write_prph(struct iwl_trans* trans, uint32_t ofs, uint32_t val) {
+void iwl_write_prph_delay(struct iwl_trans* trans, uint32_t ofs, uint32_t val, u32 delay_ms) {
   unsigned long flags;
 
   if (iwl_trans_grab_nic_access(trans, &flags)) {
+    zx_duration_t delay = ZX_MSEC(delay_ms);
+    zx_nanosleep(zx_deadline_after(delay));
     iwl_write_prph_no_grab(trans, ofs, val);
     iwl_trans_release_nic_access(trans, &flags);
   }
@@ -216,12 +218,20 @@ void iwl_clear_bits_prph(struct iwl_trans* trans, uint32_t ofs, uint32_t mask) {
   }
 }
 
-void iwl_force_nmi(struct iwl_trans* trans) {
-  if (trans->cfg->device_family < IWL_DEVICE_FAMILY_9000) {
-    iwl_write_prph(trans, DEVICE_SET_NMI_REG, DEVICE_SET_NMI_VAL_DRV);
-  } else {
-    iwl_write_prph(trans, UREG_NIC_SET_NMI_DRIVER, UREG_NIC_SET_NMI_DRIVER_NMI_FROM_DRIVER_MSK);
-  }
+void iwl_force_nmi(struct iwl_trans *trans)
+{
+	if (trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_9000)
+		iwl_write_prph_delay(trans, DEVICE_SET_NMI_REG,
+				     DEVICE_SET_NMI_VAL_DRV, 1);
+	else if (trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_AX210)
+		iwl_write_umac_prph(trans, UREG_NIC_SET_NMI_DRIVER,
+				UREG_NIC_SET_NMI_DRIVER_NMI_FROM_DRIVER);
+	else if (trans->trans_cfg->device_family < IWL_DEVICE_FAMILY_BZ)
+		iwl_write_umac_prph(trans, UREG_DOORBELL_TO_ISR6,
+				    UREG_DOORBELL_TO_ISR6_NMI_BIT);
+	else
+		iwl_write32(trans, CSR_DOORBELL_VECTOR,
+			    UREG_DOORBELL_TO_ISR6_NMI_BIT);
 }
 
 static const char* get_rfh_string(int cmd) {
@@ -349,7 +359,7 @@ int iwl_dump_fh(struct iwl_trans* trans, char** buf) {
       FH_MEM_RCSR_CHNL0_CONFIG_REG,      FH_MEM_RSSR_SHARED_CTRL_REG,   FH_MEM_RSSR_RX_STATUS_REG,
       FH_MEM_RSSR_RX_ENABLE_ERR_IRQ2DRV, FH_TSSR_TX_STATUS_REG,         FH_TSSR_TX_ERROR_REG};
 
-  if (trans->cfg->mq_rx_supported) {
+  if (trans->trans_cfg->mq_rx_supported) {
     return iwl_dump_rfh(trans, buf);
   }
 
@@ -379,4 +389,95 @@ int iwl_dump_fh(struct iwl_trans* trans, char** buf) {
             iwl_read_direct32(trans, fh_tbl[i]));
 
   return 0;
+}
+
+#define IWL_HOST_MON_BLOCK_PEMON	0x00
+#define IWL_HOST_MON_BLOCK_HIPM		0x22
+
+#define IWL_HOST_MON_BLOCK_PEMON_VEC0	0x00
+#define IWL_HOST_MON_BLOCK_PEMON_VEC1	0x01
+#define IWL_HOST_MON_BLOCK_PEMON_WFPM	0x06
+
+static void iwl_dump_host_monitor_block(struct iwl_trans *trans,
+					u32 block, u32 vec, u32 iter)
+{
+	u32 i;
+
+	IWL_ERR(trans, "Host monitor block 0x%x vector 0x%x\n", block, vec);
+	iwl_write32(trans, CSR_MONITOR_CFG_REG, (block << 8) | vec);
+	for (i = 0; i < iter; i++)
+		IWL_ERR(trans, "    value [iter %d]: 0x%08x\n",
+			i, iwl_read32(trans, CSR_MONITOR_STATUS_REG));
+}
+
+static void iwl_dump_host_monitor(struct iwl_trans *trans)
+{
+	switch (trans->trans_cfg->device_family) {
+	case IWL_DEVICE_FAMILY_22000:
+	case IWL_DEVICE_FAMILY_AX210:
+		IWL_ERR(trans, "CSR_RESET = 0x%x\n",
+			iwl_read32(trans, CSR_RESET));
+		iwl_dump_host_monitor_block(trans, IWL_HOST_MON_BLOCK_PEMON,
+					    IWL_HOST_MON_BLOCK_PEMON_VEC0, 15);
+		iwl_dump_host_monitor_block(trans, IWL_HOST_MON_BLOCK_PEMON,
+					    IWL_HOST_MON_BLOCK_PEMON_VEC1, 15);
+		iwl_dump_host_monitor_block(trans, IWL_HOST_MON_BLOCK_PEMON,
+					    IWL_HOST_MON_BLOCK_PEMON_WFPM, 15);
+		iwl_dump_host_monitor_block(trans, IWL_HOST_MON_BLOCK_HIPM,
+					    IWL_HOST_MON_BLOCK_PEMON_VEC0, 1);
+		break;
+	default:
+		/* not supported yet */
+		return;
+	}
+}
+
+zx_status_t iwl_finish_nic_init(struct iwl_trans *trans)
+{
+	const struct iwl_cfg_trans_params *cfg_trans = trans->trans_cfg;
+	u32 poll_ready;
+	zx_status_t err;
+
+	if (cfg_trans->bisr_workaround) {
+		/* ensure the TOP FSM isn't still in previous reset */
+		zx_nanosleep(zx_deadline_after(ZX_MSEC(2)));
+	}
+
+	/*
+	 * Set "initialization complete" bit to move adapter from
+	 * D0U* --> D0A* (powered-up active) state.
+	 */
+	if (cfg_trans->device_family >= IWL_DEVICE_FAMILY_BZ) {
+		iwl_set_bit(trans, CSR_GP_CNTRL,
+			    CSR_GP_CNTRL_REG_FLAG_MAC_CLOCK_READY |
+			    CSR_GP_CNTRL_REG_FLAG_MAC_INIT);
+		poll_ready = CSR_GP_CNTRL_REG_FLAG_MAC_STATUS;
+	} else {
+		iwl_set_bit(trans, CSR_GP_CNTRL,
+			    CSR_GP_CNTRL_REG_FLAG_INIT_DONE);
+		poll_ready = CSR_GP_CNTRL_REG_FLAG_MAC_CLOCK_READY;
+	}
+
+	if (cfg_trans->device_family == IWL_DEVICE_FAMILY_8000)
+		zx_nanosleep(zx_deadline_after(ZX_USEC(2)));
+
+	/*
+	 * Wait for clock stabilization; once stabilized, access to
+	 * device-internal resources is supported, e.g. iwl_write_prph()
+	 * and accesses to uCode SRAM.
+	 */
+  zx_duration_t elapsed;
+	err = iwl_poll_bit(trans, CSR_GP_CNTRL, poll_ready, poll_ready, ZX_MSEC(25), &elapsed);
+	if (err != ZX_OK) {
+		IWL_DEBUG_INFO(trans, "Failed to wake NIC\n");
+
+		iwl_dump_host_monitor(trans);
+	}
+
+	if (cfg_trans->bisr_workaround) {
+		/* ensure BISR shift has finished */
+		zx_nanosleep(zx_deadline_after(ZX_USEC(200)));
+	}
+
+	return err;
 }

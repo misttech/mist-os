@@ -34,7 +34,19 @@ typedef char* acpi_string;
 
 #define ETHTOOL_FWVERS_LEN 32
 
-#define IS_ENABLED(x) (false)
+// IS_ENABLED is a macro for conditional compilation.
+//
+// The given compile flag shall be either:
+//
+//   + defined as empty string, or
+//   + defined as 1
+//
+// in the BUILD.gn file.
+//
+#define __COND__ 0   // for the empty string case.
+#define __COND__1 1  // for the =1 case.
+#define POSTFIX(flag) __COND__##flag
+#define IS_ENABLED(flag) POSTFIX(flag)
 
 #define iwl_assert_lock_held(x) ZX_DEBUG_ASSERT(mtx_trylock(x) == thrd_busy)
 
@@ -84,9 +96,11 @@ struct device {
 
 // This struct is analogous to the Linux pci_device_id struct, and contains PCI device ID values.
 struct iwl_pci_device_id {
-  uint16_t device_id;
-  uint16_t subsystem_device_id;
-  const struct iwl_cfg* config;
+  uint32_t vendor;
+  uint16_t device;
+  uint32_t subvendor;
+  uint32_t subdevice;
+  unsigned long driver_data;
 };
 
 // An opaque struct that hides a C++ FIDL client, allowing us to use FIDL
@@ -98,6 +112,9 @@ struct iwl_pci_fidl;
 struct iwl_pci_dev {
   struct device dev;
   struct iwl_pci_fidl* fidl;
+  pci_protocol_t proto;
+  unsigned short device;
+  unsigned short subsystem_device;
   struct iwl_trans* drvdata;
 };
 

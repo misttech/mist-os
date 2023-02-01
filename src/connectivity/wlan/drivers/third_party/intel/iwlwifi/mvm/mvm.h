@@ -1429,17 +1429,13 @@ static inline bool iwl_mvm_is_frag_ebs_supported(struct iwl_mvm* mvm) {
   return fw_has_api(&mvm->fw->ucode_capa, IWL_UCODE_TLV_API_FRAG_EBS);
 }
 
-static inline bool iwl_mvm_enter_d0i3_on_suspend(struct iwl_mvm* mvm) {
-  /* For now we only use this mode to differentiate between
-   * slave transports, which handle D0i3 entry in suspend by
-   * themselves in conjunction with runtime PM D0i3.  So, this
-   * function is used to check whether we need to do anything
-   * when entering suspend or if the transport layer has already
-   * done it.
-   */
-  return (mvm->trans->system_pm_mode == IWL_PLAT_PM_MODE_D0I3) &&
-         (mvm->trans->runtime_pm_mode != IWL_PLAT_PM_MODE_D0I3);
+#if 0  // NEEDS_PORTING
+static inline bool iwl_mvm_is_short_beacon_notif_supported(struct iwl_mvm *mvm)
+{
+	return fw_has_api(&mvm->fw->ucode_capa,
+			  IWL_UCODE_TLV_API_SHORT_BEACON_NOTIF);
 }
+#endif  // NEEDS_PORTING
 
 static inline bool iwl_mvm_is_dqa_data_queue(struct iwl_mvm* mvm, uint8_t queue) {
   return (queue >= IWL_MVM_DQA_MIN_DATA_QUEUE) && (queue <= IWL_MVM_DQA_MAX_DATA_QUEUE);
@@ -1496,14 +1492,16 @@ static inline bool iwl_mvm_has_new_rx_api(struct iwl_mvm* mvm) {
   return fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_MULTI_QUEUE_RX_SUPPORT);
 }
 
-static inline bool iwl_mvm_has_new_tx_api(struct iwl_mvm* mvm) {
+static inline bool iwl_mvm_has_new_tx_api(struct iwl_mvm *mvm)
+{
   /* TODO - replace with TLV once defined */
-  return mvm->trans->cfg->use_tfh;
+	return mvm->trans->trans_cfg->use_tfh;
 }
 
-static inline bool iwl_mvm_has_unified_ucode(struct iwl_mvm* mvm) {
+static inline bool iwl_mvm_has_unified_ucode(struct iwl_mvm *mvm)
+{
   /* TODO - better define this */
-  return mvm->trans->cfg->device_family >= IWL_DEVICE_FAMILY_22000;
+	return mvm->trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_22000;
 }
 
 static inline bool iwl_mvm_is_cdb_supported(struct iwl_mvm* mvm) {
@@ -1519,13 +1517,14 @@ static inline bool iwl_mvm_is_cdb_supported(struct iwl_mvm* mvm) {
   return fw_has_capa(&mvm->fw->ucode_capa, IWL_UCODE_TLV_CAPA_CDB_SUPPORT);
 }
 
-static inline bool iwl_mvm_cdb_scan_api(struct iwl_mvm* mvm) {
+static inline bool iwl_mvm_cdb_scan_api(struct iwl_mvm *mvm)
+{
   /*
    * TODO: should this be the same as iwl_mvm_is_cdb_supported()?
    * but then there's a little bit of code in scan that won't make
    * any sense...
    */
-  return mvm->trans->cfg->device_family >= IWL_DEVICE_FAMILY_22000;
+	return mvm->trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_22000;
 }
 
 static inline bool iwl_mvm_has_new_rx_stats_api(struct iwl_mvm* mvm) {
@@ -2009,8 +2008,10 @@ static inline void iwl_mvm_vif_set_low_latency(struct iwl_mvm_vif* mvmvif, bool 
 /* Return a bitmask with all the hw supported queues, except for the
  * command queue, which can't be flushed.
  */
-static inline uint32_t iwl_mvm_flushable_queues(struct iwl_mvm* mvm) {
-  return ((uint32_t)(BIT(mvm->cfg->base_params->num_of_queues) - 1) & ~BIT(IWL_MVM_DQA_CMD_QUEUE));
+static inline u32 iwl_mvm_flushable_queues(struct iwl_mvm *mvm)
+{
+	return (u32)((BIT(mvm->trans->trans_cfg->base_params->num_of_queues) - 1) &
+		~BIT(IWL_MVM_DQA_CMD_QUEUE));
 }
 
 static inline void iwl_mvm_stop_device(struct iwl_mvm* mvm) {

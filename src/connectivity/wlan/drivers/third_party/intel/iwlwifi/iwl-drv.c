@@ -408,10 +408,12 @@ static zx_status_t iwl_load_firmware(struct iwl_drv* drv, bool first) {
   char fw_name_temp[64];
 #endif
 
-  if (drv->trans->cfg->device_family == IWL_DEVICE_FAMILY_9000 &&
-      (CSR_HW_REV_STEP(drv->trans->hw_rev) != SILICON_B_STEP &&
-       CSR_HW_REV_STEP(drv->trans->hw_rev) != SILICON_C_STEP)) {
-    IWL_ERR(drv, "Only HW steps B and C are currently supported (0x%0x)\n", drv->trans->hw_rev);
+  if (drv->trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_9000 &&
+	    (drv->trans->hw_rev_step != SILICON_B_STEP &&
+	     drv->trans->hw_rev_step != SILICON_C_STEP)) {
+		IWL_ERR(drv,
+			"Only HW steps B and C are currently supported (0x%0x)\n",
+			drv->trans->hw_rev);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -1655,14 +1657,14 @@ static void iwl_req_fw_callback(struct firmware* ucode_raw, void* context) {
   if (pieces->init_evtlog_size) {
     fw->init_evtlog_size = (pieces->init_evtlog_size - 16) / 12;
   } else {
-    fw->init_evtlog_size = drv->trans->cfg->base_params->max_event_log_size;
+    fw->init_evtlog_size = drv->trans->trans_cfg->base_params->max_event_log_size;
   }
   fw->init_errlog_ptr = pieces->init_errlog_ptr;
   fw->inst_evtlog_ptr = pieces->inst_evtlog_ptr;
   if (pieces->inst_evtlog_size) {
     fw->inst_evtlog_size = (pieces->inst_evtlog_size - 16) / 12;
   } else {
-    fw->inst_evtlog_size = drv->trans->cfg->base_params->max_event_log_size;
+    fw->inst_evtlog_size = drv->trans->trans_cfg->base_params->max_event_log_size;
   }
   fw->inst_errlog_ptr = pieces->inst_errlog_ptr;
 
@@ -1808,12 +1810,6 @@ zx_status_t iwl_drv_start(struct iwl_trans* trans, struct iwl_drv** out_drv) {
 
   /* Create transport layer debugfs dir */
   drv->trans->dbgfs_dir = debugfs_create_dir("trans", drv->dbgfs_drv);
-
-  if (!drv->trans->dbgfs_dir) {
-    IWL_ERR(drv, "failed to create transport debugfs directory\n");
-    status = ZX_ERR_NO_MEMORY;
-    goto err_free_dbgfs;
-  }
 #endif
 
 #ifdef CPTCFG_IWLWIFI_DEVICE_TESTMODE

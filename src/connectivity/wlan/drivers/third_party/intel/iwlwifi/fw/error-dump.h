@@ -158,7 +158,7 @@ enum iwl_fw_error_dump_family {
 
 /**
  * struct iwl_fw_error_dump_info - info on the device / firmware
- * @device_family: the family of the device (7 / 8)
+ * @hw_type: the type of the device
  * @hw_step: the step of the device
  * @fw_human_readable: human readable FW version
  * @dev_human_readable: name of the device
@@ -170,7 +170,7 @@ enum iwl_fw_error_dump_family {
  *  if the dump collection was not initiated by an assert, the value is 0
  */
 struct iwl_fw_error_dump_info {
-  __le32 device_family;
+	__le32 hw_type;
   __le32 hw_step;
   uint8_t fw_human_readable[FW_VER_HUMAN_READABLE_SZ];
   uint8_t dev_human_readable[64];

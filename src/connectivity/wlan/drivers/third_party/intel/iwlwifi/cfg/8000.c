@@ -105,14 +105,14 @@ static const struct iwl_tt_params iwl8000_tt_params = {
 // TODO(fxbug.dev/61069): We temporarily removed .features = NETIF_F_RXCSUM. Add it back when the
 //                        WLAN driver supports it.
 #define IWL_DEVICE_8000_COMMON                                                                    \
-  .device_family = IWL_DEVICE_FAMILY_8000, .base_params = &iwl8000_base_params,                   \
+  .trans.device_family = IWL_DEVICE_FAMILY_8000, .trans.base_params = &iwl8000_base_params,       \
   .led_mode = IWL_LED_RF_STATE, .nvm_hw_section_num = 10, .features = 0, .non_shared_ant = ANT_A, \
   .dccm_offset = IWL8260_DCCM_OFFSET, .dccm_len = IWL8260_DCCM_LEN,                               \
   .dccm2_offset = IWL8260_DCCM2_OFFSET, .dccm2_len = IWL8260_DCCM2_LEN,                           \
   .smem_offset = IWL8260_SMEM_OFFSET, .smem_len = IWL8260_SMEM_LEN,                               \
   .default_nvm_file_C_step = DEFAULT_NVM_FILE_FAMILY_8000C, .thermal_params = &iwl8000_tt_params, \
   .apmg_not_supported = true, .nvm_type = IWL_NVM_EXT, .dbgc_supported = true,                    \
-  .min_umac_error_event_table = 0x800000, .csr = &iwl_csr_v1
+  .min_umac_error_event_table = 0x800000
 
 #define IWL_DEVICE_8000                                           \
   IWL_DEVICE_8000_COMMON, .ucode_api_max = IWL8000_UCODE_API_MAX, \
@@ -140,7 +140,6 @@ const struct iwl_cfg iwl8260_2ac_cfg = {
     IWL_DEVICE_8260,
     .ht_params = &iwl8000_ht_params,
     .nvm_ver = IWL8000_NVM_VERSION,
-    .max_ht_ampdu_exponent = IEEE80211_HT_MAX_AMPDU_64K,
 };
 
 const struct iwl_cfg iwl8265_2ac_cfg = {
@@ -149,7 +148,6 @@ const struct iwl_cfg iwl8265_2ac_cfg = {
     IWL_DEVICE_8265,
     .ht_params = &iwl8000_ht_params,
     .nvm_ver = IWL8000_NVM_VERSION,
-    .max_ht_ampdu_exponent = IEEE80211_HT_MAX_AMPDU_64K,
     .vht_mu_mimo_supported = true,
 };
 
@@ -159,7 +157,6 @@ const struct iwl_cfg iwl8275_2ac_cfg = {
     IWL_DEVICE_8265,
     .ht_params = &iwl8000_ht_params,
     .nvm_ver = IWL8000_NVM_VERSION,
-    .max_ht_ampdu_exponent = IEEE80211_HT_MAX_AMPDU_64K,
     .vht_mu_mimo_supported = true,
 };
 
@@ -169,5 +166,4 @@ const struct iwl_cfg iwl4165_2ac_cfg = {
     IWL_DEVICE_8000,
     .ht_params = &iwl8000_ht_params,
     .nvm_ver = IWL8000_NVM_VERSION,
-    .max_ht_ampdu_exponent = IEEE80211_HT_MAX_AMPDU_64K,
 };

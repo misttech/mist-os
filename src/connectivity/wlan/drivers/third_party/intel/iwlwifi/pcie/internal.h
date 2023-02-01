@@ -224,19 +224,12 @@ struct iwl_rxq {
   struct iwl_rx_mem_buffer* queue[RX_QUEUE_SIZE];
 };
 
-struct iwl_dma_ptr {
-  struct iwl_iobuf* io_buf;
-  dma_addr_t dma;
-  void* addr;
-  size_t size;
-};
-
 /**
  * iwl_queue_inc_wrap - increment queue index, wrap back to beginning
  * @index -- current index
  */
 static inline int iwl_queue_inc_wrap(struct iwl_trans* trans, int index) {
-  return ++index & (trans->cfg->base_params->max_tfd_queue_size - 1);
+  return ++index & (trans->trans_cfg->base_params->max_tfd_queue_size - 1);
 }
 
 /**
@@ -244,7 +237,7 @@ static inline int iwl_queue_inc_wrap(struct iwl_trans* trans, int index) {
  * @rxq - the rxq to get the rb stts from
  */
 static inline __le16 iwl_get_closed_rb_stts(struct iwl_trans* trans, struct iwl_rxq* rxq) {
-  if (trans->cfg->device_family >= IWL_DEVICE_FAMILY_22560) {
+  if (trans->trans_cfg->device_family >= IWL_DEVICE_FAMILY_AX210) {
     __le16* rb_status = (__le16*)iwl_iobuf_virtual(rxq->rb_status);
 
     return READ_ONCE(*rb_status);
@@ -260,117 +253,15 @@ static inline __le16 iwl_get_closed_rb_stts(struct iwl_trans* trans, struct iwl_
  * @index -- current index
  */
 static inline int iwl_queue_dec_wrap(struct iwl_trans* trans, int index) {
-  return --index & (trans->cfg->base_params->max_tfd_queue_size - 1);
+  return --index & (trans->trans_cfg->base_params->max_tfd_queue_size - 1);
 }
-
-struct iwl_cmd_meta {
-  /* only for SYNC commands, iff the reply skb is wanted */
-  struct iwl_host_cmd* source;
-  uint32_t flags;
-  uint32_t tbs;
-};
 
 #define TFD_TX_CMD_SLOTS 256
 #define TFD_CMD_SLOTS 32
 
-/*
- * The FH will write back to the first TB only, so we need to copy some data
- * into the buffer regardless of whether it should be mapped or not.
- * This indicates how big the first TB must be to include the scratch buffer
- * and the assigned PN.
- * Since PN location is 8 bytes at offset 12, it's 20 now.
- * If we make it bigger then allocations will be bigger and copy slower, so
- * that's probably not useful.
- */
-#define IWL_FIRST_TB_SIZE 20
-#define IWL_FIRST_TB_SIZE_ALIGN ROUND_UP(IWL_FIRST_TB_SIZE, 64)
-
-struct iwl_pcie_txq_entry {
-  struct iwl_iobuf* cmd;  // Used to store the command
-  struct iwl_iobuf* dup_io_buf;
-  struct iwl_cmd_meta meta;
-};
-
-struct iwl_pcie_first_tb_buf {
-  uint8_t buf[IWL_FIRST_TB_SIZE_ALIGN];
-};
-
-typedef void(iwlwifi_timer_callback_t)(void* data);
-
-/**
- * struct iwl_txq - Tx Queue for DMA
- * @q: generic Rx/Tx queue descriptor
- * @tfds: transmit frame descriptors (DMA memory)
- * @first_tb_bufs: start of command headers, including scratch buffers, for
- *  the writeback -- this is DMA memory and an array holding one buffer
- *  for each command on the queue
- * @entries: transmit entries (driver state)
- * @lock: queue lock
- * @stuck_timer: timer that fires if queue gets stuck
- * @trans_pcie: pointer back to transport (for timer)
- * @need_update: indicates need to update read/write index
- * @ampdu: true if this queue is an ampdu queue for an specific RA/TID
- * @wd_timeout: queue watchdog timeout - per queue
- * @frozen: tx stuck queue timer is frozen
- * @frozen_expiry_remainder: remember how long until the timer fires
- * @bc_tbl: byte count table of the queue (relevant only for gen2 transport)
- * @write_ptr: 1-st empty entry (index) host_w
- * @read_ptr: last used entry (index) host_r
- * @dma_addr:  physical addr for BD's
- * @n_window: safe queue window
- * @id: queue id
- * @low_mark: low watermark, resume queue if free space more than this
- * @high_mark: high watermark, stop queue if free space less than this
- *
- * A Tx queue consists of circular buffer of BDs (a.k.a. TFDs, transmit frame
- * descriptors) and required locking structures.
- *
- * Note the difference between TFD_QUEUE_SIZE_MAX and n_window: the hardware
- * always assumes 256 descriptors, so TFD_QUEUE_SIZE_MAX is always 256 (unless
- * there might be HW changes in the future). For the normal TX
- * queues, n_window, which is the size of the software queue data
- * is also 256; however, for the command queue, n_window is only
- * 32 since we don't need so many commands pending. Since the HW
- * still uses 256 BDs for DMA though, TFD_QUEUE_SIZE_MAX stays 256.
- * This means that we end up with the following:
- *  HW entries: | 0 | ... | N * 32 | ... | N * 32 + 31 | ... | 255 |
- *  SW entries:           | 0      | ... | 31          |
- * where N is a number between 0 and 7. This means that the SW
- * data is a window overlayed over the HW queue.
- */
-struct iwl_txq {
-  struct iwl_iobuf* tfds;
-  struct iwl_iobuf* first_tb_bufs;
-  struct iwl_pcie_txq_entry* entries;
-  mtx_t lock;
-  unsigned long frozen_expiry_remainder;
-  struct iwl_irq_timer* stuck_timer;
-  struct iwl_trans_pcie* trans_pcie;
-  bool need_update;
-  bool frozen;
-  bool ampdu;
-  int block;
-  zx_duration_t wd_timeout;
-  struct sk_buff_head overflow_q;
-  struct iwl_dma_ptr bc_tbl;
-
-  int write_ptr;
-  int read_ptr;
-  dma_addr_t dma_addr;
-  uint16_t n_window;
-  uint32_t id;
-  int low_mark;
-  int high_mark;
-};
-
 static inline dma_addr_t iwl_pcie_get_first_tb_dma(struct iwl_txq* txq, int idx) {
   return iwl_iobuf_physical(txq->first_tb_bufs) + (sizeof(struct iwl_pcie_first_tb_buf) * idx);
 }
-
-struct iwl_tso_hdr_page {
-  struct page* page;
-  uint8_t* pos;
-};
 
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
 /**
@@ -482,7 +373,6 @@ struct cont_rec {
  * @rx_page_order: page order for receive buffer size
  * @reg_lock: protect hw register access
  * @mutex: to protect stop_device / start_fw / start_hw
- * @cmd_in_flight: true when we have a host command in flight
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
  * @fw_mon_data: fw continuous recording data
 #endif
@@ -540,6 +430,7 @@ struct iwl_trans_pcie {
 
   struct iwl_txq* txq_memory;
   struct iwl_txq* txq[IWL_MAX_TVQM_QUEUES];
+  // TODO(fxbug.dev/119415): remove these queue fields since iwl_trans->txqs has them.
   unsigned long queue_used[BITS_TO_LONGS(IWL_MAX_TVQM_QUEUES)];
   unsigned long queue_stopped[BITS_TO_LONGS(IWL_MAX_TVQM_QUEUES)];
 
@@ -566,6 +457,7 @@ struct iwl_trans_pcie {
   uint8_t no_reclaim_cmds[MAX_NO_RECLAIM_CMDS];
   uint8_t max_tbs;
   uint16_t tfd_size;
+  u16 num_rx_bufs;
 
   enum iwl_amsdu_size rx_buf_size;
   bool bc_table_dword;
@@ -577,7 +469,6 @@ struct iwl_trans_pcie {
   /*protect hw register */
   mtx_t reg_lock;
   bool cmd_hold_nic_awake;
-  bool ref_cmd_in_flight;
 
 #ifdef CPTCFG_IWLWIFI_DEBUGFS
   struct cont_rec fw_mon_data;
@@ -604,8 +495,7 @@ static inline struct iwl_trans_pcie* IWL_TRANS_GET_PCIE_TRANS(struct iwl_trans* 
   return (struct iwl_trans_pcie*)trans->trans_specific;
 }
 
-#if 0   // NEEDS_PORTING
-static inline void iwl_pcie_clear_irq(struct iwl_trans* trans, struct msix_entry* entry) {
+static inline void iwl_pcie_clear_irq(struct iwl_trans* trans, int queue) {
     /*
      * Before sending the interrupt the HW disables it to prevent
      * a nested interrupt. This is done by writing 1 to the corresponding
@@ -614,9 +504,8 @@ static inline void iwl_pcie_clear_irq(struct iwl_trans* trans, struct msix_entry
      * write 1 clear (W1C) register, meaning that it's being clear
      * by writing 1 to the bit.
      */
-    iwl_write32(trans, CSR_MSIX_AUTOMASK_ST_AD, BIT(entry->entry));
+	  iwl_write32(trans, CSR_MSIX_AUTOMASK_ST_AD, (uint32_t)BIT(queue));
 }
-#endif  // NEEDS_PORTING
 
 static inline struct iwl_trans* iwl_trans_pcie_get_trans(struct iwl_trans_pcie* trans_pcie) {
   return containerof(trans_pcie, struct iwl_trans, trans_specific);
@@ -628,8 +517,11 @@ static inline struct iwl_trans* iwl_trans_pcie_get_trans(struct iwl_trans_pcie* 
  */
 struct iwl_trans* iwl_trans_pcie_alloc(struct iwl_pci_dev* pdev,
                                        const struct iwl_pci_device_id* ent,
-                                       const struct iwl_cfg* cfg);
+                                       const struct iwl_cfg_trans_params *cfg_trans);
 void iwl_trans_pcie_free(struct iwl_trans* trans);
+
+bool __iwl_trans_pcie_grab_nic_access(struct iwl_trans *trans);
+#define _iwl_trans_pcie_grab_nic_access(trans)	(__iwl_trans_pcie_grab_nic_access(trans))
 
 /*****************************************************
  * RX
@@ -684,7 +576,7 @@ void iwl_pcie_gen2_update_byte_tbl(struct iwl_trans_pcie* trans_pcie, struct iwl
                                    uint16_t byte_cnt, int num_tbs);
 
 static inline uint16_t iwl_pcie_tfd_tb_get_len(struct iwl_trans* trans, void* _tfd, uint8_t idx) {
-  if (trans->cfg->use_tfh) {
+  if (trans->trans_cfg->use_tfh) {
     struct iwl_tfh_tfd* tfd = (struct iwl_tfh_tfd*)_tfd;
     struct iwl_tfh_tb* tb = &tfd->tbs[idx];
 
@@ -838,13 +730,13 @@ static inline void iwl_enable_fw_load_int(struct iwl_trans* trans) {
 }
 
 static inline uint16_t iwl_pcie_get_cmd_index(const struct iwl_txq* q, uint32_t index) {
-  return index & (q->n_window - 1);
+  return (uint16_t)(index & (q->n_window - 1));
 }
 
 static inline void* iwl_pcie_get_tfd(struct iwl_trans* trans, struct iwl_txq* txq, int idx) {
   struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 
-  if (trans->cfg->use_tfh) {
+  if (trans->trans_cfg->use_tfh) {
     idx = iwl_pcie_get_cmd_index(txq, idx);
   }
 
@@ -887,7 +779,7 @@ static inline void iwl_enable_rfkill_int(struct iwl_trans* trans) {
     iwl_enable_hw_int_msk_msix(trans, MSIX_HW_INT_CAUSES_REG_RF_KILL);
   }
 
-  if (trans->cfg->device_family == IWL_DEVICE_FAMILY_9000) {
+  if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_9000) {
     /*
      * On 9000-series devices this bit isn't enabled by default, so
      * when we power down the device we need set the bit to allow it
@@ -898,17 +790,6 @@ static inline void iwl_enable_rfkill_int(struct iwl_trans* trans) {
 }
 
 void iwl_pcie_handle_rfkill_irq(struct iwl_trans* trans);
-
-// The hardware queue is available now, start queueing packet to hardware.  iwl_mvm_mac_itxq_xmit()
-// is called then.
-static inline void iwl_wake_queue(struct iwl_trans* trans, struct iwl_txq* txq) {
-  struct iwl_trans_pcie* trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
-
-  if (test_and_clear_bit(txq->id, trans_pcie->queue_stopped)) {
-    IWL_DEBUG_TX_QUEUES(trans, "Wake hwq %d\n", txq->id);
-    iwl_op_mode_queue_not_full(trans->op_mode, txq->id);
-  }
-}
 
 // Hardware Tx queue is full, stop queueing packets from MLME.
 static inline void iwl_stop_queue(struct iwl_trans* trans, struct iwl_txq* txq) {

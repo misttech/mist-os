@@ -2,18 +2,14 @@
 /*
  * Copyright (C) 2020-2022 Intel Corporation
  */
-#include <net/tso.h>
-#include <linux/tcp.h>
-
-#include "iwl-debug.h"
-#include "iwl-io.h"
-#include "fw/api/commands.h"
-#include "fw/api/tx.h"
-#include "fw/api/datapath.h"
-#include "queue/tx.h"
-#include "iwl-fh.h"
-#include "iwl-scd.h"
-#include <linux/dmapool.h>
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-debug.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-io.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/commands.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/tx.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/datapath.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/queue/tx.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-fh.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-scd.h"
 
 /*
  * iwl_txq_update_byte_tbl - Set up entry in Tx byte-count array

@@ -156,5 +156,7 @@ int iwl_init_paging(struct iwl_fw_runtime* fwrt, enum iwl_ucode_type type);
 void iwl_free_fw_paging(struct iwl_fw_runtime* fwrt);
 
 void iwl_get_shared_mem_conf(struct iwl_fw_runtime* fwrt);
+zx_status_t iwl_set_soc_latency(struct iwl_fw_runtime *fwrt);
+zx_status_t iwl_configure_rxq(struct iwl_fw_runtime *fwrt);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_RUNTIME_H_

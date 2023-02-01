@@ -113,6 +113,7 @@ enum iwl_ucode_tlv_type {
   IWL_UCODE_TLV_FW_DBG_DEST = 38,
   IWL_UCODE_TLV_FW_DBG_CONF = 39,
   IWL_UCODE_TLV_FW_DBG_TRIGGER = 40,
+	IWL_UCODE_TLV_CMD_VERSIONS	= 48,
   IWL_UCODE_TLV_FW_GSCAN_CAPA = 50,
   IWL_UCODE_TLV_FW_MEM_SEG = 51,
   IWL_UCODE_TLV_IML = 52,
@@ -417,6 +418,11 @@ enum iwl_ucode_tlv_capa {
   IWL_UCODE_TLV_CAPA_D3_DEBUG = (__force iwl_ucode_tlv_capa_t)87,
   IWL_UCODE_TLV_CAPA_LED_CMD_SUPPORT = (__force iwl_ucode_tlv_capa_t)88,
   IWL_UCODE_TLV_CAPA_MCC_UPDATE_11AX_SUPPORT = (__force iwl_ucode_tlv_capa_t)89,
+	IWL_UCODE_TLV_CAPA_CSI_REPORTING		= (__force iwl_ucode_tlv_capa_t)90,
+	IWL_UCODE_TLV_CAPA_DBG_SUSPEND_RESUME_CMD_SUPP	= (__force iwl_ucode_tlv_capa_t)92,
+	IWL_UCODE_TLV_CAPA_DBG_BUF_ALLOC_CMD_SUPP	= (__force iwl_ucode_tlv_capa_t)93,
+
+	/* set 3 */
   IWL_UCODE_TLV_CAPA_MLME_OFFLOAD = (__force iwl_ucode_tlv_capa_t)96,
 
   NUM_IWL_UCODE_TLV_CAPA
@@ -918,5 +924,44 @@ struct iwl_fw_dbg_conf_tlv {
   uint8_t num_of_hcmds;
   struct iwl_fw_dbg_conf_hcmd hcmd;
 } __packed;
+
+#define IWL_FW_CMD_VER_UNKNOWN 99
+
+/**
+ * struct iwl_fw_cmd_version - firmware command version entry
+ * @cmd: command ID
+ * @group: group ID
+ * @cmd_ver: command version
+ * @notif_ver: notification version
+ */
+struct iwl_fw_cmd_version {
+	u8 cmd;
+	u8 group;
+	u8 cmd_ver;
+	u8 notif_ver;
+} __packed;
+
+struct iwl_fw_tcm_error_addr {
+	__le32 addr;
+}; /* FW_TLV_TCM_ERROR_INFO_ADDRS_S */
+
+struct iwl_fw_dump_exclude {
+	__le32 addr, size;
+};
+
+static inline size_t _iwl_tlv_array_len(const struct iwl_ucode_tlv *tlv,
+					size_t fixed_size, size_t var_size)
+{
+	size_t var_len = le32_to_cpu(tlv->length) - fixed_size;
+
+	if (WARN_ON(var_len % var_size))
+		return 0;
+
+	return var_len / var_size;
+}
+
+#define iwl_tlv_array_len(_tlv_ptr, _struct_ptr, _memb)			\
+	_iwl_tlv_array_len((_tlv_ptr), sizeof(*(_struct_ptr)),		\
+			   sizeof(_struct_ptr->_memb[0]))
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_FILE_H_

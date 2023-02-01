@@ -4,8 +4,10 @@
  * Copyright (C) 2013-2015 Intel Mobile Communications GmbH
  * Copyright (C) 2016-2017 Intel Deutschland GmbH
  */
-#ifndef __iwl_fw_api_system_h__
-#define __iwl_fw_api_system_h__
+#ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_API_SYSTEM_H_
+#define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_API_SYSTEM_H_
+
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/compiler.h"
 
 #define SOC_CONFIG_CMD_FLAGS_DISCRETE		BIT(0)
 #define SOC_CONFIG_CMD_FLAGS_LOW_LATENCY	BIT(1)
@@ -40,4 +42,4 @@ struct iwl_system_features_control_cmd {
 	__le32 features[4];
 } __packed; /* SYSTEM_FEATURES_CONTROL_CMD_API_S_VER_1 */
 
-#endif /* __iwl_fw_api_system_h__ */
+#endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_INTEL_IWLWIFI_FW_API_SYSTEM_H_

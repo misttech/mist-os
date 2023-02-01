@@ -548,6 +548,8 @@ static void iwl_mvm_dump_umac_error_log(struct iwl_mvm* mvm) {
   IWL_ERR(mvm, "0x%08X | isr status reg\n", table.nic_isr_pref);
 }
 
+// TODO(fxbug.dev/119415): This functions has been replaced by iwl_fwrt_dump_lmac_error_log() in
+//                         fw/dump.c. Remove this after uprev.
 static void iwl_mvm_dump_lmac_error_log(struct iwl_mvm* mvm, uint8_t lmac_num) {
   struct iwl_trans* trans = mvm->trans;
   struct iwl_error_event_table table;
@@ -572,23 +574,18 @@ static void iwl_mvm_dump_lmac_error_log(struct iwl_mvm* mvm, uint8_t lmac_num) {
   /* check if there is a HW error */
   val = iwl_trans_read_mem32(trans, base);
   if (((val & ~0xf) == 0xa5a5a5a0) || ((val & ~0xf) == 0x5a5a5a50)) {
-    int err;
 
     IWL_ERR(trans, "HW error, resetting before reading\n");
 
     /* reset the device */
-    iwl_trans_sw_reset(trans);
-
-    /* set INIT_DONE flag */
-    iwl_set_bit(trans, CSR_GP_CNTRL, BIT(trans->cfg->csr->flag_init_done));
+    iwl_trans_sw_reset(trans, true);
 
     /* and wait for clock stabilization */
-    if (trans->cfg->device_family == IWL_DEVICE_FAMILY_8000) {
+    if (trans->trans_cfg->device_family == IWL_DEVICE_FAMILY_8000) {
       zx_nanosleep(zx_deadline_after(ZX_USEC(2)));
     }
 
-    err = iwl_poll_bit(trans, CSR_GP_CNTRL, BIT(trans->cfg->csr->flag_mac_clock_ready),
-                       BIT(trans->cfg->csr->flag_mac_clock_ready), ZX_MSEC(25), NULL);
+    zx_status_t err = iwl_finish_nic_init(trans);
     if (err != ZX_OK) {
       IWL_DEBUG_INFO(trans, "Failed to reset the card for the dump\n");
       return;
@@ -1068,7 +1065,7 @@ bool iwl_mvm_is_vif_assoc(struct iwl_mvm* mvm) {
 zx_duration_t iwl_mvm_get_wd_timeout(struct iwl_mvm* mvm, struct ieee80211_vif* vif, bool tdls,
                                      bool cmd_q) {
 #if 1  // NEEDS_PORTING
-  unsigned int default_timeout = cmd_q ? IWL_DEF_WD_TIMEOUT : mvm->cfg->base_params->wd_timeout;
+  unsigned int default_timeout = cmd_q ? IWL_DEF_WD_TIMEOUT : mvm->trans->trans_cfg->base_params->wd_timeout;
 
   return default_timeout;
 #else

@@ -97,7 +97,7 @@
 
 /* Find TFD CB base pointer for given queue */
 static inline unsigned int FH_MEM_CBBC_QUEUE(struct iwl_trans* trans, unsigned int chnl) {
-  if (trans->cfg->use_tfh) {
+  if (trans->trans_cfg->use_tfh) {
     WARN_ON_ONCE(chnl >= 64);
     return TFH_TFDQ_CBB_TABLE + 8 * chnl;
   }

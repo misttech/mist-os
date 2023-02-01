@@ -3,11 +3,10 @@
  * Copyright (C) 2015-2017 Intel Deutschland GmbH
  * Copyright (C) 2018-2022 Intel Corporation
  */
-#include <linux/module.h>
-#include <linux/stringify.h>
-#include "iwl-config.h"
-#include "iwl-prph.h"
-#include "fw/api/txq.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-config.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/iwl-prph.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/txq.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/platform/ieee80211.h"
 
 /* Highest firmware API version supported */
 #define IWL_22000_UCODE_API_MAX	72
@@ -159,10 +158,13 @@ static const struct iwl_base_params iwl_ax210_base_params = {
 static const struct iwl_ht_params iwl_22000_ht_params = {
 	.stbc = true,
 	.ldpc = true,
-	.ht40_bands = BIT(NL80211_BAND_2GHZ) | BIT(NL80211_BAND_5GHZ) |
-		      BIT(NL80211_BAND_6GHZ),
+	.ht40_bands = BIT(WLAN_BAND_TWO_GHZ) | BIT(WLAN_BAND_FIVE_GHZ)
+#if 0   // NEEDS_PORTING
+		      BIT(WLAN_BAND_SIX_GHZ),
+#endif  // NEEDS_PORTING
 };
 
+// TODO(fxbug.com/79135): add back .features flags.
 #define IWL_DEVICE_22000_COMMON						\
 	.ucode_api_max = IWL_22000_UCODE_API_MAX,			\
 	.ucode_api_min = IWL_22000_UCODE_API_MIN,			\
@@ -175,7 +177,7 @@ static const struct iwl_ht_params iwl_22000_ht_params = {
 	.dccm2_len = IWL_22000_DCCM2_LEN,				\
 	.smem_offset = IWL_22000_SMEM_OFFSET,				\
 	.smem_len = IWL_22000_SMEM_LEN,					\
-	.features = IWL_TX_CSUM_NETIF_FLAGS | NETIF_F_RXCSUM,		\
+	.features = 0,		\
 	.apmg_not_supported = true,					\
 	.trans.mq_rx_supported = true,					\
 	.vht_mu_mimo_supported = true,					\
@@ -240,6 +242,7 @@ static const struct iwl_ht_params iwl_22000_ht_params = {
 		},							\
 	}
 
+// TODO(fxbug.com/79135): add back .features flags.
 #define IWL_DEVICE_BZ_COMMON						\
 	.ucode_api_max = IWL_22000_UCODE_API_MAX,			\
 	.ucode_api_min = IWL_22000_UCODE_API_MIN,			\
@@ -252,7 +255,7 @@ static const struct iwl_ht_params iwl_22000_ht_params = {
 	.dccm2_len = IWL_22000_DCCM2_LEN,				\
 	.smem_offset = IWL_22000_SMEM_OFFSET,				\
 	.smem_len = IWL_22000_SMEM_LEN,					\
-	.features = IWL_TX_CSUM_NETIF_FLAGS_BZ | NETIF_F_RXCSUM,	\
+	.features = 0,	\
 	.apmg_not_supported = true,					\
 	.trans.mq_rx_supported = true,					\
 	.vht_mu_mimo_supported = true,					\
@@ -974,6 +977,8 @@ const struct iwl_cfg iwl_cfg_bnj_a0_hr_b0 = {
 	IWL_DEVICE_BZ,
 	.num_rbds = IWL_NUM_RBDS_AX210_HE,
 };
+
+#if 0  // NEEDS_PORTING
 MODULE_FIRMWARE(IWL_QU_B_HR_B_MODULE_FIRMWARE(IWL_22000_UCODE_API_MAX));
 MODULE_FIRMWARE(IWL_QNJ_B_HR_B_MODULE_FIRMWARE(IWL_22000_UCODE_API_MAX));
 MODULE_FIRMWARE(IWL_QU_C_HR_B_MODULE_FIRMWARE(IWL_22000_UCODE_API_MAX));
@@ -1007,3 +1012,4 @@ MODULE_FIRMWARE(IWL_BNJ_A_FM4_A_MODULE_FIRMWARE(IWL_22000_UCODE_API_MAX));
 MODULE_FIRMWARE(IWL_BNJ_A_GF_A_MODULE_FIRMWARE(IWL_22000_UCODE_API_MAX));
 MODULE_FIRMWARE(IWL_BNJ_A_GF4_A_MODULE_FIRMWARE(IWL_22000_UCODE_API_MAX));
 MODULE_FIRMWARE(IWL_BNJ_A_HR_B_MODULE_FIRMWARE(IWL_22000_UCODE_API_MAX));
+#endif  // NEEDS_PORTING

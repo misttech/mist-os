@@ -95,7 +95,7 @@ struct iwl_nvm_data* iwl_parse_eeprom_data(struct device* dev, const struct iwl_
 size_t iwl_init_sband_channels(struct iwl_nvm_data* data, struct ieee80211_supported_band* sband,
                                size_t n_channels, wlan_band_t band);
 
-void iwl_init_ht_hw_capab(const struct iwl_cfg* cfg, struct iwl_nvm_data* data,
+void iwl_init_ht_hw_capab(struct iwl_trans *trans, struct iwl_nvm_data* data,
                           struct ieee80211_sta_ht_cap* ht_info, wlan_band_t band, uint8_t tx_chains,
                           uint8_t rx_chains);
 

@@ -2,8 +2,9 @@
 /*
  * Copyright(c) 2019 - 2021 Intel Corporation
  */
-#include <fw/api/commands.h>
-#include "img.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/cmdhdr.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/api/commands.h"
+#include "src/connectivity/wlan/drivers/third_party/intel/iwlwifi/fw/img.h"
 
 u8 iwl_fw_lookup_cmd_ver(const struct iwl_fw *fw, u32 cmd_id, u8 def)
 {
@@ -28,7 +29,6 @@ u8 iwl_fw_lookup_cmd_ver(const struct iwl_fw *fw, u32 cmd_id, u8 def)
 
 	return def;
 }
-EXPORT_SYMBOL_GPL(iwl_fw_lookup_cmd_ver);
 
 u8 iwl_fw_lookup_notif_ver(const struct iwl_fw *fw, u8 grp, u8 cmd, u8 def)
 {
@@ -50,7 +50,6 @@ u8 iwl_fw_lookup_notif_ver(const struct iwl_fw *fw, u8 grp, u8 cmd, u8 def)
 
 	return def;
 }
-EXPORT_SYMBOL_GPL(iwl_fw_lookup_notif_ver);
 
 static const struct {
 	const char *name;
@@ -81,7 +80,7 @@ static const struct {
 
 const char *iwl_fw_lookup_assert_desc(u32 num)
 {
-	int i;
+	size_t i;
 
 	for (i = 0; i < ARRAY_SIZE(advanced_lookup) - 1; i++)
 		if (advanced_lookup[i].num == (num & ~FW_SYSASSERT_CPU_MASK))
@@ -90,4 +89,3 @@ const char *iwl_fw_lookup_assert_desc(u32 num)
 	/* No entry matches 'num', so it is the last: ADVANCED_SYSASSERT */
 	return advanced_lookup[i].name;
 }
-EXPORT_SYMBOL_GPL(iwl_fw_lookup_assert_desc);

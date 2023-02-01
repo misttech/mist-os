@@ -222,7 +222,7 @@ static zx_status_t iwl_nvm_read_section(struct iwl_mvm* mvm, uint16_t section, u
   /* Read the NVM until exhausted (reading less than requested) */
   while (bytes_read == length) {
     /* Check no memory assumptions fail and cause an overflow */
-    if ((size_read + offset + length) > mvm->cfg->base_params->eeprom_size) {
+    if ((size_read + offset + length) > mvm->trans->trans_cfg->base_params->eeprom_size) {
       IWL_ERR(mvm, "EEPROM size is too small for NVM\n");
       return ZX_ERR_INVALID_ARGS;
     }
@@ -338,7 +338,7 @@ zx_status_t iwl_nvm_init(struct iwl_mvm* mvm) {
   /* Read From FW NVM */
   IWL_DEBUG_EEPROM(mvm->trans->dev, "Read from NVM\n");
 
-  nvm_buffer = malloc(mvm->cfg->base_params->eeprom_size);
+  nvm_buffer = malloc(mvm->trans->trans_cfg->base_params->eeprom_size);
   if (!nvm_buffer) {
     return ZX_ERR_NO_MEMORY;
   }
