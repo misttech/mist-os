@@ -11,7 +11,10 @@ use fuchsia_zircon as zx;
 
 use anyhow::Context as _;
 
-use crate::errors::{self, ContextExt as _};
+use crate::{
+    errors::{self, ContextExt as _},
+    exit_with_fidl_error,
+};
 
 /// An error when adding a device.
 pub(super) enum AddDeviceError {
@@ -151,10 +154,9 @@ impl NetworkDeviceInstance {
         let device_for_netstack = get_device()?;
         let () = installer
             .install_device(device_for_netstack, device_control_server_end)
-            .context("calling Installer install_device")
             // NB: Failing to communicate with installer is a fatal error, that
             // means the Netstack is gone, which we don't tolerate.
-            .map_err(errors::Error::Fatal)?;
+            .unwrap_or_else(|err| exit_with_fidl_error(err));
 
         Ok(futures::stream::try_unfold(
             (port_watcher, device_control, device, topological_path),

@@ -40,7 +40,7 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_vfs_watcher as fvfs_watcher;
 use fuchsia_zircon::{self as zx, DurationNum as _};
 
-use anyhow::{anyhow, Context as _};
+use anyhow::{anyhow, bail, Context as _};
 use async_trait::async_trait;
 use async_utils::stream::{TryFlattenUnorderedExt as _, WithTag as _};
 use dns_server_watcher::{DnsServers, DnsServersUpdateSource, DEFAULT_DNS_PORT};
@@ -299,15 +299,17 @@ const FILTER_CAS_RETRY_INTERVAL_MILLIS: i64 = 500;
 macro_rules! cas_filter_rules {
     ($filter:expr, $get_rules:ident, $update_rules:ident, $rules:expr, $error_type:ident) => {
         for retry in 0..FILTER_CAS_RETRY_MAX {
-            let generation = match $filter.$get_rules().await? {
-                Ok((_rules, generation)) => generation,
-                Err(e) => {
-                    return Err(anyhow::anyhow!("{} failed: {:?}", stringify!($get_rules), e));
-                }
-            };
-            match $filter.$update_rules(&mut $rules.iter_mut(), generation).await.with_context(
-                || format!("error getting response from {}", stringify!($update_rules)),
-            )? {
+            let (_rules, generation) = $filter
+                .$get_rules()
+                .await
+                .unwrap_or_else(|err| exit_with_fidl_error(err))
+                .map_err(|e| anyhow!("{} failed: {:?}", stringify!($get_rules), e))?;
+
+            match $filter
+                .$update_rules(&mut $rules.iter_mut(), generation)
+                .await
+                .unwrap_or_else(|err| exit_with_fidl_error(err))
+            {
                 Ok(()) => {
                     break;
                 }
@@ -320,7 +322,7 @@ macro_rules! cas_filter_rules {
                     .await;
                 }
                 Err(e) => {
-                    let () = Err(anyhow::anyhow!("{} failed: {:?}", stringify!($update_rules), e))?;
+                    bail!("{} failed: {:?}", stringify!($update_rules), e);
                 }
             }
         }
@@ -330,16 +332,16 @@ macro_rules! cas_filter_rules {
 // This is a placeholder macro while some update operations are not supported.
 macro_rules! no_update_filter_rules {
     ($filter:expr, $get_rules:ident, $update_rules:ident, $rules:expr, $error_type:ident) => {
-        let generation = match $filter.$get_rules().await? {
-            Ok((_rules, generation)) => generation,
-            Err(e) => {
-                return Err(anyhow::anyhow!("{} failed: {:?}", stringify!($get_rules), e));
-            }
-        };
+        let (_rules, generation) = $filter
+            .$get_rules()
+            .await
+            .unwrap_or_else(|err| exit_with_fidl_error(err))
+            .map_err(|e| anyhow!("{} failed: {:?}", stringify!($get_rules), e))?;
+
         match $filter
             .$update_rules(&mut $rules.iter_mut(), generation)
             .await
-            .with_context(|| format!("error getting response from {}", stringify!($update_rules)))?
+            .unwrap_or_else(|err| exit_with_fidl_error(err))
         {
             Ok(()) => {}
             Err(fnet_filter::$error_type::NotSupported) => {
@@ -955,10 +957,8 @@ impl<'a> NetCfg<'a> {
                 }
                 Event::InterfaceWatcherResult(if_watcher_res) => {
                     let event = if_watcher_res
-                        .context("error watching interface property changes")?
-                        .ok_or(anyhow::anyhow!(
-                            "interface watcher event stream ended unexpectedly"
-                        ))?;
+                        .unwrap_or_else(|err| exit_with_fidl_error(err))
+                        .expect("watcher stream never returns None");
                     trace!("got interfaces watcher event = {:?}", event);
 
                     self.handle_interface_watcher_event(
@@ -1792,10 +1792,7 @@ impl<'a> NetCfg<'a> {
             let () = filter
                 .enable_interface(interface_id)
                 .await
-                .with_context(|| {
-                    format!("error sending enable filter request on nic {}", interface_id)
-                })
-                .map_err(errors::Error::Fatal)?
+                .unwrap_or_else(|err| exit_with_fidl_error(err))
                 .map_err(|e| {
                     anyhow::anyhow!(
                         "failed to enable filter on nic {} with error = {:?}",
@@ -1809,10 +1806,7 @@ impl<'a> NetCfg<'a> {
             let () = filter
                 .disable_interface(interface_id)
                 .await
-                .with_context(|| {
-                    format!("error sending disable filter request on nic {}", interface_id)
-                })
-                .map_err(errors::Error::Fatal)?
+                .unwrap_or_else(|err| exit_with_fidl_error(err))
                 .map_err(|e| {
                     anyhow::anyhow!(
                         "failed to disable filter on nic {} with error = {:?}",
@@ -1827,8 +1821,7 @@ impl<'a> NetCfg<'a> {
         let () = stack
             .set_dhcp_client_enabled(interface_id, true)
             .await
-            .context("failed to call set dhcp client enabled")
-            .map_err(errors::Error::Fatal)?
+            .unwrap_or_else(|err| exit_with_fidl_error(err))
             .map_err(|e| anyhow!("failed to start dhcp client: {:?}", e))
             .map_err(errors::Error::NonFatal)?;
 
@@ -1913,8 +1906,7 @@ impl<'a> NetCfg<'a> {
                 metric: 0,
             })
             .await
-            .context("error sending add route request")
-            .map_err(errors::Error::Fatal)?
+            .unwrap_or_else(|err| exit_with_fidl_error(err))
             .map_err(|e| {
                 let severity = match e {
                     fidl_fuchsia_net_stack::Error::InvalidArgs => {
@@ -2527,6 +2519,14 @@ fn map_address_state_provider_error(
         };
         severity(anyhow::Error::new(e).context(ctx))
     }
+}
+
+/// If we can't reach netstack via fidl, log an error and exit.
+//
+// TODO(fxbug.dev/119295): add a test that works as intended.
+fn exit_with_fidl_error(cause: fidl::Error) -> ! {
+    error!(%cause, "exiting due to fidl error");
+    std::process::exit(1);
 }
 
 #[cfg(test)]

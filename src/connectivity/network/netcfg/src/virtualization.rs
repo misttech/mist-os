@@ -25,7 +25,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::{
     errors::{self, ContextExt as _},
-    DeviceClass,
+    exit_with_fidl_error, DeviceClass,
 };
 
 /// Network identifier.
@@ -175,8 +175,7 @@ impl<'a, B: BridgeHandler> Virtualization<'a, B> {
                         .map_err(errors::Error::NonFatal)?;
                 installer
                     .install_device(device, server_end)
-                    .context("call install device")
-                    .map_err(errors::Error::Fatal)?;
+                    .unwrap_or_else(|err| exit_with_fidl_error(err));
 
                 // Create an interface on the device, and enable it.
                 let fhardware_network::PortInfo { id: port_id, .. } = port
@@ -783,8 +782,7 @@ impl BridgeHandlerImpl {
         self.stack
             .set_dhcp_client_enabled(bridge_id, true)
             .await
-            .context("failed to call SetDhcpClientEnabled")
-            .map_err(errors::Error::Fatal)?
+            .unwrap_or_else(|err| exit_with_fidl_error(err))
             .map_err(|e| anyhow!("failed to start dhcp client: {:?}", e))
             .map_err(errors::Error::NonFatal)
     }
@@ -810,16 +808,20 @@ impl BridgeHandler for BridgeHandlerImpl {
                 upstream_interface, interfaces
             );
 
-            self.netstack
+            let result = self
+                .netstack
                 .bridge_interfaces(&interfaces)
                 .await
-                .map_err(anyhow::Error::new)
-                .and_then(|result| match result {
-                    fnetstack::Result_::Message(message) => Err(anyhow::Error::msg(message)),
-                    fnetstack::Result_::Nicid(id) => Ok(id),
-                })
-                .with_context(|| format!("could not bridge interfaces ({:?})", interfaces))
-                .map_err(errors::Error::Fatal)?
+                .unwrap_or_else(|err| exit_with_fidl_error(err));
+
+            match result {
+                fnetstack::Result_::Nicid(id) => id,
+                fnetstack::Result_::Message(message) => {
+                    return Err(anyhow!("{message}"))
+                        .with_context(|| format!("could not bridge interfaces ({:?})", interfaces))
+                        .map_err(errors::Error::Fatal);
+                }
+            }
         };
 
         let bridge_id = u64::from(bridge_id);
@@ -837,10 +839,7 @@ impl BridgeHandler for BridgeHandlerImpl {
         let (control, server_end) = fnet_interfaces_ext::admin::Control::create_endpoints()
             .context("create Control endpoints")
             .map_err(errors::Error::NonFatal)?;
-        self.debug
-            .get_admin(bridge_id, server_end)
-            .context("call get admin")
-            .map_err(errors::Error::Fatal)?;
+        self.debug.get_admin(bridge_id, server_end).unwrap_or_else(|err| exit_with_fidl_error(err));
         let did_enable = control
             .enable()
             .await
@@ -864,8 +863,7 @@ impl BridgeHandler for BridgeHandlerImpl {
         self.stack
             .del_ethernet_interface(id)
             .await
-            .context("call del_ethernet_interface")
-            .map_err(errors::Error::Fatal)?
+            .unwrap_or_else(|err| exit_with_fidl_error(err))
             // If the netstack failed to destroy the bridge, the bridging state machine has become
             // inconsistent with the netstack, so we return an unrecoverable error.
             //
