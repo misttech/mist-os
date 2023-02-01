@@ -1554,7 +1554,7 @@ int closedir(DIR* dir) {
     io->dirent_iterator_destroy(dir->iterator.get());
     dir->iterator.reset();
   }
-  close_impl(dir->fd, /*should_wait=*/true);
+  close_impl(dir->fd, /*should_wait=*/false);
   delete dir;
   return 0;
 }
