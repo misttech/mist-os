@@ -144,7 +144,9 @@ zx_status_t channel_create_waiter(fidl_handle_t handle, async_dispatcher_t* disp
 
 void channel_close(fidl_handle_t handle) { zx_handle_close(handle); }
 void channel_close_many(const fidl_handle_t* handles, size_t num_handles) {
-  zx_handle_close_many(handles, num_handles);
+  if (num_handles > 0) {
+    zx_handle_close_many(handles, num_handles);
+  }
 }
 
 }  // namespace
