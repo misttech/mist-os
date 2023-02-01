@@ -1,0 +1,118 @@
+{
+    "spdxVersion": "SPDX-2.2",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "test_package",
+    "documentNamespace": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx",
+    "creationInfo": {
+        "creators": [
+            "Tool: fuchsia_licenses_spdx"
+        ]
+    },
+    "dataLicense": "CC0-1.0",
+    "documentDescribes": [
+        "SPDXRef-Package-0",
+        "SPDXRef-Package-1",
+        "SPDXRef-Package-2",
+        "SPDXRef-Package-3",
+        "SPDXRef-Package-4",
+        "SPDXRef-Package-5"
+    ],
+    "packages": [
+        {
+            "SPDXID": "SPDXRef-Package-0",
+            "name": "test_package"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-1",
+            "name": "Component A",
+            "licenseConcluded": "LicenseRef-0"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-2",
+            "name": "Component B"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-3",
+            "name": "Component Foo from SPDX"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-4",
+            "name": "Component Bar from SPDX",
+            "copyrightText": "Copyright for Bar",
+            "licenseConcluded": "LicenseRef-1 OR LicenseRef-2"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-5",
+            "name": "Package with default license",
+            "copyrightText": "Test Copyright",
+            "licenseConcluded": "LicenseRef-3"
+        }
+    ],
+    "relationships": [
+        {
+            "spdxElementId": "SPDXRef-Package-0",
+            "relatedSpdxElement": "SPDXRef-Package-1",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-0",
+            "relatedSpdxElement": "SPDXRef-Package-2",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-2",
+            "relatedSpdxElement": "SPDXRef-Package-3",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-3",
+            "relatedSpdxElement": "SPDXRef-Package-4",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-0",
+            "relatedSpdxElement": "SPDXRef-Package-5",
+            "relationshipType": "CONTAINS"
+        }
+    ],
+    "hasExtractedLicensingInfos": [
+        {
+            "name": "Component A",
+            "licenseId": "LicenseRef-0",
+            "extractedText": "License for Test Component A.\nThis is not a real software license. This is just for testing.\n",
+            "crossRefs": [
+                {
+                    "url": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx/license_a.txt"
+                }
+            ]
+        },
+        {
+            "name": "Bar's license from SPDX",
+            "licenseId": "LicenseRef-1",
+            "extractedText": "License for Bar.\nThis is not a real software license. This is just for testing.\n",
+            "crossRefs": [
+                {
+                    "url": "http://bar"
+                }
+            ],
+            "seeAlsos": [
+                "http://bar"
+            ]
+        },
+        {
+            "name": "Baz license",
+            "licenseId": "LicenseRef-2",
+            "extractedText": "Baz License. This is not a real software license. This is just for testing.\n"
+        },
+        {
+            "name": "Package with default license",
+            "licenseId": "LicenseRef-3",
+            "extractedText": "Default License.\nThis is not a real software license. This is just for testing.\n",
+            "crossRefs": [
+                {
+                    "url": "https://fuchsia.googlesource.com/sdk-integration/tests/fuchsia/licenses/spdx/default_license.txt"
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,51 @@
+{
+    "spdxVersion": "SPDX-2.2",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "Doc",
+    "documentNamespace": "Namespace",
+    "creationInfo": {
+        "creators": [
+            "Organization: Google Inc."
+        ]
+    },
+    "dataLicense": "CC0-1.0",
+    "packages": [
+        {
+            "SPDXID": "SPDXRef-Package-1",
+            "name": "Package A",
+            "licenseConcluded": "LicenseRef-Foo AND LicenseRef-Bar AND LicenseRef-Baz AND LicenseRef-Quz",
+            "copyrightText": "copyright A"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-2",
+            "name": "Package B",
+            "licenseConcluded": "LicenseRef-Baz",
+            "copyrightText": "copyright B"
+        }
+    ],
+    "hasExtractedLicensingInfos": [
+        {
+            "name": "Foo",
+            "licenseId": "LicenseRef-Foo",
+            "extractedText": "Some known\ntest license 1",
+            "seeAlso": [
+                "http://foo.com"
+            ]
+        },
+        {
+            "name": "Bar",
+            "licenseId": "LicenseRef-Bar",
+            "extractedText": "Some known\ntest license 2\n(used by both Bar and Baz)"
+        },
+        {
+            "name": "Baz",
+            "licenseId": "LicenseRef-Baz",
+            "extractedText": "Some known\ntest license 2\n(used by both Bar and Baz)"
+        },
+        {
+            "name": "Qux",
+            "licenseId": "LicenseRef-Quz",
+            "extractedText": "Some unknown\ntest license 3"
+        }
+    ]
+}

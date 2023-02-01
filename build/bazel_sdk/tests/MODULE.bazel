@@ -1,0 +1,28 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+module(
+    name = "sdk-integration",
+    version = "1.0",
+    # TODO(fxbug.dev/107744) Migrate to register_toolchains
+    toolchains_to_register = [
+        "@fuchsia_sdk//:fuchsia_toolchain_sdk",
+        "@fuchsia_clang//:cc-x86_64",
+        "@fuchsia_clang//:cc-aarch64",
+    ],
+)
+
+bazel_dep(name = "rules_fuchsia", version = "")
+local_path_override(
+    module_name = "rules_fuchsia",
+    path = "bazel_rules_fuchsia",
+)
+
+bazel_dep(name = "bazel_skylib", version = "1.2.0")
+
+fuchsia_sdk_ext = use_extension("@rules_fuchsia//fuchsia:deps.bzl", "fuchsia_sdk_ext")
+use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
+
+fuchsia_clang_ext = use_extension("@rules_fuchsia//fuchsia:deps.bzl", "fuchsia_clang_ext")
+use_repo(fuchsia_clang_ext, "fuchsia_clang")

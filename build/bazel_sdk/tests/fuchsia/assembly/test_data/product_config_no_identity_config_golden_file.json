@@ -1,0 +1,17 @@
+{
+  "platform": {
+    "build_type": "user"
+  },
+  "product": {
+    "drivers": [],
+    "packages": {
+      "base": [],
+      "cache": [
+        {
+          "manifest": "../../../bazel-out/k8-fastbuild/bin/fuchsia/assembly/prebuilt_ams_light_expanded/rebased_package_manifest.json"
+        }
+      ]
+    },
+    "session_url": "fuchsia-pkg://fuchsia.com/workstation_session#meta/workstation_routing.cm"
+  }
+}

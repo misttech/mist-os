@@ -1,0 +1,18 @@
+{
+  "banjo_deps": [],
+  "deps": [
+  ],
+  "fidl_binding_deps": [],
+  "fidl_deps": [],
+  "headers": [
+    "pkg/fidl/include/lib/fidl/epitaph.h"
+  ],
+  "include_dir": "pkg/fidl/include",
+  "name": "fidl",
+  "plasa": [],
+  "root": "pkg/fidl",
+  "sources": [
+    "pkg/fidl/epitaph.c"
+  ],
+  "type": "cc_source_library"
+}

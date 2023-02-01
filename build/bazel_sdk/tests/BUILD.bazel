@@ -1,0 +1,113 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@rules_fuchsia//fuchsia:defs.bzl",
+    "fuchsia_emulator",
+    "fuchsia_local_package_repository",
+    "fuchsia_remote_product_bundle",
+)
+load("@rules_fuchsia//fuchsia:workflows.bzl", "fuchsia_development_configuration")
+
+test_suite(
+    name = "tests",
+    tags = ["all"],
+    tests = [
+        ":assembly_tests",
+        ":licenses_tests",
+        ":unittests",
+    ],
+)
+
+test_suite(
+    name = "unittests",
+    tags = ["unittests"],
+    tests = [
+        "//fuchsia_package:fuchsia_package_tests",
+        "//fuchsia_package:pkg_test",
+        "//fuchsia_package_resource:fuchsia_package_resource_tests",
+    ],
+)
+
+test_suite(
+    name = "assembly_tests",
+    tests = [
+        "//fuchsia/assembly:images_config_golden_test",
+        "//fuchsia/assembly:images_config_no_vbmeta_no_account_golden_test",
+        "//fuchsia/assembly:partitions_config_golden_test",
+        "//fuchsia/assembly:product_config_add_package_golden_test",
+        "//fuchsia/assembly:product_config_golden_test",
+        "//fuchsia/assembly:product_config_no_identity_golden_test",
+    ],
+)
+
+test_suite(
+    name = "licenses_tests",
+    tests = [
+        "//fuchsia/licenses/classification:classification_test",
+        "//fuchsia/licenses/notice:notice_test",
+        "//fuchsia/licenses/review:review_test",
+        "//fuchsia/licenses/spdx:golden_test",
+        "//fuchsia/licenses/spdx_dedup:golden_test",
+        "//tools/licenses:classification_types_test",
+        "//tools/licenses:spdx_types_test",
+    ],
+)
+
+filegroup(
+    name = "build_only_tests",
+    srcs = [
+        "//examples/hello_world_cpp:pkg",
+        "//examples/hello_world_cpp:test_pkg",
+    ],
+    testonly = True,
+)
+
+# The workstation product bundle for running the emulator
+fuchsia_remote_product_bundle(
+    name = "pb_ws",
+    product_name = "workstation_eng.qemu-x64",
+    repository = "workstation-packages",
+)
+
+# The workstation product bundle for running on the chromebook
+fuchsia_remote_product_bundle(
+    name = "pb_chromebook",
+    product_name = "workstation_eng.chromebook-x64",
+    repository = "workstation-packages",
+)
+
+# A fuchsia emulator which runs the workstation product.
+# Note: The workstation_pb must be fetched before the emulator can be started.
+fuchsia_emulator(
+    name = "emu_ws",
+    emulator_name = "workstation-emulator",
+    launch_options = [
+        "--headless",
+    ],
+    product_bundle = ":pb_ws",
+)
+
+fuchsia_local_package_repository(
+    name = "dev_repo",
+    repo_name = "dev",
+    repo_path = ".package_repos/dev",
+    #TODO: add alias support
+)
+
+fuchsia_development_configuration(
+    name = "ws_emu_development",
+    emulator = ":emu_ws",
+    package_repository = ":dev_repo",
+    #TODO: workaround until fxb/113156 is fixed.
+    product_bundle = ":pb_ws",
+)
+
+fuchsia_development_configuration(
+    name = "ws_development",
+    autodetect_target = True,
+    package_repository = ":dev_repo",
+    product_bundle = ":pb_chromebook",
+    stop_emulators = True,
+)

@@ -1,0 +1,47 @@
+{
+  "bootloader_partitions": [
+    {
+      "image": "fuchsia/assembly/test_data/u-boot.bin.signed.test-b4",
+      "name": "bootloader",
+      "type": "skip_metadata"
+    }
+  ],
+  "bootstrap_partitions": [
+    {
+      "condition": {
+        "value": "0xe9000000",
+        "variable": "emmc-total-bytes"
+      },
+      "image": "fuchsia/assembly/test_data/gpt.fuchsia.3776.bin",
+      "name": "gpt"
+    },
+    {
+      "condition": {
+        "value": "0xe9000000",
+        "variable": "emmc-total-bytes"
+      },
+      "image": "fuchsia/assembly/test_data/gpt.fuchsia.3728.bin",
+      "name": "gpt"
+    }
+  ],
+  "hardware_revision": "workstation",
+  "partitions": [
+    {
+      "name": "zircon_a",
+      "slot": "A",
+      "type": "ZBI"
+    },
+    {
+      "name": "vbmeta_b",
+      "slot": "B",
+      "type": "VBMeta"
+    },
+    {
+      "name": "fvm",
+      "type": "FVM"
+    }
+  ],
+  "unlock_credentials": [
+    "fuchsia/assembly/test_data/unlock-creds.zip"
+  ]
+}

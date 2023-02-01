@@ -1,0 +1,378 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(":fuchsia_product_configuration_test.bzl", "fuchsia_product_configuration_test")
+load(":fuchsia_images_configuration_test.bzl", "fuchsia_images_configuration_test")
+load(":fuchsia_partitions_configuration_test.bzl", "fuchsia_partitions_configuration_test")
+load(
+    "@rules_fuchsia//fuchsia:assembly.bzl",
+    "ARCHIVIST_TYPES",
+    "BLOBFS_LAYOUT",
+    "BUILD_TYPES",
+    "FEATURE_CONTROL",
+    "INPUT_DEVICE_TYPE",
+    "PARTITION_TYPE",
+    "SLOT",
+    "ZBI_COMPRESSION",
+    "fuchsia_assemble_package",
+    "fuchsia_bootloader_partition",
+    "fuchsia_bootstrap_partition",
+    "fuchsia_filesystem_blobfs",
+    "fuchsia_filesystem_empty_account",
+    "fuchsia_filesystem_empty_data",
+    "fuchsia_filesystem_minfs",
+    "fuchsia_filesystem_reserved",
+    "fuchsia_fvm_nand",
+    "fuchsia_fvm_sparse",
+    "fuchsia_fvm_standard",
+    "fuchsia_images_configuration",
+    "fuchsia_partition",
+    "fuchsia_partitions_configuration",
+    "fuchsia_platform_connectivity_configuration",
+    "fuchsia_platform_connectivity_wlan_configuration",
+    "fuchsia_platform_development_support_configuration",
+    "fuchsia_platform_diagnostics_configuration",
+    "fuchsia_platform_identity_configuration",
+    "fuchsia_platform_input_configuration",
+    "fuchsia_prebuilt_package",
+    "fuchsia_product_configuration",
+    "fuchsia_vbmeta",
+    "fuchsia_zbi",
+)
+
+fuchsia_prebuilt_package(
+    name = "prebuilt_ams_light",
+    archive = ":test_data/ams-light-test-0.far",
+)
+
+fuchsia_prebuilt_package(
+    name = "prebuilt_driver",
+    archive = ":test_data/backlight_driver.far",
+    drivers = [
+        "meta/backlight_driver.cm",
+    ],
+)
+
+fuchsia_assemble_package(
+    name = "assembled_ams_light",
+    configs = {
+        ":test_data/config_data.json": "config_data.json",
+    },
+    package = ":prebuilt_ams_light",
+)
+
+fuchsia_platform_input_configuration(
+    name = "testing_input_config",
+    supported_input_devices = [
+        INPUT_DEVICE_TYPE.BUTTON,
+        INPUT_DEVICE_TYPE.KEYBOARD,
+    ],
+)
+
+fuchsia_platform_identity_configuration(
+    name = "testing_identity_config",
+    password_pinweaver = FEATURE_CONTROL.REQUIRED,
+)
+
+fuchsia_platform_connectivity_wlan_configuration(
+    name = "testing_wlan",
+    include_wlan_aibs = True,
+    legacy_privacy_support = True,
+)
+
+fuchsia_platform_connectivity_configuration(
+    name = "testing_connectivity",
+    wlan = ":testing_wlan",
+)
+
+fuchsia_platform_development_support_configuration(
+    name = "testing_development_support",
+    enabled = True,
+)
+
+fuchsia_platform_diagnostics_configuration(
+    name = "testing_diagnostics_config",
+    archivist = ARCHIVIST_TYPES.DEFAULT_SERVICE,
+)
+
+# buildifier: leave-alone
+fuchsia_product_configuration(
+    name = "testing_product_config",
+
+    # Product configuration items
+    base_packages = [
+        ":assembled_ams_light",
+    ],
+    cache_packages = [
+        ":prebuilt_ams_light",
+    ],
+    driver_packages = [
+        ":prebuilt_driver",
+    ],
+    session_url = "fuchsia-pkg://fuchsia.com/workstation_session#meta/workstation_routing.cm",
+
+    # Platform configuration items
+    build_type = BUILD_TYPES.USER,
+    additional_serial_log_tags = [
+        "session-manager",
+        "session:session",
+    ],
+    identity = ":testing_identity_config",
+    input = ":testing_input_config",
+    connectivity = ":testing_connectivity",
+    development_support = ":testing_development_support",
+    diagnostics = ":testing_diagnostics_config",
+    additional_platform_flags_bool = {
+        "some.random.path1": "true",
+        "another.random.path1": "false",
+    },
+    additional_platform_flags_string = {
+        "some.random.string1": "I have a string",
+        "another.random.string2": "false",
+    },
+    additional_platform_flags_int = {
+        "some.random.int1": "3234234324231434134141234",
+        "another.random.int": "0",
+    },
+)
+
+fuchsia_product_configuration_test(
+    name = "product_config_golden_test",
+    golden_file = ":test_data/product_config_golden_file.json",
+    product_config = ":testing_product_config",
+)
+
+# buildifier: leave-alone
+fuchsia_product_configuration(
+    name = "testing_product_config_no_identity",
+    artifact_base_path = ":test_data",
+    cache_packages = [
+        ":prebuilt_ams_light",
+    ],
+    session_url = "fuchsia-pkg://fuchsia.com/workstation_session#meta/workstation_routing.cm",
+
+    # Platform configuration items
+    build_type = BUILD_TYPES.USER,
+)
+
+fuchsia_product_configuration_test(
+    name = "product_config_no_identity_golden_test",
+    golden_file = ":test_data/product_config_no_identity_config_golden_file.json",
+    product_config = ":testing_product_config_no_identity",
+)
+
+# buildifier: leave-alone
+fuchsia_product_configuration(
+    name = "testing_product_config_with_additional_package",
+    product_config = ":test_data/product_config_no_identity_config_golden_file.json",
+
+    # Product configuration items
+    base_packages = [
+        ":assembled_ams_light",
+    ],
+)
+
+fuchsia_product_configuration_test(
+    name = "product_config_add_package_golden_test",
+    golden_file = ":test_data/product_config_add_package_golden_test.json",
+    product_config = ":testing_product_config_with_additional_package",
+)
+
+fuchsia_zbi(
+    name = "my_zbi",
+    compression = ZBI_COMPRESSION.ZSTD_MAX,
+    post_processing_args = [
+        "-v",
+    ],
+    post_processing_script = ":test_data/execute_script.sh",
+    zbi_name = "fuchsia",
+)
+
+fuchsia_vbmeta(
+    name = "my_vbmeta",
+    key = ":test_data/local_key_file",
+    key_metadata = ":test_data/local_key_metadata_file",
+    vbmeta_name = "fuchsia",
+)
+
+fuchsia_filesystem_blobfs(
+    name = "my_blobfs",
+    compress = True,
+    layout = BLOBFS_LAYOUT.DEPRECATED_PADDED,
+    maximum_contents_size = "182452224",
+)
+
+fuchsia_filesystem_minfs(
+    name = "my_minfs",
+    maximum_bytes = "13860864",
+    minimum_data_bytes = "10485760",
+)
+
+fuchsia_filesystem_empty_data(
+    name = "my_empty_data",
+)
+
+fuchsia_filesystem_reserved(
+    name = "my_reserved",
+    slices = "32",
+)
+
+fuchsia_filesystem_empty_account(
+    name = "my_empty_account",
+)
+
+fuchsia_fvm_standard(
+    name = "fvm_standard",
+    compress = True,
+    filesystems = [
+        ":my_blobfs",
+        ":my_minfs",
+        ":my_empty_account",
+        ":my_reserved",
+    ],
+    fvm_standard_name = "fvm",
+)
+
+fuchsia_fvm_standard(
+    name = "fvm_standard_no_account",
+    compress = True,
+    filesystems = [
+        ":my_blobfs",
+        ":my_minfs",
+        ":my_reserved",
+    ],
+    fvm_standard_name = "fvm",
+    resize_image_file_to_fit = True,
+    truncate_to_length = "17179869184",
+)
+
+fuchsia_fvm_sparse(
+    name = "fvm_sparse",
+    filesystems = [
+        ":my_blobfs",
+        ":my_empty_data",
+        ":my_reserved",
+    ],
+    fvm_sparse_name = "fvm.sparse",
+    max_disk_size = "410779648",
+)
+
+fuchsia_fvm_nand(
+    name = "fvm_nand",
+    block_count = "1564",
+    compress = True,
+    filesystems = [
+        ":my_blobfs",
+        ":my_empty_data",
+        ":my_reserved",
+    ],
+    fvm_nand_name = "fvm.nand",
+    max_disk_size = "410779648",
+    oob_size = "8",
+    page_size = "4096",
+    pages_per_block = "64",
+)
+
+fuchsia_images_configuration(
+    name = "my_images_configuration",
+    fvm_slice_size = "32768",
+    images = [
+        ":my_zbi",
+        ":my_vbmeta",
+        ":fvm_nand",
+        ":fvm_standard",
+        ":fvm_sparse",
+    ],
+)
+
+fuchsia_images_configuration(
+    name = "my_images_configuration_no_vbmeta_no_account",
+    images = [
+        ":my_zbi",
+        ":fvm_nand",
+        ":fvm_standard_no_account",
+        ":fvm_sparse",
+    ],
+)
+
+fuchsia_images_configuration_test(
+    name = "images_config_golden_test",
+    golden_file = ":test_data/images_config_golden_file.json",
+    images_config = ":my_images_configuration",
+)
+
+fuchsia_images_configuration_test(
+    name = "images_config_no_vbmeta_no_account_golden_test",
+    golden_file = ":test_data/images_config_golden_file_no_vbmeta.json",
+    images_config = ":my_images_configuration_no_vbmeta_no_account",
+)
+
+fuchsia_bootstrap_partition(
+    name = "bootstrap_partition_3728",
+    condition_value = "0xe9000000",
+    condition_variable = "emmc-total-bytes",
+    image = ":test_data/gpt.fuchsia.3728.bin",
+    partition_name = "gpt",
+)
+
+fuchsia_bootstrap_partition(
+    name = "bootstrap_partition_3776",
+    condition_value = "0xe9000000",
+    condition_variable = "emmc-total-bytes",
+    image = ":test_data/gpt.fuchsia.3776.bin",
+    partition_name = "gpt",
+)
+
+fuchsia_bootloader_partition(
+    name = "my_bootloader_partition",
+    image = ":test_data/u-boot.bin.signed.test-b4",
+    partition_name = "bootloader",
+    type = "skip_metadata",
+)
+
+fuchsia_partition(
+    name = "zbi_partition",
+    partition_name = "zircon_a",
+    slot = SLOT.A,
+    type = PARTITION_TYPE.ZBI,
+)
+
+fuchsia_partition(
+    name = "vbmeta_partition",
+    partition_name = "vbmeta_b",
+    slot = SLOT.B,
+    type = PARTITION_TYPE.VBMETA,
+)
+
+fuchsia_partition(
+    name = "fvm_partition",
+    partition_name = "fvm",
+    type = PARTITION_TYPE.FVM,
+)
+
+fuchsia_partitions_configuration(
+    name = "my_partitions_config",
+    bootloader_partitions = [
+        ":my_bootloader_partition",
+    ],
+    bootstrap_partitions = [
+        ":bootstrap_partition_3776",
+        ":bootstrap_partition_3728",
+    ],
+    hardware_revision = "workstation",
+    partitions = [
+        ":zbi_partition",
+        ":vbmeta_partition",
+        ":fvm_partition",
+    ],
+    unlock_credentials = [
+        ":test_data/unlock-creds.zip",
+    ],
+)
+
+fuchsia_partitions_configuration_test(
+    name = "partitions_config_golden_test",
+    golden_file = ":test_data/partitions_config_golden_file.json",
+    partitions_config = ":my_partitions_config",
+)

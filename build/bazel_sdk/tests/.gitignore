@@ -1,0 +1,5 @@
+bazel-*
+.cipd/
+.cipd_client
+tools/.versions/
+tools/bazel

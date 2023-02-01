@@ -1,0 +1,92 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(":fuchsia_package_test.bzl", "fuchsia_package_test_suite")
+load(":fuchsia_package_checker_test.bzl", "fuchsia_package_checker_test", "make_file")
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_component_manifest", "fuchsia_package", "fuchsia_package_resource")
+
+fuchsia_package_test_suite(name = "fuchsia_package_tests")
+
+fuchsia_package_checker_test(
+    name = "pkg_test",
+    package_name = "pkg_for_test",
+    size = "medium",
+    manifests = [
+        "meta/cc_component.cm",
+        "meta/empty_component.cm",
+    ],
+    package_under_test = ":pkg",
+    # We currently strip all blobs
+    stripped_blobs = [
+        ":simple_file_resource",
+        ":cc_bin_resource",
+    ],
+    unstripped_blobs = [],
+)
+
+# Test Resources
+make_file(
+    name = "simple_file",
+    content = "foo",
+    filename = "text_file.txt",
+)
+
+fuchsia_package_resource(
+    name = "simple_file_resource",
+    src = ":simple_file",
+    dest = "data/text_file.txt",
+)
+
+make_file(
+    name = "cc_main",
+    content = "int main() { return 0; } \n",
+    filename = "main.cc",
+)
+
+cc_binary(
+    name = "cc_bin",
+    srcs = [":cc_main"],
+)
+
+fuchsia_package_resource(
+    name = "cc_bin_resource",
+    src = ":cc_bin",
+    dest = "bin/cc_bin",
+)
+
+fuchsia_component_manifest(
+    name = "manifest",
+    component_name = "cc_component",
+    content = "{}",
+)
+
+fuchsia_component(
+    name = "cc_component",
+    manifest = ":manifest",
+    deps = [
+        ":cc_bin_resource",
+    ],
+)
+
+fuchsia_component_manifest(
+    name = "empty_component_manifest",
+    component_name = "empty_component",
+    content = "{}",
+)
+
+fuchsia_component(
+    name = "empty_component",
+    manifest = ":empty_component_manifest",
+    deps = [],
+)
+
+fuchsia_package(
+    name = "pkg",
+    package_name = "pkg_for_test",
+    components = [
+        ":cc_component",
+        ":empty_component",
+    ],
+    resources = [":simple_file_resource"],
+)

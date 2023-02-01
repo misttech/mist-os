@@ -1,0 +1,31 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load(
+    "@rules_fuchsia//fuchsia:licenses.bzl",
+    "fuchsia_licenses_classification",
+)
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+
+sh_binary(
+    name = "mock_identify_license",
+    srcs = ["mock_identify_license.sh"],
+)
+
+fuchsia_licenses_classification(
+    name = "actual_classification.json",
+    allowed_conditions = ["allowed condition"],
+    conditions_policy = "test_policy.csv",
+    default_condition = "default condition",
+    fail_on_disallowed_conditions = False,
+    identify_license = ":mock_identify_license",
+    policy_override_rules = ["test_policy_override_rule.json"],
+    spdx_input = "input.spdx.json",
+)
+
+diff_test(
+    name = "classification_test",
+    file1 = ":actual_classification.json",
+    file2 = "expected_classification.json",
+)

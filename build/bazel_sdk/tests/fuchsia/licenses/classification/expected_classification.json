@@ -1,0 +1,253 @@
+[
+    {
+        "license_id": "LicenseRef-Bar",
+        "name": "Bar",
+        "links": [],
+        "dependents": [
+            "Package A"
+        ],
+        "identifications": [
+            {
+                "identified_as": "License Kind 3",
+                "condition": "some other disallowed condition",
+                "verified": true,
+                "overriden_conditions": [
+                    "allowed condition"
+                ],
+                "overriding_rules": [
+                    {
+                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
+                        "override_condition_to": "allowed condition",
+                        "bug": "fxb/123",
+                        "comment": [
+                            "This is a test override rule"
+                        ],
+                        "match_criteria": {
+                            "license_names": [
+                                "Bar"
+                            ],
+                            "identifications": [
+                                "License*Kind*3"
+                            ],
+                            "conditions": [
+                                "*"
+                            ],
+                            "snippet_checksums": [
+                                "*"
+                            ],
+                            "dependents": [
+                                "Package A"
+                            ]
+                        }
+                    }
+                ],
+                "confidence": 1.0,
+                "start_line": 2,
+                "end_line": 3,
+                "snippet_checksum": "1cfe5bf877f0b28cd1ada9c9ac705d34",
+                "snippet_text": "test license 2\n(used by both Bar and Baz)"
+            }
+        ],
+        "identification_stats": {
+            "size_bytes": 52,
+            "size_lines": 3,
+            "unidentified_lines": 3
+        }
+    },
+    {
+        "license_id": "LicenseRef-Baz",
+        "name": "Baz",
+        "links": [],
+        "dependents": [
+            "Package A",
+            "Package B"
+        ],
+        "identifications": [
+            {
+                "identified_as": "License Kind 3",
+                "condition": "some other disallowed condition",
+                "verified": false,
+                "verification_message": "The overriding rules ['fuchsia/licenses/classification/test_policy_override_rule.json'] changed the conditions to ['allowed condition'] but the rules don't match the dependencies ['Package A'] that remain with the condition 'some other disallowed condition that is not allowed'.",
+                "overriden_conditions": [
+                    "allowed condition"
+                ],
+                "dependents_unmatched_by_overriding_rules": [
+                    "Package A"
+                ],
+                "overriding_rules": [
+                    {
+                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
+                        "override_condition_to": "allowed condition",
+                        "bug": "fxb/456",
+                        "comment": [
+                            "This is another test override rule"
+                        ],
+                        "match_criteria": {
+                            "license_names": [
+                                "Baz"
+                            ],
+                            "identifications": [
+                                "*Kind 3"
+                            ],
+                            "conditions": [
+                                "*"
+                            ],
+                            "snippet_checksums": [
+                                "*"
+                            ],
+                            "dependents": [
+                                "Package B"
+                            ]
+                        }
+                    }
+                ],
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "Baz"
+                        ],
+                        "identifications": [
+                            "License Kind 3"
+                        ],
+                        "conditions": [
+                            "some other disallowed condition"
+                        ],
+                        "snippet_checksums": [
+                            "1cfe5bf877f0b28cd1ada9c9ac705d34"
+                        ],
+                        "dependents": [
+                            "Package A"
+                        ]
+                    }
+                },
+                "confidence": 1.0,
+                "start_line": 2,
+                "end_line": 3,
+                "snippet_checksum": "1cfe5bf877f0b28cd1ada9c9ac705d34",
+                "snippet_text": "test license 2\n(used by both Bar and Baz)"
+            }
+        ],
+        "identification_stats": {
+            "size_bytes": 52,
+            "size_lines": 3,
+            "unidentified_lines": 3
+        }
+    },
+    {
+        "license_id": "LicenseRef-Foo",
+        "name": "Foo",
+        "links": [
+            "http://foo.com"
+        ],
+        "dependents": [
+            "Package A"
+        ],
+        "identifications": [
+            {
+                "identified_as": "License Kind 1",
+                "condition": "allowed condition",
+                "verified": true,
+                "confidence": 1.0,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "fa2258a0fd04107e67394fdb57c0eecf",
+                "snippet_text": "Some known\ntest license 1"
+            },
+            {
+                "identified_as": "License Kind 2",
+                "condition": "disallowed condition",
+                "verified": false,
+                "verification_message": "'disallowed condition' condition is not an allowed",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "Foo"
+                        ],
+                        "identifications": [
+                            "License Kind 2"
+                        ],
+                        "conditions": [
+                            "disallowed condition"
+                        ],
+                        "snippet_checksums": [
+                            "80c12e04fe66d3cf50eb6a4e8e2185fc"
+                        ],
+                        "dependents": [
+                            "Package A"
+                        ]
+                    }
+                },
+                "confidence": 0.5,
+                "start_line": 2,
+                "end_line": 3,
+                "snippet_checksum": "80c12e04fe66d3cf50eb6a4e8e2185fc",
+                "snippet_text": "test license 1"
+            }
+        ],
+        "identification_stats": {
+            "size_bytes": 25,
+            "size_lines": 2,
+            "unidentified_lines": 2
+        }
+    },
+    {
+        "license_id": "LicenseRef-Quz",
+        "name": "Qux",
+        "links": [],
+        "dependents": [
+            "Package A"
+        ],
+        "identifications": [
+            {
+                "identified_as": "[UNIDENTIFIED]",
+                "condition": "default condition",
+                "verified": false,
+                "verification_message": "'default condition' condition is not an allowed",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "Qux"
+                        ],
+                        "identifications": [
+                            "[UNIDENTIFIED]"
+                        ],
+                        "conditions": [
+                            "default condition"
+                        ],
+                        "snippet_checksums": [
+                            "71c68279356ec2c9ebba3e0e31f97110"
+                        ],
+                        "dependents": [
+                            "Package A"
+                        ]
+                    }
+                },
+                "confidence": 1.0,
+                "start_line": 1,
+                "end_line": 3,
+                "snippet_checksum": "71c68279356ec2c9ebba3e0e31f97110",
+                "snippet_text": "Some unknown\ntest license 3"
+            }
+        ],
+        "identification_stats": {
+            "size_bytes": 27,
+            "size_lines": 2,
+            "unidentified_lines": 3
+        }
+    }
+]

@@ -1,0 +1,44 @@
+[
+    {
+        "override_condition_to": "allowed condition",
+        "bug": "fxb/123",
+        "comment": [
+            "This is a test override rule"
+        ],
+        "match_criteria": {
+            "license_names": [
+                "Bar"
+            ],
+            "dependents": [
+                "Package A"
+            ],
+            "identifications": [
+                "License*Kind*3"
+            ],
+            "conditions": [
+                "*"
+            ]
+        }
+    },
+    {
+        "override_condition_to": "allowed condition",
+        "bug": "fxb/456",
+        "comment": [
+            "This is another test override rule"
+        ],
+        "match_criteria": {
+            "license_names": [
+                "Baz"
+            ],
+            "dependents": [
+                "Package B"
+            ],
+            "identifications": [
+                "*Kind 3"
+            ],
+            "conditions": [
+                "*"
+            ]
+        }
+    }
+]

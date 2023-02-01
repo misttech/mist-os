@@ -1,0 +1,22 @@
+{
+  "name": "sysroot",
+  "type": "sysroot",
+  "versions": {
+    "x64": {
+      "debug_libs": [
+      ],
+      "dist_dir": "arch/x64/sysroot",
+      "dist_libs": [
+        "arch/x64/sysroot/dist/lib/ld.so.1"
+      ],
+      "headers": [
+        "arch/x64/sysroot/include/stdlib.h"
+      ],
+      "include_dir": "arch/x64/sysroot/include",
+      "link_libs": [
+        "arch/x64/sysroot/lib/libc.so"
+      ],
+      "root": "arch/x64/sysroot"
+    }
+  }
+}

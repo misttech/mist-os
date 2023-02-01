@@ -1,0 +1,41 @@
+{
+  "data": {
+    "name": "Platform version map",
+    "type": "version_history",
+    "versions": [
+      {
+        "abi_revision": "0x601665C5B1A89C7F",
+        "api_level": "4"
+      },
+      {
+        "abi_revision": "0x1FA3D8DDFBEDC6C7",
+        "api_level": "5"
+      },
+      {
+        "abi_revision": "0xE9CACD17EA11859D",
+        "api_level": "6"
+      },
+      {
+        "abi_revision": "0xECCEA2F70ACD6FC0",
+        "api_level": "7"
+      },
+      {
+        "abi_revision": "0xA56735A6690E09D8",
+        "api_level": "8"
+      },
+      {
+        "abi_revision": "0xECDB841C251A8CB9",
+        "api_level": "9"
+      },
+      {
+        "abi_revision": "0xED74D73009C2B4E3",
+        "api_level": "10"
+      },
+      {
+        "abi_revision": "0x406C7CA7EF077DB4",
+        "api_level": "11"
+      }
+    ]
+  },
+  "schema_id": "https://fuchsia.dev/schema/version_history-ef02ef45.json"
+}

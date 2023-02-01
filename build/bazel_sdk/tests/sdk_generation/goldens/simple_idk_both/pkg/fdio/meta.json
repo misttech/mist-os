@@ -1,0 +1,23 @@
+{
+  "binaries": {
+    "x64": {
+      "dist": "arch/x64/dist/libfdio.so",
+      "dist_path": "lib/libfdio.so",
+      "link": "arch/x64/lib/libfdio.so"
+    },
+    "arm64": {
+      "dist": "arch/arm64/dist/libfdio.so",
+      "dist_path": "lib/libfdio.so",
+      "link": "arch/arm64/lib/libfdio.so"
+    }
+  },
+  "deps": [],
+  "format": "shared",
+  "headers": [
+    "pkg/fdio/include/lib/fdio/fdio.h"
+  ],
+  "include_dir": "pkg/fdio/include",
+  "name": "fdio",
+  "root": "pkg/fdio",
+  "type": "cc_prebuilt_library"
+}

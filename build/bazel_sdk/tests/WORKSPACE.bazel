@@ -1,0 +1,83 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+workspace(name = "sdk-integration")
+
+load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_archive(
+    name = "bazel_skylib",
+    sha256 = "1c531376ac7e5a180e0237938a2536de0c54d93f5c278634818e0efc952dd56c",
+    urls = [
+        "https://github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-skylib/releases/download/1.0.3/bazel-skylib-1.0.3.tar.gz",
+    ],
+)
+
+load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
+
+bazel_skylib_workspace()
+
+# Setup fuchsia rules
+local_repository(
+    name = "rules_fuchsia",
+    path = "../bazel_rules_fuchsia",
+)
+
+load("@rules_fuchsia//cipd:defs.bzl", "cipd_tool_repository")
+
+cipd_tool_repository(
+    name = "cipd_tool",
+)
+
+load(
+    "@rules_fuchsia//fuchsia:deps.bzl",
+    "fuchsia_clang_repository",
+    "fuchsia_sdk_repository",
+    "rules_fuchsia_deps",
+)
+
+rules_fuchsia_deps()
+
+fuchsia_sdk_repository(
+    name = "fuchsia_sdk",
+    use_experimental = True,
+)
+
+register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+
+fuchsia_clang_repository(
+    name = "fuchsia_clang",
+)
+
+load("@fuchsia_clang//:defs.bzl", "register_clang_toolchains")
+
+register_clang_toolchains()
+
+fuchsia_sdk_repository(
+    name = "fuchsia_sdk_x64_only",
+    local_paths = [
+        "sdk_generation/goldens/simple_idk_x64",
+    ],
+)
+
+fuchsia_sdk_repository(
+    name = "fuchsia_sdk_arm64_only",
+    local_paths = [
+        "sdk_generation/goldens/simple_idk_arm64",
+    ],
+)
+
+fuchsia_sdk_repository(
+    name = "fuchsia_sdk_both",
+    local_paths = [
+        "sdk_generation/goldens/simple_idk_both",
+    ],
+)
+
+# gTest.
+local_repository(
+    name = "com_google_googletest",
+    path = "third_party/googletest",
+)

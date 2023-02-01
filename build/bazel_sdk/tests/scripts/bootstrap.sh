@@ -1,0 +1,1 @@
+../../bazel_rules_fuchsia/scripts/bootstrap.sh

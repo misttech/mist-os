@@ -1,0 +1,37 @@
+{
+  "arch": {
+    "host": "x86_64-linux-gnu",
+    "target": [
+      "x64"
+    ]
+  },
+  "id": "",
+  "parts": [
+    {
+      "meta": "fidl/fuchsia.sysinfo/meta.json",
+      "type": "fidl_library"
+    },
+    {
+      "meta": "pkg/fdio/meta.json",
+      "type": "cc_prebuilt_library"
+    },
+    {
+      "meta": "pkg/fidl/meta.json",
+      "type": "cc_source_library"
+    },
+    {
+      "meta": "pkg/sysroot/meta.json",
+      "type": "sysroot"
+    },
+    {
+      "meta": "tools/x64/ffx-meta.json",
+      "type": "host_tool"
+    },
+    {
+      "meta": "version_history.json",
+      "type": "version_history"
+    }
+  ],
+  "root": "..",
+  "schema_version": "1"
+}

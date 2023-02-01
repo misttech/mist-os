@@ -1,0 +1,17 @@
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@rules_fuchsia//fuchsia:licenses.bzl", "fuchsia_licenses_notice")
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+
+fuchsia_licenses_notice(
+    name = "actual_notice",
+    spdx_input = "input.spdx.json",
+)
+
+diff_test(
+    name = "notice_test",
+    file1 = ":actual_notice",
+    file2 = "expected_notice.txt",
+)
