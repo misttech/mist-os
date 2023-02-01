@@ -5,7 +5,6 @@
 use crate::agent::Payload;
 use crate::agent::{AgentError, Context as AgentContext, Invocation, InvocationResult, Lifespan};
 use crate::base::SettingType;
-use crate::blueprint_definition;
 use crate::event::{camera_watcher, Event, Publisher};
 use crate::handler::base::{Payload as HandlerPayload, Request};
 use crate::input::common::connect_to_camera;
@@ -16,8 +15,6 @@ use fuchsia_async as fasync;
 use fuchsia_syslog::{fx_log_err, fx_log_info};
 use std::collections::HashSet;
 use std::sync::Arc;
-
-blueprint_definition!("camera_watcher_agent", CameraWatcherAgent::create);
 
 /// Setting types that the camera watcher agent will send updates to, if they're
 /// available on the device.

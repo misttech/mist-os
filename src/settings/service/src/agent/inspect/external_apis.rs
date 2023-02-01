@@ -40,7 +40,6 @@
 //! ```
 
 use crate::agent::{Context, Payload};
-use crate::blueprint_definition;
 use crate::event::{Event, Payload as EventPayload};
 use crate::message::base::{MessageEvent, MessengerType};
 use crate::service::{self as service, TryFromWithClient};
@@ -54,11 +53,6 @@ use futures::StreamExt;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 use settings_inspect_utils::managed_inspect_queue::ManagedInspectQueue;
 use std::sync::Arc;
-
-blueprint_definition!(
-    "external_apis",
-    crate::agent::inspect::external_apis::ExternalApiInspectAgent::create
-);
 
 /// The key for the queue for completed calls per protocol.
 const COMPLETED_CALLS_KEY: &str = "completed_calls";

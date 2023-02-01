@@ -8,7 +8,6 @@ use crate::agent::Context as AgentContext;
 use crate::agent::Lifespan;
 use crate::agent::Payload;
 use crate::agent::{AgentError, Invocation, InvocationResult};
-use crate::blueprint_definition;
 use crate::event::Publisher;
 use crate::service;
 use crate::service_context::{ExternalServiceProxy, ServiceContext};
@@ -19,8 +18,6 @@ use futures::lock::Mutex;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
-
-blueprint_definition!("earcons_agent", Agent::create);
 
 /// The Earcons Agent is responsible for watching updates to relevant sources that need to play
 /// sounds.

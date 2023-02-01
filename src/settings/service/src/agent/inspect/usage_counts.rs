@@ -11,7 +11,6 @@
 use crate::agent::Context;
 use crate::agent::Payload;
 use crate::base::SettingType;
-use crate::blueprint_definition;
 use crate::handler::base::{Payload as HandlerPayload, Request};
 use crate::message::base::{MessageEvent, MessengerType};
 use crate::service::TryFromWithClient;
@@ -24,11 +23,6 @@ use inspect::NumericProperty;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 use std::collections::HashMap;
 use std::sync::Arc;
-
-blueprint_definition!(
-    "usage_counts",
-    crate::agent::inspect::usage_counts::SettingTypeUsageInspectAgent::create
-);
 
 /// Information about a setting type usage count to be written to inspect.
 struct SettingTypeUsageInspectInfo {

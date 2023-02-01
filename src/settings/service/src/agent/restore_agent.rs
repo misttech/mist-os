@@ -5,7 +5,6 @@
 use crate::agent::Payload;
 use crate::agent::{AgentError, Context, Invocation, InvocationResult, Lifespan};
 use crate::base::SettingType;
-use crate::blueprint_definition;
 use crate::event::{restore, Event, Publisher};
 use crate::handler::base::{Error, Payload as HandlerPayload, Request};
 use crate::message::base::Audience;
@@ -14,8 +13,6 @@ use crate::service;
 use fuchsia_async as fasync;
 use fuchsia_syslog::{fx_log_err, fx_log_info};
 use std::collections::HashSet;
-
-blueprint_definition!("restore_agent", crate::agent::restore_agent::RestoreAgent::create);
 
 /// The Restore Agent is responsible for signaling to all components to restore
 /// external sources to the last known value. It is invoked during startup.

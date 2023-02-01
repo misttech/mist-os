@@ -13,7 +13,6 @@
 use crate::agent::Context;
 use crate::agent::Payload;
 use crate::base::{SettingInfo, SettingType};
-use crate::blueprint_definition;
 use crate::clock;
 use crate::handler::base::{Error, Payload as HandlerPayload, Request};
 use crate::inspect::utils::enums::ResponseType;
@@ -31,11 +30,6 @@ use fuchsia_inspect_derive::{IValue, Inspect};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::sync::Arc;
-
-blueprint_definition!(
-    "setting_proxy",
-    crate::agent::inspect::setting_proxy::SettingProxyInspectAgent::create
-);
 
 /// The maximum number of pending requests to store in inspect per setting. There should generally
 /// be fairly few of these unless a setting is changing rapidly, so a slightly larger size allows us

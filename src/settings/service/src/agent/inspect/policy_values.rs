@@ -6,7 +6,6 @@ use std::convert::TryFrom;
 use std::sync::Arc;
 
 use crate::agent::{Context, Payload};
-use crate::blueprint_definition;
 use crate::clock;
 use crate::message::base::{MessageEvent, MessengerType};
 use crate::policy::{self as policy_base, Payload as PolicyPayload, Request, Role};
@@ -21,11 +20,6 @@ use futures::StreamExt;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 
 const INSPECT_NODE_NAME: &str = "policy_values";
-
-blueprint_definition!(
-    "policy_values",
-    crate::agent::inspect::policy_values::PolicyValuesInspectAgent::create
-);
 
 /// An agent that listens in on messages sent on the message hub to policy handlers
 /// to record their internal state to inspect.

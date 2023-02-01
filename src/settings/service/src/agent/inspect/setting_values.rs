@@ -14,7 +14,6 @@ use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 
 use crate::agent::{Context, Lifespan, Payload};
 use crate::base::{SettingInfo, SettingType};
-use crate::blueprint_definition;
 use crate::clock;
 use crate::handler::base::{Payload as SettingPayload, Request};
 use crate::handler::setting_handler::{Event, Payload as HandlerPayload};
@@ -25,11 +24,6 @@ use crate::service::TryFromWithClient;
 
 const INSPECT_NODE_NAME: &str = "setting_values";
 const SETTING_TYPE_INSPECT_NODE_NAME: &str = "setting_types";
-
-blueprint_definition!(
-    "setting_values",
-    crate::agent::inspect::setting_values::SettingValuesInspectAgent::create
-);
 
 /// An agent that listens in on messages between the proxy and setting handlers to record the
 /// values of all settings to inspect.

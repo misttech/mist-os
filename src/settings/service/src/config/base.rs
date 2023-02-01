@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::{AgentRegistrar, BlueprintHandle};
+use crate::agent::AgentRegistrar;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -89,32 +89,6 @@ pub fn get_default_agent_types() -> HashSet<AgentType> {
     ]
     .into_iter()
     .collect()
-}
-
-impl From<AgentType> for BlueprintHandle {
-    fn from(agent_type: AgentType) -> BlueprintHandle {
-        match agent_type {
-            AgentType::CameraWatcher => crate::agent::camera_watcher::blueprint::create(),
-            AgentType::Earcons => crate::agent::earcons::agent::blueprint::create(),
-            AgentType::MediaButtons => crate::agent::media_buttons::blueprint::create(),
-            AgentType::Restore => crate::agent::restore_agent::blueprint::create(),
-            AgentType::InspectExternalApis => {
-                crate::agent::inspect::external_apis::blueprint::create()
-            }
-            AgentType::InspectSettingProxy => {
-                crate::agent::inspect::setting_proxy::blueprint::create()
-            }
-            AgentType::InspectSettingTypeUsage => {
-                crate::agent::inspect::usage_counts::blueprint::create()
-            }
-            AgentType::InspectPolicyValues => {
-                crate::agent::inspect::policy_values::blueprint::create()
-            }
-            AgentType::InspectSettingValues => {
-                crate::agent::inspect::setting_values::blueprint::create()
-            }
-        }
-    }
 }
 
 #[macro_export]

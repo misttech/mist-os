@@ -5,7 +5,6 @@
 use crate::agent::Payload;
 use crate::agent::{AgentError, Context as AgentContext, Invocation, InvocationResult, Lifespan};
 use crate::base::SettingType;
-use crate::blueprint_definition;
 use crate::event::{media_buttons, Event, Publisher};
 use crate::handler::base::{Payload as HandlerPayload, Request};
 use crate::input::{monitor_media_buttons, MediaButtons, VolumeGain};
@@ -20,8 +19,6 @@ use fuchsia_trace as ftrace;
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::sync::Arc;
-
-blueprint_definition!("buttons_agent", MediaButtonsAgent::create);
 
 /// Setting types that the media buttons agent will send media button events to, if they're
 /// available on the device.
