@@ -351,7 +351,7 @@ To create a debugging profile:
      src="images/extensions/ext-start-debug.png"/>
 
 1. From the **Run and Debug: Run** panel, click **Show all automatic debug
-   configurations**. Then, from the command palette, select **Add Configuration**.
+   configurations**. Then, from the command palette, select **Add Config (fuchsia)**.
    The editor will open a `launch.json` file.
 1. The editor should display a list of prepopulated debugging profiles, select
    any of the profiles that start with `zxdb`.
