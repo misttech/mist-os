@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, bail, Context, Result};
+use async_trait::async_trait;
 use chrono::{Local, TimeZone};
 use errors::{ffx_bail, ffx_error};
 use ffx_component::rcs::connect_to_lifecycle_controller;
+use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::unblock;
@@ -14,58 +16,59 @@ use fuchsia_zircon_status::Status;
 use futures::StreamExt;
 use std::io::{BufRead, Write};
 use std::process::Command;
-use std::sync::Arc;
 use tempfile::{NamedTempFile, TempPath};
-
-pub async fn ffx_plugin_impl(
-    injector: &Arc<dyn ffx_core::Injector>,
-    cmd: ffx_debug_core_args::CoreCommand,
-) -> Result<()> {
-    let sdk = ffx_config::global_env_context()
-        .context("loading global environment context")?
-        .get_sdk()
-        .await?;
-    if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk).await {
-        eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
-    }
-
-    let mut _temp_minidump_path: Option<TempPath> = None; // Drop the file at the end.
-    let minidump = match cmd.minidump {
-        Some(file) => file,
-        None => {
-            let rcs: RemoteControlProxy = injector.remote_factory().await?;
-            _temp_minidump_path = Some(choose_and_copy_remote_minidumps(&rcs).await?);
-            _temp_minidump_path.as_ref().unwrap().to_str().unwrap().to_owned()
-        }
-    };
-
-    let zxdb_path = sdk.get_host_tool("zxdb")?;
-    let mut args = vec!["--core=".to_owned() + &minidump];
-    args.extend(cmd.zxdb_args);
-
-    let mut cmd = Command::new(zxdb_path).args(args).spawn()?;
-
-    if let Some(exit_code) = unblock(move || cmd.wait()).await?.code() {
-        if exit_code == 0 {
-            Ok(())
-        } else {
-            Err(ffx_error!("zxdb exited with code {}", exit_code).into())
-        }
-    } else {
-        Err(ffx_error!("zxdb terminated by signal").into())
-    }
-}
-
-pub fn ffx_plugin_writer_output() -> String {
-    String::from("Not supported")
-}
-
-pub fn ffx_plugin_is_machine_supported() -> bool {
-    false
-}
 
 // Must be kept in sync with //src/sys/core/core_component_id_index.json5.
 const STORAGE_ID: &str = "eb345fb7dcaa4260ee0c65bb73ef0ec5341b15a4f603f358d6631c4be6bf7080";
+
+#[derive(FfxTool)]
+pub struct CoreTool {
+    #[command]
+    cmd: ffx_debug_core_args::CoreCommand,
+    sdk: ffx_config::Sdk,
+    rcs: fho::Deferred<RemoteControlProxy>,
+}
+
+fho::embedded_plugin!(CoreTool);
+
+#[async_trait(?Send)]
+impl FfxMain for CoreTool {
+    type Writer = SimpleWriter;
+    async fn main(self, _writer: &SimpleWriter) -> fho::Result<()> {
+        if let Err(e) = symbol_index::ensure_symbol_index_registered(&self.sdk).await {
+            eprintln!("ensure_symbol_index_registered failed, error was: {:#?}", e);
+        }
+
+        let mut _temp_minidump_path: Option<TempPath> = None; // Drop the file at the end.
+        let minidump = match self.cmd.minidump {
+            Some(file) => file,
+            None => {
+                let rcs: RemoteControlProxy = self.rcs.await?;
+                _temp_minidump_path = Some(choose_and_copy_remote_minidumps(&rcs).await?);
+                _temp_minidump_path.as_ref().unwrap().to_str().unwrap().to_owned()
+            }
+        };
+
+        let zxdb_path = self.sdk.get_host_tool("zxdb")?;
+        let mut args = vec!["--core=".to_owned() + &minidump];
+        args.extend(self.cmd.zxdb_args);
+
+        let mut child =
+            Command::new(zxdb_path).args(args).spawn().bug_context("Failed to spawn zxdb")?;
+        let status =
+            unblock(move || child.wait()).await.bug_context("Error waiting for zxdb to exit")?;
+
+        if let Some(exit_code) = status.code() {
+            if exit_code == 0 {
+                Ok(())
+            } else {
+                Err(ffx_error!("zxdb exited with code {}", exit_code).into())
+            }
+        } else {
+            Err(ffx_error!("zxdb terminated by signal").into())
+        }
+    }
+}
 
 struct File {
     filename: String,

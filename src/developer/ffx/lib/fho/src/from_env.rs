@@ -9,6 +9,8 @@ use ffx_fidl::DaemonError;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 use selectors::{self, VerboseError};
+use std::future::Future;
+use std::pin::Pin;
 use std::time::Duration;
 use std::{rc::Rc, sync::Arc};
 
@@ -80,6 +82,54 @@ impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
                 flag
             );
         }
+    }
+}
+
+/// Allows you to defer the initialization of an object in your tool struct
+/// until you need it (if at all) or apply additional combinators on it (like
+/// custom timeout logic or anything like that).
+///
+/// Example:
+/// ```rust
+/// #[derive(FfxTool)]
+/// struct Tool {
+///     daemon: fho::Deferred<fho::DaemonProxy>,
+/// }
+/// impl fho::FfxMain for Tool {
+///     type Writer = fho::SimpleWriter;
+///     async fn main(self, _writer: fho::SimpleWriter) -> fho::Result<()> {
+///         let daemon = self.daemon.await?;
+///         writeln!(writer, "Loaded the daemon proxy!");
+///     }
+/// }
+/// ```
+pub struct Deferred<T: 'static>(Pin<Box<dyn Future<Output = Result<T>>>>);
+#[async_trait(?Send)]
+impl<T> TryFromEnv for Deferred<T>
+where
+    T: TryFromEnv,
+{
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        let env = env.clone();
+        Ok(Self(Box::pin(async move { T::try_from_env(&env).await })))
+    }
+}
+
+impl<T> Future for Deferred<T> {
+    type Output = Result<T>;
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        self.0.as_mut().poll(cx)
+    }
+}
+
+/// Gets the actively configured SDK from the environment
+#[async_trait(?Send)]
+impl TryFromEnv for ffx_config::Sdk {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        env.context.get_sdk().await.user_message("Could not load currently active SDK")
     }
 }
 
@@ -270,8 +320,41 @@ impl TryFromEnv for ffx_fidl::FastbootProxy {
 }
 
 #[async_trait(?Send)]
+impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        env.injector.remote_factory().await.user_message("Failed to create remote control proxy")
+    }
+}
+
+#[async_trait(?Send)]
 impl TryFromEnv for ffx_writer::Writer {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         env.injector.writer().await.user_message("Failed to create writer")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug)]
+    struct AlwaysError;
+    #[async_trait(?Send)]
+    impl TryFromEnv for AlwaysError {
+        async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
+            Err(Error::User(anyhow::anyhow!("boom")))
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_deferred_err() {
+        let config_env = ffx_config::test_init().await.unwrap();
+        let tool_env = crate::testing::ToolEnv::new().make_environment(config_env.context.clone());
+
+        Deferred::<AlwaysError>::try_from_env(&tool_env)
+            .await
+            .expect("Deferred result should be Ok")
+            .await
+            .expect_err("Inner AlwaysError should error after second await");
     }
 }
