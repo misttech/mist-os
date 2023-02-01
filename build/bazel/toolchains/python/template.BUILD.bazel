@@ -4,17 +4,26 @@
 
 """Python toolchain definition for our prebuilt Python3 executable."""
 
-load("//:fuchsia_build_config.bzl", "build_config")
+load("@//:fuchsia_build_config.bzl", "build_config")
 load("@rules_python//python:defs.bzl", "py_runtime_pair")
 
 package(default_visibility = ["//visibility:public"])
 
-_python3_interpreter_path = "prebuilt/third_party/python3/%s/bin/python3" % build_config.host_tag
+_python3_interpreter_path = "external/{repository_dir}/{python_launcher}"
+
+filegroup(
+    name = "runtime_files",
+    srcs = [
+        "{python_launcher}",
+        "{python_real}",
+        "{lib_python_zip}",
+    ],
+)
 
 py_runtime(
     name = "py3_runtime",
-    files = ["//:prebuilt_python_files"],
-    interpreter = "//:%s" % _python3_interpreter_path,
+    files = [":runtime_files"],
+    interpreter = "//:{python_launcher}",
     python_version = "PY3",
     # Set stub_shebang so the Python wrapper can find the prebuilt Python
     # interpreter.

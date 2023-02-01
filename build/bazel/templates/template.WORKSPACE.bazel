@@ -223,4 +223,16 @@ generate_prebuilt_clang_toolchain_repository(
 register_toolchains("@prebuilt_clang//:host_clang_{host_os}_x64_cc_toolchain")
 register_toolchains("@prebuilt_clang//:host_clang_{host_os}_arm64_cc_toolchain")
 
-register_toolchains("//build/bazel/toolchains/python:py_toolchain")
+# buildifier: disable=load-on-top
+load(
+    "//:build/bazel/toolchains/python/repository_rule.bzl",
+    "compact_python_runtime_repository",
+)
+
+compact_python_runtime_repository(
+    name = "prebuilt_python",
+    interpreter_path = "prebuilt/third_party/python3/{host_tag}/bin/python3",
+    lib_python_path = "prebuilt/third_party/python3/{host_tag}/lib/python3.8",
+)
+
+register_toolchains("@prebuilt_python//:py_toolchain")
