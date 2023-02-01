@@ -26,7 +26,7 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
   }
 
   const uint32_t node_1_bind_rule_1_values[] = {10, 3};
-  const ddk::NodeGroupBindRule node_1_bind_rules[] = {
+  const ddk::BindRule node_1_bind_rules[] = {
       ddk::MakeAcceptBindRuleList(50, node_1_bind_rule_1_values),
       ddk::MakeRejectBindRule("sandpiper", true),
   };
@@ -37,7 +37,7 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
   };
 
   const uint32_t node_2_props_values_1[] = {88, 99};
-  const ddk::NodeGroupBindRule node_2_bind_rules[] = {
+  const ddk::BindRule node_2_bind_rules[] = {
       ddk::MakeAcceptBindRuleList(BIND_PLATFORM_DEV_VID, node_2_props_values_1),
       ddk::MakeRejectBindRule(20, 10),
   };
@@ -46,9 +46,9 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
       ddk::MakeProperty(BIND_PROTOCOL, 20),
   };
 
-  status = root_dev->DdkAddNodeGroup(
-      "node_group", ddk::NodeGroupDesc(node_1_bind_rules, node_1_properties)
-                        .AddNodeRepresentation(node_2_bind_rules, node_2_properties));
+  status = root_dev->DdkAddCompositeNodeSpec(
+      "test_composite", ddk::CompositeNodeSpec(node_1_bind_rules, node_1_properties)
+                            .AddParentSpec(node_2_bind_rules, node_2_properties));
   if (status != ZX_OK) {
     return status;
   }
@@ -59,7 +59,7 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
       {50, 0, 10},
   };
   auto node_dev_1 = std::make_unique<Root>(dev);
-  status = node_dev_1->DdkAdd(ddk::DeviceAddArgs("node_representation_a")
+  status = node_dev_1->DdkAdd(ddk::DeviceAddArgs("parent_a")
                                   .set_props(node_props_1)
                                   .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD));
   if (status != ZX_OK) {
@@ -72,7 +72,7 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
       {BIND_PLATFORM_DEV_VID, 0, 88},
   };
   auto node_dev_2 = std::make_unique<Root>(dev);
-  status = node_dev_2->DdkAdd(ddk::DeviceAddArgs("node_representation_b")
+  status = node_dev_2->DdkAdd(ddk::DeviceAddArgs("parent_b")
                                   .set_props(node_props_2)
                                   .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD));
   if (status != ZX_OK) {

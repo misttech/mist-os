@@ -129,8 +129,7 @@ zx::result<device_bind_prop_value_t> ConvertFidlPropertyValue(
   }
 }
 
-zx::result<ddk::NodeGroupBindRule> ConvertFidlBindRule(
-    const fuchsia_driver_framework::BindRule& fidl_rule) {
+zx::result<ddk::BindRule> ConvertFidlBindRule(const fuchsia_driver_framework::BindRule& fidl_rule) {
   auto key = ConvertFidlPropertyKey(fidl_rule.key());
 
   std::vector<device_bind_prop_value_t> values;
@@ -155,7 +154,7 @@ zx::result<ddk::NodeGroupBindRule> ConvertFidlBindRule(
       return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  return zx::ok(ddk::NodeGroupBindRule(key, condition, values));
+  return zx::ok(ddk::BindRule(key, condition, values));
 }
 
 }  // anonymous namespace
@@ -652,7 +651,7 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
   auto did = request->node.has_did() ? request->node.did() : 0;
   auto instance_id = request->node.has_instance_id() ? request->node.instance_id() : 0;
 
-  const ddk::NodeGroupBindRule kPDevBindRules[] = {
+  const ddk::BindRule kPDevBindRules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID, vid),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID, pid),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID, did),
@@ -666,7 +665,7 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
       ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
   };
 
-  auto node_group_desc = ddk::NodeGroupDesc(kPDevBindRules, kPDevProperties);
+  auto node_group_desc = ddk::CompositeNodeSpec(kPDevBindRules, kPDevProperties);
 
   auto node_group = fidl::ToNatural(request->group);
   for (const auto& node : node_group.nodes().value()) {
@@ -682,7 +681,7 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
       return;
     }
 
-    std::vector<ddk::NodeGroupBindRule> rules;
+    std::vector<ddk::BindRule> rules;
     rules.reserve(node.bind_rules().size());
     for (const auto& bind_rule : node.bind_rules()) {
       auto result = ConvertFidlBindRule(bind_rule);
@@ -708,13 +707,13 @@ void PlatformBus::AddNodeGroup(AddNodeGroupRequestView request, fdf::Arena& aren
           .value = property_value.value(),
       });
     }
-    node_group_desc.AddNodeRepresentation(rules, properties);
+    node_group_desc.AddParentSpec(rules, properties);
   }
 
-  auto status = DdkAddNodeGroup(node_group.name()->c_str(), node_group_desc);
+  auto status = DdkAddCompositeNodeSpec(node_group.name()->c_str(), node_group_desc);
 
   if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAddNodeGroup failed %s", zx_status_get_string(status));
+    zxlogf(ERROR, "DdkAddCompositeNodeSpec failed %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);
     return;
   }

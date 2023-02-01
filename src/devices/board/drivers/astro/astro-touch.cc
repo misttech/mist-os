@@ -35,7 +35,7 @@ static const device_metadata_t ft3x27_touch_metadata[] = {
     {.type = DEVICE_METADATA_PRIVATE, .data = &device_info, .length = sizeof(device_info)},
 };
 
-const ddk::NodeGroupBindRule kFocaltechI2cRules[] = {
+const ddk::BindRule kFocaltechI2cRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
@@ -49,7 +49,7 @@ const device_bind_prop_t kFocaltechI2cProperties[] = {
                       bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
 };
 
-const ddk::NodeGroupBindRule kGoodixI2cRules[] = {
+const ddk::BindRule kGoodixI2cRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
@@ -62,7 +62,7 @@ const device_bind_prop_t kGoodixI2cProperties[] = {
     ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_GOODIX_TOUCH),
 };
 
-const ddk::NodeGroupBindRule kInterruptRules[] = {
+const ddk::BindRule kInterruptRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_4),
@@ -72,7 +72,7 @@ const device_bind_prop_t kInterruptProperties[] = {
     ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
-const ddk::NodeGroupBindRule kResetRules[] = {
+const ddk::BindRule kResetRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_9),
@@ -97,22 +97,22 @@ zx_status_t Astro::TouchInit() {
   gpio_impl_.Read(S905D2_GPIOH(5), &gpio_state);
 
   if (gpio_state) {
-    auto status = DdkAddNodeGroup("gt92xx_touch",
-                                  ddk::NodeGroupDesc(kGoodixI2cRules, kGoodixI2cProperties)
-                                      .AddNodeRepresentation(kInterruptRules, kInterruptProperties)
-                                      .AddNodeRepresentation(kResetRules, kResetProperties));
+    auto status = DdkAddCompositeNodeSpec(
+        "gt92xx_touch", ddk::CompositeNodeSpec(kGoodixI2cRules, kGoodixI2cProperties)
+                            .AddParentSpec(kInterruptRules, kInterruptProperties)
+                            .AddParentSpec(kResetRules, kResetProperties));
     if (status != ZX_OK) {
-      zxlogf(INFO, "gt92xx: DdkAddNodeGroup failed: %s", zx_status_get_string(status));
+      zxlogf(INFO, "gt92xx: DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));
       return status;
     }
   } else {
-    auto status = DdkAddNodeGroup("ft3x27_touch",
-                                  ddk::NodeGroupDesc(kFocaltechI2cRules, kFocaltechI2cProperties)
-                                      .AddNodeRepresentation(kInterruptRules, kInterruptProperties)
-                                      .AddNodeRepresentation(kResetRules, kResetProperties)
-                                      .set_metadata(ft3x27_touch_metadata));
+    auto status = DdkAddCompositeNodeSpec(
+        "ft3x27_touch", ddk::CompositeNodeSpec(kFocaltechI2cRules, kFocaltechI2cProperties)
+                            .AddParentSpec(kInterruptRules, kInterruptProperties)
+                            .AddParentSpec(kResetRules, kResetProperties)
+                            .set_metadata(ft3x27_touch_metadata));
     if (status != ZX_OK) {
-      zxlogf(ERROR, "ft3x27: DdkAddNodeGroup failed: %s", zx_status_get_string(status));
+      zxlogf(ERROR, "ft3x27: DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));
       return status;
     }
   }

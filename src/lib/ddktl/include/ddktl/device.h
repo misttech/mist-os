@@ -23,11 +23,11 @@
 #include <deque>
 #include <type_traits>
 
+#include <ddktl/composite-node-spec.h>
 #include <ddktl/device-internal.h>
 #include <ddktl/fidl.h>
 #include <ddktl/init-txn.h>
 #include <ddktl/metadata.h>
-#include <ddktl/node-group.h>
 #include <ddktl/resume-txn.h>
 #include <ddktl/suspend-txn.h>
 #include <ddktl/unbind-txn.h>
@@ -475,8 +475,8 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     return device_add_composite(this->parent_, name, comp_desc);
   }
 
-  zx_status_t DdkAddNodeGroup(const char* name, NodeGroupDesc group_desc) {
-    return device_add_group(this->parent_, name, &group_desc.get());
+  zx_status_t DdkAddCompositeNodeSpec(const char* name, CompositeNodeSpec spec) {
+    return device_add_group(this->parent_, name, &spec.get());
   }
 
   // Schedules the removal of the device and its descendents.

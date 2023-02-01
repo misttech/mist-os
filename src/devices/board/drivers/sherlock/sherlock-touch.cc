@@ -27,7 +27,7 @@ namespace sherlock {
 const uint32_t kI2cAddressValues[] = {bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH,
                                       bind_fuchsia_i2c::BIND_I2C_ADDRESS_TI_INA231_SPEAKERS};
 
-const ddk::NodeGroupBindRule kI2cRules[] = {
+const ddk::BindRule kI2cRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(SHERLOCK_I2C_2)),
@@ -40,7 +40,7 @@ const device_bind_prop_t kI2cProperties[] = {
                       bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
 };
 
-const ddk::NodeGroupBindRule kInterruptRules[] = {
+const ddk::BindRule kInterruptRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_1),
@@ -50,7 +50,7 @@ const device_bind_prop_t kInterruptProperties[] = {
     ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
-const ddk::NodeGroupBindRule kResetRules[] = {
+const ddk::BindRule kResetRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                             bind_fuchsia_amlogic_platform_t931::GPIOZ_PIN_ID_PIN_9),
@@ -72,13 +72,13 @@ zx_status_t Sherlock::TouchInit() {
       {.type = DEVICE_METADATA_PRIVATE, .data = &device_info, .length = sizeof(device_info)},
   };
 
-  auto status = DdkAddNodeGroup("ft5726_touch",
-                                ddk::NodeGroupDesc(kI2cRules, kI2cProperties)
-                                    .AddNodeRepresentation(kInterruptRules, kInterruptProperties)
-                                    .AddNodeRepresentation(kResetRules, kResetProperties)
-                                    .set_metadata(ft5726_touch_metadata));
+  auto status = DdkAddCompositeNodeSpec("ft5726_touch",
+                                        ddk::CompositeNodeSpec(kI2cRules, kI2cProperties)
+                                            .AddParentSpec(kInterruptRules, kInterruptProperties)
+                                            .AddParentSpec(kResetRules, kResetProperties)
+                                            .set_metadata(ft5726_touch_metadata));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkAddNodeGroup failed: %d", __func__, status);
+    zxlogf(ERROR, "%s: DdkAddCompositeNodeSpec failed: %d", __func__, status);
     return status;
   }
   return ZX_OK;

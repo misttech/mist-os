@@ -55,9 +55,9 @@ void VerifyPropertyValue(device_bind_prop_value_t expected, device_bind_prop_val
   }
 }
 
-class NodeGroupTest : public zxtest::Test {};
+class CompositeNodeSpecTest : public zxtest::Test {};
 
-TEST_F(NodeGroupTest, CreateAcceptBindRules) {
+TEST_F(CompositeNodeSpecTest, CreateAcceptBindRules) {
   auto int_key_bind_rule = ddk::MakeAcceptBindRule(5, 100);
   ASSERT_EQ(5, int_key_bind_rule.get().key.data.int_key);
   ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, int_key_bind_rule.get().condition);
@@ -91,7 +91,7 @@ TEST_F(NodeGroupTest, CreateAcceptBindRules) {
                enum_val_bind_rule.get().values[0].data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateAcceptBindRulesGeneratedConstants) {
+TEST_F(CompositeNodeSpecTest, CreateAcceptBindRulesGeneratedConstants) {
   auto int_val_bind_rule =
       ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_testlib::BIND_PROTOCOL_VALUE);
   ASSERT_STREQ(bind_fuchsia::PROTOCOL, int_val_bind_rule.get().key.data.str_key);
@@ -121,7 +121,7 @@ TEST_F(NodeGroupTest, CreateAcceptBindRulesGeneratedConstants) {
   ASSERT_STREQ(bind_testlib::ENUM_PROP_VALUE, enum_val_bind_rule.get().values[0].data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateRejectBindRules) {
+TEST_F(CompositeNodeSpecTest, CreateRejectBindRules) {
   auto int_key_bind_rule = ddk::MakeRejectBindRule(5, 100);
   ASSERT_EQ(5, int_key_bind_rule.get().key.data.int_key);
   ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_REJECT, int_key_bind_rule.get().condition);
@@ -155,7 +155,7 @@ TEST_F(NodeGroupTest, CreateRejectBindRules) {
                enum_val_bind_rule.get().values[0].data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateRejectBindRulesGeneratedConstants) {
+TEST_F(CompositeNodeSpecTest, CreateRejectBindRulesGeneratedConstants) {
   auto int_val_bind_rule =
       ddk::MakeRejectBindRule(bind_fuchsia::PROTOCOL, bind_testlib::BIND_PROTOCOL_VALUE);
   ASSERT_STREQ(bind_fuchsia::PROTOCOL, int_val_bind_rule.get().key.data.str_key);
@@ -185,7 +185,7 @@ TEST_F(NodeGroupTest, CreateRejectBindRulesGeneratedConstants) {
   ASSERT_STREQ(bind_testlib::ENUM_PROP_VALUE, enum_val_bind_rule.get().values[0].data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateAcceptBindRuleList) {
+TEST_F(CompositeNodeSpecTest, CreateAcceptBindRuleList) {
   const uint32_t int_key_bind_rule_values[] = {10, 3};
   auto int_key_bind_rule = ddk::MakeAcceptBindRuleList(5, int_key_bind_rule_values);
   ASSERT_EQ(5, int_key_bind_rule.get().key.data.int_key);
@@ -225,7 +225,7 @@ TEST_F(NodeGroupTest, CreateAcceptBindRuleList) {
                enum_val_bind_rule.get().values[1].data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateAcceptBindRuleListWithConstants) {
+TEST_F(CompositeNodeSpecTest, CreateAcceptBindRuleListWithConstants) {
   const uint32_t int_val_bind_rule_values[] = {bind_testlib::BIND_PROTOCOL_VALUE,
                                                bind_testlib::BIND_PROTOCOL_VALUE_2};
   auto int_val_bind_rule =
@@ -257,7 +257,7 @@ TEST_F(NodeGroupTest, CreateAcceptBindRuleListWithConstants) {
   ASSERT_STREQ(bind_testlib::ENUM_PROP_VALUE_2, enum_val_bind_rule.get().values[1].data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateRejectBindRuleList) {
+TEST_F(CompositeNodeSpecTest, CreateRejectBindRuleList) {
   const uint32_t int_key_bind_rule_values[] = {10, 3};
   auto int_key_bind_rule = ddk::MakeRejectBindRuleList(5, int_key_bind_rule_values);
   ASSERT_EQ(5, int_key_bind_rule.get().key.data.int_key);
@@ -297,7 +297,7 @@ TEST_F(NodeGroupTest, CreateRejectBindRuleList) {
                enum_val_bind_rule.get().values[1].data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateRejectBindRuleListWithConstants) {
+TEST_F(CompositeNodeSpecTest, CreateRejectBindRuleListWithConstants) {
   const uint32_t int_val_bind_rule_values[] = {bind_testlib::BIND_PROTOCOL_VALUE,
                                                bind_testlib::BIND_PROTOCOL_VALUE_2};
   auto int_val_bind_rule =
@@ -329,7 +329,7 @@ TEST_F(NodeGroupTest, CreateRejectBindRuleListWithConstants) {
   ASSERT_STREQ(bind_testlib::ENUM_PROP_VALUE_2, enum_val_bind_rule.get().values[1].data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateBindProperties) {
+TEST_F(CompositeNodeSpecTest, CreateBindProperties) {
   auto int_key_bind_prop = ddk::MakeProperty(1, 100);
   ASSERT_EQ(1, int_key_bind_prop.key.data.int_key);
   ASSERT_EQ(100, int_key_bind_prop.value.data.int_value);
@@ -351,7 +351,7 @@ TEST_F(NodeGroupTest, CreateBindProperties) {
   ASSERT_STREQ("fuchsia.gpio.BIND_PROTOCOL.DEVICE", enum_val_bind_prop.value.data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateBindPropertiesWithContants) {
+TEST_F(CompositeNodeSpecTest, CreateBindPropertiesWithContants) {
   auto int_val_bind_prop =
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_testlib::BIND_PROTOCOL_VALUE);
   ASSERT_STREQ(bind_fuchsia::PROTOCOL, int_val_bind_prop.key.data.str_key);
@@ -373,8 +373,8 @@ TEST_F(NodeGroupTest, CreateBindPropertiesWithContants) {
   ASSERT_STREQ(bind_testlib::ENUM_PROP_VALUE, enum_val_bind_prop.value.data.enum_value);
 }
 
-TEST_F(NodeGroupTest, CreateNodeGroupDescValues) {
-  const ddk::NodeGroupBindRule kBindRules[] = {
+TEST_F(CompositeNodeSpecTest, CreateSpec) {
+  const ddk::BindRule kBindRules[] = {
       ddk::MakeAcceptBindRule("test", static_cast<uint32_t>(10)),
   };
 
@@ -382,7 +382,7 @@ TEST_F(NodeGroupTest, CreateNodeGroupDescValues) {
       ddk::MakeProperty("test", static_cast<uint32_t>(10)),
   };
 
-  auto node_group_desc = ddk::NodeGroupDesc(kBindRules, kBindProperties);
+  auto composite_node_spec = ddk::CompositeNodeSpec(kBindRules, kBindProperties);
 
   {
     auto dealloc_props = std::vector{
@@ -391,56 +391,55 @@ TEST_F(NodeGroupTest, CreateNodeGroupDescValues) {
     };
 
     // Store the int values dynacmically into a vector and then pass
-    // it to |node_group_desc|.
+    // it to |composite_node_spec|.
     uint32_t kTestDeallocIntValues[] = {10, 20, 100};
-    std::vector<ddk::NodeGroupBindRule> dealloc_rules;
+    std::vector<ddk::BindRule> dealloc_rules;
     for (auto val : kTestDeallocIntValues) {
       dealloc_rules.push_back(ddk::MakeAcceptBindRule("test", val));
     }
-    node_group_desc.AddNodeRepresentation(dealloc_rules, dealloc_props);
+    composite_node_spec.AddParentSpec(dealloc_rules, dealloc_props);
   }
 
-  // Verifying the node group desc.
-  auto desc = node_group_desc.get();
-  ASSERT_EQ(2, desc.nodes_count);
+  auto spec = composite_node_spec.get();
+  ASSERT_EQ(2, spec.nodes_count);
 
-  // Verify the bind properties in the first node.
-  auto node_1 = desc.nodes[0];
-  ASSERT_EQ(1, node_1.property_count);
-  VerifyPropertyKey(device_bind_prop_str_key("test"), node_1.properties[0].key);
-  VerifyPropertyValue(device_bind_prop_int_val(10), node_1.properties[0].value);
+  // Verify the bind properties in the first parent.
+  auto parent_1 = spec.nodes[0];
+  ASSERT_EQ(1, parent_1.property_count);
+  VerifyPropertyKey(device_bind_prop_str_key("test"), parent_1.properties[0].key);
+  VerifyPropertyValue(device_bind_prop_int_val(10), parent_1.properties[0].value);
 
-  // Verify the bind rules in the first node.
-  ASSERT_EQ(1, node_1.bind_rule_count);
-  VerifyPropertyKey(device_bind_prop_str_key("test"), node_1.bind_rules[0].key);
-  ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, node_1.bind_rules[0].condition);
-  ASSERT_EQ(1, node_1.bind_rules[0].values_count);
-  VerifyPropertyValue(device_bind_prop_int_val(10), node_1.bind_rules[0].values[0]);
+  // Verify the bind rules in the first parent.
+  ASSERT_EQ(1, parent_1.bind_rule_count);
+  VerifyPropertyKey(device_bind_prop_str_key("test"), parent_1.bind_rules[0].key);
+  ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, parent_1.bind_rules[0].condition);
+  ASSERT_EQ(1, parent_1.bind_rules[0].values_count);
+  VerifyPropertyValue(device_bind_prop_int_val(10), parent_1.bind_rules[0].values[0]);
 
-  // Verify the bind properties in the second node.
-  auto node_2 = desc.nodes[1];
-  ASSERT_EQ(2, node_2.property_count);
-  VerifyPropertyKey(device_bind_prop_str_key("test"), node_2.properties[0].key);
-  VerifyPropertyValue(device_bind_prop_int_val(10), node_2.properties[0].value);
-  VerifyPropertyKey(device_bind_prop_str_key("swallow"), node_2.properties[1].key);
-  VerifyPropertyValue(device_bind_prop_bool_val(true), node_2.properties[1].value);
+  // Verify the bind properties in the second parent.
+  auto parent_2 = spec.nodes[1];
+  ASSERT_EQ(2, parent_2.property_count);
+  VerifyPropertyKey(device_bind_prop_str_key("test"), parent_2.properties[0].key);
+  VerifyPropertyValue(device_bind_prop_int_val(10), parent_2.properties[0].value);
+  VerifyPropertyKey(device_bind_prop_str_key("swallow"), parent_2.properties[1].key);
+  VerifyPropertyValue(device_bind_prop_bool_val(true), parent_2.properties[1].value);
 
-  // Verify the bind rules in the second node.
-  ASSERT_EQ(3, node_2.bind_rule_count);
-  VerifyPropertyKey(device_bind_prop_str_key("test"), node_2.bind_rules[0].key);
-  ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, node_2.bind_rules[0].condition);
-  ASSERT_EQ(1, node_2.bind_rules[1].values_count);
-  VerifyPropertyValue(device_bind_prop_int_val(10), node_2.bind_rules[0].values[0]);
+  // Verify the bind rules in the second parent.
+  ASSERT_EQ(3, parent_2.bind_rule_count);
+  VerifyPropertyKey(device_bind_prop_str_key("test"), parent_2.bind_rules[0].key);
+  ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, parent_2.bind_rules[0].condition);
+  ASSERT_EQ(1, parent_2.bind_rules[1].values_count);
+  VerifyPropertyValue(device_bind_prop_int_val(10), parent_2.bind_rules[0].values[0]);
 
-  VerifyPropertyKey(device_bind_prop_str_key("test"), node_2.bind_rules[1].key);
-  ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, node_2.bind_rules[1].condition);
-  ASSERT_EQ(1, node_2.bind_rules[1].values_count);
-  VerifyPropertyValue(device_bind_prop_int_val(20), node_2.bind_rules[1].values[0]);
+  VerifyPropertyKey(device_bind_prop_str_key("test"), parent_2.bind_rules[1].key);
+  ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, parent_2.bind_rules[1].condition);
+  ASSERT_EQ(1, parent_2.bind_rules[1].values_count);
+  VerifyPropertyValue(device_bind_prop_int_val(20), parent_2.bind_rules[1].values[0]);
 
-  VerifyPropertyKey(device_bind_prop_str_key("test"), node_2.bind_rules[2].key);
-  ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, node_2.bind_rules[2].condition);
-  ASSERT_EQ(1, node_2.bind_rules[2].values_count);
-  VerifyPropertyValue(device_bind_prop_int_val(100), node_2.bind_rules[2].values[0]);
+  VerifyPropertyKey(device_bind_prop_str_key("test"), parent_2.bind_rules[2].key);
+  ASSERT_EQ(DEVICE_BIND_RULE_CONDITION_ACCEPT, parent_2.bind_rules[2].condition);
+  ASSERT_EQ(1, parent_2.bind_rules[2].values_count);
+  VerifyPropertyValue(device_bind_prop_int_val(100), parent_2.bind_rules[2].values[0]);
 }
 
 }  // namespace

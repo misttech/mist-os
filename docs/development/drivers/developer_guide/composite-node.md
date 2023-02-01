@@ -29,7 +29,7 @@ process is as follows:
     composite node with the nodes as parents, and binds the composite driver to
     it. The primary node and node names are provided by the composite driver.
 
-![node-group-bind-diagram](/docs/contribute/governance/rfcs/resources/0197_node_groups/node_group_diagram.png)
+![composite-node-spec-bind-diagram](/docs/contribute/governance/rfcs/resources/0197_node_groups/node_group_diagram.png)
 
 ## Defining a node group
 
@@ -142,11 +142,11 @@ accept BIND_I2C_ADDRESS { fuchsia.i2c.BIND_I2C_ADDRESS.FOCALTECH_TOUCH }
 #### Writing in Driver Framework v1 (DFv1)
 
 In DFv1, node groups are written using the DDK. The functions to write the bind
-rules are in [`node-group.h`](/src/lib/ddktl/include/ddktl/node-group.h). With
+rules are in [`composite-node-spec.h`](/src/lib/ddktl/include/ddktl/composite-node-spec.h). With
 the DDK library and bind libraries codegen values, we can write the following:
 
 ```
-const ddk::NodeGroupBindRule kI2cBindRules[] = {
+const ddk::BindRule kI2cBindRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
@@ -189,7 +189,7 @@ be an integer, boolean, string or enum type.
 #### Writing in Driver Framework v1 (DFv1)
 
 In DFv1, node groups are written using DDK and the functions to write the bind
-rules are in [`node-group.h`](/src/lib/ddktl/include/ddktl/node-group.h). With
+rules are in [`composite-node-spec.h`](/src/lib/ddktl/include/ddktl/composite-node-spec.h). With
 the DDK library and bind libraries codegen values, we can write the following:
 
 ```
@@ -240,11 +240,11 @@ AddNodeGroup(struct {
 }) -> () error zx.status;
 ```
 
-See [Defining a node group](#defining-a-node-group) for instructions.
+See [Defining a node group](#defining-a-composite-node-spec) for instructions.
 
 The platform bus API uses the same `NodeGroup` struct defined in
 [`node_group.fidl`](/sdk/fidl/fuchsia.driver.framework/node_group.fidl). See
-[Defining a Node group](#defining-a-node-group) for instructions.
+[Defining a Node group](#defining-a-composite-node-spec) for instructions.
 
 For example, say we defined the following node group:
 
@@ -340,14 +340,14 @@ the passed in node group.
 ### Driver Framework v1 (DFv1)
 
 In DFv1, a driver can add node groups through the DDK library through the
-`DdkAddNodeGroup()` function.
+`DdkAddCompositeNodeSpec()` function.
 
-The driver must first define a `NodeGroupDesc` in the node_group.h library.
-Using the above bind rules and properties, we can define a `NodeGroupDesc` with
+The driver must first define a `CompositeNodeSpec` in the node_group.h library.
+Using the above bind rules and properties, we can define a `CompositeNodeSpec` with
 an I2C node representation:
 
 ```
-const ddk::NodeGroupBindRule kI2cBindRules[] = {
+const ddk::BindRule kI2cBindRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID,
@@ -363,15 +363,15 @@ const device_bind_prop_t kI2cProperties[] = {
                       bind_fuchsia_i2c::BIND_I2C_ADDRESS_FOCALTECH_TOUCH),
 };
 
-auto desc = ddk::NodeGroupDesc(kI2cBindRules, kI2cProperties);
+auto spec = ddk::CompositeNodeSpec(kI2cBindRules, kI2cProperties);
 ```
 
-Any additional nodes can be added with the `AddNodeRepresentation()`. For
+Any additional nodes can be added with the `AddParentSpec()`. For
 instance, if we want to add a node representation for a GPIO interpret pin, we
 can write the following:
 
 ```
-const ddk::NodeGroupBindRule kGpioInterruptRules[] = {
+const ddk::BindRule kGpioInterruptRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
                             bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
     ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
@@ -384,25 +384,25 @@ const device_bind_prop_t kGpioInterruptProperties[] = {
     ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION,
                       bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
 
-desc.AddNodeRepresentation(kGpioInterruptRules, kGpioInterruptProperties);
+desc.AddParentSpec(kGpioInterruptRules, kGpioInterruptProperties);
 ```
 
 Metadata can be passed to the node group’s composite through the
 `set_metadata()` function.
 
-Once the NodeGroupDesc is ready, you can add it with `DdkAddNodeGroup()`:
+Once the `CompositeNodeSpec` is ready, you can add it with `DdkAddCompositeNodeSpec()`:
 
 ```
-auto status = DdkAddNodeGroup("ft3x27_touch" /*node group name*/, desc);
+auto status = DdkAddCompositeNodeSpec("ft3x27_touch", spec);
 ```
 
-Since `NodeGroupDesc` follows the builder pattern, this can be simplify to:
+Since `CompositeNodeSpec` follows the builder pattern, this can be simplify to:
 
 ```
 auto status =
-     DdkAddNodeGroup("ft3x27_touch",
-          ddk::NodeGroupDesc(kFocaltechI2cRules, kFocaltechI2cProperties)
-              .AddNodeRepresentation(kGpioInterruptRules, kGpioInterruptProperties)
+     DdkAddCompositeNodeSpec("ft3x27_touch",
+          ddk::CompositeNodeSpec(kFocaltechI2cRules, kFocaltechI2cProperties)
+              .AddParentSpec(kGpioInterruptRules, kGpioInterruptProperties)
               .set_metadata(metadata);
 ```
 
@@ -532,7 +532,7 @@ Matching cannot be ambiguous:
 *   Nodes do not need to be matched in order
 *   If an ambiguous case occurs, a warning message will be printed out.
 
-![node-group-bind-diagram](/docs/contribute/governance/rfcs/resources/0197_node_groups/composite_bind_diagram.png)
+![composite-node-spec-bind-diagram](/docs/contribute/governance/rfcs/resources/0197_node_groups/composite_bind_diagram.png)
 
 ### Writing the bind rules
 

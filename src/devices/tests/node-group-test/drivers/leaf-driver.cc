@@ -27,7 +27,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
 
   // Add node group.
   const uint32_t node_1_bind_rule_1_values[] = {10, 3};
-  const ddk::NodeGroupBindRule node_1_bind_rules[] = {
+  const ddk::BindRule node_1_bind_rules[] = {
       ddk::MakeAcceptBindRuleList(50, node_1_bind_rule_1_values),
       ddk::MakeRejectBindRule(bind_test::FLAG, true),
   };
@@ -39,7 +39,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
 
   const char* node_2_props_values_1[] = {bind_test::TEST_PROP_VALUE_1.c_str(),
                                          bind_test::TEST_PROP_VALUE_2.c_str()};
-  const ddk::NodeGroupBindRule node_2_bind_rules[] = {
+  const ddk::BindRule node_2_bind_rules[] = {
       ddk::MakeAcceptBindRuleList(bind_test::TEST_PROP, node_2_props_values_1),
       ddk::MakeRejectBindRule(20, 10),
   };
@@ -50,7 +50,7 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
 
   const char* node_3_props_values_1[] = {bind_test::TEST_PROP_VALUE_3.c_str(),
                                          bind_test::TEST_PROP_VALUE_4.c_str()};
-  const ddk::NodeGroupBindRule node_3_bind_rules[] = {
+  const ddk::BindRule node_3_bind_rules[] = {
       ddk::MakeAcceptBindRuleList(bind_test::TEST_PROP, node_3_props_values_1),
       ddk::MakeRejectBindRule(20, 10),
   };
@@ -67,19 +67,19 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
       },
   };
 
-  status = dev->DdkAddNodeGroup("node_group",
-                                ddk::NodeGroupDesc(node_1_bind_rules, node_1_properties)
-                                    .AddNodeRepresentation(node_2_bind_rules, node_2_properties)
-                                    .set_metadata(metadata));
+  status = dev->DdkAddCompositeNodeSpec("test_composite_1",
+                                        ddk::CompositeNodeSpec(node_1_bind_rules, node_1_properties)
+                                            .AddParentSpec(node_2_bind_rules, node_2_properties)
+                                            .set_metadata(metadata));
   if (status != ZX_OK) {
     return status;
   }
 
-  status = dev->DdkAddNodeGroup("node_group_2",
-                                ddk::NodeGroupDesc(node_1_bind_rules, node_1_properties)
-                                    .AddNodeRepresentation(node_2_bind_rules, node_2_properties)
-                                    .AddNodeRepresentation(node_3_bind_rules, node_3_properties)
-                                    .set_metadata(metadata));
+  status = dev->DdkAddCompositeNodeSpec("test_composite_2",
+                                        ddk::CompositeNodeSpec(node_1_bind_rules, node_1_properties)
+                                            .AddParentSpec(node_2_bind_rules, node_2_properties)
+                                            .AddParentSpec(node_3_bind_rules, node_3_properties)
+                                            .set_metadata(metadata));
   if (status != ZX_OK) {
     return status;
   }
