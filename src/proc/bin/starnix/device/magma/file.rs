@@ -249,8 +249,7 @@ impl FileOps for MagmaFile {
                 ) = read_control_and_response(current_task, &command)?;
 
                 if let Some(buffers) = self.connections.lock().get_mut(&{ control.connection }) {
-                    #[allow(unaligned_references)]
-                    match buffers.remove(&control.buffer) {
+                    match buffers.remove(&{ control.buffer }) {
                         Some(_) => release_buffer(control, &mut response),
                         _ => {
                             log_error!(
