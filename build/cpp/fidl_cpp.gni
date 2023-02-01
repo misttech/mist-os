@@ -192,9 +192,14 @@ template("_fidl_cpp_library_impl") {
       }
     }
 
-    # TODO(fxbug.dev/56257): Remove this line when `-Wextra-semi` is on
+    # TODO(fxbug.dev/56257): Remove `-Wextra-semi` when the flag is on
     # for all of Fuchsia by default.
-    cflags_cc = [ "-Wextra-semi" ]
+    # TODO(fxbug.dev/120888): Remove `-Wshadow` when the flag is on
+    # by default.
+    cflags_cc = [
+      "-Wextra-semi",
+      "-Wshadow",
+    ]
 
     # TODO(fxbug.dev/69585): We suppress deprecated raw channel usage
     # in LLCPP generated code itself. Delete this line after everything

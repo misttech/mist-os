@@ -10,15 +10,15 @@
 #ifdef __Fuchsia__
 void ::test_handlesintypes::wire::HandlesInTypes::_CloseHandles() {
   normal_handle.reset();
-  for (auto& e : handle_in_vec) {
-    e.reset();
+  for (auto& e_1 : handle_in_vec) {
+    e_1.reset();
   }
-  for (auto& e : handle_in_array) {
-    e.reset();
+  for (auto& e_1 : handle_in_array) {
+    e_1.reset();
   }
-  for (auto& e : handle_in_mixed_vec_array) {
-    for (auto& e : e) {
-      e.reset();
+  for (auto& e_1 : handle_in_mixed_vec_array) {
+    for (auto& e_2 : e_1) {
+      e_2.reset();
     }
   }
   table_with_handle._CloseHandles();

@@ -17,8 +17,8 @@ void ::test_largemessages::wire::Elements::_CloseHandles() {
 
 #ifdef __Fuchsia__
 void ::test_largemessages::wire::UnboundedMaybeLargeResource::_CloseHandles() {
-  for (auto& e : elements) {
-    e._CloseHandles();
+  for (auto& e_1 : elements) {
+    e_1._CloseHandles();
   }
 }
 

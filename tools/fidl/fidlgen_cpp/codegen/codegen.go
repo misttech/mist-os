@@ -27,11 +27,20 @@ type TypedArgument struct {
 	MutableAccess bool
 }
 
+type closeHandleContext struct {
+	unique_name_counter int
+}
+
+func (c *closeHandleContext) genUniqueName() string {
+	c.unique_name_counter += 1
+	return fmt.Sprintf("e_%d", c.unique_name_counter)
+}
+
 // closeHandles generates a code snippet to recursively close all handles within
 // a wire domain object identified by the expression expr.
 //
 // exprType is the type of the expression.
-func closeHandles(expr string, exprType cpp.Type) string {
+func closeHandles(expr string, exprType cpp.Type, context *closeHandleContext) string {
 	if !exprType.IsResource {
 		return ""
 	}
@@ -42,8 +51,12 @@ func closeHandles(expr string, exprType cpp.Type) string {
 	case cpp.TypeKinds.Array, cpp.TypeKinds.Vector:
 		// Iterating over array and vector views isn't affected by optionality.
 		var buf bytes.Buffer
-		buf.WriteString(fmt.Sprintf("for (auto& e : %s) {\n", expr))
-		buf.WriteString(closeHandles("e", *exprType.ElementType))
+		// Use a unique item name to avoid shadowing the name of the collection or
+		// the name of the item for an ancestor for loop. Shadowing can be detected
+		// by compiling with -Wshadow.
+		expr_item_name := context.genUniqueName()
+		buf.WriteString(fmt.Sprintf("for (auto& %s : %s) {\n", expr_item_name, expr))
+		buf.WriteString(closeHandles(expr_item_name, *exprType.ElementType, context))
 		buf.WriteString("\n}\n")
 		return buf.String()
 	case cpp.TypeKinds.Union:
@@ -88,7 +101,7 @@ var utilityFuncs = template.FuncMap{
 		if useAccessor {
 			v = fmt.Sprintf("%s()", v)
 		}
-		return closeHandles(v, t)
+		return closeHandles(v, t, &closeHandleContext{})
 	},
 }
 

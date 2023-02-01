@@ -410,11 +410,11 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
     fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       {{/* Two switches here, so they are translated to lookup tables. */}}
-      size_t inline_size = 0;
+      size_t encode_inline_size = 0;
       switch (i) {
         {{- range .Members }}
         case {{ Sub .Ordinal 1 }}:
-          inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::inline_size;
+          encode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::inline_size;
           break;
         {{- end }}
       }
@@ -427,7 +427,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
         {{- end }}
       }
       WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
-      WireEncodeEnvelope(inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
+      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -444,11 +444,11 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
     fidl_vector_t* vec = position.As<fidl_vector_t>();
     for (size_t i = 0; i < vec->count; i++) {
       {{/* Two switches here, so they are translated to lookup tables. */}}
-      size_t inline_size = 0;
+      size_t decode_inline_size = 0;
       switch (i) {
         {{- range .Members }}
         case {{ Sub .Ordinal 1 }}:
-          inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::inline_size;
+          decode_inline_size = ::fidl::internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::inline_size;
           break;
         {{- end }}
       }
@@ -460,7 +460,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
           break;
         {{- end }}
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
     }
   }
 };

@@ -781,10 +781,10 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::TableSmallArray, 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
     fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
-      size_t inline_size = 0;
+      size_t encode_inline_size = 0;
       switch (i) {
         case 0:
-          inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+          encode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
           break;
       }
       ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
@@ -794,7 +794,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::TableSmallArray, 
           break;
       }
       WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
-      WireEncodeEnvelope(inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
+      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -810,10 +810,10 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::TableSmallArray, 
 
     fidl_vector_t* vec = position.As<fidl_vector_t>();
     for (size_t i = 0; i < vec->count; i++) {
-      size_t inline_size = 0;
+      size_t decode_inline_size = 0;
       switch (i) {
         case 0:
-          inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+          decode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
           break;
       }
       DecodeFn<IsRecursive> decode_fn = nullptr;
@@ -822,7 +822,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::TableSmallArray, 
           decode_fn = ::fidl::internal::MakeDecodeFn<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
     }
   }
 };
@@ -868,10 +868,10 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::TableLargeArray, 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
     fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
-      size_t inline_size = 0;
+      size_t encode_inline_size = 0;
       switch (i) {
         case 0:
-          inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+          encode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
           break;
       }
       ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
@@ -881,7 +881,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::TableLargeArray, 
           break;
       }
       WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
-      WireEncodeEnvelope(inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
+      WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -897,10 +897,10 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::TableLargeArray, 
 
     fidl_vector_t* vec = position.As<fidl_vector_t>();
     for (size_t i = 0; i < vec->count; i++) {
-      size_t inline_size = 0;
+      size_t decode_inline_size = 0;
       switch (i) {
         case 0:
-          inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+          decode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
           break;
       }
       DecodeFn<IsRecursive> decode_fn = nullptr;
@@ -909,7 +909,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::TableLargeArray, 
           decode_fn = ::fidl::internal::MakeDecodeFn<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
     }
   }
 };
@@ -957,13 +957,13 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionSmallArray, 
 
     *position.As<fidl_xunion_tag_t>() = u->tag;
 
-    size_t inline_size;
+    size_t encode_inline_size;
     switch (u->tag) {
       case 1:  // ::test_arrays::wire::UnionSmallArray::Tag::kA
-        inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        encode_inline_size = 0;
         break;
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
@@ -975,7 +975,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionSmallArray, 
         encode_fn = nullptr;
         break;
     }
-    WireEncodeEnvelope(inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -997,13 +997,13 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionSmallArray, 
       return;
     }
 
-    size_t inline_size;
+    size_t decode_inline_size;
     switch (tag) {
       case ::test_arrays::wire::UnionSmallArray::Tag::kA:
-        inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 2>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        decode_inline_size = 0;
         break;
     }
     DecodeFn<IsRecursive> decode_fn;
@@ -1015,7 +1015,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionSmallArray, 
         decode_fn = nullptr;
         break;
     }
-    ::fidl::internal::WireDecodeStrictEnvelope(inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 };
 
@@ -1067,13 +1067,13 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionLargeArray, 
 
     *position.As<fidl_xunion_tag_t>() = u->tag;
 
-    size_t inline_size;
+    size_t encode_inline_size;
     switch (u->tag) {
       case 1:  // ::test_arrays::wire::UnionLargeArray::Tag::kA
-        inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        encode_inline_size = 0;
         break;
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
@@ -1085,7 +1085,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionLargeArray, 
         encode_fn = nullptr;
         break;
     }
-    WireEncodeEnvelope(inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1107,13 +1107,13 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionLargeArray, 
       return;
     }
 
-    size_t inline_size;
+    size_t decode_inline_size;
     switch (tag) {
       case ::test_arrays::wire::UnionLargeArray::Tag::kA:
-        inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint32_t, 100>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        decode_inline_size = 0;
         break;
     }
     DecodeFn<IsRecursive> decode_fn;
@@ -1125,7 +1125,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionLargeArray, 
         decode_fn = nullptr;
         break;
     }
-    ::fidl::internal::WireDecodeStrictEnvelope(inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 };
 

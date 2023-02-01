@@ -677,13 +677,13 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize8
 
     *position.As<fidl_xunion_tag_t>() = u->tag;
 
-    size_t inline_size;
+    size_t encode_inline_size;
     switch (u->tag) {
       case 1:  // ::test_unionsandwich::wire::UnionSize8Alignment4::Tag::kVariant
-        inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        encode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        encode_inline_size = 0;
         break;
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
@@ -695,7 +695,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize8
         encode_fn = nullptr;
         break;
     }
-    WireEncodeEnvelope(inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -717,13 +717,13 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize8
       return;
     }
 
-    size_t inline_size;
+    size_t decode_inline_size;
     switch (tag) {
       case ::test_unionsandwich::wire::UnionSize8Alignment4::Tag::kVariant:
-        inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        decode_inline_size = ::fidl::internal::WireCodingTraits<uint32_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        decode_inline_size = 0;
         break;
     }
     DecodeFn<IsRecursive> decode_fn;
@@ -735,7 +735,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize8
         decode_fn = nullptr;
         break;
     }
-    ::fidl::internal::WireDecodeStrictEnvelope(inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 };
 
@@ -787,13 +787,13 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize1
 
     *position.As<fidl_xunion_tag_t>() = u->tag;
 
-    size_t inline_size;
+    size_t encode_inline_size;
     switch (u->tag) {
       case 1:  // ::test_unionsandwich::wire::UnionSize12Alignment4::Tag::kVariant
-        inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint8_t, 6>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint8_t, 6>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        encode_inline_size = 0;
         break;
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
@@ -805,7 +805,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize1
         encode_fn = nullptr;
         break;
     }
-    WireEncodeEnvelope(inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -827,13 +827,13 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize1
       return;
     }
 
-    size_t inline_size;
+    size_t decode_inline_size;
     switch (tag) {
       case ::test_unionsandwich::wire::UnionSize12Alignment4::Tag::kVariant:
-        inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint8_t, 6>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint8_t, 6>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        decode_inline_size = 0;
         break;
     }
     DecodeFn<IsRecursive> decode_fn;
@@ -845,7 +845,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize1
         decode_fn = nullptr;
         break;
     }
-    ::fidl::internal::WireDecodeStrictEnvelope(inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 };
 
@@ -897,13 +897,13 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize2
 
     *position.As<fidl_xunion_tag_t>() = u->tag;
 
-    size_t inline_size;
+    size_t encode_inline_size;
     switch (u->tag) {
       case 1:  // ::test_unionsandwich::wire::UnionSize24Alignment8::Tag::kVariant
-        inline_size = ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::StructSize16Alignment8, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::StructSize16Alignment8, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        encode_inline_size = 0;
         break;
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
@@ -915,7 +915,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize2
         encode_fn = nullptr;
         break;
     }
-    WireEncodeEnvelope(inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -937,13 +937,13 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize2
       return;
     }
 
-    size_t inline_size;
+    size_t decode_inline_size;
     switch (tag) {
       case ::test_unionsandwich::wire::UnionSize24Alignment8::Tag::kVariant:
-        inline_size = ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::StructSize16Alignment8, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::StructSize16Alignment8, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        decode_inline_size = 0;
         break;
     }
     DecodeFn<IsRecursive> decode_fn;
@@ -955,7 +955,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize2
         decode_fn = nullptr;
         break;
     }
-    ::fidl::internal::WireDecodeStrictEnvelope(inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 };
 
@@ -1007,13 +1007,13 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize3
 
     *position.As<fidl_xunion_tag_t>() = u->tag;
 
-    size_t inline_size;
+    size_t encode_inline_size;
     switch (u->tag) {
       case 1:  // ::test_unionsandwich::wire::UnionSize36Alignment4::Tag::kVariant
-        inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint8_t, 32>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        encode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint8_t, 32>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        encode_inline_size = 0;
         break;
     }
     ::fidl::internal::EncodeFn<IsRecursive> encode_fn;
@@ -1025,7 +1025,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize3
         encode_fn = nullptr;
         break;
     }
-    WireEncodeEnvelope(inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &u->envelope, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
@@ -1047,13 +1047,13 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize3
       return;
     }
 
-    size_t inline_size;
+    size_t decode_inline_size;
     switch (tag) {
       case ::test_unionsandwich::wire::UnionSize36Alignment4::Tag::kVariant:
-        inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint8_t, 32>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
+        decode_inline_size = ::fidl::internal::WireCodingTraits<::fidl::Array<uint8_t, 32>, fidl::internal::WireCodingConstraintEmpty, IsRecursive>::inline_size;
         break;
       default:
-        inline_size = 0;
+        decode_inline_size = 0;
         break;
     }
     DecodeFn<IsRecursive> decode_fn;
@@ -1065,7 +1065,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize3
         decode_fn = nullptr;
         break;
     }
-    ::fidl::internal::WireDecodeStrictEnvelope(inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
+    ::fidl::internal::WireDecodeStrictEnvelope(decode_inline_size, decode_fn, decoder, position + sizeof(fidl_xunion_tag_t), inner_depth);
   }
 };
 
