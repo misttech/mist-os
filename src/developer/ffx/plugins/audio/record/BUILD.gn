@@ -10,7 +10,7 @@ ffx_plugin("ffx_audio_record") {
 
   args_deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
-    "//src/media/audio/services/ffxdaemon/utils:audio-daemon-utils",
+    "//src/media/audio/services/ffxdaemon:format-utils",
     "//third_party/rust_crates:anyhow",
   ]
 

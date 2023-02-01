@@ -11,13 +11,14 @@ ffx_plugin("ffx_audio_gen") {
   args_with_unit_tests = true
 
   args_deps = [
-    "//src/media/audio/services/ffxdaemon/utils:audio-daemon-utils",
+    "//src/media/audio/services/ffxdaemon:format-utils",
     "//third_party/rust_crates:anyhow",
   ]
 
   deps = [
+    "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
     "//src/developer/ffx/lib/errors:lib",
-    "//src/media/audio/services/ffxdaemon/utils:audio-daemon-utils",
+    "//src/media/audio/services/ffxdaemon:format-utils",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:hound",
     "//third_party/rust_crates:rand",

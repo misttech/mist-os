@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result, argh::FromArgs, audio_daemon_utils, ffx_core::ffx_command, std::time::Duration,
+    anyhow::Result, argh::FromArgs, ffx_core::ffx_command, format_utils::Format,
+    std::time::Duration,
 };
 
 /// TODO(fxbug.dev/109807) - Add support for writing infinite files.
@@ -48,7 +49,7 @@ pub struct SineCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_daemon_utils::AudioOutputFormat,
+    pub format: Format,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -71,7 +72,7 @@ pub struct SquareCommand {
     pub duty_cycle: f64,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_daemon_utils::AudioOutputFormat,
+    pub format: Format,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -91,7 +92,7 @@ pub struct SawtoothCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_daemon_utils::AudioOutputFormat,
+    pub format: Format,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -111,7 +112,7 @@ pub struct TriangleCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_daemon_utils::AudioOutputFormat,
+    pub format: Format,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -128,7 +129,7 @@ pub struct WhiteNoiseCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_daemon_utils::AudioOutputFormat,
+    pub format: Format,
 }
 
 #[derive(FromArgs, Debug, PartialEq)]
@@ -145,10 +146,10 @@ pub struct PinkNoiseCommand {
     pub amplitude: Option<f64>,
 
     #[argh(option, description = "output format (see 'ffx audio help' for more information).")]
-    pub format: audio_daemon_utils::AudioOutputFormat,
+    pub format: Format,
 }
 
 /// Parses a Duration from string.
 fn parse_duration(value: &str) -> Result<Duration, String> {
-    audio_daemon_utils::parse_duration(value)
+    format_utils::parse_duration(value)
 }

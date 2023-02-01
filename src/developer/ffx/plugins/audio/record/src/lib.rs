@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_audio_ffxdaemon::{
         AudioDaemonProxy, AudioDaemonRecordRequest, CapturerInfo, RecordLocation,
     },
-    fidl_fuchsia_media::{AudioSampleFormat, AudioStreamType},
+    fidl_fuchsia_media::AudioStreamType,
     futures,
 };
 
@@ -47,9 +47,9 @@ pub async fn record_capture(
         _ => None,
     };
     let stream_type = AudioStreamType {
-        sample_format: AudioSampleFormat::from(&record_command.format),
+        sample_format: record_command.format.sample_type,
         channels: record_command.format.channels as u32,
-        frames_per_second: record_command.format.sample_rate,
+        frames_per_second: record_command.format.frames_per_second,
     };
 
     let fut = async {
