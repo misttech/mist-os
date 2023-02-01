@@ -14,10 +14,9 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 
 use assert_matches::assert_matches;
-use either::Either;
 use fidl::endpoints::Proxy;
 use futures::{
-    stream::FusedStream, Future, FutureExt as _, Stream, StreamExt as _, TryFutureExt as _,
+    channel::mpsc, future::FusedFuture, Future, FutureExt as _, StreamExt as _, TryFutureExt as _,
 };
 use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6, net_mac};
 use netstack_testing_common::{
@@ -37,7 +36,7 @@ use packet_formats::{
     testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame,
 };
 use reachability_core::{State, FIDL_TIMEOUT_ID};
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use test_case::test_case;
 use tracing::info;
 
@@ -271,7 +270,7 @@ struct NetemulInterface<'a> {
     _network: netemul::TestNetwork<'a>,
     interface: netemul::TestInterface<'a>,
     fake_ep: netemul::TestFakeEndpoint<'a>,
-    is_sending_replies: RefCell<bool>,
+    state: Rc<RefCell<State>>,
 }
 
 impl<'a> NetemulInterface<'a> {
@@ -359,33 +358,28 @@ async fn configure_interface<'a>(
         .expect("add IPv6 default route error");
 }
 
-fn handle_frame_stream<'a>(
+async fn handle_frame_stream<'a>(
     fake_ep: &'a netemul::TestFakeEndpoint<'_>,
-    want: State,
-    gateway_v4: &'a net_types::ip::Ipv4Addr,
-    gateway_v6: &'a net_types::ip::Ipv6Addr,
-    is_sending_replies: &'a RefCell<bool>,
-) -> impl Stream<Item = ()> + 'a {
-    fake_ep.frame_stream().map(|r| r.expect("fake endpoint frame stream error")).filter_map(
-        move |(frame, dropped)| {
+    gateway_v4: net_types::ip::Ipv4Addr,
+    gateway_v6: net_types::ip::Ipv6Addr,
+    state: Rc<RefCell<State>>,
+    echo_notifier: &mpsc::UnboundedSender<()>,
+) {
+    let mut frame_stream = fake_ep.frame_stream();
+    loop {
+        if let Some(Ok((frame, dropped))) = frame_stream.next().await {
+            echo_notifier.unbounded_send(()).expect("failed to send echo notice");
             assert_eq!(dropped, 0);
-            async move {
-                let reply = if *is_sending_replies.borrow() {
-                    match reply_if_echo_request(frame, want, &gateway_v4, &gateway_v6) {
-                        Some(reply) => reply,
-                        None => return None,
-                    }
-                } else {
-                    return None;
-                };
+            if let Some(reply) =
+                reply_if_echo_request(frame, *state.borrow(), &gateway_v4, &gateway_v6)
+            {
                 fake_ep
                     .write(reply.as_ref())
                     .await
-                    .map(Some)
-                    .expect("failed to write echo reply to fake endpoint")
+                    .expect("failed to write echo reply to fake endpoint");
             }
-        },
-    )
+        }
+    }
 }
 
 struct ReachabilityEnv<'a> {
@@ -429,7 +423,7 @@ async fn create_netemul_interfaces<'a>(
     configs: &[(InterfaceConfig, State)],
 ) -> Vec<NetemulInterface<'a>> {
     futures::stream::iter(configs.iter())
-        .then(|(config, _): &(InterfaceConfig, State)| {
+        .then(|(config, init_state): &(InterfaceConfig, State)| {
             let config = config.clone();
             async {
                 let name = format!("{}_{}", name, config.name_suffix);
@@ -442,40 +436,36 @@ async fn create_netemul_interfaces<'a>(
                     .join_network(&network, name)
                     .await
                     .expect("failed to join network with netdevice endpoint");
-                let is_sending_replies = RefCell::new(true);
+                let state = Rc::new(RefCell::new(*init_state));
 
                 configure_interface(&interface, &env.controller, &env.stack, config).await;
-                NetemulInterface { _network: network, interface, fake_ep, is_sending_replies }
+                NetemulInterface { _network: network, interface, fake_ep, state }
             }
         })
         .collect::<_>()
         .await
 }
 
-fn create_echo_reply_streams<'a>(
-    interfaces: &'a Vec<NetemulInterface<'_>>,
-    configs: &'a [(InterfaceConfig, State)],
-) -> impl FusedStream<Item = ()> + 'a {
+async fn echo_reply_streams(
+    interfaces: Vec<NetemulInterface<'_>>,
+    configs: Vec<InterfaceConfig>,
+    echo_notifier: mpsc::UnboundedSender<()>,
+) {
     // TODO(fxbug.dev/119965): Combine configs with the NetemulInterface struct
-    interfaces
+    let stream = interfaces
         .iter()
         .zip(configs.iter())
-        .map(
-            |(
-                NetemulInterface { _network, interface: _, fake_ep, is_sending_replies },
-                (config, want_state),
-            )| {
-                Box::pin(handle_frame_stream(
-                    &fake_ep,
-                    *want_state,
-                    &config.gateway_v4,
-                    &config.gateway_v6,
-                    &is_sending_replies,
-                ))
-            },
-        )
-        .collect::<futures::stream::SelectAll<_>>()
-        .fuse()
+        .map(|(NetemulInterface { _network, interface: _, fake_ep, state }, config)| {
+            Box::pin(handle_frame_stream(
+                &fake_ep,
+                config.gateway_v4,
+                config.gateway_v6,
+                state.clone(),
+                &echo_notifier,
+            ))
+        })
+        .collect::<futures::stream::FuturesUnordered<_>>();
+    let _: Vec<()> = stream.collect::<Vec<_>>().await;
 }
 
 async fn initialize_fake_clock_with_deadline<T>(fake_clock: &T) -> zx::EventPair
@@ -610,6 +600,7 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
     let deadline_set_event = initialize_fake_clock_with_deadline(&env.fake_clock).await;
 
     let interfaces = create_netemul_interfaces(&name, &env.sandbox, &env, &configs).await;
+    let interfaces_count = interfaces.len();
     let want_interfaces = interfaces
         .iter()
         .zip(configs.iter())
@@ -618,7 +609,13 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
         })
         .collect::<HashMap<_, _>>();
 
-    let mut echo_reply_streams = create_echo_reply_streams(&interfaces, &configs);
+    let interface_configs =
+        configs.iter().cloned().map(|(c, _)| c).collect::<Vec<InterfaceConfig>>();
+    let (sender, receiver) = mpsc::unbounded();
+    let echo_receiver = receiver.fuse();
+    futures::pin_mut!(echo_receiver);
+    let echo_reply_streams = echo_reply_streams(interfaces, interface_configs, sender).fuse();
+    futures::pin_mut!(echo_reply_streams);
 
     // TODO(https://fxbug.dev/65585): Get reachability monitor's reachability state over FIDL rather
     // than the inspect data. Watching for updates to inspect data is currently not supported, so
@@ -652,7 +649,10 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
 
     // Ensure that at least one echo request has been replied to before polling the inspect data
     // stream to guarantee that reachability monitor has initialized its inspect data tree.
-    let () = echo_reply_streams.next().await.expect("echo reply stream ended unexpectedly");
+    futures::select! {
+        _ = echo_reply_streams => panic!("echo reply streams ended unexpectedly"),
+        _ = echo_receiver.next() => (),
+    }
 
     let IpStates { ipv4: want_system_ipv4, ipv6: want_system_ipv6 } =
         want_interfaces.values().fold(
@@ -675,8 +675,8 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
     loop {
         futures::select! {
             _ = time_control_fut => (),
-            o = echo_reply_streams.next() => {
-                let () = o.expect("interface echo reply stream ended unexpectedly");
+            _ = echo_reply_streams => {
+                panic!("interface echo reply stream ended unexpectedly");
             }
             r = inspect_data_stream.next() => {
                 let (got_interfaces, IpStates { ipv4: got_system_ipv4, ipv6: got_system_ipv6 }) = r
@@ -721,7 +721,7 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
                     .count();
                 if got_system_ipv4 == want_system_ipv4
                     && got_system_ipv6 == want_system_ipv6
-                    && equal_count == interfaces.len()
+                    && equal_count == interfaces_count
                 {
                     break;
                 }
@@ -733,156 +733,150 @@ async fn test_state(name: &str, sub_test_name: &str, configs: &[(InterfaceConfig
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum InterfacesWithInternetInitiallyTrue {
-    All,
-    AllThenZero,
-    AtLeastOne,
+struct ReachabilityTestHelper<'a> {
+    env: &'a ReachabilityEnv<'a>,
+    monitor: fnet_reachability::MonitorProxy,
+    iface_states: Vec<Rc<RefCell<State>>>,
+    echo_reply_streams: std::pin::Pin<Box<dyn FusedFuture<Output = ()> + 'a>>,
+    _echo_reply_receiver: mpsc::UnboundedReceiver<()>,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-enum InterfacesWithInternetInitiallyFalse {
-    ZeroThenAll,
-    ZeroThenOne,
-    Zero,
+impl<'a> ReachabilityTestHelper<'a> {
+    async fn new(
+        name: &'a str,
+        env: &'a ReachabilityEnv<'a>,
+        configs: Vec<(InterfaceConfig, State)>,
+    ) -> ReachabilityTestHelper<'a> {
+        let monitor = env
+            .realm
+            .connect_to_protocol::<fnet_reachability::MonitorMarker>()
+            .expect("failed to connect to fuchsia.net.reachability.Monitor");
+
+        let interface_configs =
+            configs.iter().cloned().map(|(c, _)| c).collect::<Vec<InterfaceConfig>>();
+        let interfaces = create_netemul_interfaces(name, &env.sandbox, &env, &configs).await;
+
+        let iface_states = interfaces.iter().map(|iface| iface.state.clone()).collect();
+
+        let (sender, receiver) = mpsc::unbounded();
+
+        let echo_reply_streams =
+            Box::pin(echo_reply_streams(interfaces, interface_configs, sender).fuse());
+
+        Self { env, monitor, iface_states, echo_reply_streams, _echo_reply_receiver: receiver }
+    }
+
+    async fn next_snapshot(&mut self) -> fnet_reachability::Snapshot {
+        let reachability_monitor_wait_fut = wait_for_component_stopped(
+            &self.env.realm,
+            constants::reachability::COMPONENT_NAME,
+            None,
+        )
+        .fuse();
+        futures::pin_mut!(reachability_monitor_wait_fut);
+
+        let deadline_set_event = initialize_fake_clock_with_deadline(&self.env.fake_clock).await;
+
+        let snapshot_fut = self.monitor.watch();
+        futures::pin_mut!(snapshot_fut);
+
+        let time_control_fut =
+            accelerate_time_until_timeout(&self.env.fake_clock, &deadline_set_event).fuse();
+        futures::pin_mut!(time_control_fut);
+
+        loop {
+            futures::select! {
+                _ = time_control_fut => (),
+                _ = self.echo_reply_streams.as_mut() => {
+                    panic!("interface echo reply stream ended unexpectedly");
+                }
+                r = snapshot_fut => {
+                    match r {
+                       Ok(snapshot) => {
+                            return snapshot;
+                       },
+                       Err(e) => panic!("failed to fetch updated snapshot {}", e),
+                    }
+                }
+                event = reachability_monitor_wait_fut => {
+                    panic!("reachability monitor terminated unexpectedly with event: {:?}", event);
+                }
+            }
+        }
+    }
+
+    fn set_iface_states(&mut self, states: Vec<State>) {
+        assert!(states.len() == self.iface_states.len());
+        self.iface_states
+            .iter()
+            .zip(states)
+            .for_each(|(iface_state, new_state)| *iface_state.borrow_mut() = new_state);
+    }
 }
 
 #[netstack_test]
-#[test_case(&Either::Left(InterfacesWithInternetInitiallyTrue::All))]
-#[test_case(&Either::Left(InterfacesWithInternetInitiallyTrue::AllThenZero))]
-#[test_case(&Either::Left(InterfacesWithInternetInitiallyTrue::AtLeastOne))]
-#[test_case(&Either::Right(InterfacesWithInternetInitiallyFalse::ZeroThenAll))]
-#[test_case(&Either::Right(InterfacesWithInternetInitiallyFalse::ZeroThenOne))]
-#[test_case(&Either::Right(InterfacesWithInternetInitiallyFalse::Zero))]
-async fn test_internet_available(
-    name: &str,
-    interfaces_with_internet: &Either<
-        InterfacesWithInternetInitiallyTrue,
-        InterfacesWithInternetInitiallyFalse,
-    >,
-) {
+#[test_case(State::Internet, State::Internet)]
+#[test_case(State::Internet, State::Gateway)]
+#[test_case(State::Internet, State::Up)]
+async fn test_internet_available(name: &str, state1: State, state2: State) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let env = setup_reachability_env(name, &sandbox);
+    let configs = vec![
+        (InterfaceConfig::new_primary(LOWER_METRIC), state1),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), state2),
+    ];
+    let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
-    let deadline_set_event = initialize_fake_clock_with_deadline(&env.fake_clock).await;
-    let monitor = env
-        .realm
-        .connect_to_protocol::<fnet_reachability::MonitorMarker>()
-        .expect("failed to connect to fuchsia.net.reachability.Monitor");
+    // The first call to wait() always returns a snapshot with no internet.
+    // We expect both this and a subsequent snapshot with the actual internet
+    // available state.
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.internet_available, Some(false));
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.internet_available, Some(true));
+}
 
+#[netstack_test]
+#[test_case(State::Internet, State::Internet)]
+#[test_case(State::Internet, State::Gateway)]
+#[test_case(State::Internet, State::Up)]
+async fn test_internet_comes_up(name: &str, state1: State, state2: State) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let env = setup_reachability_env(name, &sandbox);
+    let configs = vec![
+        (InterfaceConfig::new_primary(LOWER_METRIC), State::Up),
+        (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Up),
+    ];
+    let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
+
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.internet_available, Some(false));
+
+    helper.set_iface_states(vec![state1, state2]);
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.internet_available, Some(true));
+}
+
+#[netstack_test]
+#[test_case(State::Gateway, State::Gateway)]
+#[test_case(State::Up, State::Up)]
+async fn test_internet_goes_down(name: &str, state1: State, state2: State) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let env = setup_reachability_env(name, &sandbox);
     let configs = vec![
         (InterfaceConfig::new_primary(LOWER_METRIC), State::Internet),
         (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Internet),
     ];
-    let interfaces = create_netemul_interfaces(name, &env.sandbox, &env, &configs).await;
+    let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
-    let mut echo_reply_streams = create_echo_reply_streams(&interfaces, &configs);
-    let () = echo_reply_streams.next().await.expect("echo reply stream ended unexpectedly");
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.internet_available, Some(false));
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.internet_available, Some(true));
 
-    let reachability_monitor_wait_fut =
-        wait_for_component_stopped(&env.realm, constants::reachability::COMPONENT_NAME, None)
-            .fuse();
-    futures::pin_mut!(reachability_monitor_wait_fut);
-
-    // Creates a stream from Watch so it can be called again when the response has been received.
-    let monitor_ref = &monitor;
-    let monitor_watch_stream =
-        futures::stream::unfold((), |_| async move { Some((monitor_ref.watch().await, ())) })
-            .fuse();
-    futures::pin_mut!(monitor_watch_stream);
-
-    let time_control_fut =
-        accelerate_time_until_timeout(&env.fake_clock, &deadline_set_event).fuse();
-    futures::pin_mut!(time_control_fut);
-
-    let expected_final_state = match interfaces_with_internet {
-        Either::Left(interface_case) => {
-            // The first call to the Monitor should return the Some(false) default response.
-            let snapshot: fnet_reachability::Snapshot = monitor
-                .watch()
-                .await
-                .expect("failed to fetch snapshot fuchsia.net.reachability.Monitor");
-            assert_eq!(snapshot.internet_available, Some(false));
-
-            match interface_case {
-                InterfacesWithInternetInitiallyTrue::All => true,
-                InterfacesWithInternetInitiallyTrue::AllThenZero => false,
-                InterfacesWithInternetInitiallyTrue::AtLeastOne => {
-                    // Disable replies for all but one interface.
-                    *interfaces[0].is_sending_replies.borrow_mut() = false;
-                    true
-                }
-            }
-        }
-        Either::Right(interface_case) => {
-            // Disable replies for all interfaces.
-            *interfaces[0].is_sending_replies.borrow_mut() = false;
-            *interfaces[1].is_sending_replies.borrow_mut() = false;
-
-            match interface_case {
-                InterfacesWithInternetInitiallyFalse::ZeroThenAll => true,
-                InterfacesWithInternetInitiallyFalse::ZeroThenOne => true,
-                InterfacesWithInternetInitiallyFalse::Zero => false,
-            }
-        }
-    };
-
-    loop {
-        futures::select! {
-            _ = time_control_fut => (),
-            o = echo_reply_streams.next() => {
-                let () = o.expect("interface echo reply stream ended unexpectedly");
-            }
-            r = monitor_watch_stream.next() => {
-                match r {
-                   Some(Ok(x)) => {
-                       let internet_available = x.internet_available.unwrap();
-
-                       match interfaces_with_internet {
-                            Either::Left(interface_case) => {
-                                if internet_available {
-                                    match interface_case {
-                                        InterfacesWithInternetInitiallyTrue::AllThenZero => {
-                                            // Disable replies for all interfaces.
-                                            *interfaces[0].is_sending_replies.borrow_mut() = false;
-                                            *interfaces[1].is_sending_replies.borrow_mut() = false;
-                                            continue;
-                                        },
-                                        _ => (),
-                                    }
-                                }
-                            },
-                            Either::Right(interface_case) => {
-                                if !internet_available {
-                                    match interface_case {
-                                        InterfacesWithInternetInitiallyFalse::ZeroThenAll => {
-                                            // Enable replies for all interfaces.
-                                            *interfaces[0].is_sending_replies.borrow_mut() = true;
-                                            *interfaces[1].is_sending_replies.borrow_mut() = true;
-                                            continue;
-                                        },
-                                        InterfacesWithInternetInitiallyFalse::ZeroThenOne => {
-                                            // Enable replies for one interface.
-                                            *interfaces[0].is_sending_replies.borrow_mut() = true;
-                                            continue;
-                                        },
-                                        InterfacesWithInternetInitiallyFalse::Zero => (),
-                                    }
-                                }
-                            },
-                       };
-                       assert_eq!(internet_available, expected_final_state);
-                       break;
-                   },
-                   Some(Err(e)) => panic!("failed to fetch updated snapshot {}", e),
-                   None => unreachable!("monitor_watch_stream unexpectedly ended"),
-                }
-            }
-            event = reachability_monitor_wait_fut => {
-                panic!("reachability monitor terminated unexpectedly with event: {:?}", event);
-            }
-        }
-    }
+    helper.set_iface_states(vec![state1, state2]);
+    let snapshot = helper.next_snapshot().await;
+    assert_eq!(snapshot.internet_available, Some(false));
 }
 
 #[netstack_test]
