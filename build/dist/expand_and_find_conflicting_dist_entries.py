@@ -33,8 +33,13 @@ def main():
         help='Prepend PREFIX to each destination path')
     args = parser.parse_args()
 
+    contents = u""
     with open(args.input, 'r') as input_file:
-        contents = json.load(input_file)
+        try:
+            contents = json.load(input_file)
+        except Exception as e:
+            print("while reading:\n\t{}:\n\t{}".format(args.input, e))
+            return 1
 
     opened_files = set()
     entries, error = distribution_manifest.expand_manifest(
