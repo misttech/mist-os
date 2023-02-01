@@ -113,7 +113,7 @@ impl LifecycleController {
             self.model.find(&moniker).await.ok_or(fsys::UnresolveError::InstanceNotFound)?;
         component.unresolve().await.map_err(|error| {
             warn!(%moniker, %error, "failed to unresolve instance");
-            fsys::UnresolveError::Internal
+            error.into()
         })?;
         Ok(())
     }

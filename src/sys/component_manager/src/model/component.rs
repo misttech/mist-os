@@ -13,7 +13,7 @@ use {
         error::{
             AddChildError, AddDynamicChildError, DestroyActionError, DiscoverActionError,
             DynamicOfferError, ModelError, OpenExposedDirError, RebootError, ResolveActionError,
-            StartActionError, StopActionError, StructuredConfigError,
+            StartActionError, StopActionError, StructuredConfigError, UnresolveActionError,
         },
         exposed_dir::ExposedDir,
         hooks::{Event, EventPayload, Hooks},
@@ -499,7 +499,7 @@ impl ComponentInstance {
     /// Unresolves the component using an UnresolveAction. The component will be shut down, then
     /// reset to the Discovered state without being destroyed. An Unresolved event is dispatched on
     /// success or error.
-    pub async fn unresolve(self: &Arc<Self>) -> Result<(), ModelError> {
+    pub async fn unresolve(self: &Arc<Self>) -> Result<(), UnresolveActionError> {
         ActionSet::register(self.clone(), UnresolveAction::new()).await
     }
 

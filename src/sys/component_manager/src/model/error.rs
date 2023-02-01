@@ -656,3 +656,28 @@ impl Into<fsys::DestroyError> for DestroyActionError {
         }
     }
 }
+
+#[derive(Debug, Clone, Error)]
+pub enum UnresolveActionError {
+    #[error("failed to shutdown component: {}", err)]
+    ShutdownFailed {
+        #[from]
+        err: StopActionError,
+    },
+    #[error("{moniker} cannot be unresolved while it is running")]
+    InstanceRunning { moniker: AbsoluteMoniker },
+    #[error("{moniker} was destroyed")]
+    InstanceDestroyed { moniker: AbsoluteMoniker },
+}
+
+// This is implemented for fuchsia.sys2.LifecycleController protocol.
+impl Into<fsys::UnresolveError> for UnresolveActionError {
+    fn into(self) -> fsys::UnresolveError {
+        match self {
+            UnresolveActionError::InstanceDestroyed { .. } => {
+                fsys::UnresolveError::InstanceNotFound
+            }
+            _ => fsys::UnresolveError::Internal,
+        }
+    }
+}

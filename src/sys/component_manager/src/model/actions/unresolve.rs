@@ -6,12 +6,10 @@ use {
     crate::model::{
         actions::{Action, ActionKey, ActionSet, ShutdownAction},
         component::{ComponentInstance, InstanceState},
-        error::ModelError,
+        error::UnresolveActionError,
         hooks::{Event, EventPayload},
     },
-    anyhow::anyhow,
     async_trait::async_trait,
-    routing::error::ComponentInstanceError,
     std::sync::Arc,
 };
 
@@ -29,7 +27,7 @@ impl UnresolveAction {
 
 #[async_trait]
 impl Action for UnresolveAction {
-    type Output = Result<(), ModelError>;
+    type Output = Result<(), UnresolveActionError>;
     async fn handle(&self, component: &Arc<ComponentInstance>) -> Self::Output {
         do_unresolve(component).await
     }
@@ -38,85 +36,55 @@ impl Action for UnresolveAction {
     }
 }
 
-// Check the component state for applicability of the UnresolveAction. Return Ok(true) if the
-// component is Discovered so UnresolveAction can early-return. Return Ok(false) if the component is
-// resolved so UnresolveAction can proceed. Return an error if the component is running or in an
-// incompatible state.
-async fn check_state(component: &Arc<ComponentInstance>) -> Result<bool, ModelError> {
-    if component.lock_execution().await.runtime.is_some() {
-        return Err(ModelError::from(ComponentInstanceError::unresolve_failed(
-            component.abs_moniker.clone(),
-            anyhow!("component was running"),
-        )));
-    }
-    match *component.lock_state().await {
-        InstanceState::Unresolved => return Ok(true),
-        InstanceState::Resolved(_) => return Ok(false),
-        _ => {}
-    }
-
-    Err(ModelError::from(ComponentInstanceError::unresolve_failed(
-        component.abs_moniker.clone(),
-        anyhow!("component was not discovered or resolved"),
-    )))
-}
-
-async fn unresolve_resolved_children(component: &Arc<ComponentInstance>) -> Result<(), ModelError> {
-    let mut resolved_children: Vec<Arc<ComponentInstance>> = vec![];
-    {
-        let state = component.lock_resolved_state().await?;
-        // Collect only the resolved children. It is not required that all children are resolved for
-        // successful recursion. It's also unnecessary to unresolve components that are not
-        // resolved, so don't include them.
-        for (_, child_instance) in state.children() {
-            let child_state = child_instance.lock_state().await;
-            if matches!(*child_state, InstanceState::Resolved(_)) {
-                resolved_children.push(child_instance.clone());
-            }
-        }
-    };
-    // Unresolve the children before unresolving the component because removing the resolved
-    // state removes the ChildInstanceState that contains the list of children.
-    for instance in resolved_children {
-        ActionSet::register(instance.clone(), UnresolveAction::new()).await?;
-    }
-    Ok(())
-}
-
 // Implement the UnresolveAction by resetting the state from unresolved to unresolved and emitting
 // an Unresolved event. Unresolve the component's resolved children if any.
-async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ModelError> {
+async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), UnresolveActionError> {
     // Shut down the component, preventing new starts or resolves during the UnresolveAction.
     ActionSet::register(component.clone(), ShutdownAction::new()).await?;
 
-    if check_state(&component).await? {
-        return Ok(());
+    if component.lock_execution().await.runtime.is_some() {
+        return Err(UnresolveActionError::InstanceRunning {
+            moniker: component.abs_moniker.clone(),
+        });
     }
 
-    unresolve_resolved_children(&component).await?;
+    let children: Vec<Arc<ComponentInstance>> = {
+        match *component.lock_state().await {
+            InstanceState::Resolved(ref s) => s.children().map(|(_, c)| c.clone()).collect(),
+            InstanceState::Destroyed => {
+                return Err(UnresolveActionError::InstanceDestroyed {
+                    moniker: component.abs_moniker.clone(),
+                })
+            }
+            InstanceState::Unresolved | InstanceState::New => return Ok(()),
+        }
+    };
+
+    // Unresolve the children before unresolving the component because removing the resolved
+    // state removes the ChildInstanceState that contains the list of children.
+    for child in children {
+        ActionSet::register(child, UnresolveAction::new()).await?;
+    }
 
     // Move the component back to the Discovered state. We can't use a DiscoverAction for this
     // change because the system allows and does call DiscoverAction on resolved components with
     // the expectation that they will return without changing the instance state to Discovered.
     // The state may have changed during the time taken for the recursions, so recheck here.
-    // TODO(fxbug.dev/100544): Investigate and change to DiscoverAction.
-    let success = {
+    {
         let mut state = component.lock_state().await;
         match &*state {
             InstanceState::Resolved(_) => {
                 state.set(InstanceState::Unresolved);
                 true
             }
-            _ => false,
+            InstanceState::Destroyed => {
+                return Err(UnresolveActionError::InstanceDestroyed {
+                    moniker: component.abs_moniker.clone(),
+                })
+            }
+            InstanceState::Unresolved | InstanceState::New => return Ok(()),
         }
     };
-
-    if !success {
-        return Err(ModelError::from(ComponentInstanceError::unresolve_failed(
-            component.abs_moniker.clone(),
-            anyhow!("state change failed in UnresolveAction"),
-        )));
-    }
 
     // The component was shut down, so won't start. Re-enable it.
     component.lock_execution().await.reset_shut_down();
@@ -132,8 +100,8 @@ pub mod tests {
         crate::model::{
             actions::test_utils::{is_destroyed, is_discovered, is_executing, is_resolved},
             actions::{ActionSet, ShutdownAction, UnresolveAction},
-            component::{ComponentInstance, InstanceState, StartReason},
-            error::ModelError,
+            component::{ComponentInstance, StartReason},
+            error::UnresolveActionError,
             events::{registry::EventSubscription, stream::EventStream},
             hooks::EventType,
             testing::test_helpers::{component_decl_with_test_runner, ActionsTest},
@@ -141,8 +109,7 @@ pub mod tests {
         assert_matches::assert_matches,
         cm_rust_testing::{CollectionDeclBuilder, ComponentDeclBuilder},
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
-        moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker},
-        routing::error::ComponentInstanceError,
+        moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
         std::sync::Arc,
     };
 
@@ -370,9 +337,7 @@ pub mod tests {
         // the collection is stopped. Then it's an error to unresolve a Destroyed component.
         assert_matches!(
             ActionSet::register(component_a.clone(), UnresolveAction::new()).await,
-            Err(ModelError::ComponentInstanceError {
-                err: ComponentInstanceError::UnresolveFailed { .. }
-            })
+            Err(UnresolveActionError::InstanceDestroyed { .. })
         );
         // Still Destroyed.
         assert!(is_destroyed(&component_a).await);
@@ -389,53 +354,5 @@ pub mod tests {
     #[fuchsia::test]
     async fn unresolve_action_on_single_run_collection() {
         test_collection(fdecl::Durability::SingleRun).await;
-    }
-
-    /// Check unresolve on a new component. The system has a root with the child `a`.
-    #[fuchsia::test]
-    async fn unresolve_action_fails_on_new_component() {
-        let components = vec![("root", ComponentDeclBuilder::new().build())];
-        let test = ActionsTest::new("root", components, None).await;
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
-        // This setup circumvents the registration of the Discover action on component_a.
-        {
-            let mut resolved_state = component_root.lock_resolved_state().await.unwrap();
-            let child = cm_rust::ChildDecl {
-                name: format!("a"),
-                url: format!("test:///a"),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-            };
-            assert!(resolved_state.add_child_no_discover(&component_root, &child, None).is_ok());
-        }
-
-        let component_root = test.look_up(AbsoluteMoniker::root()).await;
-        let component_a = match *component_root.lock_state().await {
-            InstanceState::Resolved(ref s) => s
-                .get_child(&ChildMoniker::try_from("a").unwrap())
-                .expect("child a not found")
-                .clone(),
-            _ => panic!("not resolved"),
-        };
-
-        // Confirm component is still in New state.
-        {
-            let state = &*component_a.lock_state().await;
-            assert_matches!(state, InstanceState::New);
-        };
-
-        // Try to unresolve, but it's an error to unresolve a New component.
-        assert_matches!(
-            ActionSet::register(component_a.clone(), UnresolveAction::new()).await,
-            Err(ModelError::ComponentInstanceError {
-                err: ComponentInstanceError::UnresolveFailed { .. }
-            })
-        );
-        // Still new.
-        {
-            let state = &*component_a.lock_state().await;
-            assert_matches!(state, InstanceState::New);
-        };
     }
 }
