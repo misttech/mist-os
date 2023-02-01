@@ -8,7 +8,7 @@ use {
     crate::model::{
         actions::{ActionSet, StopAction},
         component::{ComponentInstance, StartReason, WeakComponentInstance},
-        error::{DestroyActionError, ModelError, StartActionError},
+        error::ModelError,
         hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
         model::Model,
         storage::admin_protocol::StorageAdmin,
@@ -97,7 +97,7 @@ impl LifecycleController {
         let instance = self.model.find(&moniker).await.ok_or(fsys::StopError::InstanceNotFound)?;
         ActionSet::register(instance.clone(), StopAction::new(false)).await.map_err(|error| {
             warn!(%moniker, %error, "failed to stop instance");
-            fsys::StopError::Internal
+            error.into()
         })?;
         Ok(())
     }
@@ -167,12 +167,9 @@ impl LifecycleController {
         let child_moniker = ChildMoniker::try_new(&child.name, child.collection.as_ref())
             .map_err(|_| fsys::DestroyError::BadChildRef)?;
 
-        parent_component.remove_dynamic_child(&child_moniker).await.map_err(|e| match e {
-            DestroyActionError::InstanceNotFound { .. } => fsys::DestroyError::InstanceNotFound,
-            error => {
-                warn!(%parent_moniker, %child_moniker, %error, "failed to destroy dynamic child");
-                fsys::DestroyError::Internal
-            }
+        parent_component.remove_dynamic_child(&child_moniker).await.map_err(|error| {
+            warn!(%parent_moniker, %error, "failed to destroy dynamic child");
+            error.into()
         })
     }
 
@@ -485,11 +482,10 @@ mod deprecated {
     ) -> Result<fsys::StartResult, fcomponent::Error> {
         let moniker = join_monikers(scope_moniker, &moniker)?;
         let component = model.find(&moniker).await.ok_or(fcomponent::Error::InstanceNotFound)?;
-        let res =
-            component.start(&StartReason::Debug).await.map_err(|error: StartActionError| {
-                warn!(%moniker, ?error, "LifecycleController could not start instance");
-                fcomponent::Error::InstanceCannotStart
-            })?;
+        let res = component.start(&StartReason::Debug).await.map_err(|error| {
+            warn!(%moniker, ?error, "LifecycleController could not start instance");
+            fcomponent::Error::InstanceCannotStart
+        })?;
         Ok(res)
     }
 

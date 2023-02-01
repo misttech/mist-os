@@ -569,6 +569,13 @@ pub enum StopActionError {
     DestroyDynamicChildrenFailed { err: DestroyActionError },
 }
 
+// This is implemented for fuchsia.sys2.LifecycleController protocol.
+impl Into<fsys::StopError> for StopActionError {
+    fn into(self) -> fsys::StopError {
+        fsys::StopError::Internal
+    }
+}
+
 #[cfg(test)]
 impl PartialEq for StopActionError {
     fn eq(&self, other: &Self) -> bool {
@@ -636,6 +643,16 @@ impl Into<fcomponent::Error> for DestroyActionError {
         match self {
             DestroyActionError::InstanceNotFound { .. } => fcomponent::Error::InstanceNotFound,
             _ => fcomponent::Error::Internal,
+        }
+    }
+}
+
+// This is implemented for fuchsia.sys2.LifecycleController protocol.
+impl Into<fsys::DestroyError> for DestroyActionError {
+    fn into(self) -> fsys::DestroyError {
+        match self {
+            DestroyActionError::InstanceNotFound { .. } => fsys::DestroyError::InstanceNotFound,
+            _ => fsys::DestroyError::Internal,
         }
     }
 }
