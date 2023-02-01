@@ -2,34 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        common::{
-            cmd::{ManifestParams, OemFile},
-            file::*,
-        },
-        manifest::{from_in_tree, from_path, from_sdk},
-        sparse::build_sparse_files,
+use crate::{
+    common::{
+        cmd::{ManifestParams, OemFile},
+        file::*,
     },
-    anyhow::{anyhow, bail, Context, Error, Result},
-    async_trait::async_trait,
-    chrono::{DateTime, Duration, Utc},
-    errors::ffx_bail,
-    fidl::{
-        endpoints::{create_endpoints, ServerEnd},
-        Error as FidlError,
-    },
-    fidl_fuchsia_developer_ffx::{
-        FastbootProxy, RebootError, RebootListenerMarker, RebootListenerRequest,
-        UploadProgressListenerMarker, UploadProgressListenerRequest,
-    },
-    futures::prelude::*,
-    futures::try_join,
-    sdk::SdkVersion,
-    std::convert::Into,
-    std::io::Write,
-    termion::{color, style},
+    manifest::{from_in_tree, from_path, from_sdk},
+    sparse::build_sparse_files,
 };
+use anyhow::{anyhow, bail, Context, Error, Result};
+use async_trait::async_trait;
+use chrono::{DateTime, Duration, Utc};
+use errors::ffx_bail;
+use fidl::{
+    endpoints::{create_endpoints, ServerEnd},
+    Error as FidlError,
+};
+use fidl_fuchsia_developer_ffx::{
+    FastbootProxy, RebootError, RebootListenerMarker, RebootListenerRequest,
+    UploadProgressListenerMarker, UploadProgressListenerRequest,
+};
+use futures::prelude::*;
+use futures::try_join;
+use sdk::SdkVersion;
+use std::convert::Into;
+use std::io::Write;
+use termion::{color, style};
 
 pub const MISSING_CREDENTIALS: &str =
     "The flash manifest is missing the credential files to unlock this device.\n\
@@ -238,6 +236,7 @@ pub async fn stage_file<W: Write, F: FileResolver + Sync>(
     })
 }
 
+#[tracing::instrument(skip(writer))]
 async fn do_flash<W: Write>(
     writer: &mut W,
     name: &str,
@@ -265,6 +264,7 @@ async fn do_flash<W: Write>(
     })
 }
 
+#[tracing::instrument(skip(writer))]
 async fn flash_partition_sparse<W: Write>(
     writer: &mut W,
     name: &str,
@@ -292,6 +292,7 @@ async fn flash_partition_sparse<W: Write>(
     Ok(())
 }
 
+#[tracing::instrument(skip(writer, file_resolver))]
 pub async fn flash_partition<W: Write, F: FileResolver + Sync>(
     writer: &mut W,
     file_resolver: &mut F,
@@ -383,6 +384,7 @@ pub async fn verify_variable_value(
         .map(|res| res == value)
 }
 
+#[tracing::instrument(skip(writer))]
 pub async fn reboot_bootloader<W: Write>(
     writer: &mut W,
     fastboot_proxy: &FastbootProxy,
@@ -482,6 +484,7 @@ pub async fn stage_oem_files<W: Write, F: FileResolver + Sync>(
     Ok(())
 }
 
+#[tracing::instrument(skip(writer, file_resolver, partitions))]
 pub async fn flash_partitions<W: Write, F: FileResolver + Sync, P: Partition>(
     writer: &mut W,
     file_resolver: &mut F,
@@ -517,6 +520,7 @@ pub async fn flash_partitions<W: Write, F: FileResolver + Sync, P: Partition>(
     Ok(())
 }
 
+#[tracing::instrument(skip(writer, file_resolver, product, cmd))]
 pub async fn flash<W, F, Part, P>(
     writer: &mut W,
     file_resolver: &mut F,
@@ -541,6 +545,7 @@ pub async fn is_userspace_fastboot(fastboot_proxy: &FastbootProxy) -> Result<boo
     }
 }
 
+#[tracing::instrument(skip(file_resolver, writer, cmd, product))]
 pub async fn flash_bootloader<W, F, Part, P>(
     writer: &mut W,
     file_resolver: &mut F,
@@ -565,6 +570,7 @@ where
     Ok(())
 }
 
+#[tracing::instrument(skip(writer, file_resolver, cmd, product))]
 pub async fn flash_product<W, F, Part, P>(
     writer: &mut W,
     file_resolver: &mut F,
@@ -587,6 +593,7 @@ where
     stage_oem_files(writer, file_resolver, true, product.oem_files(), fastboot_proxy).await
 }
 
+#[tracing::instrument(skip(writer, file_resolver, cmd, product))]
 pub async fn flash_and_reboot<W, F, Part, P>(
     writer: &mut W,
     file_resolver: &mut F,

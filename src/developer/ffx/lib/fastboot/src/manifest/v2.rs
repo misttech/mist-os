@@ -2,23 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::{
-        common::{
-            cmd::ManifestParams, crypto::unlock_device, file::FileResolver, finish,
-            flash_bootloader, flash_product, is_locked, lock_device, verify_hardware, Boot, Flash,
-            Unlock, MISSING_CREDENTIALS, MISSING_PRODUCT,
-        },
-        manifest::v1::FlashManifest as FlashManifestV1,
-        unlock::unlock,
+use crate::{
+    common::{
+        cmd::ManifestParams, crypto::unlock_device, file::FileResolver, finish, flash_bootloader,
+        flash_product, is_locked, lock_device, verify_hardware, Boot, Flash, Unlock,
+        MISSING_CREDENTIALS, MISSING_PRODUCT,
     },
-    anyhow::Result,
-    async_trait::async_trait,
-    errors::ffx_bail,
-    fidl_fuchsia_developer_ffx::FastbootProxy,
-    serde::{Deserialize, Serialize},
-    std::io::Write,
+    manifest::v1::FlashManifest as FlashManifestV1,
+    unlock::unlock,
 };
+use anyhow::Result;
+use async_trait::async_trait;
+use errors::ffx_bail;
+use fidl_fuchsia_developer_ffx::FastbootProxy;
+use serde::{Deserialize, Serialize};
+use std::io::Write;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct FlashManifest {
@@ -31,6 +29,7 @@ pub struct FlashManifest {
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
+    #[tracing::instrument(skip(self, writer, file_resolver, cmd))]
     async fn flash<W, F>(
         &self,
         writer: &mut W,

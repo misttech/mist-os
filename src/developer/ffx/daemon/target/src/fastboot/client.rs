@@ -29,7 +29,7 @@ use {
 };
 
 /// Timeout in seconds to wait for target after a reboot to fastboot mode
-const FASTBOOT_REBOOT_RECONNECT_TIMEOUT : &str = "fastboot.reboot.reconnect_timeout";
+const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
 
 const ADMIN_SELECTOR: &str =
     "bootstrap/power_manager:expose:fuchsia.hardware.power.statecontrol.Admin";

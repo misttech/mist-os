@@ -86,6 +86,7 @@ pub struct FlashManifest(pub Vec<Product>);
 
 #[async_trait(?Send)]
 impl Flash for FlashManifest {
+    #[tracing::instrument(skip(writer, file_resolver, cmd))]
     async fn flash<W, F>(
         &self,
         writer: &mut W,

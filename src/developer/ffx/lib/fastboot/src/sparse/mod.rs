@@ -2,16 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    core::fmt,
-    serde::Serialize,
-    std::fs::File,
-    std::io::{copy, Cursor, Read, SeekFrom, Write},
-    std::mem,
-    std::path::Path,
-    tempfile::{NamedTempFile, TempPath},
-};
+use anyhow::Result;
+use core::fmt;
+use serde::Serialize;
+use std::fs::File;
+use std::io::{copy, Cursor, Read, SeekFrom, Write};
+use std::mem;
+use std::path::Path;
+use tempfile::{NamedTempFile, TempPath};
 
 /// `SparseHeader` represents the header section of a `SparseFile`
 #[derive(Serialize)]
@@ -254,6 +252,7 @@ impl SparseFile {
         self.chunks.iter().map(|c| c.output_blocks()).sum()
     }
 
+    #[tracing::instrument(skip(self, reader, writer))]
     fn write<W: Write, R: Read + std::io::Seek>(
         &self,
         reader: &mut R,
@@ -334,6 +333,7 @@ fn add_sparse_chunk(r: &mut Vec<Chunk>, chunk: Chunk) -> Result<()> {
 /// size will not exceed the maximum_download_size.
 ///
 /// This will return an error if max_download_size is <= BLK_SIZE
+#[tracing::instrument]
 fn resparse(sparse_file: SparseFile, max_download_size: u64) -> Result<Vec<SparseFile>> {
     if max_download_size as usize <= BLK_SIZE {
         anyhow::bail!(
@@ -413,6 +413,7 @@ fn resparse(sparse_file: SparseFile, max_download_size: u64) -> Result<Vec<Spars
 /// * `file_to_upload` - Path to the file to translate to sparse image format.
 /// * `dir` - Path to write the Sparse file(s).
 /// * `max_download_size` - Maximum size that can be downloaded by the device.
+#[tracing::instrument(skip(writer))]
 pub async fn build_sparse_files<W: Write>(
     writer: &mut W,
     name: &str,
@@ -431,7 +432,9 @@ pub async fn build_sparse_files<W: Write>(
     let mut in_file = File::open(file_to_upload)?;
 
     let mut total_read: usize = 0;
-    let mut chunks = Vec::<Chunk>::new();
+    // Preallocate vector to avoid reallocations as it grows.
+    let mut chunks =
+        Vec::<Chunk>::with_capacity((in_file.metadata()?.len() as usize / BLK_SIZE) + 1);
     let mut buf = [0u8; BLK_SIZE];
     loop {
         let read = in_file.read(&mut buf)?;
