@@ -1743,7 +1743,7 @@
                   "isRequiredPositional": false,
                   "name": "dumpDirectory",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 }
               },
               "name": "Dump",
@@ -1788,7 +1788,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "createFile",
-              "returnType": "File",
+              "returnType": "File?",
               "type": "MethodDeclarationImpl"
             },
             "hasDumpDirectory": {
@@ -1838,7 +1838,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "openForWrite",
-              "returnType": "IOSink",
+              "returnType": "IOSink?",
               "type": "MethodDeclarationImpl"
             },
             "writeAsBytes": {
@@ -1892,7 +1892,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "writeAsBytes",
-              "returnType": "Future<File>",
+              "returnType": "Future<File?>",
               "type": "MethodDeclarationImpl"
             },
             "writeAsString": {
@@ -1946,7 +1946,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "writeAsString",
-              "returnType": "Future<File>",
+              "returnType": "Future<File?>",
               "type": "MethodDeclarationImpl"
             }
           },

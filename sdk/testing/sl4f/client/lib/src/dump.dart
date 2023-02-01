@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:io';
 
@@ -27,7 +26,7 @@ class Dump {
   ///
   /// This may be null if it's neither passed nor set in the environment, in
   /// which case no dumps are written.
-  final String _dumpDirectory;
+  final String? _dumpDirectory;
 
   /// Construct a Dump object which writes files to [dumpDirectory].
   ///
@@ -45,18 +44,18 @@ class Dump {
   /// ambiguous, because it's not clear relative to what. It would normally be
   /// the current working directory, but other relative paths in this library
   /// are resolved relative to the location of the binary.
-  Dump([String dumpDirectory])
+  Dump([String? dumpDirectory])
       : _dumpDirectory = _notEmptyString(dumpDirectory)
             ? dumpDirectory
             : Platform.environment[_dumpDirectoryEnvVar] {
     if (hasDumpDirectory) {
       // See explanation above. Relative path would be ambiguous.
-      if (!_dumpDirectory.startsWith('/')) {
+      if (!_dumpDirectory!.startsWith('/')) {
         throw ArgumentError.value(_dumpDirectory, 'Must be absolute path');
       }
 
       // Has to use sync operations because this is a constructor.
-      final directory = Directory(_dumpDirectory);
+      final directory = Directory(_dumpDirectory!);
       if (!directory.existsSync()) {
         // Try to create the directory. This will throw if it fails to create
         // the directory.
@@ -70,7 +69,8 @@ class Dump {
   /// no dump directory is configured.
   ///
   /// Returns the [File] object of the newly created file.
-  Future<File> writeAsBytes(String name, String suffix, List<int> bytes) {
+  Future<File?> writeAsBytes(
+      String name, String suffix, List<int> bytes) async {
     final file = createFile(name, suffix);
     _log.info('writeAsBytes to file: ${file?.path}');
     return file?.writeAsBytes(bytes);
@@ -81,19 +81,20 @@ class Dump {
   /// no dump directory is configured.
   ///
   /// Returns the [File] object of the newly created file.
-  Future<File> writeAsString(String name, String suffix, String contents) =>
+  Future<File?> writeAsString(
+          String name, String suffix, String contents) async =>
       createFile(name, suffix)?.writeAsString(contents);
 
   /// Opens the appropriate file for writing.
   ///
   /// Returns the [IOSink] object of the newly created file for writing.
-  IOSink openForWrite(String name, String suffix) =>
+  IOSink? openForWrite(String name, String suffix) =>
       createFile(name, suffix)?.openWrite();
 
   /// Creates a file in the dump directory.
   ///
   /// Returns null if dump directory is invalid.
-  File createFile(String name, String suffix) {
+  File? createFile(String name, String suffix) {
     if (!hasDumpDirectory) {
       return null;
     }
@@ -107,6 +108,6 @@ class Dump {
   /// object.
   bool get hasDumpDirectory => _notEmptyString(_dumpDirectory);
 
-  static bool _notEmptyString(final String value) =>
+  static bool _notEmptyString(final String? value) =>
       value != null && value.isNotEmpty;
 }
