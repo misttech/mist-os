@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "mock/mock_mmio.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 #include "src/graphics/drivers/msd-arm-mali/src/registers.h"

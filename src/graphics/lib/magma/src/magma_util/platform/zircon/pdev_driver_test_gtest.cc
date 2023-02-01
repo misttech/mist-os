@@ -9,14 +9,24 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "magma_util/dlog.h"
+
+namespace {
+std::unique_ptr<magma::PlatformDevice> platform_device_s;
+void* test_device_s;
+}  // namespace
+
+magma::PlatformDevice* TestPlatformDevice::GetInstance() { return platform_device_s.get(); }
+
+void* GetTestDeviceHandle() { return test_device_s; }
 
 zx_status_t magma_indriver_test(zx_device_t* device) {
   DLOG("running magma unit tests");
-  TestPlatformDevice::SetInstance(magma::PlatformDevice::Create(device));
-  SetTestDeviceHandle(device);
-  const int kArgc = 3;
-  const char* argv[kArgc] = {"magma_indriver_test", "--gtest_filter=-PlatformPci*.*"};
+  platform_device_s = magma::PlatformDevice::Create(device);
+  test_device_s = device;
+  const int kArgc = 1;
+  const char* argv[kArgc + 1] = {"magma_indriver_test"};
   testing::InitGoogleTest(const_cast<int*>(&kArgc), const_cast<char**>(argv));
 
   printf("[DRV START=]\n");

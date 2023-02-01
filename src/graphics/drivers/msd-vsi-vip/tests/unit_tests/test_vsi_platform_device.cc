@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_platform_device.h"
 
 TEST(VsiPlatformDevice, ExternalSram) {

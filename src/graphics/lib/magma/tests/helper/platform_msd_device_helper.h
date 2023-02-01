@@ -1,0 +1,12 @@
+// Copyright 2016 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_MSD_DEVICE_HELPER_H_
+#define SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_MSD_DEVICE_HELPER_H_
+
+// Gets the handle that can be passed to msd::CreateDevice. This function must be implemented by the
+// MSD.
+void* GetTestDeviceHandle();
+
+#endif  // SRC_GRAPHICS_LIB_MAGMA_TESTS_HELPER_PLATFORM_MSD_DEVICE_HELPER_H_

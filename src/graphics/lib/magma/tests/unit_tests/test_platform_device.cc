@@ -95,3 +95,27 @@ TEST(PlatformDevice, FirmwareLoader) {
   EXPECT_NE(nullptr, buffer.get());
   EXPECT_EQ(59u, size);
 }
+
+TEST(PlatformDevice, RegisterInterrupt) {
+  magma::PlatformDevice* platform_device = TestPlatformDevice::GetInstance();
+  ASSERT_NE(platform_device, nullptr);
+
+  // Less than 100 interrupts should be assigned to this driver.
+  auto interrupt = platform_device->RegisterInterrupt(100);
+  EXPECT_EQ(nullptr, interrupt);
+
+  uint32_t index = 0;
+  interrupt = platform_device->RegisterInterrupt(index);
+  ASSERT_NE(nullptr, interrupt);
+
+  std::thread thread([interrupt_raw = interrupt.get()] {
+    DLOG("waiting for interrupt");
+    interrupt_raw->Wait();
+    DLOG("returned from interrupt");
+  });
+
+  interrupt->Signal();
+
+  DLOG("waiting for thread");
+  thread.join();
+}

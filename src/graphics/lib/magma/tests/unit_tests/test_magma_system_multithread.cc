@@ -9,7 +9,7 @@
 
 #include <gtest/gtest.h>
 
-#include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "sys_driver/magma_driver.h"
 #include "sys_driver/magma_system_connection.h"
 #include "sys_driver/magma_system_context.h"

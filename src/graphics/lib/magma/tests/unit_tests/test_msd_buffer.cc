@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "msd.h"
 #include "platform_buffer.h"
 

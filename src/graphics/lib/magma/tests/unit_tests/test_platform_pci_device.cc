@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <thread>
+
 #include <gtest/gtest.h>
 
-#include "helper/platform_device_helper.h"
+#include "helper/platform_pci_device_helper.h"
 #include "platform_pci_device.h"
 
 TEST(PlatformPciDevice, Basic) {
@@ -34,4 +36,24 @@ TEST(PlatformPciDevice, MapMmio) {
   // Map again different policy - this is now permitted though it's a bad idea.
   auto mmio3 = platform_device->CpuMapPciMmio(pci_bar, magma::PlatformMmio::CACHE_POLICY_UNCACHED);
   EXPECT_TRUE(mmio3);
+}
+
+TEST(PlatformPciDevice, RegisterInterrupt) {
+  magma::PlatformPciDevice* platform_device = TestPlatformPciDevice::GetInstance();
+  ASSERT_NE(platform_device, nullptr);
+
+  auto interrupt = platform_device->RegisterInterrupt();
+  // Interrupt may be null if no core device support.
+  if (interrupt) {
+    std::thread thread([interrupt_raw = interrupt.get()] {
+      DLOG("waiting for interrupt");
+      interrupt_raw->Wait();
+      DLOG("returned from interrupt");
+    });
+
+    interrupt->Signal();
+
+    DLOG("waiting for thread");
+    thread.join();
+  }
 }

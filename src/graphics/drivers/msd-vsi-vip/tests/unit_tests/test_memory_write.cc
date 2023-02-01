@@ -16,6 +16,7 @@ int etnaviv_cl_test_gc7000(int argc, char* argv[]);
 #include <gtest/gtest.h>
 
 #include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "magma_util/macros.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/address_space.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/command_buffer.h"

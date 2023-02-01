@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-#include "helper/platform_device_helper.h"
+#include "helper/platform_pci_device_helper.h"
 #include "msd_intel_device.h"
 #include "src/graphics/drivers/msd-intel-gen/include/magma_intel_gen_defs.h"
 #include "test_command_buffer.h"

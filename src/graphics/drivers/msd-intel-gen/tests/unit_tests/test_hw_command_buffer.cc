@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 #include <helper/command_buffer_helper.h>
-#include <helper/platform_device_helper.h>
+#include <helper/platform_pci_device_helper.h>
 #include <mock/fake_address_space.h>
 #include <mock/mock_bus_mapper.h>
 

@@ -7,7 +7,7 @@
 #include <gtest/gtest.h>
 
 #include "device_request.h"
-#include "helper/platform_device_helper.h"
+#include "helper/platform_pci_device_helper.h"
 #include "mock/mock_mmio.h"
 #include "msd_intel_device.h"
 #include "registers.h"

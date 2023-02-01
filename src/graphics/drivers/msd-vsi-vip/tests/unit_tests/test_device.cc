@@ -8,6 +8,7 @@
 #include <gtest/gtest.h>
 
 #include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "magma_vendor_queries.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/address_space.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/address_space_layout.h"

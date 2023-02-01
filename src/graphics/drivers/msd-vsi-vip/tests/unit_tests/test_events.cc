@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 
 #include <assert.h>
+
 #include <limits>
+
 #include <gtest/gtest.h>
 
-#include "helper/platform_device_helper.h"
+#include "helper/platform_msd_device_helper.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/instructions.h"
 #include "src/graphics/drivers/msd-vsi-vip/src/msd_vsi_device.h"
 #include "src/graphics/drivers/msd-vsi-vip/tests/mock/mock_mapped_batch.h"

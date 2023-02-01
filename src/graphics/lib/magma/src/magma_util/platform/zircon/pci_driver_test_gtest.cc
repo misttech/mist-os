@@ -4,18 +4,30 @@
 
 #define MAGMA_DLOG_ENABLE 1
 
-#include <gtest/gtest.h>
 #include <zircon/types.h>
 
-#include "helper/platform_device_helper.h"
+#include <gtest/gtest.h>
+
+#include "helper/platform_msd_device_helper.h"
+#include "helper/platform_pci_device_helper.h"
 #include "magma_util/dlog.h"
 
-zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_device) {
+namespace {
+magma::PlatformPciDevice* platform_pci_device_s = nullptr;
+
+void* test_device_s = nullptr;
+}  // namespace
+
+magma::PlatformPciDevice* TestPlatformPciDevice::GetInstance() { return platform_pci_device_s; }
+
+void* GetTestDeviceHandle() { return test_device_s; }
+
+zx_status_t magma_indriver_test(magma::PlatformPciDevice* platform_pci_device) {
   DLOG("running magma unit tests");
-  TestPlatformPciDevice::SetInstance(platform_device);
-  SetTestDeviceHandle(platform_device->GetDeviceHandle());
-  const int kArgc = 3;
-  const char* argv[kArgc] = {"magma_indriver_test", "--gtest_filter=-PlatformDevice*.*"};
+  platform_pci_device_s = platform_pci_device;
+  test_device_s = platform_pci_device->GetDeviceHandle();
+  const int kArgc = 1;
+  const char* argv[kArgc + 1] = {"magma_indriver_test"};
   testing::InitGoogleTest(const_cast<int*>(&kArgc), const_cast<char**>(argv));
 
   printf("[DRV START=]\n");

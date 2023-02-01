@@ -35,7 +35,7 @@ fuchsia_driver("msd_arm_test-driver") {
     "src",
     "tests/unit_tests:tests_requiring_hardware",
     "//src/graphics/lib/magma/src/magma_util/platform:logger_for_system_drivers",
-    "//src/graphics/lib/magma/tests/unit_tests:magma_platform_hardware_tests",
+    "//src/graphics/lib/magma/tests/unit_tests:magma_platform_device_tests",
     "//src/graphics/lib/magma/tests/unit_tests:msd_conformance_tests_cc",
   ]
 }

@@ -55,6 +55,7 @@ source_set("hardware_tests") {
     "../../src",
     "//src/graphics/lib/magma/src/magma_util:mapped_batch",
     "//src/graphics/lib/magma/tests/helper:platform_device_helper",
+    "//src/graphics/lib/magma/tests/helper:platform_msd_device_helper",
     "//third_party/googletest:gtest",
   ]
 }

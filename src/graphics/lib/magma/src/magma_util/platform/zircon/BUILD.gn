@@ -445,7 +445,8 @@ source_set("pci_driver_gtest") {
 
   deps = [
     "$magma_build_root/src/magma_util/platform:device",
-    "$magma_build_root/tests/helper:platform_device_helper",
+    "$magma_build_root/tests/helper:platform_msd_device_helper",
+    "$magma_build_root/tests/helper:platform_pci_device_helper",
     "//third_party/googletest:gtest",
   ]
 }
@@ -457,6 +458,7 @@ source_set("pdev_driver_gtest") {
 
   deps = [
     "$magma_build_root/tests/helper:platform_device_helper",
+    "$magma_build_root/tests/helper:platform_msd_device_helper",
     "//src/lib/ddk",
     "//third_party/googletest:gtest",
   ]
