@@ -8,7 +8,7 @@ use alloc::boxed::Box;
 use core::{marker::PhantomData, num::NonZeroU8, time::Duration};
 
 use net_types::{
-    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{AddrSubnet, GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{BufferMut, EmptyBuf, Serializer};
@@ -35,11 +35,11 @@ use crate::{
                 SlaacStateContext,
             },
             state::{
-                AddrConfig, AddressState, IpDeviceConfiguration, Ipv4DeviceConfiguration,
-                Ipv4DeviceState, Ipv6AddressEntry, Ipv6DeviceConfiguration, Ipv6DeviceState,
-                SlaacConfig,
+                AddrConfig, AddressState, IpDeviceConfiguration, IpDeviceState, IpDeviceStateIpExt,
+                Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddressEntry,
+                Ipv6DeviceConfiguration, Ipv6DeviceState, SlaacConfig,
             },
-            IpDeviceIpExt, IpDeviceNonSyncContext,
+            IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateAccessor,
         },
         gmp::{
             igmp::{IgmpContext, IgmpGroupState, IgmpPacketMetadata},
@@ -443,33 +443,40 @@ impl<
 /// This is functionally identical to using `Iterator::filter_map` on the
 /// provided devices and yielding devices with the address assigned (and the
 /// status), but is named so that it can be used as an associated type.
-pub(crate) struct FilterPresentWithDevices<I: Ip, Devices, SC, C> {
+pub(crate) struct FilterPresentWithDevices<I: Ip, Devices, Accessor, Instant> {
     devices: Devices,
     addr: SpecifiedAddr<I::Addr>,
-    status_source: SC,
-    _marker: PhantomData<C>,
+    state_accessor: Accessor,
+    _marker: PhantomData<Instant>,
 }
 
-impl<I: Ip, Devices, SC, C> FilterPresentWithDevices<I, Devices, SC, C> {
-    fn new(devices: Devices, addr: SpecifiedAddr<I::Addr>, status_source: SC) -> Self {
-        Self { devices, status_source, addr, _marker: PhantomData }
+impl<I: Ip, Devices, Accessor, Instant> FilterPresentWithDevices<I, Devices, Accessor, Instant> {
+    fn new(devices: Devices, state_accessor: Accessor, addr: SpecifiedAddr<I::Addr>) -> Self {
+        Self { devices, addr, state_accessor, _marker: PhantomData }
     }
 }
 
 impl<
-        I: Ip + IpLayerIpExt,
-        Devices: Iterator<Item = SC::DeviceId>,
-        C,
-        SC: ip::IpDeviceContext<I, C>,
-    > Iterator for FilterPresentWithDevices<I, Devices, &'_ SC, C>
+        's,
+        Instant: crate::Instant,
+        I: Ip + IpLayerIpExt + IpDeviceIpExt,
+        Devices: Iterator<Item = Accessor::DeviceId>,
+        Accessor: IpDeviceStateAccessor<I, Instant>,
+    > Iterator for FilterPresentWithDevices<I, Devices, Accessor, Instant>
+where
+    <I as IpDeviceIpExt>::State<Instant>: 's,
 {
-    type Item = (SC::DeviceId, I::AddressStatus);
+    type Item = (Accessor::DeviceId, I::AddressStatus);
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { devices, addr, status_source, _marker } = self;
+        let Self { devices, addr, state_accessor, _marker } = self;
         devices
-            .filter_map(|d| match status_source.address_status_for_device(*addr, &d) {
-                AddressStatus::Present(status) => Some((d, status)),
-                AddressStatus::Unassigned => None,
+            .filter_map(|d| {
+                match state_accessor
+                    .with_ip_device_state(&d, |state| assignment_state(*addr, state))
+                {
+                    AddressStatus::Present(status) => Some((d, status)),
+                    AddressStatus::Unassigned => None,
+                }
             })
             .next()
     }
@@ -493,7 +500,7 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
     }
 
     type DeviceAndAddressStatusIter<'a, 's> =
-        FilterPresentWithDevices<Ipv4, SC::DevicesIter<'a>, &'s Self, C> where
+        FilterPresentWithDevices<Ipv4, SC::DevicesIter<'a>, SC::DeviceStateAccessor<'a>, C::Instant> where
                 Self: 's;
 
     fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
@@ -501,7 +508,9 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         addr: SpecifiedAddr<Ipv4Addr>,
         cb: F,
     ) -> R {
-        self.with_devices(|devices| cb(FilterPresentWithDevices::new(devices, addr, self)))
+        self.with_devices_and_state(|devices, state| {
+            cb(FilterPresentWithDevices::new(devices, state, addr))
+        })
     }
 
     fn address_status_for_device(
@@ -513,30 +522,7 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
             return AddressStatus::Present(Ipv4PresentAddressStatus::LimitedBroadcast);
         }
 
-        self.with_ip_device_state(device_id, |state| {
-            let dev_state = &state.ip_state;
-
-            if MulticastAddr::new(dst_ip.get())
-                .map_or(false, |addr| dev_state.multicast_groups.contains(&addr))
-            {
-                return AddressStatus::Present(Ipv4PresentAddressStatus::Multicast);
-            }
-
-            dev_state
-                .iter_addrs()
-                .find_map(|addr| {
-                    let (addr, subnet) = addr.addr_subnet();
-
-                    if addr == dst_ip {
-                        Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
-                    } else if dst_ip.get() == subnet.broadcast() {
-                        Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
-                    } else {
-                        None
-                    }
-                })
-                .unwrap_or(AddressStatus::Unassigned)
-        })
+        self.with_ip_device_state(device_id, |state| assignment_state_v4(dst_ip, &state.ip_state))
     }
 
     fn is_device_routing_enabled(&self, device_id: &SC::DeviceId) -> bool {
@@ -575,7 +561,7 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
     }
 
     type DeviceAndAddressStatusIter<'a, 's> =
-        FilterPresentWithDevices<Ipv6, SC::DevicesIter<'a>, &'s Self, C> where
+        FilterPresentWithDevices<Ipv6, SC::DevicesIter<'a>, SC::DeviceStateAccessor<'a>, C::Instant> where
                 Self: 's;
 
     fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
@@ -583,7 +569,9 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
         addr: SpecifiedAddr<Ipv6Addr>,
         cb: F,
     ) -> R {
-        self.with_devices(|devices| cb(FilterPresentWithDevices::new(devices, addr, self)))
+        self.with_devices_and_state(|devices, state| {
+            cb(FilterPresentWithDevices::new(devices, state, addr))
+        })
     }
 
     fn address_status_for_device(
@@ -591,27 +579,7 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
         addr: SpecifiedAddr<Ipv6Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<<Ipv6 as IpLayerIpExt>::AddressStatus> {
-        self.with_ip_device_state(device_id, |state| {
-            let dev_state = &state.ip_state;
-
-            if MulticastAddr::new(addr.get())
-                .map_or(false, |addr| dev_state.multicast_groups.contains(&addr))
-            {
-                AddressStatus::Present(Ipv6PresentAddressStatus::Multicast)
-            } else {
-                dev_state.find_addr(&addr).map(|addr| addr.state).map_or(
-                    AddressStatus::Unassigned,
-                    |state| match state {
-                        AddressState::Assigned => {
-                            AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
-                        }
-                        AddressState::Tentative { dad_transmits_remaining: _ } => {
-                            AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
-                        }
-                    },
-                )
-            }
-        })
+        self.with_ip_device_state(device_id, |state| assignment_state_v6(addr, &state.ip_state))
     }
 
     fn is_device_routing_enabled(&self, device_id: &SC::DeviceId) -> bool {
@@ -624,6 +592,75 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
 
     fn get_mtu(&self, device_id: &Self::DeviceId) -> u32 {
         self.get_mtu(device_id)
+    }
+}
+
+fn assignment_state<I: IpLayerIpExt + IpDeviceIpExt, Instant: crate::Instant>(
+    addr: SpecifiedAddr<I::Addr>,
+    state: &impl AsRef<IpDeviceState<Instant, I>>,
+) -> AddressStatus<I::AddressStatus> {
+    let dev_state = state.as_ref();
+    #[derive(GenericOverIp)]
+    struct WrapDeviceState<'a, I: Ip + IpDeviceStateIpExt, Instant: crate::Instant>(
+        &'a IpDeviceState<Instant, I>,
+    );
+
+    #[derive(GenericOverIp)]
+    struct WrapAddressStatus<I: Ip + IpLayerIpExt>(AddressStatus<I::AddressStatus>);
+    let WrapAddressStatus(status) = I::map_ip(
+        (addr, WrapDeviceState(dev_state)),
+        |(addr, WrapDeviceState(state))| WrapAddressStatus(assignment_state_v4(addr, state)),
+        |(addr, WrapDeviceState(state))| WrapAddressStatus(assignment_state_v6(addr, state)),
+    );
+    status
+}
+
+fn assignment_state_v4<Instant: crate::Instant>(
+    addr: SpecifiedAddr<Ipv4Addr>,
+    dev_state: &IpDeviceState<Instant, Ipv4>,
+) -> AddressStatus<Ipv4PresentAddressStatus> {
+    if MulticastAddr::new(addr.get())
+        .map_or(false, |addr| dev_state.multicast_groups.contains(&addr))
+    {
+        return AddressStatus::Present(Ipv4PresentAddressStatus::Multicast);
+    }
+
+    dev_state
+        .iter_addrs()
+        .find_map(|dev_addr| {
+            let (dev_addr, subnet) = dev_addr.addr_subnet();
+
+            if dev_addr == addr {
+                Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
+            } else if addr.get() == subnet.broadcast() {
+                Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
+            } else {
+                None
+            }
+        })
+        .unwrap_or(AddressStatus::Unassigned)
+}
+
+fn assignment_state_v6<Instant: crate::Instant>(
+    addr: SpecifiedAddr<Ipv6Addr>,
+    dev_state: &IpDeviceState<Instant, Ipv6>,
+) -> AddressStatus<Ipv6PresentAddressStatus> {
+    if MulticastAddr::new(addr.get())
+        .map_or(false, |addr| dev_state.multicast_groups.contains(&addr))
+    {
+        AddressStatus::Present(Ipv6PresentAddressStatus::Multicast)
+    } else {
+        dev_state.find_addr(&*addr).map(|addr| addr.state).map_or(
+            AddressStatus::Unassigned,
+            |state| match state {
+                AddressState::Assigned => {
+                    AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
+                }
+                AddressState::Tentative { dad_transmits_remaining: _ } => {
+                    AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
+                }
+            },
+        )
     }
 }
 

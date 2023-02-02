@@ -325,18 +325,28 @@ impl<
 {
 }
 
-/// The execution context for IP devices.
-pub(crate) trait IpDeviceContext<I: IpDeviceIpExt, C: IpDeviceNonSyncContext<I, Self::DeviceId>>:
+/// Accessor for IP device state.
+pub(crate) trait IpDeviceStateAccessor<I: IpDeviceIpExt, Instant>:
     IpDeviceIdContext<I>
-where
-    I::State<C::Instant>: AsRef<IpDeviceState<C::Instant, I>>,
 {
     /// Calls the function with an immutable reference to IP device state.
-    fn with_ip_device_state<O, F: FnOnce(&I::State<C::Instant>) -> O>(
+    fn with_ip_device_state<O, F: FnOnce(&I::State<Instant>) -> O>(
         &self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
+}
+
+/// The execution context for IP devices.
+pub(crate) trait IpDeviceContext<I: IpDeviceIpExt, C: IpDeviceNonSyncContext<I, Self::DeviceId>>:
+    IpDeviceStateAccessor<I, <C as InstantContext>::Instant> + IpDeviceIdContext<I>
+where
+    I::State<C::Instant>: AsRef<IpDeviceState<C::Instant, I>>,
+{
+    type DevicesIter<'s>: Iterator<Item = Self::DeviceId> + 's;
+
+    type DeviceStateAccessor<'s>: IpDeviceStateAccessor<I, C::Instant, DeviceId = Self::DeviceId>
+        + 's;
 
     /// Calls the function with a mutable reference to IP device state.
     fn with_ip_device_state_mut<O, F: FnOnce(&mut I::State<C::Instant>) -> O>(
@@ -345,11 +355,19 @@ where
         cb: F,
     ) -> O;
 
-    type DevicesIter<'s>: Iterator<Item = Self::DeviceId> + 's;
-
     /// Calls the function with an [`Iterator`] of IDs for all initialized
     /// devices.
     fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&self, cb: F) -> O;
+
+    /// Calls the function with an [`Iterator`] of IDs for all initialized
+    /// devices and an accessor for device state.
+    fn with_devices_and_state<
+        O,
+        F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
+    >(
+        &self,
+        cb: F,
+    ) -> O;
 
     /// Gets the MTU for a device.
     ///
@@ -1473,7 +1491,7 @@ mod tests {
                     config.ip_config.ip_enabled = true;
                 });
                 assert_eq!(
-                    IpDeviceContext::<Ipv6, _>::with_ip_device_state(
+                    IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
                         sync_ctx,
                         &device_id,
                         |state| {
@@ -1576,7 +1594,7 @@ mod tests {
             ]
         );
 
-        IpDeviceContext::<Ipv6, _>::with_ip_device_state(&sync_ctx, &device_id, |state| {
+        IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(&sync_ctx, &device_id, |state| {
             assert_empty(state.ip_state.iter_addrs());
         });
 
@@ -1596,15 +1614,19 @@ mod tests {
         )
         .expect("add MAC based IPv6 link-local address");
         assert_eq!(
-            IpDeviceContext::<Ipv6, _>::with_ip_device_state(&sync_ctx, &device_id, |state| {
-                state
-                    .ip_state
-                    .iter_addrs()
-                    .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
-                        addr_sub.ipv6_unicast_addr()
-                    })
-                    .collect::<HashSet<_>>()
-            }),
+            IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
+                &sync_ctx,
+                &device_id,
+                |state| {
+                    state
+                        .ip_state
+                        .iter_addrs()
+                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                            addr_sub.ipv6_unicast_addr()
+                        })
+                        .collect::<HashSet<_>>()
+                }
+            ),
             HashSet::from([ll_addr.ipv6_unicast_addr()])
         );
         assert_eq!(
@@ -1653,15 +1675,19 @@ mod tests {
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
         assert_eq!(
-            IpDeviceContext::<Ipv6, _>::with_ip_device_state(&sync_ctx, &device_id, |state| {
-                state
-                    .ip_state
-                    .iter_addrs()
-                    .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
-                        addr_sub.ipv6_unicast_addr()
-                    })
-                    .collect::<HashSet<_>>()
-            }),
+            IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
+                &sync_ctx,
+                &device_id,
+                |state| {
+                    state
+                        .ip_state
+                        .iter_addrs()
+                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                            addr_sub.ipv6_unicast_addr()
+                        })
+                        .collect::<HashSet<_>>()
+                }
+            ),
             HashSet::from([ll_addr.ipv6_unicast_addr()]),
             "manual addresses should not be removed on device disable"
         );

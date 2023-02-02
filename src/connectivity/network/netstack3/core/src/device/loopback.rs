@@ -272,14 +272,14 @@ mod tests {
         }
 
         test::<Ipv4, _>(&mut sync_ctx, &mut non_sync_ctx, &device, |sync_ctx, device| {
-            crate::ip::device::IpDeviceContext::<Ipv4, _>::with_ip_device_state(
+            crate::ip::device::IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(
                 sync_ctx,
                 device,
                 |state| state.ip_state.iter_addrs().map(AssignedAddress::addr).collect::<Vec<_>>(),
             )
         });
         test::<Ipv6, _>(&mut sync_ctx, &mut non_sync_ctx, &device, |sync_ctx, device| {
-            crate::ip::device::IpDeviceContext::<Ipv6, _>::with_ip_device_state(
+            crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
                 sync_ctx,
                 device,
                 |state| state.ip_state.iter_addrs().map(AssignedAddress::addr).collect::<Vec<_>>(),

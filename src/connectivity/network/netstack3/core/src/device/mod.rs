@@ -52,7 +52,7 @@ use crate::{
                 Ipv6DeviceConfiguration, Ipv6DeviceState,
             },
             BufferIpDeviceContext, DualStackDeviceContext, DualStackDeviceStateRef,
-            IpDeviceContext, Ipv6DeviceContext,
+            IpDeviceContext, IpDeviceStateAccessor, Ipv6DeviceContext,
         },
         types::{AddableEntry, AddableEntryEither},
         DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext,
@@ -272,13 +272,9 @@ impl<'s, I: Instant> Iterator for DevicesIter<'s, I> {
 }
 
 impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
-    fn with_ip_device_state<O, F: FnOnce(&Ipv4DeviceState<NonSyncCtx::Instant>) -> O>(
-        &self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        with_ip_device_state(self, device, |state| cb(&state.ipv4.read()))
-    }
+    type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx::Instant>;
+
+    type DeviceStateAccessor<'s> = &'s SyncCtx<NonSyncCtx>;
 
     fn with_ip_device_state_mut<O, F: FnOnce(&mut Ipv4DeviceState<NonSyncCtx::Instant>) -> O>(
         &mut self,
@@ -288,12 +284,22 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
         with_ip_device_state(self, device, |state| cb(&mut state.ipv4.write()))
     }
 
-    type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx::Instant>;
-
     fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&self, cb: F) -> O {
         let Devices { ethernet, loopback } = &*self.state.device.devices.read();
 
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() })
+    }
+
+    fn with_devices_and_state<
+        O,
+        F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
+    >(
+        &self,
+        cb: F,
+    ) -> O {
+        let Devices { ethernet, loopback } = &*self.state.device.devices.read();
+
+        cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, self)
     }
 
     fn get_mtu(&self, device_id: &Self::DeviceId) -> u32 {
@@ -316,6 +322,18 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
         multicast_addr: MulticastAddr<Ipv4Addr>,
     ) {
         leave_link_multicast_group(self, ctx, device_id, multicast_addr)
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv4, NonSyncCtx::Instant>
+    for &'_ SyncCtx<NonSyncCtx>
+{
+    fn with_ip_device_state<O, F: FnOnce(&Ipv4DeviceState<NonSyncCtx::Instant>) -> O>(
+        &self,
+        device: &DeviceId<NonSyncCtx::Instant>,
+        cb: F,
+    ) -> O {
+        with_ip_device_state(self, device, |state| cb(&state.ipv4.read()))
     }
 }
 
@@ -432,13 +450,9 @@ impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>> BufferIpDeviceContext<Ip
 }
 
 impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
-    fn with_ip_device_state<O, F: FnOnce(&Ipv6DeviceState<NonSyncCtx::Instant>) -> O>(
-        &self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        with_ip_device_state(self, device, |state| cb(&state.ipv6.read()))
-    }
+    type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx::Instant>;
+
+    type DeviceStateAccessor<'s> = &'s SyncCtx<NonSyncCtx>;
 
     fn with_ip_device_state_mut<O, F: FnOnce(&mut Ipv6DeviceState<NonSyncCtx::Instant>) -> O>(
         &mut self,
@@ -448,12 +462,22 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         with_ip_device_state(self, device, |state| cb(&mut state.ipv6.write()))
     }
 
-    type DevicesIter<'s> = DevicesIter<'s, NonSyncCtx::Instant>;
-
     fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&self, cb: F) -> O {
         let Devices { ethernet, loopback } = &*self.state.device.devices.read();
 
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() })
+    }
+
+    fn with_devices_and_state<
+        O,
+        F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
+    >(
+        &self,
+        cb: F,
+    ) -> O {
+        let Devices { ethernet, loopback } = &*self.state.device.devices.read();
+
+        cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, self)
     }
 
     fn get_mtu(&self, device_id: &Self::DeviceId) -> u32 {
@@ -476,6 +500,18 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         multicast_addr: MulticastAddr<Ipv6Addr>,
     ) {
         leave_link_multicast_group(self, ctx, device_id, multicast_addr)
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv6, NonSyncCtx::Instant>
+    for &'_ SyncCtx<NonSyncCtx>
+{
+    fn with_ip_device_state<O, F: FnOnce(&Ipv6DeviceState<NonSyncCtx::Instant>) -> O>(
+        &self,
+        device: &DeviceId<NonSyncCtx::Instant>,
+        cb: F,
+    ) -> O {
+        with_ip_device_state(self, device, |state| cb(&state.ipv6.read()))
     }
 }
 

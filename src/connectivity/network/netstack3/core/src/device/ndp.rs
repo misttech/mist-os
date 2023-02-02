@@ -656,7 +656,7 @@ mod tests {
         device: &DeviceId<FakeInstant>,
         addr: UnicastAddr<Ipv6Addr>,
     ) -> Option<AddressState> {
-        crate::ip::device::IpDeviceContext::<Ipv6, _>::with_ip_device_state(
+        crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
             sync_ctx,
             device,
             |state| state.ip_state.find_addr(&addr).map(|a| a.state),

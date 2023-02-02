@@ -1127,14 +1127,14 @@ mod tests {
     ) -> bool {
         match addr.into() {
             IpAddr::V4(addr) => {
-                crate::ip::device::IpDeviceContext::<Ipv4, _>::with_ip_device_state(
+                crate::ip::device::IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(
                     sync_ctx,
                     device,
                     |state| state.ip_state.iter_addrs().any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
-                crate::ip::device::IpDeviceContext::<Ipv6, _>::with_ip_device_state(
+                crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
                     sync_ctx,
                     device,
                     |state| state.ip_state.iter_addrs().any(|a| a.addr() == addr),
