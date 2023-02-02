@@ -402,6 +402,11 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
                                                {"len", "len"},
                                                {"capacity", "buf.cap"},
                                                {"is_empty", "len == 0"}}));
+  // RawVec is in the inside of a Vec (used for some other containers so we have this pretty-printer
+  // to show the user). The RawVec holds only the capacity and doesn't know its length so typically
+  // contains some uninitialized memory. To avoid misleading data, only show the capacity.
+  rust_.emplace_back(InternalGlob("alloc::raw_vec::RawVec<*>"),
+                     std::make_unique<PrettyStruct>(GetterList{{"capacity", "cap"}}));
 
   // A BinaryHeap is a wrapper around a "Vec" named "data".
   rust_.emplace_back(InternalGlob("alloc::collections::binary_heap::BinaryHeap<*>"),
@@ -434,9 +439,22 @@ void PrettyTypeManager::AddDefaultRustPrettyTypes() {
   rust_.emplace_back(InternalGlob("core::sync::atomic::AtomicPtr<*>"),
                      std::make_unique<PrettyWrappedValue>("AtomicPtr", "{", "}", "v.value"));
 
+  // Remove the type annotations and ancillary data for some common wrapper objects. UnsafeCell is
+  // used for many internal mutable values. ArcInner is what alloc::sync::Arc holds a reference to.
+  rust_.emplace_back(InternalGlob("core::cell::UnsafeCell<*>"),
+                     std::make_unique<PrettyWrappedValue>("UnsafeCell", "{", "}", "value"));
+  rust_.emplace_back(InternalGlob("alloc::sync::ArcInner<*>"),
+                     std::make_unique<PrettyWrappedValue>("ArcInner", "{", "}", "data"));
+  rust_.emplace_back(InternalGlob("lock_api::mutex::Mutex<*>"),
+                     std::make_unique<PrettyWrappedValue>("Mutex", "{", "}", "data.value"));
+
   // Rust's wrapper for zx_status_t
   rust_.emplace_back(InternalGlob("fuchsia_zircon_status::Status"),
                      std::make_unique<PrettyRustZirconStatus>());
+
+  // Channels appear in many places and typically don't contain useful information.
+  rust_.emplace_back(InternalGlob("fuchsia_async::handle::zircon::channel::Channel"),
+                     std::make_unique<PrettyStruct>(GetterList{{"handle", "__0.handle.__0.__0"}}));
 }
 
 void PrettyTypeManager::AddDefaultFuchsiaCppPrettyTypes() {
