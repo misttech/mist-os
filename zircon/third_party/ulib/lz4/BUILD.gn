@@ -35,6 +35,7 @@ zx_library("lz4") {
 
   configs += [
     "//build/config:Wno-implicit-fallthrough",
+    "//build/config:Wno-missing-declarations",
     "//build/config:Wno-missing-prototypes",
   ]
 }
