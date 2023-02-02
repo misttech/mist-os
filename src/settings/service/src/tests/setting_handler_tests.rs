@@ -155,7 +155,6 @@ async fn test_write_notify() {
 
     match blueprint {
         crate::agent::AgentRegistrar::Creator(c) => c.create(agent_context).await,
-        crate::agent::AgentRegistrar::Blueprint(c) => c.create(agent_context).await,
     }
 
     let mut invocation_receptor = invocation_messenger.message(

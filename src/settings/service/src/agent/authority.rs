@@ -63,10 +63,6 @@ impl Authority {
         .await;
 
         let debug_id = match blueprint {
-            AgentRegistrar::Blueprint(blueprint) => {
-                blueprint.create(context).await;
-                blueprint.debug_id()
-            }
             AgentRegistrar::Creator(creator) => {
                 creator.create(context).await;
                 creator.debug_id

@@ -76,18 +76,6 @@ impl PartialEq for Invocation {
     }
 }
 
-/// Blueprint defines an interface provided to the authority for constructing
-/// a given agent.
-pub trait Blueprint {
-    /// Returns a debug id that can be used during error reporting.
-    fn debug_id(&self) -> &'static str;
-
-    /// Uses the supplied context to create agent.
-    fn create(&self, context: Context) -> BoxFuture<'static, ()>;
-}
-
-pub type BlueprintHandle = Arc<dyn Blueprint + Send + Sync>;
-
 pub type AgentFuture = BoxFuture<'static, ()>;
 
 /// Supported types of [Agent] creation functions.
@@ -131,7 +119,6 @@ impl AgentCreator {
 }
 
 pub enum AgentRegistrar {
-    Blueprint(BlueprintHandle),
     Creator(AgentCreator),
 }
 
