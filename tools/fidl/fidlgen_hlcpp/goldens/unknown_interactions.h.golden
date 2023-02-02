@@ -1025,7 +1025,7 @@ class UnknownInteractionsProtocolStrictTwoWayErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictTwoWayErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictTwoWayErrTopResponse>(); }
 
@@ -1192,7 +1192,7 @@ class UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictTwoWayFieldsErrTopResponse>(); }
 
@@ -1417,7 +1417,7 @@ class UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictTwoWayUnionErrTopResponse>(); }
 
@@ -1630,7 +1630,7 @@ class UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictTwoWayTableErrTopResponse>(); }
 
@@ -1795,7 +1795,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleTwoWayTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleTwoWayTopResponse>(); }
 
@@ -1962,7 +1962,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleTwoWayFieldsTopResponse>(); }
 
@@ -2187,7 +2187,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleTwoWayUnionTopResponse>(); }
 
@@ -2400,7 +2400,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleTwoWayTableTopResponse>(); }
 
@@ -2595,7 +2595,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleTwoWayErrTopResponse>(); }
 
@@ -2792,7 +2792,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrTopResponse>(); }
 
@@ -3047,7 +3047,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleTwoWayUnionErrTopResponse>(); }
 
@@ -3290,7 +3290,7 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleTwoWayTableErrTopResponse>(); }
 
@@ -3648,7 +3648,7 @@ class UnknownInteractionsProtocolStrictEventErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictEventErrRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictEventErrRequest>(); }
 
@@ -3815,7 +3815,7 @@ class UnknownInteractionsProtocolStrictEventFieldsErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictEventFieldsErrRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictEventFieldsErrRequest>(); }
 
@@ -4040,7 +4040,7 @@ class UnknownInteractionsProtocolStrictEventUnionErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictEventUnionErrRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictEventUnionErrRequest>(); }
 
@@ -4253,7 +4253,7 @@ class UnknownInteractionsProtocolStrictEventTableErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolStrictEventTableErrRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolStrictEventTableErrRequest>(); }
 
@@ -4611,7 +4611,7 @@ class UnknownInteractionsProtocolFlexibleEventErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleEventErrRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleEventErrRequest>(); }
 
@@ -4778,7 +4778,7 @@ class UnknownInteractionsProtocolFlexibleEventFieldsErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleEventFieldsErrRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleEventFieldsErrRequest>(); }
 
@@ -5003,7 +5003,7 @@ class UnknownInteractionsProtocolFlexibleEventUnionErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleEventUnionErrRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleEventUnionErrRequest>(); }
 
@@ -5216,7 +5216,7 @@ class UnknownInteractionsProtocolFlexibleEventTableErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsProtocolFlexibleEventTableErrRequest> New() { return ::std::make_unique<UnknownInteractionsProtocolFlexibleEventTableErrRequest>(); }
 
@@ -6093,7 +6093,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictTwoWayErrTopResponse>(); }
 
@@ -6260,7 +6260,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrTopResponse>(); }
 
@@ -6485,7 +6485,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrTopResponse>(); }
 
@@ -6698,7 +6698,7 @@ class UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictTwoWayTableErrTopResponse>(); }
 
@@ -7056,7 +7056,7 @@ class UnknownInteractionsAjarProtocolStrictEventErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictEventErrRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictEventErrRequest>(); }
 
@@ -7223,7 +7223,7 @@ class UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictEventFieldsErrRequest>(); }
 
@@ -7448,7 +7448,7 @@ class UnknownInteractionsAjarProtocolStrictEventUnionErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictEventUnionErrRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictEventUnionErrRequest>(); }
 
@@ -7661,7 +7661,7 @@ class UnknownInteractionsAjarProtocolStrictEventTableErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolStrictEventTableErrRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolStrictEventTableErrRequest>(); }
 
@@ -8019,7 +8019,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolFlexibleEventErrRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolFlexibleEventErrRequest>(); }
 
@@ -8186,7 +8186,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolFlexibleEventFieldsErrRequest>(); }
 
@@ -8411,7 +8411,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolFlexibleEventUnionErrRequest>(); }
 
@@ -8624,7 +8624,7 @@ class UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest> New() { return ::std::make_unique<UnknownInteractionsAjarProtocolFlexibleEventTableErrRequest>(); }
 
@@ -9357,7 +9357,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictTwoWayErrTopResponse>(); }
 
@@ -9524,7 +9524,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrTopResponse>(); }
 
@@ -9749,7 +9749,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrTopResponse>(); }
 
@@ -9962,7 +9962,7 @@ class UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictTwoWayTableErrTopResponse>(); }
 
@@ -10320,7 +10320,7 @@ class UnknownInteractionsClosedProtocolStrictEventErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictEventErrRequest> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictEventErrRequest>(); }
 
@@ -10487,7 +10487,7 @@ class UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictEventFieldsErrRequest>(); }
 
@@ -10712,7 +10712,7 @@ class UnknownInteractionsClosedProtocolStrictEventUnionErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictEventUnionErrRequest> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictEventUnionErrRequest>(); }
 
@@ -10925,7 +10925,7 @@ class UnknownInteractionsClosedProtocolStrictEventTableErrRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedProtocolStrictEventTableErrRequest> New() { return ::std::make_unique<UnknownInteractionsClosedProtocolStrictEventTableErrRequest>(); }
 
@@ -11548,7 +11548,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolStrictTwoWayErrTopResponse>(); }
 
@@ -11715,7 +11715,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrTopResponse>(); }
 
@@ -11940,7 +11940,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolStrictTwoWayUnionErrTopResponse>(); }
 
@@ -12153,7 +12153,7 @@ class UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolStrictTwoWayTableErrTopResponse>(); }
 
@@ -12318,7 +12318,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolFlexibleTwoWayTopResponse>(); }
 
@@ -12485,7 +12485,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsTopResponse>(); }
 
@@ -12710,7 +12710,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionTopResponse>(); }
 
@@ -12923,7 +12923,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolFlexibleTwoWayTableTopResponse>(); }
 
@@ -13118,7 +13118,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolFlexibleTwoWayErrTopResponse>(); }
 
@@ -13315,7 +13315,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse final 
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrTopResponse>(); }
 
@@ -13570,7 +13570,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrTopResponse>(); }
 
@@ -13813,7 +13813,7 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrTopResponse>(); }
 
@@ -14171,7 +14171,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocolStrictTwoWayErrTopResponse>(); }
 
@@ -14338,7 +14338,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse fina
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrTopResponse>(); }
 
@@ -14563,7 +14563,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse final
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrTopResponse>(); }
 
@@ -14776,7 +14776,7 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse final
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrTopResponse>(); }
 
@@ -15134,7 +15134,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocolStrictTwoWayErrTopResponse>(); }
 
@@ -15301,7 +15301,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse fi
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrTopResponse>(); }
 
@@ -15526,7 +15526,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse fin
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrTopResponse>(); }
 
@@ -15739,7 +15739,7 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse fin
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result result{};
+  ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result result;
 
   static inline ::std::unique_ptr<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse> New() { return ::std::make_unique<UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse>(); }
 

@@ -288,7 +288,7 @@ class DenyEachBindingOnlyDenyDartTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result result{};
+  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result result;
 
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenyDartTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenyDartTopResponse>(); }
 
@@ -466,7 +466,7 @@ class DenyEachBindingOnlyDenyGoTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result result{};
+  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result result;
 
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenyGoTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenyGoTopResponse>(); }
 
@@ -644,7 +644,7 @@ class DenyEachBindingOnlyDenyLibfuzzerTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result result{};
+  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result result;
 
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenyLibfuzzerTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenyLibfuzzerTopResponse>(); }
 
@@ -822,7 +822,7 @@ class DenyEachBindingOnlyDenyRustTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result result{};
+  ::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result result;
 
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenyRustTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenyRustTopResponse>(); }
 
@@ -1000,7 +1000,7 @@ class DenyEachBindingOnlyDenySyzkallerTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result result{};
+  ::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result result;
 
   static inline ::std::unique_ptr<DenyEachBindingOnlyDenySyzkallerTopResponse> New() { return ::std::make_unique<DenyEachBindingOnlyDenySyzkallerTopResponse>(); }
 
@@ -1186,7 +1186,7 @@ class OnlyAppearsInImportingLibrary final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::bindingsdenylist::MemberOnlyAppearsInImportingLibrary member_only_appears_in_importing_library{};
+  ::test::bindingsdenylist::MemberOnlyAppearsInImportingLibrary member_only_appears_in_importing_library;
 
   static inline ::std::unique_ptr<OnlyAppearsInImportingLibrary> New() { return ::std::make_unique<OnlyAppearsInImportingLibrary>(); }
 

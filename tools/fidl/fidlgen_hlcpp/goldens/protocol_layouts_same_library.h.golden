@@ -792,7 +792,7 @@ class ComposedProtocolTwoWayAnonComposedWithErrorTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result result{};
+  ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result result;
 
   static inline ::std::unique_ptr<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse> New() { return ::std::make_unique<ComposedProtocolTwoWayAnonComposedWithErrorTopResponse>(); }
 
@@ -1081,7 +1081,7 @@ class ComposedProtocolOnAnonComposedWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result result{};
+  ::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result result;
 
   static inline ::std::unique_ptr<ComposedProtocolOnAnonComposedWithErrorRequest> New() { return ::std::make_unique<ComposedProtocolOnAnonComposedWithErrorRequest>(); }
 
@@ -1215,7 +1215,7 @@ class ComposedProtocolTwoWayNamedComposedWithErrorTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result result{};
+  ::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result result;
 
   static inline ::std::unique_ptr<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse> New() { return ::std::make_unique<ComposedProtocolTwoWayNamedComposedWithErrorTopResponse>(); }
 
@@ -1349,7 +1349,7 @@ class ComposedProtocolOnNamedComposedWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result result{};
+  ::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result result;
 
   static inline ::std::unique_ptr<ComposedProtocolOnNamedComposedWithErrorRequest> New() { return ::std::make_unique<ComposedProtocolOnNamedComposedWithErrorRequest>(); }
 
@@ -1681,7 +1681,7 @@ class MainProtocolTwoWayLocalWithErrorTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result result{};
+  ::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolTwoWayLocalWithErrorTopResponse> New() { return ::std::make_unique<MainProtocolTwoWayLocalWithErrorTopResponse>(); }
 
@@ -1815,7 +1815,7 @@ class MainProtocolOnLocalWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result result{};
+  ::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolOnLocalWithErrorRequest> New() { return ::std::make_unique<MainProtocolOnLocalWithErrorRequest>(); }
 
@@ -2368,7 +2368,7 @@ class MainProtocolTwoWayAnonWithErrorTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result result{};
+  ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolTwoWayAnonWithErrorTopResponse> New() { return ::std::make_unique<MainProtocolTwoWayAnonWithErrorTopResponse>(); }
 
@@ -2672,7 +2672,7 @@ class MainProtocolOnAnonWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result result{};
+  ::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolOnAnonWithErrorRequest> New() { return ::std::make_unique<MainProtocolOnAnonWithErrorRequest>(); }
 

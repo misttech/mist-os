@@ -111,7 +111,7 @@ class SandwichUnionSize8Alignment4 final {
 
   uint32_t before{};
 
-  ::test::unionsandwich::UnionSize8Alignment4 union_{};
+  ::test::unionsandwich::UnionSize8Alignment4 union_;
 
   uint32_t after{};
 
@@ -207,7 +207,7 @@ class SandwichUnionSize12Alignment4 final {
 
   uint32_t before{};
 
-  ::test::unionsandwich::UnionSize12Alignment4 union_{};
+  ::test::unionsandwich::UnionSize12Alignment4 union_;
 
   int32_t after{};
 
@@ -326,7 +326,7 @@ class SandwichUnionSize24Alignment8 final {
 
   uint32_t before{};
 
-  ::test::unionsandwich::UnionSize24Alignment8 union_{};
+  ::test::unionsandwich::UnionSize24Alignment8 union_;
 
   uint32_t after{};
 
@@ -422,7 +422,7 @@ class SandwichUnionSize36Alignment4 final {
 
   uint32_t before{};
 
-  ::test::unionsandwich::UnionSize36Alignment4 union_{};
+  ::test::unionsandwich::UnionSize36Alignment4 union_;
 
   uint32_t after{};
 

@@ -36,7 +36,7 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::std::string s{};
+  ::std::string s;
 
   static inline ::std::unique_ptr<ExampleUseOfErrorSyntaxCallWhichMayFailRequest> New() { return ::std::make_unique<ExampleUseOfErrorSyntaxCallWhichMayFailRequest>(); }
 
@@ -193,7 +193,7 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result result{};
+  ::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result result;
 
   static inline ::std::unique_ptr<ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse> New() { return ::std::make_unique<ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>(); }
 

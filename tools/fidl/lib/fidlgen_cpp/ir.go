@@ -172,6 +172,11 @@ func (t *Type) WireInitMessage(n string) string {
 	}
 }
 
+// HLCPPShouldInitialize returns true if the type in HLCPP must be explicitly initialized.
+func (t *Type) HLCPPShouldInitialize() bool {
+	return t.IsPrimitiveType() || t.Kind == TypeKinds.Array
+}
+
 type namingContextKey = string
 
 // toKey converts a naming context into a value that can be used as a map key

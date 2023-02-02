@@ -266,7 +266,7 @@ class WithAndWithoutRequestResponseNoRequestWithResponseResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::string ret{};
+  ::std::string ret;
 
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseNoRequestWithResponseResponse> New() { return ::std::make_unique<WithAndWithoutRequestResponseNoRequestWithResponseResponse>(); }
 
@@ -289,7 +289,7 @@ class WithAndWithoutRequestResponseWithRequestNoResponseRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::string arg{};
+  ::std::string arg;
 
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseWithRequestNoResponseRequest> New() { return ::std::make_unique<WithAndWithoutRequestResponseWithRequestNoResponseRequest>(); }
 
@@ -312,7 +312,7 @@ class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::string arg{};
+  ::std::string arg;
 
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseWithRequestEmptyResponseRequest> New() { return ::std::make_unique<WithAndWithoutRequestResponseWithRequestEmptyResponseRequest>(); }
 
@@ -335,7 +335,7 @@ class WithAndWithoutRequestResponseWithRequestWithResponseRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::string arg{};
+  ::std::string arg;
 
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseWithRequestWithResponseRequest> New() { return ::std::make_unique<WithAndWithoutRequestResponseWithRequestWithResponseRequest>(); }
 
@@ -358,7 +358,7 @@ class WithAndWithoutRequestResponseWithRequestWithResponseResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::string ret{};
+  ::std::string ret;
 
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseWithRequestWithResponseResponse> New() { return ::std::make_unique<WithAndWithoutRequestResponseWithRequestWithResponseResponse>(); }
 
@@ -381,7 +381,7 @@ class WithAndWithoutRequestResponseOnWithResponseRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::string ret{};
+  ::std::string ret;
 
   static inline ::std::unique_ptr<WithAndWithoutRequestResponseOnWithResponseRequest> New() { return ::std::make_unique<WithAndWithoutRequestResponseOnWithResponseRequest>(); }
 
@@ -677,7 +677,7 @@ class WithErrorSyntaxResponseAsStructTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result result{};
+  ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result result;
 
   static inline ::std::unique_ptr<WithErrorSyntaxResponseAsStructTopResponse> New() { return ::std::make_unique<WithErrorSyntaxResponseAsStructTopResponse>(); }
 
@@ -842,7 +842,7 @@ class WithErrorSyntaxErrorAsPrimitiveTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result result{};
+  ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result result;
 
   static inline ::std::unique_ptr<WithErrorSyntaxErrorAsPrimitiveTopResponse> New() { return ::std::make_unique<WithErrorSyntaxErrorAsPrimitiveTopResponse>(); }
 
@@ -1007,7 +1007,7 @@ class WithErrorSyntaxErrorAsEnumTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result result{};
+  ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result result;
 
   static inline ::std::unique_ptr<WithErrorSyntaxErrorAsEnumTopResponse> New() { return ::std::make_unique<WithErrorSyntaxErrorAsEnumTopResponse>(); }
 
@@ -1042,7 +1042,7 @@ class WithErrorSyntax_HandleInResult_Response final {
     );
   }
   
-  ::zx::handle h{};
+  ::zx::handle h;
 
   static inline ::std::unique_ptr<WithErrorSyntax_HandleInResult_Response> New() { return ::std::make_unique<WithErrorSyntax_HandleInResult_Response>(); }
 
@@ -1186,7 +1186,7 @@ class WithErrorSyntaxHandleInResultTopResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocols::WithErrorSyntax_HandleInResult_Result result{};
+  ::test::protocols::WithErrorSyntax_HandleInResult_Result result;
 
   static inline ::std::unique_ptr<WithErrorSyntaxHandleInResultTopResponse> New() { return ::std::make_unique<WithErrorSyntaxHandleInResultTopResponse>(); }
 
@@ -1403,7 +1403,7 @@ class ChannelProtocolTakeHandleRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::zx::handle h{};
+  ::zx::handle h;
 
   static inline ::std::unique_ptr<ChannelProtocolTakeHandleRequest> New() { return ::std::make_unique<ChannelProtocolTakeHandleRequest>(); }
 
@@ -1431,7 +1431,7 @@ class ChannelProtocolMutateSocketRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::zx::socket a{};
+  ::zx::socket a;
 
   static inline ::std::unique_ptr<ChannelProtocolMutateSocketRequest> New() { return ::std::make_unique<ChannelProtocolMutateSocketRequest>(); }
 
@@ -1459,7 +1459,7 @@ class ChannelProtocolMutateSocketResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::zx::socket b{};
+  ::zx::socket b;
 
   static inline ::std::unique_ptr<ChannelProtocolMutateSocketResponse> New() { return ::std::make_unique<ChannelProtocolMutateSocketResponse>(); }
 
@@ -1847,7 +1847,7 @@ class HandleRightsProtocolNoResponseMethodRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::zx::socket h{};
+  ::zx::socket h;
 
   static inline ::std::unique_ptr<HandleRightsProtocolNoResponseMethodRequest> New() { return ::std::make_unique<HandleRightsProtocolNoResponseMethodRequest>(); }
 
@@ -1875,7 +1875,7 @@ class HandleRightsProtocolResponseMethodRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::zx::socket h{};
+  ::zx::socket h;
 
   static inline ::std::unique_ptr<HandleRightsProtocolResponseMethodRequest> New() { return ::std::make_unique<HandleRightsProtocolResponseMethodRequest>(); }
 
@@ -1903,7 +1903,7 @@ class HandleRightsProtocolResponseMethodResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::zx::socket h{};
+  ::zx::socket h;
 
   static inline ::std::unique_ptr<HandleRightsProtocolResponseMethodResponse> New() { return ::std::make_unique<HandleRightsProtocolResponseMethodResponse>(); }
 
@@ -1931,7 +1931,7 @@ class HandleRightsProtocolAnEventRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::zx::socket h{};
+  ::zx::socket h;
 
   static inline ::std::unique_ptr<HandleRightsProtocolAnEventRequest> New() { return ::std::make_unique<HandleRightsProtocolAnEventRequest>(); }
 
@@ -2042,13 +2042,13 @@ class ProtocolEnds final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::fidl::InterfaceHandle<::test::protocols::DiscoverableProtocol> client{};
+  ::fidl::InterfaceHandle<::test::protocols::DiscoverableProtocol> client;
   
-  ::fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> server{};
+  ::fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> server;
   
-  ::fidl::InterfaceHandle<::test::protocols::DiscoverableProtocol> client_opt{};
+  ::fidl::InterfaceHandle<::test::protocols::DiscoverableProtocol> client_opt;
   
-  ::fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> server_opt{};
+  ::fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> server_opt;
 
   static inline ::std::unique_ptr<ProtocolEnds> New() { return ::std::make_unique<ProtocolEnds>(); }
 
@@ -2076,7 +2076,7 @@ class WithProtocolEndsClientEndsRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::fidl::InterfaceHandle<::test::protocols::DiscoverableProtocol> in{};
+  ::fidl::InterfaceHandle<::test::protocols::DiscoverableProtocol> in;
 
   static inline ::std::unique_ptr<WithProtocolEndsClientEndsRequest> New() { return ::std::make_unique<WithProtocolEndsClientEndsRequest>(); }
 
@@ -2104,7 +2104,7 @@ class WithProtocolEndsClientEndsResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::fidl::InterfaceHandle<::test::protocols::DiscoverableProtocol> out{};
+  ::fidl::InterfaceHandle<::test::protocols::DiscoverableProtocol> out;
 
   static inline ::std::unique_ptr<WithProtocolEndsClientEndsResponse> New() { return ::std::make_unique<WithProtocolEndsClientEndsResponse>(); }
 
@@ -2132,7 +2132,7 @@ class WithProtocolEndsServerEndsRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> in{};
+  ::fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> in;
 
   static inline ::std::unique_ptr<WithProtocolEndsServerEndsRequest> New() { return ::std::make_unique<WithProtocolEndsServerEndsRequest>(); }
 
@@ -2160,7 +2160,7 @@ class WithProtocolEndsServerEndsResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> out{};
+  ::fidl::InterfaceRequest<::test::protocols::DiscoverableProtocol> out;
 
   static inline ::std::unique_ptr<WithProtocolEndsServerEndsResponse> New() { return ::std::make_unique<WithProtocolEndsServerEndsResponse>(); }
 
@@ -2188,7 +2188,7 @@ class WithProtocolEndsStructContainingEndsRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocols::ProtocolEnds in{};
+  ::test::protocols::ProtocolEnds in;
 
   static inline ::std::unique_ptr<WithProtocolEndsStructContainingEndsRequest> New() { return ::std::make_unique<WithProtocolEndsStructContainingEndsRequest>(); }
 
@@ -2216,7 +2216,7 @@ class WithProtocolEndsStructContainingEndsResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocols::ProtocolEnds out{};
+  ::test::protocols::ProtocolEnds out;
 
   static inline ::std::unique_ptr<WithProtocolEndsStructContainingEndsResponse> New() { return ::std::make_unique<WithProtocolEndsStructContainingEndsResponse>(); }
 
@@ -2550,7 +2550,7 @@ class MethodWithUnionUnionMethodRequest final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::protocols::TheUnion u{};
+  ::test::protocols::TheUnion u;
 
   static inline ::std::unique_ptr<MethodWithUnionUnionMethodRequest> New() { return ::std::make_unique<MethodWithUnionUnionMethodRequest>(); }
 
@@ -2573,7 +2573,7 @@ class MethodWithUnionUnionMethodResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::unique_ptr<::test::protocols::TheUnion> u{};
+  ::std::unique_ptr<::test::protocols::TheUnion> u;
 
   static inline ::std::unique_ptr<MethodWithUnionUnionMethodResponse> New() { return ::std::make_unique<MethodWithUnionUnionMethodResponse>(); }
 

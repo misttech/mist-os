@@ -40,7 +40,7 @@ class ParentFirstRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Parent> request{};
+  ::fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Parent> request;
 
   static inline ::std::unique_ptr<ParentFirstRequest> New() { return ::std::make_unique<ParentFirstRequest>(); }
 
@@ -94,7 +94,7 @@ class ChildSecondRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Parent> request{};
+  ::fidl::InterfaceRequest<::test::inheritancewithrecursivedecl::Parent> request;
 
   static inline ::std::unique_ptr<ChildSecondRequest> New() { return ::std::make_unique<ChildSecondRequest>(); }
 

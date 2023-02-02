@@ -56,7 +56,7 @@ class ParentGetChildResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::InterfaceHandle<::test::protocolrequest::Child> c{};
+  ::fidl::InterfaceHandle<::test::protocolrequest::Child> c;
 
   static inline ::std::unique_ptr<ParentGetChildResponse> New() { return ::std::make_unique<ParentGetChildResponse>(); }
 
@@ -81,7 +81,7 @@ class ParentGetChildRequestResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::InterfaceRequest<::test::protocolrequest::Child> r{};
+  ::fidl::InterfaceRequest<::test::protocolrequest::Child> r;
 
   static inline ::std::unique_ptr<ParentGetChildRequestResponse> New() { return ::std::make_unique<ParentGetChildRequestResponse>(); }
 
@@ -106,7 +106,7 @@ class ParentTakeChildRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::InterfaceHandle<::test::protocolrequest::Child> c{};
+  ::fidl::InterfaceHandle<::test::protocolrequest::Child> c;
 
   static inline ::std::unique_ptr<ParentTakeChildRequest> New() { return ::std::make_unique<ParentTakeChildRequest>(); }
 
@@ -131,7 +131,7 @@ class ParentTakeChildRequestRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::InterfaceRequest<::test::protocolrequest::Child> r{};
+  ::fidl::InterfaceRequest<::test::protocolrequest::Child> r;
 
   static inline ::std::unique_ptr<ParentTakeChildRequestRequest> New() { return ::std::make_unique<ParentTakeChildRequestRequest>(); }
 

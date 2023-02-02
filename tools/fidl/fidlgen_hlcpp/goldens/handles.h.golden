@@ -44,73 +44,73 @@ class Handles final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::zx::handle plain_handle{};
+  ::zx::handle plain_handle;
 
-  ::zx::bti bti_handle{};
+  ::zx::bti bti_handle;
 
-  ::zx::channel channel_handle{};
+  ::zx::channel channel_handle;
 
-  ::zx::clock clock_handle{};
+  ::zx::clock clock_handle;
 
-  ::zx::debuglog debuglog_handle{};
+  ::zx::debuglog debuglog_handle;
 
-  ::zx::event event_handle{};
+  ::zx::event event_handle;
 
-  ::zx::eventpair eventpair_handle{};
+  ::zx::eventpair eventpair_handle;
 
-  ::zx::exception exception_handle{};
+  ::zx::exception exception_handle;
 
-  ::zx::fifo fifo_handle{};
+  ::zx::fifo fifo_handle;
 
-  ::zx::guest guest_handle{};
+  ::zx::guest guest_handle;
 
-  ::zx::interrupt interrupt_handle{};
+  ::zx::interrupt interrupt_handle;
 
-  ::zx::iommu iommu_handle{};
+  ::zx::iommu iommu_handle;
 
-  ::zx::job job_handle{};
+  ::zx::job job_handle;
 
-  ::zx::msi msi_handle{};
+  ::zx::msi msi_handle;
 
-  ::zx::pager pager_handle{};
+  ::zx::pager pager_handle;
 
-  ::zx::pmt pmt_handle{};
+  ::zx::pmt pmt_handle;
 
-  ::zx::port port_handle{};
+  ::zx::port port_handle;
 
-  ::zx::process process_handle{};
+  ::zx::process process_handle;
 
-  ::zx::profile profile_handle{};
+  ::zx::profile profile_handle;
 
-  ::zx::resource resource_handle{};
+  ::zx::resource resource_handle;
 
-  ::zx::socket socket_handle{};
+  ::zx::socket socket_handle;
 
-  ::zx::stream stream_handle{};
+  ::zx::stream stream_handle;
 
-  ::zx::suspend_token suspendtoken_handle{};
+  ::zx::suspend_token suspendtoken_handle;
 
-  ::zx::thread thread_handle{};
+  ::zx::thread thread_handle;
 
-  ::zx::timer timer_handle{};
+  ::zx::timer timer_handle;
 
-  ::zx::vcpu vcpu_handle{};
+  ::zx::vcpu vcpu_handle;
 
-  ::zx::vmar vmar_handle{};
+  ::zx::vmar vmar_handle;
 
-  ::zx::vmo vmo_handle{};
+  ::zx::vmo vmo_handle;
 
-  ::zx::vmo rights_handle{};
+  ::zx::vmo rights_handle;
 
-  ::zx::handle aliased_plain_handle_field{};
+  ::zx::handle aliased_plain_handle_field;
 
-  ::zx::vmo aliased_subtype_handle_field{};
+  ::zx::vmo aliased_subtype_handle_field;
 
-  ::zx::vmo aliased_rights_handle_field{};
+  ::zx::vmo aliased_rights_handle_field;
 
-  ::fidl::InterfaceHandle<::test::handles::SomeProtocol> some_protocol{};
+  ::fidl::InterfaceHandle<::test::handles::SomeProtocol> some_protocol;
 
-  ::fidl::InterfaceRequest<::test::handles::SomeProtocol> request_some_protocol{};
+  ::fidl::InterfaceRequest<::test::handles::SomeProtocol> request_some_protocol;
 
   static inline ::std::unique_ptr<Handles> New() { return ::std::make_unique<Handles>(); }
 

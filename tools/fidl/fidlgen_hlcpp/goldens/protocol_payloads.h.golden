@@ -203,7 +203,7 @@ class MainProtocolTwoWayLocalWithErrorTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result result{};
+  ::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolTwoWayLocalWithErrorTopResponse> New() { return ::std::make_unique<MainProtocolTwoWayLocalWithErrorTopResponse>(); }
 
@@ -329,7 +329,7 @@ class MainProtocolOnLocalWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result result{};
+  ::test::protocolpayloads::MainProtocol_OnLocalWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolOnLocalWithErrorRequest> New() { return ::std::make_unique<MainProtocolOnLocalWithErrorRequest>(); }
 
@@ -577,7 +577,7 @@ class MainProtocolTwoWayAnonWithErrorTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result result{};
+  ::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolTwoWayAnonWithErrorTopResponse> New() { return ::std::make_unique<MainProtocolTwoWayAnonWithErrorTopResponse>(); }
 
@@ -756,7 +756,7 @@ class MainProtocolOnAnonWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result result{};
+  ::test::protocolpayloads::MainProtocol_OnAnonWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolOnAnonWithErrorRequest> New() { return ::std::make_unique<MainProtocolOnAnonWithErrorRequest>(); }
 
@@ -864,7 +864,7 @@ class MainProtocolTwoWayImportWithErrorTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result result{};
+  ::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolTwoWayImportWithErrorTopResponse> New() { return ::std::make_unique<MainProtocolTwoWayImportWithErrorTopResponse>(); }
 
@@ -972,7 +972,7 @@ class MainProtocolOnImportWithErrorRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::protocolpayloads::MainProtocol_OnImportWithError_Result result{};
+  ::test::protocolpayloads::MainProtocol_OnImportWithError_Result result;
 
   static inline ::std::unique_ptr<MainProtocolOnImportWithErrorRequest> New() { return ::std::make_unique<MainProtocolOnImportWithErrorRequest>(); }
 

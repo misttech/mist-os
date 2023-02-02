@@ -58,7 +58,7 @@ class EmptyProtocolSendRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::emptystruct::Empty e{};
+  ::test::emptystruct::Empty e;
 
   static inline ::std::unique_ptr<EmptyProtocolSendRequest> New() { return ::std::make_unique<EmptyProtocolSendRequest>(); }
 
@@ -79,7 +79,7 @@ class EmptyProtocolReceiveRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::emptystruct::Empty e{};
+  ::test::emptystruct::Empty e;
 
   static inline ::std::unique_ptr<EmptyProtocolReceiveRequest> New() { return ::std::make_unique<EmptyProtocolReceiveRequest>(); }
 
@@ -100,7 +100,7 @@ class EmptyProtocolSendAndReceiveRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::emptystruct::Empty e{};
+  ::test::emptystruct::Empty e;
 
   static inline ::std::unique_ptr<EmptyProtocolSendAndReceiveRequest> New() { return ::std::make_unique<EmptyProtocolSendAndReceiveRequest>(); }
 
@@ -121,7 +121,7 @@ class EmptyProtocolSendAndReceiveResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::emptystruct::Empty e{};
+  ::test::emptystruct::Empty e;
 
   static inline ::std::unique_ptr<EmptyProtocolSendAndReceiveResponse> New() { return ::std::make_unique<EmptyProtocolSendAndReceiveResponse>(); }
 

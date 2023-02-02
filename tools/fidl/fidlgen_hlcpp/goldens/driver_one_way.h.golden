@@ -45,7 +45,7 @@ class OneWaySendRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::driveroneway::Payload payload{};
+  ::test::driveroneway::Payload payload;
 
   static inline ::std::unique_ptr<OneWaySendRequest> New() { return ::std::make_unique<OneWaySendRequest>(); }
 

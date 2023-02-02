@@ -91,7 +91,7 @@ TEST_P(VulkanImageExtensionTest, BufferCollectionMultipleFormats) {
 
   fuchsia::sysmem::ImageFormatConstraints nv12_image_constraints =
       GetDefaultSysmemImageFormatConstraints();
-  nv12_image_constraints.pixel_format = {fuchsia::sysmem::PixelFormatType::NV12, false};
+  nv12_image_constraints.pixel_format = {fuchsia::sysmem::PixelFormatType::NV12, false, {}};
   nv12_image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::REC709;
   fuchsia::sysmem::ImageFormatConstraints bgra_image_constraints =
       GetDefaultSysmemImageFormatConstraints();

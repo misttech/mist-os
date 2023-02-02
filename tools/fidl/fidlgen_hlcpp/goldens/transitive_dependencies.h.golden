@@ -23,7 +23,7 @@ class Baz final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::middle::Bar g{};
+  ::test::middle::Bar g;
 
   static inline ::std::unique_ptr<Baz> New() { return ::std::make_unique<Baz>(); }
 

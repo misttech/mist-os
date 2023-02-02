@@ -38,7 +38,7 @@ class SuperFooRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::std::string s{};
+  ::std::string s;
 
   static inline ::std::unique_ptr<SuperFooRequest> New() { return ::std::make_unique<SuperFooRequest>(); }
 

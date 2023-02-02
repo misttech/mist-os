@@ -49,7 +49,7 @@ class BasicStruct final {
 
   uint32_t x{};
 
-  ::std::string y{};
+  ::std::string y;
 
   static inline ::std::unique_ptr<BasicStruct> New() { return ::std::make_unique<BasicStruct>(); }
 

@@ -99,11 +99,11 @@ class StructPaddingTestStruct final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::encapsulatedstructs::Int16Int8 trailing{};
+  ::test::encapsulatedstructs::Int16Int8 trailing;
 
-  ::test::encapsulatedstructs::Int8Int32 inner{};
+  ::test::encapsulatedstructs::Int8Int32 inner;
 
-  ::test::encapsulatedstructs::ArrayInt16Int8 array{};
+  ::test::encapsulatedstructs::ArrayInt16Int8 array;
 
   static inline ::std::unique_ptr<StructPaddingTestStruct> New() { return ::std::make_unique<StructPaddingTestStruct>(); }
 
@@ -126,9 +126,9 @@ class NonInlineStructTestStruct final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::std::unique_ptr<::test::encapsulatedstructs::Int16Int8> element{};
+  ::std::unique_ptr<::test::encapsulatedstructs::Int16Int8> element;
 
-  ::zx::handle h{};
+  ::zx::handle h;
 
   static inline ::std::unique_ptr<NonInlineStructTestStruct> New() { return ::std::make_unique<NonInlineStructTestStruct>(); }
 
@@ -153,9 +153,9 @@ class TopLevelStruct final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::encapsulatedstructs::StructPaddingTestStruct a{};
+  ::test::encapsulatedstructs::StructPaddingTestStruct a;
 
-  ::test::encapsulatedstructs::NonInlineStructTestStruct b{};
+  ::test::encapsulatedstructs::NonInlineStructTestStruct b;
 
   static inline ::std::unique_ptr<TopLevelStruct> New() { return ::std::make_unique<TopLevelStruct>(); }
 

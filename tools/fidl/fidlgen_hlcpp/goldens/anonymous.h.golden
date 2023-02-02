@@ -324,9 +324,9 @@ class OverrideTest final {
 
   ::test::anonymous::Op op{};
 
-  ::std::unique_ptr<::test::anonymous::Expression> left{};
+  ::std::unique_ptr<::test::anonymous::Expression> left;
 
-  ::std::unique_ptr<::test::anonymous::Expression> right{};
+  ::std::unique_ptr<::test::anonymous::Expression> right;
 
   static inline ::std::unique_ptr<OverrideTest> New() { return ::std::make_unique<OverrideTest>(); }
 
@@ -794,9 +794,9 @@ class SomeProtocolSomeMethodRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::anonymous::UnionMember union_member{};
+  ::test::anonymous::UnionMember union_member;
 
-  ::test::anonymous::TableMember table_member{};
+  ::test::anonymous::TableMember table_member;
 
   static inline ::std::unique_ptr<SomeProtocolSomeMethodRequest> New() { return ::std::make_unique<SomeProtocolSomeMethodRequest>(); }
 
@@ -953,7 +953,7 @@ class SomeProtocolSomeMethodTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::anonymous::SomeProtocol_SomeMethod_Result result{};
+  ::test::anonymous::SomeProtocol_SomeMethod_Result result;
 
   static inline ::std::unique_ptr<SomeProtocolSomeMethodTopResponse> New() { return ::std::make_unique<SomeProtocolSomeMethodTopResponse>(); }
 

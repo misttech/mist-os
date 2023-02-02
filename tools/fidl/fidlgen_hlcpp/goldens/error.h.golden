@@ -35,7 +35,7 @@ class ExampleFooRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::std::string s{};
+  ::std::string s;
 
   static inline ::std::unique_ptr<ExampleFooRequest> New() { return ::std::make_unique<ExampleFooRequest>(); }
 
@@ -192,7 +192,7 @@ class ExampleFooTopResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::error::Example_foo_Result result{};
+  ::test::error::Example_foo_Result result;
 
   static inline ::std::unique_ptr<ExampleFooTopResponse> New() { return ::std::make_unique<ExampleFooTopResponse>(); }
 

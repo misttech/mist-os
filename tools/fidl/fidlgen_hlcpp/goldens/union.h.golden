@@ -148,7 +148,7 @@ class Pasta final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::string sauce{};
+  ::std::string sauce;
 
   static inline ::std::unique_ptr<Pasta> New() { return ::std::make_unique<Pasta>(); }
 
@@ -1156,7 +1156,7 @@ class NullableUnionStruct final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::unique_ptr<::test::union_::Union> the_union{};
+  ::std::unique_ptr<::test::union_::Union> the_union;
 
   static inline ::std::unique_ptr<NullableUnionStruct> New() { return ::std::make_unique<NullableUnionStruct>(); }
 
@@ -2110,7 +2110,7 @@ class TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::union_::StrictBoundedXUnion xu{};
+  ::test::union_::StrictBoundedXUnion xu;
 
   static inline ::std::unique_ptr<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse> New() { return ::std::make_unique<TestProtocolStrictXUnionHenceResponseMayBeStackAllocatedResponse>(); }
 
@@ -2133,7 +2133,7 @@ class TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::test::union_::OlderSimpleUnion xu{};
+  ::test::union_::OlderSimpleUnion xu;
 
   static inline ::std::unique_ptr<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse> New() { return ::std::make_unique<TestProtocolFlexibleXUnionHenceResponseMustBeHeapAllocatedResponse>(); }
 
@@ -2211,7 +2211,7 @@ class StructWithNullableXUnion final {
  public:
   static const fidl_type_t* FidlType;
   
-  ::std::unique_ptr<::test::union_::OlderSimpleUnion> x1{};
+  ::std::unique_ptr<::test::union_::OlderSimpleUnion> x1;
 
   static inline ::std::unique_ptr<StructWithNullableXUnion> New() { return ::std::make_unique<StructWithNullableXUnion>(); }
 
@@ -2344,7 +2344,7 @@ class UnionSandwich final {
   
   uint32_t a{};
   
-  ::test::union_::ExplicitXUnion u{};
+  ::test::union_::ExplicitXUnion u;
   
   uint32_t b{};
 

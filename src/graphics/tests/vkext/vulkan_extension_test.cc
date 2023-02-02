@@ -62,7 +62,7 @@ fuchsia::sysmem::ImageFormatConstraints GetDefaultSysmemImageFormatConstraints()
   bgra_image_constraints.max_coded_width = 8192;
   bgra_image_constraints.max_coded_height = 8192;
   bgra_image_constraints.max_bytes_per_row = 0xffffffff;
-  bgra_image_constraints.pixel_format = {fuchsia::sysmem::PixelFormatType::BGRA32, false};
+  bgra_image_constraints.pixel_format = {fuchsia::sysmem::PixelFormatType::BGRA32, false, {}};
   bgra_image_constraints.color_spaces_count = 1;
   bgra_image_constraints.color_space[0].type = fuchsia::sysmem::ColorSpaceType::SRGB;
   return bgra_image_constraints;

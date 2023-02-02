@@ -48,11 +48,11 @@ class ExampleOfUseOfAliases final {
 
   ::std::vector<::test::someotherlibrary::ReferenceMe> field_of_vec_of_ref_me_at_most_5;
 
-  ::zx::channel field_of_channel{};
+  ::zx::channel field_of_channel;
 
-  ::zx::channel field_of_client_end{};
+  ::zx::channel field_of_client_end;
 
-  ::zx::channel field_of_nullable_client_end{};
+  ::zx::channel field_of_nullable_client_end;
 
   static inline ::std::unique_ptr<ExampleOfUseOfAliases> New() { return ::std::make_unique<ExampleOfUseOfAliases>(); }
 

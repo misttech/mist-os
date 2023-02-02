@@ -229,7 +229,7 @@ class ProtocolRequestStrictResponseFlexibleRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::requestflexibleenvelope::StrictFoo s{};
+  ::test::requestflexibleenvelope::StrictFoo s;
 
   static inline ::std::unique_ptr<ProtocolRequestStrictResponseFlexibleRequest> New() { return ::std::make_unique<ProtocolRequestStrictResponseFlexibleRequest>(); }
 
@@ -250,7 +250,7 @@ class ProtocolRequestStrictResponseFlexibleResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::requestflexibleenvelope::FlexibleFoo f{};
+  ::test::requestflexibleenvelope::FlexibleFoo f;
 
   static inline ::std::unique_ptr<ProtocolRequestStrictResponseFlexibleResponse> New() { return ::std::make_unique<ProtocolRequestStrictResponseFlexibleResponse>(); }
 
@@ -271,7 +271,7 @@ class ProtocolRequestFlexibleResponseStrictRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::requestflexibleenvelope::FlexibleFoo s{};
+  ::test::requestflexibleenvelope::FlexibleFoo s;
 
   static inline ::std::unique_ptr<ProtocolRequestFlexibleResponseStrictRequest> New() { return ::std::make_unique<ProtocolRequestFlexibleResponseStrictRequest>(); }
 
@@ -292,7 +292,7 @@ class ProtocolRequestFlexibleResponseStrictResponse final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::requestflexibleenvelope::StrictFoo f{};
+  ::test::requestflexibleenvelope::StrictFoo f;
 
   static inline ::std::unique_ptr<ProtocolRequestFlexibleResponseStrictResponse> New() { return ::std::make_unique<ProtocolRequestFlexibleResponseStrictResponse>(); }
 

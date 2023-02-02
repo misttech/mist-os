@@ -49,7 +49,7 @@ class StructWithNullableString final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::StringPtr val{};
+  ::fidl::StringPtr val;
 
   static inline ::std::unique_ptr<StructWithNullableString> New() { return ::std::make_unique<StructWithNullableString>(); }
 
@@ -93,7 +93,7 @@ class StructWithNullableHandle final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::zx::vmo val{};
+  ::zx::vmo val;
 
   static inline ::std::unique_ptr<StructWithNullableHandle> New() { return ::std::make_unique<StructWithNullableHandle>(); }
 
@@ -204,7 +204,7 @@ class StructWithNullableProtocol final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::InterfaceHandle<::test::nullable::SimpleProtocol> val{};
+  ::fidl::InterfaceHandle<::test::nullable::SimpleProtocol> val;
 
   static inline ::std::unique_ptr<StructWithNullableProtocol> New() { return ::std::make_unique<StructWithNullableProtocol>(); }
 
@@ -229,7 +229,7 @@ class StructWithNullableRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::fidl::InterfaceRequest<::test::nullable::SimpleProtocol> val{};
+  ::fidl::InterfaceRequest<::test::nullable::SimpleProtocol> val;
 
   static inline ::std::unique_ptr<StructWithNullableRequest> New() { return ::std::make_unique<StructWithNullableRequest>(); }
 
@@ -273,7 +273,7 @@ class StructWithNullableStruct final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::std::unique_ptr<::test::nullable::Int32Wrapper> val{};
+  ::std::unique_ptr<::test::nullable::Int32Wrapper> val;
 
   static inline ::std::unique_ptr<StructWithNullableStruct> New() { return ::std::make_unique<StructWithNullableStruct>(); }
 
@@ -381,7 +381,7 @@ class StructWithNullableUnion final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::std::unique_ptr<::test::nullable::SimpleUnion> val{};
+  ::std::unique_ptr<::test::nullable::SimpleUnion> val;
 
   static inline ::std::unique_ptr<StructWithNullableUnion> New() { return ::std::make_unique<StructWithNullableUnion>(); }
 

@@ -104,7 +104,7 @@ class ExampleProtocolMethodRequest final {
  public:
   static const fidl_type_t* FidlType;
 
-  ::test::exampleusing::Empty arg{};
+  ::test::exampleusing::Empty arg;
 
   static inline ::std::unique_ptr<ExampleProtocolMethodRequest> New() { return ::std::make_unique<ExampleProtocolMethodRequest>(); }
 
