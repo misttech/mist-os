@@ -12,14 +12,25 @@
 #include <ktl/optional.h>
 #include <ktl/variant.h>
 
+struct ZbiAmlogicRng {
+  enum class Version {
+    kV1,  // ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V1
+    kV2,  // ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V2
+  };
+
+  zbi_dcfg_amlogic_rng_driver_t config;
+  Version version;
+};
+
 // This holds (or points to) all arm64-specific data that is handed off from
 // physboot to the kernel proper at boot time.
 struct ArchPhysHandoff {
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_AMLOGIC_HDCP) payload.
   ktl::optional<zbi_dcfg_amlogic_hdcp_driver_t> amlogic_hdcp_driver;
 
-  // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V1) payload.
-  ktl::optional<zbi_dcfg_amlogic_rng_driver_t> amlogic_rng_driver;
+  // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V1) or
+  // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V2) payload
+  ktl::optional<ZbiAmlogicRng> amlogic_rng_driver;
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER) payload.
   ktl::optional<zbi_dcfg_arm_generic_timer_driver_t> generic_timer_driver;

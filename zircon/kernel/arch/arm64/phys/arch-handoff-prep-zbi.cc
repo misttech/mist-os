@@ -34,9 +34,14 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
           SaveForMexec(header, payload);
           break;
         case ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V1:
+        case ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V2:
           ZX_ASSERT(payload.size() >= sizeof(zbi_dcfg_amlogic_rng_driver_t));
-          arch_handoff.amlogic_rng_driver =
-              *reinterpret_cast<const zbi_dcfg_amlogic_rng_driver_t*>(payload.data());
+          arch_handoff.amlogic_rng_driver = {
+              .config = *reinterpret_cast<const zbi_dcfg_amlogic_rng_driver_t*>(payload.data()),
+              .version = header.extra == ZBI_KERNEL_DRIVER_AMLOGIC_RNG_V1
+                             ? ZbiAmlogicRng::Version::kV1
+                             : ZbiAmlogicRng::Version::kV2,
+          };
           SaveForMexec(header, payload);
           break;
         case ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER:

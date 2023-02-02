@@ -13,6 +13,7 @@ source_set("amlogic_rng") {
   sources = [ "amlogic-rng.cc" ]
   deps = [
     "//zircon/kernel/dev/hw_rng",
+    "//zircon/kernel/phys:handoff",
     "//zircon/system/ulib/explicit-memory",
   ]
   public_configs = [ ":includes" ]
