@@ -4,10 +4,9 @@
 
 use {
     crate::device::{BlockDevice, Device, NandDevice},
-    anyhow::Error,
+    anyhow::{Context as _, Error},
     assert_matches::assert_matches,
     fuchsia_async as fasync,
-    fuchsia_watch::{watch, PathEvent},
     futures::{channel::mpsc, lock::Mutex, stream, SinkExt, StreamExt},
     std::sync::Arc,
 };
@@ -61,44 +60,58 @@ impl PathSource {
     async fn stream(
         &mut self,
         ignore_existing: bool,
-    ) -> stream::BoxStream<'static, Box<dyn Device>> {
-        tracing::info!(path = %self.path, "watching for new devices");
+    ) -> Result<stream::BoxStream<'static, Box<dyn Device>>, Error> {
+        let path = self.path;
         let is_nand = self.is_nand;
-        Box::pin(
-            watch(self.path)
-                .await
-                .unwrap_or_else(|e| panic!("failed to watch {}: {:?}", self.path, e))
-                .filter_map(move |event| async move {
-                    let path = match event {
-                        PathEvent::Added(path, _) => Some(path),
-                        PathEvent::Existing(path, _) => {
-                            if ignore_existing {
+        let dir_proxy =
+            fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
+                .context(format!("Failed to open directory at {path}"))?;
+        let watcher = fuchsia_vfs_watcher::Watcher::new(&dir_proxy)
+            .await
+            .context(format!("Failed to watch {path}"))?;
+        Ok(Box::pin(
+            watcher
+                .filter_map(|result| {
+                    futures::future::ready({
+                        match result {
+                            Ok(message) => Some(message),
+                            Err(error) => {
+                                tracing::error!(?error, "fshost block watcher stream error");
                                 None
-                            } else {
-                                Some(path)
                             }
                         }
-                        PathEvent::Removed(_) => None,
-                    }
-                    .map(|p| p.into_os_string().into_string().unwrap());
-                    match path {
-                        Some(path) => if is_nand {
-                            NandDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
-                        } else {
-                            BlockDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
+                    })
+                })
+                .filter(|message| futures::future::ready(message.filename.as_os_str() != "."))
+                .filter_map(move |fuchsia_vfs_watcher::WatchMessage { event, filename }| {
+                    futures::future::ready({
+                        let file_path = format!("{}/{}", path, filename.to_str().unwrap());
+                        match event {
+                            fuchsia_vfs_watcher::WatchEvent::ADD_FILE => Some(file_path),
+                            fuchsia_vfs_watcher::WatchEvent::EXISTING => {
+                                if ignore_existing {
+                                    None
+                                } else {
+                                    Some(file_path)
+                                }
+                            }
+                            _ => None,
                         }
-                        .map_err(|e| {
-                            tracing::warn!(
-                                "Failed to create device (maybe it went away?): {:?}",
-                                e
-                            );
-                            e
-                        })
-                        .ok(),
-                        None => None,
+                    })
+                })
+                .filter_map(move |path| async move {
+                    if is_nand {
+                        NandDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
+                    } else {
+                        BlockDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
                     }
+                    .map_err(|e| {
+                        tracing::warn!("Failed to create device (maybe it went away?): {:?}", e);
+                        e
+                    })
+                    .ok()
                 }),
-        )
+        ))
     }
 }
 
@@ -140,7 +153,7 @@ impl Watcher {
 
         let task = fasync::Task::spawn(Self::watcher_loop(pause_event_rx, device_tx));
         let block_and_nand_device_stream =
-            stream::select(block_source.stream(false).await, nand_source.stream(false).await);
+            stream::select(block_source.stream(false).await?, nand_source.stream(false).await?);
         pause_event_tx.send(PauseEvent::Resume(Box::pin(block_and_nand_device_stream))).await?;
 
         Ok((
@@ -223,8 +236,8 @@ impl Watcher {
         // the watcher loop, as long as the channel buffer is 0.
 
         let block_and_nand_device_stream = stream::select(
-            self.block_source.stream(true).await,
-            self.nand_source.stream(true).await,
+            self.block_source.stream(true).await?,
+            self.nand_source.stream(true).await?,
         );
         self.pause_event_tx
             .send(PauseEvent::Resume(Box::pin(block_and_nand_device_stream)))
@@ -264,9 +277,11 @@ mod tests {
                                 );
                             });
                         }
-                        _ => {
-                            tracing::info!("received a request other than get_topological_path");
-                            return;
+                        Ok(controller_request) => {
+                            panic!("unexpected request: {:?}", controller_request);
+                        }
+                        Err(error) => {
+                            panic!("controller server failed: {}", error);
                         }
                     }
                 }
@@ -316,19 +331,21 @@ mod tests {
         .await
         .expect("failed to make watcher");
 
-        // There are a couple of devices that were added before we started watching.
-        assert_eq!(device_stream.next().await.unwrap().topological_path(), "block-000");
-        assert_eq!(device_stream.next().await.unwrap().topological_path(), "block-001");
+        let mut devices =
+            std::collections::HashSet::from(["block-000", "block-001", "nand-000", "nand-001"]);
 
-        // Removing an entry doesn't do anything.
+        // There are four devices that were added before we started watching.
+        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
+        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
+        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
+        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
+        assert!(devices.is_empty());
+
+        // Removing an entry for a device already taken off the stream doesn't do anything.
         assert!(block
             .remove_entry("001", false)
             .expect("failed to remove dir entry 001")
             .is_some());
-
-        // There are a couple of devices that were added before we started watching.
-        assert_eq!(device_stream.next().await.unwrap().topological_path(), "nand-000");
-        assert_eq!(device_stream.next().await.unwrap().topological_path(), "nand-001");
 
         // Adding an entry generates a new block device.
         block
