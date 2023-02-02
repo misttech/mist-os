@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/84961): Fix null safety and remove this language version.
-// @dart=2.9
+// @dart=2.12
 
 import 'dart:convert';
 import 'dart:io' show File, Platform, Process, ProcessResult;
@@ -43,7 +42,7 @@ class PerformancePublish {
 
   Future<void> convertResults(
       String converterPath, File result, Map<String, String> environment,
-      {String expectedMetricNamesFile}) async {
+      {String? expectedMetricNamesFile}) async {
     _log.info('Converting the results into the catapult format');
 
     _checkFuchsiaPerfMetricsNaming(
@@ -122,7 +121,7 @@ class PerformancePublish {
   /// expectations file.  This is currently optional.
   /// TODO(https://fxbug.dev/105202): Make this required.
   void _checkFuchsiaPerfMetricsNaming(File fuchsiaPerfFile,
-      String expectedMetricNamesFile, Map<String, String> environment) {
+      String? expectedMetricNamesFile, Map<String, String> environment) {
     // The "test_suite" field should be all lower case.  It should start
     // with "fuchsia.", to distinguish Fuchsia test results from results
     // from other projects that upload to Catapult (Chromeperf), because

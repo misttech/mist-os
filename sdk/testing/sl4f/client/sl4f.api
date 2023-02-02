@@ -4087,7 +4087,7 @@
                   "isRequiredPositional": false,
                   "name": "dump",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Dump"
+                  "varType": "Dump?"
                 }
               },
               "name": "Performance",
@@ -4147,7 +4147,7 @@
                   "isRequiredPositional": false,
                   "name": "expectedMetricNamesFile",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 },
                 "result": {
                   "isConst": false,
@@ -4227,7 +4227,7 @@
                   "isRequiredPositional": false,
                   "name": "compressedInput",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "bool"
+                  "varType": "bool?"
                 },
                 "compressedOutput": {
                   "isConst": false,
@@ -4278,7 +4278,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "convertTraceFileToJson",
-              "returnType": "Future<File>",
+              "returnType": "Future<File?>",
               "type": "MethodDeclarationImpl"
             },
             "initializeTracing": {
@@ -4295,7 +4295,7 @@
                   "isRequiredPositional": false,
                   "name": "bufferSize",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "int?"
                 },
                 "categories": {
                   "isConst": false,
@@ -4309,7 +4309,7 @@
                   "isRequiredPositional": false,
                   "name": "categories",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "List<String>"
+                  "varType": "List<String>?"
                 }
               },
               "isAbstract": false,
@@ -4326,12 +4326,12 @@
                 "chromeTrace": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "chromeTrace",
                   "type": "SimpleFormalParameterImpl",
@@ -4340,12 +4340,12 @@
                 "fuchsiaTrace": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "fuchsiaTrace",
                   "type": "SimpleFormalParameterImpl",
@@ -4354,12 +4354,12 @@
                 "traceName": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "traceName",
                   "type": "SimpleFormalParameterImpl",
@@ -4372,7 +4372,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "mergeTraces",
-              "returnType": "Future<File>",
+              "returnType": "Future<File?>",
               "type": "MethodDeclarationImpl"
             },
             "processTrace": {
@@ -4389,7 +4389,7 @@
                   "isRequiredPositional": false,
                   "name": "converterPath",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 },
                 "expectedMetricNamesFile": {
                   "isConst": false,
@@ -4403,7 +4403,7 @@
                   "isRequiredPositional": false,
                   "name": "expectedMetricNamesFile",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 },
                 "metricsSpecSet": {
                   "isConst": false,
@@ -4537,17 +4537,17 @@
                   "isRequiredPositional": false,
                   "name": "duration",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Duration"
+                  "varType": "Duration?"
                 },
                 "interval": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "interval",
                   "type": "SimpleFormalParameterImpl",
@@ -4577,17 +4577,17 @@
                   "isRequiredPositional": false,
                   "name": "duration",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Duration"
+                  "varType": "Duration?"
                 },
                 "interval": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "interval",
                   "type": "SimpleFormalParameterImpl",
@@ -4617,17 +4617,17 @@
                   "isRequiredPositional": false,
                   "name": "duration",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "Duration"
+                  "varType": "Duration?"
                 },
                 "interval": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "interval",
                   "type": "SimpleFormalParameterImpl",
@@ -4648,12 +4648,12 @@
                 "traceName": {
                   "isConst": false,
                   "isFinal": false,
-                  "isOptional": true,
-                  "isOptionalNamed": true,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
                   "isOptionalPositional": false,
                   "isPositional": false,
-                  "isRequired": false,
-                  "isRequiredNamed": false,
+                  "isRequired": true,
+                  "isRequiredNamed": true,
                   "isRequiredPositional": false,
                   "name": "traceName",
                   "type": "SimpleFormalParameterImpl",
@@ -4680,7 +4680,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "stopChromeTrace",
-              "returnType": "Future<File>",
+              "returnType": "Future<File?>",
               "type": "MethodDeclarationImpl"
             },
             "stopPowerLogging": {
@@ -4798,7 +4798,7 @@
               "isSetter": false,
               "isStatic": false,
               "name": "terminateAndDownload",
-              "returnType": "Future<File>",
+              "returnType": "Future<File?>",
               "type": "MethodDeclarationImpl"
             },
             "terminateAndDownloadAsBytes": {
@@ -4943,7 +4943,7 @@
                   "isRequiredPositional": false,
                   "name": "expectedMetricNamesFile",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "String"
+                  "varType": "String?"
                 },
                 "result": {
                   "isConst": false,
