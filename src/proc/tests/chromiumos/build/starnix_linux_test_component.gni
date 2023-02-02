@@ -23,7 +23,6 @@ import("starnix_toolchain_test_component.gni")
 #
 #   The remaining parameters are forwarded to the fuchsia_component template.
 template("starnix_linux_test_component") {
-  test_toolchain = "//build/toolchain:linux_x64"
   starnix_toolchain_test_component(target_name) {
     forward_variables_from(invoker, "*")
   }

@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//src/proc/bin/starnix/starnix.gni")
 import("//tools/cmc/build/cmc.gni")
 
 # Defines a starnix kernel package with a provided configuration file and system image.
@@ -89,8 +90,7 @@ template("starnix_galaxy_package") {
 
   # The default init executable. Used if the configuration has no init.
   resource(data_init_target) {
-    init_label =
-        "//src/proc/bin/galaxies/default_init(//build/toolchain:linux_x64)"
+    init_label = "//src/proc/bin/galaxies/default_init($target_linux_toolchain)"
     out_dir = get_label_info(init_label, "root_out_dir")
     sources = [ "${out_dir}/default_init" ]
     outputs = [ "data/init" ]

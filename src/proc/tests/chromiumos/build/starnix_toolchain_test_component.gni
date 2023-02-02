@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
+import("//src/proc/bin/starnix/starnix.gni")
 
 # Defines a Fuchsia component that contains a test binary built with a specific toolchain.
 #
@@ -16,11 +17,11 @@ import(
 #
 #   test_label (required)
 #     The label of the test.
-#     Type: GN label
-#   test_toolchain (required)
-#     The toolchain to use to build the test, e.g. //build/toolchain:linux_x64.
+#     Type: GN label string
+#   test_toolchain (optional, defaults to target_linux_toolchain)
+#      The toolchain to use to build the test, e.g. //build/toolchain:linux_x64.
 #     parameter.
-#     Type: string
+#     Type: GN label string
 #   test_binary (optional)
 #     The name of the binary produced by test_label. Defaults to target_name.
 #     Type: string
@@ -31,14 +32,19 @@ import(
 #   The remaining parameters are forwarded to the fuchsia_component template.
 template("starnix_toolchain_test_component") {
   assert(defined(invoker.test_label))
-  assert(defined(invoker.test_toolchain))
+
+  if (defined(invoker.test_toolchain)) {
+    test_toolchain = invoker.test_toolchain
+  } else {
+    test_toolchain = target_linux_toolchain
+  }
 
   if (defined(invoker.test_binary)) {
     test_binary = invoker.test_binary
   } else {
     test_binary = target_name
   }
-  test_label = "${invoker.test_label}(${invoker.test_toolchain})"
+  test_label = "${invoker.test_label}($test_toolchain)"
 
   resource("${target_name}_resource") {
     testonly = true

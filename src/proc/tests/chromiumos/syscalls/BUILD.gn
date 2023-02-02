@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//src/proc/bin/starnix/starnix.gni")
 import("//src/proc/tests/chromiumos/build/starnix_linux_test_component.gni")
 import("//src/proc/tests/starnix_test_package.gni")
 
@@ -71,7 +72,6 @@ test("crash") {
 # This syscall_test_exec_child is a helper binary used in some execve tests.
 # Using the exclude_toolchain_tags forces the build into a "novariant" variant
 # toolchain so we need that also.
-linux_toolchain = "//build/toolchain:linux_x64"
 if (is_linux) {
   executable("syscall_test_exec_child") {
     sources = [ "syscall_test_exec_child.cc" ]
@@ -92,7 +92,7 @@ starnix_linux_test_component("syscalls_test") {
   test_label = ":syscalls_test_bin"
   test_binary = "syscalls_test_bin"
   uses_expectations = true
-  deps = [ ":syscall_test_exec_child_resource($linux_toolchain)" ]
+  deps = [ ":syscall_test_exec_child_resource($target_linux_toolchain)" ]
 }
 
 starnix_linux_test_component("crash_test") {

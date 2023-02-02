@@ -25,7 +25,7 @@ import("starnix_toolchain_test_component.gni")
 #                         using the explicit linux toolchain
 template("starnix_host_test_component") {
   assert(host_os == "linux")
-  test_toolchain = "$host_toolchain"
+  test_toolchain = host_toolchain
   starnix_toolchain_test_component(target_name) {
     forward_variables_from(invoker, "*")
   }
