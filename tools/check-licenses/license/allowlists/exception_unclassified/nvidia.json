@@ -1,0 +1,20 @@
+{
+  "license": {
+    "allowlists": [
+      {
+        "entries": [
+          {
+            "bug": "",
+            "projects": [
+              "prebuilt/third_party/flutter"
+            ]
+          }
+        ],
+        "example": "http://shortn/_6PpgNZMhVp",
+        "licenseType": "nvidia",
+        "notes": [],
+        "patternRoot": "//tools/check-licenses/license/patterns/exception_unclassified/nvidia"
+      }
+    ]
+  }
+}

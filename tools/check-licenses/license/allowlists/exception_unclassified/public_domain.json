@@ -14,6 +14,20 @@
         "licenseType": "public_domain",
         "notes": [],
         "patternRoot": "//tools/check-licenses/license/patterns/exception_unclassified/public_domain"
+      },
+      {
+        "entries": [
+          {
+            "bug": "",
+            "projects": [
+              "prebuilt/third_party/flutter"
+            ]
+          }
+        ],
+        "example": "http://shortn/_p0KqQij21k",
+        "licenseType": "public_domain",
+        "notes": [],
+        "patternRoot": "//tools/check-licenses/license/patterns/exception_unclassified/public_domain"
       }
     ]
   }
