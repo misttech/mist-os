@@ -610,11 +610,6 @@ deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
 [gn.package.ryu."1.0.3"]
 rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
 
-[gn.package.rustyline."2.1.0".platform."cfg(target_os = \"fuchsia\")"]
-deps = [
-  "//src/lib/zircon/rust:fuchsia-zircon"
-]
-
 [gn.package.proc-macro-nested."0.1.7"]
 rustflags = []
 env_vars = ["OUT_DIR=../../../compat/proc-macro-nested", "PATH_SEPARATOR=/"]

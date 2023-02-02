@@ -37,8 +37,6 @@ extern crate utf8parse;
 extern crate winapi;
 #[cfg(windows)]
 extern crate kernel32;
-#[cfg(target_os = "fuchsia")]
-extern crate fuchsia_zircon as zx;
 
 pub mod completion;
 pub mod config;
