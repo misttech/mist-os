@@ -157,7 +157,7 @@ void DeviceInfoIterator::GetNext(GetNextCompleter::Sync& completer) {
       fidl::VectorView<fdd::wire::DeviceInfo>::FromExternal(result.data(), result.size()));
 }
 
-// TODO(fxb/119948): Include composites from node groups.
+// TODO(fxb/119948): Include composites from composite node specs.
 CompositeInfoIterator::CompositeInfoIterator(
     const fbl::DoublyLinkedList<std::unique_ptr<CompositeDevice>>& composites) {
   for (auto& composite : composites) {

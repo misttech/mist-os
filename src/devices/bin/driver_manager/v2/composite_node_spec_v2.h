@@ -10,16 +10,16 @@
 
 namespace dfv2 {
 
-class NodeGroupV2 : public NodeGroup {
+class CompositeNodeSpecV2 : public CompositeNodeSpec {
  public:
   // Must only be called by Create() to ensure the objects are verified.
-  NodeGroupV2(NodeGroupCreateInfo create_info, async_dispatcher_t* dispatcher,
-              NodeManager* node_manager);
+  CompositeNodeSpecV2(CompositeNodeSpecCreateInfo create_info, async_dispatcher_t* dispatcher,
+                      NodeManager* node_manager);
 
-  ~NodeGroupV2() override = default;
+  ~CompositeNodeSpecV2() override = default;
 
  protected:
-  zx::result<std::optional<DeviceOrNode>> BindNodeImpl(
+  zx::result<std::optional<DeviceOrNode>> BindParentImpl(
       fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
       const DeviceOrNode& device_or_node) override;
 

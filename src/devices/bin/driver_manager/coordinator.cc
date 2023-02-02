@@ -311,7 +311,7 @@ Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manag
 
   device_manager_ = std::make_unique<DeviceManager>(this, config_.crash_policy);
 
-  node_group_manager_ = std::make_unique<NodeGroupManager>(this);
+  composite_node_spec_manager_ = std::make_unique<CompositeNodeSpecManager>(this);
 
   suspend_resume_manager_ = std::make_unique<SuspendResumeManager>(this, config_.suspend_timeout);
   firmware_loader_ =
@@ -772,33 +772,33 @@ zx_status_t Coordinator::SetMexecZbis(zx::vmo kernel_zbi, zx::vmo data_zbi) {
   return ZX_OK;
 }
 
-zx_status_t Coordinator::AddNodeGroup(
+zx_status_t Coordinator::AddCompositeNodeSpec(
     const fbl::RefPtr<Device>& dev, std::string_view name,
-    fuchsia_device_manager::wire::NodeGroupDescriptor group_desc) {
-  if (group_desc.nodes.count() == 0) {
+    fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec) {
+  if (spec.parents.count() == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto node_group_result = node_group::NodeGroupV1::Create(
-      NodeGroupCreateInfo{
+  auto spec_result = node_group::CompositeNodeSpecV1::Create(
+      CompositeNodeSpecCreateInfo{
           .name = std::string(name.data()),
-          .size = group_desc.nodes.count(),
+          .size = spec.parents.count(),
       },
-      group_desc, &driver_loader_);
-  if (!node_group_result.is_ok()) {
-    LOGF(ERROR, "Failed to create node group");
-    return node_group_result.status_value();
+      spec, &driver_loader_);
+  if (!spec_result.is_ok()) {
+    LOGF(ERROR, "Failed to create composite node spec");
+    return spec_result.status_value();
   }
 
   fidl::Arena allocator;
   auto fidl_spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
                        .name(fidl::StringView(allocator, name))
-                       .parents(std::move(group_desc.nodes))
+                       .parents(std::move(spec.parents))
                        .Build();
 
-  auto result = node_group_manager_->AddNodeGroup(fidl_spec, std::move(node_group_result.value()));
+  auto result = composite_node_spec_manager_->AddSpec(fidl_spec, std::move(spec_result.value()));
   if (!result.is_ok()) {
-    LOGF(ERROR, "Failed to add node group to the node group manager: %d.", result.error_value());
+    LOGF(ERROR, "Failed to add spec to the CompositeNodeSpecManager: %d.", result.error_value());
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -968,23 +968,23 @@ void Coordinator::InitOutgoingServices(component::OutgoingDirectory& outgoing) {
 }
 
 // TODO(fxb/107737): Ideally, we try to match and bind all devices, regardless if they
-// match with a node group or not. However, this causes issues because the driver manager
+// match with a composite node spec or not. However, this causes issues because the driver manager
 // currently can't catch when a device is in the process of its Bind() function. As such,
 // this can create an infinite loop of the same device calling its Bind() nonstop. As a
 // short-term solution, we can following how Composite Devices just try to match and
 // bind devices to its fragments.
-void Coordinator::BindNodesForNodeGroups() {
+void Coordinator::BindNodesForCompositeNodeSpec() {
   for (auto& dev : device_manager_->devices()) {
-    auto status = bind_driver_manager_->MatchAndBindNodeGroups(fbl::RefPtr(&dev));
+    auto status = bind_driver_manager_->MatchAndBindCompositeNodeSpec(fbl::RefPtr(&dev));
     if (status != ZX_OK) {
       // LOGF(WARNING, "Failed to bind device '%s': %d", dev.name().data(), status);
     }
   }
 }
 
-void Coordinator::AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
-                                            AddToIndexCallback callback) {
-  driver_loader_.AddNodeGroup(spec, std::move(callback));
+void Coordinator::AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
+                                       AddToIndexCallback callback) {
+  driver_loader_.AddCompositeNodeSpec(spec, std::move(callback));
 }
 
 void Coordinator::RestartDriverHosts(RestartDriverHostsRequestView request,

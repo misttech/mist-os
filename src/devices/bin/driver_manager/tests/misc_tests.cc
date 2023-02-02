@@ -476,17 +476,17 @@ TEST(MiscTestCase, AddNodeGroup) {
       .value = fdf::wire::NodePropertyValue::WithIntValue(500),
   };
 
-  fidl::VectorView<fdf::wire::ParentSpec> nodes(allocator, 1);
-  nodes[0] = fdf::wire::ParentSpec{
+  fidl::VectorView<fdf::wire::ParentSpec> parents(allocator, 1);
+  parents[0] = fdf::wire::ParentSpec{
       .bind_rules = bind_rules,
       .properties = properties,
   };
 
   fidl::VectorView<fuchsia_device_manager::wire::DeviceMetadata> metadata(allocator, 0);
 
-  fuchsia_device_manager::wire::NodeGroupDescriptor group_desc =
-      fuchsia_device_manager::wire::NodeGroupDescriptor{
-          .nodes = nodes,
+  fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec =
+      fuchsia_device_manager::wire::CompositeNodeSpecDescriptor{
+          .parents = parents,
           .metadata = metadata,
       };
   const fdi::MatchedNodeGroupInfo match({
@@ -498,9 +498,9 @@ TEST(MiscTestCase, AddNodeGroup) {
   });
   fake_driver_index.AddNodeGroupMatch("group", match);
 
-  ASSERT_OK(coordinator.AddNodeGroup(device, "group", group_desc));
+  ASSERT_OK(coordinator.AddCompositeNodeSpec(device, "group", spec));
   loop.RunUntilIdle();
-  ZX_ASSERT(coordinator.node_group_manager().node_groups().count("group") != 0);
+  ZX_ASSERT(coordinator.composite_node_spec_manager().specs().count("group") != 0);
 
   controller_endpoints->server.reset();
   coordinator_endpoints->client.reset();

@@ -456,7 +456,7 @@ TEST_F(DriverLoaderTest, TestReturnDriversAndNodeGroups) {
   // Check driver.
   ASSERT_EQ(driver_name, std::get<MatchedDriverInfo>(drivers[0]).v1()->libname);
 
-  // Check node group.
+  // Check composite node spec.
   auto node_group_result = std::get<fdi::MatchedNodeRepresentationInfo>(drivers[1]);
   ASSERT_EQ(1, node_group_result.node_groups().value().size());
   ASSERT_STREQ("node_group", node_group_result.node_groups().value().at(0).name().value());

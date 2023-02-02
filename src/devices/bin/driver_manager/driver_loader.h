@@ -51,8 +51,8 @@ class DriverLoader {
     bool only_return_base_and_fallback_drivers = false;
   };
 
-  void AddNodeGroup(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
-                    AddToIndexCallback callback);
+  void AddCompositeNodeSpec(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
+                            AddToIndexCallback callback);
 
   const std::vector<MatchedDriver> MatchDeviceDriverIndex(const fbl::RefPtr<Device>& dev,
                                                           const MatchDeviceConfig& config);

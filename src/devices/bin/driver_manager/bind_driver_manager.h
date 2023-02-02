@@ -37,8 +37,8 @@ class BindDriverManager {
   // Binds all the devices to the drivers.
   void BindAllDevices(const DriverLoader::MatchDeviceConfig& config);
 
-  // Find matching node group nodes for |dev| and then bind them.
-  zx_status_t MatchAndBindNodeGroups(const fbl::RefPtr<Device>& dev);
+  // Find matching parents for |dev| and then bind them.
+  zx_status_t MatchAndBindCompositeNodeSpec(const fbl::RefPtr<Device>& dev);
 
   // Finds a matching driver for |composite|.
   zx::result<MatchedDriverInfo> MatchCompositeDevice(CompositeDevice& composite,
@@ -47,7 +47,7 @@ class BindDriverManager {
  private:
   zx_status_t BindDriverToDevice(const MatchedDriver& driver, const fbl::RefPtr<Device>& dev);
 
-  // Given a device, return all of the Drivers whose bind programs match with the device.
+  // Given a device, return all of the Drivers whose bind rules match with the device.
   // The returned vector is organized by priority, so if only one driver is being bound it
   // should be the first in the vector.
   // If |drvlibname| is not empty then the device will only be checked against the driver

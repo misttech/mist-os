@@ -10,7 +10,7 @@
 
 // Wrapper struct for a fbl::RefPtr<Device>. This allows the node_group code
 // to refer to this without any dependencies on the DFv1 code.
-// TODO(fxb/106479): Move this struct and the rest of the node group code
+// TODO(fxb/106479): Move this struct and the rest of the composite node spec code
 // under the namespace.
 struct DeviceV1Wrapper {
   const fbl::RefPtr<Device> device;
@@ -18,20 +18,20 @@ struct DeviceV1Wrapper {
 
 namespace node_group {
 
-// DFv1 implementation for NodeGroup. NodeGroupV1 creates and manages a
+// DFv1 implementation for NodeGroup. CompositeNodeSpecV1 creates and manages a
 // CompositeDevice object underneath the interface.
-class NodeGroupV1 : public NodeGroup {
+class CompositeNodeSpecV1 : public CompositeNodeSpec {
  public:
-  static zx::result<std::unique_ptr<NodeGroupV1>> Create(
-      NodeGroupCreateInfo create_info, fuchsia_device_manager::wire::NodeGroupDescriptor group_desc,
-      DriverLoader* driver_loader);
+  static zx::result<std::unique_ptr<CompositeNodeSpecV1>> Create(
+      CompositeNodeSpecCreateInfo create_info,
+      fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec, DriverLoader* driver_loader);
 
-  NodeGroupV1(NodeGroupCreateInfo create_info, fbl::Array<std::unique_ptr<Metadata>> metadata,
-              DriverLoader* driver_loader);
+  CompositeNodeSpecV1(CompositeNodeSpecCreateInfo create_info,
+                      fbl::Array<std::unique_ptr<Metadata>> metadata, DriverLoader* driver_loader);
 
  private:
   // NodeGroup interface:
-  zx::result<std::optional<DeviceOrNode>> BindNodeImpl(
+  zx::result<std::optional<DeviceOrNode>> BindParentImpl(
       fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
       const DeviceOrNode& device_or_node) override;
 
@@ -41,10 +41,10 @@ class NodeGroupV1 : public NodeGroup {
   // Used to create |composite_device_|. Set to empty once |composite_device_| is created.
   fbl::Array<std::unique_ptr<Metadata>> metadata_;
 
-  // Set by SetCompositeDevice() after the first BindNodeImpl() call.
+  // Set by SetCompositeDevice() after the first BindParentImpl() call.
   std::unique_ptr<CompositeDevice> composite_device_;
 
-  // Must outlive NodeGroupV1.
+  // Must outlive CompositeNodeSpecV1.
   DriverLoader* driver_loader_;
 };
 

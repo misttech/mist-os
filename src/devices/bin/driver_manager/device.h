@@ -383,10 +383,10 @@ class Device final
                       ScheduleRemoveCompleter::Sync& _completer) override;
   void AddCompositeDevice(AddCompositeDeviceRequestView request,
                           AddCompositeDeviceCompleter::Sync& _completer) override;
-  void AddNodeGroup(AddNodeGroupRequestView request,
-                    AddNodeGroupCompleter::Sync& _completer) override;
+  void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
+                            AddCompositeNodeSpecCompleter::Sync& _completer) override;
   void BindDevice(BindDeviceRequestView request, BindDeviceCompleter::Sync& _completer) override;
-  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& _completer) override;
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
   void LoadFirmware(LoadFirmwareRequestView request,
                     LoadFirmwareCompleter::Sync& _completer) override;
   void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& _completer) override;

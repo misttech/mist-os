@@ -20,8 +20,8 @@ namespace {
 
 namespace fdf = fuchsia_driver_framework;
 
-using TestAddNodeGroupCallback =
-    fit::function<void(fuchsia_device_manager::wire::NodeGroupDescriptor)>;
+using TestAddCompositeNodeSpecCallback =
+    fit::function<void(fuchsia_device_manager::wire::CompositeNodeSpecDescriptor)>;
 
 class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordinator> {
  public:
@@ -42,9 +42,9 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
                           AddCompositeDeviceCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
-  void AddNodeGroup(AddNodeGroupRequestView request,
-                    AddNodeGroupCompleter::Sync& completer) override {
-    node_group_callback_(request->group_desc);
+  void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
+                            AddCompositeNodeSpecCompleter::Sync& completer) override {
+    spec_callback_(request->spec);
     completer.ReplySuccess();
   }
   void BindDevice(BindDeviceRequestView request, BindDeviceCompleter::Sync& completer) override {
@@ -76,8 +76,8 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
 
   async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
 
-  void set_node_group_callback(TestAddNodeGroupCallback callback) {
-    node_group_callback_ = std::move(callback);
+  void set_spec_callback(TestAddCompositeNodeSpecCallback callback) {
+    spec_callback_ = std::move(callback);
   }
 
  private:
@@ -87,7 +87,7 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
   // it doesn't hang.
   async::Loop loop_;
 
-  TestAddNodeGroupCallback node_group_callback_;
+  TestAddCompositeNodeSpecCallback spec_callback_;
 };
 
 class CoreTest : public zxtest::Test {
@@ -380,12 +380,12 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
 
   ASSERT_NO_FATAL_FAILURE(Connect(dev));
 
-  TestAddNodeGroupCallback test_callback =
-      [](fuchsia_device_manager::wire::NodeGroupDescriptor node_group) {
-        ASSERT_EQ(2, node_group.nodes.count());
+  TestAddCompositeNodeSpecCallback test_callback =
+      [](fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec) {
+        ASSERT_EQ(2, spec.parents.count());
 
         // Check the first node.
-        auto node_result_1 = node_group.nodes.at(0);
+        auto node_result_1 = spec.parents.at(0);
         ASSERT_EQ(2, node_result_1.bind_rules.count());
 
         auto parent_1_bind_rule_1_result = node_result_1.bind_rules.at(0);
@@ -409,7 +409,7 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
         ASSERT_EQ(20, parent_1_props_result.at(1).value.int_value());
 
         // Check the second node.
-        auto node_result_2 = node_group.nodes.at(1);
+        auto node_result_2 = spec.parents.at(1);
         ASSERT_EQ(2, node_result_2.bind_rules.count());
 
         auto parent_2_bind_rule_1 = node_result_2.bind_rules.at(0);
@@ -431,7 +431,7 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
         ASSERT_TRUE(parent_2_prop_result.at(0).value.bool_value());
       };
 
-  coordinator_.set_node_group_callback(std::move(test_callback));
+  coordinator_.set_spec_callback(std::move(test_callback));
 
   const device_bind_prop_value_t parent_1_bind_rules_values_1[] = {
       device_bind_prop_int_val(1),

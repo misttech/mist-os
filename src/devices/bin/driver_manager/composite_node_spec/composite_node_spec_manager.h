@@ -18,57 +18,42 @@ struct CompositeNodeAndDriver {
   DeviceOrNode node;
 };
 
-// This class is responsible for managing node groups. It keeps track of the device
-// groups and its matching composite driver and nodes. NodeGroupManager is owned by a
+// This class is responsible for managing composite node specs. It keeps track of the specs
+// and their matching composite driver and nodes. CompositeNodeSpecManager is owned by a
 // CompositeManagerBridge and must be outlived by it.
-class NodeGroupManager {
+class CompositeNodeSpecManager {
  public:
-  using NodeGroupMap = std::unordered_map<std::string, std::unique_ptr<NodeGroup>>;
+  using CompositeNodeSpecMap = std::unordered_map<std::string, std::unique_ptr<CompositeNodeSpec>>;
 
-  explicit NodeGroupManager(CompositeManagerBridge* bridge);
+  explicit CompositeNodeSpecManager(CompositeManagerBridge* bridge);
 
-  // Adds a node group to the driver index. If it's successfully added, then the
-  // NodeGroupManager stores the node group in a map. After that, it sends a call to
-  // CompositeManagerBridge to bind all unbound devices.
-  fit::result<fuchsia_driver_framework::CompositeNodeSpecError> AddNodeGroup(
+  // Adds a composite node spec to the driver index. If it's successfully added, then the
+  // CompositeNodeSpecManager stores the composite node spec in a map. After that, it sends a call
+  // to CompositeManagerBridge to bind all unbound devices.
+  fit::result<fuchsia_driver_framework::CompositeNodeSpecError> AddSpec(
       fuchsia_driver_framework::wire::CompositeNodeSpec fidl_spec,
-      std::unique_ptr<NodeGroup> node_group);
+      std::unique_ptr<CompositeNodeSpec> spec);
 
-  // Binds the device to one of the node group nodes that it was matched to.
-  // NodeGroupManager will go through the list of node groups until it finds one with
-  // the node unbound.
-  // DFv1:
-  // This will internally use node_group_v1, which itself uses
-  // CompositeDevice's BindFragment to do all the work needed to track the composite fragments
-  // and to start the driver.
-  // A std::nullopt is always returned.
-  // DFv2:
-  // This will use node_group_v2, which internally tracks the nodes in a ParentSetCollector,
-  // when the parent set is completed, a child node is created that is parented by all the nodes
-  // from the parent set.
-  // A std::nullopt is returned if the chosen node group is not yet complete, otherwise a
-  // shared pointer to the newly created child node is returned along with the driver of the
-  // chosen match. DriverRunner is responsible for starting the driver on the node.
-  zx::result<std::optional<CompositeNodeAndDriver>> BindNodeRepresentation(
+  // Binds the device to one of the spec parents it was matched to. CompositeNodeSpecManager will
+  // go through the list of specs until it finds one with the parent unbound. Depending on
+  // the implementation, this function either return the CompositeNodeAndDriver object for the
+  // composite node or always return std::nullopt.
+  zx::result<std::optional<CompositeNodeAndDriver>> BindParentSpec(
       fuchsia_driver_index::wire::MatchedNodeRepresentationInfo match_info,
       const DeviceOrNode& device_or_node);
-
-  // Reason for both versions of this method is that in DFv1 the match info is stored
-  // via natural types because BindNodeRepresentation is outside of the fidl wire response's scope.
-  // In DFv2 BindNodeRepresentation happens in the scope of the wire response so we don't want to
-  // do any natural type conversions.
-  zx::result<std::optional<CompositeNodeAndDriver>> BindNodeRepresentation(
+  zx::result<std::optional<CompositeNodeAndDriver>> BindParentSpec(
       fuchsia_driver_index::MatchedNodeRepresentationInfo match_info,
       const DeviceOrNode& device_or_node);
 
   // Exposed for testing only.
-  const NodeGroupMap& node_groups() const { return node_groups_; }
+  const CompositeNodeSpecMap& specs() const { return specs_; }
 
  private:
-  // Contains all node groups. This maps the name to a NodeGroup object.
-  NodeGroupMap node_groups_;
+  // Contains all composite node specs. This maps the name to a CompositeNodeSpec object.
+  CompositeNodeSpecMap specs_;
 
-  // The owner of NodeGroupManager. CompositeManagerBridge must outlive NodeGroupManager.
+  // The owner of CompositeNodeSpecManager. CompositeManagerBridge must outlive
+  // CompositeNodeSpecManager.
   CompositeManagerBridge* bridge_;
 };
 

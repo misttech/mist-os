@@ -14,11 +14,12 @@
 namespace fdf = fuchsia_driver_framework;
 namespace fdi = fuchsia_driver_index;
 
-class FakeNodeGroup : public NodeGroup {
+class FakeCompositeNodeSpec : public CompositeNodeSpec {
  public:
-  explicit FakeNodeGroup(NodeGroupCreateInfo create_info) : NodeGroup(std::move(create_info)) {}
+  explicit FakeCompositeNodeSpec(CompositeNodeSpecCreateInfo create_info)
+      : CompositeNodeSpec(std::move(create_info)) {}
 
-  zx::result<std::optional<DeviceOrNode>> BindNodeImpl(
+  zx::result<std::optional<DeviceOrNode>> BindParentImpl(
       fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
       const DeviceOrNode& device_or_node) override {
     return zx::ok(std::nullopt);
@@ -28,9 +29,9 @@ class FakeNodeGroup : public NodeGroup {
 class FakeDeviceManagerBridge : public CompositeManagerBridge {
  public:
   // CompositeManagerBridge:
-  void BindNodesForNodeGroups() override {}
-  void AddNodeGroupToDriverIndex(fdf::wire::CompositeNodeSpec group,
-                                 AddToIndexCallback callback) override {
+  void BindNodesForCompositeNodeSpec() override {}
+  void AddSpecToDriverIndex(fdf::wire::CompositeNodeSpec group,
+                            AddToIndexCallback callback) override {
     auto iter = node_group_matches_.find(std::string(group.name().get()));
     zx::result<fdi::DriverIndexAddNodeGroupResponse> result;
     if (iter == node_group_matches_.end()) {
@@ -46,34 +47,36 @@ class FakeDeviceManagerBridge : public CompositeManagerBridge {
         fit::defer([callback = std::move(callback), result]() mutable { callback(result); });
   }
 
-  void AddNodeGroupMatch(std::string_view name, fdi::MatchedNodeGroupInfo match) {
+  void AddSpecMatch(std::string_view name, fdi::MatchedNodeGroupInfo match) {
     node_group_matches_[std::string(name)] = std::move(match);
   }
 
  private:
-  // Stores matches for each node group name, that get returned to the
-  // AddToIndexCallback that is given in AddNodeGroupToDriverIndex.
+  // Stores matches for each composite node spec name, that get returned to the
+  // AddToIndexCallback that is given in AddSpecToDriverIndex.
   std::unordered_map<std::string, fdi::MatchedNodeGroupInfo> node_group_matches_;
 };
 
-class NodeGroupManagerTest : public zxtest::Test {
+class CompositeNodeSpecManagerTest : public zxtest::Test {
  public:
-  void SetUp() override { node_group_manager_ = std::make_unique<NodeGroupManager>(&bridge_); }
-
-  fit::result<fuchsia_driver_framework::CompositeNodeSpecError> AddNodeGroup(
-      fuchsia_driver_framework::wire::CompositeNodeSpec spec) {
-    auto node_group = std::make_unique<FakeNodeGroup>(NodeGroupCreateInfo{
-        .name = std::string(spec.name().get()),
-        .size = spec.parents().count(),
-    });
-    return node_group_manager_->AddNodeGroup(spec, std::move(node_group));
+  void SetUp() override {
+    composite_node_spec_manager_ = std::make_unique<CompositeNodeSpecManager>(&bridge_);
   }
 
-  std::unique_ptr<NodeGroupManager> node_group_manager_;
+  fit::result<fuchsia_driver_framework::CompositeNodeSpecError> AddSpec(
+      fuchsia_driver_framework::wire::CompositeNodeSpec fidl_spec) {
+    auto spec = std::make_unique<FakeCompositeNodeSpec>(CompositeNodeSpecCreateInfo{
+        .name = std::string(fidl_spec.name().get()),
+        .size = fidl_spec.parents().count(),
+    });
+    return composite_node_spec_manager_->AddSpec(fidl_spec, std::move(spec));
+  }
+
+  std::unique_ptr<CompositeNodeSpecManager> composite_node_spec_manager_;
   FakeDeviceManagerBridge bridge_;
 };
 
-TEST_F(NodeGroupManagerTest, TestAddMatchNodeGroup) {
+TEST_F(CompositeNodeSpecManagerTest, TestAddMatchNodeGroup) {
   fidl::Arena allocator;
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_1(allocator, 1);
@@ -123,17 +126,17 @@ TEST_F(NodeGroupManagerTest, TestAddMatchNodeGroup) {
   fdi::MatchedNodeGroupInfo match{
       {.composite = composite_match, .node_names = {{"node-0", "node-1"}}}};
 
-  bridge_.AddNodeGroupMatch(spec_name, match);
-  ASSERT_TRUE(AddNodeGroup(fdf::wire::CompositeNodeSpec::Builder(allocator)
-                               .name(fidl::StringView(allocator, spec_name))
-                               .parents(std::move(parents))
-                               .Build())
+  bridge_.AddSpecMatch(spec_name, match);
+  ASSERT_TRUE(AddSpec(fdf::wire::CompositeNodeSpec::Builder(allocator)
+                          .name(fidl::StringView(allocator, spec_name))
+                          .parents(std::move(parents))
+                          .Build())
                   .is_ok());
-  ASSERT_EQ(2, node_group_manager_->node_groups().at(spec_name)->node_representations().size());
-  ASSERT_FALSE(node_group_manager_->node_groups().at(spec_name)->node_representations()[0]);
-  ASSERT_FALSE(node_group_manager_->node_groups().at(spec_name)->node_representations()[1]);
+  ASSERT_EQ(2, composite_node_spec_manager_->specs().at(spec_name)->parent_specs().size());
+  ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
+  ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[1]);
 
-  //  Bind node group node 2.
+  //  Bind composite node spec node 2.
   auto matched_node_2 = fdi::MatchedNodeRepresentationInfo{{
       .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
   }};
@@ -145,13 +148,13 @@ TEST_F(NodeGroupManagerTest, TestAddMatchNodeGroup) {
       .node_names = {{"node-0", "node-1"}},
   }});
 
-  ASSERT_EQ(std::nullopt, node_group_manager_
-                              ->BindNodeRepresentation(fidl::ToWire(allocator, matched_node_2),
-                                                       std::weak_ptr<dfv2::Node>())
+  ASSERT_EQ(std::nullopt, composite_node_spec_manager_
+                              ->BindParentSpec(fidl::ToWire(allocator, matched_node_2),
+                                               std::weak_ptr<dfv2::Node>())
                               .value());
-  ASSERT_TRUE(node_group_manager_->node_groups().at(spec_name)->node_representations()[1]);
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[1]);
 
-  //  Bind node group node 1.
+  //  Bind composite node spec node 1.
   auto matched_node_1 = fdi::MatchedNodeRepresentationInfo{{
       .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
   }};
@@ -163,12 +166,12 @@ TEST_F(NodeGroupManagerTest, TestAddMatchNodeGroup) {
       .node_names = {{"node-0", "node-1"}},
   }});
 
-  ASSERT_OK(node_group_manager_->BindNodeRepresentation(fidl::ToWire(allocator, matched_node_1),
-                                                        std::weak_ptr<dfv2::Node>()));
-  ASSERT_TRUE(node_group_manager_->node_groups().at(spec_name)->node_representations()[0]);
+  ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node_1),
+                                                         std::weak_ptr<dfv2::Node>()));
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
 }
 
-TEST_F(NodeGroupManagerTest, TestBindSameNodeTwice) {
+TEST_F(CompositeNodeSpecManagerTest, TestBindSameNodeTwice) {
   fidl::Arena allocator;
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_1(allocator, 1);
@@ -218,18 +221,18 @@ TEST_F(NodeGroupManagerTest, TestBindSameNodeTwice) {
   fdi::MatchedNodeGroupInfo match{
       {.composite = composite_match, .node_names = {{"node-0", "node-1"}}}};
 
-  bridge_.AddNodeGroupMatch(spec_name, match);
-  ASSERT_TRUE(AddNodeGroup(fdf::wire::CompositeNodeSpec::Builder(allocator)
-                               .name(fidl::StringView(allocator, spec_name))
-                               .parents(std::move(parents))
-                               .Build())
+  bridge_.AddSpecMatch(spec_name, match);
+  ASSERT_TRUE(AddSpec(fdf::wire::CompositeNodeSpec::Builder(allocator)
+                          .name(fidl::StringView(allocator, spec_name))
+                          .parents(std::move(parents))
+                          .Build())
                   .is_ok());
-  ASSERT_EQ(2, node_group_manager_->node_groups().at(spec_name)->node_representations().size());
+  ASSERT_EQ(2, composite_node_spec_manager_->specs().at(spec_name)->parent_specs().size());
 
-  ASSERT_FALSE(node_group_manager_->node_groups().at(spec_name)->node_representations()[0]);
-  ASSERT_FALSE(node_group_manager_->node_groups().at(spec_name)->node_representations()[1]);
+  ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
+  ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[1]);
 
-  //  Bind node group node 1.
+  //  Bind composite node spec node 1.
   auto matched_node = fdi::MatchedNodeRepresentationInfo{{
       .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
   }};
@@ -241,21 +244,21 @@ TEST_F(NodeGroupManagerTest, TestBindSameNodeTwice) {
       .node_names = {{"node-0", "node-1"}},
   }});
 
-  ASSERT_OK(node_group_manager_->BindNodeRepresentation(fidl::ToWire(allocator, matched_node),
-                                                        std::weak_ptr<dfv2::Node>()));
-  ASSERT_TRUE(node_group_manager_->node_groups().at(spec_name)->node_representations()[0]);
+  ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
+                                                         std::weak_ptr<dfv2::Node>()));
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
 
   // Bind the same node.
-  ASSERT_EQ(ZX_ERR_NOT_FOUND, node_group_manager_
-                                  ->BindNodeRepresentation(fidl::ToWire(allocator, matched_node),
-                                                           std::weak_ptr<dfv2::Node>())
-                                  .status_value());
+  ASSERT_EQ(ZX_ERR_NOT_FOUND,
+            composite_node_spec_manager_
+                ->BindParentSpec(fidl::ToWire(allocator, matched_node), std::weak_ptr<dfv2::Node>())
+                .status_value());
 }
 
-TEST_F(NodeGroupManagerTest, TestMultibind) {
+TEST_F(CompositeNodeSpecManagerTest, TestMultibind) {
   fidl::Arena allocator;
 
-  // Add the first node group.
+  // Add the first composite node spec.
   fidl::VectorView<fdf::wire::BindRule> bind_rules_1(allocator, 1);
   auto prop_vals_1 = fidl::VectorView<fdf::wire::NodePropertyValue>(allocator, 1);
   prop_vals_1[0] = fdf::wire::NodePropertyValue::WithIntValue(10);
@@ -299,15 +302,16 @@ TEST_F(NodeGroupManagerTest, TestMultibind) {
   fdi::MatchedNodeGroupInfo match_1{
       {.composite = matched_info_1, .node_names = {{"node-0", "node-1"}}}};
 
-  bridge_.AddNodeGroupMatch(spec_name_1, match_1);
-  ASSERT_TRUE(AddNodeGroup(fdf::wire::CompositeNodeSpec::Builder(allocator)
-                               .name(fidl::StringView(allocator, spec_name_1))
-                               .parents(std::move(parents_1))
-                               .Build())
+  bridge_.AddSpecMatch(spec_name_1, match_1);
+  ASSERT_TRUE(AddSpec(fdf::wire::CompositeNodeSpec::Builder(allocator)
+                          .name(fidl::StringView(allocator, spec_name_1))
+                          .parents(std::move(parents_1))
+                          .Build())
                   .is_ok());
-  ASSERT_EQ(2, node_group_manager_->node_groups().at(spec_name_1)->node_representations().size());
+  ASSERT_EQ(2, composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs().size());
 
-  // Add a second node group with a node that's the same as one in the first node group.
+  // Add a second composite node spec with a node that's the same as one in the first composite node
+  // spec.
   fidl::VectorView<fdf::wire::ParentSpec> parents_2(allocator, 1);
   parents_2[0] = fdf::wire::ParentSpec{
       .bind_rules = bind_rules_2,
@@ -320,16 +324,16 @@ TEST_F(NodeGroupManagerTest, TestMultibind) {
   }};
   fdi::MatchedNodeGroupInfo match_2{{.composite = matched_info_2, .node_names = {{"node-0"}}}};
 
-  bridge_.AddNodeGroupMatch(spec_name_2, match_2);
-  ASSERT_TRUE(AddNodeGroup(fdf::wire::CompositeNodeSpec::Builder(allocator)
-                               .name(fidl::StringView(allocator, spec_name_2))
-                               .parents(std::move(parents_2))
-                               .Build())
+  bridge_.AddSpecMatch(spec_name_2, match_2);
+  ASSERT_TRUE(AddSpec(fdf::wire::CompositeNodeSpec::Builder(allocator)
+                          .name(fidl::StringView(allocator, spec_name_2))
+                          .parents(std::move(parents_2))
+                          .Build())
                   .is_ok());
-  ASSERT_EQ(1, node_group_manager_->node_groups().at(spec_name_2)->node_representations().size());
+  ASSERT_EQ(1, composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs().size());
 
   // Bind the node that's in both device node_groups(). The node should only bind to one
-  // node group.
+  // composite node spec.
   auto matched_node = fdi::MatchedNodeRepresentationInfo{{
       .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
   }};
@@ -348,19 +352,19 @@ TEST_F(NodeGroupManagerTest, TestMultibind) {
       .node_names = {{"node-0"}},
   }});
 
-  ASSERT_OK(node_group_manager_->BindNodeRepresentation(fidl::ToWire(allocator, matched_node),
-                                                        std::weak_ptr<dfv2::Node>()));
-  ASSERT_TRUE(node_group_manager_->node_groups().at(spec_name_1)->node_representations()[1]);
-  ASSERT_FALSE(node_group_manager_->node_groups().at(spec_name_2)->node_representations()[0]);
+  ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
+                                                         std::weak_ptr<dfv2::Node>()));
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
+  ASSERT_FALSE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);
 
-  // Bind the node again. Both node groups should now have the bound node.
-  ASSERT_OK(node_group_manager_->BindNodeRepresentation(fidl::ToWire(allocator, matched_node),
-                                                        std::weak_ptr<dfv2::Node>()));
-  ASSERT_TRUE(node_group_manager_->node_groups().at(spec_name_1)->node_representations()[1]);
-  ASSERT_TRUE(node_group_manager_->node_groups().at(spec_name_2)->node_representations()[0]);
+  // Bind the node again. Both composite node specs should now have the bound node.
+  ASSERT_OK(composite_node_spec_manager_->BindParentSpec(fidl::ToWire(allocator, matched_node),
+                                                         std::weak_ptr<dfv2::Node>()));
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_1)->parent_specs()[1]);
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name_2)->parent_specs()[0]);
 }
 
-TEST_F(NodeGroupManagerTest, TestBindWithNoCompositeMatch) {
+TEST_F(CompositeNodeSpecManagerTest, TestBindWithNoCompositeMatch) {
   fidl::Arena allocator;
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_1(allocator, 1);
@@ -408,10 +412,10 @@ TEST_F(NodeGroupManagerTest, TestBindWithNoCompositeMatch) {
                   .name(fidl::StringView(allocator, spec_name))
                   .parents(std::move(parents))
                   .Build();
-  ASSERT_TRUE(AddNodeGroup(spec).is_ok());
-  ASSERT_TRUE(node_group_manager_->node_groups().at(spec_name));
+  ASSERT_TRUE(AddSpec(spec).is_ok());
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name));
 
-  //  Bind node group node 1.
+  //  Bind composite node spec node 1.
   auto matched_node = fdi::MatchedNodeRepresentationInfo{{
       .node_groups = std::vector<fdi::MatchedNodeGroupInfo>(),
   }};
@@ -421,13 +425,13 @@ TEST_F(NodeGroupManagerTest, TestBindWithNoCompositeMatch) {
       .num_nodes = 2,
       .node_names = {{"node-0", "node-1"}},
   }});
-  ASSERT_EQ(ZX_ERR_NOT_FOUND, node_group_manager_
-                                  ->BindNodeRepresentation(fidl::ToWire(allocator, matched_node),
-                                                           std::weak_ptr<dfv2::Node>())
-                                  .status_value());
+  ASSERT_EQ(ZX_ERR_NOT_FOUND,
+            composite_node_spec_manager_
+                ->BindParentSpec(fidl::ToWire(allocator, matched_node), std::weak_ptr<dfv2::Node>())
+                .status_value());
 
   // Add a composite match into the matched node info.
-  // Reattempt binding the node group node 1. With a matched composite driver, it should
+  // Reattempt binding the composite node spec node 1. With a matched composite driver, it should
   // now bind successfully.
   fdi::MatchedCompositeInfo composite_match{{
       .composite_name = "waxwing",
@@ -445,13 +449,13 @@ TEST_F(NodeGroupManagerTest, TestBindWithNoCompositeMatch) {
       .num_nodes = 2,
       .node_names = {{"node-0", "node-1"}},
   }});
-  ASSERT_OK(node_group_manager_->BindNodeRepresentation(
+  ASSERT_OK(composite_node_spec_manager_->BindParentSpec(
       fidl::ToWire(allocator, matched_node_with_composite), std::weak_ptr<dfv2::Node>()));
-  ASSERT_EQ(2, node_group_manager_->node_groups().at(spec_name)->node_representations().size());
-  ASSERT_TRUE(node_group_manager_->node_groups().at(spec_name)->node_representations()[0]);
+  ASSERT_EQ(2, composite_node_spec_manager_->specs().at(spec_name)->parent_specs().size());
+  ASSERT_TRUE(composite_node_spec_manager_->specs().at(spec_name)->parent_specs()[0]);
 }
 
-TEST_F(NodeGroupManagerTest, TestAddDuplicate) {
+TEST_F(CompositeNodeSpecManagerTest, TestAddDuplicate) {
   fidl::Arena allocator;
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_1(allocator, 1);
@@ -482,27 +486,27 @@ TEST_F(NodeGroupManagerTest, TestAddDuplicate) {
   };
 
   auto spec_name = "test_name";
-  bridge_.AddNodeGroupMatch(spec_name,
-                            fdi::MatchedNodeGroupInfo{{.composite = fdi::MatchedCompositeInfo{{
-                                                           .composite_name = "grosbeak",
-                                                       }},
-                                                       .node_names = {{"node-0"}}}});
+  bridge_.AddSpecMatch(spec_name,
+                       fdi::MatchedNodeGroupInfo{{.composite = fdi::MatchedCompositeInfo{{
+                                                      .composite_name = "grosbeak",
+                                                  }},
+                                                  .node_names = {{"node-0"}}}});
 
   auto spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
                   .name(fidl::StringView(allocator, spec_name))
                   .parents(std::move(parents))
                   .Build();
-  ASSERT_TRUE(AddNodeGroup(spec).is_ok());
+  ASSERT_TRUE(AddSpec(spec).is_ok());
 
   auto spec_2 = fdf::wire::CompositeNodeSpec::Builder(allocator)
                     .name(fidl::StringView(allocator, spec_name))
                     .parents(std::move(parents_2))
                     .Build();
   ASSERT_EQ(fuchsia_driver_framework::CompositeNodeSpecError::kAlreadyExists,
-            AddNodeGroup(spec_2).error_value());
+            AddSpec(spec_2).error_value());
 }
 
-TEST_F(NodeGroupManagerTest, TestRebindCompositeMatch) {
+TEST_F(CompositeNodeSpecManagerTest, TestRebindCompositeMatch) {
   fidl::Arena allocator;
 
   fidl::VectorView<fdf::wire::BindRule> bind_rules_1(allocator, 1);
@@ -552,15 +556,15 @@ TEST_F(NodeGroupManagerTest, TestRebindCompositeMatch) {
   fdi::MatchedNodeGroupInfo match{
       {.composite = composite_match, .node_names = {{"node-0", "node-1"}}}};
 
-  bridge_.AddNodeGroupMatch(spec_name, match);
+  bridge_.AddSpecMatch(spec_name, match);
 
   auto spec = fdf::wire::CompositeNodeSpec::Builder(allocator)
                   .name(fidl::StringView(allocator, spec_name))
                   .parents(std::move(parents))
                   .Build();
-  ASSERT_TRUE(AddNodeGroup(spec).is_ok());
-  ASSERT_EQ(2, node_group_manager_->node_groups().at(spec_name)->node_representations().size());
+  ASSERT_TRUE(AddSpec(spec).is_ok());
+  ASSERT_EQ(2, composite_node_spec_manager_->specs().at(spec_name)->parent_specs().size());
 
   ASSERT_EQ(fuchsia_driver_framework::CompositeNodeSpecError::kAlreadyExists,
-            AddNodeGroup(spec).error_value());
+            AddSpec(spec).error_value());
 }

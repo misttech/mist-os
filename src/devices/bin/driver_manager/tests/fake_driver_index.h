@@ -154,7 +154,7 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   async_dispatcher_t* dispatcher_;
   MatchCallback match_callback_;
 
-  // Maps a MatchedNodeGroupInfo to a node group topological path. This gets returned when
+  // Maps a MatchedNodeGroupInfo to a composite node spec topological path. This gets returned when
   // FakeDriverIndex receives an AddNodeGroup() call for a matching topological path.
   std::unordered_map<std::string, fuchsia_driver_index::MatchedNodeGroupInfo> node_group_match_;
 };

@@ -1690,7 +1690,7 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
 
   auto defer = fit::defer([this] { Unbind(); });
 
-  // Add a match for the node group that we are creating.
+  // Add a match for the composite node spec that we are creating.
   std::string name("test-group");
   const fuchsia_driver_index::MatchedNodeGroupInfo match({
       .composite = fuchsia_driver_index::MatchedCompositeInfo(
@@ -1716,27 +1716,25 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
                .properties = std::vector<fuchsia_driver_framework::NodeProperty>(),
            })}});
 
-  auto node_group = std::make_unique<NodeGroupV2>(
-      NodeGroupCreateInfo{
+  auto spec = std::make_unique<CompositeNodeSpecV2>(
+      CompositeNodeSpecCreateInfo{
           .name = name,
           .size = 2,
       },
       dispatcher(), &driver_runner);
   fidl::Arena<> arena;
-  auto added = driver_runner.node_group_manager().AddNodeGroup(fidl::ToWire(arena, fidl_spec),
-                                                               std::move(node_group));
+  auto added = driver_runner.composite_node_spec_manager().AddSpec(fidl::ToWire(arena, fidl_spec),
+                                                                   std::move(spec));
   ASSERT_TRUE(added.is_ok());
 
   RunLoopUntilIdle();
 
-  ASSERT_EQ(
-      2u, driver_runner.node_group_manager().node_groups().at(name)->node_representations().size());
+  ASSERT_EQ(2u,
+            driver_runner.composite_node_spec_manager().specs().at(name)->parent_specs().size());
 
-  ASSERT_FALSE(
-      driver_runner.node_group_manager().node_groups().at(name)->node_representations().at(0));
+  ASSERT_FALSE(driver_runner.composite_node_spec_manager().specs().at(name)->parent_specs().at(0));
 
-  ASSERT_FALSE(
-      driver_runner.node_group_manager().node_groups().at(name)->node_representations().at(1));
+  ASSERT_FALSE(driver_runner.composite_node_spec_manager().specs().at(name)->parent_specs().at(1));
 
   fdf::NodeControllerPtr node_controller;
   driver_host().SetStartHandler(
@@ -1761,11 +1759,9 @@ TEST_F(DriverRunnerTest, CreateAndBindNodeGroup) {
   auto root_driver = StartRootDriver("fuchsia-boot:///#meta/root-driver.cm", driver_runner);
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  ASSERT_TRUE(
-      driver_runner.node_group_manager().node_groups().at(name)->node_representations().at(0));
+  ASSERT_TRUE(driver_runner.composite_node_spec_manager().specs().at(name)->parent_specs().at(0));
 
-  ASSERT_TRUE(
-      driver_runner.node_group_manager().node_groups().at(name)->node_representations().at(1));
+  ASSERT_TRUE(driver_runner.composite_node_spec_manager().specs().at(name)->parent_specs().at(1));
 
   driver_host().SetStartHandler([this](fdf::DriverStartArgs start_args, auto request) {
     auto& entries = start_args.program().entries();

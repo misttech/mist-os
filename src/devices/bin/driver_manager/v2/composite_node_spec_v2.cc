@@ -8,14 +8,14 @@
 
 namespace dfv2 {
 
-NodeGroupV2::NodeGroupV2(NodeGroupCreateInfo create_info, async_dispatcher_t* dispatcher,
-                         NodeManager* node_manager)
-    : NodeGroup(create_info),
+CompositeNodeSpecV2::CompositeNodeSpecV2(CompositeNodeSpecCreateInfo create_info,
+                                         async_dispatcher_t* dispatcher, NodeManager* node_manager)
+    : CompositeNodeSpec(create_info),
       parent_set_collector_(std::nullopt),
       dispatcher_(dispatcher),
       node_manager_(node_manager) {}
 
-zx::result<std::optional<DeviceOrNode>> NodeGroupV2::BindNodeImpl(
+zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
     fuchsia_driver_index::wire::MatchedNodeGroupInfo info, const DeviceOrNode& device_or_node) {
   auto node_ptr = std::get_if<std::weak_ptr<dfv2::Node>>(&device_or_node);
   ZX_ASSERT(node_ptr);
@@ -35,14 +35,14 @@ zx::result<std::optional<DeviceOrNode>> NodeGroupV2::BindNodeImpl(
 
   auto owned_node = (*node_ptr).lock();
   if (owned_node->name() == "sysmem-fidl" || owned_node->name() == "sysmem-banjo") {
-    LOGF(DEBUG, "Node '%s' matched node representation '%d' of node group '%s'",
+    LOGF(DEBUG, "Node '%s' matched parent '%d' of composite node spec '%s'",
          owned_node->name().c_str(), info.node_index(), std::string(info.name().get()).c_str());
   } else {
-    LOGF(INFO, "Node '%s' matched node representation '%d' of node group '%s'",
+    LOGF(INFO, "Node '%s' matched parent '%d' of composite node spec '%s'",
          owned_node->name().c_str(), info.node_index(), std::string(info.name().get()).c_str());
   }
 
-  // Check if we have all the nodes for the node group.
+  // Check if we have all the nodes for the composite node spec.
   auto completed_parents = parent_set_collector_->GetIfComplete();
   if (!completed_parents.has_value()) {
     // Parent set is not complete yet.
@@ -55,7 +55,7 @@ zx::result<std::optional<DeviceOrNode>> NodeGroupV2::BindNodeImpl(
     node_names[i] = std::string(info.node_names()[i].get());
   }
 
-  // Create a composite node for the node group with our complete parent set.
+  // Create a composite node for the composite node spec with our complete parent set.
   auto composite =
       Node::CreateCompositeNode(composite_name, std::move(*completed_parents), node_names, {},
                                 node_manager_, dispatcher_, info.primary_index());
@@ -65,7 +65,7 @@ zx::result<std::optional<DeviceOrNode>> NodeGroupV2::BindNodeImpl(
     return composite.take_error();
   }
 
-  LOGF(INFO, "Built composite node '%s' for completed node group '%s'",
+  LOGF(INFO, "Built composite node '%s' for completed composite node spec '%s'",
        composite.value()->name().c_str(), std::string(info.name().get()).c_str());
 
   // We can return a pointer, as the composite node is owned by its parents.

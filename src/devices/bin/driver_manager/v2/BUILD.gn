@@ -104,7 +104,7 @@ fuchsia_unittest_component("composite-assembler-test") {
   deps = [ ":composite_assembler_test" ]
 }
 
-executable("node_group_v2_test") {
+executable("composite_node_spec_v2_test") {
   testonly = true
   sources = [ "composite_node_spec_v2_test.cc" ]
 
@@ -116,8 +116,8 @@ executable("node_group_v2_test") {
   ]
 }
 
-fuchsia_unittest_component("node-group-v2-test") {
-  deps = [ ":node_group_v2_test" ]
+fuchsia_unittest_component("composite-node-spec-v2-test") {
+  deps = [ ":composite_node_spec_v2_test" ]
 }
 
 executable("node_removal_tracker_test") {
@@ -143,7 +143,7 @@ fuchsia_test_package("driver-runner-tests") {
   }
 
   test_components = [
-    ":node-group-v2-test",
+    ":composite-node-spec-v2-test",
     ":driver-runner-test",
     ":composite-assembler-test",
     ":node-removal-tracker-test",

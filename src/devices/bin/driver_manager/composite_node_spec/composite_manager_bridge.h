@@ -16,12 +16,12 @@ class CompositeManagerBridge {
  public:
   virtual ~CompositeManagerBridge() = default;
 
-  // Match and bind all unbound nodes. Called by the NodeGroupManager
-  // after a node group is matched with a composite driver.
-  virtual void BindNodesForNodeGroups() = 0;
+  // Match and bind all unbound nodes. Called by the CompositeNodeManager
+  // after a composite node spec is matched to a composite driver.
+  virtual void BindNodesForCompositeNodeSpec() = 0;
 
-  virtual void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
-                                         AddToIndexCallback callback) = 0;
+  virtual void AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
+                                    AddToIndexCallback callback) = 0;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_MANAGER_BRIDGE_H_

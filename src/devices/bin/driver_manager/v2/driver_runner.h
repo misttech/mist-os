@@ -57,14 +57,14 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   void AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) override;
 
   // CompositeManagerBridge interface
-  void BindNodesForNodeGroups() override;
-  void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,
-                                 AddToIndexCallback callback) override;
+  void BindNodesForCompositeNodeSpec() override;
+  void AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,
+                            AddToIndexCallback callback) override;
 
   fpromise::promise<inspect::Inspector> Inspect() const;
   size_t NumOrphanedNodes() const;
   void PublishComponentRunner(component::OutgoingDirectory& outgoing);
-  void PublishNodeGroupManager(component::OutgoingDirectory& outgoing);
+  void PublishCompositeNodeManager(component::OutgoingDirectory& outgoing);
   zx::result<> StartRootDriver(std::string_view url);
   std::shared_ptr<Node> root_node();
   // This function schedules a callback to attempt to bind all orphaned nodes against
@@ -76,7 +76,7 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   void TryBindAllOrphans(NodeBindingInfoResultCallback result_callback);
 
   // Only exposed for testing.
-  NodeGroupManager& node_group_manager() { return node_group_manager_; }
+  CompositeNodeSpecManager& composite_node_spec_manager() { return composite_node_spec_manager_; }
 
   // Create a driver component with `url` against a given `node`.
   zx::result<> StartDriver(Node& node, std::string_view url,
@@ -131,8 +131,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   // This is for dfv2 composites.
   CompositeNodeManager composite_node_manager_;
 
-  // This is for dfv2 node groups.
-  NodeGroupManager node_group_manager_;
+  // This is for dfv2 composite node specs.
+  CompositeNodeSpecManager composite_node_spec_manager_;
 
   NodeRemovalTracker removal_tracker_;
 

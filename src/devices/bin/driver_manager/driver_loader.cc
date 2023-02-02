@@ -145,8 +145,8 @@ bool DriverLoader::MatchesLibnameDriverIndex(const std::string& driver_url,
   return driver_path == libname;
 }
 
-void DriverLoader::AddNodeGroup(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
-                                AddToIndexCallback callback) {
+void DriverLoader::AddCompositeNodeSpec(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
+                                        AddToIndexCallback callback) {
   auto result = driver_index_.sync()->AddNodeGroup(spec);
   if (!result.ok()) {
     LOGF(ERROR, "DriverIndex::AddNodeGroup failed %d", result.status());
@@ -255,7 +255,7 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
   for (auto driver : drivers) {
     // TODO(fxb/119111): Remove the old composite driver matching logic entirely.
     if (driver.is_composite_driver()) {
-      LOGF(WARNING, "DFv1 only supports matching composite drivers through node groups");
+      LOGF(WARNING, "DFv1 only supports matching composite drivers through composite node specs");
       continue;
     }
 

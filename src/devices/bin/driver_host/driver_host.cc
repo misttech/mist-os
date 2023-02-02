@@ -1280,11 +1280,12 @@ zx_status_t DriverHostContext::DeviceAddCompositeNodeSpec(const fbl::RefPtr<zx_d
             spec->metadata_list[i].length)};
   }
 
-  fdm::wire::NodeGroupDescriptor desc = {.nodes = parents, .metadata = metadata};
+  fdm::wire::CompositeNodeSpecDescriptor desc = {.parents = parents, .metadata = metadata};
 
-  auto response = client.sync()->AddNodeGroup(fidl::StringView(allocator, name), std::move(desc));
+  auto response =
+      client.sync()->AddCompositeNodeSpec(fidl::StringView(allocator, name), std::move(desc));
   auto status = response.status();
   auto call_status = status == ZX_OK && response->is_error() ? response->error_value() : ZX_OK;
 
-  return log_rpc_result(dev, "add-node-group", status, call_status);
+  return log_rpc_result(dev, "add-composite-node-spec", status, call_status);
 }

@@ -14,15 +14,15 @@ class FakeNodeManager : public dfv2::NodeManager {
   zx::result<dfv2::DriverHost*> CreateDriverHost() override { return zx::ok(nullptr); }
 };
 
-class NodeGroupV2Test : public gtest::TestLoopFixture {};
+class CompositeNodeSpecV2Test : public gtest::TestLoopFixture {};
 
-TEST_F(NodeGroupV2Test, NodeGroupBind) {
+TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   FakeNodeManager node_manager;
   fidl::Arena allocator;
 
-  auto node_group = dfv2::NodeGroupV2(
-      NodeGroupCreateInfo{
-          .name = "group",
+  auto spec = dfv2::CompositeNodeSpecV2(
+      CompositeNodeSpecCreateInfo{
+          .name = "spec",
           .size = 2,
       },
       dispatcher(), &node_manager);
@@ -33,32 +33,32 @@ TEST_F(NodeGroupV2Test, NodeGroupBind) {
            {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})});
 
   // Bind the first node.
-  auto node_1 =
-      std::shared_ptr<dfv2::Node>(new dfv2::Node("group_node_1", {}, &node_manager, dispatcher()));
-  auto matched_node_1 = fuchsia_driver_index::MatchedNodeGroupInfo({
-      .name = "group",
+  auto parent_1 =
+      std::shared_ptr<dfv2::Node>(new dfv2::Node("spec_parent_1", {}, &node_manager, dispatcher()));
+  auto matched_parent_1 = fuchsia_driver_index::MatchedNodeGroupInfo({
+      .name = "spec",
       .node_index = 0,
       .composite = matched_composite,
       .num_nodes = 2,
       .node_names = {{"node-0", "node-1"}},
       .primary_index = 1,
   });
-  auto result = node_group.BindNode(fidl::ToWire(allocator, matched_node_1), node_1);
+  auto result = spec.BindParent(fidl::ToWire(allocator, matched_parent_1), parent_1);
   ASSERT_TRUE(result.is_ok());
   ASSERT_FALSE(result.value());
 
   // Bind the second node.
-  auto node_2 =
-      std::shared_ptr<dfv2::Node>(new dfv2::Node("group_node_2", {}, &node_manager, dispatcher()));
-  auto matched_node_2 = fuchsia_driver_index::MatchedNodeGroupInfo({
-      .name = "group",
+  auto parent_2 =
+      std::shared_ptr<dfv2::Node>(new dfv2::Node("spec_parent_2", {}, &node_manager, dispatcher()));
+  auto matched_parent_2 = fuchsia_driver_index::MatchedNodeGroupInfo({
+      .name = "spec",
       .node_index = 1,
       .composite = matched_composite,
       .num_nodes = 2,
       .node_names = {{"node-0", "node-1"}},
       .primary_index = 1,
   });
-  result = node_group.BindNode(fidl::ToWire(allocator, matched_node_2), node_2);
+  result = spec.BindParent(fidl::ToWire(allocator, matched_parent_2), parent_2);
   ASSERT_TRUE(result.is_ok());
   ASSERT_TRUE(result.value());
 
@@ -67,8 +67,8 @@ TEST_F(NodeGroupV2Test, NodeGroupBind) {
   auto composite_node = composite_node_ptr.lock();
   ASSERT_TRUE(composite_node);
   ASSERT_TRUE(composite_node->IsComposite());
-  ASSERT_EQ("group_node_1", composite_node->parents()[0]->name());
-  ASSERT_EQ("group_node_2", composite_node->parents()[1]->name());
+  ASSERT_EQ("spec_parent_1", composite_node->parents()[0]->name());
+  ASSERT_EQ("spec_parent_2", composite_node->parents()[1]->name());
 
-  ASSERT_EQ("group_node_2", composite_node->GetPrimaryParent()->name());
+  ASSERT_EQ("spec_parent_2", composite_node->GetPrimaryParent()->name());
 }

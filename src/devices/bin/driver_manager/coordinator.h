@@ -139,8 +139,8 @@ class Coordinator : public CompositeManagerBridge,
 
   zx_status_t BindDriverToNodeGroup(const MatchedDriver& driver, const fbl::RefPtr<Device>& dev);
 
-  zx_status_t AddNodeGroup(const fbl::RefPtr<Device>& dev, std::string_view name,
-                           fuchsia_device_manager::wire::NodeGroupDescriptor group_desc);
+  zx_status_t AddCompositeNodeSpec(const fbl::RefPtr<Device>& dev, std::string_view name,
+                                   fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec);
 
   zx_status_t MakeVisible(const fbl::RefPtr<Device>& dev);
 
@@ -206,7 +206,9 @@ class Coordinator : public CompositeManagerBridge,
   InspectManager& inspect_manager() { return *inspect_manager_; }
   DriverLoader& driver_loader() { return driver_loader_; }
   DeviceManager* device_manager() const { return device_manager_.get(); }
-  NodeGroupManager& node_group_manager() const { return *node_group_manager_; }
+  CompositeNodeSpecManager& composite_node_spec_manager() const {
+    return *composite_node_spec_manager_;
+  }
   BindDriverManager& bind_driver_manager() const { return *bind_driver_manager_; }
   FirmwareLoader& firmware_loader() const { return *firmware_loader_; }
   zx::vmo& mexec_kernel_zbi() { return mexec_kernel_zbi_; }
@@ -216,9 +218,9 @@ class Coordinator : public CompositeManagerBridge,
 
  private:
   // CompositeManagerBridge interface
-  void BindNodesForNodeGroups() override;
-  void AddNodeGroupToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
-                                 AddToIndexCallback callback) override;
+  void BindNodesForCompositeNodeSpec() override;
+  void AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
+                            AddToIndexCallback callback) override;
 
   // fuchsia.driver.development/DriverDevelopment interface
   void RestartDriverHosts(RestartDriverHostsRequestView request,
@@ -279,7 +281,7 @@ class Coordinator : public CompositeManagerBridge,
 
   std::unique_ptr<DeviceManager> device_manager_;
 
-  std::unique_ptr<NodeGroupManager> node_group_manager_;
+  std::unique_ptr<CompositeNodeSpecManager> composite_node_spec_manager_;
 
   std::unique_ptr<BindDriverManager> bind_driver_manager_;
 

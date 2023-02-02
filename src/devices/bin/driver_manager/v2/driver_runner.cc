@@ -163,12 +163,12 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       root_node_(std::make_shared<Node>(kRootDeviceName, std::vector<Node*>{}, this, dispatcher)),
       composite_device_manager_(this, dispatcher, [this]() { this->TryBindAllOrphansUntracked(); }),
       composite_node_manager_(dispatcher_, this),
-      node_group_manager_(this) {
+      composite_node_spec_manager_(this) {
   inspector.GetRoot().CreateLazyNode(
       "driver_runner", [this] { return Inspect(); }, &inspector);
 }
 
-void DriverRunner::BindNodesForNodeGroups() { TryBindAllOrphansUntracked(); }
+void DriverRunner::BindNodesForCompositeNodeSpec() { TryBindAllOrphansUntracked(); }
 
 void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) {
   if (!request->has_name() || !request->has_parents()) {
@@ -181,17 +181,17 @@ void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& c
     return;
   }
 
-  auto node_group = std::make_unique<NodeGroupV2>(
-      NodeGroupCreateInfo{
+  auto spec = std::make_unique<CompositeNodeSpecV2>(
+      CompositeNodeSpecCreateInfo{
           .name = std::string(request->name().get()),
           .size = request->parents().count(),
       },
       dispatcher_, this);
-  completer.Reply(node_group_manager_.AddNodeGroup(*request, std::move(node_group)));
+  completer.Reply(composite_node_spec_manager_.AddSpec(*request, std::move(spec)));
 }
 
-void DriverRunner::AddNodeGroupToDriverIndex(
-    fuchsia_driver_framework::wire::CompositeNodeSpec group, AddToIndexCallback callback) {
+void DriverRunner::AddSpecToDriverIndex(fuchsia_driver_framework::wire::CompositeNodeSpec group,
+                                        AddToIndexCallback callback) {
   driver_index_->AddNodeGroup(group).Then(
       [callback = std::move(callback)](
           fidl::WireUnownedResult<fdi::DriverIndex::AddNodeGroup>& result) mutable {
@@ -256,7 +256,7 @@ void DriverRunner::PublishComponentRunner(component::OutgoingDirectory& outgoing
   composite_device_manager_.Publish(outgoing);
 }
 
-void DriverRunner::PublishNodeGroupManager(component::OutgoingDirectory& outgoing) {
+void DriverRunner::PublishCompositeNodeManager(component::OutgoingDirectory& outgoing) {
   auto result = outgoing.AddUnmanagedProtocol<fdf::CompositeNodeManager>(
       manager_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   ZX_ASSERT(result.is_ok());
@@ -441,7 +441,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       orphaned();
       LOGF(WARNING,
            "Failed to match Node '%s', the MatchedDriver is not a normal/composite"
-           "driver or a node group node.",
+           "driver or a composite node spec's parent.",
            driver_node->name().c_str());
       return;
     }
@@ -459,10 +459,11 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
     if (matched_driver.is_node_representation() &&
         !matched_driver.node_representation().has_node_groups()) {
       orphaned();
-      LOGF(WARNING,
-           "Failed to match Node '%s', the MatchedDriver is missing node groups for a device "
-           "group node.",
-           driver_node->name().c_str());
+      LOGF(
+          WARNING,
+          "Failed to match Node '%s', the MatchedDriver is missing composite node specs for a device "
+          "group node.",
+          driver_node->name().c_str());
       return;
     }
 
@@ -481,16 +482,16 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       driver_node = *composite;
     }
 
-    // If this is a node group match, bind the node into its node group and get the child
-    // and driver if its a completed node group to proceed with driver start.
+    // If this is a composite node spec match, bind the node into the spec. If the spec is
+    // completed, use the returned node and driver to start the driver.
     fdi::wire::MatchedDriverInfo driver_info;
     if (matched_driver.is_node_representation()) {
       auto node_groups = matched_driver.node_representation();
       auto result =
-          node_group_manager_.BindNodeRepresentation(node_groups, driver_node->weak_from_this());
+          composite_node_spec_manager_.BindParentSpec(node_groups, driver_node->weak_from_this());
       if (result.is_error()) {
         orphaned();
-        LOGF(ERROR, "Failed to bind node '%s' to any of the matched node group nodes.",
+        LOGF(ERROR, "Failed to bind node '%s' to any of the matched composite node spec parents.",
              driver_node->name().c_str());
         return;
       }
@@ -498,7 +499,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       auto composite_node_and_driver = result.value();
 
       // If it doesn't have a value but there was no error it just means the node was added
-      // to a node group but the node group is not complete yet.
+      // to a composite node spec but the spec is still incomplete.
       if (!composite_node_and_driver.has_value()) {
         return;
       }

@@ -22,8 +22,8 @@ zx_status_t BindDriverManager::BindDriverToDevice(const MatchedDriver& driver,
     auto device_ptr = std::shared_ptr<DeviceV1Wrapper>(new DeviceV1Wrapper{
         .device = dev,
     });
-    return coordinator_->node_group_manager()
-        .BindNodeRepresentation(*info, device_ptr)
+    return coordinator_->composite_node_spec_manager()
+        .BindParentSpec(*info, device_ptr)
         .status_value();
   }
 
@@ -187,7 +187,7 @@ void BindDriverManager::BindAllDevices(const DriverLoader::MatchDeviceConfig& co
   }
 }
 
-zx_status_t BindDriverManager::MatchAndBindNodeGroups(const fbl::RefPtr<Device>& dev) {
+zx_status_t BindDriverManager::MatchAndBindCompositeNodeSpec(const fbl::RefPtr<Device>& dev) {
   DriverLoader::MatchDeviceConfig config;
   auto result = MatchDevice(dev, config);
   if (!result.is_ok()) {
@@ -206,10 +206,10 @@ zx_status_t BindDriverManager::MatchAndBindNodeGroups(const fbl::RefPtr<Device>&
     auto device_ptr = std::shared_ptr<DeviceV1Wrapper>(new DeviceV1Wrapper{
         .device = dev,
     });
-    auto bind_result = coordinator_->node_group_manager().BindNodeRepresentation(
+    auto bind_result = coordinator_->composite_node_spec_manager().BindParentSpec(
         std::get<fdi::MatchedNodeRepresentationInfo>(driver), device_ptr);
     if (bind_result.is_error()) {
-      LOGF(WARNING, "Failed to bind node group node: %d", bind_result.status_value());
+      LOGF(WARNING, "Failed to bind parent: %d", bind_result.status_value());
     }
   }
 

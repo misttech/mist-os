@@ -967,10 +967,11 @@ void Device::AddCompositeDevice(AddCompositeDeviceRequestView request,
   }
 }
 
-void Device::AddNodeGroup(AddNodeGroupRequestView request, AddNodeGroupCompleter::Sync& completer) {
+void Device::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
+                                  AddCompositeNodeSpecCompleter::Sync& completer) {
   auto dev = fbl::RefPtr(this);
   zx_status_t status =
-      this->coordinator->AddNodeGroup(dev, request->name.get(), request->group_desc);
+      this->coordinator->AddCompositeNodeSpec(dev, request->name.get(), request->spec);
   if (status != ZX_OK) {
     completer.ReplyError(status);
   } else {

@@ -15,29 +15,29 @@ class Node;
 
 using DeviceOrNode = std::variant<std::weak_ptr<DeviceV1Wrapper>, std::weak_ptr<dfv2::Node>>;
 
-struct NodeGroupCreateInfo {
+struct CompositeNodeSpecCreateInfo {
   std::string name;
   size_t size;
 };
 
-// This partially abstract class represents a node group and is responsible for managing
-// its state and composite node. The NodeGroup class will manage the state of its bound
-// nodes while its subclasses manage the composite node under the node group. There should
-// be a subclass for DFv1 and DFv2.
-class NodeGroup {
+// This partially abstract class represents a composite node spec and is responsible for managing
+// its state and composite node. The CompositeNodeSpec class will manage the state of its bound
+// nodes while its subclasses manage the composite node under the spec. There should be a subclass
+// for DFv1 and DFv2.
+class CompositeNodeSpec {
  public:
-  // TODO(fxb/108360): Take in a primary_node_index when that is available in the match info.
-  explicit NodeGroup(NodeGroupCreateInfo create_info);
+  explicit CompositeNodeSpec(CompositeNodeSpecCreateInfo create_info);
 
-  virtual ~NodeGroup() = default;
+  virtual ~CompositeNodeSpec() = default;
 
-  // Called when NodeGroupManager receives a MatchedNodeRepresentation.
-  // Returns ZX_ERR_ALREADY_BOUND if it's already bound. See BindNodeImpl() for return type details.
-  zx::result<std::optional<DeviceOrNode>> BindNode(
+  // Called when CompositeNodeManager receives a MatchedNodeRepresentation.
+  // Returns ZX_ERR_ALREADY_BOUND if it's already bound. See BindParentImpl() for return type
+  // details.
+  zx::result<std::optional<DeviceOrNode>> BindParent(
       fuchsia_driver_index::wire::MatchedNodeGroupInfo info, const DeviceOrNode& device_or_node);
 
   // Exposed for testing.
-  const std::vector<bool>& node_representations() const { return node_representations_; }
+  const std::vector<bool>& parent_specs() const { return parent_specs_; }
 
  protected:
   // Subclass implementation for binding the DeviceOrNode to its composite. If the composite is not
@@ -45,13 +45,13 @@ class NodeGroup {
   // std::nullopt. In DFv2, if the composite is complete, it returns a pointer to the new node.
   // Otherwise, it returns std::nullopt. The lifetime of this node object is managed by
   // the parent nodes.
-  virtual zx::result<std::optional<DeviceOrNode>> BindNodeImpl(
+  virtual zx::result<std::optional<DeviceOrNode>> BindParentImpl(
       fuchsia_driver_index::wire::MatchedNodeGroupInfo info,
       const DeviceOrNode& device_or_node) = 0;
 
  private:
   std::string name_;
-  std::vector<bool> node_representations_;
+  std::vector<bool> parent_specs_;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_COMPOSITE_NODE_SPEC_COMPOSITE_NODE_SPEC_H_
