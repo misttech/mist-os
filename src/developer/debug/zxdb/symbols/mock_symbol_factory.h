@@ -17,7 +17,7 @@ namespace zxdb {
 // Symbols have a backpointer to their SymbolFactory, yet the mock symbol factory must contain
 // owning references to the symbols it vends. This creates a reference cycle that will leak.
 //
-// To get around this, the MockSymbolFactory is not actually a SymbolFactory implementat, but a
+// To get around this, the MockSymbolFactory is not actually a SymbolFactory implementation, but a
 // non-reference-counted wrapper object you should create on the stack (or as a member of your test
 // harness). It will clear all of the symbol references in the actual SymbolFactory implementation
 // when it goes out of scope, breaking the reference cycle.

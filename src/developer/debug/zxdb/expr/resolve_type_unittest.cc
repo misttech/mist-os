@@ -10,6 +10,7 @@
 #include "src/developer/debug/zxdb/symbols/collection.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
 #include "src/developer/debug/zxdb/symbols/index_test_support.h"
+#include "src/developer/debug/zxdb/symbols/mock_symbol_factory.h"
 #include "src/developer/debug/zxdb/symbols/modified_type.h"
 #include "src/developer/debug/zxdb/symbols/process_symbols_test_setup.h"
 #include "src/developer/debug/zxdb/symbols/type_test_support.h"
@@ -51,6 +52,46 @@ TEST(ResolveType, GetConcreteType) {
   EXPECT_EQ(def.get(), result_type.get());
   result_type = GetConcreteType(find_name_context, const_forward_decl.get());
   EXPECT_EQ(def.get(), result_type.get());
+}
+
+// Given this code:
+//   struct Foo;
+//   typedef Foo Foo;
+// that never provides a concrete definition of Foo:
+//
+// The struct forward declaration defines a DWARF structure type declaration. When we look that
+// up we can find the typedef which in turn references the structure. This test ensures that
+// GetConcreteType handles this cycle.
+TEST(ResolveType, TypedefCycle) {
+  ProcessSymbolsTestSetup setup;
+  MockModuleSymbols* module_symbols = setup.InjectMockModule();
+  SymbolContext symbol_context(ProcessSymbolsTestSetup::kDefaultLoadAddress);
+  MockSymbolFactory factory;
+
+  const char kStructName[] = "Foo";
+
+  // Struct forward declaration.
+  auto forward_decl = fxl::MakeRefCounted<Collection>(DwarfTag::kStructureType);
+  forward_decl->set_assigned_name(kStructName);
+  forward_decl->set_is_declaration(true);
+  // We need to set the lazy "this" member on the symbol so it has a valid DIE offset which is used
+  // for cycle checking.
+  forward_decl->set_lazy_this(UncachedLazySymbol(factory.factory_ref(), 1234));
+
+  // Create the typedef and index it. Also needs a unique DIE offset.
+  auto typedef_decl = fxl::MakeRefCounted<ModifiedType>(DwarfTag::kTypedef, forward_decl);
+  typedef_decl->set_assigned_name(kStructName);
+  typedef_decl->set_lazy_this(UncachedLazySymbol(factory.factory_ref(), 5678));
+  TestIndexedSymbol indexed_typedef(module_symbols, &module_symbols->index().root(), kStructName,
+                                    typedef_decl);
+
+  FindNameContext find_name_context(&setup.process(), symbol_context);
+  auto result_type = GetConcreteType(find_name_context, forward_decl.get());
+
+  // The specific answer is not very important. Since neither the typedef nor the struct have a
+  // real definition, either is plausibly valid for the return value for GetConcreteType(). The
+  // important thing is that one of them is returned and the above code doesn't infinitely loop.
+  EXPECT_TRUE(result_type.get() == forward_decl.get() || result_type.get() == typedef_decl.get());
 }
 
 }  // namespace zxdb

@@ -4,6 +4,9 @@
 
 #include "src/developer/debug/zxdb/expr/resolve_type.h"
 
+#include <algorithm>
+#include <vector>
+
 #include "src/developer/debug/zxdb/expr/find_name.h"
 #include "src/developer/debug/zxdb/expr/found_name.h"
 #include "src/developer/debug/zxdb/symbols/lazy_symbol.h"
@@ -15,10 +18,29 @@ fxl::RefPtr<Type> GetConcreteType(const FindNameContext& find_name_context, cons
   if (!type)
     return fxl::RefPtr<Type>();
 
-  // Iteratively strip C-V qualifications, follow typedefs, and follow forward
-  // declarations.
+  // The nonzero DIE offset of all nodes visited so far. This prevents cycles. For example,
+  //   struct Foo;
+  //   typedef Foo Foo;
+  // can create a cycle as looking up the struct forward declaration can resolve to the typedef
+  // which loops back.
+  //
+  // We assume that types with 0 DIE offsets are synthetic types manually made in tests and don't
+  // check those.
+  //
+  // This is a vector because we expect a maximum path in the single digits and brute-force is
+  // more efficient than heap-allocating a bunch of nodes for a set.
+  std::vector<uint64_t> checked_dies;
+
+  // Iteratively strip C-V qualifications, follow typedefs, and follow forward declarations.
   fxl::RefPtr<Type> cur = RefPtrTo(type);
   do {
+    if (uint64_t die_offset = cur->GetDieOffset()) {
+      // Non-synthetic symbol.
+      if (std::find(checked_dies.begin(), checked_dies.end(), die_offset) != checked_dies.end())
+        break;  // Already visited.
+      checked_dies.push_back(die_offset);
+    }
+
     // Follow forward declarations.
     if (cur->is_declaration()) {
       cur = FindTypeDefinition(find_name_context, cur.get());
@@ -26,7 +48,6 @@ fxl::RefPtr<Type> GetConcreteType(const FindNameContext& find_name_context, cons
         break;  // Declaration can't be resolved, give up.
     }
 
-    // Strip C-V qualifiers and follow typedefs.
     cur = RefPtrTo(cur->StripCVT());
   } while (cur && cur->is_declaration());
   return cur;
