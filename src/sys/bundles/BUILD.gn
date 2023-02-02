@@ -3,5 +3,8 @@
 # found in the LICENSE file.
 
 group("debugging") {
-  deps = [ "//src/sys/bin/psutils" ]
+  deps = [
+    "//src/sys/bin/psutils",
+    "//src/sys/tools/component",
+  ]
 }

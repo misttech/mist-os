@@ -290,13 +290,19 @@
             protocol: "fuchsia.sys2.LifecycleController",
             from: "framework",
             as: "fuchsia.sys2.LifecycleController.root",
-            to: "#core",
+            to: [
+                "#bootstrap",
+                "#core",
+            ],
         },
         {
             protocol: "fuchsia.sys2.RouteValidator",
             from: "framework",
             as: "fuchsia.sys2.RouteValidator.root",
-            to: "#core",
+            to: [
+                "#bootstrap",
+                "#core",
+            ],
         },
 
         // Offer boot resolver to `bootstrap` for driver usage.

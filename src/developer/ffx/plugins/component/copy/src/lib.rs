@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::Result, component_debug::copy::copy, errors::ffx_bail,
+    anyhow::Result, component_debug::copy::copy_cmd, errors::ffx_bail,
     ffx_component::rcs::connect_to_realm_query, ffx_component_copy_args::CopyComponentCommand,
     ffx_core::ffx_plugin, fidl_fuchsia_developer_remotecontrol as rc,
 };
@@ -16,7 +16,7 @@ pub async fn component_copy(
     let query_proxy = connect_to_realm_query(&rcs_proxy).await?;
     let CopyComponentCommand { paths, verbose } = cmd;
 
-    match copy(&query_proxy, paths, verbose).await {
+    match copy_cmd(&query_proxy, paths, verbose).await {
         Ok(_) => Ok(()),
         Err(e) => ffx_bail!("{}", e),
     }

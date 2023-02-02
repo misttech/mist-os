@@ -19,6 +19,9 @@ group("tests") {
     "disable_syscalls:tests",
     "dlog:tests",
 
+    # component_tool is an e2e test for all products.
+    "end_to_end/component_tool:tests",
+
     # fidlcat is an e2e test for all products.
     "end_to_end/fidlcat:tests",
     "end_to_end/package_manager:tests",

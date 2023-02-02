@@ -77,7 +77,7 @@ const NESTED_PATH_DEPTH: usize = 2;
 /// * `realm_query`: |RealmQueryProxy| to fetch the component's namespace.
 /// * `paths`: The host and remote paths used for file copying.
 /// * `verbose`: Flag used to indicate whether or not to print output to console.
-pub async fn copy(
+pub async fn copy_cmd(
     realm_query: &fsys::RealmQueryProxy,
     mut paths: Vec<String>,
     verbose: bool,
@@ -659,7 +659,9 @@ mod tests {
         populate_host_with_file_contents(&root_path, seed_files.clone()).unwrap();
         let realm_query = create_realm_query(seed_files, READ_ONLY);
 
-        copy(&realm_query, vec![input.source, destination_path], /*verbose=*/ false).await.unwrap();
+        copy_cmd(&realm_query, vec![input.source, destination_path], /*verbose=*/ false)
+            .await
+            .unwrap();
 
         let expected_data = expectation.data.to_owned().into_bytes();
         let actual_data_path_string = format!("{}{}", root_path, expectation.path);
@@ -708,7 +710,9 @@ mod tests {
         populate_host_with_file_contents(&root_path, seed_files.clone()).unwrap();
         let realm_query = create_realm_query(seed_files, READ_ONLY);
 
-        copy(&realm_query, vec![input.source, destination_path], /*verbose=*/ true).await.unwrap();
+        copy_cmd(&realm_query, vec![input.source, destination_path], /*verbose=*/ true)
+            .await
+            .unwrap();
 
         for expected in expectation {
             let expected_data = expected.data.to_owned().into_bytes();
@@ -731,7 +735,7 @@ mod tests {
         let destination_path = format!("{}{}", root_path, input.destination);
         let realm_query = create_realm_query(seed_files, READ_ONLY);
         let result =
-            copy(&realm_query, vec![input.source, destination_path], /*verbose=*/ true).await;
+            copy_cmd(&realm_query, vec![input.source, destination_path], /*verbose=*/ true).await;
 
         assert!(result.is_err());
     }
@@ -775,7 +779,9 @@ mod tests {
         write(&source_path, expectation.data.to_owned().into_bytes()).unwrap();
         let (realm_query, ns_dir) = create_realm_query_with_ns_client(seed_files, READ_WRITE);
 
-        copy(&realm_query, vec![source_path, input.destination], /*verbose=*/ false).await.unwrap();
+        copy_cmd(&realm_query, vec![source_path, input.destination], /*verbose=*/ false)
+            .await
+            .unwrap();
 
         let actual_data = read_data_from_namespace(&ns_dir, expectation.path).await.unwrap();
         let expected_data = expectation.data.to_owned().into_bytes();
@@ -822,7 +828,7 @@ mod tests {
         let (realm_query, destination_namespace) =
             create_realm_query_with_multiple_components(components, READ_WRITE);
 
-        copy(&realm_query, vec![input.source, input.destination], /*verbose=*/ false)
+        copy_cmd(&realm_query, vec![input.source, input.destination], /*verbose=*/ false)
             .await
             .unwrap();
 
@@ -860,7 +866,7 @@ mod tests {
         let (realm_query, _) = create_realm_query_with_multiple_components(components, READ_WRITE);
 
         let result =
-            copy(&realm_query, vec![input.source, input.destination], /*verbose=*/ false).await;
+            copy_cmd(&realm_query, vec![input.source, input.destination], /*verbose=*/ false).await;
 
         assert!(result.is_err());
     }
@@ -896,7 +902,7 @@ mod tests {
             input.sources.into_iter().map(|path| format!("{}{}", root_path, path)).collect();
         paths.push(input.destination.to_string());
 
-        copy(&realm_query, paths, /*verbose=*/ false).await.unwrap();
+        copy_cmd(&realm_query, paths, /*verbose=*/ false).await.unwrap();
 
         for expected in expectation {
             let actual_data = read_data_from_namespace(&ns_dir, expected.path).await.unwrap();
@@ -919,7 +925,7 @@ mod tests {
         let realm_query = create_realm_query(generate_directory_paths(vec!["data"]), READ_WRITE);
 
         let result =
-            copy(&realm_query, vec![source_path, input.destination], /*verbose=*/ false).await;
+            copy_cmd(&realm_query, vec![source_path, input.destination], /*verbose=*/ false).await;
 
         assert!(result.is_err());
     }
@@ -936,7 +942,7 @@ mod tests {
         let realm_query = create_realm_query(generate_directory_paths(vec!["data"]), READ_ONLY);
 
         let result =
-            copy(&realm_query, vec![source_path, input.destination], /*verbose=*/ false).await;
+            copy_cmd(&realm_query, vec![source_path, input.destination], /*verbose=*/ false).await;
 
         assert!(result.is_err());
     }
@@ -952,7 +958,7 @@ mod tests {
             generate_file_paths(vec![File { on_host: false, name: "data/foo.txt", data: "Hello" }]),
             READ_WRITE,
         );
-        let result = copy(&realm_query, paths, /*verbose=*/ false).await;
+        let result = copy_cmd(&realm_query, paths, /*verbose=*/ false).await;
 
         assert!(result.is_err());
     }
@@ -995,7 +1001,7 @@ mod tests {
             .collect();
         paths.push(input.destination.to_owned());
 
-        copy(&realm_query, paths, /*verbose=*/ false).await.unwrap();
+        copy_cmd(&realm_query, paths, /*verbose=*/ false).await.unwrap();
 
         for expected in expectation {
             let actual_data =

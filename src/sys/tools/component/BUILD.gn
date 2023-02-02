@@ -1,0 +1,30 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_binary.gni")
+
+rustc_binary("component") {
+  edition = "2021"
+
+  deps = [
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/sys/lib/component_debug",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
+  ]
+
+  # The component tool is only used in eng products, not production.
+  deps += [ "//build/validate:non_production_tag" ]
+
+  # This binary is a part of the bootfs image, so attempt to minimize
+  # its size impact.
+  configs += [ "//build/config/rust:bootfs" ]
+
+  sources = [
+    "src/args.rs",
+    "src/main.rs",
+  ]
+}
