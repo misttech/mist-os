@@ -142,43 +142,33 @@ fn process_payload(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent::Blueprint;
+    use crate::agent::AgentCreator;
     use crate::message::message_hub::MessageHub;
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
 
+    fn create(context: Context) -> futures::future::BoxFuture<'static, ()> {
+        Box::pin(async move {
+            let _ = &context;
+            let mut receptor = context.receptor;
+            fasync::Task::spawn(async move {
+                while let Ok((Payload::Invocation(_), client)) = receptor.next_of::<Payload>().await
+                {
+                    let _ =
+                        client.reply(Payload::Complete(Err(AgentError::UnexpectedError)).into());
+                }
+            })
+            .detach();
+        })
+    }
+
     #[fasync::run_until_stalled(test)]
     async fn test_log() {
-        struct TestAgentBlueprint;
-
-        impl Blueprint for TestAgentBlueprint {
-            fn debug_id(&self) -> &'static str {
-                "test_agent"
-            }
-
-            fn create(&self, context: Context) -> futures::future::BoxFuture<'static, ()> {
-                Box::pin(async move {
-                    let _ = &context;
-                    let mut receptor = context.receptor;
-                    fasync::Task::spawn(async move {
-                        while let Ok((Payload::Invocation(_), client)) =
-                            receptor.next_of::<Payload>().await
-                        {
-                            let _ = client
-                                .reply(Payload::Complete(Err(AgentError::UnexpectedError)).into());
-                        }
-                    })
-                    .detach();
-                })
-            }
-        }
-
         let delegate = MessageHub::create();
         let mut authority = Authority::create(delegate, HashSet::new(), HashSet::new())
             .await
             .expect("Should be able to create authority");
-        let agent = TestAgentBlueprint;
-        authority.register(AgentRegistrar::Blueprint(Arc::new(agent))).await;
+        authority.register(crate::create_agent!(test_agent, create)).await;
         let result = authority
             .execute_lifespan(
                 Lifespan::Initialization,
