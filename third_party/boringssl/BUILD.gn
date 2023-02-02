@@ -250,9 +250,7 @@ if (!is_kernel) {
       deps = [ ":ssl_test" ]
     }
     fuchsia_test_package("boringssl_tests") {
-      # ssl_test_component is disabled until upstream fixes b/261632678 which
-      # is breaking one of the tests and we roll the fix in
-      test_components = crypto_test_components  # + [ ":ssl_test_component" ]
+      test_components = crypto_test_components + [ ":ssl_test_component" ]
       deps = [
         "//src/connectivity/network/netstack:component",
         "//src/sys/stash:stash_secure_v2",
@@ -385,7 +383,10 @@ config("test_config") {
 
   # TODO(fxbug.dev/11049): Newer googletest's are spamming about an API rename, but
   # BoringSSL hasn't updated yet.
-  cflags = [ "-Wno-deprecated-declarations" ]
+  cflags = [
+    "-Wno-deprecated-declarations",
+    "-Wno-ignored-qualifiers", # trust_token_test.cc has an extra const
+  ]
 }
 
 config("fuzz_config") {

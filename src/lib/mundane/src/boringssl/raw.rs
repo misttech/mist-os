@@ -12,9 +12,8 @@
 //! This module also directly re-exports any raw bindings which are infallible
 //! (e.g., `void` functions).
 
-// Infallible functions and the `size_t` type.
 pub use bssl_sys::{
-    size_t, CBB_cleanup, CBB_len, CBS_init, CBS_len, CRYPTO_memcmp, EC_GROUP_get_curve_name,
+    CBB_cleanup, CBB_len, CBS_init, CBS_len, CRYPTO_memcmp, EC_GROUP_get_curve_name,
     ED25519_keypair, ED25519_keypair_from_seed, ERR_print_errors_cb, HMAC_CTX_init, HMAC_size,
     RC4_set_key, RSA_bits, RC4,
 };
@@ -36,7 +35,7 @@ use boringssl::BoringError;
 macro_rules! impl_hash_context {
     ($ctx:ident, $update:ident, $final:ident) => {
         #[allow(non_snake_case)]
-        pub unsafe fn $update(ctx: *mut ffi::$ctx, data: *const c_void, len: size_t) {
+        pub unsafe fn $update(ctx: *mut ffi::$ctx, data: *const c_void, len: usize) {
             // All XXX_Update functions promise to return 1.
             assert_abort_eq!(ffi::$update(ctx, data, len), 1);
         }
@@ -67,7 +66,7 @@ impl_traits!(CBS, CDestruct => _);
 
 #[allow(non_snake_case)]
 #[must_use]
-pub unsafe fn CBB_init(cbb: *mut CBB, initial_capacity: size_t) -> Result<(), BoringError> {
+pub unsafe fn CBB_init(cbb: *mut CBB, initial_capacity: usize) -> Result<(), BoringError> {
     one_or_err("CBB_init", ffi::CBB_init(cbb, initial_capacity))
 }
 
@@ -84,7 +83,7 @@ pub unsafe fn CBB_data(cbb: *const CBB) -> Result<NonNull<u8>, BoringError> {
 pub unsafe fn ED25519_sign(
     out: *mut [u8; 64],
     message: *const u8,
-    message_len: size_t,
+    message_len: usize,
     private_key: *const [u8; 64],
 ) -> Result<(), BoringError> {
     one_or_err(
@@ -97,7 +96,7 @@ pub unsafe fn ED25519_sign(
 #[must_use]
 pub unsafe fn ED25519_verify(
     message: *const u8,
-    message_len: size_t,
+    message_len: usize,
     signature: *const [u8; 64],
     public_key: *const [u8; 32],
 ) -> bool {
@@ -197,7 +196,7 @@ pub unsafe fn EC_KEY_set_group(
 pub unsafe fn ECDSA_sign(
     type_: c_int,
     digest: *const u8,
-    digest_len: size_t,
+    digest_len: usize,
     sig: *mut u8,
     sig_len: *mut c_uint,
     key: *const EC_KEY,
@@ -208,7 +207,7 @@ pub unsafe fn ECDSA_sign(
 #[allow(non_snake_case)]
 #[must_use]
 pub unsafe fn ECDSA_size(key: *const EC_KEY) -> Result<NonZeroUsize, BoringError> {
-    NonZeroUsize::new(ffi::ECDSA_size(key).into_usize())
+    NonZeroUsize::new(ffi::ECDSA_size(key))
         .ok_or_else(|| BoringError::consume_stack("ECDSA_size"))
 }
 
@@ -217,9 +216,9 @@ pub unsafe fn ECDSA_size(key: *const EC_KEY) -> Result<NonZeroUsize, BoringError
 pub unsafe fn ECDSA_verify(
     type_: c_int,
     digest: *const u8,
-    digest_len: size_t,
+    digest_len: usize,
     sig: *const u8,
-    sig_len: size_t,
+    sig_len: usize,
     key: *const EC_KEY,
 ) -> bool {
     match ffi::ECDSA_verify(type_, digest, digest_len, sig, sig_len, key) {
@@ -279,15 +278,15 @@ pub unsafe fn EVP_PKEY_get1_RSA(pkey: *mut EVP_PKEY) -> Result<NonNull<RSA>, Bor
 #[must_use]
 pub unsafe fn EVP_PBE_scrypt(
     password: *const c_char,
-    password_len: size_t,
+    password_len: usize,
     salt: *const u8,
-    salt_len: size_t,
+    salt_len: usize,
     N: u64,
     r: u64,
     p: u64,
-    max_mem: size_t,
+    max_mem: usize,
     out_key: *mut u8,
-    key_len: size_t,
+    key_len: usize,
 ) -> Result<(), BoringError> {
     one_or_err(
         "EVP_PBE_scrypt",
@@ -312,12 +311,12 @@ pub unsafe fn EVP_PBE_scrypt(
 #[must_use]
 pub unsafe fn PKCS5_PBKDF2_HMAC(
     password: *const c_char,
-    password_len: size_t,
+    password_len: usize,
     salt: *const u8,
-    salt_len: size_t,
+    salt_len: usize,
     iterations: c_uint,
     digest: *const EVP_MD,
-    key_len: size_t,
+    key_len: usize,
     out_key: *mut u8,
 ) -> Result<(), BoringError> {
     one_or_err(
@@ -350,14 +349,14 @@ impl_traits!(HMAC_CTX, CDestruct => HMAC_CTX_cleanup);
 pub unsafe fn HMAC_Init_ex(
     ctx: *mut HMAC_CTX,
     key: *const c_void,
-    key_len: size_t,
+    key_len: usize,
     md: *const EVP_MD,
 ) -> Result<(), BoringError> {
     one_or_err("HMAC_Init_ex", ffi::HMAC_Init_ex(ctx, key, key_len, md, ptr::null_mut()))
 }
 
 #[allow(non_snake_case)]
-pub unsafe fn HMAC_Update(ctx: *mut HMAC_CTX, data: *const u8, data_len: size_t) {
+pub unsafe fn HMAC_Update(ctx: *mut HMAC_CTX, data: *const u8, data_len: usize) {
     // HMAC_Update promises to return 1.
     assert_abort_eq!(ffi::HMAC_Update(ctx, data, data_len), 1);
 }
@@ -380,7 +379,7 @@ pub unsafe fn HMAC_CTX_copy(dest: *mut HMAC_CTX, src: *const HMAC_CTX) -> Result
 // rand.h
 
 #[allow(non_snake_case)]
-pub unsafe fn RAND_bytes(buf: *mut u8, len: size_t) {
+pub unsafe fn RAND_bytes(buf: *mut u8, len: usize) {
     // RAND_bytes promises to return 1.
     assert_abort_eq!(ffi::RAND_bytes(buf, len), 1);
 }
@@ -418,7 +417,7 @@ pub unsafe fn RSA_parse_private_key(cbs: *mut CBS) -> Result<NonNull<RSA>, Borin
 pub unsafe fn RSA_sign(
     hash_nid: c_int,
     in_: *const u8,
-    in_len: c_uint,
+    in_len: usize,
     out: *mut u8,
     out_len: *mut c_uint,
     key: *mut RSA,
@@ -430,11 +429,11 @@ pub unsafe fn RSA_sign(
 #[must_use]
 pub unsafe fn RSA_sign_pss_mgf1(
     rsa: *mut RSA,
-    out_len: *mut size_t,
+    out_len: *mut usize,
     out: *mut u8,
-    max_out: size_t,
+    max_out: usize,
     in_: *const u8,
-    in_len: size_t,
+    in_len: usize,
     md: *const EVP_MD,
     mgf1_md: *const EVP_MD,
     salt_len: c_int,
@@ -458,9 +457,9 @@ pub unsafe fn RSA_size(key: *const RSA) -> Result<NonZeroUsize, BoringError> {
 pub unsafe fn RSA_verify(
     hash_nid: c_int,
     msg: *const u8,
-    msg_len: size_t,
+    msg_len: usize,
     sig: *const u8,
-    sig_len: size_t,
+    sig_len: usize,
     rsa: *mut RSA,
 ) -> bool {
     match ffi::RSA_verify(hash_nid, msg, msg_len, sig, sig_len, rsa) {
@@ -476,12 +475,12 @@ pub unsafe fn RSA_verify(
 pub unsafe fn RSA_verify_pss_mgf1(
     rsa: *mut RSA,
     msg: *const u8,
-    msg_len: size_t,
+    msg_len: usize,
     md: *const EVP_MD,
     mgf1_md: *const EVP_MD,
     salt_len: c_int,
     sig: *const u8,
-    sig_len: size_t,
+    sig_len: usize,
 ) -> bool {
     match ffi::RSA_verify_pss_mgf1(rsa, msg, msg_len, md, mgf1_md, salt_len, sig, sig_len) {
         0 => false,
@@ -548,9 +547,9 @@ impl_hash_context!(SHA512_CTX, SHA512_Update, SHA512_Final);
 // If code is 1, returns Ok, otherwise returns Err. f should be the name of the
 // function that returned this value.
 #[must_use]
-pub fn one_or_err<S: TryInto<size_t>>(f: &str, code: S) -> Result<(), BoringError> {
+pub fn one_or_err<S: TryInto<usize>>(f: &str, code: S) -> Result<(), BoringError> {
     // If the conversion failed, then the value is definitely not 1 since 1 is
-    // representable in `size_t`. Thus, in that case, we assume there was an
+    // representable in `usize`. Thus, in that case, we assume there was an
     // error.
     if code.try_into().map(|code| code == 1).unwrap_or(false) {
         Ok(())
@@ -563,66 +562,4 @@ pub fn one_or_err<S: TryInto<size_t>>(f: &str, code: S) -> Result<(), BoringErro
 // of the function that returned this value.
 fn ptr_or_err<T>(f: &str, ptr: *mut T) -> Result<NonNull<T>, BoringError> {
     NonNull::new(ptr).ok_or_else(|| BoringError::consume_stack(f))
-}
-
-/// Convert from the `usize` type into the `size_t` type.
-///
-/// Bindgen generates its own `size_t` Rust type to act as the equivalent of the
-/// `size_t` C type. On all current platforms, this is an unsigned integer of
-/// the same size as the platform word size (e.g., `u64` on 64-bit platforms).
-/// On those platforms, `usize` and `size_t` are, in practice, interchangeable,
-/// though the type system doesn't know it. This trait exists to convert between
-/// them, and also to ensure that compilation fails if they are not
-/// interchangeable on a particular platform.
-pub trait IntoSizeT {
-    fn into_size_t(self) -> size_t;
-}
-
-/// Convert from the `size_t` type into the `usize` type.
-pub trait IntoUsize {
-    fn into_usize(self) -> usize;
-}
-
-#[cfg(target_pointer_width = "64")]
-impl IntoSizeT for usize {
-    fn into_size_t(self) -> size_t {
-        // This is an infallible conversion since we're on a 64-bit platform.
-        let x = self as u64;
-        // This line will stop compiling if `size_t` is no longer an alias for
-        // `u64`.
-        x
-    }
-}
-
-#[cfg(target_pointer_width = "64")]
-impl IntoUsize for size_t {
-    fn into_usize(self) -> usize {
-        // This line will stop compiling if `size_t` is no longer an alias for
-        // `u64`.
-        let x: u64 = self;
-        // This is an infallible conversion since we're on a 64-bit platform.
-        x as usize
-    }
-}
-
-#[cfg(target_pointer_width = "32")]
-impl IntoSizeT for usize {
-    fn into_size_t(self) -> size_t {
-        // This is an infallible conversion since we're on a 32-bit platform.
-        let x = self as u32;
-        // This line will stop compiling if `size_t` is no longer an alias for
-        // `u32`.
-        x
-    }
-}
-
-#[cfg(target_pointer_width = "32")]
-impl IntoUsize for size_t {
-    fn into_usize(self) -> usize {
-        // This line will stop compiling if `size_t` is no longer an alias for
-        // `u32`.
-        let x: u32 = self;
-        // This is an infallible conversion since we're on a 32-bit platform.
-        x as usize
-    }
 }

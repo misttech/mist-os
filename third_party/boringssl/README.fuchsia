@@ -14,7 +14,8 @@ Prerequisites:
 
 To update:
 1. `rustup update`
-1. `cargo install bindgen` and update BINDGEN_EXPECTED_VERSION in
+1. `rustup component add rustfmt`
+1. `cargo install bindgen-cli` and update BINDGEN_EXPECTED_VERSION in
    ./rust/boringssl-sys/bindgen.sh to `bindgen --version`. (If things regress,
    revert back to pinned version with `cargo install bindgen --version
    ${BINDGEN_EXPECTED_VERSION}` and investigate).
@@ -28,4 +29,4 @@ To update:
    looking for is at //integration/fuchsia/third_party/flower.
 
 Upstream revision:
-https://fuchsia.googlesource.com/third_party/boringssl/+/59e37765f1dbc63a121153f664505cf65499e66c/
+https://fuchsia.googlesource.com/third_party/boringssl/+/a5ab818854d1adf6ee866f768b47f6162f4ca0a9/

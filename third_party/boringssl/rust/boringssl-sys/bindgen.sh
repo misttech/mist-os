@@ -25,7 +25,7 @@ fi
 # changing the Rust types that are generated for particular C types). If a more
 # recent version of bindgen is available, "roll" bindgen by updating the
 # `BINDGEN_EXPECTED_VERSION` variable here.
-BINDGEN_EXPECTED_VERSION="bindgen 0.59.2"
+BINDGEN_EXPECTED_VERSION="bindgen 0.63.0"
 BINDGEN_GOT_VERSION="$(bindgen --version)"
 if [ "$BINDGEN_GOT_VERSION" != "$BINDGEN_EXPECTED_VERSION" ]; then
     echo "Unexpected version of bindgen: got $BINDGEN_GOT_VERSION; wanted $BINDGEN_EXPECTED_VERSION.
@@ -51,22 +51,22 @@ done
 # - Use the --use-core flag once std isn't required (see
 #   https://github.com/rust-lang-nursery/rust-bindgen/issues/1015)
 
-# Whitelist BoringSSL-related symbols so we don't get non-BoringSSL symbols such
+# Allowlist BoringSSL-related symbols so we don't get non-BoringSSL symbols such
 # as platform-specific symbols (specific to the platform that is running
-# 'bindgen') and other C standard library symbols. The whitelist is broken into
+# 'bindgen') and other C standard library symbols. The allowlist is broken into
 # two sections: symbols with a prefix followed by an underscore and symbols with
 # no following characters, such as the `RC4` function.
-WHITELIST="((AES|ERR|BIO|CRYPTO|RAND|V_ASN1|ASN1|B_ASN1|CBS_ASN1|CAST|EVP|CBS|CBB|CIPHER|OPENSSL|SSLEAY|DH|DES|DIGEST|DSA|NID|EC|ECDSA|ECDH|ED25519|X25519|PKCS5_PBKDF2|SHA|SHA1|SHA224|SHA256|SHA384|SHA512|HMAC|RSA|BN|RC4|MD5)_.*)|(RC4)$"
+ALLOWLIST="((AES|ERR|BIO|CRYPTO|RAND|V_ASN1|ASN1|B_ASN1|CBS_ASN1|CAST|EVP|CBS|CBB|CIPHER|OPENSSL|SSLEAY|DH|DES|DIGEST|DSA|NID|EC|ECDSA|ECDH|ED25519|X25519|PKCS5_PBKDF2|SHA|SHA1|SHA224|SHA256|SHA384|SHA512|HMAC|RSA|BN|RC4|MD5)_.*)|(RC4)$"
 # NOTE(joshlf) on --target: Currently, we just pass x86_64 since none of the
 # symbols we're linking against are architecture-specific (they may be
 # word-size-specific, but Fuchsia only targets 64-bit platforms). If this ever
 # becomes a problem, then the thing to do is probably to generate different
 # files for different platforms (bindgen_x86_64.rs, bindgen_arm64.rs, etc) and
 # conditionally compile them depending on target.
-bindgen bindgen.h \
-    --whitelist-function "$WHITELIST" \
-    --whitelist-type "$WHITELIST" \
-    --whitelist-var "$WHITELIST" \
+bindgen --verbose bindgen.h \
+    --allowlist-function "$ALLOWLIST" \
+    --allowlist-type "$ALLOWLIST" \
+    --allowlist-var "$ALLOWLIST" \
     -o src/lib.rs -- \
     -I $BSSL/include \
     -I $LIBC/include \
