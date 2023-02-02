@@ -3011,11 +3011,6 @@ extra_vbmeta_descriptors = [{
 
 From //build/images/vbmeta.gni:37
 
-### extract_minfs_metadata_on_corruption
-
-If extract_minfs_metadata_on_corruption is true, fshost extracts minfs metadata on finding it
-corrupted. Setting this flag to true helps debugging corruptions.
-
 **Current value (from the default):** `false`
 
 From //src/storage/fshost/generated_fshost_config.gni:31
