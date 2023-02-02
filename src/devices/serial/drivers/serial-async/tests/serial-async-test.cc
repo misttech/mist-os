@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fidl-async/cpp/bind.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fit/defer.h>
@@ -17,6 +16,7 @@
 #include <zxtest/zxtest.h>
 
 #include "serial.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
@@ -128,60 +128,64 @@ class FakeSerialImpl : public ddk::SerialImplAsyncProtocol<FakeSerialImpl, ddk::
 
 class SerialTester {
  public:
-  SerialTester() { ddk_.SetProtocol(ZX_PROTOCOL_SERIAL_IMPL_ASYNC, serial_impl_.proto()); }
+  SerialTester() {
+    root_->AddProtocol(ZX_PROTOCOL_SERIAL_IMPL_ASYNC, serial_impl_.proto()->ops,
+                       serial_impl_.proto()->ctx);
+  }
 
-  fake_ddk::Bind& ddk() { return ddk_; }
+  std::shared_ptr<MockDevice> root() { return root_; }
   FakeSerialImpl& serial_impl() { return serial_impl_; }
 
  private:
-  fake_ddk::Bind ddk_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   FakeSerialImpl serial_impl_;
 };
 
 TEST(SerialTest, InitNoProtocolParent) {
   // SerialTester is intentionally not defined in this scope as it would
   // define the ZX_PROTOCOL_SERIAL_IMPL protocol.
-  serial::SerialDevice device(fake_ddk::kFakeParent);
+  std::shared_ptr<MockDevice> root = MockDevice::FakeRootParent();
+  serial::SerialDevice device(root.get());
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, device.Init());
 }
 
 TEST(SerialTest, Init) {
   SerialTester tester;
-  serial::SerialDevice device(fake_ddk::kFakeParent);
+  serial::SerialDevice device(tester.root().get());
   ASSERT_EQ(ZX_OK, device.Init());
 }
 
 TEST(SerialTest, DdkLifetime) {
   SerialTester tester;
-  serial::SerialDevice* device(new serial::SerialDevice(fake_ddk::kFakeParent));
+  serial::SerialDevice* device(new serial::SerialDevice(tester.root().get()));
 
   ASSERT_EQ(ZX_OK, device->Init());
   ASSERT_EQ(ZX_OK, device->Bind());
   device->DdkAsyncRemove();
-  EXPECT_TRUE(tester.ddk().Ok());
-
-  // Delete the object.
-  device->DdkRelease();
+  mock_ddk::ReleaseFlaggedDevices(tester.root().get());
   ASSERT_FALSE(tester.serial_impl().enabled());
 }
 
 // Provides control primitives for tests that issue IO requests to the device.
 class SerialDeviceTest : public zxtest::Test {
  public:
-  SerialDeviceTest();
-  ~SerialDeviceTest();
-  fidl::WireSyncClient<fuchsia_hardware_serial::Device>& fidl() {
-    if (!fidl_.is_valid()) {
-      // Connect
-      auto connection =
-          fidl::WireSyncClient(tester_.ddk().FidlClient<fuchsia_hardware_serial::DeviceProxy>());
-      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_serial::Device>();
-      // TODO(fxbug.dev/97955) Consider handling the error instead of ignoring it.
-      (void)connection->GetChannel(std::move(endpoints->server));
-      fidl_ = fidl::WireSyncClient(std::move(endpoints->client));
-    }
-    return fidl_;
+  void SetUp() override {
+    device_ = new serial::SerialDevice(tester_.root().get());
+    ASSERT_OK(device_->Init());
+    loop_.StartThread();
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_serial::Device>();
+    ASSERT_OK(endpoints.status_value());
+    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), device_);
+    fidl_.Bind(std::move(endpoints->client));
   }
+
+  void TearDown() override {
+    loop_.Shutdown();
+    device_->DdkAsyncRemove();
+    mock_ddk::ReleaseFlaggedDevices(tester_.root().get());
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_serial::Device>& fidl() { return fidl_; }
   serial::SerialDevice* device() { return device_; }
   FakeSerialImpl& serial_impl() { return tester_.serial_impl(); }
 
@@ -191,18 +195,8 @@ class SerialDeviceTest : public zxtest::Test {
   fidl::WireSyncClient<fuchsia_hardware_serial::Device> fidl_;
   SerialTester tester_;
   serial::SerialDevice* device_;
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
-
-SerialDeviceTest::SerialDeviceTest() {
-  device_ = new serial::SerialDevice(fake_ddk::kFakeParent);
-
-  if (ZX_OK != device_->Init()) {
-    delete device_;
-    device_ = nullptr;
-  }
-}
-
-SerialDeviceTest::~SerialDeviceTest() { device_->DdkRelease(); }
 
 static zx_status_t SerialWrite(
     const fidl::WireSyncClient<fuchsia_hardware_serial::Device>& interface,
@@ -233,7 +227,6 @@ TEST_F(SerialDeviceTest, AsyncRead) {
   strcpy(serial_impl().read_buffer(), expected);
   serial_impl().set_state_and_notify(SERIAL_STATE_READABLE);
   ASSERT_OK(device()->Bind());
-  auto unbind = fit::defer([=]() { device()->DdkAsyncRemove(); });
   // Test.
   ASSERT_EQ(ZX_OK, Read(fidl(), &buffer));
   ASSERT_EQ(4, buffer.size());
@@ -249,7 +242,6 @@ TEST_F(SerialDeviceTest, AsyncWrite) {
 
   // Test set up.
   ASSERT_OK(device()->Bind());
-  auto unbind = fit::defer([=]() { device()->DdkAsyncRemove(); });
   serial_impl().set_state_and_notify(SERIAL_STATE_WRITABLE);
 
   // Test.

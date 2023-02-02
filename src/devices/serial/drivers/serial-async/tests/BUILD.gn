@@ -16,9 +16,7 @@ test("serial-async-unittest-bin") {
   include_dirs = [ ".." ]
   deps = [
     "..:common",
-
-    # TODO(fxb/115066): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/fidl-async",
     "//zircon/system/ulib/fidl-async:fidl-async-cpp",
     "//zircon/system/ulib/zxtest",
@@ -29,6 +27,12 @@ fuchsia_unittest_package("serial-async-unittest") {
   deps = [ ":serial-async-unittest-bin" ]
   test_specs = {
     environments = basic_envs
+
+    # There's expected error logs that happen in the failure test case
+    # InitNoProtocolParent.
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 
