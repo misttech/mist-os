@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <lib/fake_ddk/fake_ddk.h>
 
 #include <src/devices/sysmem/drivers/sysmem/device.h>
 #include <src/devices/sysmem/drivers/sysmem/driver.h>
@@ -38,10 +37,10 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
 
   LOGRTNC(size != kRequiredFuzzingBytes, "size: %zu != kRequiredFuzzingBytes: %zu\n", size,
           kRequiredFuzzingBytes);
-  FakeDdkSysmem fake_sysmem;
-  LOGRTNC(!fake_sysmem.Init(), "Failed FakeDdkSysmem::Init()\n");
+  MockDdkSysmem mock_sysmem;
+  LOGRTNC(!mock_sysmem.Init(), "Failed MockDdkSysmem::Init()\n");
 
-  auto allocator_client = fake_sysmem.Connect();
+  auto allocator_client = mock_sysmem.Connect();
   LOGRTN(allocator_client.status_value(), "Failed to connect to sysmem driver.\n");
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator(std::move(allocator_client.value()));
 

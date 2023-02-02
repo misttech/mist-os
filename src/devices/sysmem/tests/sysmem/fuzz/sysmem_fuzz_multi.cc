@@ -13,10 +13,10 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
           kBufferCollectionConstraintsSize);
   uint8_t* data_ptr = data;
 
-  FakeDdkSysmem fake_sysmem;
-  LOGRTNC(!fake_sysmem.Init(), "Failed FakeDdkSysmem::Init()\n");
+  MockDdkSysmem mock_sysmem;
+  LOGRTNC(!mock_sysmem.Init(), "Failed MockDdkSysmem::Init()\n");
 
-  auto allocator_client_1 = fake_sysmem.Connect();
+  auto allocator_client_1 = mock_sysmem.Connect();
   LOGRTN(allocator_client_1.status_value(), "Failed to connect to sysmem driver.\n");
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator_1(
       std::move(allocator_client_1.value()));
@@ -73,7 +73,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
   LOGRTN(set_constraints_result.status(), "BufferCollectionSetConstraints 1 failed.\n");
 
   // Client 2 connects to sysmem separately.
-  auto allocator_client_2 = fake_sysmem.Connect();
+  auto allocator_client_2 = mock_sysmem.Connect();
   LOGRTN(allocator_client_2.status_value(), "Failed to connect to sysmem driver. (2)\n");
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> allocator_2(
       std::move(allocator_client_2.value()));

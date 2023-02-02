@@ -6,29 +6,28 @@
 #define SRC_DEVICES_SYSMEM_TESTS_SYSMEM_FUZZ_SYSMEM_FUZZ_COMMON_H_
 
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <lib/fake_ddk/fake_ddk.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/sysmem/drivers/sysmem/driver.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
-class FakeDdkSysmem {
+class MockDdkSysmem {
  public:
-  ~FakeDdkSysmem();
-  fake_ddk::Bind& ddk() { return ddk_; }
+  ~MockDdkSysmem();
+  std::shared_ptr<MockDevice>& root() { return root_; }
 
   bool Init();
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> Connect();
 
  protected:
   bool initialized_ = false;
-  sysmem_driver::Driver sysmem_ctx_;
-  sysmem_driver::Device sysmem_{fake_ddk::kFakeParent, &sysmem_ctx_};
-
   fake_pdev::FakePDev pdev_;
-  // ddk must be destroyed before sysmem because it may be executing messages against sysmem on
-  // another thread.
-  fake_ddk::Bind ddk_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+
+  sysmem_driver::Driver sysmem_ctx_;
+  sysmem_driver::Device sysmem_{root_.get(), &sysmem_ctx_};
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 #endif  // SRC_DEVICES_SYSMEM_TESTS_SYSMEM_FUZZ_SYSMEM_FUZZ_COMMON_H_
