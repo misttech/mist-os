@@ -919,10 +919,10 @@ where
 
     // The service does not work without storage, so ensure it is always included first.
     agent_authority
-        .register(AgentRegistrar::Blueprint(Arc::new(crate::agent::storage_agent::Blueprint::new(
+        .register(crate::agent::storage_agent::create_registrar(
             device_storage_factory,
             fidl_storage_factory,
-        ))))
+        ))
         .await;
 
     for blueprint in agent_blueprints {

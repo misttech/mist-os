@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use crate::accessibility::types::AccessibilityInfo;
-use crate::agent::Blueprint;
 use crate::base::{get_all_setting_types, SettingInfo, SettingType, UnknownInfo};
 use crate::config::base::AgentType;
 use crate::handler::base::{ContextBuilder, Request};
@@ -149,11 +148,16 @@ async fn test_write_notify() {
     .await;
 
     let (directory_proxy, _stream) = create_proxy_and_stream::<DirectoryMarker>().unwrap();
-    let blueprint = crate::agent::storage_agent::Blueprint::new(
+    let blueprint = crate::agent::storage_agent::create_registrar(
         Arc::clone(&storage_factory),
         Arc::new(FidlStorageFactory::new(1, directory_proxy)),
     );
-    blueprint.create(agent_context).await;
+
+    match blueprint {
+        crate::agent::AgentRegistrar::Creator(c) => c.create(agent_context).await,
+        crate::agent::AgentRegistrar::Blueprint(c) => c.create(agent_context).await,
+    }
+
     let mut invocation_receptor = invocation_messenger.message(
         crate::agent::Payload::Invocation(crate::agent::Invocation {
             lifespan: crate::agent::Lifespan::Initialization,

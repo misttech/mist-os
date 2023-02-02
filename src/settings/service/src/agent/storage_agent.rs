@@ -10,12 +10,11 @@ use std::sync::Arc;
 
 use fuchsia_async as fasync;
 use fuchsia_trace as ftrace;
-use futures::future::BoxFuture;
 use futures::stream::{FuturesUnordered, StreamFuture};
 use futures::StreamExt;
 
 use crate::accessibility::types::AccessibilityInfo;
-use crate::agent::{self, Context, Lifespan};
+use crate::agent::{self, AgentCreator, AgentRegistrar, Context, CreationFunc, Lifespan};
 use crate::audio::policy as audio_policy;
 use crate::audio::types::AudioInfo;
 #[cfg(test)]
@@ -45,42 +44,24 @@ use settings_storage::fidl_storage::{FidlStorage, FidlStorageConvertible};
 use settings_storage::storage_factory::StorageFactory;
 use settings_storage::UpdateState;
 
-/// `Blueprint` struct for managing the state needed to construct a [`StorageAgent`].
-pub(crate) struct Blueprint<T, F>
-where
-    T: StorageFactory<Storage = DeviceStorage>,
-    F: StorageFactory<Storage = FidlStorage>,
-{
+pub(crate) fn create_registrar<T, F>(
     device_storage_factory: Arc<T>,
     fidl_storage_factory: Arc<F>,
-}
-
-impl<T, F> Blueprint<T, F>
-where
-    T: StorageFactory<Storage = DeviceStorage>,
-    F: StorageFactory<Storage = FidlStorage>,
-{
-    pub(crate) fn new(device_storage_factory: Arc<T>, fidl_storage_factory: Arc<F>) -> Self {
-        Self { device_storage_factory, fidl_storage_factory }
-    }
-}
-
-impl<T, F> agent::Blueprint for Blueprint<T, F>
+) -> AgentRegistrar
 where
     T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static,
     F: StorageFactory<Storage = FidlStorage> + Send + Sync + 'static,
 {
-    fn debug_id(&self) -> &'static str {
-        "StorageAgent"
-    }
-
-    fn create(&self, context: Context) -> BoxFuture<'static, ()> {
-        let device_storage_factory = Arc::clone(&self.device_storage_factory);
-        let fidl_storage_factory = Arc::clone(&self.fidl_storage_factory);
-        Box::pin(async move {
-            StorageAgent::create(context, device_storage_factory, fidl_storage_factory).await;
-        })
-    }
+    AgentRegistrar::Creator(AgentCreator {
+        debug_id: "StorageAgent",
+        create: CreationFunc::Dynamic(Arc::new(move |context| {
+            let device_storage_factory = device_storage_factory.clone();
+            let fidl_storage_factory = fidl_storage_factory.clone();
+            Box::pin(async move {
+                StorageAgent::create(context, device_storage_factory, fidl_storage_factory).await;
+            })
+        })),
+    })
 }
 
 pub(crate) struct StorageAgent<T, F>

@@ -123,7 +123,7 @@ pub struct AgentCreator {
 }
 
 impl AgentCreator {
-    fn create(&self, context: Context) -> AgentFuture {
+    pub(crate) fn create(&self, context: Context) -> AgentFuture {
         match &self.create {
             CreationFunc::Static(f) => (f)(context),
             CreationFunc::Dynamic(f) => (f)(context),
