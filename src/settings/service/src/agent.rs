@@ -95,7 +95,7 @@ pub enum CreationFunc {
     /// A simple wrapper around a static creation function.
     ///
     /// Example usage:
-    /// ```
+    /// ```no_run
     /// async fn create(c: Context) { }
     /// let f = CreationFunc::Static(|c| Box::Pin(example::create(c));
     /// ```
@@ -103,7 +103,7 @@ pub enum CreationFunc {
     /// Used for more complicate creation functions that need to capture state.
     ///
     /// Example usage:
-    /// ```
+    /// ```no_run
     /// let shared = Arc::new(Mutex::new(0u));
     /// let f = CreationFunc::Dynamic(Arc::new(move |c| -> AgentFuture {
     ///     let shared = shared.clone();
@@ -112,7 +112,6 @@ pub enum CreationFunc {
     ///     })
     /// }));
     /// ```
-    #[allow(dead_code)]
     Dynamic(Arc<dyn Fn(Context) -> AgentFuture>),
 }
 
