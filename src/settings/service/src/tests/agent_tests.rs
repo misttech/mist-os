@@ -4,17 +4,17 @@
 
 use crate::agent::authority::Authority;
 use crate::agent::{
-    AgentError, AgentRegistrar, BlueprintHandle, Context, Invocation, InvocationResult, Lifespan,
-    Payload,
+    AgentCreator, AgentError, AgentRegistrar, Context, CreationFunc, Invocation, InvocationResult,
+    Lifespan, Payload,
 };
 use crate::service;
 use crate::service_context::ServiceContext;
 use crate::storage::testing::InMemoryStorageFactory;
-use crate::tests::scaffold;
 use crate::EnvironmentBuilder;
 use core::fmt::{Debug, Formatter};
 use fuchsia_async as fasync;
 use futures::channel::mpsc::UnboundedSender;
+use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use rand::Rng;
@@ -68,7 +68,7 @@ impl TestAgent {
     ) -> Arc<Mutex<TestAgent>> {
         let (agent, generate) = Self::create(id, lifespan_target, callback);
 
-        authority.register(AgentRegistrar::Blueprint(generate)).await;
+        authority.register(generate).await;
 
         agent
     }
@@ -77,7 +77,7 @@ impl TestAgent {
         id: u32,
         lifespan_target: LifespanTarget,
         callback: CallbackSender,
-    ) -> (Arc<Mutex<TestAgent>>, BlueprintHandle) {
+    ) -> (Arc<Mutex<TestAgent>>, AgentRegistrar) {
         let agent = Arc::new(Mutex::new(TestAgent {
             id,
             last_invocation: None,
@@ -86,24 +86,31 @@ impl TestAgent {
         }));
 
         let agent_clone = agent.clone();
-        let blueprint = Arc::new(scaffold::agent::Blueprint::new(scaffold::agent::Generate::Sync(
-            Arc::new(move |mut context: Context| {
-                let agent = agent_clone.clone();
-                fasync::Task::spawn(async move {
-                    let _ = &context;
-                    while let Ok((Payload::Invocation(invocation), client)) =
-                        context.receptor.next_of::<Payload>().await
-                    {
-                        let _ = client.reply(
-                            Payload::Complete(agent.lock().await.handle(invocation).await).into(),
-                        );
-                    }
-                })
-                .detach();
-            }),
-        )));
 
-        (agent, blueprint)
+        let creation_func = CreationFunc::Dynamic(Arc::new(
+            move |mut context: Context| -> BoxFuture<'static, ()> {
+                let agent = agent_clone.clone();
+                Box::pin(async move {
+                    fasync::Task::spawn(async move {
+                        let _ = &context;
+                        while let Ok((Payload::Invocation(invocation), client)) =
+                            context.receptor.next_of::<Payload>().await
+                        {
+                            let _ = client.reply(
+                                Payload::Complete(agent.lock().await.handle(invocation).await)
+                                    .into(),
+                            );
+                        }
+                    })
+                    .detach();
+                })
+            },
+        ));
+
+        (
+            agent,
+            AgentRegistrar::Creator(AgentCreator { debug_id: "TestAgent", create: creation_func }),
+        )
     }
 
     async fn handle(&mut self, invocation: Invocation) -> InvocationResult {
@@ -181,10 +188,7 @@ async fn test_environment_startup() {
         TestAgent::create(startup_agent_id, LifespanTarget::Initialization, startup_tx);
 
     assert!(EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
-        .agents(vec![
-            AgentRegistrar::Blueprint(service_agent_generate),
-            AgentRegistrar::Blueprint(agent_generate),
-        ])
+        .agents(vec![service_agent_generate, agent_generate,])
         .spawn_nested(ENV_NAME)
         .await
         .is_ok());

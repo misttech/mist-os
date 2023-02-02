@@ -253,7 +253,6 @@ rustc_library("lib") {
     "src/tests/privacy_tests.rs",
     "src/tests/restore_agent_tests.rs",
     "src/tests/scaffold.rs",
-    "src/tests/scaffold/agent.rs",
     "src/tests/scaffold/event.rs",
     "src/tests/scaffold/workload.rs",
     "src/tests/service_configuration_tests.rs",
