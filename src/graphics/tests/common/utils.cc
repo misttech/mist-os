@@ -36,6 +36,10 @@ VulkanExtensionSupportState GetVulkanTimelineSemaphoreSupport(uint32_t instance_
     RTN_MSG(VulkanExtensionSupportState::kNotSupported, "Failed to get physical devices.\n");
   }
 
+  if (physical_devices.size() == 0) {
+    RTN_MSG(VulkanExtensionSupportState::kNotSupported, "Zero physical devices found.\n");
+  }
+
   const uint32_t kDeviceIndex = 0u;
   const auto &physical_device = physical_devices[kDeviceIndex];
   auto device_properties = physical_device.getProperties();

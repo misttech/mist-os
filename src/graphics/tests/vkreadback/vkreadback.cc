@@ -186,6 +186,9 @@ bool VkReadbackTest::InitVulkan(uint32_t vk_api_version) {
 #endif
   ctx_ = builder.Unique();
 
+  if (!ctx_)
+    return false;
+
 #ifdef __Fuchsia__
   // Initialize Fuchsia external memory procs.
   if (import_export_ != SELF) {

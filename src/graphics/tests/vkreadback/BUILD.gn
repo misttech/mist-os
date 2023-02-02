@@ -31,7 +31,7 @@ source_set("helper") {
 
 # Built both on Fuchsia and on the host.
 test("vkreadback_test") {
-  sources = [ "main.cc" ]
+  sources = [ "vkreadback_test.cc" ]
 
   deps = [
     ":helper",

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/graphics/tests/vkreadback/vkreadback.h"
+
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
@@ -12,7 +14,6 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/tests/common/utils.h"
-#include "src/graphics/tests/vkreadback/vkreadback.h"
 
 #include <vulkan/vulkan.hpp>
 
