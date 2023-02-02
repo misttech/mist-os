@@ -1,0 +1,228 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_binary.gni")
+import("//build/testing/host_test.gni")
+import("//build/testing/host_test_data.gni")
+
+# Declares a host-side Python E2E Mobly test.
+#
+# Mobly is an open-source Python test framework
+# that specializes at E2E tests with complex testbeds
+# such as multi-device testing.
+#
+# Example
+# ```
+# python_host_e2e_test("hello_world_test") {
+#   main_source = "my_mobly_test.py"
+#   sources = [
+#     "test_helpers_foo.py",
+#     "test_helpers_bar.py",
+#   ]
+#   libraries = [
+#     "//path/to/foo:lib",
+#     "//path/to/bar:lib",
+#   ]
+#   extra_args = [ "--a_mobly_test_flag" ]
+#   local_config_source = "mobly_config.yaml"
+#   params_source = "mobly_params.yaml"
+#  }
+# ```
+#
+# Example local Mobly config YAML content
+# ```
+# TestBeds:
+#   - Name: LocalTestbed
+#     Controllers:
+#       FuchsiaDevice:
+#         - nodename: "fuchsia-LOCAL_NODE_NAME"
+# ```
+#
+# Example Mobly test params YAML content
+# ```
+# bool_param: True
+# str_param: some_string
+# dict_param:
+#   fld_1: val_1
+#   fld_2: val_2
+# list_param:
+#   - 1
+#   - 2
+#   - 3
+#   - 4
+# ```
+#
+# Parameters
+#
+#  main_source (required)
+#    The Mobly .py test file that will be interpreted.
+#    Type: path
+#
+#  sources (optional)
+#    Other files that are used in the Mobly test.
+#    Type: list(path)
+#    Default: empty list
+#
+#  libraries (optional)
+#    Paths to python_libraries this Mobly test imports.
+#    Type: list(string)
+#    Default: empty list
+#
+#  test_dir (optional)
+#    Path to where the test executes.
+#    Type: string
+#    Default: "${root_out_dir}/test_data/${target_dir}"
+#
+#  extra_args (optional)
+#    Additional arguments to pass to the test.
+#    Type: list(string)
+#    Default: empty list
+#
+#  local_config_source (optional)
+#    Path to the Mobly YAML config file to use for local execution.
+#    If not provided, Mobly test will not be executable in the local env.
+#    Type: string
+#
+#  params_source (optional)
+#    Path to the Mobly test params YAML config file.
+#    If not provided, Mobly test will execute without test params.
+#    Type: string
+#
+#  test_data_deps (optional)
+#    List of test data GN targets that are needed at runtime.
+#    Type: list(string)
+#    Default: empty list
+#
+#  deps
+#  environments
+#  visibility
+
+template("python_mobly_test") {
+  assert(defined(invoker.main_source), "main_source is required")
+
+  #
+  # Define Mobly test python_binary().
+  #
+  _test_binary_name = "${target_name}.pyz"
+  _test_binary_target = "${target_name}_python_binary"
+  python_binary(_test_binary_target) {
+    forward_variables_from(invoker,
+                           [
+                             "main_source",
+                             "sources",
+                           ])
+
+    testonly = true
+    visibility = [ ":*" ]
+
+    output_name = _test_binary_name
+
+    # Mobly-specific entry point.
+    main_callable = "test_runner.main"
+
+    deps = [ "//third_party/mobly" ]
+    if (defined(invoker.libraries)) {
+      deps += invoker.libraries
+    }
+  }
+
+  _test_dir = "${target_out_dir}/test_data"
+  if (defined(invoker.test_dir)) {
+    _test_dir = invoker.test_dir
+  }
+
+  #
+  # Define Mobly test host_test_data().
+  #
+  _mobly_test_data_target = "${target_name}_test_data"
+  host_test_data(_mobly_test_data_target) {
+    visibility = [ ":*" ]
+
+    sources = [ get_label_info(":${_test_binary_target}", "target_out_dir") +
+                "/${_test_binary_name}" ]
+    outputs = [ "${_test_dir}/${_test_binary_name}" ]
+    deps = [ ":${_test_binary_target}" ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+  }
+
+  #
+  # Construct host test arguments.
+  #
+
+  # Mobly Driver is provided as the first host test argument so that it's the
+  # interpreter's entry-point. This allows Mobly Driver to wrap the execution
+  # lifecycle of the underlying Mobly test.
+  #
+  # We define Mobly Driver outside of this template so that the Mobly Driver
+  # binary is built only once but can be used/referenced for any Mobly tests.
+  _md_test_data_dir =
+      get_label_info("//src/testing/end_to_end/mobly_driver", "target_out_dir")
+  _host_test_args = [
+    rebase_path("${_md_test_data_dir}/mobly_driver.pyz", root_build_dir),
+    rebase_path("${_test_dir}/${_test_binary_name}", root_build_dir),
+  ]
+  _additional_deps = []
+
+  # If specified, define test params data target and data path add to host args.
+  if (defined(invoker.params_source)) {
+    _param_yaml_data_target = "${target_name}_params_data"
+    host_test_data(_param_yaml_data_target) {
+      sources = [ invoker.params_source ]
+      outputs = [ "${_test_dir}/test_params.yaml" ]
+    }
+
+    _host_test_args += [
+      "-params_yaml_path",
+      rebase_path("${_test_dir}/test_params.yaml", root_build_dir),
+    ]
+
+    _additional_deps += [ ":${_param_yaml_data_target}" ]
+  }
+
+  # If specified, define test config data target and add data path to host args.
+  if (defined(invoker.local_config_source)) {
+    _config_yaml_data_target = "${target_name}_config_data"
+    host_test_data(_config_yaml_data_target) {
+      sources = [ invoker.local_config_source ]
+      outputs = [ "${_test_dir}/config.yaml" ]
+    }
+
+    _host_test_args += [
+      "-config_yaml_path",
+      rebase_path("${_test_dir}/config.yaml", root_build_dir),
+    ]
+
+    _additional_deps += [ ":${_config_yaml_data_target}" ]
+  }
+
+  #
+  # Define the Mobly host_test().
+  #
+  host_test(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "environments",
+                             "visibility",
+                           ])
+
+    binary_path = python_exe_src
+    args = _host_test_args
+
+    if (defined(invoker.extra_args)) {
+      args += invoker.extra_args
+    }
+
+    deps =
+        [
+          ":${_mobly_test_data_target}",
+          "//build/python:interpreter",
+          "//src/testing/end_to_end/mobly_driver:mobly_driver_test_data_target",
+        ] + _additional_deps
+    if (defined(invoker.test_data_deps)) {
+      deps += invoker.test_data_deps
+    }
+  }
+}
