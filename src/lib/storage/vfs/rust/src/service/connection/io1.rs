@@ -48,10 +48,9 @@ impl Connection {
     pub fn create_connection(
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let task = Self::create_connection_task(scope.clone(), flags, mode, server_end);
+        let task = Self::create_connection_task(scope.clone(), flags, server_end);
         // If we failed to send the task to the executor, it is probably shut down or is in the
         // process of shutting down (this is the only error state currently).  So there is nothing
         // for us to do, but to ignore the open.  `server_end` will be closed when the object will
@@ -62,10 +61,9 @@ impl Connection {
     async fn create_connection_task(
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        let flags = match new_connection_validate_flags(flags, mode) {
+        let flags = match new_connection_validate_flags(flags) {
             Ok(updated) => updated,
             Err(status) => {
                 send_on_open_with_error(flags, server_end, status);
@@ -195,6 +193,6 @@ impl Connection {
             }
         };
 
-        Self::create_connection(self.scope.clone(), flags, 0, server_end);
+        Self::create_connection(self.scope.clone(), flags, server_end);
     }
 }

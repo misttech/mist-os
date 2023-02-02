@@ -22,7 +22,7 @@ pub type CapabilitySource = CapabilitySourceInterface<ComponentInstance>;
 #[async_trait]
 pub trait CapabilityProvider: Send + Sync {
     /// Binds a server end of a zx::Channel to the provided capability.  If the capability is a
-    /// directory, then `flags`, `open_mode` and `relative_path` will be propagated along to open
+    /// directory, then `flags`, and `relative_path` will be propagated along to open
     /// the appropriate directory.
     ///
     /// May return a `fuchsia_async::Task` to serve this capability. The caller should ensure that
@@ -31,7 +31,6 @@ pub trait CapabilityProvider: Send + Sync {
         self: Box<Self>,
         task_scope: TaskScope,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError>;
@@ -41,4 +40,6 @@ pub trait CapabilityProvider: Send + Sync {
 pub const PERMITTED_FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
     .union(fio::OpenFlags::RIGHT_READABLE)
     .union(fio::OpenFlags::RIGHT_WRITABLE)
-    .union(fio::OpenFlags::POSIX_WRITABLE);
+    .union(fio::OpenFlags::POSIX_WRITABLE)
+    .union(fio::OpenFlags::DIRECTORY)
+    .union(fio::OpenFlags::NOT_DIRECTORY);

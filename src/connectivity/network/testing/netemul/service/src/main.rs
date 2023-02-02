@@ -533,8 +533,7 @@ impl ManagedRealm {
                 ManagedRealmRequest::GetDevfs { devfs: server_end, control_handle: _ } => {
                     let () = devfs.clone().open(
                         vfs::execution_scope::ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE,
-                        fio::MODE_TYPE_DIRECTORY,
+                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                         vfs::path::Path::dot(),
                         server_end.into_channel().into(),
                     );
@@ -816,8 +815,7 @@ fn make_devfs() -> Result<(fio::DirectoryProxy, Arc<SimpleMutableDir>)> {
     let dir = vfs::directory::mutable::simple::simple();
     let () = dir.clone().open(
         vfs::execution_scope::ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_DIRECTORY,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         vfs::path::Path::dot(),
         server.into_channel().into(),
     );
@@ -2304,8 +2302,8 @@ mod tests {
             .expect("create directory proxy");
         let () = devfs
             .open(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+                fio::ModeType::empty(),
                 &ethernet_path,
                 server_end.into_channel().into(),
             )

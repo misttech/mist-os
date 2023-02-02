@@ -45,7 +45,7 @@ TEST(NullTest, Default) {
   ASSERT_STATUS(zxio_default_get_read_buffer_available(&io, nullptr), ZX_ERR_NOT_SUPPORTED);
 
   constexpr std::string_view name("hello");
-  ASSERT_STATUS(zxio_open_async(&io, 0u, 0u, name.data(), name.length(), ZX_HANDLE_INVALID),
+  ASSERT_STATUS(zxio_open_async(&io, {}, name.data(), name.length(), ZX_HANDLE_INVALID),
                 ZX_ERR_NOT_SUPPORTED);
   ASSERT_STATUS(zxio_add_inotify_filter(&io, name.data(), name.length(), 0u, 0, ZX_HANDLE_INVALID),
                 ZX_ERR_NOT_SUPPORTED);
@@ -110,7 +110,7 @@ TEST(NullTest, Null) {
   ASSERT_STATUS(zxio_default_get_read_buffer_available(&io, nullptr), ZX_ERR_NOT_SUPPORTED);
 
   constexpr std::string_view name("hello");
-  ASSERT_STATUS(zxio_open_async(&io, 0u, 0u, name.data(), name.length(), ZX_HANDLE_INVALID),
+  ASSERT_STATUS(zxio_open_async(&io, {}, name.data(), name.length(), ZX_HANDLE_INVALID),
                 ZX_ERR_NOT_SUPPORTED);
   ASSERT_STATUS(zxio_add_inotify_filter(&io, name.data(), name.length(), 0u, 0, ZX_HANDLE_INVALID),
                 ZX_ERR_NOT_SUPPORTED);

@@ -665,8 +665,9 @@ async fn use_restricted_storage_open_failure() {
         }),
         &parent_consumer_instance,
         OpenOptions::Storage(OpenStorageOptions {
-            flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            open_mode: fio::MODE_TYPE_DIRECTORY,
+            flags: fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             relative_path: ".".into(),
             server_chan: &mut server_end,
         }),
@@ -701,8 +702,9 @@ async fn use_restricted_storage_open_failure() {
         }),
         &parent_consumer_instance,
         OpenOptions::Storage(OpenStorageOptions {
-            flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            open_mode: fio::MODE_TYPE_DIRECTORY,
+            flags: fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             relative_path: ".".into(),
             server_chan: &mut server_end,
         }),
@@ -793,8 +795,9 @@ async fn open_storage_subdirectory() {
         }),
         &consumer_instance,
         OpenOptions::Storage(OpenStorageOptions {
-            flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            open_mode: fio::MODE_TYPE_DIRECTORY,
+            flags: fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             relative_path: ".".into(),
             server_chan: &mut server_end,
         }),
@@ -824,8 +827,9 @@ async fn open_storage_subdirectory() {
         }),
         &consumer_instance,
         OpenOptions::Storage(OpenStorageOptions {
-            flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            open_mode: fio::MODE_TYPE_DIRECTORY,
+            flags: fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             relative_path: "foo/bar".into(),
             server_chan: &mut server_end,
         }),

@@ -181,7 +181,6 @@ impl<T: LazyDirectory> DirectoryEntry for Lazy<T> {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         mut path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -197,7 +196,7 @@ impl<T: LazyDirectory> DirectoryEntry for Lazy<T> {
             let scope = scope.clone();
             async move {
                 match self.inner.get_entry(&name).await {
-                    Ok(entry) => entry.open(scope, flags, mode, path, server_end),
+                    Ok(entry) => entry.open(scope, flags, path, server_end),
                     Err(status) => send_on_open_with_error(flags, server_end, status),
                 }
             }

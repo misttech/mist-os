@@ -108,7 +108,7 @@ impl BlobfsRamdiskBuilder {
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::RIGHT_EXECUTABLE,
-            0,
+            fio::ModeType::empty(),
             "root",
             server.into_channel().into(),
         )?;

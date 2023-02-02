@@ -376,7 +376,7 @@ macro_rules! open_get_proxy_assert {
     ($proxy:expr, $flags:expr, $path:expr, $new_proxy_type:ty, $expected_pattern:pat,
      $expected_assertion:block) => {{
         use $crate::test_utils::node::open_get_proxy;
-        let new_proxy = open_get_proxy::<$new_proxy_type>($proxy, $flags, 0, $path);
+        let new_proxy = open_get_proxy::<$new_proxy_type>($proxy, $flags, $path);
         assert_event!(new_proxy, $expected_pattern, $expected_assertion);
         new_proxy
     }};

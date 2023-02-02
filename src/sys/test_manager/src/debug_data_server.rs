@@ -216,7 +216,12 @@ pub(crate) async fn serve_iterator(
             .into_iter()
             .map(|file_name| {
                 let (file, server) = create_endpoints::<fio::NodeMarker>()?;
-                directory.open(fuchsia_fs::OpenFlags::RIGHT_READABLE, 0, &file_name, server)?;
+                directory.open(
+                    fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                    fio::ModeType::empty(),
+                    &file_name,
+                    server,
+                )?;
                 tracing::info!("Serving debug data file {}: {}", dir_path, file_name);
                 Ok(ftest_manager::DebugData {
                     file: Some(ClientEnd::new(file.into_channel())),

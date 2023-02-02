@@ -34,9 +34,6 @@ use {
 /// Path to the service directory in an application's root namespace.
 const SVC_DIR: &'static str = "/svc";
 
-const SERVICE_FLAGS: fio::OpenFlags = fio::OpenFlags::empty();
-const SERVICE_DIR_FLAGS: fio::OpenFlags = SERVICE_FLAGS.union(fio::OpenFlags::DIRECTORY);
-
 /// A protocol connection request that allows checking if the protocol exists.
 pub struct ProtocolConnector<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> {
     svc_dir: D,
@@ -75,7 +72,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
             .borrow()
             .open(
                 fio::OpenFlags::RIGHT_READABLE,
-                0, /* mode */
+                fio::ModeType::empty(),
                 P::PROTOCOL_NAME,
                 ServerEnd::new(server_end),
             )
@@ -193,9 +190,26 @@ pub fn connect_to_named_protocol_at_dir_root<P: ProtocolMarker>(
     filename: &str,
 ) -> Result<P::Proxy, Error> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
-    let () = directory
-        .open(SERVICE_FLAGS, fio::MODE_TYPE_SERVICE, filename, server_end.into_channel().into())
-        .context("Failed to open protocol in directory")?;
+    // TODO(https://fxbug.dev/113160): Replacing this with fdio_service_connect_at causes
+    // PEER_CLOSED errors to go silently unreported, but the behavior is racy (reproduces locally
+    // under ASAN only, but everywhere in CQ). Reproduce by replacing this with
+    // fdio_service_connect_at and running:
+    //
+    // fx test -o fuchsia-pkg://fuchsia.com/session_manager_tests#meta/session_manager_tests.cm \
+    //   --test-filter=startup::tests::set_session_returns_error_if_binder_connection_fails
+    //
+    // fx test -o fuchsia-pkg://fuchsia.com/element_manager_tests#meta/element_manager_tests.cm \
+    //   --test-filter=element_manager::tests::launch_element_bind_error
+    let () = directory.open(
+        // TODO(https://fxbug.dev/120673): Replacing this with NOT_DIRECTORY produces test failures.
+        // Reproduce with:
+        //
+        // fx test -o component-manager-services-tests#meta/filtered-service-routing-test.cm
+        fio::OpenFlags::empty(),
+        fio::ModeType::empty(),
+        filename,
+        server_end.into_channel().into(),
+    )?;
     Ok(proxy)
 }
 
@@ -215,7 +229,13 @@ struct DirectoryProtocolImpl(fio::DirectoryProxy);
 impl MemberOpener for DirectoryProtocolImpl {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
         let Self(directory) = self;
-        directory.open(SERVICE_FLAGS, fio::MODE_TYPE_SERVICE, member, ServerEnd::new(server_end))
+        // NB: This can't use fdio::service_connect_at because the return type is fidl::Error.
+        directory.open(
+            fio::OpenFlags::NOT_DIRECTORY,
+            fio::ModeType::empty(),
+            member,
+            ServerEnd::new(server_end),
+        )
     }
 }
 
@@ -247,7 +267,7 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
 ) -> Result<S::Proxy, Error> {
     let service_path = format!("{}/{}/{}", path_prefix, S::SERVICE_NAME, instance);
     let directory_proxy =
-        fuchsia_fs::directory::open_in_namespace(&service_path, SERVICE_DIR_FLAGS)?;
+        fuchsia_fs::directory::open_in_namespace(&service_path, fio::OpenFlags::empty())?;
     Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
 }
 
@@ -272,7 +292,7 @@ pub fn connect_to_service_instance_at_dir<S: ServiceMarker>(
     let directory_proxy = fuchsia_fs::directory::open_directory_no_describe(
         directory,
         &service_path,
-        SERVICE_DIR_FLAGS,
+        fio::OpenFlags::empty(),
     )?;
     Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
 }
@@ -297,14 +317,19 @@ pub fn connect_to_service_instance_at_channel<S: ServiceMarker>(
     let (directory_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
     // NB: This has to use `fdio` because we are holding a channel rather than a
     // proxy, and we can't make FIDL calls on unowned channels in Rust.
-    let () = fdio::open_at(directory, &service_path, SERVICE_DIR_FLAGS, server_end.into_channel())?;
+    let () = fdio::open_at(
+        directory,
+        &service_path,
+        fio::OpenFlags::DIRECTORY,
+        server_end.into_channel(),
+    )?;
     Ok(S::Proxy::from_member_opener(Box::new(DirectoryProtocolImpl(directory_proxy))))
 }
 
 /// Opens a FIDL service as a directory, which holds instances of the service.
 pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
     let service_path = format!("{}/{}", SVC_DIR, S::SERVICE_NAME);
-    fuchsia_fs::directory::open_in_namespace(&service_path, SERVICE_DIR_FLAGS)
+    fuchsia_fs::directory::open_in_namespace(&service_path, fio::OpenFlags::empty())
         .context("namespace open failed")
 }
 
@@ -313,8 +338,12 @@ pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
 pub fn open_service_at_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
 ) -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::directory::open_directory_no_describe(directory, S::SERVICE_NAME, SERVICE_DIR_FLAGS)
-        .map_err(Into::into)
+    fuchsia_fs::directory::open_directory_no_describe(
+        directory,
+        S::SERVICE_NAME,
+        fio::OpenFlags::empty(),
+    )
+    .map_err(Into::into)
 }
 
 /// Opens the exposed directory from a child. Only works in CFv2, and only works if this component
@@ -983,8 +1012,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(dir_server.into_channel()),
         );

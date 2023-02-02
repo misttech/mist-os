@@ -24,7 +24,7 @@ fbl::unique_fd PseudoDirServer::OpenAt(std::string path) {
   fuchsia::io::NodePtr node;
   dir_ptr_->Open(
       /*flags=*/fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::DESCRIBE,
-      /*mode=*/0u, path, node.NewRequest());
+      /*mode=*/{}, path, node.NewRequest());
 
   return fsl::OpenChannelAsFileDescriptor(node.Unbind().TakeChannel());
 }

@@ -42,8 +42,6 @@ type OpenFlags = strict bits : uint32 {
     /// can be used to open a protocol that does not compose fuchsia.io/Node; the event is sent as
     /// if the protocol is fuchsia.io/Node and then the target protocol is used exclusively.
     DESCRIBE = 0x00800000;
-    @available(deprecated=7, removed=HEAD, note="Use POSIX_WRITABLE/POSIX_EXECUTABLE instead.")
-    POSIX_DEPRECATED = 0x01000000;
     /// Specify this flag to request POSIX-compatibility with respect to write permission handling.
     /// Currently, it affects permission handling specifically during Open:
     /// - If the target path is a directory, the rights on the new connection expand to include
@@ -84,6 +82,10 @@ type OpenFlags = strict bits : uint32 {
     /// regardless if it is a file or directory. Otherwise, clone attempts to use the requested rights.
     /// It is invalid to pass any of the `RIGHT_*` flags together with `OpenFlags.CLONE_SAME_RIGHTS`.
     CLONE_SAME_RIGHTS = 0x04000000;
+
+    /// Open the target object as a block device.
+    // TODO(https://fxbug.dev/120898): this form of protocol negotiation is unprincipled.
+    BLOCK_DEVICE = 0x01000000;
 };
 
 /// All known rights.
@@ -94,20 +96,7 @@ const OPEN_RIGHTS OpenFlags
 const OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE OpenFlags
         = OpenFlags.DIRECTORY | OpenFlags.NOT_DIRECTORY | OpenFlags.DESCRIBE | OpenFlags.NODE_REFERENCE;
 
-/// Bits reserved for posix protections. Native fuchsia filesystems
-/// are not required to set bits contained within `MODE_PROTECTION_MASK`,
-/// but filesystems that wish to do so may refer to sys/stat.h for their
-/// definitions.
-const MODE_PROTECTION_MASK uint32 = 0x00FFF;
-/// Bits indicating node type. The canonical mechanism to check
-/// for a node type is to take 'mode', bitwise AND it with the
-/// `MODE_TYPE_MASK`, and check exact equality against a mode type.
-const MODE_TYPE_MASK uint32 = 0xFF000;
-
-const MODE_TYPE_BLOCK_DEVICE uint32 = 0x02000;
-const MODE_TYPE_DIRECTORY uint32 = 0x04000;
-const MODE_TYPE_FILE uint32 = 0x08000;
-const MODE_TYPE_SERVICE uint32 = 0x10000;
+type ModeType = flexible bits : uint32 {};
 
 /// The maximal buffer size which can be transmitted for buffered operations.
 /// This capacity is currently set somewhat arbitrarily.
@@ -210,17 +199,11 @@ protocol Openable {
     /// Exceeding those rights causes an access denied error to be transmitted in the
     /// `OnOpen` event if applicable, and the `object` connection closed.
     ///
-    /// `mode` is only used if an object is created and indicates the type of object to be
-    /// created. An unsupported mode will cause the connection to be closed.
-    /// The mode type, if set, must always be consistent with the OpenFlags.DIRECTORY and
-    /// OpenFlags.NOT_DIRECTORY flags, even if an object is not being created. If an object is not
-    /// being created, `mode` is otherwise ignored. If an object is being created and the mode
-    /// type is not set, a directory will be created if OpenFlags.DIRECTORY is set (explicitly or
-    /// implicitly), or otherwise a server chosen object type.
+    /// `mode` is ignored.
     @selector("fuchsia.io1/Directory.Open")
     Open(resource struct {
         flags OpenFlags;
-        mode uint32;
+        mode ModeType;
         path string:MAX_PATH;
         object server_end:Node;
     });

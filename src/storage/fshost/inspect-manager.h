@@ -19,7 +19,7 @@ namespace fshost {
 // Utility to open a directory at the given `path` under `root`. The resulting channel handle will
 // be in `result`. The returned `status` indicates whether the operation was successful or not.
 zx_status_t OpenNode(fidl::UnownedClientEnd<fuchsia_io::Directory> root, const std::string& path,
-                     uint32_t mode, fidl::ClientEnd<fuchsia_io::Node>* result);
+                     fuchsia_io::wire::OpenFlags flags, fidl::ClientEnd<fuchsia_io::Node>* result);
 
 // Management of fshost inspect data.
 class FshostInspectManager {

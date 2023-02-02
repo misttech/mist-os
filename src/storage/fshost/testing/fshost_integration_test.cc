@@ -102,7 +102,7 @@ std::pair<fbl::unique_fd, uint64_t> FshostIntegrationTest::WaitForMount(
   for (int i = 0; i < kMaxRetries; i++) {
     auto root_endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
     EXPECT_EQ(root_endpoints.status_value(), ZX_OK);
-    auto open_res = exposed_dir()->Open(fuchsia_io::wire::OpenFlags::kRightReadable, 0,
+    auto open_res = exposed_dir()->Open(fuchsia_io::wire::OpenFlags::kRightReadable, {},
                                         fidl::StringView::FromExternal(name),
                                         std::move(root_endpoints->server));
     EXPECT_EQ(open_res.status(), ZX_OK);

@@ -75,10 +75,9 @@ async fn resolve(
     };
 
     let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY;
-    let mode = fio::MODE_TYPE_DIRECTORY;
     let node = ServerEnd::from(directory_request.into_channel());
 
-    root.open(ExecutionScope::new(), flags, mode, vfs::path::Path::dot(), node);
+    root.open(ExecutionScope::new(), flags, vfs::path::Path::dot(), node);
 
     Ok(())
 }

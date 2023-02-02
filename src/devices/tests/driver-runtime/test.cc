@@ -37,7 +37,7 @@ class RuntimeTest : public gtest::TestLoopFixture {
     // Connect to dev.
     fidl::InterfaceHandle<fuchsia::io::Node> dev;
     zx_status_t status = realm_->component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE,
-                                                             0, "dev", dev.NewRequest());
+                                                             {}, "dev", dev.NewRequest());
     ASSERT_EQ(status, ZX_OK);
 
     fbl::unique_fd root_fd;

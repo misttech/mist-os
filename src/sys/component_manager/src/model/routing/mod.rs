@@ -121,27 +121,21 @@ pub async fn route(
 /// [`crate::model::policy::GlobalPolicyChecker`], the capability is then opened at its source
 /// triggering a `CapabilityRouted` event.
 ///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `open_mode`, `relative_path`,
+/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
 /// and `server_chan` parameters are used in the open call.
 ///
 /// Only capabilities that can be installed in a namespace are supported: Protocol, Service,
 /// Directory, and Storage.
 pub(super) async fn route_and_open_namespace_capability(
     flags: fio::OpenFlags,
-    open_mode: u32,
     relative_path: String,
     use_decl: UseDecl,
     target: &Arc<ComponentInstance>,
     server_chan: &mut zx::Channel,
 ) -> Result<(), ModelError> {
     let route_request = request_for_namespace_capability_use(use_decl)?;
-    let open_options = OpenOptions::for_namespace_capability(
-        &route_request,
-        flags,
-        open_mode,
-        relative_path,
-        server_chan,
-    )?;
+    let open_options =
+        OpenOptions::for_namespace_capability(&route_request, flags, relative_path, server_chan)?;
     route_and_open_capability(route_request, target, open_options).await
 }
 
@@ -151,27 +145,21 @@ pub(super) async fn route_and_open_namespace_capability(
 /// [`crate::model::policy::GlobalPolicyChecker`], the capability is then opened at its source
 /// triggering a `CapabilityRouted` event.
 ///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `open_mode`, `relative_path`,
+/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
 /// and `server_chan` parameters are used in the open call.
 ///
 /// Only capabilities that can both be opened from a VFS and be exposed to their parent
 /// are supported: Protocol, Service, and Directory.
 pub(super) async fn route_and_open_namespace_capability_from_expose(
     flags: fio::OpenFlags,
-    open_mode: u32,
     relative_path: String,
     expose_decl: ExposeDecl,
     target: &Arc<ComponentInstance>,
     server_chan: &mut zx::Channel,
 ) -> Result<(), ModelError> {
     let route_request = request_for_namespace_capability_expose(expose_decl)?;
-    let open_options = OpenOptions::for_namespace_capability(
-        &route_request,
-        flags,
-        open_mode,
-        relative_path,
-        server_chan,
-    )?;
+    let open_options =
+        OpenOptions::for_namespace_capability(&route_request, flags, relative_path, server_chan)?;
     route_and_open_capability(route_request, target, open_options).await
 }
 
@@ -336,10 +324,10 @@ async fn get_default_provider(
 /// Opens the capability at `source`, triggering a `CapabilityRouted` event and binding
 /// to the source component instance if necessary.
 ///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `open_mode`, `relative_path`,
+/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
 /// and `server_chan` parameters are used in the open call.
 pub async fn open_capability_at_source(open_request: OpenRequest<'_>) -> Result<(), ModelError> {
-    let OpenRequest { flags, open_mode, relative_path, source, target, server_chan } = open_request;
+    let OpenRequest { flags, relative_path, source, target, server_chan } = open_request;
 
     let capability_provider =
         if let Some(provider) = get_default_provider(target.as_weak(), &source).await? {
@@ -369,7 +357,7 @@ pub async fn open_capability_at_source(open_request: OpenRequest<'_>) -> Result<
             ExtendedInstance::AboveRoot(top) => top.task_scope(),
             ExtendedInstance::Component(component) => component.nonblocking_task_scope(),
         };
-        capability_provider.open(task_scope, flags, open_mode, relative_path, server_chan).await?;
+        capability_provider.open(task_scope, flags, relative_path, server_chan).await?;
         Ok(())
     } else {
         match &source {
@@ -524,7 +512,7 @@ pub async fn report_routing_failure(
 /// Routes a storage capability from `target` to its source and opens its backing directory
 /// capability, binding to the component instance if necessary.
 ///
-/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `open_mode`, `relative_path`,
+/// See [`fidl_fuchsia_io::Directory::Open`] for how the `flags`, `relative_path`,
 /// and `server_chan` parameters are used in the open call.
 async fn open_storage_capability(
     source: &storage::StorageCapabilitySource,
@@ -535,13 +523,7 @@ async fn open_storage_capability(
     let dir_source = source.storage_provider.clone();
     let relative_moniker_2 = relative_moniker.clone();
     match options {
-        OpenOptions::Storage(OpenStorageOptions {
-            flags,
-            open_mode,
-            relative_path,
-            server_chan,
-            ..
-        }) => {
+        OpenOptions::Storage(OpenStorageOptions { flags, relative_path, server_chan, .. }) => {
             let storage_dir_proxy = storage::open_isolated_storage(
                 &source,
                 target.persistent_storage,
@@ -560,7 +542,7 @@ async fn open_storage_capability(
             let relative_path = if relative_path.is_empty() { "." } else { &relative_path };
 
             storage_dir_proxy
-                .open(flags, open_mode, relative_path, ServerEnd::new(server_chan))
+                .open(flags, fio::ModeType::empty(), relative_path, ServerEnd::new(server_chan))
                 .map_err(|e| {
                     let moniker = match &dir_source {
                         Some(r) => InstancedExtendedMoniker::ComponentInstance(

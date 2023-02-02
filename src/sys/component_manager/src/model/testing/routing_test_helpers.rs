@@ -737,7 +737,9 @@ impl RoutingTestModel for RoutingTest {
                     )
                     .await;
                 let (storage_proxy, server_end) = create_proxy().unwrap();
-                let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
+                let flags = fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::CREATE
+                    | fio::OpenFlags::DIRECTORY;
                 let relative_moniker_string = format!("{}", storage_relation);
                 let component_abs_moniker =
                     moniker.descendant(&storage_relation.without_instance_ids());
@@ -751,7 +753,7 @@ impl RoutingTestModel for RoutingTest {
                     .open_component_storage(
                         relative_moniker_string.as_str(),
                         flags,
-                        fio::MODE_TYPE_DIRECTORY,
+                        fio::ModeType::empty(),
                         server_end,
                     )
                     .expect("failed to open component storage");
@@ -1002,11 +1004,12 @@ pub mod capability_util {
         expected_res: ExpectedResult,
     ) {
         let (file_proxy, server_end) = create_proxy::<fio::FileMarker>().unwrap();
-        let flags = fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE;
+        let flags =
+            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY;
         let res = async {
             dir_proxy.open(
                 flags,
-                fio::MODE_TYPE_FILE,
+                fio::ModeType::empty(),
                 "hippos",
                 ServerEnd::new(server_end.into_channel()),
             )?;
@@ -1237,7 +1240,7 @@ pub mod capability_util {
         expected_res: ExpectedResult,
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, fio::MODE_TYPE_DIRECTORY, server_end).await;
+        open_exposed_dir(&path, abs_moniker, model, true, server_end).await;
         let dir_proxy = fio::DirectoryProxy::new(node_proxy.into_channel().unwrap());
         match expected_res {
             ExpectedResult::Ok => {
@@ -1287,7 +1290,7 @@ pub mod capability_util {
         expected_res: ExpectedResult,
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, fio::MODE_TYPE_SERVICE, server_end).await;
+        open_exposed_dir(&path, abs_moniker, model, false, server_end).await;
         let echo_proxy = echo::EchoProxy::new(node_proxy.into_channel().unwrap());
         call_echo_and_validate_result(echo_proxy, expected_res).await;
     }
@@ -1301,7 +1304,7 @@ pub mod capability_util {
         expected_res: ExpectedResult,
     ) {
         let (node_proxy, server_end) = endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        open_exposed_dir(&path, abs_moniker, model, fio::MODE_TYPE_SERVICE, server_end).await;
+        open_exposed_dir(&path, abs_moniker, model, false, server_end).await;
         // TODO(fxbug.dev/118249): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
@@ -1400,7 +1403,7 @@ pub mod capability_util {
         path: &'a CapabilityPath,
         abs_moniker: &'a AbsoluteMoniker,
         model: &'a Arc<Model>,
-        open_mode: u32,
+        directory: bool,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let component = model
@@ -1414,11 +1417,14 @@ pub mod capability_util {
         let state = component.lock_state().await;
         match &*state {
             InstanceState::Resolved(resolved_instance_state) => {
-                let flags = fio::OpenFlags::RIGHT_READABLE;
+                let flags = fio::OpenFlags::RIGHT_READABLE
+                    | if directory {
+                        fio::OpenFlags::DIRECTORY
+                    } else {
+                        fio::OpenFlags::NOT_DIRECTORY
+                    };
                 let vns_path = to_fvfs_path(path);
-                resolved_instance_state
-                    .get_exposed_dir()
-                    .open(flags, open_mode, vns_path, server_end);
+                resolved_instance_state.get_exposed_dir().open(flags, vns_path, server_end);
             }
             _ => {
                 panic!("Attempted to open exposed dir of unresolved component: {}", abs_moniker);

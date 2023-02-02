@@ -212,33 +212,11 @@ void main() {
         ];
         for (final entry in invalidFlags.asMap().entries) {
           DirectoryProxy proxy = DirectoryProxy();
-          final status = dir.connect(entry.value | OpenFlags.describe, 0,
+          final status = dir.connect(
+              entry.value | OpenFlags.describe,
+              ModeType.$none,
               InterfaceRequest(proxy.ctrl.request().passChannel()));
           expect(status, isNot(ZX.OK), reason: 'flagIndex: ${entry.key}');
-          await proxy.onOpen.first.then((response) {
-            expect(response.s, status);
-            expect(response.info, isNull);
-          }).catchError((err) async {
-            fail(err.toString());
-          });
-        }
-      });
-
-      test('invalid mode', () async {
-        PseudoDir dir = PseudoDir();
-        final invalidModes = [
-          modeTypeBlockDevice,
-          modeTypeFile,
-          modeTypeService,
-          modeTypeService,
-        ];
-
-        for (final entry in invalidModes.asMap().entries) {
-          DirectoryProxy proxy = DirectoryProxy();
-          final status = dir.connect(OpenFlags.describe, entry.value,
-              InterfaceRequest(proxy.ctrl.request().passChannel()));
-          expect(status, ZX.ERR_INVALID_ARGS,
-              reason: 'modeIndex: ${entry.key}');
           await proxy.onOpen.first.then((response) {
             expect(response.s, status);
             expect(response.info, isNull);
@@ -253,7 +231,7 @@ void main() {
       DirectoryProxy proxy = DirectoryProxy();
       final status = dir.connect(
           flags ?? OpenFlags.rightReadable | OpenFlags.rightWritable,
-          0,
+          ModeType.$none,
           InterfaceRequest(proxy.ctrl.request().passChannel()));
       expect(status, ZX.OK);
       return proxy;
@@ -272,16 +250,19 @@ void main() {
       });
     });
 
-    test('open passes with valid mode', () async {
+    test('open passes with any mode', () async {
       PseudoDir dir = PseudoDir();
-      final validModes = [
+      final modes = [
         modeProtectionMask,
+        modeTypeBlockDevice,
         modeTypeDirectory,
+        modeTypeFile,
+        modeTypeService,
       ];
 
-      for (final entry in validModes.asMap().entries) {
+      for (final entry in modes.asMap().entries) {
         DirectoryProxy proxy = DirectoryProxy();
-        final status = dir.connect(OpenFlags.describe, entry.value,
+        final status = dir.connect(OpenFlags.describe, ModeType(entry.value),
             InterfaceRequest(proxy.ctrl.request().passChannel()));
         expect(status, ZX.OK, reason: 'modeIndex: ${entry.key}');
         await proxy.onOpen.first.then((response) {
@@ -826,7 +807,7 @@ void main() {
       Future<void> _openFileAndAssert(DirectoryProxy proxy, String filePath,
           int bufferLen, String expectedContent) async {
         FileProxy fileProxy = FileProxy();
-        await proxy.open(OpenFlags.rightReadable, 0, filePath,
+        await proxy.open(OpenFlags.rightReadable, ModeType.$none, filePath,
             InterfaceRequest(fileProxy.ctrl.request().passChannel()));
 
         final data = await fileProxy.read(bufferLen);
@@ -857,7 +838,7 @@ void main() {
         final paths = ['.'];
         for (final path in paths) {
           DirectoryProxy newProxy = DirectoryProxy();
-          await proxy.open(OpenFlags.rightReadable, 0, path,
+          await proxy.open(OpenFlags.rightReadable, ModeType.$none, path,
               InterfaceRequest(newProxy.ctrl.request().passChannel()));
 
           // open file 1 in proxy and check contents to make sure correct dir was opened.
@@ -893,8 +874,11 @@ void main() {
         ];
         for (final path in paths) {
           DirectoryProxy newProxy = DirectoryProxy();
-          await proxy.open(OpenFlags.rightReadable | OpenFlags.describe, 0,
-              path, InterfaceRequest(newProxy.ctrl.request().passChannel()));
+          await proxy.open(
+              OpenFlags.rightReadable | OpenFlags.describe,
+              ModeType.$none,
+              path,
+              InterfaceRequest(newProxy.ctrl.request().passChannel()));
 
           await newProxy.onOpen.first.then((response) {
             expect(response.s, isNot(ZX.OK));
@@ -911,8 +895,11 @@ void main() {
         final proxy = _getProxyForDir(dir);
 
         FileProxy fileProxy = FileProxy();
-        await proxy.open(OpenFlags.rightReadable | OpenFlags.describe, 0,
-            'file1/', InterfaceRequest(fileProxy.ctrl.request().passChannel()));
+        await proxy.open(
+            OpenFlags.rightReadable | OpenFlags.describe,
+            ModeType.$none,
+            'file1/',
+            InterfaceRequest(fileProxy.ctrl.request().passChannel()));
 
         await fileProxy.onOpen.first.then((response) {
           expect(response.s, ZX.ERR_NOT_DIR);
@@ -928,7 +915,7 @@ void main() {
         final proxy = _getProxyForDir(dir);
 
         FileProxy fileProxy = FileProxy();
-        await proxy.open(OpenFlags.rightReadable, 0, 'invalid',
+        await proxy.open(OpenFlags.rightReadable, ModeType.$none, 'invalid',
             InterfaceRequest(fileProxy.ctrl.request().passChannel()));
 
         // channel should be closed
@@ -943,7 +930,7 @@ void main() {
         FileProxy fileProxy = FileProxy();
         await proxy.open(
             OpenFlags.rightReadable | OpenFlags.describe,
-            0,
+            ModeType.$none,
             'file1/file2',
             InterfaceRequest(fileProxy.ctrl.request().passChannel()));
 
@@ -965,11 +952,11 @@ void main() {
 
         final proxy = _getProxyForDir(dir);
         DirectoryProxy subDirProxy = DirectoryProxy();
-        await proxy.open(OpenFlags.rightReadable, 0, 'subDir',
+        await proxy.open(OpenFlags.rightReadable, ModeType.$none, 'subDir',
             InterfaceRequest(subDirProxy.ctrl.request().passChannel()));
 
         FileProxy fileProxy = FileProxy();
-        await proxy.open(OpenFlags.rightReadable, 0, 'file1',
+        await proxy.open(OpenFlags.rightReadable, ModeType.$none, 'file1',
             InterfaceRequest(fileProxy.ctrl.request().passChannel()));
         dir.close();
         proxy.ctrl.whenClosed.asStream().listen(expectAsync1((_) {}));
@@ -983,7 +970,7 @@ void main() {
         final proxy = _getProxyForDir(dir);
 
         DirectoryProxy dirProxy = DirectoryProxy();
-        await proxy.open(OpenFlags.rightReadable, 0, 'subDir',
+        await proxy.open(OpenFlags.rightReadable, ModeType.$none, 'subDir',
             InterfaceRequest(dirProxy.ctrl.request().passChannel()));
 
         // open file 2 check contents to make sure correct dir was opened.
@@ -996,8 +983,11 @@ void main() {
         final proxy = _getProxyForDir(dir, OpenFlags.rightReadable);
 
         final newProxy = DirectoryProxy();
-        await proxy.open(OpenFlags.rightWritable | OpenFlags.describe, 0,
-            'subDir', InterfaceRequest(newProxy.ctrl.request().passChannel()));
+        await proxy.open(
+            OpenFlags.rightWritable | OpenFlags.describe,
+            ModeType.$none,
+            'subDir',
+            InterfaceRequest(newProxy.ctrl.request().passChannel()));
 
         await newProxy.onOpen.first.then((response) {
           expect(response.s, ZX.ERR_ACCESS_DENIED);
@@ -1013,8 +1003,11 @@ void main() {
         final proxy = _getProxyForDir(dir, OpenFlags.rightWritable);
 
         final newProxy = DirectoryProxy();
-        await proxy.open(OpenFlags.rightWritable | OpenFlags.describe, 0,
-            'subDir', InterfaceRequest(newProxy.ctrl.request().passChannel()));
+        await proxy.open(
+            OpenFlags.rightWritable | OpenFlags.describe,
+            ModeType.$none,
+            'subDir',
+            InterfaceRequest(newProxy.ctrl.request().passChannel()));
 
         await newProxy.onOpen.first.then((response) {
           expect(response.s, ZX.OK);
@@ -1024,7 +1017,7 @@ void main() {
         });
 
         FileProxy fileProxy = FileProxy();
-        await newProxy.open(OpenFlags.rightReadable, 0, 'file2',
+        await newProxy.open(OpenFlags.rightReadable, ModeType.$none, 'file2',
             InterfaceRequest(fileProxy.ctrl.request().passChannel()));
 
         // channel should be closed
@@ -1037,7 +1030,7 @@ void main() {
         final proxy = _getProxyForDir(dir);
 
         DirectoryProxy dirProxy = DirectoryProxy();
-        await proxy.open(OpenFlags.rightReadable, 0, 'subDir/',
+        await proxy.open(OpenFlags.rightReadable, ModeType.$none, 'subDir/',
             InterfaceRequest(dirProxy.ctrl.request().passChannel()));
 
         // open file 2 check contents to make sure correct dir was opened.
@@ -1069,7 +1062,10 @@ void main() {
 
         // open file 2 in subDir.
         FileProxy fileProxy = FileProxy();
-        await proxy.open(OpenFlags.rightReadable, 0, 'subDir/file2',
+        await proxy.open(
+            OpenFlags.rightReadable,
+            ModeType.$none,
+            'subDir/file2',
             InterfaceRequest(fileProxy.ctrl.request().passChannel()));
 
         // channel should be closed
@@ -1090,7 +1086,7 @@ void main() {
             OpenFlags.rightReadable |
                 OpenFlags.rightWritable |
                 OpenFlags.describe,
-            0,
+            ModeType.$none,
             'subDir',
             InterfaceRequest(subDirProxy.ctrl.request().passChannel()));
 
@@ -1230,7 +1226,7 @@ class _TestVnode extends Vnode {
   _TestVnode();
 
   @override
-  int connect(OpenFlags flags, int mode, InterfaceRequest<Node> request,
+  int connect(OpenFlags flags, ModeType mode, InterfaceRequest<Node> request,
       [OpenFlags? parentFlags]) {
     throw UnimplementedError();
   }

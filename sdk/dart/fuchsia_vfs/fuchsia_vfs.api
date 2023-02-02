@@ -112,7 +112,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "fidl_io.ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,
@@ -260,7 +260,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,
@@ -400,7 +400,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,
@@ -684,7 +684,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,
@@ -930,7 +930,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,
@@ -1008,7 +1008,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,
@@ -1138,7 +1138,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,
@@ -1394,7 +1394,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,
@@ -1498,7 +1498,7 @@
                   "isRequiredPositional": true,
                   "name": "mode",
                   "type": "SimpleFormalParameterImpl",
-                  "varType": "int"
+                  "varType": "ModeType"
                 },
                 "parentFlags": {
                   "isConst": false,

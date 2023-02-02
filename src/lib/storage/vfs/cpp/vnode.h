@@ -264,7 +264,7 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
 
   // Implements fuchsia.io/Openable.Open by forwarding requests to the remote end. Supported iff
   // `IsRemote()`.
-  virtual zx_status_t OpenRemote(fuchsia_io::OpenFlags, uint32_t, fidl::StringView,
+  virtual zx_status_t OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                                  fidl::ServerEnd<fuchsia_io::Node>) const;
 
   // Check existing inotify watches and issue inotify events.

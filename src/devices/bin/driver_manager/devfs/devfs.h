@@ -126,7 +126,7 @@ class Devnode {
                                          fs::VnodeRepresentation* info) final;
 
       bool IsRemote() const final;
-      zx_status_t OpenRemote(fuchsia_io::OpenFlags, uint32_t, fidl::StringView,
+      zx_status_t OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                              fidl::ServerEnd<fuchsia_io::Node>) const final;
 
       VnodeImpl& parent_;

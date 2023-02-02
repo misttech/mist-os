@@ -868,7 +868,6 @@ mod tests {
         dir.open(
             scope_for_watcher,
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             Path::dot(),
             server_end_for_watcher,
         );
@@ -883,7 +882,6 @@ mod tests {
         pseudo_dir_clone.open(
             scope_for_pipeline,
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             Path::dot(),
             server_end_for_pipeline,
         );
@@ -957,7 +955,6 @@ mod tests {
         dir.open(
             scope_for_watcher,
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             Path::dot(),
             server_end_for_watcher,
         );
@@ -972,7 +969,6 @@ mod tests {
         pseudo_dir_clone.open(
             scope_for_pipeline,
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             Path::dot(),
             server_end_for_pipeline,
         );

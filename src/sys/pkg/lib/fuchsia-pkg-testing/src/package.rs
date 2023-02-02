@@ -343,7 +343,7 @@ async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, Ver
     let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
 
     let flags = fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE;
-    dir.open(flags, 0, path, ServerEnd::new(server_end.into_channel()))
+    dir.open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
         .expect("open request to send");
 
     let mut events = file.take_event_stream();

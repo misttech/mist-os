@@ -151,10 +151,9 @@ impl Client {
         &self,
         blob: &Hash,
         flags: fio::OpenFlags,
-        mode: u32,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fidl::Error> {
-        self.proxy.open(flags, mode, &blob.to_string(), server_end)
+        self.proxy.open(flags, fio::ModeType::empty(), &blob.to_string(), server_end)
     }
 
     /// Returns the list of known blobs in blobfs.

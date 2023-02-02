@@ -58,7 +58,6 @@ fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> DirectoryProxy {
     dir.open(
         scope,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        0,
         vfs::path::Path::dot(),
         ServerEnd::new(server_end.into_channel()),
     );

@@ -208,7 +208,7 @@ impl FsNodeOps for RemoteNode {
             | fio::OpenFlags::RIGHT_READABLE;
         let zxio = Arc::new(
             self.zxio
-                .open(open_flags, 0, name)
+                .open(open_flags, name)
                 .map_err(|status| from_status_like_fdio!(status, name))?,
         );
 
@@ -232,15 +232,14 @@ impl FsNodeOps for RemoteNode {
             log_warn!("bad utf8 in pathname! remote filesystems can't handle this");
             errno!(EINVAL)
         })?;
-        let zxio =
-            Arc::new(self.zxio.open(self.rights, 0, name).map_err(|status| match status {
-                // TODO: When the file is not found `PEER_CLOSED` is returned. In this case the peer
-                // closed should be translated into ENOENT, so that the file may be created. This
-                // logic creates a race when creating files in remote filesystems, between us and
-                // any other client creating a file between here and `mknod`.
-                zx::Status::PEER_CLOSED => errno!(ENOENT, name),
-                status => from_status_like_fdio!(status, name),
-            })?);
+        let zxio = Arc::new(self.zxio.open(self.rights, name).map_err(|status| match status {
+            // TODO: When the file is not found `PEER_CLOSED` is returned. In this case the peer
+            // closed should be translated into ENOENT, so that the file may be created. This
+            // logic creates a race when creating files in remote filesystems, between us and
+            // any other client creating a file between here and `mknod`.
+            zx::Status::PEER_CLOSED => errno!(ENOENT, name),
+            status => from_status_like_fdio!(status, name),
+        })?);
 
         // TODO: It's unfortunate to have another round-trip. We should be able
         // to set the mode based on the information we get during open.

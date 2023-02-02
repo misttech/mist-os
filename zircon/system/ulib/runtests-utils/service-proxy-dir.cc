@@ -60,7 +60,7 @@ zx_status_t ServiceProxyDir::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode
           fbl::MakeRefCounted<fs::Service>([this, entry_name](fidl::ServerEnd<fio::Node> request) {
             return fidl::WireCall(proxy_dir_)
                 ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable,
-                       0755, fidl::StringView::FromExternal(entry_name), std::move(request))
+                       {}, fidl::StringView::FromExternal(entry_name), std::move(request))
                 .status();
           }));
 

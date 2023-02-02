@@ -52,7 +52,7 @@ class HidDriverTest : public zxtest::Test {
 
     // Connect to dev.
     fidl::InterfaceHandle<fuchsia::io::Node> dev;
-    ASSERT_OK(realm_->component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, 0, "dev",
+    ASSERT_OK(realm_->component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, {}, "dev",
                                                   dev.NewRequest()));
     ASSERT_OK(fdio_fd_create(dev.TakeChannel().release(), dev_fd_.reset_and_get_address()));
 

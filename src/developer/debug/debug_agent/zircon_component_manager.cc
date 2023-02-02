@@ -53,7 +53,7 @@ void ReadElfJobId(fuchsia::io::DirectoryHandle runtime_dir_handle, const std::st
   fuchsia::io::DirectoryPtr runtime_dir = runtime_dir_handle.Bind();
   fuchsia::io::FilePtr job_id_file;
   runtime_dir->Open(
-      fuchsia::io::OpenFlags::RIGHT_READABLE, 0, "elf/job_id",
+      fuchsia::io::OpenFlags::RIGHT_READABLE, {}, "elf/job_id",
       fidl::InterfaceRequest<fuchsia::io::Node>(job_id_file.NewRequest().TakeChannel()));
   job_id_file.set_error_handler(
       [cb = cb.share()](zx_status_t err) mutable { cb(ZX_KOID_INVALID); });

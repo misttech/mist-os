@@ -1485,15 +1485,10 @@ mod tests {
                 } => {
                     let _ = responder.send(&mut Ok(()));
                 }
-                fcomponent::RealmRequest::OpenExposedDir {
-                    child: _,
-                    exposed_dir: _,
-                    responder,
-                } => {
-                    // By not binding a server implementation to the provided `exposed_dir`
-                    // field, a PEER_CLOSED signal will be observed. Thus, the library
-                    // can assume that the component did not launch.
-                    let _ = responder.send(&mut Ok(()));
+                fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
+                    // Close the incoming channel before responding to avoid race conditions.
+                    let () = std::mem::drop(exposed_dir);
+                    let () = responder.send(&mut Ok(())).unwrap();
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             }
@@ -1502,17 +1497,16 @@ mod tests {
         let element_manager =
             ElementManager::new(realm, None, launcher, example_collection_config(), false);
 
-        let result =
-            element_manager.launch_element(component_url.to_string(), None, None, "").await;
-        assert!(result.is_err());
-        assert_eq!(
-            result.err().unwrap(),
-            ElementManagerError::not_bound(
-                "",
-                "elements",
-                component_url,
-                "Failed to open protocol in directory"
-            )
+        assert_matches::assert_matches!(
+            element_manager.launch_element(component_url.to_string(), None, None, "").await,
+            Err(err) => {
+                assert_eq!(err, ElementManagerError::not_bound(
+                    "",
+                    "elements",
+                    component_url,
+                    "A FIDL client's channel to the service (anonymous) Directory was closed: PEER_CLOSED"
+                ));
+            }
         );
     }
 }

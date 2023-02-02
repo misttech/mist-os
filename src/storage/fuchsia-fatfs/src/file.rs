@@ -345,7 +345,6 @@ impl DirectoryEntry for FatFile {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        _mode: u32,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -410,7 +409,7 @@ mod tests {
             dir.open_ref(&fs.filesystem().lock().unwrap()).expect("open_ref failed");
             closer.add(FatNode::Dir(dir.clone()));
             let file = match dir
-                .open_child("test_file", fio::OpenFlags::empty(), 0, &mut closer)
+                .open_child("test_file", fio::OpenFlags::empty(), &mut closer)
                 .expect("Open to succeed")
             {
                 FatNode::File(f) => f,

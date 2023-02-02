@@ -52,7 +52,7 @@ TEST(PbusBtiTest, BtiIsSameAfterCrash) {
 
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = realm.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, 0,
+  zx_status_t status = realm.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, {},
                                                          "dev", dev.NewRequest());
   ASSERT_EQ(status, ZX_OK);
 

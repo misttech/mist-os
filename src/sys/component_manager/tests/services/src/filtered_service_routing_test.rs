@@ -813,7 +813,11 @@ async fn regular_echo_at_service_instance(
         .expect("failed to connect to protocol directly")
         .echo_string(echo_string)
         .await;
-    assert_eq!(response.clone().ok(), direct_protocol_response.ok());
+    match (response.clone(), direct_protocol_response) {
+        (Ok(left), Ok(right)) => assert_eq!(left, right),
+        (Err(left), Err(right)) => println!("{left:?} | {right:?}"),
+        (left, right) => panic!("{left:?} != {right:?}"),
+    };
 
     return response;
 }

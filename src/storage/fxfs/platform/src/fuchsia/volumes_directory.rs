@@ -295,7 +295,6 @@ impl VolumesDirectory {
         outgoing_dir.open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            0,
             Path::dot(),
             outgoing_dir_server_end.into_channel().into(),
         );
@@ -838,8 +837,7 @@ mod tests {
 
         volumes_directory.directory_node().clone().open(
             ExecutionScope::new(),
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             ServerEnd::new(dir_server_end.into_channel()),
         );
@@ -919,7 +917,6 @@ mod tests {
         volumes_directory.directory_node().clone().open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             Path::validate_and_split("encrypted").unwrap(),
             volume_server_end.into_channel().into(),
         );
@@ -955,7 +952,6 @@ mod tests {
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
                         | fio::OpenFlags::CREATE,
-                    0,
                     "root/test",
                 )
                 .await;
@@ -1071,7 +1067,6 @@ mod tests {
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                0,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
                 volume_server_end.into_channel().into(),
             );
@@ -1155,7 +1150,6 @@ mod tests {
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                0,
                 Path::validate_and_split(name).unwrap(),
                 volume_server_end.into_channel().into(),
             );
@@ -1165,8 +1159,10 @@ mod tests {
                     .expect("Create dir proxy to succeed");
             volume_dir_proxy
                 .open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_DIRECTORY,
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::DIRECTORY,
+                    fio::ModeType::empty(),
                     "root",
                     ServerEnd::new(root_server_end.into_channel()),
                 )
@@ -1176,8 +1172,8 @@ mod tests {
                 &root_proxy,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_FILE,
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
             )
             .await;

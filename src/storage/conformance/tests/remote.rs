@@ -32,8 +32,7 @@ async fn open_remote_directory_test() {
 
     open_node::<fio::DirectoryMarker>(
         &root_dir,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        fio::MODE_TYPE_DIRECTORY,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
         remote_name,
     )
     .await;
@@ -60,19 +59,17 @@ async fn open_remote_file_test() {
     // Test opening file by opening the remote directory first and then opening the file.
     let remote_dir_proxy = open_node::<fio::DirectoryMarker>(
         &root_dir,
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_DIRECTORY,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         remote_name,
     )
     .await;
-    open_node::<fio::NodeMarker>(&remote_dir_proxy, fio::OpenFlags::RIGHT_READABLE, 0, TEST_FILE)
+    open_node::<fio::NodeMarker>(&remote_dir_proxy, fio::OpenFlags::RIGHT_READABLE, TEST_FILE)
         .await;
 
     // Test opening file directly though local directory by crossing remote automatically.
     open_node::<fio::NodeMarker>(
         &root_dir,
         fio::OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_DIRECTORY,
         [remote_name, "/", TEST_FILE].join("").as_str(),
     )
     .await;
@@ -123,8 +120,9 @@ async fn open_remote_directory_right_escalation_test() {
         .open(
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_WRITABLE
-                | fio::OpenFlags::POSIX_EXECUTABLE,
-            fio::MODE_TYPE_DIRECTORY,
+                | fio::OpenFlags::POSIX_EXECUTABLE
+                | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
             mount_point,
             node_server,
         )

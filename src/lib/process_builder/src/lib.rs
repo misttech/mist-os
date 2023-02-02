@@ -1475,8 +1475,7 @@ mod tests {
         };
         dir1.open(
             dir_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(dir1_server),
         );
@@ -1488,8 +1487,7 @@ mod tests {
         };
         dir2.open(
             dir_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(dir2_server),
         );

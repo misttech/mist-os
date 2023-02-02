@@ -78,7 +78,6 @@ pub trait NonMetaStorage: Send + Sync + 'static {
         &self,
         blob: &fuchsia_hash::Hash,
         flags: fio::OpenFlags,
-        mode: u32,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fuchsia_fs::node::OpenError>;
 }
@@ -88,10 +87,9 @@ impl NonMetaStorage for blobfs::Client {
         &self,
         blob: &fuchsia_hash::Hash,
         flags: fio::OpenFlags,
-        mode: u32,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fuchsia_fs::node::OpenError> {
-        self.forward_open(blob, flags, mode, server_end)
+        self.forward_open(blob, flags, server_end)
             .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
     }
 }
@@ -102,10 +100,9 @@ impl NonMetaStorage for fio::DirectoryProxy {
         &self,
         blob: &fuchsia_hash::Hash,
         flags: fio::OpenFlags,
-        mode: u32,
         server_end: ServerEnd<fio::NodeMarker>,
     ) -> Result<(), fuchsia_fs::node::OpenError> {
-        self.open(flags, mode, blob.to_string().as_str(), server_end)
+        self.open(flags, fio::ModeType::empty(), blob.to_string().as_str(), server_end)
             .map_err(fuchsia_fs::node::OpenError::SendOpenRequest)
     }
 }
@@ -125,7 +122,6 @@ pub fn serve(
         non_meta_storage,
         meta_far,
         flags,
-        0,
         VfsPath::dot(),
         server_end.into_channel().into(),
     )
@@ -141,7 +137,6 @@ pub async fn serve_path(
     non_meta_storage: impl NonMetaStorage,
     meta_far: fuchsia_hash::Hash,
     flags: fio::OpenFlags,
-    mode: u32,
     path: VfsPath,
     server_end: ServerEnd<fio::NodeMarker>,
 ) -> Result<(), Error> {
@@ -153,7 +148,7 @@ pub async fn serve_path(
         }
     };
 
-    Arc::new(root_dir).open(scope, flags, mode, path, server_end);
+    Arc::new(root_dir).open(scope, flags, path, server_end);
     Ok(())
 }
 
@@ -225,7 +220,6 @@ async fn verify_open_adjusts_flags(
         Arc::clone(entry),
         ExecutionScope::new(),
         in_flags,
-        0,
         VfsPath::dot(),
         server_end,
     );
@@ -287,7 +281,6 @@ mod tests {
             blobfs_client,
             metafar_blob.merkle,
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             VfsPath::validate_and_split(".").unwrap(),
             server_end.into_channel().into(),
         )
@@ -316,7 +309,6 @@ mod tests {
             blobfs_client,
             metafar_blob.merkle,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
-            0,
             VfsPath::validate_and_split("meta").unwrap(),
             server_end.into_channel().into(),
         )
@@ -343,7 +335,6 @@ mod tests {
                 blobfs_client,
                 metafar_blob.merkle,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                0,
                 VfsPath::validate_and_split("not-present").unwrap(),
                 server_end.into_channel().into(),
             )
@@ -367,7 +358,6 @@ mod tests {
                 blobfs_client,
                 Hash::from([0u8; 32]),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                0,
                 VfsPath::validate_and_split(".").unwrap(),
                 server_end.into_channel().into(),
             )

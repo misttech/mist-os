@@ -62,8 +62,7 @@ pub async fn read_only_directory_helper(
     }));
     top_directory.open(
         execution_scope_dropper.execution_scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_DIRECTORY,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         VfsPath::dot(),
         outgoing_dir.into_channel().into(),
     );

@@ -49,8 +49,9 @@ class Directory : public Node {
   // Parses path and opens correct node.
   //
   // Called from |fuchsia.io.Directory#Open|.
-  void Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags parent_flags, uint32_t mode,
-            const char* path, size_t path_len, zx::channel request, async_dispatcher_t* dispatcher);
+  void Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags parent_flags,
+            fuchsia::io::ModeType mode, const char* path, size_t path_len, zx::channel request,
+            async_dispatcher_t* dispatcher);
 
   // Validates passed path
   //

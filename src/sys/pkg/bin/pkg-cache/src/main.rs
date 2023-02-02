@@ -301,7 +301,6 @@ async fn main_inner() -> Result<(), Error> {
         fio::OpenFlags::RIGHT_READABLE
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_EXECUTABLE,
-        0,
         vfs::path::Path::dot(),
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())
             .context("taking startup handle")?

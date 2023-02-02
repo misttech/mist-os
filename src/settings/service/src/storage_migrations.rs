@@ -88,7 +88,6 @@ mod tests {
         root.open(
             fs_scope,
             OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            0,
             vfs::path::Path::dot(),
             ServerEnd::new(server.into_channel()),
         );

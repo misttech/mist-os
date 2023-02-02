@@ -164,7 +164,7 @@ class TestDirectory : public fio::testing::Directory_TestBase {
     Bind(std::move(dir));
   }
 
-  void Open(fuchsia::io::OpenFlags flags, uint32_t mode, std::string path,
+  void Open(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode, std::string path,
             fidl::InterfaceRequest<fio::Node> object) override {
     open_handler_(std::move(path), std::move(object));
   }

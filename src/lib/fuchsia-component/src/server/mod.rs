@@ -669,7 +669,6 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
         self.dir.clone().open(
             self.scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            0,
             Path::dot(),
             fidl::endpoints::ServerEnd::<fio::NodeMarker>::new(chan.into_channel()),
         );

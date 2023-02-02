@@ -28,7 +28,6 @@ trait OpenRequestHandler: Sized {
     fn handle_open_request(
         &self,
         flags: fio::OpenFlags,
-        mode: u32,
         path: String,
         object: ServerEnd<fio::NodeMarker>,
         control_handle: fio::DirectoryControlHandle,
@@ -60,16 +59,19 @@ where
                         mock_filesystem::describe_dir(flags, &stream);
                         fasync::Task::spawn(Arc::clone(&self).handle_stream(stream)).detach();
                     }
-                    fio::DirectoryRequest::Open { flags, mode, path, object, control_handle } => {
-                        self.open_handler.handle_open_request(
-                            flags,
-                            mode,
-                            path,
-                            object,
-                            control_handle,
-                            Arc::clone(&self),
-                        )
-                    }
+                    fio::DirectoryRequest::Open {
+                        flags,
+                        mode: _,
+                        path,
+                        object,
+                        control_handle,
+                    } => self.open_handler.handle_open_request(
+                        flags,
+                        path,
+                        object,
+                        control_handle,
+                        Arc::clone(&self),
+                    ),
                     fio::DirectoryRequest::Close { .. } => (),
                     req => panic!("DirectoryStreamHandler unhandled request {:?}", req),
                 }
@@ -111,7 +113,6 @@ impl OpenRequestHandler for OpenFailOrTempFs {
     fn handle_open_request(
         &self,
         flags: fio::OpenFlags,
-        mode: u32,
         path: String,
         object: ServerEnd<fio::NodeMarker>,
         _control_handle: fio::DirectoryControlHandle,
@@ -136,7 +137,7 @@ impl OpenRequestHandler for OpenFailOrTempFs {
                 server_end.into_channel(),
             )
             .unwrap();
-            tempdir_proxy.open(flags, mode, &path, object).unwrap();
+            tempdir_proxy.open(flags, fio::ModeType::empty(), &path, object).unwrap();
         }
     }
 }
@@ -194,7 +195,6 @@ impl OpenRequestHandler for WriteFailOrTempFs {
     fn handle_open_request(
         &self,
         flags: fio::OpenFlags,
-        mode: u32,
         path: String,
         object: ServerEnd<fio::NodeMarker>,
         _control_handle: fio::DirectoryControlHandle,
@@ -209,7 +209,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
 
         if !self.files_to_fail_writes.contains(&path) {
             // We don't want to intercept file operations, so just open the file normally.
-            self.tempdir_proxy.open(flags, mode, &path, object).unwrap();
+            self.tempdir_proxy.open(flags, fio::ModeType::empty(), &path, object).unwrap();
             return;
         }
 
@@ -227,7 +227,7 @@ impl OpenRequestHandler for WriteFailOrTempFs {
             fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
 
         self.tempdir_proxy
-            .open(flags, mode, &path, backing_node_server_end)
+            .open(flags, fio::ModeType::empty(), &path, backing_node_server_end)
             .expect("open file requested by pkg-resolver");
 
         // All the things pkg-resolver attempts to open in these tests are files,
@@ -379,7 +379,6 @@ impl OpenRequestHandler for RenameFailOrTempFs {
     fn handle_open_request(
         &self,
         flags: fio::OpenFlags,
-        mode: u32,
         path: String,
         object: ServerEnd<fio::NodeMarker>,
         _control_handle: fio::DirectoryControlHandle,
@@ -397,7 +396,7 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         )
         .unwrap();
         if !self.should_fail() || path != "." {
-            tempdir_proxy.open(flags, mode, &path, object).unwrap();
+            tempdir_proxy.open(flags, fio::ModeType::empty(), &path, object).unwrap();
             return;
         }
 
@@ -432,10 +431,15 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                         fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         responder.send(&mut Err(Status::NOT_FOUND.into_raw())).unwrap();
                     }
-                    fio::DirectoryRequest::Open { flags, mode, path, object, control_handle } => {
+                    fio::DirectoryRequest::Open {
+                        flags,
+                        mode: _,
+                        path,
+                        object,
+                        control_handle,
+                    } => {
                         parent.open_handler.handle_open_request(
                             flags,
-                            mode,
                             path,
                             object,
                             control_handle,

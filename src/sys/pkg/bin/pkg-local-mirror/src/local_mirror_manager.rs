@@ -52,8 +52,10 @@ impl LocalMirrorManager {
         let () = self
             .metadata_dir
             .open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                fio::MODE_TYPE_FILE,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::NOT_DIRECTORY
+                    | fio::OpenFlags::DESCRIBE,
+                fio::ModeType::empty(),
                 &path,
                 ServerEnd::new(metadata.into_channel()),
             )
@@ -78,8 +80,10 @@ impl LocalMirrorManager {
         let () = self
             .blobs_dir
             .open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-                fio::MODE_TYPE_FILE,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::NOT_DIRECTORY
+                    | fio::OpenFlags::DESCRIBE,
+                fio::ModeType::empty(),
                 &path,
                 ServerEnd::new(blob.into_channel()),
             )

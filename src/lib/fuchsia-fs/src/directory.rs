@@ -103,10 +103,9 @@ pub fn open_directory_no_describe(
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
 
     let flags = flags | fio::OpenFlags::DIRECTORY;
-    let mode = fio::MODE_TYPE_DIRECTORY;
 
     parent
-        .open(flags, mode, path, ServerEnd::new(server_end.into_channel()))
+        .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
         .map_err(OpenError::SendOpenRequest)?;
 
     Ok(dir)
@@ -123,10 +122,9 @@ pub async fn open_directory(
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
 
     let flags = flags | fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE;
-    let mode = fio::MODE_TYPE_DIRECTORY;
 
     parent
-        .open(flags, mode, path, ServerEnd::new(server_end.into_channel()))
+        .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
         .map_err(OpenError::SendOpenRequest)?;
 
     // wait for the directory to open and report success.
@@ -145,15 +143,11 @@ pub async fn create_directory(
     // NB: POSIX does not allow open(2) to create dirs, but fuchsia.io does not have an equivalent
     // of mkdir(2), so on Fuchsia we're expected to call open on a DirectoryMarker with (flags &
     // OPEN_FLAG_CREATE) set.
-    // (mode & MODE_TYPE_DIRECTORY) is also required, although it is redundant (the fact that we
-    // opened a DirectoryMarker is the main way that the underlying filesystem understands our
-    // intention.)
     let flags =
         flags | fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY | fio::OpenFlags::DESCRIBE;
-    let mode = fio::MODE_TYPE_DIRECTORY;
 
     parent
-        .open(flags, mode, path, ServerEnd::new(server_end.into_channel()))
+        .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
         .map_err(OpenError::SendOpenRequest)?;
 
     // wait for the directory to open and report success.
@@ -191,10 +185,10 @@ pub fn open_file_no_describe(
     let (file, server_end) =
         fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(OpenError::CreateProxy)?;
 
-    let mode = fio::MODE_TYPE_FILE;
+    let flags = flags | fio::OpenFlags::NOT_DIRECTORY;
 
     parent
-        .open(flags, mode, path, ServerEnd::new(server_end.into_channel()))
+        .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
         .map_err(OpenError::SendOpenRequest)?;
 
     Ok(file)
@@ -210,11 +204,10 @@ pub async fn open_file(
     let (file, server_end) =
         fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(OpenError::CreateProxy)?;
 
-    let flags = flags | fio::OpenFlags::DESCRIBE;
-    let mode = fio::MODE_TYPE_FILE;
+    let flags = flags | fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DESCRIBE;
 
     parent
-        .open(flags, mode, path, ServerEnd::new(server_end.into_channel()))
+        .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
         .map_err(OpenError::SendOpenRequest)?;
 
     // wait for the file to open and report success.
@@ -227,7 +220,6 @@ pub async fn open_node(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::OpenFlags,
-    mode: u32,
 ) -> Result<fio::NodeProxy, OpenError> {
     let (file, server_end) =
         fidl::endpoints::create_proxy::<fio::NodeMarker>().map_err(OpenError::CreateProxy)?;
@@ -235,7 +227,7 @@ pub async fn open_node(
     let flags = flags | fio::OpenFlags::DESCRIBE;
 
     parent
-        .open(flags, mode, path, ServerEnd::new(server_end.into_channel()))
+        .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
         .map_err(OpenError::SendOpenRequest)?;
 
     // wait for the file to open and report success.
@@ -248,9 +240,8 @@ pub fn open_node_no_describe(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::OpenFlags,
-    mode: u32,
 ) -> Result<fio::NodeProxy, OpenError> {
-    open_no_describe::<fio::NodeMarker>(parent, path, flags, mode)
+    open_no_describe::<fio::NodeMarker>(parent, path, flags)
 }
 
 /// Opens the given `path` from the given `parent` directory as a [`P::Proxy`]. The target is not
@@ -259,12 +250,13 @@ pub fn open_no_describe<P: fidl::endpoints::ProtocolMarker>(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::OpenFlags,
-    mode: u32,
 ) -> Result<P::Proxy, OpenError> {
     let (client, server_end) =
         fidl::endpoints::create_endpoints().map_err(OpenError::CreateProxy)?;
 
-    let () = parent.open(flags, mode, path, server_end).map_err(OpenError::SendOpenRequest)?;
+    let () = parent
+        .open(flags, fio::ModeType::empty(), path, server_end)
+        .map_err(OpenError::SendOpenRequest)?;
 
     ClientEnd::<P>::new(client.into_channel()).into_proxy().map_err(OpenError::CreateProxy)
 }
@@ -443,7 +435,7 @@ where
                 } else {
                     let open_dir_result = dir.open(
                         fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                        fio::MODE_TYPE_DIRECTORY,
+                        fio::ModeType::empty(),
                         &dir_entry.name,
                         ServerEnd::new(subdir_server.into_channel()),
                     );
@@ -647,7 +639,7 @@ pub async fn remove_dir_recursive(root_dir: &fio::DirectoryProxy, name: &str) ->
     let (dir, dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
     root_dir
-        .open(DIR_FLAGS, fio::MODE_TYPE_DIRECTORY, name, ServerEnd::new(dir_server.into_channel()))
+        .open(DIR_FLAGS, fio::ModeType::empty(), name, ServerEnd::new(dir_server.into_channel()))
         .map_err(|e| Error::Fidl("open", e))?;
     remove_dir_contents(dir).await?;
     root_dir
@@ -674,7 +666,7 @@ fn remove_dir_contents(dir: fio::DirectoryProxy) -> BoxFuture<'static, Result<()
                             .expect("failed to create proxy");
                     dir.open(
                         DIR_FLAGS,
-                        fio::MODE_TYPE_DIRECTORY,
+                        fio::ModeType::empty(),
                         &dirent.name,
                         ServerEnd::new(subdir_server.into_channel()),
                     )
@@ -926,7 +918,7 @@ mod tests {
             Err(OpenError::UnexpectedNodeKind {
                 expected: node::Kind::File,
                 actual: node::Kind::Directory,
-            })
+            } | node::OpenError::OpenError(zx_status::Status::NOT_FILE))
         );
     }
 
@@ -943,8 +935,7 @@ mod tests {
         let scope = ExecutionScope::new();
         example_dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            DIR_FLAGS,
             vfs::path::Path::dot(),
             ServerEnd::new(example_dir_service.into_channel()),
         );
@@ -1018,14 +1009,14 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn open_node_no_describe_opens_real_node() {
         let pkg = open_pkg();
-        let node = open_node_no_describe(&pkg, "data", fio::OpenFlags::RIGHT_READABLE, 0).unwrap();
+        let node = open_node_no_describe(&pkg, "data", fio::OpenFlags::RIGHT_READABLE).unwrap();
         crate::node::close(node).await.unwrap();
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn open_node_no_describe_opens_fake_node() {
         let pkg = open_pkg();
-        let fake = open_node_no_describe(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE, 0).unwrap();
+        let fake = open_node_no_describe(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE).unwrap();
         // The open error is not detected until the proxy is interacted with.
         assert_matches!(crate::node::close(fake).await, Err(_));
     }
@@ -1035,7 +1026,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn open_node_opens_real_node() {
         let pkg = open_pkg();
-        let node = open_node(&pkg, "data", fio::OpenFlags::RIGHT_READABLE, 0).await.unwrap();
+        let node = open_node(&pkg, "data", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
         crate::node::close(node).await.unwrap();
     }
 
@@ -1043,7 +1034,7 @@ mod tests {
     async fn open_node_opens_fake_node() {
         let pkg = open_pkg();
         // The open error should be detected immediately.
-        assert_matches!(open_node(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE, 0).await, Err(_));
+        assert_matches!(open_node(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE).await, Err(_));
     }
 
     // clone_no_describe
@@ -1270,7 +1261,6 @@ mod tests {
         dir.open(
             scope,
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            0,
             vfs::path::Path::dot(),
             ServerEnd::new(server_end.into_channel()),
         );
@@ -1304,7 +1294,6 @@ mod tests {
         let () = dir.open(
             scope,
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            0,
             vfs::path::Path::dot(),
             ServerEnd::new(server_end.into_channel()),
         );

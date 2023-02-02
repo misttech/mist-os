@@ -534,8 +534,9 @@ impl ComponentInstance {
 
                 let (exposed_dir, expose_server) = fidl::endpoints::create_endpoints().unwrap();
                 r.get_exposed_dir().open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_DIRECTORY,
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::DIRECTORY,
                     vfs::path::Path::dot(),
                     expose_server,
                 );
@@ -547,8 +548,8 @@ impl ComponentInstance {
                 r.get_ns_dir().open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::RIGHT_EXECUTABLE,
-                    fio::MODE_TYPE_DIRECTORY,
+                        | fio::OpenFlags::RIGHT_EXECUTABLE
+                        | fio::OpenFlags::DIRECTORY,
                     vfs::path::Path::dot(),
                     ns_server,
                 );
@@ -593,8 +594,9 @@ impl ComponentInstance {
 
                 let (exposed_dir, expose_server) = fidl::endpoints::create_endpoints().unwrap();
                 r.get_exposed_dir().open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_DIRECTORY,
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::DIRECTORY,
                     vfs::path::Path::dot(),
                     expose_server,
                 );
@@ -651,8 +653,7 @@ impl ComponentInstance {
                     endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>().unwrap();
                 let mut server_channel = server_channel.into_channel();
                 let options = OpenRunnerOptions {
-                    flags: fio::OpenFlags::empty(),
-                    open_mode: fio::MODE_TYPE_SERVICE,
+                    flags: fio::OpenFlags::NOT_DIRECTORY,
                     server_chan: &mut server_channel,
                 };
                 route_and_open_capability(
@@ -985,7 +986,6 @@ impl ComponentInstance {
     pub async fn open_outgoing(
         &self,
         flags: fio::OpenFlags,
-        open_mode: u32,
         path: PathBuf,
         server_chan: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -1001,7 +1001,7 @@ impl ComponentInstance {
         let path = fuchsia_fs::canonicalize_path(path);
         let server_chan = channel::take_channel(server_chan);
         let server_end = ServerEnd::new(server_chan);
-        out_dir.open(flags, open_mode, path, server_end).map_err(|e| {
+        out_dir.open(flags, fio::ModeType::empty(), path, server_end).map_err(|e| {
             ModelError::from(OpenResourceError::open_outgoing_failed(
                 &self.instanced_moniker,
                 path,
@@ -1028,10 +1028,11 @@ impl ComponentInstance {
                 // failing if not available.
                 let flags = fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::POSIX_WRITABLE
-                    | fio::OpenFlags::POSIX_EXECUTABLE;
+                    | fio::OpenFlags::POSIX_EXECUTABLE
+                    | fio::OpenFlags::DIRECTORY;
                 let server_chan = channel::take_channel(server_chan);
                 let server_end = ServerEnd::new(server_chan);
-                exposed_dir.open(flags, fio::MODE_TYPE_DIRECTORY, Path::dot(), server_end);
+                exposed_dir.open(flags, Path::dot(), server_end);
                 Ok(())
             }
             InstanceState::Destroyed => Err(OpenExposedDirError::InstanceDestroyed),

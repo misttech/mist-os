@@ -44,14 +44,8 @@ impl ExposedDir {
     }
 
     /// Opens a new connection to this ExposedDir that is closed once this ExposedDir is dropped.
-    pub fn open(
-        &self,
-        flags: fio::OpenFlags,
-        mode: u32,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        self.root_dir.clone().open(self.execution_scope.clone(), flags, mode, path, server_end);
+    pub fn open(&self, flags: fio::OpenFlags, path: Path, server_end: ServerEnd<fio::NodeMarker>) {
+        self.root_dir.clone().open(self.execution_scope.clone(), flags, path, server_end);
     }
 }
 

@@ -832,7 +832,7 @@ class FastbootRebootTest
     ASSERT_OK(fidl::WireCall(endpoints->client)
                   ->Open(fuchsia_io::wire::OpenFlags::kRightWritable |
                              fuchsia_io::wire::OpenFlags::kRightReadable,
-                         0, "svc",
+                         {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
     loop_.StartThread("fastboot-reboot-test-loop");
@@ -955,7 +955,7 @@ class FastbootFshostTest : public FastbootDownloadTest,
     ASSERT_OK(fidl::WireCall(endpoints->client)
                   ->Open(fuchsia_io::wire::OpenFlags::kRightWritable |
                              fuchsia_io::wire::OpenFlags::kRightReadable,
-                         0, "svc",
+                         {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
     loop_.StartThread("fastboot-fshost-test-loop");
@@ -1184,7 +1184,7 @@ class FastbootBuildInfoTest : public FastbootDownloadTest,
     ASSERT_OK(fidl::WireCall(endpoints->client)
                   ->Open(fuchsia_io::wire::OpenFlags::kRightWritable |
                              fuchsia_io::wire::OpenFlags::kRightReadable,
-                         0, "svc",
+                         {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
     loop_.StartThread("fastboot-buildinfo-test-loop");

@@ -35,8 +35,8 @@ pub async fn wait_for_device_with<T>(
                 fidl::endpoints::create_proxy::<ControllerMarker>()?;
             let () = dev_dir
                 .open(
-                    fio::OpenFlags::empty(),
-                    fio::MODE_TYPE_SERVICE,
+                    fio::OpenFlags::NOT_DIRECTORY,
+                    fio::ModeType::empty(),
                     filename,
                     server_end.into_channel().into(),
                 )
@@ -111,7 +111,6 @@ async fn recursive_wait_and_open_with_flags<P: fidl::endpoints::ProtocolMarker>(
     mut dir: fio::DirectoryProxy,
     name: &str,
     flags: fio::OpenFlags,
-    mode: u32,
 ) -> Result<P::Proxy> {
     let path = std::path::Path::new(name);
     let mut components = path.components().peekable();
@@ -128,7 +127,7 @@ async fn recursive_wait_and_open_with_flags<P: fidl::endpoints::ProtocolMarker>(
         if components.peek().is_some() {
             dir = fuchsia_fs::directory::open_directory_no_describe(&dir, file, flags)?;
         } else {
-            break fuchsia_fs::directory::open_no_describe::<P>(&dir, file, flags, mode)
+            break fuchsia_fs::directory::open_no_describe::<P>(&dir, file, flags)
                 .map_err(Into::into);
         }
     }
@@ -151,13 +150,7 @@ pub async fn recursive_wait_and_open<P: fidl::endpoints::ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     name: &str,
 ) -> Result<P::Proxy> {
-    recursive_wait_and_open_with_flags::<P>(
-        Clone::clone(dir),
-        name,
-        fio::OpenFlags::empty(),
-        fio::MODE_TYPE_SERVICE,
-    )
-    .await
+    recursive_wait_and_open_with_flags::<P>(Clone::clone(dir), name, fio::OpenFlags::empty()).await
 }
 
 #[cfg(test)]
@@ -200,8 +193,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(remote.into_channel()),
         );
@@ -225,8 +217,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(remote.into_channel()),
         );
@@ -260,8 +251,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(remote.into_channel()),
         );
@@ -287,7 +277,6 @@ mod tests {
         root.open(
             fs_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            0,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );
@@ -297,7 +286,6 @@ mod tests {
             client,
             "test/dir",
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            0,
         )
         .await
         .unwrap();

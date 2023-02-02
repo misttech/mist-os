@@ -162,7 +162,7 @@ zx_status_t AwaitIoOnOpenStatus(fidl::UnownedClientEnd<fuchsia_io::Node> node) {
 // Calls `fuchsia.io.Directory/Open` on a channel and awaits the result.
 zx::result<fidl::ClientEnd<fuchsia_io::Node>> OpenObjectInDirectory(
     fidl::UnownedClientEnd<fuchsia_io::Directory> root, fuchsia_io::wire::OpenFlags flags,
-    uint32_t mode, const std::string& path) {
+    const std::string& path) {
   // Ensure `kOpenFlagDescribe` is passed
   flags |= fuchsia_io::wire::OpenFlags::kDescribe;
 
@@ -175,7 +175,7 @@ zx::result<fidl::ClientEnd<fuchsia_io::Node>> OpenObjectInDirectory(
 
   auto [client_end, server_end] = std::move(endpoints.value());
 
-  auto result = fidl::WireCall(root)->Open(flags, mode, fidl::StringView::FromExternal(path),
+  auto result = fidl::WireCall(root)->Open(flags, {}, fidl::StringView::FromExternal(path),
                                            std::move(server_end));
   if (!result.ok()) {
     LOG(ERROR, "could not call fuchsia.io.Directory/Open (status: %s)", result.status_string());
@@ -229,10 +229,11 @@ static zx::result<fidl::ClientEnd<fuchsia_io::Directory>> RecursivelyWalkPath(
   // If the path is more than just the root, then we need to walk the path.
   fidl::ClientEnd<fuchsia_io::Directory> current_dir{};
   for (const auto& fragment : path) {
-    static constexpr uint32_t kOpenMode = fuchsia_io::wire::kModeTypeDirectory;
-    auto new_client_end = OpenObjectInDirectory(
-        current_dir.is_valid() ? current_dir.borrow() : root,
-        static_cast<fuchsia_io::wire::OpenFlags>(kOpenFlags), kOpenMode, fragment.string());
+    auto new_client_end =
+        OpenObjectInDirectory(current_dir.is_valid() ? current_dir.borrow() : root,
+                              static_cast<fuchsia_io::wire::OpenFlags>(kOpenFlags) |
+                                  fuchsia_io::wire::OpenFlags::kDirectory,
+                              fragment.string());
     if (new_client_end.is_error()) {
       return new_client_end.take_error();
     }
@@ -1280,9 +1281,8 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemOpenFile(OpenFileFileSystemRp
   static constexpr fuchsia_io::wire::OpenFlags kOpenFlags =
       fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
       fuchsia_io::wire::OpenFlags::kNotDirectory | fuchsia_io::wire::OpenFlags::kDescribe;
-  static constexpr uint32_t kOpenMode = fuchsia_io::wire::kModeTypeFile;
-  auto node = OpenObjectInDirectory(storage_dir.value().borrow(), kOpenFlags, kOpenMode,
-                                    path.filename().string());
+  auto node =
+      OpenObjectInDirectory(storage_dir.value().borrow(), kOpenFlags, path.filename().string());
   if (node.status_value() == ZX_ERR_NOT_FOUND) {
     LOG(DEBUG, "file not found (status: %s)", node.status_string());
     message->set_return_code(TEEC_ERROR_ITEM_NOT_FOUND);
@@ -1329,10 +1329,10 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemCreateFile(
 
   static constexpr fuchsia_io::wire::OpenFlags kCreateFlags =
       fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
-      fuchsia_io::wire::OpenFlags::kCreate | fuchsia_io::wire::OpenFlags::kDescribe;
-  static constexpr uint32_t kCreateMode = fuchsia_io::wire::kModeTypeFile;
-  auto node = OpenObjectInDirectory(storage_dir.value().borrow(), kCreateFlags, kCreateMode,
-                                    path.filename().string());
+      fuchsia_io::wire::OpenFlags::kCreate | fuchsia_io::wire::OpenFlags::kNotDirectory |
+      fuchsia_io::wire::OpenFlags::kDescribe;
+  auto node =
+      OpenObjectInDirectory(storage_dir.value().borrow(), kCreateFlags, path.filename().string());
   if (node.is_error()) {
     LOG(DEBUG, "unable to create file (status: %s)", node.status_string());
     message->set_return_code(node.status_value() == ZX_ERR_ALREADY_EXISTS
@@ -1597,10 +1597,8 @@ zx_status_t OpteeClient::HandleRpcCommandFileSystemRenameFile(
   if (!message->should_overwrite()) {
     static constexpr fuchsia_io::wire::OpenFlags kCheckRenameFlags =
         fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kDescribe;
-    static constexpr uint32_t kCheckRenameMode =
-        fuchsia_io::wire::kModeTypeFile | fuchsia_io::wire::kModeTypeDirectory;
-    auto destination = OpenObjectInDirectory(new_storage.value().borrow(), kCheckRenameFlags,
-                                             kCheckRenameMode, new_name);
+    auto destination =
+        OpenObjectInDirectory(new_storage.value().borrow(), kCheckRenameFlags, new_name);
     if (destination.is_ok()) {
       // The file exists but shouldn't be overwritten
       LOG(INFO, "refusing to rename file to path that already exists with overwrite set to false");

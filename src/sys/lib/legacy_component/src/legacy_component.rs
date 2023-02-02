@@ -90,12 +90,11 @@ impl LegacyComponent {
         vfs::remote::remote_boxed(Box::new(
             move |_scope: ExecutionScope,
                   flags: fio::OpenFlags,
-                  mode: u32,
                   _relative_path: VfsPath,
                   server_end: ServerEnd<fio::NodeMarker>| {
                 if let Err(e) = runner_svc_dir_proxy.open(
                     flags,
-                    mode,
+                    fio::ModeType::empty(),
                     fsysv1::LoaderMarker::PROTOCOL_NAME,
                     server_end,
                 ) {
@@ -115,12 +114,14 @@ impl LegacyComponent {
                     vfs::remote::remote_boxed(Box::new(
                         move |_scope: ExecutionScope,
                               flags: fio::OpenFlags,
-                              mode: u32,
                               _relative_path: VfsPath,
                               server_end: ServerEnd<fio::NodeMarker>| {
-                            if let Err(e) =
-                                svc_dir_proxy.open(flags, mode, svc_name.as_str(), server_end)
-                            {
+                            if let Err(e) = svc_dir_proxy.open(
+                                flags,
+                                fio::ModeType::empty(),
+                                svc_name.as_str(),
+                                server_end,
+                            ) {
                                 error!("failed to forward service open to v2 namespace: {:?}", e);
                             }
                         },
@@ -142,8 +143,9 @@ impl LegacyComponent {
             .context("could not create node proxy endpoints")?;
         host_pseudo_dir.clone().open(
             execution_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             VfsPath::dot(),
             host_dir_server_end.into_channel().into(),
         );
@@ -196,8 +198,9 @@ impl LegacyComponent {
         );
         out_pseudo_dir.open(
             execution_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             VfsPath::dot(),
             start_info
                 .outgoing_dir
@@ -244,8 +247,7 @@ impl LegacyComponent {
         if let Some(runtime_dir_server) = self.runtime_dir.take() {
             runtime_dir.open(
                 execution_scope.clone(),
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 VfsPath::dot(),
                 runtime_dir_server.into_channel().into(),
             );

@@ -121,8 +121,7 @@ async fn all_partitions(
         match fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
             &block_dir,
             &child.name,
-            fio::OpenFlags::empty(),
-            fio::MODE_TYPE_SERVICE,
+            fio::OpenFlags::NOT_DIRECTORY,
         ) {
             Ok(controller) => partitions.push(DevBlockPartition(controller)),
             Err(err) => {
@@ -356,8 +355,8 @@ fn get_device_manager_proxy(
     let (device_manager_proxy, server_end) =
         fidl::endpoints::create_proxy::<DeviceManagerMarker>()?;
     dev_block_device.0.open(
-        fio::OpenFlags::empty(),
-        fio::MODE_TYPE_SERVICE,
+        fio::OpenFlags::NOT_DIRECTORY,
+        fio::ModeType::empty(),
         "zxcrypt",
         ServerEnd::new(server_end.into_channel()),
     )?;
@@ -389,8 +388,7 @@ impl EncryptedBlockDevice for EncryptedDevBlockDevice {
         let unsealed_block = fuchsia_fs::directory::open_no_describe::<ControllerMarker>(
             &unsealed_dir,
             "block",
-            fio::OpenFlags::empty(),
-            fio::MODE_TYPE_SERVICE,
+            fio::OpenFlags::NOT_DIRECTORY,
         )?;
         Ok(DevBlockDevice(unsealed_block))
     }
@@ -451,8 +449,9 @@ pub mod testing {
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
             vfs::directory::mutable::simple().open(
                 scope,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
                 vfs::path::Path::dot(),
                 ServerEnd::new(server_end.into_channel()),
             );
@@ -793,14 +792,13 @@ pub mod test {
             self: Arc<Self>,
             scope: ExecutionScope,
             flags: fio::OpenFlags,
-            mode: u32,
             path: VfsPath,
             server_end: ServerEnd<fio::NodeMarker>,
         ) {
-            if mode & fio::MODE_TYPE_DIRECTORY != 0 {
-                self.directory.clone().open(scope, flags, mode, path, server_end);
+            if flags.contains(fio::OpenFlags::DIRECTORY) {
+                self.directory.clone().open(scope, flags, path, server_end);
             } else {
-                self.service.clone().open(scope, flags, mode, path, server_end);
+                self.service.clone().open(scope, flags, path, server_end);
             }
         }
 
@@ -830,8 +828,7 @@ pub mod test {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         mock_devfs.open(
             scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             VfsPath::dot(),
             ServerEnd::new(server_end.into_channel()),
         );

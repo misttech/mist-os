@@ -45,7 +45,6 @@ impl CapabilityProvider for PkgDirectoryProvider {
         self: Box<Self>,
         _task_scope: TaskScope,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -55,14 +54,15 @@ impl CapabilityProvider for PkgDirectoryProvider {
             .to_string();
         let server_end = ServerEnd::new(channel::take_channel(server_end));
         if let Some(package) = &self.package {
-            package.package_dir.open(flags, open_mode, &relative_path, server_end).map_err(
-                |_| {
+            package
+                .package_dir
+                .open(flags, fio::ModeType::empty(), &relative_path, server_end)
+                .map_err(|_| {
                     ModelError::open_directory_error(
                         self.abs_moniker.clone(),
                         relative_path.clone(),
                     )
-                },
-            )?;
+                })?;
         } else {
             return Err(ModelError::PackageDirectoryMissing);
         }

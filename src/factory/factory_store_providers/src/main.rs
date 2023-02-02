@@ -189,8 +189,7 @@ async fn apply_config(config: Config, dir: Arc<Mutex<fio::DirectoryProxy>>) -> f
 
     dir.open(
         ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_DIRECTORY,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         vfs::path::Path::dot(),
         ServerEnd::<fio::NodeMarker>::new(directory_server_end.into_channel()),
     );
@@ -240,8 +239,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
 
             factory_items_directory.open(
                 ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 vfs::path::Path::dot(),
                 ServerEnd::<fio::NodeMarker>::new(directory_server_end.into_channel()),
             );
@@ -458,8 +456,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(dir_server.into_channel()),
         );

@@ -403,7 +403,6 @@ async fn setup_rtc(
                             fio::OpenFlags::RIGHT_READABLE
                                 | fio::OpenFlags::RIGHT_WRITABLE
                                 | fio::OpenFlags::RIGHT_EXECUTABLE,
-                            0,
                             vfs::path::Path::dot(),
                             ServerEnd::new(server_end.into_channel()),
                         );

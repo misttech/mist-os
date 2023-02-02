@@ -217,7 +217,6 @@ mod tests {
         dir.clone().open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            0,
             Path::validate_and_split("test").unwrap(),
             server_end,
         );

@@ -62,7 +62,6 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: VfsPath,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -90,7 +89,7 @@ impl vfs::directory::entry::DirectoryEntry for Validation {
                 let () = vfs::file::vmo::asynchronous::read_only_const(
                     self.make_missing_contents().await.as_slice(),
                 )
-                .open(scope, flags, mode, VfsPath::dot(), server_end);
+                .open(scope, flags, VfsPath::dot(), server_end);
             });
             return;
         }
@@ -193,7 +192,6 @@ mod tests {
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_WRITABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE,
-            0,
             VfsPath::dot(),
             server_end.into_channel().into(),
         );
@@ -222,7 +220,6 @@ mod tests {
                 Arc::clone(&validation),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
-                0,
                 VfsPath::dot(),
                 server_end.into_channel().into(),
             );
@@ -243,7 +240,6 @@ mod tests {
         Arc::new(validation).open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             VfsPath::dot(),
             server_end.into_channel().into(),
         );
@@ -270,7 +266,6 @@ mod tests {
         Arc::clone(&validation).open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             VfsPath::validate_and_split("missing").unwrap(),
             server_end.into_channel().into(),
         );

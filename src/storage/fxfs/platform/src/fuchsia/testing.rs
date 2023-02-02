@@ -89,7 +89,6 @@ impl TestFixture {
             fio::OpenFlags::DIRECTORY
                 | fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
             Path::dot(),
             ServerEnd::new(server_end.into_channel()),
         );
@@ -190,11 +189,10 @@ pub async fn close_dir_checked(dir: fio::DirectoryProxy) {
 pub async fn open_file(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
-    mode: u32,
     path: &str,
 ) -> Result<fio::FileProxy, Error> {
     let (proxy, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
-    dir.open(flags, mode, path, ServerEnd::new(server_end.into_channel()))?;
+    dir.open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)
 }
@@ -203,21 +201,19 @@ pub async fn open_file(
 pub async fn open_file_checked(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
-    mode: u32,
     path: &str,
 ) -> fio::FileProxy {
-    open_file(dir, flags, mode, path).await.expect("open_file failed")
+    open_file(dir, flags, path).await.expect("open_file failed")
 }
 
 // Utility function to open a new node connection under |dir|.
 pub async fn open_dir(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
-    mode: u32,
     path: &str,
 ) -> Result<fio::DirectoryProxy, Error> {
     let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
-    dir.open(flags, mode, path, ServerEnd::new(server_end.into_channel()))?;
+    dir.open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))?;
     let _: Vec<_> = proxy.query().await?;
     Ok(proxy)
 }
@@ -226,10 +222,9 @@ pub async fn open_dir(
 pub async fn open_dir_checked(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
-    mode: u32,
     path: &str,
 ) -> fio::DirectoryProxy {
-    open_dir(dir, flags, mode, path).await.expect("open_dir failed")
+    open_dir(dir, flags, path).await.expect("open_dir failed")
 }
 
 /// Utility function to write to an `FxFile`.

@@ -299,7 +299,6 @@ impl DirectoryEntry for FxFile {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        _mode: u32,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -556,8 +555,7 @@ mod tests {
 
         let file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_FILE,
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -597,8 +595,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -653,8 +651,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -713,8 +711,8 @@ mod tests {
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_FILE,
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
             )
             .await;
@@ -735,9 +733,12 @@ mod tests {
         let fixture = TestFixture::open(reused_device, false, true).await;
         let root = fixture.root();
 
-        let file =
-            open_file_checked(&root, fio::OpenFlags::RIGHT_READABLE, fio::MODE_TYPE_FILE, "foo")
-                .await;
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
 
         let vmo =
             file.get_backing_memory(fio::VmoFlags::READ).await.expect("Fidl failure").unwrap();
@@ -771,8 +772,8 @@ mod tests {
                 &root,
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_FILE,
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
             )
             .await;
@@ -792,9 +793,12 @@ mod tests {
         let fixture = TestFixture::open(reused_device, false, true).await;
         let root = fixture.root();
 
-        let file =
-            open_file_checked(&root, fio::OpenFlags::RIGHT_READABLE, fio::MODE_TYPE_FILE, "foo")
-                .await;
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
 
         let vmo =
             file.get_backing_memory(fio::VmoFlags::READ).await.expect("Fidl failure").unwrap();
@@ -821,7 +825,7 @@ mod tests {
             } else {
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE
             };
-            let file = open_file_checked(&root, flags, fio::MODE_TYPE_FILE, "foo").await;
+            let file = open_file_checked(&root, flags | fio::OpenFlags::NOT_DIRECTORY, "foo").await;
 
             if i == 0 {
                 let _: u64 = file
@@ -863,8 +867,8 @@ mod tests {
                 fio::OpenFlags::CREATE
                     | fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::APPEND,
-                fio::MODE_TYPE_FILE,
+                    | fio::OpenFlags::APPEND
+                    | fio::OpenFlags::NOT_DIRECTORY,
                 "foo",
             )
             .await;
@@ -879,9 +883,12 @@ mod tests {
             close_file_checked(file).await;
         }
 
-        let file =
-            open_file_checked(&root, fio::OpenFlags::RIGHT_READABLE, fio::MODE_TYPE_FILE, "foo")
-                .await;
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
         let buf = file
             .read_at(fio::MAX_BUF, 0)
             .await
@@ -909,8 +916,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -1001,8 +1008,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -1074,8 +1081,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -1150,8 +1157,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -1238,8 +1245,8 @@ mod tests {
                         &root,
                         fio::OpenFlags::CREATE
                             | fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE,
-                        fio::MODE_TYPE_FILE,
+                            | fio::OpenFlags::RIGHT_WRITABLE
+                            | fio::OpenFlags::NOT_DIRECTORY,
                         "foo",
                     )
                     .await;
@@ -1258,8 +1265,8 @@ mod tests {
                         &root,
                         fio::OpenFlags::CREATE
                             | fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE,
-                        fio::MODE_TYPE_FILE,
+                            | fio::OpenFlags::RIGHT_WRITABLE
+                            | fio::OpenFlags::NOT_DIRECTORY,
                         "foo",
                     )
                     .await;
@@ -1278,8 +1285,8 @@ mod tests {
                         &root,
                         fio::OpenFlags::CREATE
                             | fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE,
-                        fio::MODE_TYPE_FILE,
+                            | fio::OpenFlags::RIGHT_WRITABLE
+                            | fio::OpenFlags::NOT_DIRECTORY,
                         "foo",
                     )
                     .await;
@@ -1308,8 +1315,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -1352,8 +1359,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -1395,8 +1402,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;
@@ -1430,8 +1437,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
             "foo",
         )
         .await;

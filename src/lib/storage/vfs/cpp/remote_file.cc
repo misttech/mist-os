@@ -33,7 +33,7 @@ zx_status_t RemoteFile::GetAttributes(VnodeAttributes* attr) {
 
 bool RemoteFile::IsRemote() const { return true; }
 
-zx_status_t RemoteFile::OpenRemote(fio::OpenFlags flags, uint32_t mode, fidl::StringView path,
+zx_status_t RemoteFile::OpenRemote(fio::OpenFlags flags, fio::ModeType mode, fidl::StringView path,
                                    fidl::ServerEnd<fio::Node> object) const {
   return fidl::WireCall(remote_client_)->Open(flags, mode, path, std::move(object)).status();
 }

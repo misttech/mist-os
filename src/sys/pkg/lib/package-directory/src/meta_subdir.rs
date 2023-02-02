@@ -37,7 +37,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: VfsPath,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -77,7 +76,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
             let () = Arc::new(MetaFile::new(Arc::clone(&self.root_dir), location)).open(
                 scope,
                 flags,
-                mode,
                 VfsPath::dot(),
                 server_end,
             );
@@ -88,7 +86,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaSub
         for k in self.root_dir.meta_files.keys() {
             if k.starts_with(&directory_path) {
                 let () = Arc::new(MetaSubdir::new(Arc::clone(&self.root_dir), directory_path))
-                    .open(scope, flags, mode, VfsPath::dot(), server_end);
+                    .open(scope, flags, VfsPath::dot(), server_end);
                 return;
             }
         }
@@ -222,7 +220,6 @@ mod tests {
                 Arc::clone(&sub_dir),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
-                0,
                 VfsPath::dot(),
                 server_end.into_channel().into(),
             );
@@ -243,7 +240,6 @@ mod tests {
         Arc::new(sub_dir).open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             VfsPath::dot(),
             server_end.into_channel().into(),
         );
@@ -267,7 +263,6 @@ mod tests {
             Arc::clone(&sub_dir).open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
-                0,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );
@@ -287,7 +282,6 @@ mod tests {
             Arc::clone(&sub_dir).open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
-                0,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );

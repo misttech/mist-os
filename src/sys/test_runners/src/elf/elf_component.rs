@@ -491,7 +491,6 @@ where
     runtime_dir_builder.build().open(
         ExecutionScope::new(),
         fio::OpenFlags::RIGHT_READABLE,
-        0,
         vfs::path::Path::dot(),
         ServerEnd::<fio::NodeMarker>::new(runtime_dir.into_channel()),
     );

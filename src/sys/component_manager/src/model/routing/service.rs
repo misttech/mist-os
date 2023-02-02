@@ -116,7 +116,6 @@ impl DirectoryEntry for FilteredServiceDirectory {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: vfs::path::Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -146,7 +145,9 @@ impl DirectoryEntry for FilteredServiceDirectory {
                     format!("{}/{}", source, protocol_name).to_string()
                 });
 
-            if let Err(e) = self.source_dir_proxy.open(flags, mode, &source_path, server_end) {
+            if let Err(e) =
+                self.source_dir_proxy.open(flags, fio::ModeType::empty(), &source_path, server_end)
+            {
                 error!(
                     error = %e,
                     path = source_path.as_str(),
@@ -276,7 +277,6 @@ impl CapabilityProvider for FilteredServiceProvider {
         mut self: Box<Self>,
         task_scope: TaskScope,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -297,7 +297,6 @@ impl CapabilityProvider for FilteredServiceProvider {
             .open(
                 task_scope,
                 flags,
-                open_mode,
                 PathBuf::new(), //relative_path,
                 &mut (source_service_server_end.into_channel()),
             )
@@ -337,7 +336,6 @@ impl CapabilityProvider for FilteredServiceProvider {
         .open(
             self.execution_scope.clone(),
             flags,
-            open_mode,
             relative_path_vfs,
             ServerEnd::new(channel::take_channel(server_end)),
         );
@@ -381,7 +379,6 @@ impl CapabilityProvider for AggregateServiceDirectoryProvider {
         self: Box<Self>,
         _task_scope: TaskScope,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -397,7 +394,6 @@ impl CapabilityProvider for AggregateServiceDirectoryProvider {
         self.dir.open(
             self.execution_scope.clone(),
             flags,
-            open_mode,
             relative_path,
             ServerEnd::new(channel::take_channel(server_end)),
         );
@@ -502,8 +498,9 @@ impl lazy_immutable_dir::LazyDirectory for AggregateServiceDirectory {
                 let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .map_err(|_| zx::Status::INTERNAL)?;
                 if let Ok(()) = open_capability_at_source(OpenRequest {
-                    flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    open_mode: fio::MODE_TYPE_DIRECTORY,
+                    flags: fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::DIRECTORY,
                     relative_path: PathBuf::new(),
                     source,
                     target: &target,
@@ -752,8 +749,9 @@ impl CollectionServiceDirectory {
         let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
         open_capability_at_source(OpenRequest {
-            flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            open_mode: fio::MODE_TYPE_DIRECTORY,
+            flags: fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             relative_path: PathBuf::new(),
             source: source.clone(),
             target: &target,
@@ -899,7 +897,6 @@ impl DirectoryEntry for ServiceInstanceDirectoryEntry {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: vfs::path::Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -922,7 +919,6 @@ impl DirectoryEntry for ServiceInstanceDirectoryEntry {
 
             if let Err(err) = open_capability_at_source(OpenRequest {
                 flags,
-                open_mode: mode,
                 relative_path,
                 source: self.source.clone(),
                 target: &parent,
@@ -1088,8 +1084,9 @@ mod tests {
 
         dir.open(
             execution_scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(server_end.into_channel()),
         );
@@ -1593,8 +1590,9 @@ mod tests {
         let task_scope = TaskScope::new();
         host.open(
             task_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             PathBuf::new(),
             &mut server_end,
         )
@@ -1680,8 +1678,9 @@ mod tests {
         let task_scope = TaskScope::new();
         host.open(
             task_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             PathBuf::new(),
             &mut server_end,
         )
@@ -1767,8 +1766,9 @@ mod tests {
         path_buf.push("one");
         host.open(
             task_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             path_buf,
             &mut server_end,
         )

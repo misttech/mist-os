@@ -55,7 +55,6 @@ impl DirectoryEntry for PkgfsPackagesVariants {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         mut path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -77,10 +76,9 @@ impl DirectoryEntry for PkgfsPackagesVariants {
             Some(Some(hash)) => {
                 let blobfs = self.blobfs.clone();
                 scope.clone().spawn(async move {
-                    if let Err(e) = package_directory::serve_path(
-                        scope, blobfs, hash, flags, mode, path, server_end,
-                    )
-                    .await
+                    if let Err(e) =
+                        package_directory::serve_path(scope, blobfs, hash, flags, path, server_end)
+                            .await
                     {
                         error!("Failed to open package directory for {}: {:#}", hash, anyhow!(e));
                     }
@@ -209,7 +207,6 @@ mod tests {
                 Arc::clone(self),
                 ExecutionScope::new(),
                 flags,
-                0,
                 Path::dot(),
                 server_end.into_channel().into(),
             );

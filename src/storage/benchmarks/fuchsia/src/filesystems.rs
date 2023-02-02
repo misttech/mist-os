@@ -266,7 +266,7 @@ impl MemfsInstance {
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::POSIX_EXECUTABLE
                     | fio::OpenFlags::POSIX_WRITABLE,
-                0,
+                fio::ModeType::empty(),
                 "root",
                 fidl::endpoints::ServerEnd::new(server_end.into_channel()),
             )

@@ -129,8 +129,8 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
                 let server_end = channel.into_zx_channel().into();
                 svc_dir
                     .open(
-                        fio::OpenFlags::empty(),
-                        fio::MODE_TYPE_SERVICE,
+                        fio::OpenFlags::NOT_DIRECTORY,
+                        fio::ModeType::empty(),
                         &protocol_name,
                         server_end,
                     )
@@ -166,7 +166,6 @@ async fn inject_process_launcher_and_resolver(svc_dir: fio::DirectoryProxy) -> f
     vfs.open(
         ExecutionScope::new(),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        0,
         Path::dot(),
         server_end,
     );

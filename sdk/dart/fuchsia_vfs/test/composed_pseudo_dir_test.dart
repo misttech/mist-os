@@ -35,7 +35,10 @@ void main() {
 
       // connect to the file through the composed directory
       final fileProxy = io.FileProxy();
-      composedDir.open(io.OpenFlags.rightReadable, io.modeTypeFile, 'foo.txt',
+      composedDir.open(
+          io.OpenFlags.notDirectory | io.OpenFlags.rightReadable,
+          io.ModeType.$none,
+          'foo.txt',
           InterfaceRequest<io.Node>(fileProxy.ctrl.request().passChannel()));
 
       final data = await fileProxy.read(io.maxBuf);
@@ -53,7 +56,10 @@ void main() {
 
       // connect to the service through the composed directory
       final proxy = AsyncProxy(AsyncProxyController());
-      composedDir.open(io.OpenFlags.$none, io.modeTypeService, 'test.foo',
+      composedDir.open(
+          io.OpenFlags.notDirectory | io.OpenFlags.$none,
+          io.ModeType.$none,
+          'test.foo',
           InterfaceRequest<io.Node>(proxy.ctrl.request().passChannel()));
 
       expect(() => completer.future, returnsNormally);
@@ -66,7 +72,10 @@ void main() {
 
       // connect to the file through the composed directory
       final fileProxy = io.FileProxy();
-      composedDir.open(io.OpenFlags.rightReadable, io.modeTypeFile, 'foo.txt',
+      composedDir.open(
+          io.OpenFlags.notDirectory | io.OpenFlags.rightReadable,
+          io.ModeType.$none,
+          'foo.txt',
           InterfaceRequest<io.Node>(fileProxy.ctrl.request().passChannel()));
 
       final data = await fileProxy.read(io.maxBuf);
@@ -88,7 +97,10 @@ void main() {
 
       // connect to the file through the composed directory
       final fileProxy = io.FileProxy();
-      composedDir.open(io.OpenFlags.rightReadable, io.modeTypeFile, 'foo.txt',
+      composedDir.open(
+          io.OpenFlags.notDirectory | io.OpenFlags.rightReadable,
+          io.ModeType.$none,
+          'foo.txt',
           InterfaceRequest<io.Node>(fileProxy.ctrl.request().passChannel()));
 
       await expectLater(
@@ -106,7 +118,10 @@ void main() {
 
       // connect to the file through the composed directory
       final fileProxy = io.FileProxy();
-      composedDir.open(io.OpenFlags.rightReadable, io.modeTypeFile, 'foo.txt',
+      composedDir.open(
+          io.OpenFlags.notDirectory | io.OpenFlags.rightReadable,
+          io.ModeType.$none,
+          'foo.txt',
           InterfaceRequest<io.Node>(fileProxy.ctrl.request().passChannel()));
 
       await expectLater(

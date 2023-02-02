@@ -97,7 +97,8 @@ class Node {
 
   // Implemented by subclasses that are remote directories. Forwards open requests to the remote
   // end.
-  virtual void OpenRemote(fuchsia::io::OpenFlags flags, uint32_t mode, std::string_view path,
+  virtual void OpenRemote(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode,
+                          std::string_view path,
                           fidl::InterfaceRequest<fuchsia::io::Node> request) {
     ZX_PANIC("Unimplemented");
   }

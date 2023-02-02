@@ -35,7 +35,8 @@ zx_status_t RemoteDir::Readdir(uint64_t offset, void* data, uint64_t len, uint64
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-void RemoteDir::OpenRemote(fuchsia::io::OpenFlags flags, uint32_t mode, std::string_view path,
+void RemoteDir::OpenRemote(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode,
+                           std::string_view path,
                            fidl::InterfaceRequest<fuchsia::io::Node> request) {
   dir_ptr_->Open(flags, mode, std::string(path), std::move(request));
 }

@@ -163,7 +163,6 @@ async fn test_legacy_echo_with_directory() {
     config_data_dir.open(
         scope,
         fio::OpenFlags::RIGHT_READABLE,
-        0,
         vfs::path::Path::dot(),
         ServerEnd::new(server_end.into_channel()),
     );

@@ -75,10 +75,9 @@ pub fn convert_node_proxy<T: ProtocolMarker>(proxy: fio::NodeProxy) -> T::Proxy 
 pub async fn open_node<T: ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
-    mode: u32,
     path: &str,
 ) -> T::Proxy {
-    open_node_status::<T>(dir, flags, mode, path)
+    open_node_status::<T>(dir, flags, path)
         .await
         .unwrap_or_else(|e| panic!("open_node_status failed for {}: {:?}", path, e))
 }
@@ -87,12 +86,11 @@ pub async fn open_node<T: ProtocolMarker>(
 pub async fn open_node_status<T: ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     flags: fio::OpenFlags,
-    mode: u32,
     path: &str,
 ) -> Result<T::Proxy, zx::Status> {
     let flags = flags | fio::OpenFlags::DESCRIBE;
     let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
-    dir.open(flags, mode, path, node_server).expect("Cannot open node");
+    dir.open(flags, fio::ModeType::empty(), path, node_server).expect("Cannot open node");
     let status = get_open_status(&node_proxy).await;
 
     if status != zx::Status::OK {
@@ -114,7 +112,7 @@ pub async fn open_file_with_flags(
     flags: fio::OpenFlags,
     path: &str,
 ) -> fio::FileProxy {
-    open_node::<fio::FileMarker>(&parent_dir, flags, fio::MODE_TYPE_FILE, path).await
+    open_node::<fio::FileMarker>(&parent_dir, flags | fio::OpenFlags::NOT_DIRECTORY, path).await
 }
 
 /// Helper function to open a sub-directory with the given flags. Only use this if testing
@@ -124,7 +122,7 @@ pub async fn open_dir_with_flags(
     flags: fio::OpenFlags,
     path: &str,
 ) -> fio::DirectoryProxy {
-    open_node::<fio::DirectoryMarker>(&parent_dir, flags, fio::MODE_TYPE_DIRECTORY, path).await
+    open_node::<fio::DirectoryMarker>(&parent_dir, flags | fio::OpenFlags::DIRECTORY, path).await
 }
 
 /// Helper function to open a sub-directory as readable and writable. Only use this if testing
@@ -149,13 +147,7 @@ pub async fn get_token(dir: &fio::DirectoryProxy) -> fidl::Handle {
 /// Helper function to read a file and return its contents. Only use this if testing something other
 /// than the read call directly.
 pub async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Vec<u8> {
-    let file = open_node::<fio::FileMarker>(
-        dir,
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_FILE,
-        path,
-    )
-    .await;
+    let file = open_file_with_flags(dir, fio::OpenFlags::RIGHT_READABLE, path).await;
     file.read(100).await.expect("read failed").map_err(zx::Status::from_raw).expect("read error")
 }
 
@@ -163,8 +155,8 @@ pub async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Vec<u8> {
 pub async fn assert_file_not_found(dir: &fio::DirectoryProxy, path: &str) {
     let (file_proxy, file_server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy");
     dir.open(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-        fio::MODE_TYPE_FILE,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DESCRIBE,
+        fio::ModeType::empty(),
         path,
         file_server,
     )
@@ -230,8 +222,7 @@ pub async fn create_file_and_get_backing_memory(
     let dir_proxy = test_harness.get_directory(root, file_flags);
     let file_proxy = open_node_status::<fio::FileMarker>(
         &dir_proxy,
-        file_flags,
-        fio::MODE_TYPE_FILE,
+        file_flags | fio::OpenFlags::NOT_DIRECTORY,
         &file_path,
     )
     .await?;

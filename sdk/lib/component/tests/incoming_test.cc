@@ -40,7 +40,7 @@ class IncomingTest : public gtest::RealLoopFixture {
       auto endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
       fidl::Request<fuchsia_io::Directory::Open> request(
           /*flags=*/fuchsia_io::OpenFlags::kRightReadable,
-          /*mode=*/static_cast<uint32_t>(fuchsia_io::OpenMode::kOpenExisting),
+          /*mode=*/fuchsia_io::ModeType{},
           /*path=*/component::OutgoingDirectory::kServiceDirectory,
           /*object=*/std::move(endpoints->server));
       auto result = outgoing_client_->Open(std::move(request));

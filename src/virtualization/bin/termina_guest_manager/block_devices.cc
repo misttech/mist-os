@@ -295,11 +295,11 @@ zx::result<fidl::InterfaceHandle<fuchsia::hardware::block::Block>> GetFxfsPartit
     return zx::error(device_endpoints.status_value());
   }
   auto [device_client, device_server] = *std::move(device_endpoints);
-  uint32_t mode = fuchsia::io::MODE_TYPE_BLOCK_DEVICE;
+  flags |= fio::OpenFlags::kBlockDevice;
   // TODO(fxbug.dev/103241): Consider using io2 for the Open() call.
   auto device_open_result =
       fidl::WireCall(dir_client)
-          ->Open(flags, mode, fidl::StringView::FromExternal(image_path.filename().c_str()),
+          ->Open(flags, {}, fidl::StringView::FromExternal(image_path.filename().c_str()),
                  std::move(device_server));
   if (!device_open_result.ok()) {
     FX_PLOGS(ERROR, device_open_result.status())
@@ -326,7 +326,7 @@ fit::result<std::string, std::vector<fuchsia::virtualization::BlockSpec>> GetBlo
   FX_LOGS(INFO) << "Adding stateful partition type: "
                 << structured_config.stateful_partition_type();
   if (structured_config.stateful_partition_type() == "block-file") {
-    // Use a file opened with MODE_TYPE_BLOCK_DEVICE
+    // Use a file opened with OpenFlags.BLOCK_DEVICE.
     auto handle = GetFxfsPartition(kBlockFileStatefulImage, stateful_image_size_bytes);
     if (handle.is_error()) {
       return fit::error(

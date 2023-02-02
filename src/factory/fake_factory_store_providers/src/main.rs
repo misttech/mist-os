@@ -64,8 +64,7 @@ fn start_test_dir(config_path: &str) -> Result<fio::DirectoryProxy, Error> {
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
     test_dir.open(
         ExecutionScope::new(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_DIRECTORY,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         vfs::path::Path::dot(),
         test_dir_service.into_channel().into(),
     );

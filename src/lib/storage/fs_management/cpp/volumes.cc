@@ -37,7 +37,7 @@ zx::result<> CheckExists(fidl::UnownedClientEnd<fuchsia_io::Directory> exposed_d
     return endpoints_or.take_error();
   auto [client, server] = std::move(*endpoints_or);
   auto res = fidl::WireCall(exposed_dir)
-                 ->Open(fuchsia_io::wire::OpenFlags::kNodeReference, 0,
+                 ->Open(fuchsia_io::wire::OpenFlags::kNodeReference, {},
                         fidl::StringView::FromExternal(path), std::move(server));
   if (!res.ok()) {
     return zx::error(res.error().status());

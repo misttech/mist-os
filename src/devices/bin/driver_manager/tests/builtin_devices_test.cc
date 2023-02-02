@@ -39,7 +39,7 @@ class BuiltinDevicesTest : public zxtest::Test {
     }
     auto& [client, server] = endpoints.value();
     if (const fidl::Status result = fidl::WireCall(client_)->Open(
-            flags, 0, fidl::StringView::FromExternal(path), std::move(server));
+            flags, {}, fidl::StringView::FromExternal(path), std::move(server));
         !result.ok()) {
       return zx::error(result.status());
     }

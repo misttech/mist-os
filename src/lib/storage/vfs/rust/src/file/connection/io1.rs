@@ -804,7 +804,7 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
         };
 
         let file = self.file.clone_file();
-        file.open(self.scope.clone(), flags, 0, Path::dot(), server_end);
+        file.open(self.scope.clone(), flags, Path::dot(), server_end);
     }
 
     async fn handle_get_attr(&mut self) -> (zx::Status, fio::NodeAttributes) {
@@ -1076,7 +1076,6 @@ mod tests {
             self: Arc<Self>,
             scope: ExecutionScope,
             flags: fio::OpenFlags,
-            _mode: u32,
             path: Path,
             server_end: ServerEnd<fio::NodeMarker>,
         ) {

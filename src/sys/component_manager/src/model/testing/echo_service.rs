@@ -44,7 +44,6 @@ impl CapabilityProvider for EchoCapabilityProvider {
         self: Box<Self>,
         task_scope: TaskScope,
         _flags: fio::OpenFlags,
-        _open_mode: u32,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {

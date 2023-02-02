@@ -127,8 +127,8 @@ async fn main() {
         scope.clone(),
         fio::OpenFlags::RIGHT_READABLE
             | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE,
-        fio::MODE_TYPE_DIRECTORY,
+            | fio::OpenFlags::RIGHT_EXECUTABLE
+            | fio::OpenFlags::DIRECTORY,
         vfs::path::Path::dot(),
         fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleType::DirectoryRequest.into())
             .unwrap()

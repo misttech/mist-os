@@ -24,9 +24,10 @@ struct DirectoryProtocolImpl(fio::DirectoryProxy);
 impl MemberOpener for DirectoryProtocolImpl {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
         let Self(directory) = self;
-        directory.open(
-            fio::OpenFlags::empty(),
-            fio::MODE_TYPE_SERVICE,
+        // NB: This can't use fdio::service_connect_at because the return type is fidl::Error.
+        let () = directory.open(
+            fio::OpenFlags::NOT_DIRECTORY,
+            fio::ModeType::empty(),
             member,
             ServerEnd::new(server_end),
         )?;

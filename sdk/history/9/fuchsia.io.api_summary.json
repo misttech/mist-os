@@ -227,7 +227,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory.Open",
         "ordinal": "3193127272456937152",
-        "type": "(fuchsia.io/OpenFlags flags,uint32 mode,string:4096 path,server_end:fuchsia.io/Node object)"
+        "type": "(fuchsia.io/OpenFlags flags,fuchsia.io/ModeType mode,string:4096 path,server_end:fuchsia.io/Node object)"
     },
     {
         "kind": "protocol/member",
@@ -351,7 +351,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Directory1.Open",
         "ordinal": "3193127272456937152",
-        "type": "(fuchsia.io/OpenFlags flags,uint32 mode,string:4096 path,server_end:fuchsia.io/Node object)"
+        "type": "(fuchsia.io/OpenFlags flags,fuchsia.io/ModeType mode,string:4096 path,server_end:fuchsia.io/Node object)"
     },
     {
         "kind": "protocol/member",
@@ -1320,7 +1320,7 @@
         "kind": "const",
         "name": "fuchsia.io/MODE_TYPE_BLOCK_DEVICE",
         "type": "uint32",
-        "value": "8192"
+        "value": "24576"
     },
     {
         "kind": "const",
@@ -1351,6 +1351,12 @@
         "name": "fuchsia.io/MOVE",
         "type": "fuchsia.io/InotifyWatchMask",
         "value": "192"
+    },
+    {
+        "kind": "bits",
+        "name": "fuchsia.io/ModeType",
+        "strictness": "flexible",
+        "type": "uint32"
     },
     {
         "kind": "table/member",
@@ -1868,6 +1874,11 @@
     },
     {
         "kind": "bits/member",
+        "name": "fuchsia.io/OpenFlags.BLOCK_DEVICE",
+        "value": "16777216"
+    },
+    {
+        "kind": "bits/member",
         "name": "fuchsia.io/OpenFlags.CLONE_SAME_RIGHTS",
         "value": "67108864"
     },
@@ -1900,11 +1911,6 @@
         "kind": "bits/member",
         "name": "fuchsia.io/OpenFlags.NOT_DIRECTORY",
         "value": "33554432"
-    },
-    {
-        "kind": "bits/member",
-        "name": "fuchsia.io/OpenFlags.POSIX_DEPRECATED",
-        "value": "16777216"
     },
     {
         "kind": "bits/member",
@@ -1967,7 +1973,7 @@
         "kind": "protocol/member",
         "name": "fuchsia.io/Openable.Open",
         "ordinal": "3193127272456937152",
-        "type": "(fuchsia.io/OpenFlags flags,uint32 mode,string:4096 path,server_end:fuchsia.io/Node object)"
+        "type": "(fuchsia.io/OpenFlags flags,fuchsia.io/ModeType mode,string:4096 path,server_end:fuchsia.io/Node object)"
     },
     {
         "kind": "protocol",

@@ -401,8 +401,7 @@ mod tests {
                     assert_eq!(package_url, "fuchsia-pkg://fuchsia.example/test");
                     fs.clone().open(
                         ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE,
-                        fio::MODE_TYPE_DIRECTORY,
+                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                         Path::dot(),
                         dir.into_channel().into(),
                     );
@@ -459,8 +458,7 @@ mod tests {
                     );
                     fs.clone().open(
                         ExecutionScope::new(),
-                        fio::OpenFlags::RIGHT_READABLE,
-                        fio::MODE_TYPE_DIRECTORY,
+                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                         Path::dot(),
                         dir.into_channel().into(),
                     );
@@ -580,8 +578,7 @@ mod tests {
         let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         pseudo_directory! {}.clone().open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             dir_server.into_channel().into(),
         );
@@ -629,8 +626,7 @@ mod tests {
         .clone()
         .open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             dir_server.into_channel().into(),
         );
@@ -678,8 +674,7 @@ mod tests {
         .clone()
         .open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             dir_server.into_channel().into(),
         );
@@ -713,8 +708,7 @@ mod tests {
         .clone()
         .open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             dir_server.into_channel().into(),
         );
@@ -746,8 +740,7 @@ mod tests {
         .clone()
         .open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             dir_server.into_channel().into(),
         );

@@ -15,7 +15,7 @@ namespace fio = fuchsia_io;
 namespace fshost {
 
 zx_status_t OpenNode(fidl::UnownedClientEnd<fio::Directory> root, const std::string& path,
-                     uint32_t mode, fidl::ClientEnd<fio::Node>* result) {
+                     fuchsia_io::wire::OpenFlags flags, fidl::ClientEnd<fio::Node>* result) {
   auto dir = fidl::CreateEndpoints<fio::Node>();
   if (!dir.is_ok()) {
     return dir.status_value();
@@ -23,7 +23,7 @@ zx_status_t OpenNode(fidl::UnownedClientEnd<fio::Directory> root, const std::str
 
   fidl::StringView path_view(fidl::StringView::FromExternal(path));
   zx_status_t status = fidl::WireCall(root)
-                           ->Open(fs::VnodeConnectionOptions::ReadOnly().ToIoV1Flags(), mode,
+                           ->Open(fs::VnodeConnectionOptions::ReadOnly().ToIoV1Flags() | flags, {},
                                   std::move(path_view), std::move(dir->server))
                            .status();
   if (status != ZX_OK) {
@@ -56,7 +56,8 @@ void FshostInspectManager::ServeStats(std::string name,
           return fpromise::make_result_promise<inspect::Inspector>(fpromise::error());
         }
         fidl::ClientEnd<fio::Node> root_chan;
-        zx_status_t status = OpenNode(root, ".", S_IFDIR, &root_chan);
+        zx_status_t status =
+            OpenNode(root, ".", fuchsia_io::wire::OpenFlags::kDirectory, &root_chan);
         if (status != ZX_OK) {
           FX_LOGS_FIRST_N(ERROR, 10) << "Cannot serve stats for " << name
                                      << ": failed to open node: " << zx_status_get_string(status);
@@ -236,7 +237,7 @@ std::optional<DirectoryEntry> DirectoryEntriesIterator::MaybeMakeEntry(
     const std::string& entry_name) {
   // Open child of the current node with the given entry name.
   fidl::ClientEnd<fio::Node> child_chan;
-  zx_status_t status = OpenNode(directory_, entry_name, 0, &child_chan);
+  zx_status_t status = OpenNode(directory_, entry_name, {}, &child_chan);
   if (status != ZX_OK) {
     return std::nullopt;
   }

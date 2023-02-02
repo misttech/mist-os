@@ -60,10 +60,10 @@ typedef struct zxio_ops {
   zx_status_t (*on_mapped)(zxio_t* io, void* ptr);
   zx_status_t (*get_read_buffer_available)(zxio_t* io, size_t* out_available);
   zx_status_t (*shutdown)(zxio_t* io, zxio_shutdown_options_t options, int16_t* out_code);
-  zx_status_t (*open)(zxio_t* io, uint32_t flags, uint32_t mode, const char* path, size_t path_len,
+  zx_status_t (*open)(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
                       zxio_storage_t* storage);
-  zx_status_t (*open_async)(zxio_t* io, uint32_t flags, uint32_t mode, const char* path,
-                            size_t path_len, zx_handle_t request);
+  zx_status_t (*open_async)(zxio_t* io, uint32_t flags, const char* path, size_t path_len,
+                            zx_handle_t request);
   zx_status_t (*add_inotify_filter)(zxio_t* io, const char* path, size_t path_len, uint32_t mask,
                                     uint32_t watch_descriptor, zx_handle_t socket);
   zx_status_t (*unlink)(zxio_t* io, const char* name, size_t name_len, int flags);

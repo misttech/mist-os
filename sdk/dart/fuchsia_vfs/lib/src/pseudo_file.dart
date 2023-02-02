@@ -96,17 +96,12 @@ class PseudoFile extends Vnode {
 
   /// Connects to this instance of [PseudoFile] and serves [fidl_fuchsia_io.File] over fidl.
   @override
-  int connect(OpenFlags flags, int mode, fidl.InterfaceRequest<Node> request,
+  int connect(
+      OpenFlags flags, ModeType mode, fidl.InterfaceRequest<Node> request,
       [OpenFlags? parentFlags]) {
     if (_isClosed) {
       sendErrorEvent(flags, ZX.ERR_NOT_SUPPORTED, request);
       return ZX.ERR_NOT_SUPPORTED;
-    }
-    // There should be no MODE_TYPE_* flags set, except for, possibly,
-    // MODE_TYPE_FILE when the target is a pseudo file.
-    if ((mode & ~modeProtectionMask) & ~modeTypeFile != 0) {
-      sendErrorEvent(flags, ZX.ERR_INVALID_ARGS, request);
-      return ZX.ERR_INVALID_ARGS;
     }
 
     final connectFlags = filterForNodeReference(flags);
@@ -175,7 +170,8 @@ class PseudoFile extends Vnode {
         OpenFlags.nodeReference |
         OpenFlags.posixWritable |
         OpenFlags.posixExecutable |
-        OpenFlags.cloneSameRights;
+        OpenFlags.cloneSameRights |
+        OpenFlags.notDirectory;
     if (_readFn != null) {
       allowedFlags |= OpenFlags.rightReadable;
     }
@@ -231,7 +227,7 @@ class _FileConnection extends File {
   final OpenFlags flags;
 
   /// open file mode
-  final int mode;
+  final ModeType mode;
 
   /// seek position in file.
   int seekPos = 0;

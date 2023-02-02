@@ -131,7 +131,7 @@ static bool do_lstat_v1(zx::socket& socket, const std::vector<std::string>& path
   }
 
   if (!path.empty()) {
-    auto result = component->Open(fuchsia_io::OpenFlags::kRightReadable, 0,
+    auto result = component->Open(fuchsia_io::OpenFlags::kRightReadable, {},
                                   fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
                                   std::move(endpoints->server));
     if (!result.ok()) {
@@ -173,7 +173,7 @@ static bool do_stat_v2(zx::socket& socket, uint32_t id, const std::vector<std::s
   }
 
   if (!path.empty()) {
-    auto result = component->Open(fuchsia_io::OpenFlags::kRightReadable, 0,
+    auto result = component->Open(fuchsia_io::OpenFlags::kRightReadable, {},
                                   fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
                                   std::move(endpoints->server));
     if (!result.ok()) {
@@ -237,7 +237,7 @@ static bool do_list(zx::socket& socket, const std::vector<std::string>& path,
     return false;
   }
   if (!path.empty()) {
-    if (auto open = component->Open(fuchsia_io::OpenFlags::kRightReadable, 0,
+    if (auto open = component->Open(fuchsia_io::OpenFlags::kRightReadable, {},
                                     fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
                                     std::move(endpoints->server));
         !open.ok()) {
@@ -283,7 +283,7 @@ static bool do_list(zx::socket& socket, const std::vector<std::string>& path,
         goto increment;
       }
       if (auto open = dir_ptr->Open(
-              fuchsia_io::OpenFlags::kRightReadable, 0, fidl::StringView::FromExternal(name),
+              fuchsia_io::OpenFlags::kRightReadable, {}, fidl::StringView::FromExternal(name),
               fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
           !open.ok()) {
         FX_LOGS(ERROR) << "Failed to open file " << open.error();
@@ -378,7 +378,7 @@ static bool handle_send_file(zx::socket& socket, const std::vector<std::string>&
   if (auto open = component->Open(
           fuchsia_io::OpenFlags::kRightWritable | fuchsia_io::OpenFlags::kCreate |
               fuchsia_io::OpenFlags::kTruncate | fuchsia_io::OpenFlags::kNotDirectory,
-          fuchsia_io::kModeTypeFile, fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
+          {}, fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
           fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
       !open.ok()) {
     SendSyncFail(socket, "Open failed");
@@ -555,10 +555,10 @@ static bool do_recv(zx::socket& socket, const std::vector<std::string>& path,
     FX_LOGS(ERROR) << "Could not create endpoint " << endpoints.status_value();
     return false;
   }
-  if (auto open =
-          component->Open(fuchsia_io::OpenFlags::kRightReadable, fuchsia_io::kModeTypeFile,
-                          fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
-                          fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
+  if (auto open = component->Open(
+          fuchsia_io::OpenFlags::kRightReadable | fuchsia_io::OpenFlags::kNotDirectory, {},
+          fidl::StringView::FromExternal(ConcatenateRelativePath(path)),
+          fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
       !open.ok()) {
     FX_LOGS(INFO) << "Open failed " << open.error();
     SendSyncFail(socket, "open failed");

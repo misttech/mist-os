@@ -266,7 +266,6 @@ impl DirectoryEntry for VmoFile {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        _mode: u32,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {

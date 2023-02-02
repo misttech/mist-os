@@ -173,7 +173,6 @@ impl CapabilityProvider for RouteValidatorCapabilityProvider {
         self: Box<Self>,
         task_scope: TaskScope,
         flags: fio::OpenFlags,
-        _open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {

@@ -18,7 +18,6 @@ std::string builtin_semantic_fuchsia_io =
     "    request.object = handle / request.path;\n"
     "    input_field: request.path;\n"
     "    result: request.object;\n"
-    "    print mode as directory_open_mode;\n"
     "  }\n"
     "  File::Seek {\n"
     "    input_field: request.origin;\n"

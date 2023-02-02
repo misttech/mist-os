@@ -43,7 +43,6 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
                 .open(
                     scope.clone(),
                     fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_EXECUTABLE,
-                    0,
                     vfs::path::Path::dot(),
                     mock_handles.outgoing_dir.into_channel().into(),
                 );

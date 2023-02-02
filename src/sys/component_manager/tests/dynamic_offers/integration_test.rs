@@ -210,8 +210,7 @@ async fn realm_user(
     let _binder_node = fuchsia_fs::directory::open_node(
         &exposed_proxy,
         "fuchsia.component.Binder2",
-        fuchsia_fs::OpenFlags::empty(),
-        fio::MODE_TYPE_SERVICE,
+        fuchsia_fs::OpenFlags::NOT_DIRECTORY,
     )
     .await
     .unwrap();

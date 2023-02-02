@@ -25,8 +25,8 @@ import 'package:fidl_fuchsia_io/fidl_async.dart' as fio;
 //   /// proxy. The proxy is connected and then returned so it can be called.
 //   P openMember(String member, P serviceMemberProxy) {
 //     open(
-//       fio.OpenFlags.$none,
-//       fio.modeTypeService,
+//       fio.OpenFlags.notDirectory,
+//       fio.ModeType.$none,
 //       member,
 //       fidl.InterfaceRequest<fio.Node>(
 //           serviceMemberProxy.ctrl.request().passChannel()!),
@@ -88,8 +88,8 @@ class LocalComponentHandles {
           "the component's namespace doesn't have an /svc directory");
     }
     svcDirProxy.open(
-      fio.OpenFlags.$none,
-      fio.modeTypeService,
+      fio.OpenFlags.notDirectory,
+      fio.ModeType.$none,
       protocolName,
       fidl.InterfaceRequest<fio.Node>(proxy.ctrl.request().passChannel()!),
     );
@@ -107,7 +107,7 @@ class LocalComponentHandles {
     final serviceDir = fio.DirectoryProxy();
     svcDirProxy.open(
       fio.OpenFlags.directory,
-      fio.modeTypeDirectory,
+      fio.ModeType.$none,
       serviceName,
       fidl.InterfaceRequest<fio.Node>(serviceDir.ctrl.request().passChannel()!),
     );
@@ -149,8 +149,8 @@ class LocalComponentHandles {
   //   S serviceProxy,
   // ) {
   //   openNamedService(serviceName).open(
-  //     fio.OpenFlags.$none,
-  //     fio.modeTypeService,
+  //     fio.OpenFlags.notDirectory,
+  //     fio.ModeType.$none,
   //     instanceName,
   //     fidl.InterfaceRequest<fio.Node>(
   //         serviceProxy.ctrl.request().passChannel()!),
@@ -174,7 +174,7 @@ class LocalComponentHandles {
   /// dataDir.open(
   ///   fio.OpenFlags.directory |
   ///       fio.OpenFlags.rightReadable,
-  ///   fio.modeTypeDirectory,
+  ///   fio.ModeType.$none,
   ///   "assets",
   ///   fidl.InterfaceRequest<fio.Node>(assetsDir.ctrl.request().passChannel()!),
   /// );

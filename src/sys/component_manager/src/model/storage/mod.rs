@@ -171,8 +171,7 @@ async fn open_storage_root(
         dir_source_component.start(&StartReason::StorageAdmin).await?;
         dir_source_component
             .open_outgoing(
-                FLAGS,
-                fio::MODE_TYPE_DIRECTORY,
+                FLAGS | fio::OpenFlags::DIRECTORY,
                 full_backing_directory_path.clone(),
                 &mut local_server_end.into_channel(),
             )

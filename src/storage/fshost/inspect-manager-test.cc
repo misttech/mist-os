@@ -146,7 +146,8 @@ TEST_F(InspectManagerTest, DirectoryEntryIteratorGetNext) {
                                                    fuchsia_io::wire::OpenFlags::kRightExecutable),
                              server.TakeChannel().release()));
   fidl::ClientEnd<fuchsia_io::Node> test_dir_chan;
-  auto status = fshost::OpenNode(root, "/iterator-test", S_IFDIR, &test_dir_chan);
+  auto status = fshost::OpenNode(root, "/iterator-test", fuchsia_io::wire::OpenFlags::kDirectory,
+                                 &test_dir_chan);
   ASSERT_EQ(status, ZX_OK);
 
   // The opened node must be a directory because of the |MakeDir| call above.

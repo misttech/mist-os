@@ -158,7 +158,7 @@ zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
 //
 // Otherwise, this function creates a generic "remote" object.
 zx::result<fdio_ptr> fdio_namespace::Open(fbl::RefPtr<LocalVnode> vn, std::string_view path,
-                                          fio::wire::OpenFlags flags, uint32_t mode) const {
+                                          fio::wire::OpenFlags flags) const {
   {
     fbl::AutoLock lock(&lock_);
     zx_status_t status = WalkLocked(&vn, &path);
@@ -180,7 +180,7 @@ zx::result<fdio_ptr> fdio_namespace::Open(fbl::RefPtr<LocalVnode> vn, std::strin
 
             // Active remote connections are immutable, so referencing remote here
             // is safe. We don't want to do a blocking open under the ns lock.
-            return fdio_internal::open_async(s.Connection(), path, flags, mode);
+            return fdio_internal::open_async(s.Connection(), path, flags);
           },
       },
       vn->NodeType());

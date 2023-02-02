@@ -58,9 +58,7 @@ pub trait DirectoryEntry: IntoAny + Sync + Send {
     ///
     /// `flags` holds one or more of the `OPEN_RIGHT_*`, `OPEN_FLAG_*` constants.  Processing of the
     /// `flags` value is specific to the item - in particular, the `OPEN_RIGHT_*` flags need to
-    /// match the item capabilities.  See the fuchsia.io documentation for the precise semantics of
-    /// the `mode` argument.  Some validation of the `flags` and `mode` fields will have taken place
-    /// prior to this call; `flags` and `mode` will be consistent with each other.
+    /// match the item capabilities.
     ///
     /// It is the responsibility of the implementation to strip POSIX flags if the path crosses
     /// a boundary that does not have the required permissions.
@@ -79,7 +77,6 @@ pub trait DirectoryEntry: IntoAny + Sync + Send {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     );
@@ -108,6 +105,6 @@ impl<T: DirectoryEntry> DirectoryEntryForFxbug120673Transition for T {
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        DirectoryEntry::open(self, scope, flags, 0, path, server_end)
+        DirectoryEntry::open(self, scope, flags, path, server_end)
     }
 }

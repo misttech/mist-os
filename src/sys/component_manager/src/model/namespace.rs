@@ -334,8 +334,7 @@ async fn route_directory(
         UseDecl::Directory(use_dir_decl) => (
             RouteRequest::UseDirectory(use_dir_decl.clone()),
             OpenOptions::Directory(OpenDirectoryOptions {
-                flags,
-                open_mode: fio::MODE_TYPE_DIRECTORY,
+                flags: flags | fio::OpenFlags::DIRECTORY,
                 relative_path: String::new(),
                 server_chan: &mut server_end,
             }),
@@ -343,8 +342,7 @@ async fn route_directory(
         UseDecl::Storage(use_storage_decl) => (
             RouteRequest::UseStorage(use_storage_decl.clone()),
             OpenOptions::Storage(OpenStorageOptions {
-                flags,
-                open_mode: fio::MODE_TYPE_DIRECTORY,
+                flags: flags | fio::OpenFlags::DIRECTORY,
                 relative_path: ".".into(),
                 server_chan: &mut server_end,
             }),
@@ -382,7 +380,6 @@ fn add_service_or_protocol_use(
     let use_clone = use_.clone();
     let route_open_fn = move |scope: ExecutionScope,
                               flags: fio::OpenFlags,
-                              mode: u32,
                               relative_path: Path,
                               server_end: ServerEnd<fio::NodeMarker>| {
         let use_ = use_.clone();
@@ -408,7 +405,6 @@ fn add_service_or_protocol_use(
                                  OpenOptions::Service(
                                      OpenServiceOptions{
                                          flags,
-                                         open_mode: mode,
                                          relative_path: relative_path.into_string(),
                                          server_chan: &mut server_end
                                      }
@@ -419,7 +415,6 @@ fn add_service_or_protocol_use(
                                  OpenOptions::Protocol(
                                      OpenProtocolOptions{
                                          flags,
-                                         open_mode: mode,
                                          relative_path: relative_path.into_string(),
                                          server_chan: &mut server_end
                                      }
@@ -430,7 +425,6 @@ fn add_service_or_protocol_use(
                                  OpenOptions::EventStream(
                                      OpenEventStreamOptions{
                                          flags,
-                                         open_mode: mode,
                                          relative_path: stream.target_path.to_string(),
                                          server_chan: &mut server_end,
                                      }
@@ -514,8 +508,9 @@ fn serve_and_install_svc_dirs(
             //
             // TODO(https://fxbug.dev/101092): remove RIGHT_READABLE once all downstream consumers
             // contain this commit.
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             server_end.into_channel().into(),
         );

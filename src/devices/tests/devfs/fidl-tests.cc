@@ -26,7 +26,7 @@ void FidlOpenValidator(const fidl::ClientEnd<fio::Directory>& directory, const c
   zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(endpoints.status_value());
   const fidl::Status result = fidl::WireCall(directory)->Open(
-      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe, 0,
+      fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe, {},
       fidl::StringView::FromExternal(path), std::move(endpoints->server));
   ASSERT_OK(result.status());
 

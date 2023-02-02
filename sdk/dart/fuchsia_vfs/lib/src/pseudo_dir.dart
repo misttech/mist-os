@@ -90,17 +90,12 @@ class PseudoDir extends Vnode {
   /// Connects to this instance of [PseudoDir] and serves
   /// [fidl_fuchsia_io.Directory] over fidl.
   @override
-  int connect(OpenFlags flags, int mode, fidl.InterfaceRequest<Node> request,
+  int connect(
+      OpenFlags flags, ModeType mode, fidl.InterfaceRequest<Node> request,
       [OpenFlags? parentFlags]) {
     if (_isClosed) {
       sendErrorEvent(flags, ZX.ERR_NOT_SUPPORTED, request);
       return ZX.ERR_NOT_SUPPORTED;
-    }
-    // There should be no modeType* flags set, except for, possibly,
-    // modeTypeDirectory when the target is a pseudo dir.
-    if ((mode & ~modeProtectionMask) & ~modeTypeDirectory != 0) {
-      sendErrorEvent(flags, ZX.ERR_INVALID_ARGS, request);
-      return ZX.ERR_INVALID_ARGS;
     }
 
     var connectFlags = filterForNodeReference(flags);
@@ -154,7 +149,7 @@ class PseudoDir extends Vnode {
   }
 
   @override
-  void open(OpenFlags flags, int mode, String path,
+  void open(OpenFlags flags, ModeType mode, String path,
       fidl.InterfaceRequest<Node> request,
       [OpenFlags? parentFlags]) {
     parentFlags ??= Flags.fsRightsDefault();
@@ -225,7 +220,7 @@ class PseudoDir extends Vnode {
       assert((rights & ~openRights) == OpenFlags.$none);
     }
     rights ??= OpenFlags.rightReadable | OpenFlags.rightWritable;
-    return connect(OpenFlags.directory | rights, 0, request);
+    return connect(OpenFlags.directory | rights, ModeType.$none, request);
   }
 
   @override
@@ -276,7 +271,7 @@ class _DirConnection extends Directory {
 
   // reference to current Directory object;
   final PseudoDir _dir;
-  final int _mode;
+  final ModeType _mode;
   final OpenFlags _flags;
 
   /// Position in directory where [#readDirents] should start searching. If less
@@ -411,7 +406,7 @@ class _DirConnection extends Directory {
   }
 
   @override
-  Future<void> open(OpenFlags flags, int mode, String path,
+  Future<void> open(OpenFlags flags, ModeType mode, String path,
       fidl.InterfaceRequest<Node> object) async {
     if (!Flags.inputPrecondition(flags)) {
       _dir.sendErrorEvent(flags, ZX.ERR_INVALID_ARGS, object);

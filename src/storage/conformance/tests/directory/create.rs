@@ -35,8 +35,11 @@ async fn create_directory_with_create_if_absent_flag() {
 
     root_dir
         .open(
-            fio::OpenFlags::CREATE_IF_ABSENT | fio::OpenFlags::CREATE | fio::OpenFlags::DESCRIBE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::CREATE_IF_ABSENT
+                | fio::OpenFlags::CREATE
+                | fio::OpenFlags::DESCRIBE
+                | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
             "mnt/tmp/foo",
             server,
         )
@@ -60,8 +63,11 @@ async fn create_file_with_sufficient_rights() {
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
 
         dir.open(
-            dir_flags | fio::OpenFlags::CREATE | fio::OpenFlags::DESCRIBE,
-            fio::MODE_TYPE_FILE,
+            dir_flags
+                | fio::OpenFlags::CREATE
+                | fio::OpenFlags::DESCRIBE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            fio::ModeType::empty(),
             TEST_FILE,
             server,
         )
@@ -87,8 +93,11 @@ async fn create_file_with_insufficient_rights() {
         let (client, server) = create_proxy::<fio::NodeMarker>().expect("Cannot create proxy.");
 
         dir.open(
-            dir_flags | fio::OpenFlags::CREATE | fio::OpenFlags::DESCRIBE,
-            fio::MODE_TYPE_FILE,
+            dir_flags
+                | fio::OpenFlags::CREATE
+                | fio::OpenFlags::DESCRIBE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            fio::ModeType::empty(),
             TEST_FILE,
             server,
         )

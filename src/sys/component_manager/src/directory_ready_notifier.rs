@@ -254,8 +254,11 @@ impl DirectoryReadyNotifier {
             .open(
                 // TODO(fxbug.dev/118292): we might be able to remove READABLE from here, but at the
                 // moment driver_manager fails to expose inspect if we remove it.
-                rights.into_legacy() | fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                rights.into_legacy()
+                    | fio::OpenFlags::DESCRIBE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::DIRECTORY,
+                fio::ModeType::empty(),
                 &canonicalized_path,
                 ServerEnd::new(server_end.into_channel()),
             )

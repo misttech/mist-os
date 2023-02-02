@@ -42,7 +42,6 @@ fn mock_boot_handles(
     dir.open(
         scope,
         fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-        0,
         vfs::path::Path::dot(),
         ServerEnd::new(server),
     );

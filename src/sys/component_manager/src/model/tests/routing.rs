@@ -86,7 +86,6 @@ async fn use_framework_service() {
             self: Box<Self>,
             task_scope: TaskScope,
             _flags: fio::OpenFlags,
-            _open_mode: u32,
             _relative_path: PathBuf,
             server_end: &mut zx::Channel,
         ) -> Result<(), ModelError> {
@@ -1804,7 +1803,6 @@ async fn use_runner_from_environment_failed() {
             self: Box<Self>,
             _task_scope: TaskScope,
             _flags: fio::OpenFlags,
-            _open_mode: u32,
             _relative_path: PathBuf,
             server_end: &mut zx::Channel,
         ) -> Result<(), ModelError> {

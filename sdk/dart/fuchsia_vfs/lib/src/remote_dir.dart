@@ -33,15 +33,16 @@ class RemoteDir extends Vnode {
   }
 
   @override
-  int connect(OpenFlags flags, int mode, request, [OpenFlags? parentFlags]) {
+  int connect(OpenFlags flags, ModeType mode, request,
+      [OpenFlags? parentFlags]) {
     // Called when a PseudoDir needs to open this directory
     open(flags, mode, '.', request);
     return ZX.OK;
   }
 
   @override
-  void open(
-      OpenFlags flags, int mode, String path, InterfaceRequest<Node> request,
+  void open(OpenFlags flags, ModeType mode, String path,
+      InterfaceRequest<Node> request,
       [OpenFlags? parentFlags]) {
     if (_isClosed) {
       sendErrorEvent(flags, ZX.ERR_NOT_SUPPORTED, request);

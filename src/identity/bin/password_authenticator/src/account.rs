@@ -262,7 +262,7 @@ impl<SM: StorageManager + 'static> Account<SM> {
                         | fio::OpenFlags::RIGHT_WRITABLE
                         | fio::OpenFlags::DIRECTORY
                         | fio::OpenFlags::CREATE,
-                    fio::MODE_TYPE_DIRECTORY,
+                    fio::ModeType::empty(),
                     DEFAULT_DIR,
                     ServerEnd::new(data_directory.into_channel()),
                 )

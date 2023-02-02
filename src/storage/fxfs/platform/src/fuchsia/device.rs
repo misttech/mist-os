@@ -665,8 +665,8 @@ mod tests {
                     &root,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_FILE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::NOT_DIRECTORY,
                     "block_device",
                 )
                 .await;
@@ -684,8 +684,10 @@ mod tests {
                     .expect("close error");
 
                 root.open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "block_device",
                     server.into_channel().into(),
                 )
@@ -762,8 +764,9 @@ mod tests {
                 root.open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "foo",
                     ServerEnd::new(server_channel),
                 )
@@ -807,8 +810,9 @@ mod tests {
                 root.open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "foo",
                     ServerEnd::new(server_channel),
                 )
@@ -843,8 +847,9 @@ mod tests {
                 root.open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "foo",
                     ServerEnd::new(server_channel),
                 )
@@ -905,8 +910,9 @@ mod tests {
                 root.open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "foo",
                     ServerEnd::new(server_channel),
                 )
@@ -937,8 +943,9 @@ mod tests {
                 root.open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "foo",
                     ServerEnd::new(server_channel),
                 )
@@ -969,8 +976,9 @@ mod tests {
                 root.open(
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "foo",
                     ServerEnd::new(server_channel),
                 )
@@ -1006,8 +1014,8 @@ mod tests {
                     &root,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_FILE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::NOT_DIRECTORY,
                     "block_device",
                 )
                 .await;
@@ -1025,8 +1033,10 @@ mod tests {
                     .expect("close error");
 
                 root.open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "block_device",
                     ServerEnd::new(server_channel),
                 )
@@ -1099,8 +1109,8 @@ mod tests {
                     &root,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_FILE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::NOT_DIRECTORY,
                     "block_device",
                 )
                 .await;
@@ -1118,8 +1128,10 @@ mod tests {
                     .expect("close error");
 
                 root.open(
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_BLOCK_DEVICE,
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::BLOCK_DEVICE,
+                    fio::ModeType::empty(),
                     "block_device",
                     server.into_channel().into(),
                 )

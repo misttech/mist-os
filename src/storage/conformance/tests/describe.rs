@@ -17,8 +17,7 @@ async fn directory_query() {
     {
         let dir = open_node::<fio::DirectoryMarker>(
             &test_dir,
-            fio::OpenFlags::NODE_REFERENCE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DIRECTORY,
             ".",
         )
         .await;
@@ -27,13 +26,8 @@ async fn directory_query() {
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::NODE_PROTOCOL_NAME));
     }
     {
-        let dir = open_node::<fio::DirectoryMarker>(
-            &test_dir,
-            fio::OpenFlags::empty(),
-            fio::MODE_TYPE_DIRECTORY,
-            ".",
-        )
-        .await;
+        let dir =
+            open_node::<fio::DirectoryMarker>(&test_dir, fio::OpenFlags::DIRECTORY, ".").await;
 
         let protocol = dir.query().await.expect("query failed");
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::DIRECTORY_PROTOCOL_NAME));
@@ -49,8 +43,7 @@ async fn file_query() {
     {
         let file = open_node::<fio::FileMarker>(
             &test_dir,
-            fio::OpenFlags::NODE_REFERENCE,
-            fio::MODE_TYPE_FILE,
+            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY,
             TEST_FILE,
         )
         .await;
@@ -59,13 +52,8 @@ async fn file_query() {
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::NODE_PROTOCOL_NAME));
     }
     {
-        let file = open_node::<fio::FileMarker>(
-            &test_dir,
-            fio::OpenFlags::empty(),
-            fio::MODE_TYPE_FILE,
-            TEST_FILE,
-        )
-        .await;
+        let file =
+            open_node::<fio::FileMarker>(&test_dir, fio::OpenFlags::NOT_DIRECTORY, TEST_FILE).await;
 
         let protocol = file.query().await.expect("query failed");
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::FILE_PROTOCOL_NAME));
@@ -84,8 +72,7 @@ async fn vmo_file_query() {
     {
         let file = open_node::<fio::FileMarker>(
             &test_dir,
-            fio::OpenFlags::NODE_REFERENCE,
-            fio::MODE_TYPE_FILE,
+            fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY,
             TEST_FILE,
         )
         .await;
@@ -94,13 +81,8 @@ async fn vmo_file_query() {
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::NODE_PROTOCOL_NAME));
     }
     {
-        let file = open_node::<fio::FileMarker>(
-            &test_dir,
-            fio::OpenFlags::empty(),
-            fio::MODE_TYPE_FILE,
-            TEST_FILE,
-        )
-        .await;
+        let file =
+            open_node::<fio::FileMarker>(&test_dir, fio::OpenFlags::NOT_DIRECTORY, TEST_FILE).await;
 
         let protocol = file.query().await.expect("query failed");
         assert_eq!(std::str::from_utf8(&protocol), Ok(fio::FILE_PROTOCOL_NAME));

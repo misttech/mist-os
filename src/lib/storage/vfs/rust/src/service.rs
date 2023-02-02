@@ -88,17 +88,15 @@ impl Service {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        Connection::create_connection(scope, flags, mode, server_end);
+        Connection::create_connection(scope, flags, server_end);
     }
 
     fn open_as_service(
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let channel = match Channel::from_channel(server_end.into_channel()) {
@@ -129,7 +127,7 @@ impl Service {
             Ok(Arc::try_unwrap(inner).unwrap().into_channel())
         };
 
-        match new_connection_validate_flags(flags, mode) {
+        match new_connection_validate_flags(flags) {
             Ok(_updated) => {
                 if let Ok(channel) = describe(channel, Ok(())) {
                     (self.open)(scope, channel)
@@ -149,7 +147,6 @@ impl DirectoryEntry for Service {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -162,9 +159,9 @@ impl DirectoryEntry for Service {
         }
 
         if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-            self.open_as_node(scope, flags, mode, server_end);
+            self.open_as_node(scope, flags, server_end);
         } else {
-            self.open_as_service(scope, flags, mode, server_end);
+            self.open_as_service(scope, flags, server_end);
         }
     }
 

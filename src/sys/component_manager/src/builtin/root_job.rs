@@ -105,7 +105,7 @@ mod tests {
         let task_scope = TaskScope::new();
         if let Some(provider) = provider.lock().await.take() {
             provider
-                .open(task_scope.clone(), fio::OpenFlags::empty(), 0, PathBuf::new(), &mut server)
+                .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
                 .await?;
         };
 

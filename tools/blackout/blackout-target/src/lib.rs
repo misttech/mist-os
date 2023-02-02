@@ -301,7 +301,6 @@ pub async fn find_partition(partition_label: &str, device_path: Option<&str>) ->
             &dev(),
             fvm_block_path.strip_prefix("/dev/").unwrap(),
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            0,
         )
         .await
         {

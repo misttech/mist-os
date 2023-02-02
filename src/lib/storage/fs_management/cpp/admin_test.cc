@@ -272,7 +272,7 @@ class OutgoingDirectoryMinfs : public OutgoingDirectoryFixture {
                                       fio::wire::OpenFlags::kRightWritable |
                                       fio::wire::OpenFlags::kCreate;
     ASSERT_EQ(fidl::WireCall(DataRoot())
-                  ->Open(file_flags, 0, kTestFilePath, std::move(test_file_server))
+                  ->Open(file_flags, {}, kTestFilePath, std::move(test_file_server))
                   .status(),
               ZX_OK);
 
@@ -305,7 +305,7 @@ TEST_F(OutgoingDirectoryMinfs, CannotWriteToReadOnlyDataRoot) {
   fio::wire::OpenFlags fail_file_flags =
       fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable;
   // open "succeeds" but...
-  auto open_resp = fidl::WireCall(data_root)->Open(fail_file_flags, 0, kTestFilePath,
+  auto open_resp = fidl::WireCall(data_root)->Open(fail_file_flags, {}, kTestFilePath,
                                                    std::move(fail_test_file_server));
   ASSERT_TRUE(open_resp.ok()) << open_resp.status_string();
 
@@ -321,7 +321,7 @@ TEST_F(OutgoingDirectoryMinfs, CannotWriteToReadOnlyDataRoot) {
 
   fio::wire::OpenFlags file_flags = fio::wire::OpenFlags::kRightReadable;
   auto open_resp2 =
-      fidl::WireCall(data_root)->Open(file_flags, 0, kTestFilePath, std::move(test_file_server));
+      fidl::WireCall(data_root)->Open(file_flags, {}, kTestFilePath, std::move(test_file_server));
   ASSERT_TRUE(open_resp2.ok()) << open_resp2.status_string();
 
   fidl::WireSyncClient<fio::File> file_client(std::move(test_file_ends->client));
@@ -344,8 +344,8 @@ TEST_F(OutgoingDirectoryMinfs, CannotWriteToOutgoingDirectory) {
   fio::wire::OpenFlags file_flags = fio::wire::OpenFlags::kRightReadable |
                                     fio::wire::OpenFlags::kRightWritable |
                                     fio::wire::OpenFlags::kCreate;
-  auto open_resp =
-      fidl::WireCall(ExportRoot())->Open(file_flags, 0, kTestFilePath, std::move(test_file_server));
+  auto open_resp = fidl::WireCall(ExportRoot())
+                       ->Open(file_flags, {}, kTestFilePath, std::move(test_file_server));
   ASSERT_TRUE(open_resp.ok()) << open_resp.status_string();
 
   fidl::WireSyncClient<fio::File> file_client(std::move(test_file_ends->client));

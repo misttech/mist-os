@@ -123,7 +123,7 @@ class Incoming {
           'See [Incoming.request] for more information');
     }
 
-    _dirProxy.open(OpenFlags.$none, modeTypeService, serviceName,
+    _dirProxy.open(OpenFlags.notDirectory, ModeType.$none, serviceName,
         InterfaceRequest<Node>(channel));
   }
 
@@ -177,4 +177,4 @@ class IncomingStateException implements Exception {
 }
 
 // TODO(https://fxbug.dev/120673): Remove this after soft transition.
-const int modeTypeNone = 0;
+const ModeType modeTypeNone = ModeType.$none;

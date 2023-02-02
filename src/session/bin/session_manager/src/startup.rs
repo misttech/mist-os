@@ -270,8 +270,10 @@ mod tests {
                 fcomponent::RealmRequest::CreateChild { responder, .. } => {
                     let _ = responder.send(&mut Ok(()));
                 }
-                fcomponent::RealmRequest::OpenExposedDir { responder, .. } => {
-                    let _ = responder.send(&mut Ok(()));
+                fcomponent::RealmRequest::OpenExposedDir { child: _, exposed_dir, responder } => {
+                    // Close the incoming channel before responding to avoid race conditions.
+                    let () = std::mem::drop(exposed_dir);
+                    let () = responder.send(&mut Ok(())).unwrap();
                 }
                 _ => panic!("Realm handler received an unexpected request"),
             };

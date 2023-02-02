@@ -2064,12 +2064,12 @@ impl ScopedInstance {
     ) -> Result<(), anyhow::Error> {
         self.exposed_dir
             .open(
-                fio::OpenFlags::empty(),
-                fio::MODE_TYPE_SERVICE,
+                fio::OpenFlags::NOT_DIRECTORY,
+                fio::ModeType::empty(),
                 protocol_name,
                 ServerEnd::new(server_end),
             )
-            .context("Failed to open protocol in directory")
+            .map_err(Into::into)
     }
 
     /// Returns a reference to the component's read-only exposed directory.

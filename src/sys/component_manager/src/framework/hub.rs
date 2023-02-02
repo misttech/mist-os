@@ -56,7 +56,6 @@ impl CapabilityProvider for HubCapabilityProvider {
         self: Box<Self>,
         _task_scope: TaskScope,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -68,7 +67,7 @@ impl CapabilityProvider for HubCapabilityProvider {
         relative_path.push('/');
         let dir_path = pfsPath::validate_and_split(relative_path.clone())
             .map_err(|_| ModelError::open_directory_error(self.moniker.clone(), relative_path))?;
-        self.hub.open(&self.moniker, flags, open_mode, dir_path, server_end).await?;
+        self.hub.open(&self.moniker, flags, dir_path, server_end).await?;
         Ok(())
     }
 }
@@ -109,8 +108,13 @@ impl Hub {
         mut server_end: zx::Channel,
     ) -> Result<(), ModelError> {
         let root_moniker = AbsoluteMoniker::root();
-        self.open(&root_moniker, flags, fio::MODE_TYPE_DIRECTORY, pfsPath::dot(), &mut server_end)
-            .await?;
+        self.open(
+            &root_moniker,
+            flags | fio::OpenFlags::DIRECTORY,
+            pfsPath::dot(),
+            &mut server_end,
+        )
+        .await?;
         Ok(())
     }
 
@@ -134,7 +138,6 @@ impl Hub {
         &self,
         moniker: &AbsoluteMoniker,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: pfsPath,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -147,7 +150,6 @@ impl Hub {
         instance.directory.clone().open(
             self.scope.clone(),
             flags,
-            open_mode,
             relative_path,
             ServerEnd::<fio::NodeMarker>::new(server_end),
         );
@@ -520,8 +522,9 @@ mod tests {
 
             out_dir.clone().open(
                 ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
                 pfsPath::dot(),
                 ServerEnd::new(server_end.into_channel()),
             );
@@ -537,8 +540,9 @@ mod tests {
 
             pseudo_dir.clone().open(
                 ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
                 pfsPath::dot(),
                 ServerEnd::new(server_end.into_channel()),
             );

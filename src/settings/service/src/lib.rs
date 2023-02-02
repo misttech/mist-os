@@ -255,7 +255,6 @@ fn init_storage_dir() -> DirectoryProxy {
     mut_pseudo_directory! {}.open(
         fs_scope,
         OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-        0,
         vfs::path::Path::dot(),
         ServerEnd::new(server.into_channel()),
     );

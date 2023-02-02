@@ -91,7 +91,6 @@ where
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         name: &str,
         path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, Status> {
@@ -106,14 +105,8 @@ where
                 Ok(entry.clone())
             }
             None => {
-                let entry = Connection::entry_not_found(
-                    scope.clone(),
-                    self.clone(),
-                    flags,
-                    mode,
-                    name,
-                    path,
-                )?;
+                let entry =
+                    Connection::entry_not_found(scope.clone(), self.clone(), flags, name, path)?;
 
                 let _ = this.entries.insert(name.to_string(), entry.clone());
                 Ok(entry)
@@ -179,7 +172,6 @@ where
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         mut path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -210,7 +202,7 @@ where
         let res = if !path_ref.is_empty() {
             self.get_entry(name)
         } else {
-            self.get_or_insert_entry(scope.clone(), flags, mode, name, path_ref)
+            self.get_or_insert_entry(scope.clone(), flags, name, path_ref)
         };
         let found = match res {
             Err(status) => {
@@ -218,7 +210,7 @@ where
                 false
             }
             Ok(entry) => {
-                entry.open(scope, flags, mode, path, server_end);
+                entry.open(scope, flags, path, server_end);
                 true
             }
         };

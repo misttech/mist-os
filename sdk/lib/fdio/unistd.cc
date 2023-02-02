@@ -194,9 +194,12 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, int flags, uint32
   // http://pubs.opengroup.org/onlinepubs/9699919799/functions/open.html
   const bool flags_incompatible_with_directory =
       ((flags & ~O_PATH & O_ACCMODE) != O_RDONLY) || (flags & O_CREAT);
-  const fio::wire::OpenFlags fio_flags = fdio_flags_to_zxio(static_cast<uint32_t>(flags));
+  fio::wire::OpenFlags fio_flags = fdio_flags_to_zxio(static_cast<uint32_t>(flags));
+  if (S_ISDIR(mode)) {
+    fio_flags |= fio::wire::OpenFlags::kDirectory;
+  }
 
-  return open_at_impl(dirfd, path, fio_flags, mode,
+  return open_at_impl(dirfd, path, fio_flags,
                       {
                           .disallow_directory = enforce_eisdir && flags_incompatible_with_directory,
                           .allow_absolute_path = true,
@@ -204,7 +207,7 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, int flags, uint32
 }
 
 zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, fio::wire::OpenFlags flags,
-                                  uint32_t mode, OpenAtOptions options) {
+                                  OpenAtOptions options) {
   if (path == nullptr) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -251,7 +254,7 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, fio::wire::OpenFl
   if (flags & fio::wire::OpenFlags::kNodeReference) {
     flags &= fio::wire::kOpenFlagsAllowedWithNodeReference;
   }
-  return iodir->open(clean, flags, mode);
+  return iodir->open(clean, flags);
 }
 
 // Open |path| from the |dirfd| directory, enforcing the POSIX EISDIR error condition. Specifically,
@@ -390,7 +393,7 @@ zx::result<fdio_ptr> opendir_containing_at(int dirfd, const char* path, NameBuff
     base = ".";
   }
 
-  return iodir->open(base, fdio_flags_to_zxio(O_RDONLY | O_DIRECTORY), 0);
+  return iodir->open(base, fdio_flags_to_zxio(O_RDONLY | O_DIRECTORY));
 }
 
 }  // namespace fdio_internal

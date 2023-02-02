@@ -421,8 +421,8 @@ async fn get_storage_for_component_instance(moniker_prefix: &str) -> fio::Direct
     storage_admin
         .open_component_storage(
             matching_storage_users.first().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+            fio::ModeType::empty(),
             ServerEnd::new(server_end.into_channel()),
         )
         .unwrap();

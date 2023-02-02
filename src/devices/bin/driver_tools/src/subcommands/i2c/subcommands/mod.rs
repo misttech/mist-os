@@ -24,7 +24,7 @@ fn connect_to_i2c_device(
         .as_os_str()
         .to_str()
         .ok_or(anyhow::anyhow!("Failed to get device path string"))?;
-    root.open(fio::OpenFlags::RIGHT_READABLE, 0, device_path, server)
+    root.open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), device_path, server)
         .context("Failed to open I2C device file")?;
     Ok(fi2c::DeviceProxy::new(proxy.into_channel().unwrap()))
 }

@@ -310,8 +310,8 @@ impl RunningSuite {
             let directory: ClientEnd<fio::DirectoryMarker> = node.into_channel().into();
             artifact_storage_admin.open_component_storage(
                 &storage_moniker,
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+                fio::ModeType::empty(),
                 server,
             )?;
             let (event_client, event_server) = zx::EventPair::create();

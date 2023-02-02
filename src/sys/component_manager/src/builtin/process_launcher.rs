@@ -373,7 +373,6 @@ impl CapabilityProvider for ProcessLauncherCapabilityProvider {
         self: Box<Self>,
         task_scope: TaskScope,
         _flags: fio::OpenFlags,
-        _open_mode: u32,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -462,7 +461,7 @@ mod tests {
         let task_scope = TaskScope::new();
         if let Some(capability_provider) = capability_provider {
             capability_provider
-                .open(task_scope.clone(), fio::OpenFlags::empty(), 0, PathBuf::new(), &mut server)
+                .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server)
                 .await?;
         };
 
@@ -609,8 +608,9 @@ mod tests {
         };
         dir.clone().open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             path::Path::dot(),
             ServerEnd::new(dir_server),
         );

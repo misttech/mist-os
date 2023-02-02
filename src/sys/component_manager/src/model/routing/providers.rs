@@ -39,7 +39,6 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
         self: Box<Self>,
         _task_scope: TaskScope,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -76,7 +75,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             // Pass back the channel so the caller can set the epitaph, if necessary.
             *server_end = channel::take_channel(&mut server_end_in);
             let path = self.path.to_path_buf().attach(relative_path);
-            res?.open_outgoing(flags, open_mode, path, server_end).await?;
+            res?.open_outgoing(flags, path, server_end).await?;
         } else {
             res?;
         }
@@ -95,7 +94,6 @@ impl CapabilityProvider for NamespaceCapabilityProvider {
         self: Box<Self>,
         _task_scope: TaskScope,
         flags: fio::OpenFlags,
-        _open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -131,7 +129,6 @@ impl CapabilityProvider for DirectoryEntryCapabilityProvider {
         self: Box<Self>,
         _task_scope: TaskScope,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -148,7 +145,6 @@ impl CapabilityProvider for DirectoryEntryCapabilityProvider {
         self.entry.open(
             self.execution_scope.clone(),
             flags,
-            open_mode,
             relative_path,
             ServerEnd::new(channel::take_channel(server_end)),
         );

@@ -134,7 +134,7 @@ zx_status_t Vnode::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
 
 zx::result<std::string> Vnode::GetDevicePath() const { return zx::error(ZX_ERR_NOT_SUPPORTED); }
 
-zx_status_t Vnode::OpenRemote(fuchsia_io::OpenFlags, uint32_t, fidl::StringView,
+zx_status_t Vnode::OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                               fidl::ServerEnd<fuchsia_io::Node>) const {
   return ZX_ERR_NOT_SUPPORTED;
 }

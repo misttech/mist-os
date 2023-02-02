@@ -220,7 +220,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: VfsPath,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -254,22 +253,12 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         if canonical_path == "meta" {
             // This branch is done here instead of in MetaAsDir so that Clone'ing MetaAsDir yields
             // MetaAsDir. See the MetaAsDir::open impl for more.
-            if open_meta_as_file(flags, mode) {
-                let () = Arc::new(MetaAsFile::new(self)).open(
-                    scope,
-                    flags,
-                    mode,
-                    VfsPath::dot(),
-                    server_end,
-                );
+            if open_meta_as_file(flags) {
+                let () =
+                    Arc::new(MetaAsFile::new(self)).open(scope, flags, VfsPath::dot(), server_end);
             } else {
-                let () = Arc::new(MetaAsDir::new(self)).open(
-                    scope,
-                    flags,
-                    mode,
-                    VfsPath::dot(),
-                    server_end,
-                );
+                let () =
+                    Arc::new(MetaAsDir::new(self)).open(scope, flags, VfsPath::dot(), server_end);
             }
             return;
         }
@@ -279,7 +268,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
                 let () = Arc::new(MetaFile::new(self, meta_file)).open(
                     scope,
                     flags,
-                    mode,
                     VfsPath::dot(),
                     server_end,
                 );
@@ -292,7 +280,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
                     let () = Arc::new(MetaSubdir::new(self, subdir_prefix)).open(
                         scope,
                         flags,
-                        mode,
                         VfsPath::dot(),
                         server_end,
                     );
@@ -305,10 +292,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
         }
 
         if let Some(blob) = self.non_meta_files.get(canonical_path) {
-            let () =
-                self.non_meta_storage.open(blob, flags, mode, server_end).unwrap_or_else(|e| {
-                    error!("Error forwarding content blob open to blobfs: {:#}", anyhow::anyhow!(e))
-                });
+            let () = self.non_meta_storage.open(blob, flags, server_end).unwrap_or_else(|e| {
+                error!("Error forwarding content blob open to blobfs: {:#}", anyhow::anyhow!(e))
+            });
             return;
         }
 
@@ -318,7 +304,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for RootDir
                 let () = Arc::new(NonMetaSubdir::new(self, subdir_prefix)).open(
                     scope,
                     flags,
-                    mode,
                     VfsPath::dot(),
                     server_end,
                 );
@@ -391,12 +376,8 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry_container::Directory for Ro
 }
 
 // Behavior copied from pkgfs.
-fn open_meta_as_file(flags: fio::OpenFlags, mode: u32) -> bool {
-    let mode_type = mode & fio::MODE_TYPE_MASK;
-    let open_as_file = mode_type == fio::MODE_TYPE_FILE;
-    let open_as_dir = mode_type == fio::MODE_TYPE_DIRECTORY
-        || flags.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE);
-    open_as_file || !open_as_dir
+fn open_meta_as_file(flags: fio::OpenFlags) -> bool {
+    !flags.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE)
 }
 
 // Open a non-meta file by hash with flags of `OPEN_RIGHT_READABLE | additional_flags` and return
@@ -411,7 +392,6 @@ fn open_for_read(
     let () = non_meta_storage.open(
         blob,
         fio::OpenFlags::RIGHT_READABLE | additional_flags,
-        0,
         server_end.into_channel().into(),
     )?;
     Ok(file)
@@ -731,7 +711,6 @@ mod tests {
                 Arc::clone(&root_dir),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
-                0,
                 VfsPath::dot(),
                 server_end.into_channel().into(),
             );
@@ -753,7 +732,6 @@ mod tests {
             Arc::new(root_dir),
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             VfsPath::dot(),
             server_end.into_channel().into(),
         );
@@ -789,7 +767,6 @@ mod tests {
                 Arc::clone(&root_dir),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
-                0,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end,
             );
@@ -816,8 +793,7 @@ mod tests {
             DirectoryEntry::open(
                 Arc::clone(&root_dir),
                 ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_FILE,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );
@@ -850,8 +826,7 @@ mod tests {
             DirectoryEntry::open(
                 Arc::clone(&root_dir),
                 ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );
@@ -926,7 +901,6 @@ mod tests {
                 Arc::clone(&root_dir),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
-                0,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );
@@ -947,7 +921,6 @@ mod tests {
                 Arc::clone(&root_dir),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
-                0,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );
@@ -974,7 +947,6 @@ mod tests {
                 Arc::clone(&root_dir),
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
-                0,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );
@@ -1016,7 +988,8 @@ mod tests {
     fn arb_open_flags() -> impl proptest::strategy::Strategy<Value = fio::OpenFlags> {
         use proptest::strategy::Strategy as _;
 
-        proptest::arbitrary::any::<u32>().prop_map(fio::OpenFlags::from_bits_truncate)
+        proptest::bits::u32::masked(fio::OpenFlags::all().bits())
+            .prop_map(|b| fio::OpenFlags::from_bits(b).unwrap())
     }
 
     proptest::proptest! {
@@ -1025,31 +998,17 @@ mod tests {
                 Some(Box::new(proptest::test_runner::FileFailurePersistence::Off)),
             ..Default::default()
         })]
+
         #[test]
-        fn open_meta_as_file_file_first_priority(flags in arb_open_flags(), mode: u32) {
-            let mode_with_file = (mode & !fio::MODE_TYPE_MASK) | fio::MODE_TYPE_FILE;
-            proptest::prop_assert!(open_meta_as_file(flags, mode_with_file));
+        fn open_meta_as_file_dir_second_priority(flags in arb_open_flags()) {
+            proptest::prop_assert!(!open_meta_as_file(flags | fio::OpenFlags::DIRECTORY));
+            proptest::prop_assert!(!open_meta_as_file(flags | fio::OpenFlags::NODE_REFERENCE));
         }
 
         #[test]
-        fn open_meta_as_file_dir_second_priority(flags in arb_open_flags(), mode: u32) {
-            let mode_with_dir = (mode & !fio::MODE_TYPE_MASK) | fio::MODE_TYPE_DIRECTORY;
-            proptest::prop_assert!(!open_meta_as_file(flags, mode_with_dir));
-
-            let mode_without_file = if mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_FILE {
-                mode & !fio::MODE_TYPE_FILE
-            } else {
-                mode
-            };
-            proptest::prop_assert!(!open_meta_as_file(flags | fio::OpenFlags::DIRECTORY, mode_without_file));
-            proptest::prop_assert!(!open_meta_as_file(flags | fio::OpenFlags::NODE_REFERENCE, mode_without_file));
-        }
-
-        #[test]
-        fn open_meta_as_file_file_fallback(flags in arb_open_flags(), mode: u32) {
-            let mode = mode & !(fio::MODE_TYPE_FILE | fio::MODE_TYPE_DIRECTORY);
+        fn open_meta_as_file_file_fallback(flags in arb_open_flags()) {
             let flags = flags & !(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE);
-            proptest::prop_assert!(open_meta_as_file(flags, mode));
+            proptest::prop_assert!(open_meta_as_file(flags));
         }
     }
 }

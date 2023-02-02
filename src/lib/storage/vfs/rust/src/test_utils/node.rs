@@ -9,12 +9,7 @@ use {
     fidl_fuchsia_io as fio,
 };
 
-pub fn open_get_proxy<M>(
-    proxy: &fio::DirectoryProxy,
-    flags: fio::OpenFlags,
-    mode: u32,
-    path: &str,
-) -> M::Proxy
+pub fn open_get_proxy<M>(proxy: &fio::DirectoryProxy, flags: fio::OpenFlags, path: &str) -> M::Proxy
 where
     M: ProtocolMarker,
 {
@@ -22,7 +17,12 @@ where
         create_proxy::<M>().expect("Failed to create connection endpoints");
 
     proxy
-        .open(flags, mode, path, ServerEnd::<fio::NodeMarker>::new(new_server_end.into_channel()))
+        .open(
+            flags,
+            fio::ModeType::empty(),
+            path,
+            ServerEnd::<fio::NodeMarker>::new(new_server_end.into_channel()),
+        )
         .unwrap();
 
     new_proxy

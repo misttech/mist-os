@@ -347,8 +347,9 @@ impl BootfsSvc {
         let (directory, directory_server_end) = fidl::endpoints::create_endpoints()?;
         vfs.open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_EXECUTABLE
+                | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::<fio::NodeMarker>::new(directory_server_end.into_channel()),
         );

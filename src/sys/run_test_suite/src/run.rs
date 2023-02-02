@@ -713,8 +713,9 @@ mod test {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(directory_service.into_channel()),
         );
@@ -860,8 +861,7 @@ mod test {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_FILE,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             vfs::path::Path::validate_and_split("test_file.profraw").unwrap(),
             ServerEnd::new(file_service.into_channel()),
         );

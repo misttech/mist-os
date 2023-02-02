@@ -73,8 +73,7 @@ mod tests {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         root.open(
             execution_scope::ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot().into(),
             fidl::endpoints::ServerEnd::new(dir_server.into_channel()),
         );

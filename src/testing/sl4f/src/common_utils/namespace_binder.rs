@@ -47,8 +47,9 @@ impl NamespaceBinder {
                 let (client, server) = fidl::endpoints::create_endpoints()?;
                 dir.clone().open(
                     self.scope.clone(),
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_DIRECTORY,
+                    fio::OpenFlags::RIGHT_READABLE
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::DIRECTORY,
                     vfs::path::Path::dot(),
                     fidl::endpoints::ServerEnd::new(server.into_channel()),
                 );

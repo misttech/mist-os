@@ -257,7 +257,6 @@ fn directory_to_proxy(
         fio::OpenFlags::RIGHT_READABLE
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_EXECUTABLE,
-        0,
         vfs::path::Path::dot(),
         server.into_channel().into(),
     );
@@ -426,7 +425,7 @@ mod tests {
         let (proxy, server_end) =
             create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-        server.open(ExecutionScope::new(), flags, 0, Path::dot(), server_end.into_channel().into());
+        server.open(ExecutionScope::new(), flags, Path::dot(), server_end.into_channel().into());
         proxy
     }
 

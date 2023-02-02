@@ -26,8 +26,7 @@ async fn unlink_file_with_sufficient_rights() {
 
         let file = open_node::<fio::FileMarker>(
             &src_dir,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_FILE,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             "file.txt",
         )
         .await;

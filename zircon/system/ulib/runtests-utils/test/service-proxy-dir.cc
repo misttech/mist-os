@@ -86,7 +86,7 @@ TEST(ServiceProxyDirTest, Simple) {
     ASSERT_OK(fidl::WireCall(proxy_endpoints->client)
                   ->Open(fio::wire::OpenFlags::kRightReadable |
                              fio::wire::OpenFlags::kRightWritable | fio::wire::OpenFlags::kDescribe,
-                         0755, fidl::StringView(kProxyEchoString), std::move(endpoints->server))
+                         {}, fidl::StringView(kProxyEchoString), std::move(endpoints->server))
                   .status());
 
     class EventHandler : public fidl::WireSyncEventHandler<fio::Node> {
@@ -125,7 +125,7 @@ TEST(ServiceProxyDirTest, Simple) {
     ASSERT_OK(fidl::WireCall(proxy_endpoints->client)
                   ->Open(fio::wire::OpenFlags::kRightReadable |
                              fio::wire::OpenFlags::kRightWritable | fio::wire::OpenFlags::kDescribe,
-                         0755, fidl::StringView(kEchoString), std::move(endpoints->server))
+                         {}, fidl::StringView(kEchoString), std::move(endpoints->server))
                   .status());
 
     class EventHandler : public fidl::WireSyncEventHandler<fio::Node> {

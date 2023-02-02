@@ -291,7 +291,6 @@ mod tests {
                 self: Arc<Self>,
                 _scope: ExecutionScope,
                 _flags: fio::OpenFlags,
-                _mode: u32,
                 _path: Path,
                 _server_end: ServerEnd<fio::NodeMarker>,
             ) {

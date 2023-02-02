@@ -56,7 +56,7 @@ func logError(err error) {
 
 type Node interface {
 	getIO() (io.NodeWithCtx, func() error, error)
-	addConnection(ctx fidl.Context, flags io.OpenFlags, mode uint32, req io.NodeWithCtxInterfaceRequest) error
+	addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error
 	DescribeDeprecated(fidl.Context) (io.NodeInfoDeprecated, error)
 }
 
@@ -77,7 +77,7 @@ func (s *Service) getIO() (io.NodeWithCtx, func() error, error) {
 	return s, noop, nil
 }
 
-func (s *Service) addConnection(ctx fidl.Context, flags io.OpenFlags, mode uint32, req io.NodeWithCtxInterfaceRequest) error {
+func (s *Service) addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
 	// TODO(fxbug.dev/33595): this does not implement the node protocol correctly,
 	// but matches the behaviour of SDK VFS.
 	if flags&io.OpenFlagsNodeReference != 0 {
@@ -125,7 +125,7 @@ func (*Service) Sync(fidl.Context) (io.Node2SyncResult, error) {
 
 func (*Service) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:      io.ModeTypeService,
+		Mode:      uint32(io.ModeTypeService),
 		Id:        io.InoUnknown,
 		LinkCount: 1,
 	}, nil
@@ -226,7 +226,7 @@ func (dir *DirectoryWrapper) getIO() (io.NodeWithCtx, func() error, error) {
 	return dir.GetDirectory(), noop, nil
 }
 
-func (dir *DirectoryWrapper) addConnection(ctx fidl.Context, flags io.OpenFlags, mode uint32, req io.NodeWithCtxInterfaceRequest) error {
+func (dir *DirectoryWrapper) addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
 	ioDir := dir.GetDirectory()
 	stub := io.DirectoryWithCtxStub{Impl: ioDir}
 	go Serve(context.Background(), &stub, req.Channel, ServeOptions{
@@ -278,7 +278,7 @@ func (*directoryState) Sync(fidl.Context) (io.Node2SyncResult, error) {
 
 func (*directoryState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:      io.ModeTypeDirectory | uint32(fdio.VtypeIRUSR),
+		Mode:      uint32(io.ModeTypeDirectory) | uint32(fdio.VtypeIRUSR),
 		Id:        io.InoUnknown,
 		LinkCount: 1,
 	}, nil
@@ -300,13 +300,12 @@ func (*directoryState) UpdateAttributes(fidl.Context, io.MutableNodeAttributes) 
 
 const dot = "."
 
-func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode uint32, path string, req io.NodeWithCtxInterfaceRequest) error {
+func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, path string, req io.NodeWithCtxInterfaceRequest) error {
 	if path == dot {
 		return dirState.addConnection(ctx, flags, mode, req)
 	}
 	const slash = "/"
 	if strings.HasSuffix(path, slash) {
-		mode |= io.ModeTypeDirectory
 		path = path[:len(path)-len(slash)]
 	}
 
@@ -520,7 +519,7 @@ func (file *FileWrapper) getIO() (io.NodeWithCtx, func() error, error) {
 	return state, state.reader.Close, nil
 }
 
-func (file *FileWrapper) addConnection(ctx fidl.Context, flags io.OpenFlags, mode uint32, req io.NodeWithCtxInterfaceRequest) error {
+func (file *FileWrapper) addConnection(ctx fidl.Context, flags io.OpenFlags, mode io.ModeType, req io.NodeWithCtxInterfaceRequest) error {
 	ioFile, err := file.getFileState()
 	if err != nil {
 		return err
@@ -625,7 +624,7 @@ func (*fileState) Sync(fidl.Context) (io.Node2SyncResult, error) {
 
 func (fState *fileState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
-		Mode:        io.ModeTypeFile | uint32(fdio.VtypeIRUSR),
+		Mode:        uint32(io.ModeTypeFile) | uint32(fdio.VtypeIRUSR),
 		Id:          io.InoUnknown,
 		ContentSize: fState.size,
 		LinkCount:   1,

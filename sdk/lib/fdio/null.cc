@@ -8,8 +8,7 @@
 
 fdio::~fdio() = default;
 
-zx::result<fdio_ptr> fdio::open(std::string_view path, fuchsia_io::wire::OpenFlags flags,
-                                uint32_t mode) {
+zx::result<fdio_ptr> fdio::open(std::string_view path, fuchsia_io::wire::OpenFlags flags) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 

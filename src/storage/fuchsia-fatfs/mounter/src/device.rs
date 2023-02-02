@@ -325,7 +325,6 @@ pub mod test {
         let () = root.clone().open(
             dev.scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             Path::dot(),
             remote.into_channel().into(),
         );

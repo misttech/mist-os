@@ -77,7 +77,6 @@ impl CapabilityProvider for MockFrameworkDirectoryProvider {
         self: Box<Self>,
         _task_scope: TaskScope,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -85,7 +84,7 @@ impl CapabilityProvider for MockFrameworkDirectoryProvider {
         let server_end = channel::take_channel(server_end);
         let server_end = ServerEnd::<fio::NodeMarker>::new(server_end);
         self.test_dir_proxy
-            .open(flags, open_mode, relative_path, server_end)
+            .open(flags, fio::ModeType::empty(), relative_path, server_end)
             .expect("failed to open test dir");
         Ok(())
     }

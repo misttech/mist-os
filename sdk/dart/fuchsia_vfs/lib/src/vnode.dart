@@ -26,7 +26,7 @@ abstract class Vnode {
   /// By default param [#parentFlags] is all rights, so that open will allow
   /// all rights requested on the incoming [request].
   /// This param is used by clone to restrict cloning.
-  int connect(OpenFlags flags, int mode, InterfaceRequest<Node> request,
+  int connect(OpenFlags flags, ModeType mode, InterfaceRequest<Node> request,
       [OpenFlags? parentFlags]);
 
   /// Filter flags when [OpenFlags.nodeReference] is passed.
@@ -49,8 +49,8 @@ abstract class Vnode {
   /// Behavior:
   /// For directory types, it will throw UnimplementedError error.
   /// For non empty path it will fail with [ERR_NOT_DIR].
-  void open(
-      OpenFlags flags, int mode, String path, InterfaceRequest<Node> request,
+  void open(OpenFlags flags, ModeType mode, String path,
+      InterfaceRequest<Node> request,
       [OpenFlags? parentFlags]) {
     if (type() == DirentType.directory) {
       // dir types should implement this function

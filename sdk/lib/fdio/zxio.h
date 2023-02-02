@@ -68,8 +68,7 @@ struct remote : public zxio {
   static zx::result<fdio_ptr> create(fidl::ClientEnd<fuchsia_io::Node> node);
   static zx::result<fdio_ptr> create(zx::vmo vmo, zx::stream stream);
 
-  zx::result<fdio_ptr> open(std::string_view path, fuchsia_io::wire::OpenFlags flags,
-                            uint32_t mode) override;
+  zx::result<fdio_ptr> open(std::string_view path, fuchsia_io::wire::OpenFlags flags) override;
   void wait_begin(uint32_t events, zx_handle_t* handle, zx_signals_t* signals) override;
   void wait_end(zx_signals_t signals, uint32_t* events) override;
 
@@ -82,7 +81,7 @@ struct remote : public zxio {
 };
 
 zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path,
-                                fuchsia_io::wire::OpenFlags flags, uint32_t mode);
+                                fuchsia_io::wire::OpenFlags flags);
 
 }  // namespace fdio_internal
 

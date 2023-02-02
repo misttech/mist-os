@@ -56,7 +56,7 @@ impl FxfsInner {
         outgoing_dir
             .open(
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                0,
+                fio::ModeType::empty(),
                 "root",
                 server_end.into_channel().into(),
             )

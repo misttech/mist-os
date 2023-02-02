@@ -109,7 +109,6 @@ fn new_proxy_routing_fn(ty: CapabilityType) -> RoutingFn {
     Box::new(
         move |scope: ExecutionScope,
               flags: fio::OpenFlags,
-              mode: u32,
               path: Path,
               server_end: ServerEnd<fio::NodeMarker>| {
             match ty {
@@ -129,7 +128,7 @@ fn new_proxy_routing_fn(ty: CapabilityType) -> RoutingFn {
                     let sub_dir = pseudo_directory!(
                         "hello" => read_only_static(b"friend"),
                     );
-                    sub_dir.open(ExecutionScope::new(), flags, mode, path, server_end);
+                    sub_dir.open(ExecutionScope::new(), flags, path, server_end);
                 }
                 CapabilityType::Service => panic!("service capability unsupported"),
                 CapabilityType::Runner => panic!("runner capability unsupported"),
@@ -194,8 +193,9 @@ impl MockResolver {
         );
         sub_dir.open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(server.into_channel()),
         );

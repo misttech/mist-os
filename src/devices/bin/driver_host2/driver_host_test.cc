@@ -90,7 +90,7 @@ class TestDirectory : public fio::testing::Directory_TestBase {
   void SetOpenHandler(OpenHandler open_handler) { open_handler_ = std::move(open_handler); }
 
  private:
-  void Open(fio::OpenFlags flags, uint32_t mode, std::string path,
+  void Open(fio::OpenFlags flags, fio::ModeType mode, std::string path,
             fidl::InterfaceRequest<fio::Node> object) override {
     open_handler_(flags, std::move(path), std::move(object));
   }

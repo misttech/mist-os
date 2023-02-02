@@ -67,11 +67,6 @@ zx_status_t fdio_open(const char* path, uint32_t flags, zx_handle_t request) {
   return fdio_ns_open(ns, path, flags, handle.release());
 }
 
-// We need to select some value to pass as the mode when calling Directory.Open. We use this value
-// to match our historical behavior rather than for any more principled reason.
-constexpr uint32_t kArbitraryMode =
-    S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
-
 namespace fdio_internal {
 
 // TODO(https://fxbug.dev/97878): This should reuse the logic used by openat().
@@ -82,7 +77,7 @@ zx_status_t fdio_open_at(fidl::UnownedClientEnd<fio::Directory> directory, std::
   }
 
   return fidl::WireCall(directory)
-      ->Open(flags, kArbitraryMode, fidl::StringView::FromExternal(path), std::move(request))
+      ->Open(flags, {}, fidl::StringView::FromExternal(path), std::move(request))
       .status();
 }
 
@@ -115,7 +110,7 @@ zx_status_t fdio_open_fd_at_internal(int dirfd, const char* dirty_path, fio::wir
   // (fdio_flags_to_zxio always add _FLAG_DESCRIBE).
   flags |= fio::wire::OpenFlags::kDescribe;
 
-  zx::result io = fdio_internal::open_at_impl(dirfd, dirty_path, flags, kArbitraryMode,
+  zx::result io = fdio_internal::open_at_impl(dirfd, dirty_path, flags,
                                               {
                                                   .disallow_directory = false,
                                                   .allow_absolute_path = allow_absolute_path,

@@ -158,7 +158,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
             }))
             .new();
 
-        dir.open(scope, flags, 0, Path::dot(), directory_request.into_channel().into());
+        dir.open(scope, flags, Path::dot(), directory_request.into_channel().into());
     }
 
     Ok(())

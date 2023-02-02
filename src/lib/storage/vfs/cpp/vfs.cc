@@ -200,8 +200,12 @@ zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool mu
 zx::result<bool> Vfs::EnsureExists(fbl::RefPtr<Vnode> vndir, std::string_view path,
                                    fbl::RefPtr<Vnode>* out_vn, fs::VnodeConnectionOptions options,
                                    uint32_t mode, Rights parent_rights) {
-  if (options.flags.directory && !S_ISDIR(mode)) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
+  if (options.flags.directory) {
+    if (mode == 0) {
+      mode |= S_IFDIR;
+    } else if (!S_ISDIR(mode)) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
   }
   if (options.flags.not_directory && S_ISDIR(mode)) {
     return zx::error(ZX_ERR_INVALID_ARGS);

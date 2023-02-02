@@ -77,8 +77,9 @@ impl OutDir {
         Box::new(move |server_end: ServerEnd<fio::DirectoryMarker>| {
             dir.clone().open(
                 ExecutionScope::new(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
                 vfs::path::Path::dot(),
                 ServerEnd::new(server_end.into_channel()),
             );

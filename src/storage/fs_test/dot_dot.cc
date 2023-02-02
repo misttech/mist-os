@@ -107,7 +107,7 @@ TEST_P(DotDotTest, RawOpenDotDirectoryCreate) {
   auto result = fidl::WireCall(caller.borrow_as<fio::Directory>())
                     ->Open(fio::wire::OpenFlags::kRightReadable |
                                fio::wire::OpenFlags::kRightWritable | fio::wire::OpenFlags::kCreate,
-                           0755, fidl::StringView("."), std::move(endpoints->server));
+                           {}, fidl::StringView("."), std::move(endpoints->server));
   ASSERT_EQ(result.status(), ZX_OK);
 
   const fidl::WireResult close_result = fidl::WireCall(endpoints->client)->Close();
@@ -130,7 +130,7 @@ TEST_P(DotDotTest, RawOpenDotDirectoryCreateIfAbsent) {
       fidl::WireCall(caller.borrow_as<fio::Directory>())
           ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightWritable |
                      fio::wire::OpenFlags::kCreate | fio::wire::OpenFlags::kCreateIfAbsent,
-                 0755, fidl::StringView("."), std::move(endpoints->server));
+                 {}, fidl::StringView("."), std::move(endpoints->server));
   ASSERT_EQ(result.status(), ZX_OK);
 
   const fidl::WireResult close_result = fidl::WireCall(endpoints->client)->Close();

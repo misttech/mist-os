@@ -22,7 +22,6 @@ pub fn route_use_fn(component: WeakComponentInstance, use_: UseDecl) -> RoutingF
     Box::new(
         move |scope: ExecutionScope,
               flags: fio::OpenFlags,
-              mode: u32,
               path: Path,
               server_end: ServerEnd<fio::NodeMarker>| {
             let component = component.clone();
@@ -44,7 +43,6 @@ pub fn route_use_fn(component: WeakComponentInstance, use_: UseDecl) -> RoutingF
                 let mut server_end = server_end.into_channel();
                 let res = route_and_open_namespace_capability(
                     flags,
-                    mode,
                     path.into_string(),
                     use_.clone(),
                     &component,
@@ -69,7 +67,6 @@ pub fn route_expose_fn(component: WeakComponentInstance, expose: ExposeDecl) -> 
     Box::new(
         move |scope: ExecutionScope,
               flags: fio::OpenFlags,
-              mode: u32,
               path: Path,
               server_end: ServerEnd<fio::NodeMarker>| {
             let component = component.clone();
@@ -91,7 +88,6 @@ pub fn route_expose_fn(component: WeakComponentInstance, expose: ExposeDecl) -> 
                 let mut server_end = server_end.into_channel();
                 let res = route_and_open_namespace_capability_from_expose(
                     flags,
-                    mode,
                     path.into_string(),
                     expose.clone(),
                     &component,

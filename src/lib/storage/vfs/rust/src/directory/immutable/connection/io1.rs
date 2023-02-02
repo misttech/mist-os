@@ -113,7 +113,6 @@ impl DerivedConnection for ImmutableConnection {
         _scope: ExecutionScope,
         _parent: Arc<dyn DirectoryEntry>,
         flags: fio::OpenFlags,
-        _mode: u32,
         _name: &str,
         _path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, Status> {

@@ -75,7 +75,7 @@ fn describe() {
             create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
 
         let flags = fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE;
-        server.open(scope, flags, 0, Path::dot(), server_end.into_channel().into());
+        server.open(scope, flags, Path::dot(), server_end.into_channel().into());
 
         assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
             assert_eq!(s, Status::OK.into_raw());

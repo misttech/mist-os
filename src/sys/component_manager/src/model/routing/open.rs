@@ -33,47 +33,25 @@ impl<'a> OpenOptions<'a> {
     pub fn for_namespace_capability(
         route_request: &RouteRequest,
         flags: fio::OpenFlags,
-        open_mode: u32,
         relative_path: String,
         server_chan: &'a mut zx::Channel,
     ) -> Result<Self, ModelError> {
         match route_request {
             RouteRequest::UseDirectory(_) | RouteRequest::ExposeDirectory(_) => {
-                Ok(Self::Directory(OpenDirectoryOptions {
-                    flags,
-                    open_mode,
-                    relative_path,
-                    server_chan,
-                }))
+                Ok(Self::Directory(OpenDirectoryOptions { flags, relative_path, server_chan }))
             }
             RouteRequest::UseProtocol(_) | RouteRequest::ExposeProtocol(_) => {
-                Ok(Self::Protocol(OpenProtocolOptions {
-                    flags,
-                    open_mode,
-                    relative_path,
-                    server_chan,
-                }))
+                Ok(Self::Protocol(OpenProtocolOptions { flags, relative_path, server_chan }))
             }
             RouteRequest::UseService(_) | RouteRequest::ExposeService(_) => {
-                Ok(Self::Service(OpenServiceOptions {
-                    flags,
-                    open_mode,
-                    relative_path,
-                    server_chan,
-                }))
+                Ok(Self::Service(OpenServiceOptions { flags, relative_path, server_chan }))
             }
-            RouteRequest::UseEventStream(_) => Ok(Self::EventStream(OpenEventStreamOptions {
-                flags,
-                open_mode,
-                relative_path,
-                server_chan,
-            })),
-            RouteRequest::UseStorage(_) => Ok(Self::Storage(OpenStorageOptions {
-                flags,
-                open_mode,
-                relative_path,
-                server_chan,
-            })),
+            RouteRequest::UseEventStream(_) => {
+                Ok(Self::EventStream(OpenEventStreamOptions { flags, relative_path, server_chan }))
+            }
+            RouteRequest::UseStorage(_) => {
+                Ok(Self::Storage(OpenStorageOptions { flags, relative_path, server_chan }))
+            }
             _ => Err(ModelError::unsupported("capability cannot be installed in a namespace")),
         }
     }
@@ -81,47 +59,40 @@ impl<'a> OpenOptions<'a> {
 
 pub struct OpenDirectoryOptions<'a> {
     pub flags: fio::OpenFlags,
-    pub open_mode: u32,
     pub relative_path: String,
     pub server_chan: &'a mut zx::Channel,
 }
 
 pub struct OpenProtocolOptions<'a> {
     pub flags: fio::OpenFlags,
-    pub open_mode: u32,
     pub relative_path: String,
     pub server_chan: &'a mut zx::Channel,
 }
 
 pub struct OpenResolverOptions<'a> {
     pub flags: fio::OpenFlags,
-    pub open_mode: u32,
     pub server_chan: &'a mut zx::Channel,
 }
 
 pub struct OpenRunnerOptions<'a> {
     pub flags: fio::OpenFlags,
-    pub open_mode: u32,
     pub server_chan: &'a mut zx::Channel,
 }
 
 pub struct OpenServiceOptions<'a> {
     pub flags: fio::OpenFlags,
-    pub open_mode: u32,
     pub relative_path: String,
     pub server_chan: &'a mut zx::Channel,
 }
 
 pub struct OpenStorageOptions<'a> {
     pub flags: fio::OpenFlags,
-    pub open_mode: u32,
     pub relative_path: String,
     pub server_chan: &'a mut zx::Channel,
 }
 
 pub struct OpenEventStreamOptions<'a> {
     pub flags: fio::OpenFlags,
-    pub open_mode: u32,
     pub relative_path: String,
     pub server_chan: &'a mut zx::Channel,
 }
@@ -129,7 +100,6 @@ pub struct OpenEventStreamOptions<'a> {
 /// A request to open a capability at its source.
 pub struct OpenRequest<'a> {
     pub flags: fio::OpenFlags,
-    pub open_mode: u32,
     pub relative_path: PathBuf,
     pub source: CapabilitySource,
     pub target: &'a Arc<ComponentInstance>,
@@ -148,7 +118,6 @@ impl<'a> OpenRequest<'a> {
                 if let OpenOptions::Directory(open_dir_options) = options {
                     return Self {
                         flags: open_dir_options.flags,
-                        open_mode: open_dir_options.open_mode,
                         relative_path: directory_state
                             .make_relative_path(open_dir_options.relative_path),
                         source,
@@ -161,7 +130,6 @@ impl<'a> OpenRequest<'a> {
                 if let OpenOptions::Protocol(open_protocol_options) = options {
                     return Self {
                         flags: open_protocol_options.flags,
-                        open_mode: open_protocol_options.open_mode,
                         relative_path: PathBuf::from(open_protocol_options.relative_path),
                         source,
                         target,
@@ -173,7 +141,6 @@ impl<'a> OpenRequest<'a> {
                 if let OpenOptions::Service(open_service_options) = options {
                     return Self {
                         flags: open_service_options.flags,
-                        open_mode: open_service_options.open_mode,
                         relative_path: PathBuf::from(open_service_options.relative_path),
                         source,
                         target,
@@ -185,7 +152,6 @@ impl<'a> OpenRequest<'a> {
                 if let OpenOptions::Resolver(open_resolver_options) = options {
                     return Self {
                         flags: open_resolver_options.flags,
-                        open_mode: open_resolver_options.open_mode,
                         relative_path: PathBuf::new(),
                         source,
                         target,
@@ -197,7 +163,6 @@ impl<'a> OpenRequest<'a> {
                 if let OpenOptions::Runner(open_runner_options) = options {
                     return Self {
                         flags: open_runner_options.flags,
-                        open_mode: open_runner_options.open_mode,
                         relative_path: PathBuf::new(),
                         source,
                         target,
@@ -209,7 +174,6 @@ impl<'a> OpenRequest<'a> {
                 if let OpenOptions::EventStream(open_event_stream_options) = options {
                     return Self {
                         flags: open_event_stream_options.flags,
-                        open_mode: open_event_stream_options.open_mode,
                         relative_path: PathBuf::from(open_event_stream_options.relative_path),
                         source,
                         target,

@@ -96,7 +96,6 @@ impl DirectoryEntry for PkgfsPackages {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         mut path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -119,7 +118,7 @@ impl DirectoryEntry for PkgfsPackages {
                 Some(Ok(package_name)) => match self.package_variants(&package_name).await {
                     Some(variants) => {
                         Arc::new(PkgfsPackagesVariants::new(variants, self.blobfs.clone()))
-                            .open(scope, flags, mode, path, server_end)
+                            .open(scope, flags, path, server_end)
                     }
                     None => send_on_open_with_error(flags, server_end, zx::Status::NOT_FOUND),
                 },
@@ -222,7 +221,6 @@ mod tests {
                 Arc::clone(self),
                 ExecutionScope::new(),
                 flags,
-                0,
                 Path::dot(),
                 server_end.into_channel().into(),
             );

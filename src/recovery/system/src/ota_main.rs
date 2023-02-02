@@ -46,7 +46,6 @@ where
         fio::OpenFlags::RIGHT_READABLE
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_EXECUTABLE,
-        0,
         vfs::path::Path::dot(),
         out_dir,
     );
@@ -163,7 +162,6 @@ mod tests {
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::RIGHT_EXECUTABLE,
-            0,
             vfs::path::Path::dot(),
             server.into_channel().into(),
         );

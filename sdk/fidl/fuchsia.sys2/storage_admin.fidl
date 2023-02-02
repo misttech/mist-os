@@ -49,7 +49,7 @@ protocol StorageAdmin {
     OpenComponentStorage(resource struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         flags fuchsia.io.OpenFlags;
-        mode uint32;
+        mode fuchsia.io.ModeType;
         object server_end:fuchsia.io.Node;
     });
 

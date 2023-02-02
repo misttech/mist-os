@@ -57,14 +57,8 @@ impl NamespaceDir {
 
     /// Opens a new connection to this NamespaceDir that is closed once this
     /// NamespaceDir is dropped.
-    pub fn open(
-        &self,
-        flags: fio::OpenFlags,
-        mode: u32,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        self.root_dir.clone().open(self.execution_scope.clone(), flags, mode, path, server_end);
+    pub fn open(&self, flags: fio::OpenFlags, path: Path, server_end: ServerEnd<fio::NodeMarker>) {
+        self.root_dir.clone().open(self.execution_scope.clone(), flags, path, server_end);
     }
 }
 

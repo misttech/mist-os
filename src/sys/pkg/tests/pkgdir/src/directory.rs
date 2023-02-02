@@ -87,14 +87,6 @@ const ALL_FLAGS: [fio::OpenFlags; 15] = [
     fio::OpenFlags::NOT_DIRECTORY,
 ];
 
-const ALL_MODES: [u32; 5] = [
-    0,
-    fio::MODE_TYPE_DIRECTORY,
-    fio::MODE_TYPE_BLOCK_DEVICE,
-    fio::MODE_TYPE_FILE,
-    fio::MODE_TYPE_SERVICE,
-];
-
 async fn assert_open_root_directory(
     source: &PackageSource,
     parent_path: &str,
@@ -115,63 +107,55 @@ async fn assert_open_root_directory(
 
     let child_paths = generate_valid_directory_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
-    let all_flag_mode_and_child_paths =
-        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+    let all_flag_and_child_paths =
+        itertools::iproduct!(ALL_FLAGS, lax_child_paths.iter().map(String::as_str));
 
-    let success_flags_modes_and_child_paths =
-        itertools::iproduct!(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
+    let success_flags_and_child_paths =
+        itertools::iproduct!(success_flags, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
         parent_path,
-        success_flags_modes_and_child_paths.clone(),
+        success_flags_and_child_paths.clone(),
         verify_directory_opened,
     )
     .await;
 
-    assert_open_flag_mode_and_child_path_failure(
+    assert_open_flag_and_child_path_failure(
         package_root,
         parent_path,
-        subtract(all_flag_mode_and_child_paths, success_flags_modes_and_child_paths).into_iter(),
+        subtract(all_flag_and_child_paths, success_flags_and_child_paths).into_iter(),
         verify_open_failed,
     )
     .await;
 }
 
 fn filter_out_contradictory_open_parameters(
-    (flag, mode, child_path): (fio::OpenFlags, u32, &str),
-) -> Option<(fio::OpenFlags, u32, &'_ str)> {
-    // See "mode checked for consistency with OPEN_FLAG{_NOT,}_DIRECTORY" in the README
-
-    if flag.intersects(fio::OpenFlags::NOT_DIRECTORY) && mode == fio::MODE_TYPE_DIRECTORY {
-        // Skipping invalid mode combination
-        return None;
+    (flag, child_path): (fio::OpenFlags, &str),
+) -> Option<(fio::OpenFlags, &'_ str)> {
+    if flag.intersects(fio::OpenFlags::NOT_DIRECTORY) && child_path.ends_with('/') {
+        None
+    } else {
+        Some((flag, child_path))
     }
-    if (flag.intersects(fio::OpenFlags::DIRECTORY) || child_path.ends_with('/'))
-        && !(mode == 0 || mode == fio::MODE_TYPE_DIRECTORY)
-    {
-        // Skipping invalid mode combination
-        return None;
-    }
-    Some((flag, mode, child_path))
 }
 
 async fn assert_open_success<V, Fut>(
     package_root: &fio::DirectoryProxy,
     parent_path: &str,
-    allowed_flags_modes_and_child_paths: impl Iterator<Item = (fio::OpenFlags, u32, &str)>,
+    allowed_flags_and_child_paths: impl Iterator<Item = (fio::OpenFlags, &str)>,
     verifier: V,
 ) where
     V: Fn(fio::NodeProxy, fio::OpenFlags) -> Fut,
     Fut: Future<Output = Result<(), Error>>,
 {
     let parent = open_parent(package_root, parent_path).await;
-    for (flag, mode, child_path) in allowed_flags_modes_and_child_paths {
-        let node = open_node(&parent, flag, mode, child_path);
+    for (flag, child_path) in allowed_flags_and_child_paths {
+        let node = open_node(&parent, flag, child_path);
         if let Err(e) = verifier(node, flag).await {
             panic!(
                 "failed to verify open. parent: {parent_path:?}, child: {child_path:?}, flag: {flag:?}, \
-                       mode: {mode:#x}, error: {e:#}"
+                       error: {e:#}"
             );
         }
     }
@@ -196,24 +180,24 @@ async fn assert_open_content_directory(
     ];
     let child_paths = generate_valid_directory_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
-    let all_flag_mode_and_child_paths =
-        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+    let all_flag_and_child_paths =
+        itertools::iproduct!(ALL_FLAGS, lax_child_paths.iter().map(String::as_str));
 
-    let success_flags_modes_and_child_paths =
-        itertools::iproduct!(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
+    let success_flags_and_child_paths =
+        itertools::iproduct!(success_flags, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
         parent_path,
-        success_flags_modes_and_child_paths.clone(),
+        success_flags_and_child_paths.clone(),
         verify_directory_opened,
     )
     .await;
 
-    assert_open_flag_mode_and_child_path_failure(
+    assert_open_flag_and_child_path_failure(
         package_root,
         parent_path,
-        subtract(all_flag_mode_and_child_paths, success_flags_modes_and_child_paths).into_iter(),
+        subtract(all_flag_and_child_paths, success_flags_and_child_paths).into_iter(),
         verify_open_failed,
     )
     .await;
@@ -235,22 +219,22 @@ fn test_subtract() {
     assert_eq!(subtract(["foo", "bar"], ["bar", "baz"]), vec!["foo"]);
 }
 
-async fn assert_open_flag_mode_and_child_path_failure<V, Fut>(
+async fn assert_open_flag_and_child_path_failure<V, Fut>(
     package_root: &fio::DirectoryProxy,
     parent_path: &str,
-    disallowed_flags_modes_and_child_paths: impl Iterator<Item = (fio::OpenFlags, u32, &str)>,
+    disallowed_flags_and_child_paths: impl Iterator<Item = (fio::OpenFlags, &str)>,
     verifier: V,
 ) where
     V: Fn(fio::NodeProxy) -> Fut,
     Fut: Future<Output = Result<(), Error>>,
 {
     let parent = open_parent(package_root, parent_path).await;
-    for (flag, mode, child_path) in disallowed_flags_modes_and_child_paths {
-        let node = open_node(&parent, flag, mode, child_path);
+    for (flag, child_path) in disallowed_flags_and_child_paths {
+        let node = open_node(&parent, flag, child_path);
         if let Err(e) = verifier(node).await {
             panic!(
                 "failed to verify open failed. parent: {parent_path:?}, child: {child_path:?}, flag: {flag:?}, \
-                       mode: {mode:#x}, error: {e:#}"
+                       error: {e:#}"
             );
         }
     }
@@ -275,34 +259,26 @@ async fn assert_open_content_file(
         fio::OpenFlags::NOT_DIRECTORY,
     ];
 
-    let success_modes = [
-        0,
-        fio::MODE_TYPE_DIRECTORY,
-        fio::MODE_TYPE_BLOCK_DEVICE,
-        fio::MODE_TYPE_FILE,
-        fio::MODE_TYPE_SERVICE,
-    ];
-
     let child_paths = generate_valid_file_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
-    let all_flag_mode_and_child_paths =
-        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+    let all_flag_and_child_paths =
+        itertools::iproduct!(ALL_FLAGS, lax_child_paths.iter().map(String::as_str));
 
-    let success_flags_modes_and_child_paths =
-        itertools::iproduct!(success_flags, success_modes, child_paths.iter().map(String::as_str))
+    let success_flags_and_child_paths =
+        itertools::iproduct!(success_flags, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
         parent_path,
-        success_flags_modes_and_child_paths.clone(),
+        success_flags_and_child_paths.clone(),
         verify_content_file_opened,
     )
     .await;
 
-    assert_open_flag_mode_and_child_path_failure(
+    assert_open_flag_and_child_path_failure(
         package_root,
         parent_path,
-        subtract(all_flag_mode_and_child_paths, success_flags_modes_and_child_paths).into_iter(),
+        subtract(all_flag_and_child_paths, success_flags_and_child_paths).into_iter(),
         verify_open_failed,
     )
     .await;
@@ -315,76 +291,47 @@ async fn assert_open_meta_as_directory_and_file(
 ) {
     let package_root = &source.dir;
 
-    let base_directory_success_flags = [
+    let directory_success_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
-        fio::OpenFlags::DIRECTORY,
-        fio::OpenFlags::NODE_REFERENCE,
         fio::OpenFlags::DESCRIBE,
         fio::OpenFlags::POSIX_WRITABLE,
         fio::OpenFlags::POSIX_EXECUTABLE,
     ];
-    let modes = [0, fio::MODE_TYPE_DIRECTORY, fio::MODE_TYPE_BLOCK_DEVICE, fio::MODE_TYPE_SERVICE];
 
-    // To open "meta" as a directory:
-    //  1. mode cannot be MODE_TYPE_FILE
-    //  2. and at least one of the following must be true:
-    //    a. MODE_TYPE_DIRECTORY is set
-    //    b. OPEN_FLAG_DIRECTORY is set
-    //    c. OPEN_FLAG_NODE_REFERENCE is set
-    let directory_flags_and_modes = itertools::iproduct!(
-        base_directory_success_flags.iter().copied(),
-        [fio::MODE_TYPE_DIRECTORY].into_iter()
-    )
-    .chain(itertools::iproduct!(
-        base_directory_success_flags.iter().copied().filter_map(|f| {
-            if f.intersects(fio::OpenFlags::NOT_DIRECTORY) {
-                // "OPEN_FLAG_DIRECTORY and OPEN_FLAG_NOT_DIRECTORY are mutually exclusive"
-                None
-            } else {
-                Some(f | fio::OpenFlags::DIRECTORY)
-            }
-        }),
-        modes.iter().copied()
-    ))
-    .chain(itertools::iproduct!(
-        base_directory_success_flags.iter().copied().map(|f| f | fio::OpenFlags::NODE_REFERENCE),
-        modes.iter().copied()
-    ));
+    // To open "meta" as a directory at least one of the following must be true:
+    //   1. OPEN_FLAG_DIRECTORY is set
+    //   2. OPEN_FLAG_NODE_REFERENCE is set
+    let directory_flags = std::iter::empty()
+        .chain(directory_success_flags.iter().copied().map(|f| f | fio::OpenFlags::DIRECTORY))
+        .chain(directory_success_flags.iter().copied().map(|f| f | fio::OpenFlags::NODE_REFERENCE));
 
     let directory_child_paths = generate_valid_directory_paths(child_base_path);
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
 
     let directory_only_child_paths = generate_valid_directory_only_paths(child_base_path);
-    let all_flag_mode_and_child_paths =
-        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+    let all_flag_and_child_paths =
+        itertools::iproduct!(ALL_FLAGS, lax_child_paths.iter().map(String::as_str));
 
-    let directory_flags_modes_and_child_paths = itertools::iproduct!(
-        directory_flags_and_modes,
-        directory_child_paths.iter().map(String::as_str)
-    )
-    .map(|((flag, mode), path)| (flag, mode, path))
-    .chain(itertools::iproduct!(
-        base_directory_success_flags,
-        modes.iter().copied(),
-        directory_only_child_paths.iter().map(String::as_str)
-    ))
-    .filter_map(filter_out_contradictory_open_parameters);
+    let directory_flags_and_child_paths =
+        itertools::iproduct!(directory_flags, directory_child_paths.iter().map(String::as_str))
+            .chain(itertools::iproduct!(
+                directory_success_flags,
+                directory_only_child_paths.iter().map(String::as_str)
+            ))
+            .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
         parent_path,
-        directory_flags_modes_and_child_paths.clone(),
+        directory_flags_and_child_paths.clone(),
         verify_directory_opened,
     )
     .await;
 
-    // To open "meta" as a file at least one of the following must be true:
-    //  1. mode is MODE_TYPE_FILE
-    //  2. none of the following are true:
-    //    a. MODE_TYPE_DIRECTORY is set
-    //    b. OPEN_FLAG_DIRECTORY is set
-    //    c. OPEN_FLAG_NODE_REFERENCE is set
-    let base_file_flags = [
+    // To open "meta" as a file none of the following are true:
+    //   1. OPEN_FLAG_DIRECTORY is set
+    //   2. OPEN_FLAG_NODE_REFERENCE is set
+    let file_flags = [
         fio::OpenFlags::empty(),
         fio::OpenFlags::RIGHT_READABLE,
         fio::OpenFlags::DESCRIBE,
@@ -393,41 +340,29 @@ async fn assert_open_meta_as_directory_and_file(
         fio::OpenFlags::NOT_DIRECTORY,
     ];
 
-    let file_flags_and_modes = itertools::iproduct!(
-        base_file_flags
-            .iter()
-            .copied()
-            .chain([fio::OpenFlags::DIRECTORY, fio::OpenFlags::NODE_REFERENCE]),
-        [fio::MODE_TYPE_FILE]
-    )
-    .chain(itertools::iproduct!(
-        base_file_flags.iter().copied(),
-        [0, fio::MODE_TYPE_BLOCK_DEVICE, fio::MODE_TYPE_SERVICE]
-    ));
     let file_child_paths = generate_valid_file_paths(child_base_path);
 
-    let file_flags_modes_and_child_paths =
-        itertools::iproduct!(file_flags_and_modes, file_child_paths.iter().map(String::as_str))
-            .map(|((flag, mode), path)| (flag, mode, path))
+    let file_flags_and_child_paths =
+        itertools::iproduct!(file_flags, file_child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
 
     assert_open_success(
         package_root,
         parent_path,
-        file_flags_modes_and_child_paths.clone(),
+        file_flags_and_child_paths.clone(),
         verify_meta_as_file_opened,
     )
     .await;
 
-    let failure_flags_modes_and_child_paths = subtract(
-        subtract(all_flag_mode_and_child_paths, directory_flags_modes_and_child_paths),
-        file_flags_modes_and_child_paths,
+    let failure_flags_and_child_paths = subtract(
+        subtract(all_flag_and_child_paths, directory_flags_and_child_paths),
+        file_flags_and_child_paths,
     )
     .into_iter();
-    assert_open_flag_mode_and_child_path_failure(
+    assert_open_flag_and_child_path_failure(
         package_root,
         parent_path,
-        failure_flags_modes_and_child_paths,
+        failure_flags_and_child_paths,
         verify_open_failed,
     )
     .await;
@@ -453,24 +388,24 @@ async fn assert_open_meta_subdirectory(
     let child_paths = generate_valid_directory_paths(child_base_path);
 
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
-    let all_flag_mode_and_child_paths =
-        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+    let all_flag_and_child_paths =
+        itertools::iproduct!(ALL_FLAGS, lax_child_paths.iter().map(String::as_str));
 
-    let success_flags_modes_and_child_paths =
-        itertools::iproduct!(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
+    let success_flags_and_child_paths =
+        itertools::iproduct!(success_flags, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
         parent_path,
-        success_flags_modes_and_child_paths.clone(),
+        success_flags_and_child_paths.clone(),
         verify_directory_opened,
     )
     .await;
 
-    assert_open_flag_mode_and_child_path_failure(
+    assert_open_flag_and_child_path_failure(
         package_root,
         parent_path,
-        subtract(all_flag_mode_and_child_paths, success_flags_modes_and_child_paths).into_iter(),
+        subtract(all_flag_and_child_paths, success_flags_and_child_paths).into_iter(),
         verify_open_failed,
     )
     .await;
@@ -492,24 +427,24 @@ async fn assert_open_meta_file(source: &PackageSource, parent_path: &str, child_
     let child_paths = generate_valid_file_paths(child_base_path);
 
     let lax_child_paths = generate_lax_directory_paths(child_base_path);
-    let all_flag_mode_and_child_paths =
-        itertools::iproduct!(ALL_FLAGS, ALL_MODES, lax_child_paths.iter().map(String::as_str));
+    let all_flag_and_child_paths =
+        itertools::iproduct!(ALL_FLAGS, lax_child_paths.iter().map(String::as_str));
 
-    let success_flags_modes_and_child_paths =
-        itertools::iproduct!(success_flags, ALL_MODES, child_paths.iter().map(String::as_str))
+    let success_flags_and_child_paths =
+        itertools::iproduct!(success_flags, child_paths.iter().map(String::as_str))
             .filter_map(filter_out_contradictory_open_parameters);
     assert_open_success(
         package_root,
         parent_path,
-        success_flags_modes_and_child_paths.clone(),
+        success_flags_and_child_paths.clone(),
         verify_meta_as_file_opened,
     )
     .await;
 
-    assert_open_flag_mode_and_child_path_failure(
+    assert_open_flag_and_child_path_failure(
         package_root,
         parent_path,
-        subtract(all_flag_mode_and_child_paths, success_flags_modes_and_child_paths).into_iter(),
+        subtract(all_flag_and_child_paths, success_flags_and_child_paths).into_iter(),
         verify_open_failed,
     )
     .await;
@@ -530,14 +465,9 @@ async fn open_parent(package_root: &fio::DirectoryProxy, parent_path: &str) -> f
         .expect("open parent directory")
 }
 
-fn open_node(
-    parent: &fio::DirectoryProxy,
-    flags: fio::OpenFlags,
-    mode: u32,
-    path: &str,
-) -> fio::NodeProxy {
+fn open_node(parent: &fio::DirectoryProxy, flags: fio::OpenFlags, path: &str) -> fio::NodeProxy {
     let (node, server_end) = create_proxy::<fio::NodeMarker>().expect("create_proxy");
-    parent.open(flags, mode, path, server_end).expect("open node");
+    parent.open(flags, fio::ModeType::empty(), path, server_end).expect("open node");
     node
 }
 

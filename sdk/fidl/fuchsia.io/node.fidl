@@ -13,6 +13,26 @@ type NodeAttributeFlags = strict bits : uint32 {
     MODIFICATION_TIME = 0x00000002;
 };
 
+/// Bits reserved for posix protections. Native fuchsia filesystems
+/// are not required to set bits contained within `MODE_PROTECTION_MASK`,
+/// but filesystems that wish to do so may refer to sys/stat.h for their
+/// definitions.
+const MODE_PROTECTION_MASK uint32 = 0x00FFF;
+
+// Chosen to match S_IFDIR.
+const MODE_TYPE_DIRECTORY uint32 = 0x04000;
+// Chosen to match S_IFBLK.
+const MODE_TYPE_BLOCK_DEVICE uint32 = 0x06000;
+// Chosen to match S_IFREG.
+const MODE_TYPE_FILE uint32 = 0x08000;
+// Chosen arbitrarily.
+const MODE_TYPE_SERVICE uint32 = 0x10000;
+
+/// Bits indicating node type. The canonical mechanism to check
+/// for a node type is to take 'mode', bitwise AND it with the
+/// `MODE_TYPE_MASK`, and check exact equality against a mode type.
+const MODE_TYPE_MASK uint32 = 0xFF000;
+
 /// NodeAttributes defines generic information about a filesystem node.
 type NodeAttributes = struct {
     /// Protection bits and node type information describe in 'mode'.

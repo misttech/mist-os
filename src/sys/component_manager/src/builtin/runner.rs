@@ -105,7 +105,6 @@ impl CapabilityProvider for RunnerCapabilityProvider {
         self: Box<Self>,
         task_scope: TaskScope,
         _flags: fio::OpenFlags,
-        _open_mode: u32,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -185,7 +184,7 @@ mod tests {
         let mut server = server.into_channel();
         let task_scope = TaskScope::new();
         provider
-            .open(task_scope.clone(), fio::OpenFlags::empty(), 0, PathBuf::from("."), &mut server)
+            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::from("."), &mut server)
             .await?;
 
         // Start the component.
@@ -253,7 +252,7 @@ mod tests {
         let mut server = server.into_channel();
         let task_scope = TaskScope::new();
         provider
-            .open(task_scope.clone(), fio::OpenFlags::empty(), 0, PathBuf::from("."), &mut server)
+            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::from("."), &mut server)
             .await?;
 
         // Ensure errors are propagated back to the caller.

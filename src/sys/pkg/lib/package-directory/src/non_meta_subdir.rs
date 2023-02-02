@@ -38,7 +38,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for NonMeta
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: VfsPath,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -75,9 +74,9 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for NonMeta
 
         if let Some(blob) = self.root_dir.non_meta_files.get(&file_path) {
             let () =
-                self.root_dir.non_meta_storage.open(blob, flags, mode, server_end).unwrap_or_else(
-                    |e| error!("Error forwarding content blob open to blobfs: {:#}", anyhow!(e)),
-                );
+                self.root_dir.non_meta_storage.open(blob, flags, server_end).unwrap_or_else(|e| {
+                    error!("Error forwarding content blob open to blobfs: {:#}", anyhow!(e))
+                });
             return;
         }
 
@@ -85,7 +84,7 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for NonMeta
         for k in self.root_dir.non_meta_files.keys() {
             if k.starts_with(&directory_path) {
                 let () = Arc::new(NonMetaSubdir::new(Arc::clone(&self.root_dir), directory_path))
-                    .open(scope, flags, mode, VfsPath::dot(), server_end);
+                    .open(scope, flags, VfsPath::dot(), server_end);
                 return;
             }
         }
@@ -268,7 +267,6 @@ mod tests {
             Arc::clone(&sub_dir).open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
-                0,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );
@@ -293,7 +291,6 @@ mod tests {
             Arc::clone(&sub_dir).open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE,
-                0,
                 VfsPath::validate_and_split(path).unwrap(),
                 server_end.into_channel().into(),
             );
@@ -333,7 +330,6 @@ mod tests {
                 Arc::clone(&sub_dir),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
-                0,
                 VfsPath::dot(),
                 server_end.into_channel().into(),
             );
@@ -354,7 +350,6 @@ mod tests {
         Arc::new(sub_dir).open(
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             VfsPath::dot(),
             server_end.into_channel().into(),
         );

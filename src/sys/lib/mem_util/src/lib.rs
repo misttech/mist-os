@@ -24,8 +24,8 @@ pub async fn open_file_data(
         fidl::endpoints::create_proxy::<fio::FileMarker>().map_err(FileError::CreateProxy)?;
     parent
         .open(
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_FILE,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            fio::ModeType::empty(),
             path,
             ServerEnd::new(server_end.into_channel()),
         )
@@ -141,7 +141,7 @@ mod tests {
     /// Test that we get a VMO when the server supports `File/GetBackingMemory`.
     #[fuchsia::test]
     async fn bytes_from_vmo_from_get_buffer() {
-        let channel_only_foo: RoutingFn = Box::new(|scope, _flags, _mode, _path, server_end| {
+        let channel_only_foo: RoutingFn = Box::new(|scope, _flags, _path, server_end| {
             let server_end: ServerEnd<fio::FileMarker> = ServerEnd::new(server_end.into_channel());
             let (mut file_requests, control) = server_end.into_stream_and_control_handle().unwrap();
 
@@ -186,7 +186,7 @@ mod tests {
     #[fuchsia::test]
     async fn bytes_from_channel_fallback() {
         // create a fuchsia.io.Node which returns NOT_SUPPORTED on `File/GetBackingMemory`.
-        let channel_only_foo: RoutingFn = Box::new(|scope, _flags, _mode, _path, server_end| {
+        let channel_only_foo: RoutingFn = Box::new(|scope, _flags, _path, server_end| {
             let server_end: ServerEnd<fio::FileMarker> = ServerEnd::new(server_end.into_channel());
             let (mut file_requests, control) = server_end.into_stream_and_control_handle().unwrap();
 
@@ -242,7 +242,6 @@ mod tests {
         root.open(
             fs_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             vfs::path::Path::dot(),
             ServerEnd::new(server.into_channel()),
         );

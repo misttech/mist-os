@@ -59,8 +59,7 @@ async fn run_mocks(
     let scope = ExecutionScope::new();
     export.open(
         scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE,
-        fio::MODE_TYPE_DIRECTORY,
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
         Path::dot(),
         fidl::endpoints::ServerEnd::from(handles.outgoing_dir.into_channel()),
     );

@@ -101,7 +101,8 @@ class _TestPseudoVmoFile {
     final proxy = FileProxy();
     final channel = proxy.ctrl.request().passChannel();
     final interfaceRequest = InterfaceRequest<Node>(channel);
-    _pseudoVmoFile.connect(openRights, modeTypeFile, interfaceRequest);
+    _pseudoVmoFile.connect(
+        OpenFlags.notDirectory | openRights, ModeType.$none, interfaceRequest);
     return proxy;
   }
 }

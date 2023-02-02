@@ -245,11 +245,12 @@ void main() {
             var dataDir = handles.cloneFromNamespace('data');
             final exampleFile = fio.FileProxy();
             await dataDir.open(
-                fio.OpenFlags.rightReadable |
+                fio.OpenFlags.notDirectory |
+                    fio.OpenFlags.rightReadable |
                     fio.OpenFlags.rightWritable |
                     fio.OpenFlags.create |
                     fio.OpenFlags.describe,
-                fio.modeTypeFile,
+                fio.ModeType.$none,
                 'example_file',
                 fidl.InterfaceRequest<fio.Node>(
                     exampleFile.ctrl.request().passChannel()));

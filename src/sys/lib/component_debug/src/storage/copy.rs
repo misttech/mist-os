@@ -101,14 +101,11 @@ mod test {
             // Serve the root directory
             // Rewind on root directory should succeed
             let request = root_dir.try_next().await;
-            if let Ok(Some(fio::DirectoryRequest::Open { path, flags, mode, object, .. })) = request
-            {
+            if let Ok(Some(fio::DirectoryRequest::Open { path, flags, object, .. })) = request {
                 if path == "from_host" {
                     assert!(flags.intersects(fio::OpenFlags::CREATE));
-                    assert!(mode & fio::MODE_TYPE_FILE != 0);
                     setup_fake_file_from_host(node_to_file(object));
                 } else if path == "from_device" {
-                    assert!(mode & fio::MODE_TYPE_FILE != 0);
                     setup_fake_file_from_device(node_to_file(object));
                 } else {
                     panic!("incorrect path: {}", path);

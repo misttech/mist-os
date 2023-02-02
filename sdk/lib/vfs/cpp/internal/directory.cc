@@ -13,44 +13,6 @@
 #include <string_view>
 
 namespace vfs {
-namespace {
-
-/// Validates consistency of mode and flags passed to an Open call.
-///
-/// As the SDK VFS does not support the CREATE flags, as per the fuchsia.io protocol, the
-/// mode only needs to be consistent with the flags/path if the resource already exists
-/// (i.e. even if the path points to a file that reports it's mode as MODE_TYPE_FILE, it is
-/// not an error to open the file with MODE_TYPE_DIRECTORY).
-bool ValidateMode(uint32_t mode, fuchsia::io::OpenFlags flags, std::string_view path) {
-  if (path.empty()) {
-    return false;
-  }
-
-  const uint32_t mode_type = mode & fuchsia::io::MODE_TYPE_MASK;
-
-  // The mode type must always be consistent with OPEN_FLAG_DIRECTORY/NOT_DIRECTORY.
-  if ((mode_type == fuchsia::io::MODE_TYPE_DIRECTORY) && Flags::IsNotDirectory(flags)) {
-    return false;
-  }
-  if ((mode_type == fuchsia::io::MODE_TYPE_FILE) && Flags::IsDirectory(flags)) {
-    return false;
-  }
-
-  // Can't open "." with OPEN_FLAG_NOT_DIRECTORY
-  if (Flags::IsNotDirectory(flags) && (path == ".")) {
-    return false;
-  }
-  // If the path specifies a directory (indicated by a trailing slash), reject
-  // either OPEN_FLAG_NOT_DIRECTORY or MODE_TYPE_FILE.
-  if (path.back() == '/') {
-    return !(Flags::IsNotDirectory(flags) || (mode_type == fuchsia::io::MODE_TYPE_FILE));
-  }
-
-  return true;
-}
-
-}  // namespace
-
 namespace internal {
 
 Directory::Directory() = default;
@@ -192,8 +154,8 @@ zx_status_t Directory::LookupPath(const char* path, size_t path_len, bool* out_i
 }
 
 void Directory::Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags parent_flags,
-                     uint32_t mode, const char* path, size_t path_len, zx::channel request,
-                     async_dispatcher_t* dispatcher) {
+                     fuchsia::io::ModeType mode, const char* path, size_t path_len,
+                     zx::channel request, async_dispatcher_t* dispatcher) {
   if (!Flags::InputPrecondition(open_flags)) {
     Node::SendOnOpenEventOnError(open_flags, std::move(request), ZX_ERR_INVALID_ARGS);
     return;
@@ -206,11 +168,14 @@ void Directory::Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags p
     Node::SendOnOpenEventOnError(open_flags, std::move(request), ZX_ERR_ACCESS_DENIED);
     return;
   }
-  if ((path_len < 1) || (path_len > PATH_MAX)) {
+  std::string_view path_view{path, path_len};
+  if (path_view.empty() || path_view.length() > PATH_MAX) {
     Node::SendOnOpenEventOnError(open_flags, std::move(request), ZX_ERR_BAD_PATH);
     return;
   }
-  if (!ValidateMode(mode, open_flags, std::string_view{path, path_len})) {
+  // OPEN_FLAG_NOT_DIRECTORY implies can't open "." because we're a directory and can't open a
+  // subdirectory indicated by a trailing slash.
+  if (Flags::IsNotDirectory(open_flags) && (path_view == "." || path_view.back() == '/')) {
     Node::SendOnOpenEventOnError(open_flags, std::move(request), ZX_ERR_INVALID_ARGS);
     return;
   }

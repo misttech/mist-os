@@ -41,13 +41,13 @@ void main() {
         ..serve(InterfaceRequest(dirProxy.ctrl.request().passChannel()));
       {
         final nodeProxy = io.NodeProxy();
-        await dirProxy.open(
-            io.OpenFlags.$none, 0, 'public/foo', nodeProxy.ctrl.request());
+        await dirProxy.open(io.OpenFlags.$none, io.ModeType.$none, 'public/foo',
+            nodeProxy.ctrl.request());
       }
       {
         final nodeProxy = io.NodeProxy();
-        await dirProxy.open(
-            io.OpenFlags.$none, 0, 'svc/foo', nodeProxy.ctrl.request());
+        await dirProxy.open(io.OpenFlags.$none, io.ModeType.$none, 'svc/foo',
+            nodeProxy.ctrl.request());
       }
       _stream.listen(expectAsync1((response) {
         expect(response, true);
@@ -64,8 +64,8 @@ void main() {
           .serve(InterfaceRequest(dirProxy.ctrl.request().passChannel()));
       final fileProxy = io.FileProxy();
       await dirProxy.open(
-          io.OpenFlags.rightReadable,
-          io.modeTypeFile,
+          io.OpenFlags.notDirectory | io.OpenFlags.rightReadable,
+          io.ModeType.$none,
           'diagnostics/foo',
           InterfaceRequest<io.Node>(fileProxy.ctrl.request().passChannel()));
       final data = await fileProxy.read(io.maxBuf);

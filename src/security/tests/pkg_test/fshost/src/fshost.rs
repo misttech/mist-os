@@ -39,8 +39,8 @@ impl FSHost {
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
-            fio::MODE_TYPE_DIRECTORY,
+                | fio::OpenFlags::RIGHT_EXECUTABLE
+                | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             take_startup_handle(HandleType::DirectoryRequest.into()).unwrap().into(),
         );

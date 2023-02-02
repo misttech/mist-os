@@ -131,7 +131,7 @@ async fn single_storage_user() {
         .open_component_storage(
             &storage_user_moniker_with_instances,
             fio::OpenFlags::RIGHT_READABLE,
-            0,
+            fio::ModeType::empty(),
             node_server,
         )
         .expect("open component storage");

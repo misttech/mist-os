@@ -127,8 +127,7 @@ zx::result<zx::vmo> PackageResolver::LoadDriver(
     return endpoints.take_error();
   }
   auto file_open_result = package_dir->Open(
-      kFileRights, 0u /* mode */,
-      ::fidl::StringView(fidl::StringView::FromExternal(package_url.resource_path())),
+      kFileRights, {} /* mode */, fidl::StringView::FromExternal(package_url.resource_path()),
       fidl::ServerEnd<fuchsia_io::Node>(endpoints->server.TakeChannel()));
   if (!file_open_result.ok()) {
     LOGF(ERROR, "Failed to open driver file: %s", package_url.resource_path().c_str());

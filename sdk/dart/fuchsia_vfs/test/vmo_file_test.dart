@@ -26,8 +26,8 @@ void main() {
       ..vmoFile = VmoFile.readOnly(Vmo(sizedVmo.handle), mode)
       ..proxy = FileProxy();
     expect(
-        file.vmoFile
-            .connect(openRights, 0, _getNodeInterfaceRequest(file.proxy)),
+        file.vmoFile.connect(
+            openRights, ModeType.$none, _getNodeInterfaceRequest(file.proxy)),
         ZX.OK);
     return file;
   }

@@ -28,13 +28,14 @@ class Service<T> extends Vnode {
   }
 
   @override
-  int connect(OpenFlags flags, int mode, fidl.InterfaceRequest<Node> request,
+  int connect(
+      OpenFlags flags, ModeType mode, fidl.InterfaceRequest<Node> request,
       [OpenFlags? parentFlags]) {
     if (_closed) {
       sendErrorEvent(flags, ZX.ERR_NOT_SUPPORTED, request);
       return ZX.ERR_NOT_SUPPORTED;
     }
-    final status = _validateFlagsAndMode(flags, mode);
+    final status = _validateFlags(flags);
     if (status != ZX.OK) {
       sendErrorEvent(flags, status, request);
       return status;
@@ -49,10 +50,7 @@ class Service<T> extends Vnode {
     return DirentType.service;
   }
 
-  int _validateFlagsAndMode(OpenFlags flags, int mode) {
-    if ((mode & ~modeProtectionMask) & ~modeTypeService != 0) {
-      return ZX.ERR_INVALID_ARGS;
-    }
+  int _validateFlags(OpenFlags flags) {
     if (flags & OpenFlags.directory != OpenFlags.$none) {
       return ZX.ERR_NOT_DIR;
     }
@@ -65,7 +63,8 @@ class Service<T> extends Vnode {
         OpenFlags.rightWritable |
         OpenFlags.posixWritable |
         OpenFlags.posixExecutable |
-        OpenFlags.cloneSameRights);
+        OpenFlags.cloneSameRights |
+        OpenFlags.notDirectory);
     if (flags & unsupportedFlags != OpenFlags.$none) {
       return ZX.ERR_NOT_SUPPORTED;
     }

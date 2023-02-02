@@ -486,7 +486,6 @@ extern "C" {
     pub fn zxio_open(
         directory: *mut zxio_t,
         flags: u32,
-        mode: u32,
         path: *const ::std::os::raw::c_char,
         path_len: usize,
         storage: *mut zxio_storage_t,
@@ -496,7 +495,6 @@ extern "C" {
     pub fn zxio_open_async(
         directory: *mut zxio_t,
         flags: u32,
-        mode: u32,
         path: *const ::std::os::raw::c_char,
         path_len: usize,
         request: zx_handle_t,

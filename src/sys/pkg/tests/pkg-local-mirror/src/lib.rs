@@ -160,7 +160,6 @@ fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
     dir.open(
         scope,
         fio::OpenFlags::RIGHT_READABLE,
-        0,
         vfs::path::Path::dot(),
         ServerEnd::new(server_end.into_channel()),
     );
@@ -191,7 +190,6 @@ impl DirectoryEntry for DropAndSignal {
         self: Arc<Self>,
         _scope: ExecutionScope,
         flags: fio::OpenFlags,
-        _mode: u32,
         _path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {

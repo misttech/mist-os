@@ -47,13 +47,13 @@ TEST_P(DeviceTest, TestWriteThenRead) {
   ASSERT_EQ(endpoints.status_value(), ZX_OK);
   auto& [client, server] = endpoints.value();
 
-  // Re-open file as block device i.e. using MODE_TYPE_BLOCK_DEVICE
+  // Re-open file as block device i.e. using OpenFlag.BLOCK_DEVICE.
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
   ASSERT_EQ(fidl::WireCall(caller.directory())
                 ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                           fuchsia_io::wire::OpenFlags::kRightWritable,
-                       fuchsia_io::wire::kModeTypeBlockDevice, "block_device",
-                       fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
+                           fuchsia_io::wire::OpenFlags::kRightWritable |
+                           fuchsia_io::wire::OpenFlags::kBlockDevice,
+                       {}, "block_device", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
                 .status(),
             ZX_OK);
 
@@ -114,9 +114,9 @@ TEST_P(DeviceTest, TestGroupWritesThenReads) {
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
   ASSERT_EQ(fidl::WireCall(caller.directory())
                 ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                           fuchsia_io::wire::OpenFlags::kRightWritable,
-                       fuchsia_io::wire::kModeTypeBlockDevice, "block_device",
-                       fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
+                           fuchsia_io::wire::OpenFlags::kRightWritable |
+                           fuchsia_io::wire::OpenFlags::kBlockDevice,
+                       {}, "block_device", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
                 .status(),
             ZX_OK);
 
@@ -198,9 +198,9 @@ TEST_P(DeviceTest, TestWriteThenFlushThenRead) {
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
   ASSERT_EQ(fidl::WireCall(caller.directory())
                 ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                           fuchsia_io::wire::OpenFlags::kRightWritable,
-                       fuchsia_io::wire::kModeTypeBlockDevice, "block_device",
-                       fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
+                           fuchsia_io::wire::OpenFlags::kRightWritable |
+                           fuchsia_io::wire::OpenFlags::kBlockDevice,
+                       {}, "block_device", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
                 .status(),
             ZX_OK);
 
@@ -258,9 +258,9 @@ TEST_P(DeviceTest, TestInvalidGroupRequests) {
   fdio_cpp::FdioCaller caller(fs().GetRootFd());
   ASSERT_EQ(fidl::WireCall(caller.directory())
                 ->Open(fuchsia_io::wire::OpenFlags::kRightReadable |
-                           fuchsia_io::wire::OpenFlags::kRightWritable,
-                       fuchsia_io::wire::kModeTypeBlockDevice, "block_device",
-                       fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
+                           fuchsia_io::wire::OpenFlags::kRightWritable |
+                           fuchsia_io::wire::OpenFlags::kBlockDevice,
+                       {}, "block_device", fidl::ServerEnd<fuchsia_io::Node>(server.TakeChannel()))
                 .status(),
             ZX_OK);
 

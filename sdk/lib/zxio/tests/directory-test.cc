@@ -41,10 +41,11 @@ class TestDirectoryServer : public zxio_tests::TestDirectoryServerBase {
       completer.Close(ZX_ERR_INVALID_ARGS);
       return;
     }
-    constexpr uint32_t kExpectedMode = 0u;
+    constexpr fuchsia_io::wire::ModeType kExpectedMode = {};
     if (request->mode != kExpectedMode) {
       ADD_FAILURE() << "unexpected mode for Open request: " << std::showbase << std::hex
-                    << request->mode << " vs " << std::showbase << std::hex << kExpectedMode;
+                    << static_cast<uint32_t>(request->mode) << " vs " << std::showbase << std::hex
+                    << static_cast<uint32_t>(kExpectedMode);
       completer.Close(ZX_ERR_INVALID_ARGS);
       return;
     }
@@ -168,9 +169,8 @@ class Directory : public zxtest::Test {
 
 TEST_F(Directory, Open) {
   fuchsia_io::wire::OpenFlags flags = fuchsia_io::wire::OpenFlags::kRightReadable;
-  uint32_t mode = 0u;
   zxio_storage_t file_storage;
-  ASSERT_OK(zxio_open(directory(), static_cast<uint32_t>(flags), mode, kTestPath.data(),
+  ASSERT_OK(zxio_open(directory(), static_cast<uint32_t>(flags), kTestPath.data(),
                       kTestPath.length(), &file_storage));
   zxio_t* file = &file_storage.io;
 

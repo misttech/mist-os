@@ -69,7 +69,6 @@ impl FuzzSink {
             let entry = match self.dir.open_child(
                 name,
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                0,
                 &mut closer,
             ) {
                 Ok(entry) => entry,

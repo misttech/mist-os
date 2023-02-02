@@ -299,7 +299,7 @@ class AuthService {
             OpenFlags.rightWritable |
             OpenFlags.create |
             OpenFlags.directory,
-        0,
+        ModeType.$none,
         kCacheSubdirectory,
         InterfaceRequest(cacheSubdirChannel.second));
 
@@ -312,7 +312,7 @@ class AuthService {
             OpenFlags.rightWritable |
             OpenFlags.create |
             OpenFlags.directory,
-        0,
+        ModeType.$none,
         kTmpSubdirectory,
         InterfaceRequest(tmpSubdirChannel.second));
 

@@ -26,7 +26,10 @@ void main() {
       for (var unsupportedFlag in unsupportedFlags) {
         var fs = _FsWithEchoService();
         EchoProxy echoProxy = EchoProxy();
-        await fs.dirProxy.open(unsupportedFlag, 0, Echo.$serviceName,
+        await fs.dirProxy.open(
+            unsupportedFlag,
+            io_fidl.ModeType.$none,
+            Echo.$serviceName,
             InterfaceRequest(echoProxy.ctrl.request().passChannel()));
 
         // as we passed invalid flag, other side will fail to connect and close
@@ -45,7 +48,7 @@ void main() {
           expectedStatus = ZX.ERR_NOT_DIR;
         }
         expect(
-            service.connect(unsupportedFlag, 0,
+            service.connect(unsupportedFlag, io_fidl.ModeType.$none,
                 InterfaceRequest(echoProxy.ctrl.request().passChannel())),
             expectedStatus);
       }
@@ -55,32 +58,12 @@ void main() {
       var fs = _FsWithEchoService();
 
       var echoProxy = io_fidl.NodeProxy();
-      await fs.dirProxy.open(io_fidl.OpenFlags.describe, 0, Echo.$serviceName,
-          echoProxy.ctrl.request());
+      await fs.dirProxy.open(io_fidl.OpenFlags.describe, io_fidl.ModeType.$none,
+          Echo.$serviceName, echoProxy.ctrl.request());
       echoProxy.onOpen.listen(expectAsync1((response) {
         expect(response.s, ZX.ERR_NOT_SUPPORTED);
         expect(response.info, isNull);
       }));
-    });
-
-    test('connect to service fails for invalid modes', () async {
-      var fs = _FsWithEchoService();
-      var invalidModes = [
-        io_fidl.modeTypeBlockDevice,
-        io_fidl.modeTypeDirectory,
-        io_fidl.modeTypeFile,
-        io_fidl.modeTypeMask,
-      ];
-      for (var mode in invalidModes) {
-        var echoProxy = io_fidl.NodeProxy();
-        await fs.dirProxy.open(io_fidl.OpenFlags.describe, mode,
-            Echo.$serviceName, echoProxy.ctrl.request());
-
-        echoProxy.onOpen.listen(expectAsync1((response) {
-          expect(response.s, ZX.ERR_INVALID_ARGS);
-          expect(response.info, isNull);
-        }));
-      }
     });
 
     test('connect to service fails for OpenFlags.directory', () async {
@@ -88,7 +71,7 @@ void main() {
       var nodeProxy = io_fidl.NodeProxy();
       await fs.dirProxy.open(
           io_fidl.OpenFlags.directory | io_fidl.OpenFlags.describe,
-          0,
+          io_fidl.ModeType.$none,
           Echo.$serviceName,
           nodeProxy.ctrl.request());
 
@@ -109,7 +92,10 @@ void main() {
         // connect to service
         var echoProxy = EchoProxy();
 
-        await fs.dirProxy.open(supportedFlag, 0, Echo.$serviceName,
+        await fs.dirProxy.open(
+            supportedFlag,
+            io_fidl.ModeType.$none,
+            Echo.$serviceName,
             InterfaceRequest(echoProxy.ctrl.request().passChannel()));
         String str = 'my message';
         var got = await echoProxy.echoString(str);
@@ -117,19 +103,23 @@ void main() {
       }
     });
 
-    test('connect to service passes with valid modes', () async {
-      var supportedModes = [
+    test('connect to service passes with any mode', () async {
+      var modes = [
         io_fidl.modeProtectionMask,
-        io_fidl.modeTypeService
+        io_fidl.modeTypeBlockDevice,
+        io_fidl.modeTypeDirectory,
+        io_fidl.modeTypeFile,
+        io_fidl.modeTypeMask,
+        io_fidl.modeTypeService,
       ];
-      for (var supportedMode in supportedModes) {
+      for (final mode in modes) {
         var fs = _FsWithEchoService();
         // connect to service
         var echoProxy = EchoProxy();
 
         await fs.dirProxy.open(
             io_fidl.OpenFlags.rightReadable,
-            supportedMode,
+            io_fidl.ModeType(mode),
             Echo.$serviceName,
             InterfaceRequest(echoProxy.ctrl.request().passChannel()));
         String str = 'my message';
@@ -149,7 +139,7 @@ class _FsWithEchoService {
     Service<Echo> service = Service.withConnector(echo.bind);
     var status = _dir.connect(
         io_fidl.OpenFlags.rightReadable | io_fidl.OpenFlags.rightWritable,
-        0,
+        io_fidl.ModeType.$none,
         InterfaceRequest(dirProxy.ctrl.request().passChannel()));
     expect(status, ZX.OK);
     _dir.addNode(Echo.$serviceName, service);

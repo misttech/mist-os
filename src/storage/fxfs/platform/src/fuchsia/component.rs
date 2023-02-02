@@ -220,7 +220,6 @@ impl Component {
         self.outgoing_dir.clone().open(
             self.scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE,
-            0,
             Path::dot(),
             outgoing_dir.into(),
         );
@@ -659,7 +658,7 @@ mod tests {
             client
                 .open(
                     fio::OpenFlags::RIGHT_READABLE,
-                    0,
+                    fio::ModeType::empty(),
                     "volumes",
                     ServerEnd::new(server_end.into_channel()),
                 )

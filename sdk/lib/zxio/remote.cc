@@ -412,11 +412,9 @@ class Remote : public HasIo {
 
   zx_status_t VmoGet(zxio_vmo_flags_t zxio_flags, zx_handle_t* out_vmo);
 
-  zx_status_t Open(uint32_t flags, uint32_t mode, const char* path, size_t path_len,
-                   zxio_storage_t* storage);
+  zx_status_t Open(uint32_t flags, const char* path, size_t path_len, zxio_storage_t* storage);
 
-  zx_status_t OpenAsync(uint32_t flags, uint32_t mode, const char* path, size_t path_len,
-                        zx_handle_t request);
+  zx_status_t OpenAsync(uint32_t flags, const char* path, size_t path_len, zx_handle_t request);
 
   zx_status_t AddInotifyFilter(const char* path, size_t path_len, uint32_t mask,
                                uint32_t watch_descriptor, zx_handle_t socket_handle);
@@ -890,7 +888,7 @@ zx_status_t Remote<Protocol>::VmoGet(zxio_vmo_flags_t zxio_flags, zx_handle_t* o
 }
 
 template <typename Protocol>
-zx_status_t Remote<Protocol>::Open(uint32_t flags, uint32_t mode, const char* path, size_t path_len,
+zx_status_t Remote<Protocol>::Open(uint32_t flags, const char* path, size_t path_len,
                                    zxio_storage_t* storage) {
   zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
   if (endpoints.is_error()) {
@@ -898,8 +896,8 @@ zx_status_t Remote<Protocol>::Open(uint32_t flags, uint32_t mode, const char* pa
   }
   auto [client_end, server_end] = std::move(endpoints.value());
   const fidl::Status result =
-      client()->Open(static_cast<fio::wire::OpenFlags>(flags) | fio::wire::OpenFlags::kDescribe,
-                     mode, fidl::StringView::FromExternal(path, path_len), std::move(server_end));
+      client()->Open(static_cast<fio::wire::OpenFlags>(flags) | fio::wire::OpenFlags::kDescribe, {},
+                     fidl::StringView::FromExternal(path, path_len), std::move(server_end));
   if (!result.ok()) {
     return result.status();
   }
@@ -907,11 +905,11 @@ zx_status_t Remote<Protocol>::Open(uint32_t flags, uint32_t mode, const char* pa
 }
 
 template <typename Protocol>
-zx_status_t Remote<Protocol>::OpenAsync(uint32_t flags, uint32_t mode, const char* path,
-                                        size_t path_len, zx_handle_t request) {
+zx_status_t Remote<Protocol>::OpenAsync(uint32_t flags, const char* path, size_t path_len,
+                                        zx_handle_t request) {
   fidl::ServerEnd<fio::Node> node_request{zx::channel(request)};
   const fidl::Status result =
-      client()->Open(static_cast<fio::wire::OpenFlags>(flags), mode,
+      client()->Open(static_cast<fio::wire::OpenFlags>(flags), {},
                      fidl::StringView::FromExternal(path, path_len), std::move(node_request));
   return result.status();
 }

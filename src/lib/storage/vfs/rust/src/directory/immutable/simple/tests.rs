@@ -112,7 +112,7 @@ fn open_empty_directory_with_describe() {
             create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
-        server.open(scope, flags, 0, Path::dot(), server_end.into_channel().into());
+        server.open(scope, flags, Path::dot(), server_end.into_channel().into());
 
         assert_event!(root, fio::DirectoryEvent::OnOpen_ { s, info }, {
             assert_eq!(s, ZX_OK);
@@ -551,14 +551,14 @@ fn open_file_as_directory() {
         let flags =
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE | fio::OpenFlags::DIRECTORY;
         {
-            let root = open_get_proxy::<fio::FileMarker>(&root, flags, 0, "file2");
+            let root = open_get_proxy::<fio::FileMarker>(&root, flags, "file2");
             assert_event!(root, fio::FileEvent::OnOpen_ { s, info }, {
                 assert_eq!(Status::from_raw(s), Status::NOT_DIR);
                 assert_eq!(info, None);
             });
         }
         {
-            let root = open_get_proxy::<fio::FileMarker>(&root, flags, 0, "dir/file1");
+            let root = open_get_proxy::<fio::FileMarker>(&root, flags, "dir/file1");
             assert_event!(root, fio::FileEvent::OnOpen_ { s, info }, {
                 assert_eq!(Status::from_raw(s), Status::NOT_DIR);
                 assert_eq!(info, None);
@@ -582,14 +582,14 @@ fn open_directory_as_file() {
             | fio::OpenFlags::DESCRIBE
             | fio::OpenFlags::NOT_DIRECTORY;
         {
-            let root = open_get_proxy::<fio::DirectoryMarker>(&root, flags, 0, "dir");
+            let root = open_get_proxy::<fio::DirectoryMarker>(&root, flags, "dir");
             assert_event!(root, fio::DirectoryEvent::OnOpen_ { s, info }, {
                 assert_eq!(Status::from_raw(s), Status::NOT_FILE);
                 assert_eq!(info, None);
             });
         }
         {
-            let root = open_get_proxy::<fio::DirectoryMarker>(&root, flags, 0, "dir/dir2");
+            let root = open_get_proxy::<fio::DirectoryMarker>(&root, flags, "dir/dir2");
             assert_event!(root, fio::DirectoryEvent::OnOpen_ { s, info }, {
                 assert_eq!(Status::from_raw(s), Status::NOT_FILE);
                 assert_eq!(info, None);
@@ -1176,7 +1176,7 @@ fn in_tree_open() {
             create_proxy::<fio::DirectoryMarker>().expect("Failed to create connection endpoints");
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
-        ssh.open(scope, flags, 0, Path::dot(), server_end.into_channel().into());
+        ssh.open(scope, flags, Path::dot(), server_end.into_channel().into());
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
         open_as_vmo_file_assert_content!(&proxy, flags, "sshd_config", "# Empty");
@@ -1205,7 +1205,7 @@ fn in_tree_open_path_one_component() {
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
         let path = Path::validate_and_split("ssh").unwrap();
-        etc.open(scope, flags, 0, path, server_end.into_channel().into());
+        etc.open(scope, flags, path, server_end.into_channel().into());
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
         open_as_vmo_file_assert_content!(&proxy, flags, "sshd_config", "# Empty");
@@ -1234,7 +1234,7 @@ fn in_tree_open_path_two_components() {
 
         let flags = fio::OpenFlags::RIGHT_READABLE;
         let path = Path::validate_and_split("ssh/sshd_config").unwrap();
-        etc.open(scope, flags, 0, path, server_end.into_channel().into());
+        etc.open(scope, flags, path, server_end.into_channel().into());
 
         assert_read!(&proxy, "# Empty");
         assert_close!(proxy);
@@ -1577,7 +1577,7 @@ fn watch_addition_with_two_scopes() {
                     .expect("Failed to create connection endpoints");
 
                 let flags = fio::OpenFlags::RIGHT_READABLE;
-                server.open(scope, flags, 0, Path::dot(), server_end.into_channel().into());
+                server.open(scope, flags, Path::dot(), server_end.into_channel().into());
                 proxy
             }
 

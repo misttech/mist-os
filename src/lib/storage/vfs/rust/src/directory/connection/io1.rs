@@ -70,7 +70,6 @@ pub trait DerivedConnection: Send + Sync {
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,
         flags: fio::OpenFlags,
-        mode: u32,
         name: &str,
         path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, zx::Status>;
@@ -170,7 +169,7 @@ where
         match request {
             fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
                 fuchsia_trace::duration!("storage", "Directory::Clone");
-                self.handle_clone(flags, 0, object);
+                self.handle_clone(flags, object);
             }
             fio::DirectoryRequest::Reopen {
                 rights_request: _,
@@ -239,7 +238,15 @@ where
             }
             fio::DirectoryRequest::Open { flags, mode, path, object, control_handle: _ } => {
                 fuchsia_trace::duration!("storage", "Directory::Open");
-                self.handle_open(flags, mode, path, object);
+                // Temporarily allow clients that send POSIX modes when creating directories to succeed.
+                //
+                // TODO(https://fxbug.dev/120673): Remove this when all downstream consumers contain this commit.
+                let flags = if mode.bits() & fio::MODE_TYPE_MASK == fio::MODE_TYPE_DIRECTORY {
+                    flags | fio::OpenFlags::DIRECTORY
+                } else {
+                    flags
+                };
+                self.handle_open(flags, path, object);
             }
             fio::DirectoryRequest::Open2 {
                 path: _,
@@ -339,12 +346,7 @@ where
         Ok(ConnectionState::Alive)
     }
 
-    fn handle_clone(
-        &self,
-        flags: fio::OpenFlags,
-        mode: u32,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
+    fn handle_clone(&self, flags: fio::OpenFlags, server_end: ServerEnd<fio::NodeMarker>) {
         let flags = match inherit_rights_for_clone(self.flags, flags) {
             Ok(updated) => updated,
             Err(status) => {
@@ -353,13 +355,12 @@ where
             }
         };
 
-        self.directory.clone().open(self.scope.clone(), flags, mode, Path::dot(), server_end);
+        self.directory.clone().open(self.scope.clone(), flags, Path::dot(), server_end);
     }
 
     fn handle_open(
         &self,
         mut flags: fio::OpenFlags,
-        mode: u32,
         path: String,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -380,7 +381,7 @@ where
             flags |= fio::OpenFlags::DIRECTORY;
         }
 
-        let (flags, mode) = match check_child_connection_flags(self.flags, flags, mode) {
+        let flags = match check_child_connection_flags(self.flags, flags) {
             Ok(updated) => updated,
             Err(status) => {
                 send_on_open_with_error(flags, server_end, status);
@@ -400,7 +401,7 @@ where
 
         // It is up to the open method to handle OPEN_FLAG_DESCRIBE from this point on.
         let directory = self.directory.clone();
-        directory.open(self.scope.clone(), flags, mode, path, server_end);
+        directory.open(self.scope.clone(), flags, path, server_end);
     }
 
     async fn handle_read_dirents(&mut self, max_bytes: u64) -> (zx::Status, Vec<u8>) {
@@ -480,7 +481,6 @@ mod tests {
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
             Path::dot(),
             ServerEnd::new(dir_server_end.into_channel()),
         );
@@ -491,8 +491,8 @@ mod tests {
         // Try to open a file that doesn't exist.
         assert_matches!(
             dir_proxy.open(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_FILE,
+                fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+                fio::ModeType::empty(),
                 "foo",
                 node_server_end
             ),
@@ -518,7 +518,6 @@ mod tests {
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
             Path::dot(),
             ServerEnd::new(dir_server_end.into_channel()),
         );
@@ -529,8 +528,8 @@ mod tests {
         // Try to open a file that doesn't exist.
         assert_matches!(
             dir_proxy.open(
-                fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_FILE,
+                fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
+                fio::ModeType::empty(),
                 "foo",
                 node_server_end
             ),
@@ -558,7 +557,6 @@ mod tests {
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
             Path::dot(),
             ServerEnd::new(dir_server_end.into_channel()),
         );
@@ -569,8 +567,10 @@ mod tests {
         // Try to open a file that doesn't exist.
         assert_matches!(
             dir_proxy.open(
-                fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_FILE,
+                fio::OpenFlags::DIRECTORY
+                    | fio::OpenFlags::DESCRIBE
+                    | fio::OpenFlags::RIGHT_READABLE,
+                fio::ModeType::empty(),
                 "foo",
                 node_server_end,
             ),
@@ -596,7 +596,6 @@ mod tests {
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
             Path::dot(),
             ServerEnd::new(dir_server_end.into_channel()),
         );
@@ -607,8 +606,10 @@ mod tests {
         // Try to open a file that doesn't exist.
         assert_matches!(
             dir_proxy.open(
-                fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_FILE,
+                fio::OpenFlags::DIRECTORY
+                    | fio::OpenFlags::DESCRIBE
+                    | fio::OpenFlags::RIGHT_READABLE,
+                fio::ModeType::empty(),
                 "foo",
                 node_server_end,
             ),
@@ -644,7 +645,6 @@ mod tests {
         dir.open(
             ExecutionScope::new(),
             fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
             Path::dot(),
             ServerEnd::new(dir_server_end.into_channel()),
         );

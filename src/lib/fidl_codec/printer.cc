@@ -21,11 +21,6 @@
 
 namespace fidl_codec {
 
-using fuchsia::io::MODE_TYPE_BLOCK_DEVICE;
-using fuchsia::io::MODE_TYPE_DIRECTORY;
-using fuchsia::io::MODE_TYPE_FILE;
-using fuchsia::io::MODE_TYPE_SERVICE;
-
 constexpr int kCharactersPerByte = 2;
 
 const Colors WithoutColors("", "", "", "", "", "");
@@ -137,58 +132,6 @@ void PrettyPrinter::DisplayClock(zx_clock_t clock) {
       *this << Red << clock << ResetColor;
       return;
   }
-}
-
-#define DirectoryOpenCase(name)     \
-  if ((value & (name)) == (name)) { \
-    value &= ~(name);               \
-    *this << separator << #name;    \
-    separator = " | ";              \
-  }
-
-#define OpenModeCase(name) \
-  case name:               \
-    *this << #name;        \
-    separator = " | ";     \
-    break
-
-void PrettyPrinter::DisplayDirectoryOpenMode(uint32_t value) {
-  if (value == 0) {
-    *this << Blue << "0" << ResetColor;
-    return;
-  }
-
-  *this << Blue;
-  const char* separator = "";
-
-  // Type.
-  switch (value & 0xff000) {
-    OpenModeCase(MODE_TYPE_SERVICE);
-    OpenModeCase(MODE_TYPE_FILE);
-    OpenModeCase(MODE_TYPE_BLOCK_DEVICE);
-    OpenModeCase(MODE_TYPE_DIRECTORY);
-  }
-
-  // Remaining flags.
-  value &= 0xfff;
-  DirectoryOpenCase(S_ISUID);
-  DirectoryOpenCase(S_ISGID);
-  DirectoryOpenCase(S_IRWXU);
-  DirectoryOpenCase(S_IRUSR);
-  DirectoryOpenCase(S_IWUSR);
-  DirectoryOpenCase(S_IXUSR);
-  DirectoryOpenCase(S_IRWXG);
-  DirectoryOpenCase(S_IRGRP);
-  DirectoryOpenCase(S_IWGRP);
-  DirectoryOpenCase(S_IXGRP);
-  DirectoryOpenCase(S_IRWXO);
-  DirectoryOpenCase(S_IROTH);
-  DirectoryOpenCase(S_IWOTH);
-  DirectoryOpenCase(S_IXOTH);
-  if (value != 0) {
-    *this << separator << "0x" << std::hex << value << std::dec;
-  }
-  *this << ResetColor;
 }
 
 void PrettyPrinter::DisplayDuration(zx_duration_t duration_ns) {

@@ -173,7 +173,7 @@ impl TestFixture {
             .get_exposed_dir()
             .open(
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                0,
+                fio::ModeType::empty(),
                 dir,
                 server.into_channel().into(),
             )
@@ -193,7 +193,7 @@ impl TestFixture {
     pub async fn check_test_data_file(&self) {
         let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
         self.dir("data")
-            .open(fio::OpenFlags::RIGHT_READABLE, 0, "foo", server)
+            .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "foo", server)
             .expect("open failed");
         file.get_attr().await.expect("get_attr failed");
 

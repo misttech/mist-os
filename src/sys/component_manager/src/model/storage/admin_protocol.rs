@@ -170,7 +170,6 @@ impl CapabilityProvider for StorageAdminProtocolProvider {
         self: Box<Self>,
         task_scope: TaskScope,
         flags: fio::OpenFlags,
-        _open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -906,8 +905,9 @@ mod tests {
 
         dir.open(
             scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );
@@ -1312,8 +1312,9 @@ mod tests {
         let scope = ExecutionScope::new();
         test_dir.clone().open(
             scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );
@@ -1368,7 +1369,6 @@ mod tests {
             self: Arc<Self>,
             _scope: ExecutionScope,
             flags: fio::OpenFlags,
-            _mode: u32,
             _path: Path,
             server_end: ServerEnd<fio::NodeMarker>,
         ) {
@@ -1443,8 +1443,7 @@ mod tests {
 
         fake_dir.open(
             execution_scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );

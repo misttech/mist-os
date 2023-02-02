@@ -536,7 +536,7 @@ async fn connect_to_protocol_in_exposed_dir(
     exposed_dir
         .open(
             io::OpenFlags::RIGHT_READABLE | io::OpenFlags::POSIX_WRITABLE,
-            0,
+            io::ModeType::empty(),
             protocol_name,
             ServerEnd::new(server_end),
         )

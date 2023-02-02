@@ -142,7 +142,7 @@ fn read_only_read_with_describe() {
             create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
 
         let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
-        server.open(scope, flags, 0, Path::dot(), server_end.into_channel().into());
+        server.open(scope, flags, Path::dot(), server_end.into_channel().into());
 
         assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
             assert_eq!(s, ZX_OK);
@@ -228,7 +228,6 @@ fn read_error() {
             server.clone().open(
                 scope.clone(),
                 flags,
-                0,
                 Path::dot(),
                 server_end.into_channel().into(),
             );
@@ -243,7 +242,7 @@ fn read_error() {
             let (proxy, server_end) =
                 create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
 
-            server.open(scope, flags, 0, Path::dot(), server_end.into_channel().into());
+            server.open(scope, flags, Path::dot(), server_end.into_channel().into());
 
             assert_event!(proxy, fio::FileEvent::OnOpen_ { s, info }, {
                 assert_eq!(s, ZX_OK);
@@ -908,7 +907,6 @@ fn mock_directory_with_one_file_and_two_connections() {
                 server.open(
                     scope,
                     fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                    0,
                     Path::dot(),
                     server_end.into_channel().into(),
                 );

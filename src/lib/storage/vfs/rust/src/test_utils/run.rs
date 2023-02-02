@@ -106,8 +106,8 @@ impl<'test_refs> Drop for TestController<'test_refs> {
     }
 }
 
-/// Collects a basic required set of parameters for a server/client test.  Additional parameteres
-/// can be specified using `exec`, `mode`, and `coordinator` methods via a builder patter.
+/// Collects a basic required set of parameters for a server/client test.  Additional parameters
+/// can be specified using `exec` and `coordinator` methods via a builder patter.
 /// Actual execution of the test happen when [`AsyncServerClientTestParams::run()`] method is
 /// invoked.
 pub fn test_server_client<'test_refs, Marker, GetClient, GetClientRes>(
@@ -123,32 +123,6 @@ where
     AsyncServerClientTestParams {
         exec: None,
         flags,
-        mode: None,
-        server,
-        get_client: Box::new(move |proxy| Box::pin(get_client(proxy))),
-        coordinator: None,
-        entry_constructor: None,
-    }
-}
-
-/// Collects a basic required set of parameters for a server/client test.  Similar to
-/// [`test_server_client`] but also takes the `mode` argument as part of the invocation, in order
-/// to keep it close the the `flag` and the other related arguments.
-pub fn test_server_client_with_mode<'test_refs, Marker, GetClient, GetClientRes>(
-    flags: fio::OpenFlags,
-    mode: u32,
-    server: Arc<dyn DirectoryEntry>,
-    get_client: GetClient,
-) -> AsyncServerClientTestParams<'test_refs, Marker>
-where
-    Marker: ProtocolMarker,
-    GetClient: FnOnce(Marker::Proxy) -> GetClientRes + 'test_refs,
-    GetClientRes: Future<Output = ()> + 'test_refs,
-{
-    AsyncServerClientTestParams {
-        exec: None,
-        flags,
-        mode: Some(mode),
         server,
         get_client: Box::new(move |proxy| Box::pin(get_client(proxy))),
         coordinator: None,
@@ -182,7 +156,6 @@ where
 {
     exec: Option<TestExecutor>,
     flags: fio::OpenFlags,
-    mode: Option<u32>,
     server: Arc<dyn DirectoryEntry>,
     get_client: Box<
         dyn FnOnce(Marker::Proxy) -> Pin<Box<dyn Future<Output = ()> + 'test_refs>> + 'test_refs,
@@ -214,7 +187,6 @@ where
     Marker: ProtocolMarker,
 {
     field_setter!(exec, TestExecutor);
-    field_setter!(mode, u32);
 
     pub fn coordinator(
         mut self,
@@ -243,7 +215,6 @@ where
         self.server.open(
             scope_builder.new(),
             self.flags,
-            self.mode.unwrap_or(0),
             Path::dot(),
             server_end.into_channel().into(),
         );

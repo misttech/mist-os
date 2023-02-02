@@ -69,8 +69,8 @@ void DirectoryConnection::SetAttr(fuchsia::io::NodeAttributeFlags flags,
   Connection::SetAttr(vn_, flags, attributes, std::move(callback));
 }
 
-void DirectoryConnection::Open(fuchsia::io::OpenFlags flags, uint32_t mode, std::string path,
-                               fidl::InterfaceRequest<fuchsia::io::Node> object) {
+void DirectoryConnection::Open(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode,
+                               std::string path, fidl::InterfaceRequest<fuchsia::io::Node> object) {
   vn_->Open(flags, this->flags(), mode, path.data(), path.length(), object.TakeChannel(),
             binding_.dispatcher());
 }

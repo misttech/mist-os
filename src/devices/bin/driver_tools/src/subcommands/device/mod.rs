@@ -9,7 +9,6 @@ use {
     args::{
         BindCommand, DeviceCommand, DeviceSubcommand, LogLevelCommand, RebindCommand, UnbindCommand,
     },
-    fidl::endpoints::Proxy,
     fidl_fuchsia_device as fdev, fidl_fuchsia_io as fio, fuchsia_zircon_status as zx,
 };
 
@@ -51,9 +50,10 @@ pub async fn device(cmd: DeviceCommand, dev: fio::DirectoryProxy) -> Result<()> 
 }
 
 fn connect_to_device(dev: fio::DirectoryProxy, device_path: &str) -> Result<fdev::ControllerProxy> {
-    let (client, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>()?;
-
-    dev.open(fio::OpenFlags::RIGHT_READABLE, 0, device_path, server)?;
-
-    Ok(fdev::ControllerProxy::new(client.into_channel().unwrap()))
+    // This should be fuchsia_component::client::connect_to_named_protocol_at_dir_root but this
+    // needs to build on host for some reason.
+    let (client, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>()?;
+    let () = dev.open(fio::OpenFlags::empty(), fio::ModeType::empty(), device_path, server)?;
+    let client: fidl::endpoints::ClientEnd<fdev::ControllerMarker> = client.into_channel().into();
+    client.into_proxy().map_err(Into::into)
 }

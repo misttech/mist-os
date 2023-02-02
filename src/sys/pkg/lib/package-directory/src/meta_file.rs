@@ -65,7 +65,6 @@ impl<S: crate::NonMetaStorage> vfs::directory::entry::DirectoryEntry for MetaFil
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        _mode: u32,
         path: VfsPath,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -308,7 +307,6 @@ mod tests {
             Arc::new(meta_file),
             ExecutionScope::new(),
             fio::OpenFlags::DESCRIBE,
-            0,
             VfsPath::validate_and_split("non-empty").unwrap(),
             server_end,
         );
@@ -338,7 +336,6 @@ mod tests {
                 Arc::clone(&meta_file),
                 ExecutionScope::new(),
                 fio::OpenFlags::DESCRIBE | forbidden_flag,
-                0,
                 VfsPath::dot(),
                 server_end,
             );
@@ -360,7 +357,6 @@ mod tests {
             Arc::new(meta_file),
             ExecutionScope::new(),
             fio::OpenFlags::DESCRIBE,
-            0,
             VfsPath::dot(),
             server_end,
         );

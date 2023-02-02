@@ -266,24 +266,20 @@ impl FatDirectory {
     fn lookup(
         self: &Arc<Self>,
         flags: fio::OpenFlags,
-        mode: u32,
         mut path: Path,
         closer: &mut Closer<'_>,
     ) -> Result<FatNode, Status> {
         let mut cur_entry = FatNode::Dir(self.clone());
 
         while !path.is_empty() {
-            let (child_flags, child_mode) = if path.is_single_component() {
-                (flags, mode)
-            } else {
-                (fio::OpenFlags::DIRECTORY, fio::MODE_TYPE_DIRECTORY)
-            };
+            let child_flags =
+                if path.is_single_component() { flags } else { fio::OpenFlags::DIRECTORY };
 
             match cur_entry {
                 FatNode::Dir(entry) => {
                     let name = path.next().unwrap();
                     validate_filename(name)?;
-                    cur_entry = entry.clone().open_child(name, child_flags, child_mode, closer)?;
+                    cur_entry = entry.clone().open_child(name, child_flags, closer)?;
                 }
                 FatNode::File(_) => {
                     return Err(Status::NOT_DIR);
@@ -304,7 +300,6 @@ impl FatDirectory {
         self: &Arc<Self>,
         name: &str,
         flags: fio::OpenFlags,
-        mode: u32,
         closer: &mut Closer<'_>,
     ) -> Result<FatNode, Status> {
         let fs_lock = self.filesystem.lock().unwrap();
@@ -347,9 +342,7 @@ impl FatDirectory {
                 // Child entry does not exist, but we've been asked to create it.
                 created = true;
                 let dir = self.borrow_dir(&fs_lock)?;
-                if flags.intersects(fio::OpenFlags::DIRECTORY)
-                    || (mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_DIRECTORY)
-                {
+                if flags.intersects(fio::OpenFlags::DIRECTORY) {
                     let dir = dir.create_dir(name).map_err(fatfs_error_to_status)?;
                     // Safe because we give the FatDirectory a FatFilesystem which ensures that the
                     // FatfsDirRef will not outlive its FatFilesystem.
@@ -757,13 +750,12 @@ impl DirectoryEntry for FatDirectory {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         let mut closer = Closer::new(&self.filesystem);
 
-        match self.lookup(flags, mode, path, &mut closer) {
+        match self.lookup(flags, path, &mut closer) {
             Err(e) => send_on_open_with_error(flags, server_end, e),
             Ok(FatNode::Dir(entry)) => {
                 entry
@@ -777,7 +769,7 @@ impl DirectoryEntry for FatDirectory {
                 );
             }
             Ok(FatNode::File(entry)) => {
-                entry.clone().open(scope, flags, mode, Path::dot(), server_end);
+                entry.clone().open(scope, flags, Path::dot(), server_end);
             }
         };
     }
@@ -1129,7 +1121,7 @@ mod tests {
 
         let scope = ExecutionScope::new();
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        dir.clone().open(scope.clone(), fio::OpenFlags::RIGHT_READABLE, 0, Path::dot(), server_end);
+        dir.clone().open(scope.clone(), fio::OpenFlags::RIGHT_READABLE, Path::dot(), server_end);
         let scope_clone = scope.clone();
 
         proxy
@@ -1142,7 +1134,6 @@ mod tests {
         dir.clone().open(
             scope_clone,
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             Path::validate_and_split("test").unwrap(),
             server_end,
         );

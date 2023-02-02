@@ -36,7 +36,7 @@ class ComposedPseudoDir extends PseudoDir {
         _directory = directory;
 
   @override
-  void open(fidl_io.OpenFlags flags, int mode, String path,
+  void open(fidl_io.OpenFlags flags, fidl_io.ModeType mode, String path,
       fidl.InterfaceRequest<fidl_io.Node> request,
       [fidl_io.OpenFlags? parentFlags]) {
     if (_inheritedNodes.contains(path)) {

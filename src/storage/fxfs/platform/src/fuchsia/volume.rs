@@ -795,8 +795,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             "foo",
         )
         .await;
@@ -807,13 +807,16 @@ mod tests {
                 | fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::DIRECTORY,
-            fio::MODE_TYPE_DIRECTORY,
             "bar",
         )
         .await;
 
-        let f =
-            open_file_checked(&root, fio::OpenFlags::CREATE, fio::MODE_TYPE_FILE, "foo/a").await;
+        let f = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo/a",
+        )
+        .await;
         close_file_checked(f).await;
 
         let (status, dst_token) = dst.get_token().await.expect("FIDL call failed");
@@ -824,7 +827,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::empty(), fio::MODE_TYPE_FILE, "foo/a")
+            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -832,8 +835,7 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f =
-            open_file_checked(&root, fio::OpenFlags::empty(), fio::MODE_TYPE_FILE, "bar/b").await;
+        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "bar/b").await;
         close_file_checked(f).await;
 
         close_dir_checked(dst).await;
@@ -851,14 +853,18 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             "foo",
         )
         .await;
 
-        let f =
-            open_file_checked(&root, fio::OpenFlags::CREATE, fio::MODE_TYPE_FILE, "foo/a").await;
+        let f = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo/a",
+        )
+        .await;
         close_file_checked(f).await;
 
         let (status, src_token) = src.get_token().await.expect("FIDL call failed");
@@ -869,7 +875,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::empty(), fio::MODE_TYPE_FILE, "foo/a")
+            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -877,8 +883,7 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f =
-            open_file_checked(&root, fio::OpenFlags::empty(), fio::MODE_TYPE_FILE, "foo/b").await;
+        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/b").await;
         close_file_checked(f).await;
 
         close_dir_checked(src).await;
@@ -895,8 +900,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             "foo",
         )
         .await;
@@ -907,7 +912,6 @@ mod tests {
                 | fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::DIRECTORY,
-            fio::MODE_TYPE_DIRECTORY,
             "bar",
         )
         .await;
@@ -915,8 +919,7 @@ mod tests {
         // The src file is non-empty.
         let src_file = open_file_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_FILE,
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY,
             "foo/a",
         )
         .await;
@@ -925,8 +928,12 @@ mod tests {
         close_file_checked(src_file).await;
 
         // The dst file is empty (so we can distinguish it).
-        let f =
-            open_file_checked(&root, fio::OpenFlags::CREATE, fio::MODE_TYPE_FILE, "bar/b").await;
+        let f = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
+            "bar/b",
+        )
+        .await;
         close_file_checked(f).await;
 
         let (status, dst_token) = dst.get_token().await.expect("FIDL call failed");
@@ -937,7 +944,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_file(&root, fio::OpenFlags::empty(), fio::MODE_TYPE_FILE, "foo/a")
+            open_file(&root, fio::OpenFlags::NOT_DIRECTORY, "foo/a")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -945,9 +952,12 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let file =
-            open_file_checked(&root, fio::OpenFlags::RIGHT_READABLE, fio::MODE_TYPE_FILE, "bar/b")
-                .await;
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
+            "bar/b",
+        )
+        .await;
         let buf = file::read(&file).await.expect("read file failed");
         assert_eq!(buf, vec![0xaa as u8; 8192]);
         close_file_checked(file).await;
@@ -967,8 +977,8 @@ mod tests {
             &root,
             fio::OpenFlags::CREATE
                 | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             "foo",
         )
         .await;
@@ -979,7 +989,6 @@ mod tests {
                 | fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::DIRECTORY,
-            fio::MODE_TYPE_DIRECTORY,
             "bar",
         )
         .await;
@@ -987,13 +996,17 @@ mod tests {
         // The src dir is non-empty.
         open_dir_checked(
             &root,
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
             "foo/a",
         )
         .await;
-        open_file_checked(&root, fio::OpenFlags::CREATE, fio::MODE_TYPE_FILE, "foo/a/file").await;
-        open_dir_checked(&root, fio::OpenFlags::CREATE, fio::MODE_TYPE_DIRECTORY, "bar/b").await;
+        open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
+            "foo/a/file",
+        )
+        .await;
+        open_dir_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "bar/b").await;
 
         let (status, dst_token) = dst.get_token().await.expect("FIDL call failed");
         Status::ok(status).expect("get_token failed");
@@ -1003,7 +1016,7 @@ mod tests {
             .expect("rename failed");
 
         assert_eq!(
-            open_dir(&root, fio::OpenFlags::empty(), fio::MODE_TYPE_DIRECTORY, "foo/a")
+            open_dir(&root, fio::OpenFlags::DIRECTORY, "foo/a")
                 .await
                 .expect_err("Open succeeded")
                 .root_cause()
@@ -1011,9 +1024,7 @@ mod tests {
                 .expect("No status"),
             &Status::NOT_FOUND,
         );
-        let f =
-            open_file_checked(&root, fio::OpenFlags::empty(), fio::MODE_TYPE_FILE, "bar/b/file")
-                .await;
+        let f = open_file_checked(&root, fio::OpenFlags::NOT_DIRECTORY, "bar/b/file").await;
         close_file_checked(f).await;
 
         close_dir_checked(dst).await;
@@ -1340,7 +1351,6 @@ mod tests {
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                0,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
                 volume_server_end.into_channel().into(),
             );
@@ -1377,8 +1387,10 @@ mod tests {
                         .expect("Create dir proxy to succeed");
                 volume_dir_proxy
                     .open(
-                        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                        fio::MODE_TYPE_DIRECTORY,
+                        fio::OpenFlags::RIGHT_READABLE
+                            | fio::OpenFlags::RIGHT_WRITABLE
+                            | fio::OpenFlags::DIRECTORY,
+                        fio::ModeType::empty(),
                         "root",
                         ServerEnd::new(root_server_end.into_channel()),
                     )
@@ -1388,8 +1400,8 @@ mod tests {
                     &root_proxy,
                     fio::OpenFlags::CREATE
                         | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE,
-                    fio::MODE_TYPE_FILE,
+                        | fio::OpenFlags::RIGHT_WRITABLE
+                        | fio::OpenFlags::NOT_DIRECTORY,
                     FILE_NAME,
                 )
                 .await
@@ -1456,7 +1468,6 @@ mod tests {
             volumes_directory.directory_node().clone().open(
                 ExecutionScope::new(),
                 fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                0,
                 Path::validate_and_split(VOLUME_NAME).unwrap(),
                 volume_server_end.into_channel().into(),
             );
@@ -1542,7 +1553,9 @@ mod tests {
         let fixture = TestFixture::new_unencrypted().await;
         let root = fixture.root();
 
-        let f = open_file_checked(&root, fio::OpenFlags::CREATE, fio::MODE_TYPE_FILE, "foo").await;
+        let f =
+            open_file_checked(&root, fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY, "foo")
+                .await;
         close_file_checked(f).await;
 
         fixture.close().await;

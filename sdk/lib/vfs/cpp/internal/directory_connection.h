@@ -39,7 +39,7 @@ class DirectoryConnection final : public Connection, public fuchsia::io::Directo
   void GetAttr(GetAttrCallback callback) override;
   void SetAttr(fuchsia::io::NodeAttributeFlags flags, fuchsia::io::NodeAttributes attributes,
                SetAttrCallback callback) override;
-  void Open(fuchsia::io::OpenFlags flags, uint32_t mode, std::string path,
+  void Open(fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode, std::string path,
             fidl::InterfaceRequest<fuchsia::io::Node> object) override;
   void AddInotifyFilter(std::string path, fuchsia::io::InotifyWatchMask filters,
                         uint32_t watch_descriptor, zx::socket socket,

@@ -265,7 +265,7 @@ impl Filesystem {
                 fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::POSIX_EXECUTABLE
                     | fio::OpenFlags::POSIX_WRITABLE,
-                0,
+                fio::ModeType::empty(),
                 "root",
                 server_end,
             )?;
@@ -349,7 +349,7 @@ impl Filesystem {
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE
                 | fio::OpenFlags::POSIX_WRITABLE,
-            0,
+            fio::ModeType::empty(),
             "root",
             server_end.into_channel().into(),
         )?;
@@ -614,7 +614,6 @@ impl ServingMultiVolumeFilesystem {
             self.exposed_dir.as_ref().unwrap(),
             &path,
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NODE_REFERENCE,
-            0,
         )
         .await
         .map(|_| true)
@@ -694,7 +693,7 @@ impl ServingMultiVolumeFilesystem {
             fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE
                 | fio::OpenFlags::POSIX_WRITABLE,
-            0,
+            fio::ModeType::empty(),
             "root",
             server_end,
         )?;

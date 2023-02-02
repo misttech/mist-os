@@ -26,22 +26,7 @@ pub const POSIX_READ_WRITE_PROTECTION_ATTRIBUTES: u32 = S_IRUSR | S_IWUSR;
 /// indicating the problem.
 ///
 /// Changing this function can be dangerous!  Flags operations may have security implications.
-pub fn new_connection_validate_flags(
-    mut flags: fio::OpenFlags,
-    mode: u32,
-) -> Result<fio::OpenFlags, Status> {
-    // There should be no MODE_TYPE_* flags set, except for, possibly, MODE_TYPE_SERVICE when the
-    // target is a service.
-    if (mode & !fio::MODE_PROTECTION_MASK) & !fio::MODE_TYPE_SERVICE != 0 {
-        if mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_DIRECTORY {
-            return Err(Status::NOT_DIR);
-        } else if mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_FILE {
-            return Err(Status::NOT_FILE);
-        } else {
-            return Err(Status::INVALID_ARGS);
-        };
-    }
-
+pub fn new_connection_validate_flags(mut flags: fio::OpenFlags) -> Result<fio::OpenFlags, Status> {
     // A service is not a directory.
     flags &= !fio::OpenFlags::NOT_DIRECTORY;
 
@@ -88,8 +73,8 @@ mod tests {
     use {fidl_fuchsia_io as fio, fuchsia_zircon::Status};
 
     /// Assertion for when `new_connection_validate_flags` should succeed => `ncvf_ok`.
-    fn ncvf_ok(flags: fio::OpenFlags, mode: u32, expected_new_flags: fio::OpenFlags) {
-        match new_connection_validate_flags(flags, mode) {
+    fn ncvf_ok(flags: fio::OpenFlags, expected_new_flags: fio::OpenFlags) {
+        match new_connection_validate_flags(flags) {
             Ok(new_flags) => assert_eq!(
                 expected_new_flags, new_flags,
                 "new_connection_validate_flags returned unexpected set of flags.\n\
@@ -102,8 +87,8 @@ mod tests {
     }
 
     /// Assertion for when `new_connection_validate_flags` should fail => `ncvf_err`.
-    fn ncvf_err(flags: fio::OpenFlags, mode: u32, expected_status: Status) {
-        match new_connection_validate_flags(flags, mode) {
+    fn ncvf_err(flags: fio::OpenFlags, expected_status: Status) {
+        match new_connection_validate_flags(flags) {
             Ok(new_flags) => panic!(
                 "new_connection_validate_flags should have failed.\n\
                  Got new flags: {:X}",
@@ -121,52 +106,47 @@ mod tests {
     #[test]
     fn node_reference_basic() {
         // OPEN_FLAG_NODE_REFERENCE is preserved.
-        ncvf_ok(fio::OpenFlags::NODE_REFERENCE, 0, fio::OpenFlags::NODE_REFERENCE);
+        ncvf_ok(fio::OpenFlags::NODE_REFERENCE, fio::OpenFlags::NODE_REFERENCE);
 
         // Access flags are dropped.
         ncvf_ok(
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::RIGHT_READABLE,
-            0,
             fio::OpenFlags::NODE_REFERENCE,
         );
         ncvf_ok(
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::RIGHT_WRITABLE,
-            0,
             fio::OpenFlags::NODE_REFERENCE,
         );
 
         // OPEN_FLAG_DESCRIBE is preserved.
         ncvf_ok(
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
-            0,
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
         );
         ncvf_ok(
             fio::OpenFlags::NODE_REFERENCE | READ_WRITE | fio::OpenFlags::DESCRIBE,
-            0,
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
         );
 
         ncvf_ok(
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::NOT_DIRECTORY,
-            0,
             fio::OpenFlags::NODE_REFERENCE,
         );
-        ncvf_err(fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DIRECTORY, 0, Status::NOT_DIR);
+        ncvf_err(fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DIRECTORY, Status::NOT_DIR);
     }
 
     #[test]
     fn service_basic() {
         // Access flags are required and preserved.
-        ncvf_ok(READ_WRITE, 0, READ_WRITE);
-        ncvf_ok(fio::OpenFlags::RIGHT_READABLE, 0, fio::OpenFlags::RIGHT_READABLE);
-        ncvf_ok(fio::OpenFlags::empty(), 0, fio::OpenFlags::empty());
+        ncvf_ok(READ_WRITE, READ_WRITE);
+        ncvf_ok(fio::OpenFlags::RIGHT_READABLE, fio::OpenFlags::RIGHT_READABLE);
+        ncvf_ok(fio::OpenFlags::empty(), fio::OpenFlags::empty());
 
         // OPEN_FLAG_DESCRIBE is allowed.
-        ncvf_ok(READ_WRITE | fio::OpenFlags::DESCRIBE, 0, READ_WRITE | fio::OpenFlags::DESCRIBE);
+        ncvf_ok(READ_WRITE | fio::OpenFlags::DESCRIBE, READ_WRITE | fio::OpenFlags::DESCRIBE);
 
-        ncvf_ok(READ_WRITE | fio::OpenFlags::NOT_DIRECTORY, 0, READ_WRITE);
-        ncvf_err(READ_WRITE | fio::OpenFlags::DIRECTORY, 0, Status::NOT_DIR);
+        ncvf_ok(READ_WRITE | fio::OpenFlags::NOT_DIRECTORY, READ_WRITE);
+        ncvf_err(READ_WRITE | fio::OpenFlags::DIRECTORY, Status::NOT_DIR);
     }
 
     #[test]
@@ -176,7 +156,6 @@ mod tests {
             fio::OpenFlags::NODE_REFERENCE
                 | fio::OpenFlags::POSIX_WRITABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE,
-            0,
             fio::OpenFlags::NODE_REFERENCE,
         );
         ncvf_ok(
@@ -184,7 +163,6 @@ mod tests {
                 | fio::OpenFlags::DESCRIBE
                 | fio::OpenFlags::POSIX_WRITABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE,
-            0,
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE,
         );
         ncvf_ok(
@@ -192,7 +170,6 @@ mod tests {
                 | READ_WRITE
                 | fio::OpenFlags::POSIX_WRITABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE,
-            0,
             fio::OpenFlags::NODE_REFERENCE,
         );
     }
@@ -202,7 +179,6 @@ mod tests {
         // OPEN_FLAG_POSIX_* is ignored for services.
         ncvf_ok(
             READ_WRITE | fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE,
-            0,
             READ_WRITE,
         );
         ncvf_ok(
@@ -210,34 +186,7 @@ mod tests {
                 | fio::OpenFlags::DESCRIBE
                 | fio::OpenFlags::POSIX_WRITABLE
                 | fio::OpenFlags::POSIX_EXECUTABLE,
-            0,
             READ_WRITE | fio::OpenFlags::DESCRIBE,
-        );
-    }
-
-    #[test]
-    fn file() {
-        ncvf_err(fio::OpenFlags::NODE_REFERENCE, fio::MODE_TYPE_FILE, Status::NOT_FILE);
-        ncvf_err(READ_WRITE, fio::MODE_TYPE_FILE, Status::NOT_FILE);
-    }
-
-    #[test]
-    fn mode_directory() {
-        ncvf_err(fio::OpenFlags::NODE_REFERENCE, fio::MODE_TYPE_DIRECTORY, Status::NOT_DIR);
-        ncvf_err(READ_WRITE, fio::MODE_TYPE_DIRECTORY, Status::NOT_DIR);
-    }
-
-    #[test]
-    fn mode_service() {
-        ncvf_ok(
-            fio::OpenFlags::NODE_REFERENCE,
-            fio::MODE_TYPE_SERVICE,
-            fio::OpenFlags::NODE_REFERENCE,
-        );
-        ncvf_ok(
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_SERVICE,
-            fio::OpenFlags::RIGHT_READABLE,
         );
     }
 }

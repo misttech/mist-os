@@ -47,7 +47,6 @@ impl DirectoryEntry for BlockFile {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        _mode: u32,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -169,7 +168,6 @@ async fn main() -> Result<(), Error> {
         let () = dir.open(
             scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            0,
             Path::dot(),
             ServerEnd::new(server.into_channel()),
         );

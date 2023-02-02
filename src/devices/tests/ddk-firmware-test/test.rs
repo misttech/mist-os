@@ -42,16 +42,11 @@ impl DirectoryEntry for FakePackageVariant {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: vfs::path::Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
-        fn open_as_file(flags: fio::OpenFlags, mode: u32) -> bool {
-            let mode_type = mode & fio::MODE_TYPE_MASK;
-            let open_as_file = mode_type == fio::MODE_TYPE_FILE;
-            let open_as_dir = mode_type == fio::MODE_TYPE_DIRECTORY
-                || flags.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE);
-            open_as_file || !open_as_dir
+        fn open_as_file(flags: fio::OpenFlags) -> bool {
+            !flags.intersects(fio::OpenFlags::DIRECTORY | fio::OpenFlags::NODE_REFERENCE)
         }
 
         // vfs::path::Path::as_str() is an object relative path expression [1],
@@ -64,12 +59,12 @@ impl DirectoryEntry for FakePackageVariant {
         // [1] https://fuchsia.dev/fuchsia-src/concepts/process/namespaces?hl=en#object_relative_path_expressions
         let canonical_path = path.as_ref().strip_suffix("/").unwrap_or_else(|| path.as_ref());
 
-        if canonical_path == "meta" && open_as_file(flags, mode) {
+        if canonical_path == "meta" && open_as_file(flags) {
             let meta_file = Arc::clone(&self.meta_file);
-            meta_file.open(scope, flags, mode, vfs::path::Path::dot(), server_end);
+            meta_file.open(scope, flags, vfs::path::Path::dot(), server_end);
         } else {
             let dir = Arc::clone(&self.dir);
-            dir.open(scope, flags, mode, path, server_end);
+            dir.open(scope, flags, path, server_end);
         }
     }
 
@@ -92,7 +87,6 @@ async fn serve_fake_filesystem(
     root.open(
         fs_scope.clone(),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        0,
         vfs::path::Path::dot(),
         ServerEnd::new(handles.outgoing_dir.into_channel()),
     );

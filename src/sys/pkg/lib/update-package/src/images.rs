@@ -692,7 +692,6 @@ mod legacy_tests {
         dir.open(
             scope,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            0,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(proxy_server_end.into_channel()),
         );
@@ -1213,7 +1212,6 @@ mod tests {
         dir.open(
             scope,
             fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            0,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(proxy_server_end.into_channel()),
         );

@@ -22,9 +22,8 @@ use {
 
 /// The type for the callback function used to create new connections to the remote object. The
 /// arguments mirror DirectoryEntry::open.
-pub type RoutingFn = Box<
-    dyn Fn(ExecutionScope, fio::OpenFlags, u32, Path, ServerEnd<fio::NodeMarker>) + Send + Sync,
->;
+pub type RoutingFn =
+    Box<dyn Fn(ExecutionScope, fio::OpenFlags, Path, ServerEnd<fio::NodeMarker>) + Send + Sync>;
 
 /// Create a new [`Remote`] node that forwards requests to the provided [`RoutingFn`]. This routing
 /// function is called once per open request. The dirent type is set to the provided
@@ -47,7 +46,7 @@ pub fn remote_boxed(open: RoutingFn) -> Arc<Remote> {
 /// instead.
 pub fn remote<Open>(open: Open) -> Arc<Remote>
 where
-    Open: Fn(ExecutionScope, fio::OpenFlags, u32, Path, ServerEnd<fio::NodeMarker>)
+    Open: Fn(ExecutionScope, fio::OpenFlags, Path, ServerEnd<fio::NodeMarker>)
         + Send
         + Sync
         + 'static,
@@ -59,8 +58,8 @@ where
 /// effectively handing off the handling of any further requests to the remote fidl server.
 pub fn remote_dir(dir: fio::DirectoryProxy) -> Arc<Remote> {
     remote_boxed_with_type(
-        Box::new(move |_scope, flags, mode, path, server_end| {
-            let _ = dir.open(flags, mode, path.as_ref(), server_end);
+        Box::new(move |_scope, flags, path, server_end| {
+            let _ = dir.open(flags, fio::ModeType::empty(), path.as_ref(), server_end);
         }),
         fio::DirentType::Directory,
     )
@@ -68,7 +67,7 @@ pub fn remote_dir(dir: fio::DirectoryProxy) -> Arc<Remote> {
 
 /// Create a new [`Remote`] node that clones the given node when connected.
 pub fn remote_node(node: fio::NodeProxy) -> Arc<Remote> {
-    remote_boxed(Box::new(move |_scope, flags, _mode, path, server_end| {
+    remote_boxed(Box::new(move |_scope, flags, path, server_end| {
         if !path.is_empty() {
             send_on_open_with_error(flags, server_end, zx::Status::NOT_DIR);
             return;
@@ -90,13 +89,12 @@ impl DirectoryEntry for Remote {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         path: Path,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
         // There is no flag validation to do here. All flags are either handled by the initial
         // connection that forwarded this open request (if it exists) or the remote node.
-        (self.open)(scope, flags, mode, path, server_end);
+        (self.open)(scope, flags, path, server_end);
     }
 
     fn entry_info(&self) -> EntryInfo {

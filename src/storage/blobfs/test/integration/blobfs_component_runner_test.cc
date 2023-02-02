@@ -69,9 +69,9 @@ class BlobfsComponentRunnerTest : public testing::Test {
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(svc_endpoints.status_value() == ZX_OK);
     auto status = fidl::WireCall(root_)->Open(
-        fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable,
-        fuchsia_io::wire::kModeTypeDirectory, "svc",
-        fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel()));
+        fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
+            fuchsia_io::wire::OpenFlags::kDirectory,
+        {}, "svc", fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel()));
     ZX_ASSERT(status.status() == ZX_OK);
     return std::move(svc_endpoints->client);
   }
@@ -80,9 +80,9 @@ class BlobfsComponentRunnerTest : public testing::Test {
     auto root_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ZX_ASSERT(root_endpoints.status_value() == ZX_OK);
     auto status = fidl::WireCall(root_)->Open(
-        fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable,
-        fuchsia_io::wire::kModeTypeDirectory, "root",
-        fidl::ServerEnd<fuchsia_io::Node>(root_endpoints->server.TakeChannel()));
+        fuchsia_io::wire::OpenFlags::kRightReadable | fuchsia_io::wire::OpenFlags::kRightWritable |
+            fuchsia_io::wire::OpenFlags::kDirectory,
+        {}, "root", fidl::ServerEnd<fuchsia_io::Node>(root_endpoints->server.TakeChannel()));
     ZX_ASSERT(status.status() == ZX_OK);
     return std::move(root_endpoints->client);
   }

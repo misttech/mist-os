@@ -63,7 +63,7 @@ class DirConnection : public gtest::RealLoopFixture {
   void AssertOpenPathImpl(std::string caller_file, int caller_line,
                           fuchsia::io::DirectorySyncPtr& dir_ptr, const std::string& path,
                           ::fidl::SynchronousInterfacePtr<T>& out_sync_ptr,
-                          fuchsia::io::OpenFlags flags, uint32_t mode = 0,
+                          fuchsia::io::OpenFlags flags, fuchsia::io::ModeType mode = {},
                           zx_status_t expected_status = ZX_OK) {
     ::fidl::InterfacePtr<fuchsia::io::Node> node_ptr;
     dir_ptr->Open(flags | fuchsia::io::OpenFlags::DESCRIBE, mode, path, node_ptr.NewRequest());

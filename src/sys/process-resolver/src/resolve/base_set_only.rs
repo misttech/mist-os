@@ -105,8 +105,9 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_EXECUTABLE
+                | fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(server_end.into_channel()),
         );

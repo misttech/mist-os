@@ -388,13 +388,7 @@ impl MockRealmQuery {
 
 // Mock directory structure.
 pub trait Entry {
-    fn open(
-        self: Arc<Self>,
-        flags: fio::OpenFlags,
-        mode: u32,
-        path: &str,
-        object: ServerEnd<fio::NodeMarker>,
-    );
+    fn open(self: Arc<Self>, flags: fio::OpenFlags, path: &str, object: ServerEnd<fio::NodeMarker>);
     fn encode(&self, buf: &mut Vec<u8>);
     fn name(&self) -> String;
 }
@@ -427,11 +421,11 @@ impl MockDir {
         );
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                fio::DirectoryRequest::Open { flags, mode, path, object, .. } => {
-                    self.clone().open(flags, mode, &path, object);
+                fio::DirectoryRequest::Open { flags, mode: _, path, object, .. } => {
+                    self.clone().open(flags, &path, object);
                 }
                 fio::DirectoryRequest::Clone { flags, object, .. } => {
-                    self.clone().open(flags, fio::MODE_TYPE_DIRECTORY, ".", object);
+                    self.clone().open(flags | fio::OpenFlags::DIRECTORY, ".", object);
                 }
                 fio::DirectoryRequest::Rewind { responder, .. } => {
                     self.at_end.store(false, Ordering::Relaxed);
@@ -470,7 +464,6 @@ impl Entry for MockDir {
     fn open(
         self: Arc<Self>,
         flags: fio::OpenFlags,
-        mode: u32,
         path: &str,
         object: ServerEnd<fio::NodeMarker>,
     ) {
@@ -492,7 +485,7 @@ impl Entry for MockDir {
             return;
         }
         if let Some(entry) = self.subdirs.get(segment) {
-            entry.clone().open(flags, mode, path_iter.as_path().to_str().unwrap(), object);
+            entry.clone().open(flags, path_iter.as_path().to_str().unwrap(), object);
         } else {
             send_error(object, Status::NOT_FOUND);
         }
@@ -515,11 +508,10 @@ impl Entry for fio::DirectoryProxy {
     fn open(
         self: Arc<Self>,
         flags: fio::OpenFlags,
-        mode: u32,
         path: &str,
         object: ServerEnd<fio::NodeMarker>,
     ) {
-        let _ = fio::DirectoryProxy::open(&*self, flags, mode, path, object);
+        let _ = fio::DirectoryProxy::open(&*self, flags, fio::ModeType::empty(), path, object);
     }
 
     fn encode(&self, _buf: &mut Vec<u8>) {
@@ -548,7 +540,6 @@ impl Entry for MockFile {
     fn open(
         self: Arc<Self>,
         _flags: fio::OpenFlags,
-        _mode: u32,
         _path: &str,
         _object: ServerEnd<fio::NodeMarker>,
     ) {

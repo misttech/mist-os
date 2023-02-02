@@ -94,9 +94,6 @@ class PrettyPrinter {
   // Displays a clock.
   void DisplayClock(zx_clock_t clock);
 
-  // Display the value of the field mode of fuchsia.io/Directory.Open.
-  void DisplayDirectoryOpenMode(uint32_t value);
-
   // Displays a duration.
   void DisplayDuration(zx_duration_t duration_ns);
 

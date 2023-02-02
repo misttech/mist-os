@@ -346,7 +346,6 @@ mod tests {
             self: Arc<Self>,
             _scope: vfs::execution_scope::ExecutionScope,
             flags: fio::OpenFlags,
-            _mode: u32,
             _path: vfs::path::Path,
             server_end: ServerEnd<fio::NodeMarker>,
         ) {
@@ -377,7 +376,6 @@ mod tests {
         let () = pseudo_dir.open(
             vfs::execution_scope::ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            0,
             vfs::path::Path::dot(),
             ServerEnd::new(server_end.into_channel()),
         );

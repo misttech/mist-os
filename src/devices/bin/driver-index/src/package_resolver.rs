@@ -131,7 +131,6 @@ mod tests {
         packages.open(
             fs_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            0,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );

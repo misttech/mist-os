@@ -292,7 +292,6 @@ async fn get(
                 &package_status,
                 non_static_allow_list,
             )),
-            0,
             vfs::path::Path::dot(),
             dir.into_channel().into(),
         );

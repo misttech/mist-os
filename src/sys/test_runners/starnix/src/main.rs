@@ -50,7 +50,6 @@ async fn main() -> Result<(), Error> {
     outgoing_dir.open(
         execution_scope.clone(),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        0,
         vfs::path::Path::dot(),
         outgoing_dir_server_end,
     );

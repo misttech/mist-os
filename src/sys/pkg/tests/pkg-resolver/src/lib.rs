@@ -585,7 +585,6 @@ where
                         fio::OpenFlags::RIGHT_READABLE
                             | fio::OpenFlags::RIGHT_WRITABLE
                             | fio::OpenFlags::RIGHT_EXECUTABLE,
-                        0,
                         vfs::path::Path::dot(),
                         handles.outgoing_dir.into_channel().into(),
                     );

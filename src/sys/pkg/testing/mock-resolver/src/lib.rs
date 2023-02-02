@@ -66,13 +66,12 @@ impl TestPackage {
 }
 
 // Should roughly be kept in sync with the heuristic under Open in pkgfs/package_directory.go
-fn should_redirect_request_to_merkle_file(path: &str, flags: fio::OpenFlags, mode: u32) -> bool {
-    let mode_file = mode & fio::MODE_TYPE_MASK == fio::MODE_TYPE_FILE;
+fn should_redirect_request_to_merkle_file(path: &str, flags: fio::OpenFlags) -> bool {
     let file_flag = flags.intersects(fio::OpenFlags::NOT_DIRECTORY);
     let dir_flag = flags.intersects(fio::OpenFlags::DIRECTORY);
     let path_flag = flags.intersects(fio::OpenFlags::NODE_REFERENCE);
 
-    let open_as_file = mode_file || file_flag;
+    let open_as_file = file_flag;
     let open_as_directory = dir_flag || path_flag;
 
     path == "meta" && (open_as_file || !open_as_directory)
@@ -90,7 +89,7 @@ pub async fn handle_package_directory_stream(
         backing_dir_proxy
             .open(
                 fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                fio::MODE_TYPE_DIRECTORY,
+                fio::ModeType::empty(),
                 PACKAGE_CONTENTS_PATH,
                 package_contents_dir_server_end,
             )
@@ -113,7 +112,7 @@ pub async fn handle_package_directory_stream(
                         )
                     }
 
-                    if should_redirect_request_to_merkle_file(&path, flags, mode) {
+                    if should_redirect_request_to_merkle_file(&path, flags) {
                         backing_dir_proxy.open(flags, mode, &path, object).unwrap();
                     } else {
                         package_contents_dir_proxy.open(flags, mode, &path, object).unwrap();

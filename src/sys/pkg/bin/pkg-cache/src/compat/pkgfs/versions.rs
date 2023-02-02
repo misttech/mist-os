@@ -111,7 +111,6 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
         self: Arc<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
-        mode: u32,
         mut path: VfsPath,
         server_end: ServerEnd<fio::NodeMarker>,
     ) {
@@ -169,7 +168,6 @@ impl vfs::directory::entry::DirectoryEntry for PkgfsVersions {
                         self.blobfs.clone(),
                         package_hash,
                         flags,
-                        mode,
                         path,
                         server_end,
                     )
@@ -213,7 +211,6 @@ mod tests {
                 Arc::clone(self),
                 ExecutionScope::new(),
                 flags,
-                0,
                 VfsPath::dot(),
                 server_end.into_channel().into(),
             );
@@ -509,7 +506,6 @@ mod tests {
             pkgfs_versions,
             ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE,
-            0,
             VfsPath::dot(),
             server_end.into_channel().into(),
         );

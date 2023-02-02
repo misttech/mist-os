@@ -111,8 +111,7 @@ impl Resolver for RemoteResolver {
         let open_options = OpenResolverOptions {
             // TODO(https://fxbug.dev/101092): change this to empty() once all downstream
             // consumers contain this commit.
-            flags: fio::OpenFlags::RIGHT_READABLE,
-            open_mode: fio::MODE_TYPE_SERVICE,
+            flags: fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY,
             server_chan: &mut server_end.into_channel(),
         };
         route_and_open_capability(

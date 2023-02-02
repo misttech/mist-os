@@ -187,8 +187,7 @@ mod tests {
         let (data_dir, data_server) = zx::Channel::create();
         in_dir.open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             path::Path::validate_and_split("data").unwrap(),
             ServerEnd::<fio::NodeMarker>::new(data_server.into()),
         );
@@ -257,8 +256,9 @@ mod tests {
         let (in_dir_client, in_dir_server) = zx::Channel::create();
         in_dir.open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             path::Path::dot(),
             ServerEnd::<fio::NodeMarker>::new(in_dir_server.into()),
         );
@@ -335,8 +335,9 @@ mod tests {
         let (expose_dir_client, expose_dir_server) = zx::Channel::create();
         expose_dir.open(
             ExecutionScope::new(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
             path::Path::dot(),
             ServerEnd::<fio::NodeMarker>::new(expose_dir_server.into()),
         );

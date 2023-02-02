@@ -70,7 +70,6 @@ impl DerivedConnection for MutableConnection {
         scope: ExecutionScope,
         parent: Arc<dyn DirectoryEntry>,
         flags: fio::OpenFlags,
-        mode: u32,
         name: &str,
         path: &Path,
     ) -> Result<Arc<dyn DirectoryEntry>, zx::Status> {
@@ -78,7 +77,7 @@ impl DerivedConnection for MutableConnection {
             return Err(zx::Status::NOT_FOUND);
         }
 
-        let type_ = NewEntryType::from_flags_and_mode(flags, mode, path.is_dir())?;
+        let type_ = NewEntryType::from_flags(flags, path.is_dir())?;
 
         let entry_constructor = match scope.entry_constructor() {
             None => return Err(zx::Status::NOT_SUPPORTED),
@@ -350,7 +349,6 @@ mod tests {
             self: Arc<Self>,
             _scope: ExecutionScope,
             _flags: fio::OpenFlags,
-            _mode: u32,
             _path: Path,
             _server_end: ServerEnd<fio::NodeMarker>,
         ) {

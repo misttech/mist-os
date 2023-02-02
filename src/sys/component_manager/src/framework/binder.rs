@@ -58,7 +58,6 @@ impl CapabilityProvider for BinderCapabilityProvider {
         self: Box<Self>,
         task_scope: TaskScope,
         _flags: fio::OpenFlags,
-        _open_mode: u32,
         _relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {
@@ -266,7 +265,7 @@ mod tests {
         fixture
             .provider(moniker.clone(), vec!["target"].try_into().unwrap())
             .await
-            .open(task_scope.clone(), fio::OpenFlags::empty(), 0, PathBuf::new(), &mut server_end)
+            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
             .await
             .expect("failed to call open()");
         task_scope.shutdown().await;
@@ -294,7 +293,7 @@ mod tests {
         fixture
             .provider(moniker, AbsoluteMoniker::root())
             .await
-            .open(task_scope.clone(), fio::OpenFlags::empty(), 0, PathBuf::new(), &mut server_end)
+            .open(task_scope.clone(), fio::OpenFlags::empty(), PathBuf::new(), &mut server_end)
             .await
             .expect("failed to call open()");
         task_scope.shutdown().await;

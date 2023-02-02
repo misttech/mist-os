@@ -28,7 +28,7 @@ void ConnectToVirtualAudio(component_testing::RealmRoot& root,
                            fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control>& out) {
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = root.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, 0,
+  zx_status_t status = root.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, {},
                                                         "dev", dev.NewRequest());
   ASSERT_EQ(status, ZX_OK);
 

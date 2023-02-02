@@ -335,23 +335,23 @@ zx_status_t zxio_shutdown(zxio_t* io, zxio_shutdown_options_t options, int16_t* 
   return zio->ops->shutdown(io, options, out_code);
 }
 
-zx_status_t zxio_open(zxio_t* directory, uint32_t flags, uint32_t mode, const char* path,
-                      size_t path_len, zxio_storage_t* storage) {
+zx_status_t zxio_open(zxio_t* directory, uint32_t flags, const char* path, size_t path_len,
+                      zxio_storage_t* storage) {
   if (!zxio_is_valid(directory)) {
     return ZX_ERR_BAD_HANDLE;
   }
   zxio_internal_t* zio = to_internal(directory);
-  return zio->ops->open(directory, flags, mode, path, path_len, storage);
+  return zio->ops->open(directory, flags, path, path_len, storage);
 }
 
-zx_status_t zxio_open_async(zxio_t* directory, uint32_t flags, uint32_t mode, const char* path,
-                            size_t path_len, zx_handle_t request) {
+zx_status_t zxio_open_async(zxio_t* directory, uint32_t flags, const char* path, size_t path_len,
+                            zx_handle_t request) {
   if (!zxio_is_valid(directory)) {
     zx_handle_close(request);
     return ZX_ERR_BAD_HANDLE;
   }
   zxio_internal_t* zio = to_internal(directory);
-  return zio->ops->open_async(directory, flags, mode, path, path_len, request);
+  return zio->ops->open_async(directory, flags, path, path_len, request);
 }
 
 zx_status_t zxio_add_inotify_filter(zxio_t* directory, const char* path, size_t path_len,

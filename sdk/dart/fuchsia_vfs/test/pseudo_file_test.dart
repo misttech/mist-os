@@ -27,8 +27,8 @@ void main() {
       })
       ..proxy = FileProxy();
     expect(
-        file.pseudoFile
-            .connect(openFlags, 0, _getNodeInterfaceRequest(file.proxy)),
+        file.pseudoFile.connect(
+            openFlags, ModeType.$none, _getNodeInterfaceRequest(file.proxy)),
         expectedStatus);
     return file;
   }
@@ -132,31 +132,32 @@ void main() {
       {
         final proxy = FileProxy();
         expect(
-            file.pseudoFile.connect(
-                OpenFlags.truncate, 0, _getNodeInterfaceRequest(proxy)),
+            file.pseudoFile.connect(OpenFlags.truncate, ModeType.$none,
+                _getNodeInterfaceRequest(proxy)),
             ZX.ERR_NOT_SUPPORTED);
       }
 
       {
         final proxy = FileProxy();
         expect(
-            file.pseudoFile.connect(
-                OpenFlags.directory, 0, _getNodeInterfaceRequest(proxy)),
+            file.pseudoFile.connect(OpenFlags.directory, ModeType.$none,
+                _getNodeInterfaceRequest(proxy)),
             ZX.ERR_NOT_DIR);
       }
 
       {
         final proxy = FileProxy();
         expect(
-            file.pseudoFile
-                .connect(OpenFlags.append, 0, _getNodeInterfaceRequest(proxy)),
+            file.pseudoFile.connect(OpenFlags.append, ModeType.$none,
+                _getNodeInterfaceRequest(proxy)),
             ZX.ERR_INVALID_ARGS);
       }
 
       for (final flag in _notAllowedFlags) {
         final proxy = FileProxy();
         expect(
-            file.pseudoFile.connect(flag, 0, _getNodeInterfaceRequest(proxy)),
+            file.pseudoFile
+                .connect(flag, ModeType.$none, _getNodeInterfaceRequest(proxy)),
             ZX.ERR_NOT_SUPPORTED,
             reason: 'for flag: $flag');
       }
@@ -168,56 +169,25 @@ void main() {
       {
         final proxy = FileProxy();
         expect(
-            file.connect(
-                OpenFlags.directory, 0, _getNodeInterfaceRequest(proxy)),
+            file.connect(OpenFlags.directory, ModeType.$none,
+                _getNodeInterfaceRequest(proxy)),
             ZX.ERR_NOT_DIR);
       }
 
       {
         final proxy = FileProxy();
         expect(
-            file.connect(OpenFlags.append, 0, _getNodeInterfaceRequest(proxy)),
+            file.connect(OpenFlags.append, ModeType.$none,
+                _getNodeInterfaceRequest(proxy)),
             ZX.ERR_INVALID_ARGS);
       }
 
       for (final flag in _notAllowedFlags) {
         final proxy = FileProxy();
-        expect(file.connect(flag, 0, _getNodeInterfaceRequest(proxy)),
+        expect(
+            file.connect(flag, ModeType.$none, _getNodeInterfaceRequest(proxy)),
             ZX.ERR_NOT_SUPPORTED,
             reason: 'for flag: $flag');
-      }
-    });
-
-    test('connect file with mode', () async {
-      final file = _createReadWriteFileStub();
-
-      {
-        final proxy = FileProxy();
-        expect(
-            file.connect(OpenFlags.rightReadable | OpenFlags.describe,
-                ~modeTypeFile, _getNodeInterfaceRequest(proxy)),
-            ZX.ERR_INVALID_ARGS);
-
-        await proxy.onOpen.first.then((response) {
-          expect(response.s, ZX.ERR_INVALID_ARGS);
-          expect(response.info, isNull);
-        }).catchError((err) async {
-          fail(err.toString());
-        });
-      }
-
-      {
-        final proxy = FileProxy();
-        expect(
-            file.connect(OpenFlags.rightReadable | OpenFlags.describe,
-                modeTypeFile, _getNodeInterfaceRequest(proxy)),
-            ZX.OK);
-        await proxy.onOpen.first.then((response) {
-          expect(response.s, ZX.OK);
-          expect(response.info, isNotNull);
-        }).catchError((err) async {
-          fail(err.toString());
-        });
       }
     });
 
@@ -227,8 +197,8 @@ void main() {
       final paths = ['', '/', '.', './', './/', './//'];
       for (final path in paths) {
         final proxy = FileProxy();
-        file.open(OpenFlags.rightReadable | OpenFlags.describe, 0, path,
-            _getNodeInterfaceRequest(proxy), OpenFlags.rightReadable);
+        file.open(OpenFlags.rightReadable | OpenFlags.describe, ModeType.$none,
+            path, _getNodeInterfaceRequest(proxy), OpenFlags.rightReadable);
 
         await proxy.onOpen.first.then((response) {
           expect(response.s, ZX.ERR_NOT_DIR);
@@ -262,7 +232,7 @@ void main() {
         expect(
             file.pseudoFile.connect(
                 flags ?? OpenFlags.rightReadable | OpenFlags.rightWritable,
-                0,
+                ModeType.$none,
                 _getNodeInterfaceRequest(file.proxy)),
             ZX.OK);
       }
@@ -388,8 +358,8 @@ void main() {
       for (final flag in flagsToTest) {
         final proxy = FileProxy();
         expect(
-            file.pseudoFile
-                .connect(OpenFlags.$none, 0, _getNodeInterfaceRequest(proxy)),
+            file.pseudoFile.connect(OpenFlags.$none, ModeType.$none,
+                _getNodeInterfaceRequest(proxy)),
             ZX.OK);
 
         final clonedProxy = FileProxy();
@@ -813,8 +783,8 @@ void main() {
 
         final proxy = FileProxy();
         expect(
-            file.pseudoFile.connect(
-                OpenFlags.rightReadable, 0, _getNodeInterfaceRequest(proxy)),
+            file.pseudoFile.connect(OpenFlags.rightReadable, ModeType.$none,
+                _getNodeInterfaceRequest(proxy)),
             ZX.OK);
         await expectLater(
             proxy.resize(3),
@@ -849,7 +819,7 @@ void main() {
                 OpenFlags.rightReadable |
                     OpenFlags.rightWritable |
                     OpenFlags.truncate,
-                0,
+                ModeType.$none,
                 _getNodeInterfaceRequest(proxy)),
             ZX.OK);
 

@@ -38,7 +38,6 @@ pub fn serve_with_options<'a, ServiceObjTy: ServiceObjTrait>(
     dir.open(
         scope,
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        0,
         Path::dot(),
         server_end,
     );

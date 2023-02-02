@@ -304,15 +304,13 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
   ASSERT_OK(root.status_value());
   ASSERT_OK(ConnectClient(std::move(root->server)));
 
-  constexpr uint32_t kOpenMode = 0755;
-
   // Connect to polymorphic node as a directory, by passing |kOpenFlagDirectory|.
   zx::result dc = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(dc.status_value());
   ASSERT_OK(fidl::WireCall(root->client)
                 ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe |
                            fio::wire::OpenFlags::kDirectory,
-                       kOpenMode, fidl::StringView("file_or_dir"), std::move(dc->server))
+                       {}, fidl::StringView("file_or_dir"), std::move(dc->server))
                 .status());
   zx::result<fio::wire::NodeInfoDeprecated> dir_info = GetOnOpenResponse(dc->client);
   ASSERT_OK(dir_info);
@@ -324,7 +322,7 @@ TEST_F(ConnectionTest, NegotiateProtocol) {
   ASSERT_OK(fidl::WireCall(root->client)
                 ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe |
                            fio::wire::OpenFlags::kNotDirectory,
-                       kOpenMode, fidl::StringView("file_or_dir"), std::move(fc->server))
+                       {}, fidl::StringView("file_or_dir"), std::move(fc->server))
                 .status());
   zx::result<fio::wire::NodeInfoDeprecated> file_info = GetOnOpenResponse(fc->client);
   ASSERT_OK(file_info);
@@ -337,7 +335,6 @@ TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
   ASSERT_OK(root.status_value());
   ASSERT_OK(ConnectClient(std::move(root->server)));
 
-  constexpr uint32_t kOpenMode = 0755;
   // Flag combination which should return INVALID_ARGS (see PrevalidateFlags in connection.cc).
   constexpr fio::wire::OpenFlags kInvalidFlagCombo =
       fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kDescribe |
@@ -346,10 +343,10 @@ TEST_F(ConnectionTest, PrevalidateFlagsOpenFailure) {
   zx::result dc = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(dc.status_value());
   // Ensure that invalid flag combination returns INVALID_ARGS.
-  ASSERT_OK(fidl::WireCall(root->client)
-                ->Open(kInvalidFlagCombo, kOpenMode, fidl::StringView("file_or_dir"),
-                       std::move(dc->server))
-                .status());
+  ASSERT_OK(
+      fidl::WireCall(root->client)
+          ->Open(kInvalidFlagCombo, {}, fidl::StringView("file_or_dir"), std::move(dc->server))
+          .status());
   ASSERT_EQ(GetOnOpenResponse(dc->client).status_value(), ZX_ERR_INVALID_ARGS);
 }
 
@@ -409,7 +406,6 @@ TEST_F(ConnectionClosingTest, ClosingChannelImpliesClosingNode) {
   ASSERT_OK(root.status_value());
   ASSERT_OK(ConnectClient(std::move(root->server)));
 
-  constexpr uint32_t kOpenMode = 0755;
   constexpr int kNumActiveClients = 20;
 
   ASSERT_EQ(count_outstanding_open_vnode()->GetOpenCount(), 0);
@@ -420,7 +416,7 @@ TEST_F(ConnectionClosingTest, ClosingChannelImpliesClosingNode) {
     zx::result fc = fidl::CreateEndpoints<fio::Node>();
     ASSERT_OK(fc.status_value());
     ASSERT_OK(fidl::WireCall(root->client)
-                  ->Open(fio::wire::OpenFlags::kRightReadable, kOpenMode,
+                  ->Open(fio::wire::OpenFlags::kRightReadable, {},
                          fidl::StringView("count_outstanding_open_vnode"), std::move(fc->server))
                   .status());
     clients.push_back(std::move(fc->client));

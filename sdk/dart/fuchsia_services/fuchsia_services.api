@@ -309,7 +309,7 @@
           "isLate": false,
           "name": "modeTypeNone",
           "type": "VariableDeclarationImpl",
-          "varType": "int"
+          "varType": "ModeType"
         }
       },
       "name": "incoming.dart",

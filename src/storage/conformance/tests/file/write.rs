@@ -11,13 +11,14 @@ use {
 async fn file_write_with_sufficient_rights() {
     let harness = TestHarness::new().await;
 
-    for file_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+    for file_flags in harness
+        .file_rights
+        .valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY)
+    {
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
         let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-        let file =
-            open_node::<fio::FileMarker>(&test_dir, file_flags, fio::MODE_TYPE_FILE, TEST_FILE)
-                .await;
+        let file = open_node::<fio::FileMarker>(&test_dir, file_flags, TEST_FILE).await;
         let _: u64 = file
             .write("".as_bytes())
             .await
@@ -31,13 +32,14 @@ async fn file_write_with_sufficient_rights() {
 async fn file_write_with_insufficient_rights() {
     let harness = TestHarness::new().await;
 
-    for file_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+    for file_flags in harness
+        .file_rights
+        .valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY)
+    {
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
         let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-        let file =
-            open_node::<fio::FileMarker>(&test_dir, file_flags, fio::MODE_TYPE_FILE, TEST_FILE)
-                .await;
+        let file = open_node::<fio::FileMarker>(&test_dir, file_flags, TEST_FILE).await;
         let result =
             file.write("".as_bytes()).await.expect("write failed").map_err(zx::Status::from_raw);
         assert_eq!(result, Err(zx::Status::BAD_HANDLE))
@@ -48,13 +50,14 @@ async fn file_write_with_insufficient_rights() {
 async fn file_write_at_with_sufficient_rights() {
     let harness = TestHarness::new().await;
 
-    for file_flags in harness.file_rights.valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE) {
+    for file_flags in harness
+        .file_rights
+        .valid_combos_with(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY)
+    {
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
         let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-        let file =
-            open_node::<fio::FileMarker>(&test_dir, file_flags, fio::MODE_TYPE_FILE, TEST_FILE)
-                .await;
+        let file = open_node::<fio::FileMarker>(&test_dir, file_flags, TEST_FILE).await;
         let _: u64 = file
             .write_at("".as_bytes(), 0)
             .await
@@ -67,13 +70,14 @@ async fn file_write_at_with_sufficient_rights() {
 #[fuchsia::test]
 async fn file_write_at_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    for file_flags in harness.file_rights.valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE) {
+    for file_flags in harness
+        .file_rights
+        .valid_combos_without(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::NOT_DIRECTORY)
+    {
         let root = root_directory(vec![file(TEST_FILE, vec![])]);
         let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
-        let file =
-            open_node::<fio::FileMarker>(&test_dir, file_flags, fio::MODE_TYPE_FILE, TEST_FILE)
-                .await;
+        let file = open_node::<fio::FileMarker>(&test_dir, file_flags, TEST_FILE).await;
         let result = file
             .write_at("".as_bytes(), 0)
             .await
@@ -96,8 +100,9 @@ async fn vmo_file_write_to_limits() {
         .get_directory(root, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
     let file = open_node::<fio::FileMarker>(
         &test_dir,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        fio::MODE_TYPE_FILE,
+        fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::NOT_DIRECTORY,
         TEST_FILE,
     )
     .await;

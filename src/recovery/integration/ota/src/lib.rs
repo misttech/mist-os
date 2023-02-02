@@ -195,7 +195,6 @@ async fn route_ssl_certs(
                 out_dir.clone().open(
                     scope.clone(),
                     fio::OpenFlags::RIGHT_READABLE,
-                    0,
                     vfs::path::Path::dot(),
                     handles.outgoing_dir.into_channel().into(),
                 );
@@ -268,7 +267,6 @@ async fn route_config_data(
                 out_dir.clone().open(
                     scope.clone(),
                     fio::OpenFlags::RIGHT_READABLE,
-                    0,
                     vfs::path::Path::dot(),
                     handles.outgoing_dir.into_channel().into(),
                 );

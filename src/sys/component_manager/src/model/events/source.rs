@@ -147,7 +147,6 @@ impl CapabilityProvider for EventSource {
         mut self: Box<Self>,
         _task_scope: TaskScope,
         _flags: fio::OpenFlags,
-        _open_mode: u32,
         relative_path: PathBuf,
         server_end: &mut zx::Channel,
     ) -> Result<(), ModelError> {

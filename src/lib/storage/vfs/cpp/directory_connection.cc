@@ -23,6 +23,8 @@
 
 #include <fbl/string_buffer.h>
 
+#include "fidl/fuchsia.io/cpp/common_types.h"
+#include "fidl/fuchsia.io/cpp/wire_types.h"
 #include "src/lib/storage/vfs/cpp/advisory_lock.h"
 #include "src/lib/storage/vfs/cpp/debug.h"
 #include "src/lib/storage/vfs/cpp/vfs_types.h"
@@ -37,9 +39,9 @@ namespace {
 // Performs a path walk and opens a connection to another node.
 void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
             fidl::ServerEnd<fio::Node> server_end, std::string_view path,
-            VnodeConnectionOptions options, Rights parent_rights, uint32_t mode) {
-  vfs->Open(parent, path, options, parent_rights, mode)
-      .visit([vfs, &server_end, options, mode](auto&& result) {
+            VnodeConnectionOptions options, Rights parent_rights) {
+  vfs->Open(parent, path, options, parent_rights, 0)
+      .visit([vfs, &server_end, options](auto&& result) {
         using ResultT = std::decay_t<decltype(result)>;
         using OpenResult = fs::Vfs::OpenResult;
         if constexpr (std::is_same_v<ResultT, OpenResult::Error>) {
@@ -55,7 +57,7 @@ void OpenAt(FuchsiaVfs* vfs, const fbl::RefPtr<Vnode>& parent,
 
           // Ignore errors since there is nothing we can do if this fails.
           [[maybe_unused]] const zx_status_t status =
-              vn->OpenRemote(options.ToIoV1Flags(), mode, fidl::StringView::FromExternal(path),
+              vn->OpenRemote(options.ToIoV1Flags(), {}, fidl::StringView::FromExternal(path),
                              std::move(server_end));
         } else if constexpr (std::is_same_v<ResultT, OpenResult::Ok>) {
           // |Vfs::Open| already performs option validation for us.
@@ -223,20 +225,11 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
     return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
   }
 
-  uint32_t mode = request->mode;
-  const uint32_t mode_type = mode & fio::wire::kModeTypeMask;
-  if (mode_type == 0) {
-    if (open_options.flags.directory) {
-      mode |= fio::wire::kModeTypeDirectory;
-    }
-  } else {
-    if (open_options.flags.directory && mode_type != fio::wire::kModeTypeDirectory) {
-      return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
-    }
-
-    if (open_options.flags.not_directory && mode_type == fio::wire::kModeTypeDirectory) {
-      return write_error(std::move(request->object), ZX_ERR_INVALID_ARGS);
-    }
+  // Temporarily allow clients that send POSIX modes when creating directories to succeed.
+  //
+  // TODO(https://fxbug.dev/120673): Remove this when all downstream consumers contain this commit.
+  if (S_ISDIR(static_cast<uint32_t>(request->mode))) {
+    open_options.set_directory();
   }
 
   FS_PRETTY_TRACE_DEBUG("[DirectoryOpen] our options: ", options(),
@@ -253,7 +246,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   if (status != ZX_OK) {
     return write_error(std::move(request->object), status);
   }
-  OpenAt(vfs(), vnode(), std::move(request->object), path, open_options, options().rights, mode);
+  OpenAt(vfs(), vnode(), std::move(request->object), path, open_options, options().rights);
 }
 
 void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) {

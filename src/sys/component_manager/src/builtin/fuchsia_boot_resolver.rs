@@ -419,7 +419,6 @@ mod tests {
         root.open(
             fs_scope.clone(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-            0,
             vfs::path::Path::dot(),
             ServerEnd::new(server.into_channel()),
         );

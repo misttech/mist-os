@@ -38,13 +38,12 @@ fidl::ClientEnd<fio::Directory> CreateDirectory(fio::wire::OpenFlags dir_flags,
 
 zx_status_t OpenFileWithCreate(const fidl::ClientEnd<fio::Directory>& dir,
                                const std::string& path) {
-  fio::wire::OpenFlags child_flags = fio::wire::OpenFlags::kCreate |
-                                     fio::wire::OpenFlags::kRightReadable |
-                                     fio::wire::OpenFlags::kDescribe;
+  fio::wire::OpenFlags child_flags =
+      fio::wire::OpenFlags::kCreate | fio::wire::OpenFlags::kRightReadable |
+      fio::wire::OpenFlags::kNotDirectory | fio::wire::OpenFlags::kDescribe;
   auto child_endpoints = fidl::CreateEndpoints<fio::Node>();
   EXPECT_EQ(child_endpoints.status_value(), ZX_OK);
-  auto open_res = fidl::WireCall(dir)->Open(child_flags, fio::wire::kModeTypeFile,
-                                            fidl::StringView::FromExternal(path),
+  auto open_res = fidl::WireCall(dir)->Open(child_flags, {}, fidl::StringView::FromExternal(path),
                                             std::move(child_endpoints->server));
   EXPECT_EQ(open_res.status(), ZX_OK);
   fidl::WireSyncClient child{std::move(child_endpoints->client)};
@@ -91,11 +90,10 @@ TEST_P(OpenTest, OpenFileWithCreateCreatesInReadWriteDirPosixOpen) {
 
   flags = fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kPosixWritable |
           fio::wire::OpenFlags::kDirectory;
-  uint32_t mode = fio::wire::kModeTypeDirectory;
   std::string path = ".";
   auto clone_endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_EQ(clone_endpoints.status_value(), ZX_OK);
-  auto clone_res = fidl::WireCall(parent)->Open(flags, mode, fidl::StringView::FromExternal(path),
+  auto clone_res = fidl::WireCall(parent)->Open(flags, {}, fidl::StringView::FromExternal(path),
                                                 std::move(clone_endpoints->server));
   ASSERT_EQ(clone_res.status(), ZX_OK);
   fidl::ClientEnd<fio::Directory> clone_dir(clone_endpoints->client.TakeChannel());
@@ -109,11 +107,10 @@ TEST_P(OpenTest, OpenFileWithCreateFailsInReadOnlyDirPosixOpen) {
 
   flags = fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kPosixWritable |
           fio::wire::OpenFlags::kDirectory;
-  uint32_t mode = fio::wire::kModeTypeDirectory;
   std::string path = ".";
   auto clone_endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_EQ(clone_endpoints.status_value(), ZX_OK);
-  auto clone_res = fidl::WireCall(parent)->Open(flags, mode, fidl::StringView::FromExternal(path),
+  auto clone_res = fidl::WireCall(parent)->Open(flags, {}, fidl::StringView::FromExternal(path),
                                                 std::move(clone_endpoints->server));
   ASSERT_EQ(clone_res.status(), ZX_OK);
   fidl::ClientEnd<fio::Directory> clone_dir(clone_endpoints->client.TakeChannel());

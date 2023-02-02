@@ -400,8 +400,8 @@ ZXIO_EXPORT zx_status_t zxio_shutdown(zxio_t* io, zxio_shutdown_options_t option
 // This call blocks on the remote server.
 //
 // See fuchsia.io for the available |flags| and |mode|.
-ZXIO_EXPORT zx_status_t zxio_open(zxio_t* directory, uint32_t flags, uint32_t mode,
-                                  const char* path, size_t path_len, zxio_storage_t* storage);
+ZXIO_EXPORT zx_status_t zxio_open(zxio_t* directory, uint32_t flags, const char* path,
+                                  size_t path_len, zxio_storage_t* storage);
 
 // Open a new object relative to the given |directory|.
 //
@@ -413,9 +413,9 @@ ZXIO_EXPORT zx_status_t zxio_open(zxio_t* directory, uint32_t flags, uint32_t mo
 // connection can be wrapped in a zxio object by calling
 // zxio_create_with_on_open().
 //
-// See fuchsia.io for the available |flags| and |mode|.
-ZXIO_EXPORT zx_status_t zxio_open_async(zxio_t* directory, uint32_t flags, uint32_t mode,
-                                        const char* path, size_t path_len, zx_handle_t request);
+// See fuchsia.io for the available |flags|.
+ZXIO_EXPORT zx_status_t zxio_open_async(zxio_t* directory, uint32_t flags, const char* path,
+                                        size_t path_len, zx_handle_t request);
 
 // Adds a inotify filter on a file/directory relative to the given |directory|.
 // The events on server side are communicated to the client via |socket|.

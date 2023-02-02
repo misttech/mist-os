@@ -110,7 +110,7 @@ async fn data_reformatted_when_corrupt() {
     let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
     fixture
         .dir("data")
-        .open(fio::OpenFlags::RIGHT_READABLE, 0, "foo", server)
+        .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "foo", server)
         .expect("open failed");
     file.get_attr().await.expect_err("foo shouldn't exist");
 

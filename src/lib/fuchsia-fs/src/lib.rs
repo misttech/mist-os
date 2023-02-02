@@ -25,16 +25,6 @@ pub fn canonicalize_path(path: &str) -> &str {
     path
 }
 
-pub trait DefaultForFxbug120673Transition {
-    fn default() -> Self;
-}
-
-impl DefaultForFxbug120673Transition for u32 {
-    fn default() -> Self {
-        0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
@@ -119,8 +109,7 @@ mod tests {
         let scope = ExecutionScope::new();
         example_dir.open(
             scope,
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
-            fio::MODE_TYPE_DIRECTORY,
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE | OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(example_dir_service.into_channel()),
         );

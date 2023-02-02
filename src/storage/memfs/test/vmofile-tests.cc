@@ -84,7 +84,7 @@ TEST(VmofileTests, test_vmofile_basic) {
   zx::result node_endpoints = fidl::CreateEndpoints<fio::Node>();
   ASSERT_OK(node_endpoints.status_value());
   auto open_result = fidl::WireCall(directory_endpoints->client)
-                         ->Open(fio::wire::OpenFlags::kRightReadable, 0,
+                         ->Open(fio::wire::OpenFlags::kRightReadable, {},
                                 fidl::StringView("greeting"), std::move(node_endpoints->server));
   ASSERT_OK(open_result.status());
   fidl::ClientEnd<fio::File> file(node_endpoints->client.TakeChannel());
@@ -186,7 +186,7 @@ TEST(VmofileTests, test_vmofile_exec) {
   ASSERT_OK(node_endpoints.status_value());
   auto open_result =
       fidl::WireCall(directory_endpoints->client)
-          ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable, 0,
+          ->Open(fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable, {},
                  fidl::StringView("read_exec"), std::move(node_endpoints->server));
   ASSERT_OK(open_result.status());
   fidl::ClientEnd<fio::File> file(node_endpoints->client.TakeChannel());

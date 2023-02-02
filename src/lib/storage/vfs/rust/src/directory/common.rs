@@ -74,25 +74,7 @@ pub fn new_connection_validate_flags(
 pub fn check_child_connection_flags(
     parent_flags: fio::OpenFlags,
     mut flags: fio::OpenFlags,
-    mut mode: u32,
-) -> Result<(fio::OpenFlags, u32), zx::Status> {
-    let mode_type = mode & fio::MODE_TYPE_MASK;
-
-    if mode_type == 0 {
-        if flags.intersects(fio::OpenFlags::DIRECTORY) {
-            mode |= fio::MODE_TYPE_DIRECTORY;
-        }
-    } else {
-        if flags.intersects(fio::OpenFlags::DIRECTORY) && mode_type != fio::MODE_TYPE_DIRECTORY {
-            return Err(zx::Status::INVALID_ARGS);
-        }
-
-        if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) && mode_type == fio::MODE_TYPE_DIRECTORY
-        {
-            return Err(zx::Status::INVALID_ARGS);
-        }
-    }
-
+) -> Result<fio::OpenFlags, zx::Status> {
     if flags & (fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DIRECTORY)
         == fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DIRECTORY
     {
@@ -127,7 +109,7 @@ pub fn check_child_connection_flags(
     }
 
     if stricter_or_same_rights(parent_flags, flags) {
-        Ok((flags, mode))
+        Ok(flags)
     } else {
         Err(zx::Status::ACCESS_DENIED)
     }
@@ -281,28 +263,26 @@ mod tests {
 
     #[test]
     fn check_child_connection_flags_create_flags() {
-        assert!(check_child_connection_flags(
-            fio::OpenFlags::RIGHT_WRITABLE,
-            fio::OpenFlags::CREATE,
-            0
-        )
-        .is_ok());
-        assert!(check_child_connection_flags(
-            fio::OpenFlags::RIGHT_WRITABLE,
-            fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT,
-            0
-        )
-        .is_ok());
+        assert_eq!(
+            check_child_connection_flags(fio::OpenFlags::RIGHT_WRITABLE, fio::OpenFlags::CREATE,),
+            Ok(fio::OpenFlags::CREATE)
+        );
+        assert_eq!(
+            check_child_connection_flags(
+                fio::OpenFlags::RIGHT_WRITABLE,
+                fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT,
+            ),
+            Ok(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT)
+        );
 
         assert_eq!(
-            check_child_connection_flags(fio::OpenFlags::empty(), fio::OpenFlags::CREATE, 0),
+            check_child_connection_flags(fio::OpenFlags::empty(), fio::OpenFlags::CREATE),
             Err(zx::Status::ACCESS_DENIED),
         );
         assert_eq!(
             check_child_connection_flags(
                 fio::OpenFlags::empty(),
                 fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT,
-                0
             ),
             Err(zx::Status::ACCESS_DENIED),
         );
@@ -312,36 +292,6 @@ mod tests {
             check_child_connection_flags(
                 fio::OpenFlags::RIGHT_WRITABLE,
                 fio::OpenFlags::CREATE_IF_ABSENT,
-                0
-            ),
-            Err(zx::Status::INVALID_ARGS),
-        );
-    }
-
-    #[test]
-    fn check_child_connection_flags_mode() {
-        // If mode is 0 but we specify OPEN_FLAG_DIRECTORY, ensure the resulting mode is correct.
-        assert_eq!(
-            check_child_connection_flags(fio::OpenFlags::empty(), fio::OpenFlags::DIRECTORY, 0)
-                .expect("check_child_connection_flags failed")
-                .1,
-            fio::MODE_TYPE_DIRECTORY
-        );
-
-        // Ensure that ambiguous flags/mode types are handled correctly.
-        assert_eq!(
-            check_child_connection_flags(
-                fio::OpenFlags::empty(),
-                fio::OpenFlags::NOT_DIRECTORY,
-                fio::MODE_TYPE_DIRECTORY
-            ),
-            Err(zx::Status::INVALID_ARGS),
-        );
-        assert_eq!(
-            check_child_connection_flags(
-                fio::OpenFlags::empty(),
-                fio::OpenFlags::DIRECTORY,
-                fio::MODE_TYPE_FILE
             ),
             Err(zx::Status::INVALID_ARGS),
         );
@@ -354,7 +304,6 @@ mod tests {
             check_child_connection_flags(
                 fio::OpenFlags::empty(),
                 fio::OpenFlags::DIRECTORY | fio::OpenFlags::NOT_DIRECTORY,
-                0
             ),
             Err(zx::Status::INVALID_ARGS),
         );
@@ -364,7 +313,6 @@ mod tests {
             check_child_connection_flags(
                 fio::OpenFlags::empty(),
                 fio::OpenFlags::CLONE_SAME_RIGHTS,
-                0
             ),
             Err(zx::Status::INVALID_ARGS),
         );

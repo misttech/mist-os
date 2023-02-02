@@ -211,7 +211,7 @@ zx_status_t Devnode::VnodeImpl::RemoteNode::GetNodeInfoForProtocol(fs::VnodeProt
 
 bool Devnode::VnodeImpl::RemoteNode::IsRemote() const { return true; }
 
-zx_status_t Devnode::VnodeImpl::RemoteNode::OpenRemote(fio::OpenFlags flags, uint32_t mode,
+zx_status_t Devnode::VnodeImpl::RemoteNode::OpenRemote(fio::OpenFlags flags, fio::ModeType mode,
                                                        fidl::StringView path,
                                                        fidl::ServerEnd<fio::Node> object) const {
   ZX_ASSERT_MSG(path.get() == ".", "unexpected path to remote '%.*s'",
