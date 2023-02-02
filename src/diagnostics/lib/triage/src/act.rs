@@ -5,6 +5,8 @@
 #[cfg(target_os = "fuchsia")]
 use tracing::{error, warn};
 
+use crate::config::ActionConfig;
+
 use {
     super::{
         config::DiagnosticData,
@@ -157,42 +159,41 @@ pub enum Action {
     Snapshot(Snapshot),
 }
 
-impl<'de> Deserialize<'de> for Action {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        /// TODO(fxbug.dev/73441): `Warning` will be deprecated once all config files use `Alert`
-        #[derive(Debug, Deserialize)]
-        struct DeWarning {
-            /// A wrapped expression to evaluate which determines if this action triggers.
-            pub trigger: ValueSource,
-            /// What to print if trigger is true.
-            pub print: String,
-            /// Describes where bugs should be filed if this action triggers.
-            pub file_bug: Option<String>,
-            /// An optional tag to associate with this Action.
-            pub tag: Option<String>,
-        }
-
-        #[derive(Debug, Deserialize)]
-        #[serde(tag = "type")]
-        enum DeAction {
-            Alert(Alert),
-            Warning(DeWarning),
-            Gauge(Gauge),
-            Snapshot(Snapshot),
-        }
-
-        Ok(match DeAction::deserialize(deserializer)? {
-            DeAction::Warning(warning) => {
-                let DeWarning { trigger, print, file_bug, tag } = warning;
-                Action::Alert(Alert { trigger, print, file_bug, tag, severity: Severity::Warning })
+impl Action {
+    pub fn from_config_with_namespace(
+        action_config: ActionConfig,
+        namespace: &str,
+    ) -> Result<Action, anyhow::Error> {
+        let action = match action_config {
+            ActionConfig::Alert { trigger, print, file_bug, tag, severity } => {
+                Action::Alert(Alert {
+                    trigger: ValueSource::try_from_expression_with_namespace(&trigger, namespace)?,
+                    print,
+                    file_bug,
+                    tag,
+                    severity,
+                })
             }
-            DeAction::Alert(alert) => Action::Alert(alert),
-            DeAction::Gauge(gauge) => Action::Gauge(gauge),
-            DeAction::Snapshot(snapshot) => Action::Snapshot(snapshot),
-        })
+            ActionConfig::Warning { trigger, print, file_bug, tag } => Action::Alert(Alert {
+                trigger: ValueSource::try_from_expression_with_namespace(&trigger, namespace)?,
+                print,
+                file_bug,
+                tag,
+                /// TODO(fxbug.dev/73441): `Warning` will be deprecated once all config files use `Alert`
+                severity: Severity::Warning,
+            }),
+            ActionConfig::Gauge { value, format, tag } => Action::Gauge(Gauge {
+                value: ValueSource::try_from_expression_with_namespace(&value, namespace)?,
+                format,
+                tag,
+            }),
+            ActionConfig::Snapshot { trigger, repeat, signature } => Action::Snapshot(Snapshot {
+                trigger: ValueSource::try_from_expression_with_namespace(&trigger, namespace)?,
+                repeat: ValueSource::try_from_expression_with_namespace(&repeat, namespace)?,
+                signature,
+            }),
+        };
+        Ok(action)
     }
 }
 
@@ -204,52 +205,51 @@ pub enum Severity {
     Error,
 }
 
-pub(crate) fn validate_actions(actions: &ActionsSchema) -> Result<(), Error> {
-    for (action_name, action) in actions {
-        match action {
-            // Make sure the snapshot signature isn't too long.
-            Action::Snapshot(snapshot) => {
-                if snapshot.signature.len() > MAX_CRASH_SIGNATURE_LENGTH as usize {
-                    bail!("Signature too long in {}", action_name);
-                }
-                // Make sure repeat is a const int expression (cache the value if so)
-                match &snapshot.repeat.metric {
-                    Metric::Eval(repeat_expression) => {
-                        let repeat_value = MetricState::evaluate_const_expression(
-                            &repeat_expression.parsed_expression,
+pub(crate) fn validate_action(
+    action_name: &str,
+    action_config: &ActionConfig,
+    namespace: &str,
+) -> Result<(), Error> {
+    match action_config {
+        // Make sure the snapshot signature isn't too long.
+        ActionConfig::Snapshot { signature, repeat, .. } => {
+            if signature.len() > MAX_CRASH_SIGNATURE_LENGTH as usize {
+                bail!("Signature too long in {}", action_name);
+            }
+            let repeat = ValueSource::try_from_expression_with_namespace(&repeat, namespace)?;
+            // Make sure repeat is a const int expression (cache the value if so)
+            match repeat.metric {
+                Metric::Eval(repeat_expression) => {
+                    let repeat_value = MetricState::evaluate_const_expression(
+                        &repeat_expression.parsed_expression,
+                    );
+                    if let MetricValue::Int(repeat_int) = repeat_value {
+                        repeat.cached_value.borrow_mut().replace(MetricValue::Int(repeat_int));
+                    } else {
+                        bail!(
+                            "Snapshot {} repeat expression '{}' must evaluate to int, not {:?}",
+                            action_name,
+                            repeat_expression.raw_expression,
+                            repeat_value
                         );
-                        if let MetricValue::Int(repeat_int) = repeat_value {
-                            snapshot
-                                .repeat
-                                .cached_value
-                                .borrow_mut()
-                                .replace(MetricValue::Int(repeat_int));
-                        } else {
-                            bail!(
-                                "Snapshot {} repeat expression '{}' must evaluate to int, not {:?}",
-                                action_name,
-                                repeat_expression.raw_expression,
-                                repeat_value
-                            );
-                        }
                     }
-                    _ => unreachable!("ValueSource::try_from() only produces an Eval"),
                 }
+                _ => unreachable!("ValueSource::try_from() only produces an Eval"),
             }
-            // Make sure Error-level alerts have a file_bug field.
-            Action::Alert(alert) => {
-                if alert.severity == Severity::Error && alert.file_bug == None {
-                    bail!("Error severity requires file_bug field in {}", action_name);
-                }
-            }
-            _ => {}
         }
+        // Make sure Error-level alerts have a file_bug field.
+        ActionConfig::Alert { severity, file_bug, .. } => {
+            if *severity == Severity::Error && file_bug.is_none() {
+                bail!("Error severity requires file_bug field in {}", action_name);
+            }
+        }
+        _ => {}
     }
     Ok(())
 }
 
 /// Action that is triggered if a predicate is met.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct Alert {
     /// A wrapped expression to evaluate which determines if this action triggers.
     pub trigger: ValueSource,
@@ -264,18 +264,8 @@ pub struct Alert {
     pub severity: Severity,
 }
 
-impl<'de> Deserialize<'de> for ValueSource {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        Ok(ValueSource::try_from_expression(&String::deserialize(deserializer)?)
-            .map_err(serde::de::Error::custom)?)
-    }
-}
-
 /// Action that displays percentage of value.
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct Gauge {
     /// Value to surface.
     pub value: ValueSource,
@@ -286,7 +276,7 @@ pub struct Gauge {
 }
 
 /// Action that displays percentage of value.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, PartialEq)]
 pub struct Snapshot {
     /// Take snapshot when this is true.
     pub trigger: ValueSource,
@@ -559,7 +549,7 @@ mod test {
             metrics::{ExpressionContext, Metric, Metrics, ValueSource},
         },
         anyhow::Error,
-        std::{cell::RefCell, convert::TryFrom},
+        std::cell::RefCell,
     };
 
     /// Tells whether any of the stored values include a substring.
@@ -589,7 +579,7 @@ mod test {
         action_file.insert(
             "do_true".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("true").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true", "file").unwrap(),
                 print: "True was fired".to_string(),
                 file_bug: Some("Some>Monorail>Component".to_string()),
                 tag: None,
@@ -599,7 +589,7 @@ mod test {
         action_file.insert(
             "do_false".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("false").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("false", "file").unwrap(),
                 print: "False was fired".to_string(),
                 file_bug: None,
                 tag: None,
@@ -609,7 +599,8 @@ mod test {
         action_file.insert(
             "do_true_array".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("true_array").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true_array", "file")
+                    .unwrap(),
                 print: "True array was fired".to_string(),
                 file_bug: None,
                 tag: None,
@@ -619,7 +610,8 @@ mod test {
         action_file.insert(
             "do_false_array".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("false_array").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("false_array", "file")
+                    .unwrap(),
                 print: "False array was fired".to_string(),
                 file_bug: None,
                 tag: None,
@@ -630,7 +622,7 @@ mod test {
         action_file.insert(
             "do_operation".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("0 < 10").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("0 < 10", "file").unwrap(),
                 print: "Inequality triggered".to_string(),
                 file_bug: None,
                 tag: None,
@@ -672,7 +664,8 @@ mod test {
                 action_file.insert(
                     $name.to_string(),
                     Action::Gauge(Gauge {
-                        value: ValueSource::try_from_expression($name).unwrap(),
+                        value: ValueSource::try_from_expression_with_namespace($name, "file")
+                            .unwrap(),
                         format: $format,
                         tag: None,
                     }),
@@ -749,7 +742,8 @@ mod test {
         action_file.insert(
             "time_1234".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("Now() == 1234").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("Now() == 1234", "file")
+                    .unwrap(),
                 print: "1234".to_string(),
                 tag: None,
                 file_bug: None,
@@ -759,7 +753,8 @@ mod test {
         action_file.insert(
             "time_missing".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("Problem(Now())").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("Problem(Now())", "file")
+                    .unwrap(),
                 print: "missing".to_string(),
                 tag: None,
                 file_bug: None,
@@ -787,14 +782,16 @@ mod test {
         let actions = Actions::new();
         let data = vec![];
         let mut action_context = ActionContext::new(&metrics, &actions, &data, None);
-        let true_value = ValueSource::try_from_expression("1==1")?;
-        let false_value = ValueSource::try_from_expression("1==2")?;
+        let true_value = ValueSource::try_from_expression_with_default_namespace("1==1")?;
+        let false_value = ValueSource::try_from_expression_with_default_namespace("1==2")?;
         let five_value = ValueSource {
-            metric: Metric::Eval(ExpressionContext::try_from("5".to_string())?),
+            metric: Metric::Eval(ExpressionContext::try_from_expression_with_default_namespace(
+                "5",
+            )?),
             cached_value: RefCell::new(Some(MetricValue::Int(5))),
         };
-        let foo_value = ValueSource::try_from_expression("'foo'")?;
-        let missing_value = ValueSource::try_from_expression("foo")?;
+        let foo_value = ValueSource::try_from_expression_with_default_namespace("'foo'")?;
+        let missing_value = ValueSource::try_from_expression_with_default_namespace("foo")?;
         let snapshot_5_sig = SnapshotTrigger { interval: 5, signature: "signature".to_string() };
         // Tester re-uses the same action_context, so results will accumulate.
         macro_rules! tester {
@@ -851,7 +848,7 @@ mod test {
         action_file.insert(
             "true_warning".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("true").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true", "file").unwrap(),
                 print: "True was fired".to_string(),
                 file_bug: None,
                 tag: None,
@@ -861,7 +858,7 @@ mod test {
         action_file.insert(
             "false_gauge".to_string(),
             Action::Gauge(Gauge {
-                value: ValueSource::try_from_expression("false").unwrap(),
+                value: ValueSource::try_from_expression_with_namespace("false", "file").unwrap(),
                 format: None,
                 tag: None,
             }),
@@ -869,9 +866,12 @@ mod test {
         action_file.insert(
             "true_snapshot".to_string(),
             Action::Snapshot(Snapshot {
-                trigger: ValueSource::try_from_expression("true").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true", "file").unwrap(),
                 repeat: ValueSource {
-                    metric: Metric::Eval(ExpressionContext::try_from("five".to_string()).unwrap()),
+                    metric: Metric::Eval(
+                        ExpressionContext::try_from_expression_with_namespace("five", "file")
+                            .unwrap(),
+                    ),
                     cached_value: RefCell::new(Some(MetricValue::Int(5))),
                 },
                 signature: "signature".to_string(),
@@ -880,8 +880,8 @@ mod test {
         action_file.insert(
             "test_snapshot".to_string(),
             Action::Snapshot(Snapshot {
-                trigger: ValueSource::try_from_expression("true").unwrap(),
-                repeat: ValueSource::try_from_expression("five").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true", "file").unwrap(),
+                repeat: ValueSource::try_from_expression_with_namespace("five", "file").unwrap(),
                 signature: "signature".to_string(),
             }),
         );

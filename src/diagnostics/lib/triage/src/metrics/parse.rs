@@ -390,8 +390,8 @@ fn expression_top<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree
 
 // Parses a given string into either an Error or an Expression ready
 // to be evaluated.
-pub(crate) fn parse_expression(i: &str) -> Result<ExpressionTree, Error> {
-    let ctx = ParsingContext::new(i);
+pub(crate) fn parse_expression(i: &str, namespace: &str) -> Result<ExpressionTree, Error> {
+    let ctx = ParsingContext::new(i, namespace);
     let match_whole = all_consuming(terminated(expression_top, whitespace));
     match match_whole(ctx) {
         Err(Err::Error(e)) | Err(Err::Failure(e)) => {
@@ -460,7 +460,7 @@ mod test {
 
     macro_rules! get_parse {
         ($fn:expr, $string:expr) => {
-            simplify_fn($string, $fn(ParsingContext::new($string)))
+            simplify_fn($string, $fn(ParsingContext::new($string, /*namespace= */ "")))
         };
     }
 
@@ -802,7 +802,7 @@ mod test {
     #[fuchsia::test]
     fn parser_comparisons() -> Result<(), Error> {
         assert_eq!(
-            format!("{:?}", parse_expression("2>1")),
+            format!("{:?}", parse_expression("2>1", /*namespace= */ "")),
             "Ok(Function(Math(Greater), [Value(Int(2)), Value(Int(1))]))"
         );
         assert_eq!(eval!("2>2"), MetricValue::Bool(false));
@@ -822,14 +822,14 @@ mod test {
         assert_eq!(eval!(r#"'a'=="a""#), MetricValue::Bool(true));
 
         // There can be only one.
-        assert!(parse_expression("2==2==2").is_err());
+        assert!(parse_expression("2==2==2", /* namespace= */ "").is_err());
         Ok(())
     }
 
     #[fuchsia::test]
     fn parser_boolean_functions_value() -> Result<(), Error> {
         assert_eq!(
-            format!("{:?}", parse_expression("Not(2>1)")),
+            format!("{:?}", parse_expression("Not(2>1)", /* namespace= */ "")),
             "Ok(Function(Not, [Function(Math(Greater), [Value(Int(2)), Value(Int(1))])]))"
         );
         assert_eq!(eval!("And(2>1, 2>2)"), MetricValue::Bool(false));
@@ -995,14 +995,15 @@ mod test {
 
     #[fuchsia::test]
     fn test_now() -> Result<(), Error> {
-        let now_expression = parse_expression("Now()")?;
+        let now_expression = parse_expression("Now()", /* namespace= */ "")?;
         let values = HashMap::new();
         let fetcher = Fetcher::TrialData(TrialDataFetcher::new(&values));
         let files = HashMap::new();
         let state = MetricState::new(&files, fetcher, Some(2000));
 
         let time = state.evaluate_expression(&now_expression);
-        let no_time = state.evaluate_expression(&parse_expression("Now(5)")?);
+        let no_time =
+            state.evaluate_expression(&parse_expression("Now(5)", /* namespace= */ "")?);
         assert_eq!(time, i(2000));
         assert_problem!(no_time, "SyntaxError: Now() requires no operands.");
         Ok(())

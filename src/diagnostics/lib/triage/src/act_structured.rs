@@ -192,7 +192,7 @@ mod test {
             make_metrics,
             metrics::{ExpressionContext, Metric, ValueSource},
         },
-        std::{cell::RefCell, convert::TryFrom},
+        std::cell::RefCell,
     };
 
     macro_rules! cast {
@@ -236,7 +236,7 @@ mod test {
         action_file.insert(
             "do_true".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("true").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true", "file").unwrap(),
                 print: "True was fired".to_string(),
                 file_bug: Some("Some>Monorail>Component".to_string()),
                 tag: None,
@@ -246,7 +246,7 @@ mod test {
         action_file.insert(
             "do_false".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("false").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("false", "file").unwrap(),
                 print: "False was fired".to_string(),
                 file_bug: None,
                 tag: None,
@@ -256,7 +256,8 @@ mod test {
         action_file.insert(
             "do_true_array".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("true_array").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true_array", "file")
+                    .unwrap(),
                 print: "True array was fired".to_string(),
                 file_bug: None,
                 tag: None,
@@ -266,7 +267,8 @@ mod test {
         action_file.insert(
             "do_false_array".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("false_array").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("false_array", "file")
+                    .unwrap(),
                 print: "False array was fired".to_string(),
                 file_bug: None,
                 tag: None,
@@ -277,7 +279,7 @@ mod test {
         action_file.insert(
             "do_operation".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("0 < 10").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("0 < 10", "file").unwrap(),
                 print: "Inequality triggered".to_string(),
                 file_bug: None,
                 tag: None,
@@ -357,7 +359,8 @@ mod test {
                 action_file.insert(
                     $name.to_string(),
                     Action::Gauge(Gauge {
-                        value: ValueSource::try_from_expression($name).unwrap(),
+                        value: ValueSource::try_from_expression_with_namespace($name, "file")
+                            .unwrap(),
                         format: $format,
                         tag: None,
                     }),
@@ -542,7 +545,7 @@ mod test {
         action_file.insert(
             "true_warning".to_string(),
             Action::Alert(Alert {
-                trigger: ValueSource::try_from_expression("true").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true", "file").unwrap(),
                 print: "True was fired".to_string(),
                 file_bug: None,
                 tag: None,
@@ -552,7 +555,7 @@ mod test {
         action_file.insert(
             "false_gauge".to_string(),
             Action::Gauge(Gauge {
-                value: ValueSource::try_from_expression("false").unwrap(),
+                value: ValueSource::try_from_expression_with_namespace("false", "file").unwrap(),
                 format: None,
                 tag: None,
             }),
@@ -560,9 +563,12 @@ mod test {
         action_file.insert(
             "true_snapshot".to_string(),
             Action::Snapshot(Snapshot {
-                trigger: ValueSource::try_from_expression("true").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true", "file").unwrap(),
                 repeat: ValueSource {
-                    metric: Metric::Eval(ExpressionContext::try_from("five".to_string()).unwrap()),
+                    metric: Metric::Eval(
+                        ExpressionContext::try_from_expression_with_namespace("five", "file")
+                            .unwrap(),
+                    ),
                     cached_value: RefCell::new(Some(MetricValue::Int(5))),
                 },
                 signature: "signature".to_string(),
@@ -571,8 +577,8 @@ mod test {
         action_file.insert(
             "test_snapshot".to_string(),
             Action::Snapshot(Snapshot {
-                trigger: ValueSource::try_from_expression("true").unwrap(),
-                repeat: ValueSource::try_from_expression("five").unwrap(),
+                trigger: ValueSource::try_from_expression_with_namespace("true", "file").unwrap(),
+                repeat: ValueSource::try_from_expression_with_namespace("five", "file").unwrap(),
                 signature: "signature".to_string(),
             }),
         );

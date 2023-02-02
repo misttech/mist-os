@@ -15,11 +15,13 @@ use nom::{
 pub struct ParsingContext<'a> {
     /// The input of the parser.
     input: &'a str,
+    // The current namespace.
+    namespace: &'a str,
 }
 
 impl<'a> ParsingContext<'a> {
-    pub fn new(input: &'a str) -> Self {
-        Self { input }
+    pub fn new(input: &'a str, namespace: &'a str) -> Self {
+        Self { input, namespace }
     }
     pub fn into_inner(self) -> &'a str {
         self.input
@@ -73,12 +75,12 @@ impl<'a> InputLength for ParsingContext<'a> {
 
 impl<'a> InputTake for ParsingContext<'a> {
     fn take(&self, count: usize) -> Self {
-        Self::new(&self.input[..count])
+        Self::new(&self.input[..count], self.namespace)
     }
 
     fn take_split(&self, count: usize) -> (Self, Self) {
         let (s0, s1) = self.input.split_at(count);
-        (ParsingContext::new(s1), ParsingContext::new(s0))
+        (ParsingContext::new(s1, self.namespace), ParsingContext::new(s0, self.namespace))
     }
 }
 
@@ -87,7 +89,7 @@ where
     &'a str: Slice<R>,
 {
     fn slice(&self, range: R) -> Self {
-        Self::new(self.input.slice(range))
+        Self::new(self.input.slice(range), self.namespace)
     }
 }
 

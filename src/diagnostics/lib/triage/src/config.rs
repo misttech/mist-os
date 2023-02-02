@@ -4,16 +4,13 @@
 
 use {
     crate::{
-        act::{
-            self,
-            Action::{Alert, Gauge, Snapshot},
-            Actions, ActionsSchema,
-        },
+        act::{validate_action, Actions, ActionsSchema, Severity},
         metrics::{
             fetch::{InspectFetcher, KeyValueFetcher, SelectorString, TextFetcher},
             Metric, Metrics, ValueSource,
         },
         validate::{validate, Trials, TrialsSchema},
+        Action,
     },
     anyhow::{bail, format_err, Context, Error},
     num_derive::FromPrimitive,
@@ -46,7 +43,7 @@ pub struct ConfigFileSchema {
     pub file_evals: Option<HashMap<String, String>>,
     /// Map of named Actions. Each Action uses a boolean value to trigger a warning.
     #[serde(rename = "act")]
-    pub(crate) file_actions: Option<ActionsSchema>,
+    pub(crate) file_actions: Option<HashMap<String, ActionConfig>>,
     /// Map of named Tests. Each test applies sample data to lists of actions that should or
     /// should not trigger.
     #[serde(rename = "test")]
@@ -101,22 +98,59 @@ impl<'de> Deserialize<'de> for SelectorEntry {
     }
 }
 
+// TODO(fxb/111911): This struct should be removed once serde_json5 has DeserializeSeed support.
+#[derive(Deserialize, Debug)]
+#[serde(tag = "type")]
+pub enum ActionConfig {
+    Alert {
+        trigger: String,
+        print: String,
+        file_bug: Option<String>,
+        tag: Option<String>,
+        severity: Severity,
+    },
+    Warning {
+        trigger: String,
+        print: String,
+        file_bug: Option<String>,
+        tag: Option<String>,
+    },
+    Gauge {
+        value: String,
+        format: Option<String>,
+        tag: Option<String>,
+    },
+    Snapshot {
+        trigger: String,
+        repeat: String,
+        signature: String,
+    },
+}
+
+impl ConfigFileSchema {
+    fn try_from_str_with_namespace(s: &str, namespace: &str) -> Result<Self, anyhow::Error> {
+        let schema = serde_json5::from_str::<ConfigFileSchema>(&s)
+            .map_err(|e| format_err!("Unable to deserialize config file {}", e))?;
+        validate_config(&schema, namespace)?;
+        Ok(schema)
+    }
+}
+
 impl TryFrom<String> for ConfigFileSchema {
     type Error = anyhow::Error;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        match serde_json5::from_str::<ConfigFileSchema>(&s) {
-            Ok(config) => validate_config(config),
-            Err(e) => return Err(format_err!("Error {}", e)),
-        }
+        ConfigFileSchema::try_from_str_with_namespace(&s, /* namespace=*/ "")
     }
 }
 
-fn validate_config(config: ConfigFileSchema) -> Result<ConfigFileSchema, Error> {
-    if let Some(ref actions) = config.file_actions {
-        act::validate_actions(actions)?;
+fn validate_config(config: &ConfigFileSchema, namespace: &str) -> Result<(), Error> {
+    if let Some(ref actions_config) = config.file_actions {
+        for (action_name, action_config) in actions_config.iter() {
+            validate_action(action_name, &action_config, namespace)?;
+        }
     }
-    Ok(config)
+    Ok(())
 }
 
 pub enum DataFetcher {
@@ -170,14 +204,22 @@ impl ParseResult {
         let mut tests = HashMap::new();
 
         for (namespace, file_data) in configs {
-            let file_config = match ConfigFileSchema::try_from(file_data.clone()) {
-                Ok(c) => c,
-                Err(e) => bail!("Parsing file '{}': {}", namespace, e),
-            };
+            let file_config =
+                match ConfigFileSchema::try_from_str_with_namespace(file_data, namespace) {
+                    Ok(c) => c,
+                    Err(e) => bail!("Parsing file '{}': {}", namespace, e),
+                };
             let ConfigFileSchema { file_actions, file_selectors, file_evals, file_tests } =
                 file_config;
             // Other code assumes that each name will have an entry in all categories.
-            let file_actions = file_actions.unwrap_or_else(|| HashMap::new());
+            let file_actions_config = file_actions.unwrap_or_else(|| HashMap::new());
+            let file_actions = file_actions_config
+                .into_iter()
+                .map(|(k, action_config)| {
+                    Action::from_config_with_namespace(action_config, namespace)
+                        .map(|action| (k, action))
+                })
+                .collect::<Result<HashMap<_, _>, _>>()?;
             let file_selectors = file_selectors.unwrap_or_else(|| HashMap::new());
             let file_evals = file_evals.unwrap_or_else(|| HashMap::new());
             let file_tests = file_tests.unwrap_or_else(|| HashMap::new());
@@ -194,7 +236,10 @@ impl ParseResult {
                 if file_metrics.contains_key(&key) {
                     bail!("Duplicate metric name {} in file {}", key, namespace);
                 }
-                file_metrics.insert(key, ValueSource::try_from_expression(&value)?);
+                file_metrics.insert(
+                    key,
+                    ValueSource::try_from_expression_with_namespace(&value, namespace)?,
+                );
             }
             metrics.insert(namespace.clone(), file_metrics);
             actions.insert(namespace.clone(), file_actions);
@@ -232,13 +277,13 @@ impl ParseResult {
         for (_, action_set) in self.actions.iter() {
             for (_, action) in action_set.iter() {
                 match action {
-                    Alert(alert) => {
+                    Action::Alert(alert) => {
                         *alert.trigger.cached_value.borrow_mut() = None;
                     }
-                    Gauge(gauge) => {
+                    Action::Gauge(gauge) => {
                         *gauge.value.cached_value.borrow_mut() = None;
                     }
-                    Snapshot(snapshot) => {
+                    Action::Snapshot(snapshot) => {
                         *snapshot.trigger.cached_value.borrow_mut() = None;
                         *snapshot.repeat.cached_value.borrow_mut() = None;
                     }
@@ -384,7 +429,7 @@ mod test {
         ( $($key:expr => $contents:expr, $tag:expr),+ ) => {
             {
                 let mut m =  ActionsSchema::new();
-                let trigger =  ValueSource::try_from_expression("a_trigger").unwrap();
+                let trigger =  ValueSource::try_from_expression_with_default_namespace("a_trigger").unwrap();
 
                 $(
                     let action = Action::Alert(Alert {

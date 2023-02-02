@@ -215,7 +215,7 @@ mod test {
                 (
                     "fires",
                     Action::Alert(Alert {
-                        trigger: ValueSource::try_from_expression("true")?,
+                        trigger: ValueSource::try_from_expression_with_namespace("true", "foo")?,
                         print: "good".to_string(),
                         tag: None,
                         file_bug: None,
@@ -225,7 +225,7 @@ mod test {
                 (
                     "no_fire",
                     Action::Alert(Alert {
-                        trigger: ValueSource::try_from_expression("false")?,
+                        trigger: ValueSource::try_from_expression_with_namespace("false", "foo")?,
                         print: "what?!?".to_string(),
                         tag: None,
                         file_bug: None,
@@ -307,7 +307,10 @@ mod test {
                 (
                     "time_quarter",
                     Action::Alert(Alert {
-                        trigger: ValueSource::try_from_expression("Now()==250000000")?,
+                        trigger: ValueSource::try_from_expression_with_namespace(
+                            "Now()==250000000",
+                            "foo"
+                        )?,
                         print: "time_billion".to_string(),
                         tag: None,
                         file_bug: None,
@@ -317,7 +320,10 @@ mod test {
                 (
                     "time_missing",
                     Action::Alert(Alert {
-                        trigger: ValueSource::try_from_expression("Missing(Now())")?,
+                        trigger: ValueSource::try_from_expression_with_namespace(
+                            "Missing(Now())",
+                            "foo"
+                        )?,
                         print: "time_missing".to_string(),
                         tag: None,
                         file_bug: None,

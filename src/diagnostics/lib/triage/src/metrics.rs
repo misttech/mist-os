@@ -13,13 +13,12 @@ use {
     fetch::{Fetcher, FileDataFetcher, SelectorString, TrialDataFetcher},
     metric_value::{MetricValue, Problem},
     regex::Regex,
-    serde::{Deserialize, Deserializer, Serialize},
+    serde::{Deserialize, Serialize},
     std::{
         cell::RefCell,
         clone::Clone,
         cmp::min,
         collections::{HashMap, HashSet},
-        convert::TryFrom,
     },
     variable::VariableName,
 };
@@ -63,8 +62,20 @@ impl ValueSource {
         Self { metric, cached_value: RefCell::new(None) }
     }
 
-    pub(crate) fn try_from_expression(expr: &str) -> Result<Self, anyhow::Error> {
-        Ok(ValueSource::new(Metric::Eval(ExpressionContext::try_from(expr.to_string())?)))
+    pub(crate) fn try_from_expression_with_namespace(
+        expr: &str,
+        namespace: &str,
+    ) -> Result<Self, anyhow::Error> {
+        Ok(ValueSource::new(Metric::Eval(ExpressionContext::try_from_expression_with_namespace(
+            expr, namespace,
+        )?)))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn try_from_expression_with_default_namespace(
+        expr: &str,
+    ) -> Result<Self, anyhow::Error> {
+        ValueSource::try_from_expression_with_namespace(expr, "")
     }
 }
 
@@ -228,22 +239,22 @@ pub(crate) struct ExpressionContext {
     pub(crate) parsed_expression: ExpressionTree,
 }
 
-impl TryFrom<String> for ExpressionContext {
-    type Error = anyhow::Error;
-
-    fn try_from(raw_expression: String) -> Result<Self, Self::Error> {
-        let parsed_expression = parse::parse_expression(&raw_expression)?;
-        Ok(Self { raw_expression, parsed_expression })
+impl ExpressionContext {
+    pub fn try_from_expression_with_namespace(
+        raw_expression: &str,
+        namespace: &str,
+    ) -> Result<Self, anyhow::Error> {
+        let parsed_expression = parse::parse_expression(raw_expression, namespace)?;
+        Ok(Self { raw_expression: raw_expression.to_string(), parsed_expression })
     }
-}
 
-impl<'de> Deserialize<'de> for ExpressionContext {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = String::deserialize(deserializer)?;
-        Ok(ExpressionContext::try_from(value).map_err(serde::de::Error::custom)?)
+    pub fn try_from_expression_with_default_namespace(
+        raw_expression: &str,
+    ) -> Result<Self, anyhow::Error> {
+        ExpressionContext::try_from_expression_with_namespace(
+            raw_expression,
+            /*namespace= */ "",
+        )
     }
 }
 
@@ -524,7 +535,7 @@ impl<'a> MetricState<'a> {
 
     #[cfg(test)]
     fn evaluate_value(&self, namespace: &str, expression: &str) -> MetricValue {
-        match parse::parse_expression(expression) {
+        match parse::parse_expression(expression, namespace) {
             Ok(expr) => self.evaluate(namespace, &expr),
             Err(e) => syntax_error(format!("Expression parse error\n{}", e)),
         }
@@ -532,7 +543,7 @@ impl<'a> MetricState<'a> {
 
     /// Evaluate an Expression which contains only base values, not referring to other Metrics.
     pub(crate) fn evaluate_math(expr: &str) -> MetricValue {
-        let tree = match ExpressionContext::try_from(expr.to_string()) {
+        let tree = match ExpressionContext::try_from_expression_with_default_namespace(expr) {
             Ok(expr_context) => expr_context.parsed_expression,
             Err(err) => return syntax_error(format!("Failed to parse '{}': {}", expr, err)),
         };
@@ -1194,7 +1205,7 @@ pub(crate) mod test {
                 $(
                     $(
                         ($ke.to_string(),
-                        ValueSource::try_from_expression($ve)
+                        ValueSource::try_from_expression_with_namespace($ve, $namespace)
                             .expect("Unable to parse expression as value source.")),
                     )+
                 )?
@@ -1507,7 +1518,10 @@ pub(crate) mod test {
             MetricValue::Vector(vec![MetricValue::Bool(true)])
         );
         assert_eq!(
-            state.eval_action_metric("root", &ValueSource::try_from_expression("[0==0]").unwrap()),
+            state.eval_action_metric(
+                "root",
+                &ValueSource::try_from_expression_with_namespace("[0==0]", "root").unwrap()
+            ),
             MetricValue::Bool(true)
         );
 
@@ -1518,7 +1532,7 @@ pub(crate) mod test {
         assert_eq!(
             state.eval_action_metric(
                 "root",
-                &ValueSource::try_from_expression("[0==0, 0==0]").unwrap()
+                &ValueSource::try_from_expression_with_namespace("[0==0, 0==0]", "root").unwrap()
             ),
             MetricValue::Vector(vec![MetricValue::Bool(true), MetricValue::Bool(true)])
         );
@@ -1527,21 +1541,33 @@ pub(crate) mod test {
         assert_eq!(
             state.eval_action_metric(
                 "root",
-                &ValueSource::try_from_expression("StringMatches('abcd', '^a.c')").unwrap()
+                &ValueSource::try_from_expression_with_namespace(
+                    "StringMatches('abcd', '^a.c')",
+                    "root"
+                )
+                .unwrap()
             ),
             MetricValue::Bool(true)
         );
         assert_eq!(
             state.eval_action_metric(
                 "root",
-                &ValueSource::try_from_expression("StringMatches('abcd', 'a.c$')").unwrap()
+                &ValueSource::try_from_expression_with_namespace(
+                    "StringMatches('abcd', 'a.c$')",
+                    "root"
+                )
+                .unwrap()
             ),
             MetricValue::Bool(false)
         );
         assert_problem!(
             state.eval_action_metric(
                 "root",
-                &ValueSource::try_from_expression("StringMatches('abcd', '[[')").unwrap()
+                &ValueSource::try_from_expression_with_namespace(
+                    "StringMatches('abcd', '[[')",
+                    "root"
+                )
+                .unwrap()
             ),
             "SyntaxError: Could not parse `[[` as regex"
         );
@@ -1775,7 +1801,7 @@ pub(crate) mod test {
             MetricState::new(&metrics, Fetcher::FileData(FileDataFetcher::new(&files)), Some(1234));
         let state_missing =
             MetricState::new(&metrics, Fetcher::FileData(FileDataFetcher::new(&files)), None);
-        let now_expression = parse::parse_expression("Now()").unwrap();
+        let now_expression = parse::parse_expression("Now()", /*namespace= */ "").unwrap();
         assert_problem!(MetricState::evaluate_math("Now()"), "Missing: No valid time available");
         assert_eq!(state_1234.evaluate_expression(&now_expression), MetricValue::Int(1234));
         assert_problem!(
@@ -1788,24 +1814,34 @@ pub(crate) mod test {
     #[fuchsia::test]
     fn test_expression_context() {
         // Check correct error behavior when building expression from selector string
-        let selector_expr = "INSPECT:foo:bar:baz".to_string();
+        let selector_expr = "INSPECT:foo:bar:baz";
         assert_eq!(
-            format!("{:?}", ExpressionContext::try_from(selector_expr).err().unwrap()),
+            format!(
+                "{:?}",
+                ExpressionContext::try_from_expression_with_default_namespace(selector_expr)
+                    .err()
+                    .unwrap()
+            ),
             "Expression Error: \n0: at line 0, in Eof:\nINSPECT:foo:bar:baz\n       ^\n\n"
         );
 
         // Check correct error behavior when building expression from invalid expression string
-        let invalid_expr = "1 *".to_string();
+        let invalid_expr = "1 *";
         assert_eq!(
-            format!("{:?}", ExpressionContext::try_from(invalid_expr).err().unwrap()),
+            format!(
+                "{:?}",
+                ExpressionContext::try_from_expression_with_default_namespace(invalid_expr)
+                    .err()
+                    .unwrap()
+            ),
             concat!("Expression Error: \n0: at line 0, in Eof:\n1 *\n  ^\n\n")
         );
 
         // Check expression correctly built from valid expression
         let valid_expr = "42 + 1";
-        let parsed_expression = parse::parse_expression(&valid_expr).unwrap();
+        let parsed_expression = parse::parse_expression(&valid_expr, "").unwrap();
         assert_eq!(
-            ExpressionContext::try_from(valid_expr.to_string()).unwrap(),
+            ExpressionContext::try_from_expression_with_default_namespace(valid_expr).unwrap(),
             ExpressionContext { raw_expression: valid_expr.to_string(), parsed_expression }
         );
     }
