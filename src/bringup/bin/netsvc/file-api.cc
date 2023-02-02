@@ -9,6 +9,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/netboot/netboot.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "board-info.h"
 #include "netboot.h"
@@ -49,8 +50,7 @@ ssize_t FileApi::OpenRead(const char* filename, zx::duration) {
   }
 
   is_write_ = false;
-  strncpy(filename_, filename, PATH_MAX);
-  filename_[PATH_MAX] = '\0';
+  strlcpy(filename_, filename, sizeof(filename_));
   netboot_file_ = NULL;
   size_t file_size;
 
@@ -78,8 +78,7 @@ tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration t
   }
 
   is_write_ = true;
-  strncpy(filename_, filename, PATH_MAX);
-  filename_[PATH_MAX] = '\0';
+  strlcpy(filename_, filename, sizeof(filename_));
 
   if (is_zedboot_ && !strncmp(filename_, NB_FILENAME_PREFIX, NB_FILENAME_PREFIX_LEN())) {
     type_ = NetfileType::kNetboot;

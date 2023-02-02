@@ -175,7 +175,7 @@ protected:
     }
 private:
     // Test body does not have direct access to this value.
-    fbl::StringBuffer<PATH_MAX> ramdisk_path_;
+    fbl::StringBuffer<PATH_MAX - 1> ramdisk_path_;
 };
 
 // In order to reuse a fixture across multiple test cases, aliasing the fixture or
@@ -223,7 +223,7 @@ public:
     }
 private:
     // Test body does not have direct access to this value.
-    fbl::StringBuffer<PATH_MAX> ramdisk_path_;
+    fbl::StringBuffer<PATH_MAX - 1> ramdisk_path_;
 };
 
 // Use an alias to match the testcase name we want, which means that it will be treated

@@ -106,7 +106,7 @@ class WlanSoftmacDeviceTest : public SingleApTest,
       ASSERT_EQ(ZX_OK,
                 fdf::ProtocolConnect(std::move(client_token),
                                      fdf::Channel(endpoints->server.TakeChannel().release())));
-      fbl::StringBuffer<fuchsia_io::wire::kMaxPath> path;
+      fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
       path.AppendPrintf("svc/%s/default/%s",
                         fuchsia_wlan_softmac::Service::WlanSoftmac::ServiceName,
                         fuchsia_wlan_softmac::Service::WlanSoftmac::Name);

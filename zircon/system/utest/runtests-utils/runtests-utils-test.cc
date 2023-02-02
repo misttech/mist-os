@@ -78,9 +78,9 @@ TEST(JoinPath, JoinPathTrailingSlash) { EXPECT_STREQ("a/b/c/d", JoinPath("a/b/",
 TEST(JoinPath, JoinPathAbsoluteChild) { EXPECT_STREQ("a/b/c/d", JoinPath("a/b/", "/c/d").c_str()); }
 
 TEST(MkDirAll, MkDirAllTooLong) {
-  char too_long[PATH_MAX + 2];
-  memset(too_long, 'a', PATH_MAX + 1);
-  too_long[PATH_MAX + 1] = '\0';
+  char too_long[PATH_MAX + 1];
+  memset(too_long, 'a', sizeof(too_long) - 1);
+  too_long[sizeof(too_long) - 1] = '\0';
   EXPECT_EQ(ENAMETOOLONG, MkDirAll(too_long));
 }
 

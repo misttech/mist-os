@@ -6,6 +6,7 @@
 #define LIB_FDIO_NAMESPACE_LOCAL_VNODE_H_
 
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/fdio/cleanpath.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
@@ -172,8 +173,7 @@ class LocalVnode : public fbl::RefCounted<LocalVnode> {
   zx_status_t AddChild(fbl::RefPtr<LocalVnode> child);
   zx_status_t RemoveChild(LocalVnode* child);
 
-  zx_status_t EnumerateInternal(fbl::StringBuffer<PATH_MAX>* path,
-                                const EnumerateCallback& func) const;
+  zx_status_t EnumerateInternal(PathBuffer* path, const EnumerateCallback& func) const;
 
   template <class T, class... Args>
   LocalVnode(fbl::RefPtr<LocalVnode> parent, fbl::String name, std::in_place_type_t<T> in_place,

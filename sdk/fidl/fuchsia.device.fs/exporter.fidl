@@ -29,7 +29,7 @@ protocol Exporter {
         open_client client_end:Connector;
 
         /// If this is present, then the device will be exported at this topological path.
-        topological_path string:<fuchsia.io.MAX_PATH, optional>;
+        topological_path string:<fuchsia.io.MAX_PATH_LENGTH, optional>;
 
         /// If this is present, then the device will be exported into "/dev/class/{class_name}/".
         class_name string:<fuchsia.io.MAX_NAME_LENGTH, optional>;

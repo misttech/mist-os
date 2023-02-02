@@ -1389,7 +1389,7 @@ char* getcwd(char* buf, size_t size) {
   fdio_internal::PathBuffer tmp;
   if (buf == nullptr) {
     buf = tmp.data();
-    size = PATH_MAX;
+    size = tmp.capacity() + 1;  // +1 to include null-terminating character
   } else if (size == 0) {
     errno = EINVAL;
     return nullptr;
@@ -1398,8 +1398,10 @@ char* getcwd(char* buf, size_t size) {
   char* out = nullptr;
   {
     const fbl::AutoLock lock(&fdio_cwd_lock);
-    const size_t len = fdio_cwd_path.length() + 1;
-    if (len < size) {
+    const size_t len = fdio_cwd_path.length() + 1;  // +1 to include null-terminating character
+
+    // |size| is inclusive of null-terminating character.
+    if (len <= size) {
       memcpy(buf, fdio_cwd_path.data(), len);
       out = buf;
     } else {

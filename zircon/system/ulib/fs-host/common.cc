@@ -141,8 +141,8 @@ zx_status_t FsCreator::ProcessManifest(char* manifest_path) {
     return ZX_ERR_IO;
   }
 
-  char dir_path[PATH_MAX];
-  strncpy(dir_path, dirname(manifest_path), PATH_MAX);
+  const char* dir_path = dirname(manifest_path);
+
   FILE* manifest = fdopen(manifest_fd.release(), "r");
   while (true) {
     // Keep processing lines in the manifest until we have reached EOF.

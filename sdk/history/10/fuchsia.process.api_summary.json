@@ -101,7 +101,7 @@
         "kind": "struct/member",
         "name": "fuchsia.process/NameInfo.path",
         "ordinal": "1",
-        "type": "string:4096"
+        "type": "string:4095"
     },
     {
         "kind": "struct",

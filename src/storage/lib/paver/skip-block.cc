@@ -77,7 +77,7 @@ zx::result<> SkipBlockDevicePartitioner::WipeFvm() const {
     return zx::error(response.error_value());
   }
 
-  fbl::StringBuffer<PATH_MAX> name_buffer;
+  fbl::StringBuffer<PATH_MAX - 1> name_buffer;
   name_buffer.Append(response.value()->path.data(),
                      static_cast<size_t>(response.value()->path.size()));
 

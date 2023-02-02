@@ -146,7 +146,7 @@ zx::result<zx::channel> RecursiveWaitForFileHelper(const int dir_fd, std::string
 
 zx::result<zx::channel> RecursiveWaitForFile(const int dir_fd, std::string_view target,
                                              zx::duration timeout) {
-  if (target.length() > PATH_MAX) {
+  if (target.length() > PATH_MAX - 1) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   return RecursiveWaitForFileHelper(dir_fd, target, zx::deadline_after(timeout));

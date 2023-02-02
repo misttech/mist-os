@@ -168,8 +168,9 @@ void Directory::Open(fuchsia::io::OpenFlags open_flags, fuchsia::io::OpenFlags p
     Node::SendOnOpenEventOnError(open_flags, std::move(request), ZX_ERR_ACCESS_DENIED);
     return;
   }
+
   std::string_view path_view{path, path_len};
-  if (path_view.empty() || path_view.length() > PATH_MAX) {
+  if (path_view.empty() || path_view.length() > PATH_MAX - 1) {
     Node::SendOnOpenEventOnError(open_flags, std::move(request), ZX_ERR_BAD_PATH);
     return;
   }

@@ -43,7 +43,7 @@ fbl::RefPtr<zx_driver> GetFidlProxyDriver(DriverHostContext* ctx) {
 }
 
 zx::result<> FidlProxyDevice::ConnectToProtocol(const char* protocol, zx::channel request) {
-  fbl::StringBuffer<fuchsia_io::wire::kMaxPath> path;
+  fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
   path.AppendPrintf("svc/%s", protocol);
   return zx::make_result(
       fdio_service_connect_at(incoming_dir_.channel().get(), path.c_str(), request.release()));
@@ -51,7 +51,7 @@ zx::result<> FidlProxyDevice::ConnectToProtocol(const char* protocol, zx::channe
 
 zx::result<> FidlProxyDevice::ConnectToProtocol(const char* service, const char* protocol,
                                                 zx::channel request) {
-  fbl::StringBuffer<fuchsia_io::wire::kMaxPath> path;
+  fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
   path.AppendPrintf("svc/%s/default/%s", service, protocol);
   return zx::make_result(
       fdio_service_connect_at(incoming_dir_.channel().get(), path.c_str(), request.release()));

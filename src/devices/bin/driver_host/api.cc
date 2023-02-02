@@ -367,7 +367,7 @@ __EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const cha
     return status;
   }
 
-  fbl::StringBuffer<fuchsia_io::wire::kMaxPath> path;
+  fbl::StringBuffer<fuchsia_io::wire::kMaxPathLength> path;
   // We use "default" as the service instance, as that's what we expect the parent driver
   // to rename it to.
   path.AppendPrintf("svc/%s/default/%s", service_name, protocol_name);

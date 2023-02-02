@@ -36,7 +36,7 @@ type NameInfo = resource struct {
     /// Path at which to install the associated directory.
     ///
     /// Must be an absolute path (i.e., start with '/').
-    path string:fuchsia.io.MAX_PATH;
+    path fuchsia.io.Path;
 
     /// The associated directory.
     directory client_end:fuchsia.io.Directory;

@@ -30,11 +30,12 @@ namespace {
 zx_status_t
 _fuchsia_io_DirectoryOpen(zx_handle_t channel, uint32_t flags, uint32_t mode, const char* path_data,
                           size_t path_size, zx_handle_t object) {
-  if (path_size > fuchsia_io_MAX_PATH) {
+  if (path_size > fuchsia_io_MAX_PATH_LENGTH) {
     _zx_handle_close(object);
     return ZX_ERR_INVALID_ARGS;
   }
-  FIDL_ALIGNDECL char wr_bytes[sizeof(fuchsia_io_DirectoryOpenRequest) + fuchsia_io_MAX_PATH] = {};
+  FIDL_ALIGNDECL char
+      wr_bytes[sizeof(fuchsia_io_DirectoryOpenRequest) + fuchsia_io_MAX_PATH_LENGTH] = {};
   fuchsia_io_DirectoryOpenRequest* request = (fuchsia_io_DirectoryOpenRequest*)wr_bytes;
   fidl_init_txn_header(&request->hdr, 0, fuchsia_io_DirectoryOpenOrdinal, 0);
   request->flags = flags;

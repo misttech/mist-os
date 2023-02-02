@@ -63,7 +63,7 @@ bool IsInWhitelist(const std::string_view name, const fbl::Vector<fbl::String>& 
 }
 
 int MkDirAll(const std::string_view dir_name) {
-  fbl::StringBuffer<PATH_MAX> dir_buf;
+  fbl::StringBuffer<PATH_MAX - 1> dir_buf;
   if (dir_name.length() > dir_buf.capacity()) {
     return ENAMETOOLONG;
   }

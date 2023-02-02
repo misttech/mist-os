@@ -203,7 +203,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   };
 
   std::string_view path(request->path.data(), request->path.size());
-  if (path.size() > PATH_MAX) {
+  if (path.size() > fio::wire::kMaxPathLength) {
     return write_error(std::move(request->object), ZX_ERR_BAD_PATH);
   }
 

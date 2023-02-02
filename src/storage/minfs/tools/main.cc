@@ -55,7 +55,7 @@ static const char* GetModeString(uint32_t mode) {
 // Adds PATH_PREFIX to path if it isn't there
 void GetHostPath(const char* path, char* out) {
   out[0] = 0;
-  int remaining = PATH_MAX;
+  int remaining = PATH_MAX - 1;
 
   if (strncmp(path, PATH_PREFIX, PREFIX_SIZE)) {
     strncat(out, PATH_PREFIX, remaining);

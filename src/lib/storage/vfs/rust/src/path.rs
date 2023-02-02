@@ -40,7 +40,7 @@ impl Path {
 
         // Make sure that we don't accept paths longer than POSIX's PATH_MAX, plus one character
         // which accounts for the null terminator.
-        if (path.len() as u64) > std::cmp::min(fio::MAX_PATH, libc::PATH_MAX as u64 - 1) {
+        if (path.len() as u64) > libc::PATH_MAX as u64 - 1 {
             return Err(Status::BAD_PATH);
         }
 
@@ -492,12 +492,13 @@ mod tests {
     #[test]
     fn too_long_path() {
         let filename = "a".repeat(fio::MAX_FILENAME as usize);
+        const OVER_LIMIT_LENGTH: usize = fio::MAX_PATH_LENGTH as usize + 1;
         let mut path = String::new();
-        while path.len() < fio::MAX_PATH as usize {
+        while path.len() < OVER_LIMIT_LENGTH as usize {
             path.push('/');
             path.push_str(&filename);
         }
-        assert_eq!(path.len(), fio::MAX_PATH as usize);
+        assert_eq!(path.len(), OVER_LIMIT_LENGTH as usize);
         negative_construction_test! {
             path: &path,
             "path too long",
@@ -507,11 +508,11 @@ mod tests {
 
     #[test]
     fn long_path() {
-        let mut path = "a/".repeat((fio::MAX_PATH as usize - 1) / 2);
-        if path.len() < fio::MAX_PATH as usize - 1 {
+        let mut path = "a/".repeat((fio::MAX_PATH_LENGTH as usize) / 2);
+        if path.len() < fio::MAX_PATH_LENGTH as usize {
             path.push('a');
         }
-        assert_eq!(path.len(), fio::MAX_PATH as usize - 1);
+        assert_eq!(path.len(), fio::MAX_PATH_LENGTH as usize);
         simple_construction_test! {
             path: &path,
             mut path => {

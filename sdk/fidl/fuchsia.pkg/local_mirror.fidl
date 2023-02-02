@@ -23,7 +23,7 @@ protocol LocalMirror {
     /// * error a `GetMetadataError` value
     GetMetadata(resource struct {
         repo_url RepositoryUrl;
-        path string:fuchsia.io.MAX_PATH;
+        path fuchsia.io.Path;
         metadata server_end:fuchsia.io.File;
     }) -> () error GetMetadataError;
 

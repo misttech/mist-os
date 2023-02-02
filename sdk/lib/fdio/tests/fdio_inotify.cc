@@ -310,7 +310,7 @@ TEST_F(InotifyAddFilter, AddWatchOpenRace) {
 }
 
 TEST_F(InotifyAddFilter, AddWatchWithTooLongFilePath) {
-  std::string long_filepath(PATH_MAX + 1, 'x');
+  std::string long_filepath(PATH_MAX, 'x');
   ASSERT_EQ(inotify_add_watch(fd().get(), long_filepath.c_str(), IN_OPEN), -1);
   ASSERT_ERRNO(ENAMETOOLONG);
 }

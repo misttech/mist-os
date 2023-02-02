@@ -839,7 +839,7 @@ zx_status_t FvmUnbind(const fbl::unique_fd& devfs_root, const char* device) {
     ERROR("Invalid device name: %s\n", device);
     return ZX_ERR_INVALID_ARGS;
   }
-  fbl::StringBuffer<PATH_MAX> name_buffer;
+  fbl::StringBuffer<PATH_MAX - 1> name_buffer;
   name_buffer.Append(device + kDevPathLen);
   name_buffer.Append("/fvm");
 

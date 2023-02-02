@@ -47,7 +47,7 @@ type BasemgrConfig = table {
 
 type SessionShellMapEntry = table {
     /// The name of the session shell represented by its url.
-    1: name string:fuchsia.io.MAX_PATH;
+    1: name fuchsia.io.Path;
 
     /// The launch configurations for the session shell.
     2: config SessionShellConfig;
@@ -83,14 +83,14 @@ type SessionmgrConfig = table {
 
     /// A list of fuchsia package urls that specify which agents to launch at
     /// startup.
-    5: startup_agents vector<string:fuchsia.io.MAX_PATH>;
+    5: startup_agents vector<fuchsia.io.Path>;
 
     /// A list of fuchsia package urls that specify which agents to launch at
     /// startup with PuppetMaster and FocusProvider services.
-    6: session_agents vector<string:fuchsia.io.MAX_PATH>;
+    6: session_agents vector<fuchsia.io.Path>;
 
     /// The fuchsia package url for which story shell to use.
-    7: story_shell_url string:fuchsia.io.MAX_PATH;
+    7: story_shell_url fuchsia.io.Path;
 
     /// A map of agents to the arguments they should be started with.
     8: component_args vector<AppConfig>;
@@ -123,7 +123,7 @@ type SessionmgrConfig = table {
     /// restart it individually, preserving the session.
     ///
     /// The session shell is automatically added to this list.
-   11: restart_session_on_agent_crash vector<string:fuchsia.io.MAX_PATH>:MAX;
+   11: restart_session_on_agent_crash vector<fuchsia.io.Path>:MAX;
 
     /// If set to true, disables any automatic agent restarts when an agent is
     /// observed to have crashed.
@@ -139,7 +139,7 @@ type SessionmgrConfig = table {
 /// session shell, story shell, and agents.
 type AppConfig = table {
     /// The fuchsia package url for app.
-    1: url string:fuchsia.io.MAX_PATH;
+    1: url fuchsia.io.Path;
 
     /// The arguments for the app.
     2: args vector<string>;

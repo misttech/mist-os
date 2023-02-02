@@ -80,7 +80,7 @@ type DeviceSelector = table {
 
     /// ID of device.
     /// Required.
-    2: id string:fuchsia.io.MAX_PATH;
+    2: id fuchsia.io.Path;
 };
 
 /// The main entry point for ffx audio.
@@ -137,7 +137,7 @@ protocol AudioDaemon {
     ListDevices() -> (resource table {
         /// List of available devices, sorted by name.
         /// Required.
-        1: devices vector<string:fuchsia.io.MAX_PATH>:MAX;
+        1: devices vector<fuchsia.io.Path>:MAX;
     }) error zx.status;
 
     /// Returns details about a specific audio device.

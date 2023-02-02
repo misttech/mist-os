@@ -58,7 +58,7 @@ protocol Admin {
     GetDevicePath(struct {
         fs_id uint64;
     }) -> (struct {
-        path string:fuchsia.io.MAX_PATH;
+        path fuchsia.io.Path;
     }) error zx.status;
 
     /// Writes `filename` into the data partition with contents from `payload`, formatting the data
@@ -67,7 +67,7 @@ protocol Admin {
     /// This can only be called while the data partition isn't already mounted, which is typically
     /// in recovery builds where fshost is running with the `fvm_ramdisk` flag set.
     WriteDataFile(resource struct {
-        filename string:fuchsia.io.MAX_PATH;
+        filename fuchsia.io.Path;
         payload zx.handle:VMO;
     }) -> () error zx.status;
 

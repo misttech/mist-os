@@ -373,7 +373,7 @@ zx_status_t VolumeManager::RelativeTopologicalPath(fdio_cpp::UnownedFdioCaller& 
   zx_status_t rc;
 
   // Get the full device path
-  fbl::StringBuffer<PATH_MAX> path;
+  fbl::StringBuffer<PATH_MAX - 1> path;
   path.Resize(path.capacity());
   size_t path_len;
   auto resp = fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())->GetTopologicalPath();

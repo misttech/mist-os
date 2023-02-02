@@ -35,7 +35,8 @@ static_assert(fio::wire::kOpenFlagsAllowedWithNodeReference ==
                   (fio::wire::OpenFlags::kDirectory | fio::wire::OpenFlags::kNotDirectory |
                    fio::wire::OpenFlags::kDescribe | fio::wire::OpenFlags::kNodeReference),
               "OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE value mismatch");
-static_assert(PATH_MAX == fio::wire::kMaxPath, "POSIX PATH_MAX inconsistent with Fuchsia MAX_PATH");
+static_assert(PATH_MAX == fio::wire::kMaxPathLength + 1,
+              "POSIX PATH_MAX inconsistent with Fuchsia MAX_PATH_LENGTH");
 static_assert(NAME_MAX == fio::wire::kMaxFilename,
               "POSIX NAME_MAX inconsistent with Fuchsia MAX_FILENAME");
 

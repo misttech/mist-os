@@ -160,8 +160,7 @@ void LocalVnode::UnlinkFromParent() {
   parent_ = nullptr;
 }
 
-zx_status_t LocalVnode::EnumerateInternal(fbl::StringBuffer<PATH_MAX>* path,
-                                          const EnumerateCallback& func) const {
+zx_status_t LocalVnode::EnumerateInternal(PathBuffer* path, const EnumerateCallback& func) const {
   const size_t original_length = path->length();
 
   // Add this current node to the path, and enumerate it if it has a remote
@@ -198,7 +197,7 @@ zx_status_t LocalVnode::EnumerateInternal(fbl::StringBuffer<PATH_MAX>* path,
 }
 
 zx_status_t LocalVnode::EnumerateRemotes(const EnumerateCallback& func) const {
-  fbl::StringBuffer<PATH_MAX> path;
+  PathBuffer path;
   path.Append('/');
   return EnumerateInternal(&path, func);
 }

@@ -76,7 +76,7 @@ class FileApi : public FileApiInterface {
   bool is_zedboot_;
 
   bool is_write_ = false;
-  char filename_[PATH_MAX + 1] = {};
+  char filename_[PATH_MAX] = {};
   NetfileType type_ = NetfileType::kUnknown;
 
   // Use when type_ == NetfileType::kBoardName.
