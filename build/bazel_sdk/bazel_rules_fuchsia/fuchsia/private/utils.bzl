@@ -4,13 +4,7 @@
 
 """Common utilities needed by rules_fuchsia rules."""
 
-load(
-    "@fuchsia_sdk//:workspace_output_base.bzl",
-    _WORKSPACE_OUTPUT_BASE = "WORKSPACE_OUTPUT_BASE",
-)
 load(":providers.bzl", "FuchsiaProvidersInfo")
-
-WORKSPACE_OUTPUT_BASE = _WORKSPACE_OUTPUT_BASE
 
 _INVALID_LABEL_CHARACTERS = "\"!%@^_#$&'()*+,;<=>?[]{|}~/".elems()
 

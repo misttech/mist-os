@@ -130,15 +130,6 @@ def _fuchsia_sdk_repository_impl(ctx):
     # to the call to ctx.template above.
     generate_sdk_build_rules(ctx, manifests, copy_content_strategy)
 
-    # See https://bazel.build/docs/output_directories.
-    ctx.file(
-        "workspace_output_base.bzl",
-        """WORKSPACE_OUTPUT_BASE = "{output_base}"
-""".format(
-            output_base = ctx.path("../.."),
-        ),
-    )
-
 fuchsia_sdk_repository = repository_rule(
     doc = """
 Loads a particular version of the Fuchsia IDK.
