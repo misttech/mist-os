@@ -164,7 +164,7 @@ zx_status_t Dir::ConvertInlineDir() {
   }
 
   page->WaitOnWriteback();
-  page->ZeroUserSegment();
+  page.Zero();
 
   DentryBlock *dentry_blk = page->GetAddress<DentryBlock>();
 
@@ -177,8 +177,8 @@ zx_status_t Dir::ConvertInlineDir() {
 
   page.SetDirty();
   // clear inline dir and flag after data writeback
-  ipage->WaitOnWriteback();
-  ipage->ZeroUserSegment(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
+  dnode_page->WaitOnWriteback();
+  dnode_page.Zero(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
   ClearFlag(InodeInfoFlag::kInlineDentry);
 
   if (!TestFlag(InodeInfoFlag::kInlineXattr)) {
@@ -414,11 +414,11 @@ zx_status_t File::ConvertInlineData() {
     uint8_t *inline_data = InlineDataPtr(ipage);
     page->WaitOnWriteback();
     memcpy(page->GetAddress(), inline_data, GetSize());
-    page->ZeroUserSegment(GetSize());
+    page.Zero(GetSize());
     page.SetDirty();
 
-    ipage->WaitOnWriteback();
-    ipage->ZeroUserSegment(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
+    dnode_page->WaitOnWriteback();
+    dnode_page.Zero(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
   }
   ClearFlag(InodeInfoFlag::kInlineData);
   ClearFlag(InodeInfoFlag::kDataExist);

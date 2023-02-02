@@ -70,7 +70,7 @@ void F2fs::AddOrphanInode(VnodeF2fs *vnode) {
   if (vnode->IsDirty()) {
     vnode->ClearDirty();
     // Set the orphan flag of filecache to prevent further dirty Pages.
-    vnode->ClearDirtyPages();
+    vnode->ClearDirtyPagesForOrphan();
     ZX_ASSERT(GetVCache().RemoveDirty(vnode).is_ok());
   }
 }

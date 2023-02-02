@@ -5,10 +5,11 @@
 #ifndef SRC_STORAGE_F2FS_VNODE_H_
 #define SRC_STORAGE_F2FS_VNODE_H_
 
+#include "src/storage/f2fs/file_cache.h"
+#include "src/storage/f2fs/vmo_manager.h"
+
 namespace f2fs {
 constexpr uint32_t kNullIno = std::numeric_limits<uint32_t>::max();
-constexpr size_t kBlocksPerVmoNode = kDefaultBlocksPerSegment;
-constexpr size_t kVmoNodeSize = safemath::CheckMul(kBlocksPerVmoNode, kBlockSize).ValueOrDie();
 
 class F2fs;
 // for in-memory extent cache entry
@@ -74,19 +75,18 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t GetAttributes(fs::VnodeAttributes *a) final __TA_EXCLUDES(info_mutex_);
   zx_status_t SetAttributes(fs::VnodeAttributesUpdate attr) final __TA_EXCLUDES(info_mutex_);
 
-  fs::VnodeProtocolSet GetProtocols() const final;
+  fs::VnodeProtocolSet GetProtocols() const override;
 
   zx_status_t GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
                                      [[maybe_unused]] fs::Rights rights,
-                                     fs::VnodeRepresentation *info) final;
+                                     fs::VnodeRepresentation *info) override;
 
   // For fs::PagedVnode
   virtual zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) override
       __TA_EXCLUDES(mutex_);
   void VmoRead(uint64_t offset, uint64_t length) final __TA_EXCLUDES(mutex_);
-  void VmoDirty(uint64_t offset, uint64_t length) final {
-    FX_LOGS(ERROR) << "Unsupported VmoDirty.";
-  }
+  void VmoDirty(uint64_t offset, uint64_t length) override __TA_EXCLUDES(mutex_);
+
   zx::result<size_t> CreateAndPopulateVmo(zx::vmo &vmo, const size_t offset, const size_t length)
       __TA_EXCLUDES(mutex_);
   void OnNoPagedVmoClones() final __TA_REQUIRES(mutex_);
@@ -123,7 +123,7 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t ReserveNewBlock(NodePage &node_page, uint32_t ofs_in_node);
 
   void UpdateExtentCache(block_t blk_addr, pgoff_t file_offset);
-  zx_status_t FindDataPage(pgoff_t index, fbl::RefPtr<Page> *out);
+  zx_status_t FindDataPage(pgoff_t index, LockedPage *out);
   // This function returns block addresses and LockedPages for requested offsets. If there is no
   // node page of a offset or the block address is not assigned, this function adds null LockedPage
   // and kNullAddr to LockedPagesAndAddrs struct. The handling of null LockedPage and kNullAddr is
@@ -135,7 +135,7 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out);
 
   zx::result<block_t> GetBlockAddrForDirtyDataPage(LockedPage &page, bool is_reclaim);
-  zx::result<std::vector<LockedPage>> WriteBegin(const size_t offset, const size_t len);
+  zx::result<> WriteBegin(const size_t offset, const size_t len, const bool vmo_dirty = false);
 
   virtual zx_status_t RecoverInlineData(NodePage &node_page) __TA_EXCLUDES(info_mutex_) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -406,16 +406,15 @@ class VnodeF2fs : public fs::PagedVnode,
     return file_cache_->GetReadaheadPagesInfo(index, max_scan);
   }
 
-  void ClearFileCache() { file_cache_->ReleaseInactivePages(); }
-
   pgoff_t Writeback(WritebackOperation &operation) { return file_cache_->Writeback(operation); }
+
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax) {
     return file_cache_->InvalidatePages(start, end);
   }
   void ResetFileCache(pgoff_t start = 0, pgoff_t end = kPgOffMax) { file_cache_->Reset(); }
-  void ClearDirtyPages(pgoff_t start = 0, pgoff_t end = kPgOffMax) {
+  void ClearDirtyPagesForOrphan() {
     if (!file_cache_->SetOrphan()) {
-      file_cache_->ClearDirtyPages(start, end);
+      file_cache_->ClearDirtyPages();
     }
   }
 
@@ -450,16 +449,13 @@ class VnodeF2fs : public fs::PagedVnode,
   }
   zx_status_t Truncate(size_t len) override __TA_EXCLUDES(mutex_) { return ZX_ERR_NOT_SUPPORTED; }
   DirtyPageList &GetDirtyPageList() const { return file_cache_->GetDirtyPageList(); }
-  zx::result<size_t> WritebackBegin(PagedVfsCallback cb) {
-    return vmo_manager_->WritebackBegin(std::move(cb));
-  }
-  zx_status_t WritebackEnd(PagedVfsCallback cb, size_t size_in_blocks) {
-    return vmo_manager_->WritebackEnd(std::move(cb), size_in_blocks);
-  }
+  VmoManager &GetVmoManager() const { return vmo_manager(); }
 
  protected:
   void RecycleNode() override;
   VmoManager &vmo_manager() const { return *vmo_manager_; }
+  void ReportPagerError(const uint64_t offset, const uint64_t length, const zx_status_t err)
+      __TA_REQUIRES_SHARED(mutex_);
 
  private:
   zx::result<block_t> GetBlockAddrForDataPage(LockedPage &page);
@@ -474,8 +470,6 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t ClonePagedVmo(fuchsia_io::wire::VmoFlags flags, size_t size, zx::vmo *out_vmo)
       __TA_REQUIRES(mutex_);
   void SetPagedVmoName() __TA_REQUIRES(mutex_);
-  void ReportPagerError(const uint64_t offset, const uint64_t length, const zx_status_t err)
-      __TA_REQUIRES_SHARED(mutex_);
 
   std::unique_ptr<VmoManager> vmo_manager_;
   std::unique_ptr<FileCache> file_cache_;

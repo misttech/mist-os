@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <sys/stat.h>
+#include <zircon/syscalls-next.h>
 
 #include "src/storage/f2fs/f2fs.h"
 
@@ -15,12 +16,7 @@ VnodeF2fs::VnodeF2fs(F2fs *fs, ino_t ino, umode_t mode)
   }
 }
 
-fs::VnodeProtocolSet VnodeF2fs::GetProtocols() const {
-  if (IsDir()) {
-    return fs::VnodeProtocol::kDirectory;
-  }
-  return fs::VnodeProtocol::kFile;
-}
+fs::VnodeProtocolSet VnodeF2fs::GetProtocols() const { return fs::VnodeProtocol::kFile; }
 
 void VnodeF2fs::SetMode(const umode_t &mode) { mode_ = mode; }
 
@@ -55,15 +51,14 @@ bool VnodeF2fs::IsMeta() const {
 zx_status_t VnodeF2fs::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
                                               [[maybe_unused]] fs::Rights rights,
                                               fs::VnodeRepresentation *info) {
-  if (IsDir()) {
-    *info = fs::VnodeRepresentation::Directory();
-  } else {
-    *info = fs::VnodeRepresentation::File();
-  }
+  *info = fs::VnodeRepresentation::File();
   return ZX_OK;
 }
 
 zx_status_t VnodeF2fs::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) {
+  if (!IsReg()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
   if (flags & fuchsia_io::wire::VmoFlags::kExecute) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -73,12 +68,6 @@ zx_status_t VnodeF2fs::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo
   }
 
   std::lock_guard lock(mutex_);
-  ZX_DEBUG_ASSERT(open_count() > 0);
-
-  if (!IsReg()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
   auto size_or = CreatePagedVmo();
   if (size_or.is_error()) {
     return size_or.error_value();
@@ -96,7 +85,8 @@ zx::result<size_t> VnodeF2fs::CreatePagedVmo() {
   }
   if (!paged_vmo().is_valid()) {
     // TODO: consider updating the content size of vmo.
-    if (auto status = EnsureCreatePagedVmo(rounded_size, ZX_VMO_RESIZABLE); status.is_error()) {
+    if (auto status = EnsureCreatePagedVmo(rounded_size, ZX_VMO_RESIZABLE | ZX_VMO_TRAP_DIRTY);
+        status.is_error()) {
       return status.take_error();
     }
     SetPagedVmoName();
@@ -155,27 +145,22 @@ void VnodeF2fs::VmoRead(uint64_t offset, uint64_t length) {
   zx::vmo vmo;
   auto size_or = CreateAndPopulateVmo(vmo, offset, length);
   fs::SharedLock rlock(mutex_);
-  if (!paged_vmo()) {
+  if (unlikely(!paged_vmo())) {
     // Races with calling FreePagedVmo() on another thread can result in stale read requests. Ignore
     // them if the VMO is gone.
     FX_LOGS(WARNING) << "A pager-backed VMO is already freed: " << ZX_ERR_NOT_FOUND;
     return;
   }
 
-  if (size_or.is_error()) {
-    FX_LOGS(ERROR) << "failed to feed paged vmo at " << offset << " + " << length << ", "
+  if (unlikely(size_or.is_error())) {
+    FX_LOGS(ERROR) << "failed to popluate vmo at " << offset << " + " << length << ", "
                    << size_or.status_string();
     ReportPagerError(offset, length, ZX_ERR_BAD_STATE);
     return;
   }
-
-  std::optional vfs = this->vfs();
-  ZX_ASSERT(vfs.has_value());
-  if (auto ret = vfs.value().get().SupplyPages(paged_vmo(), offset, *size_or, std::move(vmo), 0);
+  if (auto ret = vmo_manager_->SupplyPages(*fs()->vfs(), offset, *size_or, std::move(vmo), 0);
       ret.is_error()) {
-    FX_LOGS(ERROR) << "failed to supply vmo at " << offset << " + " << *size_or << ", "
-                   << ret.status_string();
-    ReportPagerError(offset, *size_or, ZX_ERR_BAD_STATE);
+    ReportPagerError(offset, length, ZX_ERR_BAD_STATE);
   }
 }
 
@@ -187,7 +172,8 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
   std::vector<bool> block_bitmap;
   size_t block_offset = offset / kBlockSize;
 
-  if (TestFlag(InodeInfoFlag::kInlineData) || offset >= GetSize()) {
+  if (TestFlag(InodeInfoFlag::kInlineData) || offset >= GetSize() ||
+      TestFlag(InodeInfoFlag::kNoAlloc)) {
     // Just supply pages without read I/Os for appended or inline area.
     // |vmo_size| is set to kDefaultReadaheadSize by default
     // unless supplying |*vmo_ro| exceeds the boundary of paged vmo node.
@@ -238,6 +224,16 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
     }
   }
   return zx::ok(vmo_size);
+}
+
+void VnodeF2fs::VmoDirty(uint64_t offset, uint64_t length) {
+  auto ret = vmo_manager().DirtyPages(*fs()->vfs(), offset, offset + length);
+  if (unlikely(ret.is_error())) {
+    FX_LOGS(WARNING) << "failed to do ZX_PAGER_OP_DIRTY from " << offset << " to "
+                     << offset + length << ". " << ret.status_string();
+    fs::SharedLock lock(mutex_);
+    ReportPagerError(offset, length, ret.status_value());
+  }
 }
 
 void VnodeF2fs::OnNoPagedVmoClones() {
@@ -376,6 +372,8 @@ void VnodeF2fs::RecycleNode() {
     if (!fs()->IsTearDown()) {
       EvictVnode();
     }
+    file_cache_.reset();
+    vmo_manager_.reset();
     ReleasePagedVmo();
     Deactivate();
     delete this;
@@ -641,7 +639,7 @@ int VnodeF2fs::TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node
   if (nr_free) {
     LockedPage lock_page(fbl::RefPtr<Page>(&node_page), false);
     lock_page.SetDirty();
-    [[maybe_unused]] auto unused = lock_page.release(false);
+    lock_page.release(false);
     MarkInodeDirty();
   }
   return nr_free;
@@ -652,21 +650,23 @@ void VnodeF2fs::TruncateDataBlocks(NodePage &node_page) {
 }
 
 void VnodeF2fs::TruncatePartialDataPage(uint64_t from) {
-  size_t offset = from % kPageSize;
-
-  if (!offset) {
+  const size_t offset_in_block = from % kBlockSize;
+  if (!offset_in_block || TestFlag(InodeInfoFlag::kNoAlloc)) {
     return;
   }
 
-  fbl::RefPtr<Page> page;
-  if (FindDataPage(from >> kPageCacheShift, &page) != ZX_OK) {
-    return;
+  // Get page and zero the buffer after |from|.
+  const pgoff_t block_index = safemath::CheckDiv(from, kBlockSize).ValueOrDie();
+  LockedPage page;
+  if (FindDataPage(block_index, &page) == ZX_OK) {
+    page->WaitOnWriteback();
+    if (auto dirty_or = page.SetVmoDirty(); dirty_or.is_error()) {
+      VmoRead(safemath::CheckMul(page->GetKey(), kBlockSize).ValueOrDie(), kBlockSize);
+      ZX_ASSERT(page.SetVmoDirty().is_ok());
+    }
+    page.Zero(offset_in_block, kPageSize);
+    page.SetDirty();
   }
-
-  LockedPage locked_page(page);
-  locked_page->WaitOnWriteback();
-  locked_page->ZeroUserSegment(offset, kPageSize);
-  locked_page.SetDirty();
 }
 
 zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
@@ -719,7 +719,7 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
     TruncatePartialDataPage(from);
   }
   // After nullifying addrs, invalidate the regarding pages
-  [[maybe_unused]] auto invalid_pages = InvalidatePages(free_from);
+  InvalidatePages(free_from);
   return err;
 }
 
@@ -748,7 +748,7 @@ zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end) {
       TruncateDataBlocksRange(dnode_page.GetPage<NodePage>(), ofs_in_dnode, 1);
     }
   }
-  [[maybe_unused]] auto invalid_pages = InvalidatePages(pg_start, pg_end);
+  InvalidatePages(pg_start, pg_end);
   return ZX_OK;
 }
 
@@ -808,10 +808,10 @@ void VnodeF2fs::InitFileCache() {
       zx::vmo vmo;
       ZX_ASSERT(paged_vmo().duplicate(right, &vmo) == ZX_OK);
       vmo_manager_ =
-          std::make_unique<VmoManager>(VmoMode::kPaged, kDefaultBlocksPerSegment, std::move(vmo));
+          std::make_unique<VmoManager>(VmoMode::kPaged, GetSize(), kVmoNodeSize, std::move(vmo));
     }
   } else {
-    vmo_manager_ = std::make_unique<VmoManager>(VmoMode::kDiscardable, kDefaultBlocksPerSegment);
+    vmo_manager_ = std::make_unique<VmoManager>(VmoMode::kDiscardable, GetSize(), kVmoNodeSize);
   }
   file_cache_ = std::make_unique<FileCache>(this, vmo_manager_.get());
 }

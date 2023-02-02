@@ -16,6 +16,11 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   // Required for memory management, see the class comment above Vnode for more.
   void fbl_recycle() { RecycleNode(); }
 
+  fs::VnodeProtocolSet GetProtocols() const final;
+  zx_status_t GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
+                                     [[maybe_unused]] fs::Rights rights,
+                                     fs::VnodeRepresentation *info) final;
+
   // Lookup
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode> *out) final
       __TA_EXCLUDES(dir_mutex_);

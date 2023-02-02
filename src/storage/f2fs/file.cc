@@ -318,7 +318,6 @@ zx_status_t File::Read(void *data, size_t length, size_t offset, size_t *out_act
     uint8_t *const addr = static_cast<uint8_t *>(vmo_node.GetAddress());
     size_t num_bytes_in_node = safemath::CheckSub<size_t>(kVmoNodeSize, src_offset).ValueOrDie();
     num_bytes_in_node = std::min(num_bytes_in_node, num_bytes);
-    // Fill |data| from vmo_node.
     std::memcpy(static_cast<uint8_t *>(data) + dst_offset, &addr[src_offset], num_bytes_in_node);
 
     dst_offset += num_bytes_in_node;
@@ -348,46 +347,34 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
     ConvertInlineData();
   }
 
-  const pgoff_t block_index_start = safemath::CheckDiv<pgoff_t>(offset, kBlockSize).ValueOrDie();
-  const size_t offset_end = safemath::CheckAdd<size_t>(offset, len).ValueOrDie();
-  const pgoff_t block_index_end = CheckedDivRoundUp<pgoff_t>(offset_end, kBlockSize);
-
   fs()->GetSegmentManager().BalanceFs();
-  std::vector<LockedPage> data_pages;
-  data_pages.reserve(block_index_end - block_index_start);
-  if (auto result = WriteBegin(offset, len); result.is_error()) {
-    *out_actual = 0;
-    return result.error_value();
-  } else {
-    data_pages = std::move(result.value());
+  if (auto status = WriteBegin(offset, len); status.is_error()) {
+    return status.error_value();
   }
 
-  size_t off_in_block = safemath::CheckMod<size_t>(offset, kBlockSize).ValueOrDie();
-  size_t off_in_buf = 0;
-  size_t left = len;
+  size_t num_bytes = len;
+  const pgoff_t vmo_node_start = safemath::CheckDiv<pgoff_t>(offset, kVmoNodeSize).ValueOrDie();
+  const pgoff_t vmo_node_end =
+      CheckedDivRoundUp<pgoff_t>(safemath::CheckAdd(offset, num_bytes).ValueOrDie(), kVmoNodeSize);
+  size_t dst_offset = safemath::CheckMod(offset, kVmoNodeSize).ValueOrDie();
+  size_t src_offset = 0;
 
-  for (pgoff_t n = block_index_start; n < block_index_end && left; ++n) {
-    pgoff_t index = n - block_index_start;
-    size_t cur_len = safemath::CheckSub<size_t>(kBlockSize, off_in_block).ValueOrDie();
-    cur_len = std::min(cur_len, left);
+  for (size_t node = vmo_node_start; node < vmo_node_end && num_bytes; ++node) {
+    VmoHolder vmo_node(vmo_manager(), kBlocksPerVmoNode * node);
+    uint8_t *const addr = static_cast<uint8_t *>(vmo_node.GetAddress());
+    size_t num_bytes_in_node = safemath::CheckSub<size_t>(kVmoNodeSize, dst_offset).ValueOrDie();
+    num_bytes_in_node = std::min(num_bytes_in_node, num_bytes);
+    std::memcpy(&addr[dst_offset], static_cast<const uint8_t *>(data) + src_offset,
+                num_bytes_in_node);
 
-    ZX_ASSERT(index < data_pages.size());
-
-    LockedPage &data_page = data_pages[index];
-
-    memcpy(data_page->GetAddress<char>() + off_in_block,
-           static_cast<const char *>(data) + off_in_buf, cur_len);
-
-    off_in_block = 0;
-    off_in_buf += cur_len;
-    left -= cur_len;
-
-    data_page.SetDirty();
+    src_offset += num_bytes_in_node;
+    num_bytes -= num_bytes_in_node;
+    dst_offset = 0;
   }
 
-  if (off_in_buf > 0) {
-    if (offset + off_in_buf > GetSize()) {
-      SetSize(offset + off_in_buf);
+  if (src_offset > 0) {
+    if (offset + src_offset > GetSize()) {
+      SetSize(offset + src_offset);
     }
     timespec cur_time;
     clock_gettime(CLOCK_REALTIME, &cur_time);
@@ -396,10 +383,7 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
     MarkInodeDirty(true);
   }
 
-  *out_actual = off_in_buf;
-
-  // TODO(sk): remove it when memorypressure is available with stress-tests and fs-tests.
-  fs()->ScheduleWriteback();
+  *out_actual = src_offset;
 
   return ZX_OK;
 }
@@ -456,14 +440,14 @@ loff_t File::MaxFileSize(unsigned bits) {
   loff_t result = GetAddrsPerInode();
   loff_t leaf_count = kAddrsPerBlock;
 
-  /* two direct node blocks */
+  // two direct node blocks
   result += (leaf_count * 2);
 
-  /* two indirect node blocks */
+  // two indirect node blocks
   leaf_count *= kNidsPerBlock;
   result += (leaf_count * 2);
 
-  /* one double indirect node block */
+  // one double indirect node block
   leaf_count *= kNidsPerBlock;
   result += leaf_count;
 
@@ -481,6 +465,22 @@ zx_status_t File::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) {
     ConvertInlineData();
   }
   return VnodeF2fs::GetVmo(flags, out_vmo);
+}
+
+void File::VmoDirty(uint64_t offset, uint64_t length) {
+  // If kInlineData is set, it means that ConvertInlineData() is handling block allocation and
+  // migrating inline data to the block at |offset|. Just make this range dirty.
+  if (!TestFlag(InodeInfoFlag::kInlineData) && !TestFlag(InodeInfoFlag::kNoAlloc)) {
+    // File::DoWrite() has already allocated its block. When F2fs supports zx::stream, every block
+    // will be allocated here.
+    if (auto status = WriteBegin(offset, length, true); status.is_error()) {
+      FX_LOGS(WARNING) << "failed to reserve blocks at " << offset << " + " << length << ", "
+                       << status.status_string();
+      fs::SharedLock rlock(mutex_);
+      return ReportPagerError(offset, length, status.status_value());
+    }
+  }
+  return VnodeF2fs::VmoDirty(offset, length);
 }
 
 }  // namespace f2fs

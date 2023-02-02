@@ -39,6 +39,15 @@ const unsigned char kTypeByMode[S_IFMT >> kStatShift] = {
 
 Dir::Dir(F2fs *fs, ino_t ino, umode_t mode) : VnodeF2fs(fs, ino, mode) {}
 
+zx_status_t Dir::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
+                                        [[maybe_unused]] fs::Rights rights,
+                                        fs::VnodeRepresentation *info) {
+  *info = fs::VnodeRepresentation::Directory();
+  return ZX_OK;
+}
+
+fs::VnodeProtocolSet Dir::GetProtocols() const { return fs::VnodeProtocol::kDirectory; }
+
 block_t Dir::DirBlocks() { return safemath::checked_cast<block_t>(GetBlockCount()); }
 
 uint32_t Dir::DirBuckets(uint32_t level, uint8_t dir_level) {
@@ -131,13 +140,14 @@ DirEntry *Dir::FindInLevel(unsigned int level, std::string_view name, f2fs_hash_
   end_block = bidx + nblock;
 
   for (; bidx < end_block; ++bidx) {
-    fbl::RefPtr<Page> dentry_page;
+    LockedPage dentry_page;
     // no need to allocate new dentry pages to all the indices
     if (FindDataPage(bidx, &dentry_page) != ZX_OK) {
       room = true;
       continue;
     }
-    if (de = FindInBlock(dentry_page, name, &max_slots, namehash, res_page); de != nullptr) {
+    if (de = FindInBlock(dentry_page.release(), name, &max_slots, namehash, res_page);
+        de != nullptr) {
       break;
     }
     if (max_slots >= slot) {
@@ -197,14 +207,14 @@ DirEntry *Dir::FindEntry(std::string_view name, fbl::RefPtr<Page> *res_page) {
       return FindInInlineDir(name, res_page);
     }
 
-    fbl::RefPtr<Page> dentry_page;
+    LockedPage dentry_page;
     if (FindDataPage(*cache_page_index, &dentry_page) != ZX_OK) {
       return nullptr;
     }
 
     uint64_t max_slots = 0;
     f2fs_hash_t name_hash = DentryHash(name);
-    if (DirEntry *de = FindInBlock(dentry_page, name, &max_slots, name_hash, res_page);
+    if (DirEntry *de = FindInBlock(dentry_page.release(), name, &max_slots, name_hash, res_page);
         de != nullptr) {
       return de;
     }

@@ -291,9 +291,7 @@ zx_status_t GcManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno
     }
 
     node_page->WaitOnWriteback();
-    auto make_dirty = node_page->GetAddress<uint8_t>()[0];
     node_page.SetDirty();
-    node_page->GetAddress<uint8_t>()[0] = make_dirty;
   }
 
   return ZX_OK;
@@ -365,11 +363,6 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
       continue;
     }
 
-    LockedPage data_page;
-    if (auto err = vnode->GetLockedDataPage(start_bidx + ofs_in_node, &data_page); err != ZX_OK) {
-      continue;
-    }
-
     if (gc_type == GcType::kFgGc &&
         fs_->GetSuperblockInfo().FindVnodeFromVnodeSet(InoType::kOrphanIno, ino)) {
       // Here, GC already uploaded victim data block to the filecache.
@@ -377,7 +370,6 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
       // the vnode is recycled. Therefore, even if we truncate it here, orphan files that are
       // already opened can access data. If SPO occurs during the truncation, f2fs rolls back to the
       // previous checkpoint, so that the orphan file can be purged normally.
-      ZX_DEBUG_ASSERT(data_page->IsUptodate());
       LockedPage node_page;
       if (auto err = fs_->GetNodeManager().GetNodePage(entry->nid, &node_page); err != ZX_OK) {
         return err;
@@ -386,13 +378,28 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
       continue;
     }
 
+    LockedPage data_page;
+    const size_t block_index = start_bidx + ofs_in_node;
+    // Keeps as long as dir vnodes use discardable vmos.
+    if (vnode->IsReg()) {
+      if (auto err = vnode->GrabCachePage(block_index, &data_page); err != ZX_OK) {
+        continue;
+      }
+    } else if (auto err = vnode->GetLockedDataPage(block_index, &data_page); err != ZX_OK) {
+      continue;
+    }
+
     data_page->WaitOnWriteback();
-    // No need to add |data_page| to F2fs::dirty_data_page_list_ as victim Pages will be flushed
-    // after this loop.
-    uint8_t make_dirty = data_page->GetAddress<uint8_t>()[0];
+    // Ask kernel to dirty the vmo area for |data_page|. If the regarding pages are not present, we
+    // supply a vmo and dirty it again.
+    if (auto dirty_or = data_page.SetVmoDirty(); dirty_or.is_error()) {
+      vnode->VmoRead(safemath::CheckMul(data_page->GetKey(), kBlockSize).ValueOrDie(), kBlockSize);
+      ZX_ASSERT(data_page.SetVmoDirty().is_ok());
+    }
+    // No need to add |data_page| to F2fs::dirty_data_page_list_ as it will be flushed
+    // just after this loop.
     data_page.SetDirty(false);
     data_page->SetColdData();
-    data_page->GetAddress<uint8_t>()[0] = make_dirty;
     if (gc_type == GcType::kFgGc) {
       // If |data_page| is already in the list, remove it.
       vnode->GetDirtyPageList().RemoveDirty(data_page);

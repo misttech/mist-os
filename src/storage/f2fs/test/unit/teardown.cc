@@ -16,10 +16,10 @@
 namespace f2fs {
 namespace {
 
-class AsyncTearDownVnode : public VnodeF2fs {
+class AsyncTearDownVnode : public Dir {
  public:
   AsyncTearDownVnode(F2fs* fs, ino_t ino, sync_completion_t* completions)
-      : VnodeF2fs(fs, ino, 0), callback_(nullptr), completions_(completions) {}
+      : Dir(fs, ino, 0), callback_(nullptr), completions_(completions) {}
 
   ~AsyncTearDownVnode() {
     // C) Tear down the Vnode.

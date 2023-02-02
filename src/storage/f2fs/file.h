@@ -36,6 +36,7 @@ class File : public VnodeF2fs, public fbl::Recyclable<File> {
   zx_status_t RecoverInlineData(NodePage& node_page) final;
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final
       __TA_EXCLUDES(mutex_);
+  void VmoDirty(uint64_t offset, uint64_t length) final __TA_EXCLUDES(mutex_);
 
  private:
   zx_status_t ReadInline(void* data, size_t len, size_t off, size_t* out_actual);

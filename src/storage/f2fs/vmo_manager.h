@@ -8,9 +8,15 @@
 #include <fbl/intrusive_wavl_tree.h>
 
 #include "src/storage/f2fs/f2fs_layout.h"
+#include "src/storage/f2fs/f2fs_lib.h"
 #include "src/storage/f2fs/f2fs_types.h"
 
 namespace f2fs {
+
+constexpr uint64_t kMaxVmoSize = std::numeric_limits<uint64_t>::max();
+constexpr size_t kBlocksPerVmoNode = kDefaultBlocksPerSegment;
+constexpr size_t kVmoNodeSize = safemath::CheckMul(kBlocksPerVmoNode, kBlockSize).ValueOrDie();
+constexpr pgoff_t kPgOffMax = std::numeric_limits<pgoff_t>::max() / kBlockSize;
 
 enum class VmoMode {
   kDiscardable = 0,
@@ -40,8 +46,6 @@ class VmoMapping : public fbl::WAVLTreeContainable<std::unique_ptr<VmoMapping>> 
   }
   zx_vaddr_t address() const { return address_; }
   size_t get_size() const { return size_in_blocks_; }
-  zx_vaddr_t page_to_address(pgoff_t page_index) const;
-  pgoff_t address_to_page(zx_vaddr_t address) const;
   pgoff_t index() const { return index_; }
   uint64_t increase_active_pages() { return ++active_pages_; }
   uint64_t decrease_active_pages() { return --active_pages_; }
@@ -100,8 +104,6 @@ class VmoDiscardable : public VmoMapping {
   std::vector<bool> page_bitmap_;
 };
 
-using PagedVfsCallback = fit::function<zx::result<>(zx::vmo &vmo, size_t start, size_t end)>;
-
 // It provides vmo service to Filecache of a vnode. To cover the full range of a vnode and save va
 // mapping resource, it divides the range of a vnode into a fixed size of vmo nodes and keeps them
 // in |vmo_tree_|. A vmo node represents a range between VmoMapping::index_ and VmoMapping::index_ +
@@ -112,19 +114,7 @@ using PagedVfsCallback = fit::function<zx::result<>(zx::vmo &vmo, size_t start, 
 class VmoManager {
  public:
   VmoManager() = delete;
-  VmoManager(VmoMode mode, size_t size, zx::vmo vmo = {})
-      : mode_(mode), node_size_in_blocks_(size), vmo_(std::move(vmo)) {
-    if (vmo_.is_valid()) {
-      size_t size_in_bytes;
-      ZX_ASSERT(vmo_.get_size(&size_in_bytes) == ZX_OK);
-      size_t new_size_in_bytes =
-          fbl::round_up(size_in_bytes, kBlockSize * kDefaultBlocksPerSegment);
-      size_in_blocks_ = new_size_in_bytes / kBlockSize;
-      if (new_size_in_bytes != size_in_bytes) {
-        ZX_ASSERT(vmo_.set_size(new_size_in_bytes) == ZX_OK);
-      }
-    }
-  }
+  VmoManager(VmoMode mode, size_t content_size, size_t node_size, zx::vmo vmo = {});
   VmoManager(const VmoManager &) = delete;
   VmoManager &operator=(const VmoManager &) = delete;
   VmoManager(const VmoManager &&) = delete;
@@ -137,10 +127,29 @@ class VmoManager {
   zx::result<bool> CreateAndLockVmo(pgoff_t index) __TA_EXCLUDES(mutex_);
   zx_status_t UnlockVmo(pgoff_t index, bool evict) __TA_EXCLUDES(mutex_);
   zx::result<zx_vaddr_t> GetAddress(pgoff_t index) __TA_EXCLUDES(mutex_);
-  zx_status_t ZeroRange(pgoff_t start, pgoff_t end) __TA_EXCLUDES(mutex_);
-  zx::result<size_t> WritebackBegin(PagedVfsCallback cb) __TA_EXCLUDES(mutex_);
-  zx_status_t WritebackEnd(PagedVfsCallback cb, size_t size_in_blocks) __TA_EXCLUDES(mutex_);
+  void ZeroBlocks(fs::PagedVfs &vfs, pgoff_t start, pgoff_t end) __TA_EXCLUDES(mutex_);
+  zx::result<size_t> WritebackBeginUnsafe(fs::PagedVfs &vfs, const size_t start = 0,
+                                          const size_t end = kMaxVmoSize)
+      __TA_REQUIRES_SHARED(mutex_);
+  zx::result<size_t> WritebackBegin(fs::PagedVfs &vfs, const size_t start = 0,
+                                    const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);
+  zx_status_t WritebackEndUnsafe(fs::PagedVfs &vfs, const size_t start = 0,
+                                 const size_t end = kMaxVmoSize) __TA_REQUIRES_SHARED(mutex_);
+  zx_status_t WritebackEnd(fs::PagedVfs &vfs, const size_t start = 0,
+                           const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);
+  zx::result<size_t> DirtyPagesUnsafe(fs::PagedVfs &vfs, const size_t start = 0,
+                                      const size_t end = kMaxVmoSize) __TA_REQUIRES_SHARED(mutex_);
+  zx::result<size_t> DirtyPages(fs::PagedVfs &vfs, const size_t start = 0,
+                                const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);
+  void ClearDirtyPages(fs::PagedVfs &vfs, const size_t start = 0, const size_t end = kMaxVmoSize)
+      __TA_EXCLUDES(mutex_);
+  void ClearDirtyPagesUnsafe(fs::PagedVfs &vfs, const size_t start = 0,
+                             const size_t end = kMaxVmoSize) __TA_REQUIRES_SHARED(mutex_);
+  zx::result<> SupplyPages(fs::PagedVfs &vfs, const size_t offset, const size_t length, zx::vmo vmo,
+                           const size_t aux_offset) __TA_EXCLUDES(mutex_);
+
   void Reset(bool shutdown = false) __TA_EXCLUDES(mutex_);
+  bool IsPaged() const { return mode_ == VmoMode::kPaged; }
 
  private:
   pgoff_t GetOffsetInVmoNode(pgoff_t page_index) const;
@@ -155,7 +164,6 @@ class VmoManager {
   VmoTree vmo_tree_ __TA_GUARDED(mutex_);
   const VmoMode mode_;
 
-  // the maximum file size (4TiB) in blocks
   size_t size_in_blocks_ __TA_GUARDED(mutex_) = 0;
   size_t writeback_ops_ __TA_GUARDED(mutex_) = 0;
   const size_t node_size_in_blocks_ = 0;
@@ -167,11 +175,16 @@ class VmoManager {
 class VmoHolder final {
  public:
   VmoHolder() = delete;
-  VmoHolder(VmoManager &manager, const pgoff_t index) : manager_(manager), index_(index) {
+  VmoHolder(const VmoHolder &) = delete;
+  VmoHolder &operator=(const VmoHolder &) = delete;
+  VmoHolder(VmoHolder &&) = delete;
+  VmoHolder &operator=(VmoHolder &&) = delete;
+  explicit VmoHolder(VmoManager &manager, const pgoff_t index) : manager_(manager), index_(index) {
     auto ret = manager_.CreateAndLockVmo(index_);
     ZX_ASSERT_MSG(ret.is_ok(), "failed to get vmo node at %lu. %s", index_, ret.status_string());
   }
   ~VmoHolder() { ZX_ASSERT(manager_.UnlockVmo(index_, true) == ZX_OK); }
+
   void *GetAddress() {
     auto addr_or = manager_.GetAddress(index_);
     ZX_ASSERT(addr_or.is_ok());
@@ -181,6 +194,24 @@ class VmoHolder final {
  private:
   VmoManager &manager_;
   const pgoff_t index_;
+};
+
+// A utility class to notify kernel of start and end of writeback for a file vnode.
+class VmoCleaner final {
+ public:
+  VmoCleaner() = delete;
+  VmoCleaner(const VmoCleaner &) = delete;
+  VmoCleaner &operator=(const VmoCleaner &) = delete;
+  VmoCleaner(VmoCleaner &&) = delete;
+  VmoCleaner &operator=(VmoCleaner &&) = delete;
+  explicit VmoCleaner(VnodeF2fs &vnode, const pgoff_t start = 0, const pgoff_t end = kPgOffMax);
+  ~VmoCleaner();
+
+ private:
+  fs::PagedVfs &vfs_;
+  VmoManager &manager_;
+  size_t offset_ = 0;
+  size_t size_ = 0;
 };
 
 }  // namespace f2fs

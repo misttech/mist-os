@@ -34,18 +34,20 @@ TEST(MultiThreads, Truncate) {
   uint8_t buf[kPageSize * 2] = {1};
   FileTester::AppendToFile(vn.get(), buf, sizeof(buf));
   std::thread thread1 = std::thread([&]() {
+    bool run = true;
+    std::thread thread2 = std::thread([&]() {
+      while (run) {
+        ASSERT_EQ(vn->Truncate(0), ZX_OK);
+      }
+    });
     for (int i = 0; i < kNTry; ++i) {
       size_t out_actual;
       ASSERT_EQ(vn->Write(buf, sizeof(buf), 0, &out_actual), ZX_OK);
     }
-  });
-  std::thread thread2 = std::thread([&]() {
-    for (int i = 0; i < kNTry; ++i) {
-      ASSERT_EQ(vn->Truncate(0), ZX_OK);
-    }
+    run = false;
+    thread2.join();
   });
   thread1.join();
-  thread2.join();
   vn->Close();
   vn = nullptr;
   root_dir->Close();

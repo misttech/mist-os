@@ -152,6 +152,7 @@ TEST_F(FileCacheTest, EvictActivePages) {
 
   // Evict every inactive Page.
   op.bReleasePages = true;
+  op.bSync = false;
   ASSERT_EQ(vn->Writeback(op), 0ULL);
 
   for (auto i = 0ULL; i < kPageNum; ++i) {
@@ -306,11 +307,7 @@ TEST_F(FileCacheTest, Recycle) {
   thread1.join();
   thread2.join();
 
-  {
-    LockedPage locked_page;
-    vn->GrabCachePage(0, &locked_page);
-    locked_page->Invalidate();
-  }
+  cache.InvalidatePages();
 
   // Test FileCache::Downgrade() and FileCache::Reset() with multiple threads.
   std::thread thread_get_page([&]() {

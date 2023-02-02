@@ -160,14 +160,12 @@ zx::result<block_t> VnodeF2fs::FindDataBlkAddr(pgoff_t index) {
   return zx::ok(DatablockAddr(&dnode_page.GetPage<NodePage>(), ofs_in_dnode));
 }
 
-zx_status_t VnodeF2fs::FindDataPage(pgoff_t index, fbl::RefPtr<Page> *out) {
-  {
-    fbl::RefPtr<Page> page;
-    if (zx_status_t ret = FindPage(index, &page); ret == ZX_OK) {
-      if ((page)->IsUptodate()) {
-        *out = std::move(page);
-        return ret;
-      }
+zx_status_t VnodeF2fs::FindDataPage(pgoff_t index, LockedPage *out) {
+  fbl::RefPtr<Page> page;
+  if (zx_status_t ret = FindPage(index, &page); ret == ZX_OK) {
+    if (page->IsUptodate()) {
+      *out = LockedPage(std::move(page));
+      return ret;
     }
   }
 
@@ -190,18 +188,14 @@ zx_status_t VnodeF2fs::FindDataPage(pgoff_t index, fbl::RefPtr<Page> *out) {
     return err;
   }
 
-  if (IsReg()) {
-    locked_page->SetUptodate();
-    *out = locked_page.release();
-    return ZX_OK;
+  if (!IsReg()) {
+    auto status = fs()->MakeReadOperation(locked_page, data_blkaddr, PageType::kData);
+    if (status.is_error()) {
+      return status.error_value();
+    }
   }
 
-  auto status = fs()->MakeReadOperation(locked_page, data_blkaddr, PageType::kData);
-  if (status.is_error()) {
-    return status.status_value();
-  }
-
-  *out = locked_page.release();
+  *out = std::move(locked_page);
   return ZX_OK;
 }
 
@@ -277,6 +271,7 @@ zx_status_t VnodeF2fs::GetLockedDataPage(pgoff_t index, LockedPage *out) {
 
 zx::result<std::vector<LockedPage>> VnodeF2fs::GetLockedDataPages(const pgoff_t start,
                                                                   const pgoff_t end) {
+  ZX_ASSERT(!IsReg());
   LockedPagesAndAddrs addrs_and_pages;
   if (auto addrs_and_pages_or = FindDataBlockAddrsAndPages(start, end);
       addrs_and_pages_or.is_error()) {
@@ -349,7 +344,7 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
 
   if (data_blkaddr == kNewAddr) {
     page->SetUptodate();
-    page->ZeroUserSegment();
+    page.Zero();
   } else {
     ZX_ASSERT_MSG(data_blkaddr == kNewAddr, "%lu page should have kNewAddr but (0x%x)",
                   page->GetKey(), data_blkaddr);
@@ -473,7 +468,8 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDirtyDataPage(LockedPage &page, bo
       page->ClearDirtyForIo();
       return zx::error(ZX_ERR_NOT_FOUND);
     }
-    page->ZeroUserSegment(offset);
+    // The lock and writeback flags prevent its data to be changed or truncated during this
+    // writeback.
   }
 
   // TODO: Consider skipping the wb for hot/warm blocks
@@ -498,35 +494,33 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDirtyDataPage(LockedPage &page, bo
   return zx::ok(blk_addr);
 }
 
-zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, const size_t len) {
+zx::result<> VnodeF2fs::WriteBegin(const size_t offset, const size_t len, const bool vmo_dirty) {
   const pgoff_t index_start = safemath::CheckDiv<pgoff_t>(offset, kBlockSize).ValueOrDie();
   const size_t offset_end = safemath::CheckAdd<size_t>(offset, len).ValueOrDie();
   const pgoff_t index_end = CheckedDivRoundUp<pgoff_t>(offset_end, kBlockSize);
 
-  std::vector<LockedPage> data_pages;
-  data_pages.reserve(index_end - index_start);
-  if (auto pages_or = GrabCachePages(index_start, index_end); pages_or.is_error()) {
-    return pages_or.take_error();
+  if (vmo_dirty) {
+    fs::SharedLock rlock(fs()->GetSuperblockInfo().GetFsLock(LockType::kFileOp));
+    std::vector<LockedPage> data_pages;
+    data_pages.reserve(index_end - index_start);
+    if (auto pages_or = GrabCachePages(index_start, index_end); pages_or.is_error()) {
+      return pages_or.take_error();
+    } else {
+      data_pages = std::move(pages_or.value());
+    }
+    for (auto &page : data_pages) {
+      page->WaitOnWriteback();
+      page.SetDirty();
+    }
   } else {
-    data_pages = std::move(pages_or.value());
+    std::vector<block_t> data_block_addresses;
+    if (auto result = fs()->GetNodeManager().GetDataBlockAddresses(*this, index_start,
+                                                                   index_end - index_start);
+        result.is_error()) {
+      return result.take_error();
+    }
   }
-
-  fs::SharedLock rlock(fs()->GetSuperblockInfo().GetFsLock(LockType::kFileOp));
-
-  for (auto &page : data_pages) {
-    page->WaitOnWriteback();
-  }
-
-  std::vector<block_t> data_block_addresses;
-  if (auto result =
-          fs()->GetNodeManager().GetDataBlockAddresses(*this, index_start, index_end - index_start);
-      result.is_error()) {
-    return result.take_error();
-  } else {
-    data_block_addresses = std::move(result.value());
-  }
-
-  return zx::ok(std::move(data_pages));
+  return zx::ok();
 }
 
 }  // namespace f2fs

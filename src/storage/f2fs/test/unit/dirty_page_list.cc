@@ -45,7 +45,7 @@ TEST_F(DirtyPageListTest, AddAndRemoveDirtyPage) {
   vn = nullptr;
 }
 
-TEST_F(DirtyPageListTest, TakeeDirtyPages) {
+TEST_F(DirtyPageListTest, TakeDirtyPages) {
   fbl::RefPtr<fs::Vnode> test_file;
   root_dir_->Create("test", S_IFREG, &test_file);
   fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
@@ -114,7 +114,6 @@ TEST_F(DirtyPageListTest, ResetFileCache) {
     raw_page = locked_page.get();
   }
 
-  vn->GetDirtyPageList().Reset();
   raw_page->GetFileCache().Reset();
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 0U);
 
@@ -122,7 +121,7 @@ TEST_F(DirtyPageListTest, ResetFileCache) {
   vn = nullptr;
 }
 
-TEST_F(DirtyPageListTest, ResetDirtyPageList) {
+TEST_F(DirtyPageListTest, Invalidate) {
   fbl::RefPtr<fs::Vnode> test_file;
   root_dir_->Create("test", S_IFREG, &test_file);
   fbl::RefPtr<f2fs::File> vn = fbl::RefPtr<f2fs::File>::Downcast(std::move(test_file));
@@ -133,16 +132,18 @@ TEST_F(DirtyPageListTest, ResetDirtyPageList) {
 
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 1U);
 
+  Page *raw_page;
   {
     LockedPage locked_page;
     vn->GrabCachePage(0, &locked_page);
     ASSERT_EQ(locked_page->IsDirty(), true);
     ASSERT_EQ(locked_page->InTreeContainer(), true);
     ASSERT_EQ(locked_page->InListContainer(), true);
+    raw_page = locked_page.get();
   }
 
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 1U);
-  vn->GetDirtyPageList().Reset();
+  raw_page->GetFileCache().InvalidatePages();
   ASSERT_EQ(vn->GetDirtyPageList().Size(), 0U);
 
   vn->Close();

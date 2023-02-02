@@ -71,7 +71,7 @@ zx::result<> Reader::ReadBlocks(std::vector<LockedPage> &pages, std::vector<bloc
                                         ++key;
                                       }
                                     } else {
-                                      pages[i]->ZeroUserSegment();
+                                      pages[i].Zero();
                                     }
                                     pages[i]->SetUptodate();
                                   }

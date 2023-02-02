@@ -30,7 +30,6 @@
 #include <lib/zx/result.h>
 
 #include <fbl/algorithm.h>
-#include <fbl/intrusive_wavl_tree.h>
 #include <fbl/intrusive_double_list.h>
 #include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
@@ -64,9 +63,6 @@
 #include "src/storage/f2fs/f2fs_layout.h"
 #include "src/storage/f2fs/bcache.h"
 #include "src/storage/f2fs/mount.h"
-#include "src/storage/f2fs/vmo_manager.h"
-#include "src/storage/f2fs/file_cache.h"
-#include "src/storage/f2fs/node_page.h"
 #include "src/storage/f2fs/f2fs_internal.h"
 #include "src/storage/f2fs/namestring.h"
 #include "src/storage/f2fs/storage_buffer.h"
@@ -332,9 +328,6 @@ class F2fs final {
   // for unittest
   std::unique_ptr<PlatformVfs> vfs_for_tests_;
 
-  std::unique_ptr<VnodeF2fs> node_vnode_;
-  std::unique_ptr<VnodeF2fs> meta_vnode_;
-  fbl::RefPtr<VnodeF2fs> root_vnode_;
   MountOptions mount_options_;
 
   std::unique_ptr<Superblock> raw_sb_;
@@ -343,11 +336,16 @@ class F2fs final {
   std::unique_ptr<NodeManager> node_manager_;
   std::unique_ptr<GcManager> gc_manager_;
 
-  VnodeCache vnode_cache_;
   std::unique_ptr<Reader> reader_;
   std::unique_ptr<Writer> writer_;
 
+  std::unique_ptr<VnodeF2fs> meta_vnode_;
+  std::unique_ptr<VnodeF2fs> node_vnode_;
+  fbl::RefPtr<VnodeF2fs> root_vnode_;
+
+  VnodeCache vnode_cache_;
   DirEntryCache dir_entry_cache_;
+
   zx::event fs_id_;
   std::unique_ptr<InspectTree> inspect_tree_;
   std::atomic<MemoryPressure> current_memory_pressure_level_ = MemoryPressure::kUnknown;

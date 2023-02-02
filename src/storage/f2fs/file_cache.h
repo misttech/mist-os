@@ -8,6 +8,7 @@
 #include <condition_variable>
 #include <utility>
 
+#include <fbl/intrusive_double_list.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <safemath/checked_math.h>
 #include <storage/buffer/block_buffer.h>
@@ -31,8 +32,6 @@ enum class PageFlag {
   kPageColdData,      // It is under garbage collecting. It must not be inplace updated.
   kPageFlagSize,
 };
-
-constexpr pgoff_t kPgOffMax = std::numeric_limits<pgoff_t>::max() / kBlockSize;
 
 // It defines a writeback operation.
 struct WritebackOperation {
@@ -153,12 +152,6 @@ class Page : public PageRefCounted<Page>,
   // its block address in a dnode or nat entry first.
   void Invalidate();
 
-  void ZeroUserSegment(size_t start = 0, size_t end = BlockSize()) const {
-    if (start < end && end <= BlockSize()) {
-      std::memset(GetAddress<uint8_t>() + start, 0, end - start);
-    }
-  }
-
   static constexpr uint32_t BlockSize() { return kPageSize; }
   block_t GetBlockAddr() const { return block_addr_; }
   zx::result<> SetBlockAddr(block_t addr);
@@ -262,9 +255,20 @@ class LockedPage final {
     }
   }
 
+  // It works only for paged vmo. When f2fs needs to update the contents of a page without
+  // triggering Vnode::VmoDirty(), it calls this method before the modification. If its page is
+  // present, kernel pre-dirties the page. If not, it returns zx::error(ZX_ERR_NOT_FOUND), and the
+  // caller have to supply a vmo.
+  zx::result<> SetVmoDirty();
+
   // Call Page::SetDirty().
   // If |add_to_list| is true, it is inserted into F2fs::dirty_data_page_list_.
   bool SetDirty(bool add_to_list = true);
+  void Zero(size_t start = 0, size_t end = kPageSize) const {
+    if (start < end && end <= Page::BlockSize()) {
+      std::memset(page_->GetAddress<uint8_t>() + start, 0, end - start);
+    }
+  }
 
   // release() returns the unlocked page without changing its ref_count.
   // After release() is called, the LockedPage instance no longer has the ownership of the Page.
@@ -307,13 +311,11 @@ class DirtyPageList {
   DirtyPageList &operator=(const DirtyPageList &&) = delete;
   ~DirtyPageList();
 
-  void Reset() __TA_EXCLUDES(list_lock_);
-
   zx::result<> AddDirty(LockedPage &page) __TA_EXCLUDES(list_lock_);
   zx_status_t RemoveDirty(LockedPage &page) __TA_EXCLUDES(list_lock_);
 
   uint64_t Size() const __TA_EXCLUDES(list_lock_) {
-    fs::SharedLock read_lock(list_lock_);
+    fs::SharedLock lock(list_lock_);
     return dirty_list_.size();
   }
 
@@ -356,13 +358,17 @@ class FileCache {
   zx_status_t FindPage(pgoff_t index, fbl::RefPtr<Page> *out) __TA_EXCLUDES(tree_lock_);
   // It tries to write out dirty Pages that meets |operation| in |page_tree_|.
   pgoff_t Writeback(WritebackOperation &operation) __TA_EXCLUDES(tree_lock_);
+  // It tries to write out all dirty Pages from dirty_page_list_.
+  pgoff_t WritebackFromDirtyList(const WritebackOperation &operation) __TA_EXCLUDES(tree_lock_);
+
   // It invalidates Pages within the range of |start| to |end| in |page_tree_|.
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax)
       __TA_EXCLUDES(tree_lock_);
   // It removes all Pages from |page_tree_|. It should be called when no one can get access to
   // |vnode_|. (e.g., fbl_recycle()) It assumes that all active Pages are under writeback.
   void Reset() __TA_EXCLUDES(tree_lock_);
-  void ClearDirtyPages(pgoff_t start, pgoff_t end) __TA_EXCLUDES(tree_lock_);
+  // Clear all dirty pages.
+  void ClearDirtyPages() __TA_EXCLUDES(tree_lock_);
   // Evict and release inactive pages.
   void ReleaseInactivePages() __TA_EXCLUDES(tree_lock_);
 
@@ -414,7 +420,6 @@ class FileCache {
   using PageTree = fbl::WAVLTree<pgoff_t, Page *, PageTreeTraits>;
 
   fs::SharedMutex tree_lock_;
-  // TODO: remove it once zx_pager_query_dirty_ranges() is available.
   DirtyPageList dirty_page_list_;
   // If its file is orphaned, set it to prevent further dirty Pages.
   std::atomic_flag is_orphan_ = ATOMIC_FLAG_INIT;

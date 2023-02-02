@@ -261,7 +261,7 @@ void FileTester::CheckChildrenInBlock(Dir *vn, uint64_t bidx,
     childs.insert("..");
   }
 
-  fbl::RefPtr<Page> page = nullptr;
+  LockedPage page;
 
   if (childs.empty()) {
     ASSERT_EQ(vn->FindDataPage(bidx, &page), ZX_ERR_NOT_FOUND);

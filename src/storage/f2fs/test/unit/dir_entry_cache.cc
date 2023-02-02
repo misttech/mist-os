@@ -206,7 +206,7 @@ TEST_F(DirEntryCacheTest, CacheDataValidation) {
     // Validate cached child name
     ASSERT_EQ(element->GetName(), child_name_from_key);
 
-    fbl::RefPtr<Page> page = nullptr;
+    LockedPage page;
 
     // To validate cached parent ino, read a page for cached index
     ASSERT_EQ(root_dir_->FindDataPage(element->GetDataPageIndex(), &page), ZX_OK);

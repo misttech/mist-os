@@ -46,6 +46,7 @@ TEST(SuperblockTest, SanityCheckRawSuper) {
   ASSERT_EQ(fs->FillSuper(), ZX_ERR_INVALID_ARGS);
 
   fs->GetVCache().Reset();
+  fs->Reset();
 }
 
 TEST(SuperblockTest, GetValidCheckpoint) {
@@ -72,6 +73,7 @@ TEST(SuperblockTest, GetValidCheckpoint) {
   ASSERT_EQ(fs->FillSuper(), ZX_ERR_INVALID_ARGS);
 
   fs->GetVCache().Reset();
+  fs->Reset();
 }
 
 TEST(SuperblockTest, SanityCheckCkpt) {
@@ -101,6 +103,7 @@ TEST(SuperblockTest, SanityCheckCkpt) {
   ASSERT_EQ(fs->FillSuper(), ZX_ERR_BAD_STATE);
 
   fs->GetVCache().Reset();
+  fs->Reset();
 }
 
 TEST(SuperblockTest, Reset) {
@@ -128,9 +131,9 @@ TEST(SuperblockTest, Reset) {
   ASSERT_FALSE(fs->IsValid());
   fs->ResetSegmentManager();
   ASSERT_FALSE(fs->IsValid());
-  fs->ResetSuperblockInfo();
-  ASSERT_FALSE(fs->IsValid());
   fs->ResetPsuedoVnodes();
+  ASSERT_FALSE(fs->IsValid());
+  fs->ResetSuperblockInfo();
   ASSERT_FALSE(fs->IsValid());
   ASSERT_TRUE(fs->GetRootVnode().is_error());
 

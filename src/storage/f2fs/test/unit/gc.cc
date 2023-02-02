@@ -195,8 +195,9 @@ TEST_F(GcManagerTest, PageColdData) {
   {
     auto result = file->WriteBegin(0, kPageSize);
     ASSERT_TRUE(result.is_ok());
-    std::vector<LockedPage> data_pages = std::move(result.value());
-    data_pages[0].SetDirty();
+    LockedPage page;
+    file->GrabCachePage(0, &page);
+    page.SetDirty();
   }
   // If kPageColdData flag is not set, allocate its block as SSR or LFS.
   ASSERT_NE(file->Writeback(op), 0UL);
@@ -207,9 +208,10 @@ TEST_F(GcManagerTest, PageColdData) {
   {
     auto result = file->WriteBegin(0, kPageSize);
     ASSERT_TRUE(result.is_ok());
-    std::vector<LockedPage> data_pages = std::move(result.value());
-    data_pages[0].SetDirty();
-    data_pages[0]->SetColdData();
+    LockedPage page;
+    file->GrabCachePage(0, &page);
+    page.SetDirty();
+    page->SetColdData();
   }
   // If kPageColdData flag is set, allocate its block as LFS.
   CursegInfo *cold_curseg = fs_->GetSegmentManager().CURSEG_I(CursegType::kCursegColdData);

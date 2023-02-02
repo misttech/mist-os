@@ -32,9 +32,6 @@ inline bool F2fsCrcValid(uint32_t blk_crc, void *buff, uint32_t buff_size) {
 }
 
 // Bitmap operations
-inline size_t DivRoundUp(size_t n, size_t d) { return (((n) + (d)-1) / (d)); }
-inline size_t BitsToLongs(size_t nr) { return DivRoundUp(nr, kBitsPerByte * sizeof(long)); }
-
 inline void SetBit(uint32_t nr, void *addr) {
   uint8_t *bitmap = static_cast<uint8_t *>(addr);
   uint32_t size_per_iter = kBitsPerByte;
@@ -158,6 +155,10 @@ inline bool IsDotOrDotDot(std::string_view name) { return (name == "." || name =
 template <typename T>
 inline T CheckedDivRoundUp(const T n, const T d) {
   return safemath::CheckDiv<T>(fbl::round_up(n, d), d).ValueOrDie();
+}
+
+inline size_t BitsToLongs(size_t nr) {
+  return CheckedDivRoundUp<size_t>(nr, kBitsPerByte * sizeof(long));
 }
 
 constexpr uint32_t kBlockSize = 4096;  // F2fs block size in byte
