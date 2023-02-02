@@ -46,6 +46,10 @@
                     },
                     "type": "array"
                 },
+                "ifs": {
+                    "description": "LLVM IFS file used to describe the ABI of the library",
+                    "type": "string"
+                },
                 "include_dir": {
                     "$ref": "common.json#/definitions/file",
                     "description": "Path to the base directory for includes"

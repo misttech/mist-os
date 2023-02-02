@@ -55,6 +55,10 @@ def main():
         help=
         'Path to the file where to write the file mapping for the debug library',
         required=False)
+    parser.add_argument(
+        '--ifs',
+        help='Path to an llvm .ifs file',
+        required=False)
     args = parser.parse_args()
 
     metadata = {
@@ -70,6 +74,9 @@ def main():
             'link': args.lib_link,
         },
     }
+
+    if args.ifs:
+        metadata['ifs'] = args.ifs
 
     if args.lib_debug_file:
         # The path of the debug file in the SDK depends on its build id.

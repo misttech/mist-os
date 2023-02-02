@@ -26,6 +26,13 @@
                         }
                     ]
                 },
+                "ifs_files": {
+                    "description": "List of LLVM IFS files used to describe the ABIs of libraries in the sysroot",
+                    "items": {
+                        "$ref": "common.json#/definitions/file"
+                    },
+                    "type": "array"
+                },
                 "versions": {
                     "additionalProperties": false,
                     "description": "The various versions of the sysroot, per architecture",

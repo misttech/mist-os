@@ -372,6 +372,15 @@ template("sdk_shared_library") {
                 },
               ]
 
+  if (defined(invoker.symbols_api)) {
+    sdk_files += [
+      {
+        source = get_path_info(invoker.symbols_api, "abspath")
+        dest = "${sdk_root_path}/" + get_path_info(invoker.symbols_api, "file")
+      },
+    ]
+  }
+
   if (generate_plasa_artifacts) {
     _plasa_artifacts_target_name = "${main_target_name}_plasa"
     plasa_fragment_cc(_plasa_artifacts_target_name) {
@@ -437,6 +446,9 @@ template("sdk_shared_library") {
     ]
     args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
     args += [ "--headers" ] + sdk_metadata_headers
+    if (defined(invoker.symbols_api)) {
+      args += [ "--ifs" ] + [ get_path_info(invoker.symbols_api, "file") ]
+    }
 
     deps = sdk_deps + [ shared_lib_target ]
   }

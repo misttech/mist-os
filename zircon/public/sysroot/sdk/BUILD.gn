@@ -100,6 +100,17 @@ foreach(entry, sysroot_entries) {
   }
 }
 
+sdk_files += [
+  {
+    source = "//zircon/system/ulib/c/libc.ifs"
+    dest = "pkg/sysroot/libc.ifs"
+  },
+  {
+    source = "//src/zircon/lib/zircon/zircon.ifs"
+    dest = "pkg/sysroot/zircon.ifs"
+  },
+]
+
 sysroot_meta_json_file = "$target_gen_dir/sysroot.meta.in.json"
 
 generated_file("sysroot-meta-json") {
@@ -108,6 +119,10 @@ generated_file("sysroot-meta-json") {
   contents = {
     type = "sysroot"
     name = "sysroot"
+    ifs_files = [
+      "libc.ifs",
+      "zircon.ifs",
+    ]
     versions = {
       if (target_cpu == "arm64") {
         arm64 = version_content
