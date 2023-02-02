@@ -183,6 +183,8 @@ struct UsbXhci::UsbRequestState {
   TRB* last_trb;
 };
 
+UsbXhci::~UsbXhci() { device_state_.release(); }
+
 uint16_t UsbXhci::InterrupterMapping() {
   // No inactive interrupters. Find one with least pressure.
   uint16_t idx = 0;

@@ -388,6 +388,8 @@ zx_status_t TransferRing::CompleteTRB(TRB* trb, std::unique_ptr<TRBContext>* con
 
 DeviceState::~DeviceState() = default;
 
+UsbXhci::~UsbXhci() = default;
+
 TEST_F(EventRingHarness, ShortTransferTest) {
   InitSlot(1);
   TRB* start = trb();

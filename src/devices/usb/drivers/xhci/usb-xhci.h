@@ -92,6 +92,8 @@ class UsbXhci : public UsbXhciType, public ddk::UsbHciProtocol<UsbXhci, ddk::bas
         ddk_interaction_loop_(&kAsyncLoopConfigNeverAttachToThread),
         ddk_interaction_executor_(ddk_interaction_loop_.dispatcher()) {}
 
+  ~UsbXhci();
+
   // Called by the DDK bind operation.
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 

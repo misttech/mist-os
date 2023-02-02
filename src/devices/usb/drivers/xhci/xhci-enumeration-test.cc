@@ -363,6 +363,8 @@ fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupte
 
 DeviceState::~DeviceState() = default;
 
+UsbXhci::~UsbXhci() = default;
+
 void UsbXhci::CreateDeviceInspectNode(uint32_t slot, uint16_t vendor_id, uint16_t product_id) {}
 
 class EnumerationTests : public zxtest::Test {
