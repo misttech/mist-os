@@ -4,8 +4,8 @@
 
 use crate::agent::authority::Authority;
 use crate::agent::{
-    AgentCreator, AgentError, AgentRegistrar, Context, CreationFunc, Invocation, InvocationResult,
-    Lifespan, Payload,
+    AgentCreator, AgentError, Context, CreationFunc, Invocation, InvocationResult, Lifespan,
+    Payload,
 };
 use crate::service;
 use crate::service_context::ServiceContext;
@@ -77,7 +77,7 @@ impl TestAgent {
         id: u32,
         lifespan_target: LifespanTarget,
         callback: CallbackSender,
-    ) -> (Arc<Mutex<TestAgent>>, AgentRegistrar) {
+    ) -> (Arc<Mutex<TestAgent>>, AgentCreator) {
         let agent = Arc::new(Mutex::new(TestAgent {
             id,
             last_invocation: None,
@@ -107,10 +107,7 @@ impl TestAgent {
             },
         ));
 
-        (
-            agent,
-            AgentRegistrar::Creator(AgentCreator { debug_id: "TestAgent", create: creation_func }),
-        )
+        (agent, AgentCreator { debug_id: "TestAgent", create: creation_func })
     }
 
     async fn handle(&mut self, invocation: Invocation) -> InvocationResult {

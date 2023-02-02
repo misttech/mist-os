@@ -14,7 +14,7 @@ use futures::stream::{FuturesUnordered, StreamFuture};
 use futures::StreamExt;
 
 use crate::accessibility::types::AccessibilityInfo;
-use crate::agent::{self, AgentCreator, AgentRegistrar, Context, CreationFunc, Lifespan};
+use crate::agent::{self, AgentCreator, Context, CreationFunc, Lifespan};
 use crate::audio::policy as audio_policy;
 use crate::audio::types::AudioInfo;
 #[cfg(test)]
@@ -47,12 +47,12 @@ use settings_storage::UpdateState;
 pub(crate) fn create_registrar<T, F>(
     device_storage_factory: Arc<T>,
     fidl_storage_factory: Arc<F>,
-) -> AgentRegistrar
+) -> AgentCreator
 where
     T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static,
     F: StorageFactory<Storage = FidlStorage> + Send + Sync + 'static,
 {
-    AgentRegistrar::Creator(AgentCreator {
+    AgentCreator {
         debug_id: "StorageAgent",
         create: CreationFunc::Dynamic(Arc::new(move |context| {
             let device_storage_factory = device_storage_factory.clone();
@@ -61,7 +61,7 @@ where
                 StorageAgent::create(context, device_storage_factory, fidl_storage_factory).await;
             })
         })),
-    })
+    }
 }
 
 pub(crate) struct StorageAgent<T, F>

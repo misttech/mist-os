@@ -153,9 +153,7 @@ async fn test_write_notify() {
         Arc::new(FidlStorageFactory::new(1, directory_proxy)),
     );
 
-    match blueprint {
-        crate::agent::AgentRegistrar::Creator(c) => c.create(agent_context).await,
-    }
+    blueprint.create(agent_context).await;
 
     let mut invocation_receptor = invocation_messenger.message(
         crate::agent::Payload::Invocation(crate::agent::Invocation {

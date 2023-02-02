@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::AgentRegistrar;
+use crate::agent::AgentCreator;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
@@ -94,15 +94,15 @@ pub fn get_default_agent_types() -> HashSet<AgentType> {
 #[macro_export]
 macro_rules! create_agent {
     ($component:ident, $create:expr) => {
-        AgentRegistrar::Creator(AgentCreator {
+        AgentCreator {
             debug_id: concat!(stringify!($component), "_agent"),
             create: $crate::agent::CreationFunc::Static(|c| Box::pin($create(c))),
-        })
+        }
     };
 }
 
-impl From<AgentType> for AgentRegistrar {
-    fn from(agent_type: AgentType) -> AgentRegistrar {
+impl From<AgentType> for AgentCreator {
+    fn from(agent_type: AgentType) -> AgentCreator {
         use crate::agent::*;
         match agent_type {
             AgentType::CameraWatcher => {

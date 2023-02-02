@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::{AgentCreator, AgentError, AgentRegistrar, Context, CreationFunc, Payload};
+use crate::agent::{AgentCreator, AgentError, Context, CreationFunc, Payload};
 use crate::event;
 use crate::service;
 use crate::storage::testing::InMemoryStorageFactory;
@@ -65,7 +65,7 @@ async fn test_agent_event_propagation() {
 
     let _ = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
         .event_subscribers(&[scaffold::event::subscriber::Blueprint::create(create_subscriber)])
-        .agents(vec![AgentRegistrar::Creator(create_agent)])
+        .agents(vec![create_agent])
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();

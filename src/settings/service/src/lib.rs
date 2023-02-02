@@ -57,7 +57,7 @@ use vfs::mut_pseudo_directory;
 
 use crate::accessibility::accessibility_controller::AccessibilityController;
 use crate::agent::authority::Authority;
-use crate::agent::{AgentRegistrar, Lifespan};
+use crate::agent::{AgentCreator, Lifespan};
 use crate::audio::audio_controller::AudioController;
 use crate::audio::policy::audio_policy_handler::AudioPolicyHandler;
 use crate::base::{Dependency, Entity, SettingType};
@@ -270,7 +270,7 @@ fn init_storage_dir() -> DirectoryProxy {
 /// ultimately spawns an environment based on them.
 pub struct EnvironmentBuilder<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> {
     configuration: Option<ServiceConfiguration>,
-    agent_blueprints: Vec<AgentRegistrar>,
+    agent_blueprints: Vec<AgentCreator>,
     event_subscriber_blueprints: Vec<event::subscriber::BlueprintHandle>,
     storage_factory: Arc<T>,
     generate_service: Option<GenerateService>,
@@ -373,7 +373,7 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     }
 
     /// Appends the supplied [AgentRegistrar]s to the list of agent registrars.
-    pub fn agents(mut self, mut registrars: Vec<AgentRegistrar>) -> EnvironmentBuilder<T> {
+    pub fn agents(mut self, mut registrars: Vec<AgentCreator>) -> EnvironmentBuilder<T> {
         self.agent_blueprints.append(&mut registrars);
         self
     }
@@ -563,7 +563,7 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
         let agent_blueprints = if agent_types.is_empty() {
             self.agent_blueprints
         } else {
-            agent_types.into_iter().map(AgentRegistrar::from).collect()
+            agent_types.into_iter().map(AgentCreator::from).collect()
         };
 
         let job_manager_signature = Manager::spawn(&delegate).await;
@@ -852,7 +852,7 @@ async fn create_environment<'a, T, F>(
     components: HashSet<SettingType>,
     registrants: Vec<Registrant>,
     policies: HashSet<PolicyType>,
-    agent_blueprints: Vec<AgentRegistrar>,
+    agent_blueprints: Vec<AgentCreator>,
     event_subscriber_blueprints: Vec<event::subscriber::BlueprintHandle>,
     service_context: Arc<ServiceContext>,
     handler_factory: Arc<Mutex<SettingHandlerFactoryImpl>>,

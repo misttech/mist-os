@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::{AgentError, AgentRegistrar, Context, Invocation, Lifespan, Payload};
+use crate::agent::{AgentCreator, AgentError, Context, Invocation, Lifespan, Payload};
 use crate::base::SettingType;
 use crate::message::base::{Audience, MessengerType};
 use crate::policy::PolicyType;
@@ -46,7 +46,7 @@ impl Authority {
         })
     }
 
-    pub(crate) async fn register(&mut self, blueprint: AgentRegistrar) {
+    pub(crate) async fn register(&mut self, creator: AgentCreator) {
         let agent_receptor = self
             .delegate
             .create(MessengerType::Unbound)
@@ -62,14 +62,9 @@ impl Authority {
         )
         .await;
 
-        let debug_id = match blueprint {
-            AgentRegistrar::Creator(creator) => {
-                creator.create(context).await;
-                creator.debug_id
-            }
-        };
+        creator.create(context).await;
 
-        self.agent_signatures.push((debug_id, signature));
+        self.agent_signatures.push((creator.debug_id, signature));
     }
 
     /// Invokes each registered agent for a given lifespan. If sequential is true,

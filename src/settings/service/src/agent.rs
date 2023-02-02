@@ -118,10 +118,6 @@ impl AgentCreator {
     }
 }
 
-pub enum AgentRegistrar {
-    Creator(AgentCreator),
-}
-
 /// Agent Context contains necessary parts to create an agent.
 pub struct Context {
     /// The receivor end to receive messages.

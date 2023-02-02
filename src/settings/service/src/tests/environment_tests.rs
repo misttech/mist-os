@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::agent::{
-    AgentCreator, AgentError, AgentRegistrar, Context, Invocation, InvocationResult, Lifespan,
+    AgentCreator, AgentError, Context, Invocation, InvocationResult, Lifespan,
     Payload as AgentPayload,
 };
 use crate::base::{Dependency, Entity, SettingType};
