@@ -285,7 +285,48 @@ zx_status_t Imx8mmEvk::GpioInit() {
       (PE(0b0) | HYS(0b0) | PUE(0b0) | ODE(0b1) | FSEL(0b00) | DSE(0b000)),
   };
 
-  pinconfig_metadata.pin_config_entry_count = 50;
+  // USDHC2 - SD card pin configuration
+  pinconfig_metadata.pin_config_entry[50] = {
+      IOMUXC_SD2_CLK_USDHC2_CLK,
+      (PE(0b1) | HYS(0b1) | PUE(0b0) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+  };
+
+  pinconfig_metadata.pin_config_entry[51] = {
+      IOMUXC_SD2_CMD_USDHC2_CMD,
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+  };
+
+  pinconfig_metadata.pin_config_entry[52] = {
+      IOMUXC_SD2_DATA0_USDHC2_DATA0,
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+  };
+
+  pinconfig_metadata.pin_config_entry[53] = {
+      IOMUXC_SD2_DATA1_USDHC2_DATA1,
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+  };
+
+  pinconfig_metadata.pin_config_entry[54] = {
+      IOMUXC_SD2_DATA2_USDHC2_DATA2,
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+  };
+
+  pinconfig_metadata.pin_config_entry[55] = {
+      IOMUXC_SD2_DATA3_USDHC2_DATA3,
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b10) | DSE(0b110)),
+  };
+
+  pinconfig_metadata.pin_config_entry[56] = {
+      IOMUXC_GPIO1_IO04_USDHC2_VSELECT,
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b10) | DSE(0b000)),
+  };
+
+  pinconfig_metadata.pin_config_entry[57] = {
+      IOMUXC_GPIO1_IO15_GPIO1_IO15,
+      (PE(0b1) | HYS(0b1) | PUE(0b1) | ODE(0b0) | FSEL(0b00) | DSE(0b100)),
+  };
+
+  pinconfig_metadata.pin_config_entry_count = 58;
 
   // gpio port doesn't necessarily have 32 pins, so maintain pin count
   // per port so that GPIO APIs can validate input pin number.
