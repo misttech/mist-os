@@ -12,6 +12,8 @@ macro_rules! trace_duration {
         // Make a no-op use of all values to avoid unused variable errors on non-fuchsia platforms
         // when a variable only exists for tracing.
         #[cfg(not(target_os = "fuchsia"))]
-        $(let _ = $val;)*
-    }
+        if false {
+            $(let _ = $val;)*
+        }
+    };
 }

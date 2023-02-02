@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        block_devices::FvmVolumeFactory,
+        block_devices::{FvmVolumeFactory, RamdiskFactory},
         filesystems::{F2fs, Fxfs, Memfs, Minfs},
     },
     regex::{Regex, RegexSetBuilder},
@@ -46,6 +46,17 @@ struct Args {
     /// benchmark.
     #[argh(switch)]
     enable_tracing: bool,
+
+    /// starts each filesystem to force the filesystem components and the benchmark component to be
+    /// loaded into blobfs. Does not run any benchmarks.
+    ///
+    /// When trying to collect a trace immediately after modifying a filesystem or a benchmark, the
+    /// start of the trace will be polluted with downloading the new blobs, writing the blobs to
+    /// blobfs, and then paging the blobs back in. Running the benchmark component with this flag
+    /// once before running it again with tracing enabled will remove most of the component loading
+    /// from the start of the trace.
+    #[argh(switch)]
+    load_blobs_for_tracing: bool,
 }
 
 fn build_benchmark_set() -> BenchmarkSet {
@@ -82,9 +93,28 @@ fn build_benchmark_set() -> BenchmarkSet {
     benchmark_set
 }
 
+async fn load_blobs_for_tracing() {
+    let filesystems: Vec<Arc<dyn FilesystemConfig>> = vec![
+        Arc::new(Fxfs::new()),
+        Arc::new(F2fs::new()),
+        Arc::new(Memfs::new()),
+        Arc::new(Minfs::new()),
+    ];
+    let ramdisk_factory = RamdiskFactory::new(4096, 32 * 1024).await;
+    for fs in &filesystems {
+        fs.start_filesystem(&ramdisk_factory).await.shutdown().await;
+    }
+}
+
 #[fuchsia::main(logging_tags = ["storage_benchmarks"])]
 async fn main() {
     let args: Args = argh::from_env();
+
+    if args.load_blobs_for_tracing {
+        load_blobs_for_tracing().await;
+        return;
+    }
+
     if args.enable_tracing {
         fuchsia_trace_provider::trace_provider_create_with_fdio();
     }
