@@ -177,11 +177,10 @@ if (current_toolchain == default_toolchain) {
 
       sources = [ "legacy-boot.cc" ]
       deps = [
-        ":address-space",
         "//src/lib/zbitl",
         "//zircon/kernel/phys:acpi",
+        "//zircon/kernel/phys:address-space",
         "//zircon/kernel/phys:allocation-init",
-        "//zircon/kernel/phys:page-table",
         "//zircon/kernel/phys:symbolize",
         "//zircon/kernel/phys:uart",
         "//zircon/kernel/phys/lib/boot-shim",
@@ -282,21 +281,20 @@ if (current_toolchain == default_toolchain) {
     deps = [ "//zircon/kernel/phys:main" ]
   }
 
+  # x86-specific definitions for things in <phys/address-space.h>.
   static_library("address-space") {
-    sources = [
-      "address-space.cc",
-      "address-space.h",
-    ]
+    visibility = [ "//zircon/kernel/phys:address-space" ]
+    sources = [ "address-space-identity.cc" ]
     if (toolchain_environment == "kernel.phys32") {
-      sources += [ "paging-32.cc" ]
+      sources += [ "address-space-32.cc" ]
     } else {
-      sources += [ "paging-64.cc" ]
+      sources += [ "address-space-64.cc" ]
     }
     deps = [
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/phys:address-space.header",
       "//zircon/kernel/phys:allocation",
-      "//zircon/kernel/phys:page-table",
       "//zircon/kernel/phys:symbolize",
       "//zircon/kernel/phys/lib/memalloc",
       "//zircon/kernel/phys/lib/page-table",
@@ -353,8 +351,8 @@ qemu_kernel_test("paging-test") {
   include_dirs = [ "//zircon/kernel/phys/test" ]
   deps = [
     ":legacy-boot",
+    "//zircon/kernel/phys:address-space",
     "//zircon/kernel/phys:allocation",
-    "//zircon/kernel/phys:page-table",
     "//zircon/kernel/phys:symbolize",
     "//zircon/kernel/phys/test:test-main",
   ]

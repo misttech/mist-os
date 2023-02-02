@@ -4,9 +4,6 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include "address-space.h"
-
-#include <lib/arch/x86/boot-cpuid.h>
 #include <lib/arch/x86/system.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
@@ -17,6 +14,8 @@
 #include <ktl/algorithm.h>
 #include <ktl/optional.h>
 #include <phys/allocation.h>
+
+#include "phys/address-space.h"
 
 #include <ktl/enforce.h>
 
@@ -36,23 +35,17 @@ void SwitchToPageTable(Paddr root) {
 
 }  // namespace
 
-void InstallIdentityMapPageTables(page_table::MemoryManager& manager) {
-  // Create a page table data structure.
-  ktl::optional builder = page_table::AddressSpaceBuilder::Create(manager, arch::BootCpuidIo{});
-  if (!builder.has_value()) {
-    ZX_PANIC("Failed to create an AddressSpaceBuilder.");
-  }
-
+void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder) {
   const auto& pool = Allocation::GetPool();
   uint64_t first = fbl::round_down(pool.front().addr, ZX_MAX_PAGE_SIZE);
   uint64_t last = fbl::round_up(pool.back().end(), ZX_MAX_PAGE_SIZE);
   ZX_DEBUG_ASSERT(first < last);
-  zx_status_t result = builder->MapRegion(Vaddr(first), Paddr(first), last - first,
-                                          page_table::CacheAttributes::kNormal);
+  zx_status_t result = builder.MapRegion(Vaddr(first), Paddr(first), last - first,
+                                         page_table::CacheAttributes::kNormal);
   if (result != ZX_OK) {
     ZX_PANIC("Failed to map in range.");
   }
 
   // Switch to the new page table.
-  SwitchToPageTable(builder->root_paddr());
+  SwitchToPageTable(builder.root_paddr());
 }

@@ -15,9 +15,9 @@
 #include <zircon/boot/image.h>
 
 #include <ktl/optional.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/main.h>
-#include <phys/page-table.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 #include <phys/trampoline-boot.h>

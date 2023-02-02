@@ -20,9 +20,9 @@
 #include <ktl/limits.h>
 #include <ktl/span.h>
 #include <phys/acpi.h>
+#include <phys/address-space.h>
 #include <phys/allocation.h>
 #include <phys/main.h>
-#include <phys/page-table.h>
 #include <phys/symbolize.h>
 #include <phys/uart.h>
 #include <pretty/sizes.h>

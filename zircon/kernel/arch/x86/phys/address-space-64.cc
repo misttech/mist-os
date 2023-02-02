@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/arch/x86/boot-cpuid.h>
 #include <lib/memalloc/pool.h>
 #include <lib/page-table/types.h>
 #include <stdio.h>
@@ -13,9 +14,8 @@
 #include <ktl/byte.h>
 #include <ktl/span.h>
 #include <phys/allocation.h>
-#include <phys/page-table.h>
 
-#include "address-space.h"
+#include "phys/address-space.h"
 
 #include <ktl/enforce.h>
 
@@ -88,15 +88,24 @@ class BootstrapMemoryManager final : public page_table::MemoryManager {
   ktl::span<ktl::byte> memory_;
 };
 
+void SetUpAddressSpace(page_table::MemoryManager& manager) {
+  ktl::optional builder =
+      page_table::x86::AddressSpaceBuilder::Create(manager, arch::BootCpuidIo{});
+  if (!builder.has_value()) {
+    ZX_PANIC("Failed to create an AddressSpaceBuilder.");
+  }
+  ArchSetUpIdentityAddressSpace(*builder);
+}
+
 }  // namespace
 
 void ArchSetUpAddressSpaceEarly() {
   BootstrapMemoryManager manager(gBootstrapMemory);
-  InstallIdentityMapPageTables(manager);
+  SetUpAddressSpace(manager);
   manager.Release(Allocation::GetPool());
 }
 
 void ArchSetUpAddressSpaceLate() {
   AllocationMemoryManager manager(Allocation::GetPool());
-  InstallIdentityMapPageTables(manager);
+  SetUpAddressSpace(manager);
 }

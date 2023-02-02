@@ -6,20 +6,20 @@
 
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
-#include <lib/page-table/builder-interface.h>
+#include <lib/page-table/builder.h>
 #include <lib/uart/uart.h>
 
 #include <ktl/algorithm.h>
 #include <ktl/byte.h>
 #include <ktl/move.h>
 #include <ktl/type_traits.h>
-#include <phys/page-table.h>
+#include <phys/address-space.h>
 #include <phys/stdio.h>
 #include <phys/uart.h>
 
 #include <ktl/enforce.h>
 
-void MapUart(page_table::AddressSpaceBuilderInterface& builder, memalloc::Pool& pool) {
+void MapUart(page_table::AddressSpaceBuilder& builder, memalloc::Pool& pool) {
   // Meets the signature expected of uart::BasicIoProvider's constructor.
   auto mapper = [&pool, &builder ](uint64_t uart_mmio_base) -> volatile void* {
     const memalloc::Range* containing = pool.GetContainingRange(uart_mmio_base);

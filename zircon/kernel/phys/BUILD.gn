@@ -114,9 +114,8 @@ if (toolchain_environment == "kernel.phys" ||
     public_deps = [ ":boot-zbi" ]
 
     deps = [
+      ":address-space",
       ":main",
-      ":page-table",
-      "$arch_phys:address-space",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/phys/lib/memalloc",
     ]
@@ -255,23 +254,32 @@ if (toolchain_environment == "kernel.phys" ||
     }
   }
 
-  # Transitive dependencies for the <phys/page-table.h> header.
-  source_set("page-table") {
-    public = [ "include/phys/page-table.h" ]
-    sources = [ "page-table.cc" ]
+  source_set("address-space.header") {
+    visibility = [
+      ":address-space",
+      "$arch_phys:address-space",
+    ]
+
+    public = [ "include/phys/address-space.h" ]
 
     public_configs = [ ":includes" ]
 
     public_deps = [
       "//zircon/kernel/lib/ktl",
 
-      # "page-table.h" has #include <lib/page-table/builder-interface.h>
-      # "page-table.h" has #include <lib/page-table/types.h>
+      # "address-space.h" has #include <lib/page-table/builder-interface.h>
+      # "address-space.h" has #include <lib/page-table/types.h>
       "//zircon/kernel/phys/lib/page-table",
     ]
+  }
+
+  source_set("address-space") {
+    sources = [ "address-space.cc" ]
+    public_deps = [ ":address-space.header" ]
     deps = [
       ":stdio",
       ":uart",
+      "$arch_phys:address-space",
       "//zircon/kernel/phys/lib/memalloc",
       "//zircon/system/ulib/uart",
     ]
@@ -425,11 +433,10 @@ if (toolchain_environment == "kernel.phys" ||
       "zbi-memory.cc",
     ]
     deps = [
+      ":address-space",
       ":allocation-init",
       ":main",
-      ":page-table",
       ":symbolize",
-      "$arch_phys:address-space",
       "//src/lib/zbitl",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",

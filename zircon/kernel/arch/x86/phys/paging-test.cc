@@ -7,8 +7,8 @@
 #include <stdio.h>
 #include <zircon/assert.h>
 
+#include <phys/address-space.h>
 #include <phys/allocation.h>
-#include <phys/page-table.h>
 #include <phys/symbolize.h>
 
 #include "legacy-boot.h"

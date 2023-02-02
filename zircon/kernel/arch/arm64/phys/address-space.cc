@@ -4,6 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include "phys/address-space.h"
+
 #include <lib/arch/arm64/system.h>
 #include <lib/arch/cache.h>
 #include <lib/boot-options/boot-options.h>
@@ -17,7 +19,6 @@
 #include <ktl/byte.h>
 #include <ktl/optional.h>
 #include <phys/allocation.h>
-#include <phys/page-table.h>
 
 #include <ktl/enforce.h>
 
@@ -120,22 +121,16 @@ void EnablePaging(Paddr root) {
   }
 }
 
-void CreateBootstrapPageTable() {
-  auto& pool = Allocation::GetPool();
-  AllocationMemoryManager manager(pool);
-  // Create a page table data structure.
-  ktl::optional builder =
-      page_table::arm64::AddressSpaceBuilder::Create(manager, kDefaultPageTableLayout);
-  if (!builder.has_value()) {
-    ZX_PANIC("Failed to create an AddressSpaceBuilder.");
-  }
+}  // namespace
 
+void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder) {
   bool map_device_memory = gBootOptions->phys_map_all_device_memory;
+  auto& pool = Allocation::GetPool();
 
   // If we are mapping in all peripheral ranges, then the UART page will be
   // mapped below along with the rest.
   if (!map_device_memory) {
-    MapUart(*builder, pool);
+    MapUart(builder, pool);
   }
 
   auto map = [map_device_memory, &builder](const memalloc::Range& range) {
@@ -144,10 +139,10 @@ void CreateBootstrapPageTable() {
       return;
     }
 
-    auto result = builder->MapRegion(Vaddr(range.addr), Paddr(range.addr), range.size,
-                                     range.type == memalloc::Type::kPeripheral
-                                         ? page_table::CacheAttributes::kDevice
-                                         : page_table::CacheAttributes::kNormal);
+    auto result = builder.MapRegion(Vaddr(range.addr), Paddr(range.addr), range.size,
+                                    range.type == memalloc::Type::kPeripheral
+                                        ? page_table::CacheAttributes::kDevice
+                                        : page_table::CacheAttributes::kNormal);
     if (result != ZX_OK) {
       ZX_PANIC("Failed to map in range.");
     }
@@ -184,15 +179,21 @@ void CreateBootstrapPageTable() {
   map(*prev);
 
   // Enable the MMU and switch to the new page table.
-  EnablePaging(builder->root_paddr());
+  EnablePaging(builder.root_paddr());
 }
 
-}  // namespace
-
 void ArchSetUpAddressSpaceEarly() {
-  if (gBootOptions->phys_mmu) {
-    CreateBootstrapPageTable();
+  if (!gBootOptions->phys_mmu) {
+    return;
   }
+  AllocationMemoryManager manager(Allocation::GetPool());
+  // Create a page table data structure.
+  ktl::optional builder =
+      page_table::arm64::AddressSpaceBuilder::Create(manager, kDefaultPageTableLayout);
+  if (!builder.has_value()) {
+    ZX_PANIC("Failed to create an AddressSpaceBuilder.");
+  }
+  ArchSetUpIdentityAddressSpace(*builder);
 }
 
 void ArchSetUpAddressSpaceLate() {}

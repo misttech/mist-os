@@ -4,10 +4,10 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_PAGE_TABLE_H_
-#define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_PAGE_TABLE_H_
+#ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ADDRESS_SPACE_H_
+#define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ADDRESS_SPACE_H_
 
-#include <lib/page-table/builder-interface.h>
+#include <lib/page-table/builder.h>
 #include <lib/page-table/types.h>
 
 #include <ktl/byte.h>
@@ -29,9 +29,13 @@ class Pool;
 void ArchSetUpAddressSpaceEarly();
 void ArchSetUpAddressSpaceLate();
 
+// Set up the identity-mapped address space. This is the main subroutine of
+// ArchSetUpAddressSpace* (when implemented).
+void ArchSetUpIdentityAddressSpace(page_table::AddressSpaceBuilder& builder);
+
 // Maps in the global UART's registers, assuming that they fit within a single
 // page.
-void MapUart(page_table::AddressSpaceBuilderInterface& builder, memalloc::Pool& pool);
+void MapUart(page_table::AddressSpaceBuilder& builder, memalloc::Pool& pool);
 
 // A page_table::MemoryManager that allocates by way of Allocator.
 class AllocationMemoryManager final : public page_table::MemoryManager {
@@ -54,4 +58,4 @@ class AllocationMemoryManager final : public page_table::MemoryManager {
   memalloc::Pool& pool_;
 };
 
-#endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_PAGE_TABLE_H_
+#endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ADDRESS_SPACE_H_

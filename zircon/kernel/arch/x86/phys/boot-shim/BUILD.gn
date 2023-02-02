@@ -159,7 +159,6 @@ if (toolchain_environment == "kernel.phys32") {
     sources = [ "legacy-boot-shim.cc" ]
     public_deps = [
       ":stdout",
-      "..:address-space",
       "..:legacy-boot",
       "//zircon/kernel/lib/acpi_lite",
       "//zircon/kernel/lib/arch",
@@ -167,8 +166,8 @@ if (toolchain_environment == "kernel.phys32") {
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/lib/libc",
       "//zircon/kernel/phys:acpi",
+      "//zircon/kernel/phys:address-space",
       "//zircon/kernel/phys:main",
-      "//zircon/kernel/phys:page-table",
       "//zircon/kernel/phys:symbolize",
       "//zircon/kernel/phys:trampoline-boot",
       "//zircon/kernel/phys/lib/boot-shim",

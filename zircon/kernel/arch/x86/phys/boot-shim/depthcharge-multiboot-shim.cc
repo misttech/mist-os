@@ -21,8 +21,8 @@
 #include <ktl/iterator.h>
 #include <ktl/type_traits.h>
 #include <ktl/variant.h>
+#include <phys/address-space.h>
 #include <phys/main.h>
-#include <phys/page-table.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
 #include <phys/trampoline-boot.h>

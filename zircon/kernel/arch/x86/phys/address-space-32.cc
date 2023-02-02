@@ -12,10 +12,9 @@
 
 #include <hwreg/x86msr.h>
 #include <phys/allocation.h>
-#include <phys/page-table.h>
 #include <phys/symbolize.h>
 
-#include "address-space.h"
+#include "phys/address-space.h"
 
 void ArchSetUpAddressSpaceEarly() {}
 
@@ -53,7 +52,11 @@ void ArchSetUpAddressSpaceLate() {
   // areas that should be reserved.  So it's preferable to go directly to the
   // physical page allocator that respects explicitly reserved ranges.
   AllocationMemoryManager manager(Allocation::GetPool());
-  InstallIdentityMapPageTables(manager);
+  ktl::optional builder = page_table::AddressSpaceBuilder::Create(manager, arch::BootCpuidIo{});
+  if (!builder.has_value()) {
+    ZX_PANIC("Failed to create an AddressSpaceBuilder.");
+  }
+  ArchSetUpIdentityAddressSpace(*builder);
 
   // Now actually turn on paging.  This affects us immediately in 32-bit mode,
   // as well as being mandatory for 64-bit mode.
