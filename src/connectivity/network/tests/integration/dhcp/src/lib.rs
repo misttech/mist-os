@@ -8,76 +8,20 @@ use std::cell::RefCell;
 
 use async_utils::async_once::Once;
 use dhcpv4::protocol::IntoFidlExt as _;
+use fidl_fuchsia_net_ext::IntoExt as _;
 use fuchsia_async::TimeoutExt as _;
 use fuchsia_zircon as zx;
 use futures::{
     future::TryFutureExt as _,
     stream::{self, StreamExt as _, TryStreamExt as _},
 };
-use net_declare::{fidl_ip_v4, fidl_mac, std_ip_v4};
+use net_declare::{fidl_ip_v4, fidl_mac};
 use netstack_testing_common::{
-    interfaces,
+    dhcpv4 as dhcpv4_helper, interfaces,
     realms::{constants, KnownServiceProvider, Netstack2, TestSandboxExt as _},
     Result,
 };
 use netstack_testing_macros::netstack_test;
-
-// Encapsulates a minimal configuration needed to test a DHCP client/server combination.
-struct DhcpTestConfig {
-    // Server IP address.
-    server_addr: fidl_fuchsia_net::Ipv4Address,
-
-    // Address pool for the DHCP server.
-    managed_addrs: dhcpv4::configuration::ManagedAddresses,
-}
-
-impl DhcpTestConfig {
-    fn expected_acquired(&self) -> fidl_fuchsia_net::Subnet {
-        let Self {
-            server_addr: _,
-            managed_addrs:
-                dhcpv4::configuration::ManagedAddresses { mask, pool_range_start, pool_range_stop: _ },
-        } = self;
-        fidl_fuchsia_net::Subnet {
-            addr: fidl_fuchsia_net::IpAddress::Ipv4(pool_range_start.into_fidl()),
-            prefix_len: mask.ones(),
-        }
-    }
-
-    fn server_subnet(&self) -> fidl_fuchsia_net::Subnet {
-        let Self {
-            server_addr,
-            managed_addrs:
-                dhcpv4::configuration::ManagedAddresses {
-                    mask,
-                    pool_range_start: _,
-                    pool_range_stop: _,
-                },
-        } = self;
-        fidl_fuchsia_net::Subnet {
-            addr: fidl_fuchsia_net::IpAddress::Ipv4(*server_addr),
-            prefix_len: mask.ones(),
-        }
-    }
-
-    fn dhcp_parameters(&self) -> Vec<fidl_fuchsia_net_dhcp::Parameter> {
-        let Self { server_addr, managed_addrs } = self;
-        vec![
-            fidl_fuchsia_net_dhcp::Parameter::IpAddrs(vec![*server_addr]),
-            fidl_fuchsia_net_dhcp::Parameter::AddressPool(managed_addrs.into_fidl()),
-        ]
-    }
-}
-
-const DEFAULT_TEST_CONFIG: DhcpTestConfig = DhcpTestConfig {
-    server_addr: fidl_ip_v4!("192.168.0.1"),
-    managed_addrs: dhcpv4::configuration::ManagedAddresses {
-        // We know this is safe because 25 is less than the size of an IPv4 address in bits.
-        mask: const_unwrap::const_unwrap_option(dhcpv4::configuration::SubnetMask::new(25)),
-        pool_range_start: std_ip_v4!("192.168.0.2"),
-        pool_range_stop: std_ip_v4!("192.168.0.5"),
-    },
-};
 
 const DEFAULT_NETWORK_NAME: &str = "net1";
 
@@ -129,35 +73,6 @@ struct TestServerConfig<'a> {
 struct TestNetstackRealmConfig<'a> {
     clients: &'a [DhcpTestEndpointConfig<'a>],
     servers: &'a mut [TestServerConfig<'a>],
-}
-
-async fn set_server_settings(
-    dhcp_server: &fidl_fuchsia_net_dhcp::Server_Proxy,
-    parameters: &mut [fidl_fuchsia_net_dhcp::Parameter],
-    options: &mut [fidl_fuchsia_net_dhcp::Option_],
-) {
-    let parameters =
-        stream::iter(parameters.iter_mut()).for_each_concurrent(None, |parameter| async move {
-            dhcp_server
-                .set_parameter(parameter)
-                .await
-                .expect("failed to call dhcp/Server.SetParameter")
-                .map_err(zx::Status::from_raw)
-                .unwrap_or_else(|e| {
-                    panic!("dhcp/Server.SetParameter({:?}) returned error: {:?}", parameter, e)
-                })
-        });
-    let options = stream::iter(options.iter_mut()).for_each_concurrent(None, |option| async move {
-        dhcp_server
-            .set_option(option)
-            .await
-            .expect("failed to call dhcp/Server.SetOption")
-            .map_err(zx::Status::from_raw)
-            .unwrap_or_else(|e| {
-                panic!("dhcp/Server.SetOption({:?}) returned error: {:?}", option, e)
-            })
-    });
-    let ((), ()) = futures::future::join(parameters, options).await;
 }
 
 async fn assert_client_acquires_addr(
@@ -319,7 +234,7 @@ async fn acquire_with_dhcpd_bound_device(name: &str) {
             TestNetstackRealmConfig {
                 clients: &[DhcpTestEndpointConfig {
                     ep_type: DhcpEndpointType::Client {
-                        expected_acquired: DEFAULT_TEST_CONFIG.expected_acquired(),
+                        expected_acquired: dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired(),
                     },
                     network: &network,
                 }],
@@ -330,12 +245,14 @@ async fn acquire_with_dhcpd_bound_device(name: &str) {
                 servers: &mut [TestServerConfig {
                     endpoints: &[DhcpTestEndpointConfig {
                         ep_type: DhcpEndpointType::Server {
-                            static_addrs: vec![DEFAULT_TEST_CONFIG.server_subnet()],
+                            static_addrs: vec![dhcpv4_helper::DEFAULT_TEST_CONFIG
+                                .server_addr_with_prefix()
+                                .into_ext()],
                         },
                         network: &network,
                     }],
                     settings: Settings {
-                        parameters: &mut DEFAULT_TEST_CONFIG.dhcp_parameters(),
+                        parameters: &mut dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters(),
                         options: &mut [],
                     },
                 }],
@@ -357,7 +274,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device(name: &str) {
     // A short client renewal time which will trigger well before the test timeout of 2 minutes.
     const SHORT_RENEW: u32 = 3;
 
-    let mut parameters = DEFAULT_TEST_CONFIG.dhcp_parameters();
+    let mut parameters = dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters();
     parameters.push(fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
         default: Some(LONG_LEASE),
         max: Some(LONG_LEASE),
@@ -371,7 +288,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device(name: &str) {
             TestNetstackRealmConfig {
                 clients: &[DhcpTestEndpointConfig {
                     ep_type: DhcpEndpointType::Client {
-                        expected_acquired: DEFAULT_TEST_CONFIG.expected_acquired(),
+                        expected_acquired: dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired(),
                     },
                     network: &network,
                 }],
@@ -382,7 +299,9 @@ async fn acquire_then_renew_with_dhcpd_bound_device(name: &str) {
                 servers: &mut [TestServerConfig {
                     endpoints: &[DhcpTestEndpointConfig {
                         ep_type: DhcpEndpointType::Server {
-                            static_addrs: vec![DEFAULT_TEST_CONFIG.server_subnet()],
+                            static_addrs: vec![dhcpv4_helper::DEFAULT_TEST_CONFIG
+                                .server_addr_with_prefix()
+                                .into_ext()],
                         },
                         network: &network,
                     }],
@@ -406,7 +325,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
-    let expected_acquired = DEFAULT_TEST_CONFIG.expected_acquired();
+    let expected_acquired = dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired();
     let expected_addr = match expected_acquired.addr {
         fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address { addr: mut octets }) => {
             // We expect to assign the address numericaly succeeding the default client address
@@ -444,7 +363,9 @@ async fn acquire_with_dhcpd_bound_device_dup_addr(name: &str) {
                     endpoints: &[
                         DhcpTestEndpointConfig {
                             ep_type: DhcpEndpointType::Server {
-                                static_addrs: vec![DEFAULT_TEST_CONFIG.server_subnet()],
+                                static_addrs: vec![dhcpv4_helper::DEFAULT_TEST_CONFIG
+                                    .server_addr_with_prefix()
+                                    .into_ext()],
                             },
                             network: &network,
                         },
@@ -456,7 +377,7 @@ async fn acquire_with_dhcpd_bound_device_dup_addr(name: &str) {
                         },
                     ],
                     settings: Settings {
-                        parameters: &mut DEFAULT_TEST_CONFIG.dhcp_parameters(),
+                        parameters: &mut dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters(),
                         options: &mut [],
                     },
                 }],
@@ -570,11 +491,17 @@ fn test_dhcp<'a>(
                             .connect_to_protocol::<fidl_fuchsia_net_dhcp::Server_Marker>()
                             .expect("failed to connect to DHCP server");
 
-                        let mut parameters = parameters.to_vec();
-                        let () = parameters.push(
-                            fidl_fuchsia_net_dhcp::Parameter::BoundDeviceNames(names_to_bind),
-                        );
-                        let () = set_server_settings(&dhcp_server, &mut parameters, *options).await;
+                        let parameters = parameters
+                            .iter()
+                            .cloned()
+                            .chain(std::iter::once(
+                                fidl_fuchsia_net_dhcp::Parameter::BoundDeviceNames(names_to_bind)
+                            ));
+                        let () = dhcpv4_helper::set_server_settings(
+                            &dhcp_server,
+                            parameters,
+                            options.iter().cloned(),
+                        ).await;
 
                         dhcp_server
                             .start_serving()
@@ -689,9 +616,11 @@ impl PersistenceMode {
 // cannot be done statically, i.e. as a constant.
 fn test_dhcpd_parameters(if_name: String) -> Vec<fidl_fuchsia_net_dhcp::Parameter> {
     vec![
-        fidl_fuchsia_net_dhcp::Parameter::IpAddrs(vec![DEFAULT_TEST_CONFIG.server_addr]),
+        fidl_fuchsia_net_dhcp::Parameter::IpAddrs(vec![
+            dhcpv4_helper::DEFAULT_TEST_CONFIG.server_addr,
+        ]),
         fidl_fuchsia_net_dhcp::Parameter::AddressPool(
-            DEFAULT_TEST_CONFIG.managed_addrs.into_fidl(),
+            dhcpv4_helper::DEFAULT_TEST_CONFIG.managed_addrs.into_fidl(),
         ),
         fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
             default: Some(60),
@@ -800,10 +729,17 @@ async fn acquire_dhcp_server_after_restart(name: &str, mode: PersistenceMode) {
         )
         .await
         .expect("failed to create server network endpoint");
-    server_ep
-        .add_address_and_subnet_route(DEFAULT_TEST_CONFIG.server_subnet())
-        .await
-        .expect("configure address");
+    {
+        let fidl_fuchsia_net::Ipv4AddressWithPrefix { addr, prefix_len } =
+            dhcpv4_helper::DEFAULT_TEST_CONFIG.server_addr_with_prefix();
+        server_ep
+            .add_address_and_subnet_route(fidl_fuchsia_net::Subnet {
+                addr: fidl_fuchsia_net::IpAddress::Ipv4(addr),
+                prefix_len,
+            })
+            .await
+            .expect("configure address");
+    }
     let client_ep = client_realm
         .join_network(&network, "client-ep")
         .await
@@ -815,10 +751,13 @@ async fn acquire_dhcp_server_after_restart(name: &str, mode: PersistenceMode) {
         let dhcp_server = server_realm
             .connect_to_protocol::<fidl_fuchsia_net_dhcp::Server_Marker>()
             .expect("failed to connect to DHCP server");
-        let mut parameters = DEFAULT_TEST_CONFIG.dhcp_parameters();
-        parameters
-            .push(fidl_fuchsia_net_dhcp::Parameter::BoundDeviceNames(vec![if_name.to_string()]));
-        let () = set_server_settings(&dhcp_server, &mut parameters, &mut []).await;
+        let parameters = dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters().into_iter().chain(
+            std::iter::once(fidl_fuchsia_net_dhcp::Parameter::BoundDeviceNames(vec![
+                if_name.to_string()
+            ])),
+        );
+        let () =
+            dhcpv4_helper::set_server_settings(&dhcp_server, parameters, std::iter::empty()).await;
         let () = dhcp_server
             .start_serving()
             .await
@@ -828,7 +767,7 @@ async fn acquire_dhcp_server_after_restart(name: &str, mode: PersistenceMode) {
         let () = assert_client_acquires_addr(
             &client_realm,
             &client_ep,
-            DEFAULT_TEST_CONFIG.expected_acquired(),
+            dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired(),
             1,
             false,
         )
@@ -966,17 +905,23 @@ async fn test_dhcp_server_persistence_mode(name: &str, mode: PersistenceMode) {
         .await
         .expect("failed to create server network endpoint");
     server_ep
-        .add_address_and_subnet_route(DEFAULT_TEST_CONFIG.server_subnet())
+        .add_address_and_subnet_route(
+            dhcpv4_helper::DEFAULT_TEST_CONFIG.server_addr_with_prefix().into_ext(),
+        )
         .await
         .expect("configure address");
 
     // Configure the server with parameters and then restart it.
     {
-        let mut settings = test_dhcpd_parameters(if_name.to_string());
         let dhcp_server = server_realm
             .connect_to_protocol::<fidl_fuchsia_net_dhcp::Server_Marker>()
             .expect("failed to connect to server");
-        let () = set_server_settings(&dhcp_server, &mut settings, &mut []).await;
+        let () = dhcpv4_helper::set_server_settings(
+            &dhcp_server,
+            test_dhcpd_parameters(if_name.to_string()),
+            std::iter::empty(),
+        )
+        .await;
         let () = server_realm
             .stop_child_component(constants::dhcp_server::COMPONENT_NAME)
             .await

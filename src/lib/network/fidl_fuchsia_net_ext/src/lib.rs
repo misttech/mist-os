@@ -171,6 +171,22 @@ impl FromExt<fidl::Ipv6Address> for fidl::IpAddress {
     }
 }
 
+impl FromExt<fidl::Ipv4AddressWithPrefix> for fidl::Subnet {
+    fn from_ext(
+        fidl::Ipv4AddressWithPrefix { addr, prefix_len }: fidl::Ipv4AddressWithPrefix,
+    ) -> fidl::Subnet {
+        fidl::Subnet { addr: addr.into_ext(), prefix_len }
+    }
+}
+
+impl FromExt<fidl::Ipv6AddressWithPrefix> for fidl::Subnet {
+    fn from_ext(
+        fidl::Ipv6AddressWithPrefix { addr, prefix_len }: fidl::Ipv6AddressWithPrefix,
+    ) -> fidl::Subnet {
+        fidl::Subnet { addr: addr.into_ext(), prefix_len }
+    }
+}
+
 impl FromExt<fidl::Ipv4SocketAddress> for fidl::SocketAddress {
     fn from_ext(f: fidl::Ipv4SocketAddress) -> fidl::SocketAddress {
         fidl::SocketAddress::Ipv4(f)

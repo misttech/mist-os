@@ -8,6 +8,7 @@
 
 pub mod constants;
 pub mod devices;
+pub mod dhcpv4;
 pub mod interfaces;
 pub mod ndp;
 pub mod packets;
