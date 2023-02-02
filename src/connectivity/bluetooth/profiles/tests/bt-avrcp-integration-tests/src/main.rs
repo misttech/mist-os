@@ -187,6 +187,8 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
     // We then expect AVRCP to discover the mock peer and attempt to connect to it
     tf.avrcp_observer.expect_observer_service_found_request(tf.mock_peer.peer_id()).await.unwrap();
     match connect_requests.select_next_some().await.unwrap() {
+        // The `channel` associated with this connection is dropped as only one connection can be
+        // active at a time.
         bredr::ConnectionReceiverRequest::Connected { peer_id, .. } => {
             assert_eq!(avrcp_profile_id, peer_id.into());
         }
@@ -214,22 +216,31 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
         }
         x => panic!("Expected PeerConnected but got: {:?}", x),
     }
-    let mut vec = Vec::new();
-    let read_fut = channel.read_datagram(&mut vec);
 
     // Sending a random non-AVRCP data packet should be OK.
     let write_result = channel.as_ref().write(&[0x00, 0x00, 0x00]);
     assert_eq!(write_result, Ok(3));
 
+    // `read_datagram` occasionally returns ready with Ok(0) when there are no bytes read from the
+    // socket. Instead of erroring, we retry the read operation until we actually receive a nonzero
+    // amount of data over the channel.
     // We expect a general reject response, since the sent packet is malformed.
     let expected_read_result_packet = &[
         0x03, // Bit 0 indicates invalid profile id, Bit 1 indicates CommandType::Response.
         0x00, // Profile ID
         0x00, // Profile ID
     ];
-    let read_result = read_fut.await;
-    assert_eq!(read_result, Ok(3));
-    assert_eq!(vec.as_slice(), expected_read_result_packet);
+    loop {
+        let mut vec = Vec::new();
+        let read_result =
+            channel.read_datagram(&mut vec).await.expect("reading from channel is ok");
+
+        if read_result != 0 {
+            assert_eq!(read_result, 3);
+            assert_eq!(vec.as_slice(), expected_read_result_packet);
+            break;
+        }
+    }
 }
 
 /// Tests the case of a remote device attempting to connect over PSM_BROWSE
