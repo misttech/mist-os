@@ -6,28 +6,29 @@
 
 #include <lib/ddk/platform-defs.h>
 #include <lib/fake-bti/bti.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/sdio/hw.h>
 #include <lib/sdmmc/hw.h>
 #include <threads.h>
 
+#include <memory>
 #include <vector>
 
 #include <soc/aml-s912/s912-hw.h>
 #include <zxtest/zxtest.h>
 
 #include "aml-sdmmc-regs.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace sdmmc {
 
 class TestAmlSdmmc : public AmlSdmmc {
  public:
-  TestAmlSdmmc(const mmio_buffer_t& mmio, zx::bti bti)
+  TestAmlSdmmc(zx_device_t* parent, const mmio_buffer_t& mmio, zx::bti bti)
       // Pass BTI ownership to AmlSdmmc, but keep a copy of the handle so we can get a list of VMOs
       // that are pinned when a request is made.
-      : AmlSdmmc(fake_ddk::kFakeParent, zx::bti(bti.get()), fdf::MmioBuffer(mmio),
+      : AmlSdmmc(parent, zx::bti(bti.get()), fdf::MmioBuffer(mmio),
                  aml_sdmmc_config_t{
                      .supports_dma = true,
                      .min_freq = 400000,
@@ -38,10 +39,7 @@ class TestAmlSdmmc : public AmlSdmmc {
                  zx::interrupt(ZX_HANDLE_INVALID), ddk::GpioProtocolClient()),
         bti_(bti.release()) {}
 
-  zx_status_t TestDdkAdd() {
-    // call parent's bind
-    return Bind();
-  }
+  using AmlSdmmc::Bind;
 
   const inspect::Hierarchy* GetInspectRoot(std::string suffix) {
     const zx::vmo inspect_vmo = GetInspectVmo();
@@ -130,6 +128,7 @@ class AmlSdmmcTest : public zxtest::Test {
   AmlSdmmcTest() : mmio_({FakeMmioPtr(&mmio_), 0, 0, ZX_HANDLE_INVALID}) {}
 
   void SetUp() override {
+    root_ = MockDevice::FakeRootParent();
     registers_.reset(new uint8_t[S912_SD_EMMC_B_LENGTH]);
     memset(registers_.get(), 0, S912_SD_EMMC_B_LENGTH);
 
@@ -149,7 +148,10 @@ class AmlSdmmcTest : public zxtest::Test {
     zx::bti bti;
     ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
 
-    dut_.reset(new TestAmlSdmmc(mmio_buffer, std::move(bti)));
+    dut_ = new TestAmlSdmmc(root_.get(), mmio_buffer, std::move(bti));
+    ASSERT_OK(dut_->Bind());
+    ASSERT_EQ(1, root_->child_count());
+    mock_dev_ = root_->GetLatestChild();
 
     dut_->set_board_config({
         .supports_dma = true,
@@ -170,12 +172,6 @@ class AmlSdmmcTest : public zxtest::Test {
     EXPECT_EQ(mmio_.Read32(kAmlSdmmcAdjustOffset), 0);
 
     mmio_.Write32(1, kAmlSdmmcCfgOffset);  // Set bus width 4.
-  }
-
-  void TearDown() override {
-    if (dut_) {
-      dut_.release()->DdkRelease();
-    }
   }
 
  protected:
@@ -226,24 +222,31 @@ class AmlSdmmcTest : public zxtest::Test {
     ASSERT_OK(fake_bti_create_with_paddrs(bti_paddrs_, std::size(bti_paddrs_),
                                           bti.reset_and_get_address()));
 
-    dut_.release()->DdkRelease();
-    dut_.reset(new TestAmlSdmmc(mmio_buffer, std::move(bti)));
+    dut_->DdkAsyncRemove();
+    mock_dev_->WaitUntilAsyncRemoveCalled();
+    mock_ddk::ReleaseFlaggedDevices(dut_->zxdev());
+
+    dut_ = new TestAmlSdmmc(root_.get(), mmio_buffer, std::move(bti));
+    ASSERT_OK(dut_->Bind());
+    ASSERT_EQ(1, root_->child_count());
+    mock_dev_ = root_->GetLatestChild();
   }
 
   zx_paddr_t bti_paddrs_[64] = {};
 
   fdf::MmioBuffer mmio_;
-  std::unique_ptr<TestAmlSdmmc> dut_;
+  std::shared_ptr<MockDevice> root_;
+  TestAmlSdmmc* dut_;
+  MockDevice* mock_dev_;
 
  private:
   std::unique_ptr<uint8_t[]> registers_;
 };
 
 TEST_F(AmlSdmmcTest, DdkLifecycle) {
-  fake_ddk::Bind ddk;
-  EXPECT_OK(dut_->TestDdkAdd());
   dut_->DdkAsyncRemove();
-  EXPECT_TRUE(ddk.Ok());
+  mock_dev_->WaitUntilAsyncRemoveCalled();
+  mock_ddk::ReleaseFlaggedDevices(dut_->zxdev());
 }
 
 TEST_F(AmlSdmmcTest, InitV3) {
@@ -1202,8 +1205,9 @@ TEST_F(AmlSdmmcTest, RequestsFailAfterSuspend) {
   uint32_t unused_response[4];
   EXPECT_OK(dut_->SdmmcRequest(&request, unused_response));
 
-  ddk::SuspendTxn txn(fake_ddk::kFakeDevice, 0, false, 0);
+  ddk::SuspendTxn txn(dut_->zxdev(), 0, false, 0);
   dut_->DdkSuspend(std::move(txn));
+  mock_dev_->WaitUntilSuspendReplyCalled();
 
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, unused_response));
 }
