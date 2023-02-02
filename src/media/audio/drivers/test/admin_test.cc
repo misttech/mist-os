@@ -71,8 +71,7 @@ void AdminTest::RequestRingBufferChannel() {
 void AdminTest::RequestMinFormat() {
   ASSERT_GT(pcm_formats().size(), 0u);
 
-  // TODO(fxbug.dev/83792): Once driver issues are fixed, change this back to min_format()
-  pcm_format_ = max_format();
+  pcm_format_ = min_format();
   RequestRingBufferChannel();
 }
 

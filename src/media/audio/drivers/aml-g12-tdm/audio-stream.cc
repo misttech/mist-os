@@ -14,6 +14,7 @@
 
 #include <numeric>
 #include <optional>
+#include <set>
 #include <utility>
 
 #include <pretty/hexdump.h>
@@ -631,7 +632,30 @@ zx_status_t AmlG12TdmStream::AddFormats() {
     }
   }
 
+  // For each codec, get the supported frame rates into sets.
+  // These sets will be used to only add frame rates which are fully supported
+  // by all codecs.
+  std::vector<std::set<uint32_t>> codec_frame_rates;
+  for (auto& codec : codecs_) {
+    auto supported_formats = codec.GetDaiFormats();
+    if (supported_formats.is_error()) {
+      zxlogf(ERROR, "supported formats error %d", supported_formats.status_value());
+      return supported_formats.error_value();
+    }
+    codec_frame_rates.emplace_back().insert(supported_formats->frame_rates.begin(),
+                                            supported_formats->frame_rates.end());
+  }
+
   for (auto& i : AmlTdmConfigDevice::kSupportedFrameRates) {
+    bool fully_supported = true;
+    for (const auto& frame_rate_set : codec_frame_rates) {
+      if (frame_rate_set.count(i) == 0) {
+        fully_supported = false;
+        break;
+      }
+    }
+    if (!fully_supported)
+      continue;
     format.range.min_frames_per_second = i;
     format.range.max_frames_per_second = i;
     format.range.flags =
