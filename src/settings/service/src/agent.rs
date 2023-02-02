@@ -88,15 +88,46 @@ pub trait Blueprint {
 
 pub type BlueprintHandle = Arc<dyn Blueprint + Send + Sync>;
 
+pub type AgentFuture = BoxFuture<'static, ()>;
+
+/// Supported types of [Agent] creation functions.
+pub enum CreationFunc {
+    /// A simple wrapper around a static creation function.
+    ///
+    /// Example usage:
+    /// ```
+    /// async fn create(c: Context) { }
+    /// let f = CreationFunc::Static(|c| Box::Pin(example::create(c));
+    /// ```
+    Static(fn(Context) -> AgentFuture),
+    /// Used for more complicate creation functions that need to capture state.
+    ///
+    /// Example usage:
+    /// ```
+    /// let shared = Arc::new(Mutex::new(0u));
+    /// let f = CreationFunc::Dynamic(Arc::new(move |c| -> AgentFuture {
+    ///     let shared = shared.clone();
+    ///     Box::pin(async move {
+    ///         *shared.lock().await = 42;
+    ///     })
+    /// }));
+    /// ```
+    #[allow(dead_code)]
+    Dynamic(Arc<dyn Fn(Context) -> AgentFuture>),
+}
+
 /// AgentCreator provides a simple wrapper for an async Agent creation function.
 pub struct AgentCreator {
     pub debug_id: &'static str,
-    pub create: fn(Context) -> BoxFuture<'static, ()>,
+    pub create: CreationFunc,
 }
 
 impl AgentCreator {
-    fn create(&self, context: Context) -> BoxFuture<'static, ()> {
-        (self.create)(context)
+    fn create(&self, context: Context) -> AgentFuture {
+        match &self.create {
+            CreationFunc::Static(f) => (f)(context),
+            CreationFunc::Dynamic(f) => (f)(context),
+        }
     }
 }
 

@@ -96,7 +96,7 @@ macro_rules! create_agent {
     ($component:ident, $create:expr) => {
         AgentRegistrar::Creator(AgentCreator {
             debug_id: concat!(stringify!($component), "_agent"),
-            create: |c| Box::pin($create(c)),
+            create: $crate::agent::CreationFunc::Static(|c| Box::pin($create(c))),
         })
     };
 }
