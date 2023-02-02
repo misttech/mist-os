@@ -6,11 +6,12 @@
 
 #![deny(missing_docs, unreachable_patterns)]
 
-use lock_guard::LockGuard;
-
 /// A [`std::sync::Mutex`] assuming lock poisoning will never occur.
 #[derive(Debug, Default)]
 pub struct Mutex<T>(std::sync::Mutex<T>);
+
+/// Lock guard for access to a [`Mutex`].
+pub type LockGuard<'a, T> = lock_guard::LockGuard<'a, Mutex<T>, std::sync::MutexGuard<'a, T>>;
 
 impl<T> Mutex<T> {
     /// Creates a new mutex in an unlocked state ready for use.
@@ -28,14 +29,22 @@ impl<T> Mutex<T> {
     /// lock.
     #[inline]
     #[cfg_attr(feature = "recursive-lock-panic", track_caller)]
-    pub fn lock(&self) -> LockGuard<'_, Self, std::sync::MutexGuard<'_, T>> {
-        LockGuard::new(self, |Self(m)| m.lock().expect("unexpectedly poisoned"))
+    pub fn lock(&self) -> LockGuard<'_, T> {
+        lock_guard::LockGuard::new(self, |Self(m)| m.lock().expect("unexpectedly poisoned"))
     }
 }
 
 /// A [`std::sync::RwLock`] assuming lock poisoning will never occur.
 #[derive(Default)]
 pub struct RwLock<T>(std::sync::RwLock<T>);
+
+/// Lock guard for read access to a [`RwLock`].
+pub type RwLockReadGuard<'a, T> =
+    lock_guard::LockGuard<'a, RwLock<T>, std::sync::RwLockReadGuard<'a, T>>;
+
+/// Lock guard for write access to a [`RwLock`].
+pub type RwLockWriteGuard<'a, T> =
+    lock_guard::LockGuard<'a, RwLock<T>, std::sync::RwLockWriteGuard<'a, T>>;
 
 impl<T> RwLock<T> {
     /// Creates a new instance of an `RwLock<T>` which is unlocked.
@@ -54,8 +63,8 @@ impl<T> RwLock<T> {
     /// write lock.
     #[inline]
     #[cfg_attr(feature = "recursive-lock-panic", track_caller)]
-    pub fn read(&self) -> LockGuard<'_, Self, std::sync::RwLockReadGuard<'_, T>> {
-        LockGuard::new(self, |Self(rw)| rw.read().expect("unexpectedly poisoned"))
+    pub fn read(&self) -> RwLockReadGuard<'_, T> {
+        lock_guard::LockGuard::new(self, |Self(rw)| rw.read().expect("unexpectedly poisoned"))
     }
 
     /// Locks this rwlock with exclusive write access, blocking the current
@@ -69,8 +78,8 @@ impl<T> RwLock<T> {
     /// write lock.
     #[inline]
     #[cfg_attr(feature = "recursive-lock-panic", track_caller)]
-    pub fn write(&self) -> LockGuard<'_, Self, std::sync::RwLockWriteGuard<'_, T>> {
-        LockGuard::new(self, |Self(rw)| rw.write().expect("unexpectedly poisoned"))
+    pub fn write(&self) -> RwLockWriteGuard<'_, T> {
+        lock_guard::LockGuard::new(self, |Self(rw)| rw.write().expect("unexpectedly poisoned"))
     }
 }
 
