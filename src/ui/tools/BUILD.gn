@@ -14,7 +14,6 @@ group("tools") {
     "paper_shader_compiler",
     "print-input-report",
     "tiles",
-    "tiles_ctl",
   ]
 }
 

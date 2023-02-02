@@ -865,7 +865,6 @@ config("Wno-conversion") {
     "//src/ui/scenic/bin:*",
     "//src/ui/scenic/lib/gfx:*",
     "//src/ui/scenic/lib/gfx/tests:*",
-    "//src/ui/tools/tiles_ctl:*",
     "//src/virtualization/third_party/fdt:*",
     "//third_party/acpica/*",
     "//third_party/crashpad/src/*",

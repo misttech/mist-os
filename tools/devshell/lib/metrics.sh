@@ -144,7 +144,6 @@ _METRICS_TRACK_COMMAND_OPS=(
     "shell tee"
     "shell test"
     "shell tftp"
-    "shell tiles_ctl"
     "shell time"
     "shell touch"
     "shell tr"

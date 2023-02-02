@@ -180,7 +180,6 @@ group("cmx_allowlist") {
     "//src/ui/scenic:component_manifest_compile",
     "//src/ui/tools/tiles:tiles-flatland_manifest_compile",
     "//src/ui/tools/tiles:tiles-gfx_manifest_compile",
-    "//src/ui/tools/tiles_ctl:tiles_ctl_component_manifest_compile",
     "//src/zircon/bin/hwstress:cpu_component_manifest_compile",
     "//src/zircon/bin/hwstress:flash_component_manifest_compile",
     "//src/zircon/bin/hwstress:hwstress_component_manifest_compile",
