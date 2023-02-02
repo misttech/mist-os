@@ -20,7 +20,7 @@ class BasicFactory {
   static_assert(
       std::is_constructible_v<Driver, DriverStartArgs, fdf::UnownedSynchronizedDispatcher>,
       "Driver must contain a constructor with the signature '(fdf::DriverStartArgs, "
-      "fdf::UnownedDispatcher)' in order to be used with the BasicFactory.");
+      "fdf::UnownedSynchronizedDispatcher)' in order to be used with the BasicFactory.");
 
  public:
   static zx::result<std::unique_ptr<DriverBase>> CreateDriver(

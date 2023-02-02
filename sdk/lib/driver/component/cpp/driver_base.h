@@ -18,6 +18,9 @@ namespace fdf {
 
 using DriverStartArgs = fuchsia_driver_framework::DriverStartArgs;
 
+// Used to indicate if we should wait for the initial interest change for the driver's logger.
+extern bool logger_wait_for_initial_interest;
+
 // |DriverBase| is an interface that drivers should inherit from. It provides methods
 // for accessing the start args, as well as helper methods for common initialization tasks.
 //
@@ -79,7 +82,9 @@ class DriverBase {
     auto ns = std::move(start_args_.incoming());
     ZX_ASSERT(ns.has_value());
     Namespace incoming = Namespace::Create(ns.value()).value();
-    logger_ = Logger::Create(incoming, dispatcher_, name_).value();
+    logger_ = Logger::Create(incoming, dispatcher_, name_, FUCHSIA_LOG_INFO,
+                             logger_wait_for_initial_interest)
+                  .value();
 
     auto outgoing_request = std::move(start_args_.outgoing_dir());
     ZX_ASSERT(outgoing_request.has_value());

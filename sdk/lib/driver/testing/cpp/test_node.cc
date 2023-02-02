@@ -7,16 +7,26 @@
 namespace fdf_testing {
 
 zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>> TestNode::CreateNodeChannel() {
-  if (node_binding_.has_value()) {
-    return zx::error(ZX_ERR_ALREADY_EXISTS);
-  }
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
-  node_binding_.emplace(dispatcher_, std::move(endpoints->server), this,
-                        [this](fidl::UnbindInfo) { Remove(); });
+
+  if (zx::result result = Serve(std::move(endpoints->server)); result.is_error()) {
+    return result.take_error();
+  }
+
   return zx::ok(std::move(endpoints->client));
+}
+
+zx::result<> TestNode::Serve(fidl::ServerEnd<fuchsia_driver_framework::Node> server_end) {
+  if (node_binding_.has_value()) {
+    return zx::error(ZX_ERR_ALREADY_EXISTS);
+  }
+
+  node_binding_.emplace(dispatcher_, std::move(server_end), this,
+                        [this](fidl::UnbindInfo) { Remove(); });
+  return zx::ok();
 }
 
 void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {

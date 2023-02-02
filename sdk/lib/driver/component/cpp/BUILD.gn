@@ -19,6 +19,7 @@ sdk_source_set("cpp") {
   sources = [
     "basic_factory.h",
     "composite_node_spec.h",
+    "driver_base.cc",
     "driver_base.h",
     "driver_context.cc",
     "driver_context.h",
@@ -59,10 +60,13 @@ source_set("test_base") {
 executable("cpp_test") {
   testonly = true
   sources = [
+    "tests/driver_base_test.cc",
     "tests/logger_test.cc",
     "tests/namespace_test.cc",
     "tests/node_add_args_test.cc",
     "tests/start_args_test.cc",
+    "tests/test_driver.cc",
+    "tests/test_driver.h",
   ]
 
   deps = [
@@ -73,6 +77,7 @@ executable("cpp_test") {
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//sdk/lib/fidl/cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/diagnostics/lib/cpp-log-decoder:lib",

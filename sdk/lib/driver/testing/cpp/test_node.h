@@ -20,9 +20,17 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
   ChildrenMap& children() { return children_; }
   const std::string& name() const { return name_; }
 
+  // Create a channel pair, serve the server end, and return the client end.
+  // This method is thread-unsafe. Must be called from the same context as the dispatcher.
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>> CreateNodeChannel();
 
+  // Serve the given server end.
+  // This method is thread-unsafe. Must be called from the same context as the dispatcher.
+  zx::result<> Serve(fidl::ServerEnd<fuchsia_driver_framework::Node> server_end);
+
   bool HasNode() { return node_binding_.has_value(); }
+
+  async_dispatcher_t* dispatcher() const { return dispatcher_; }
 
  private:
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override;

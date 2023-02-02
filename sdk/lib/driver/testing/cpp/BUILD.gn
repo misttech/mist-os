@@ -13,3 +13,23 @@ source_set("test_node") {
   public_deps =
       [ "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp" ]
 }
+
+source_set("cpp") {
+  testonly = true
+
+  sources = [
+    "driver_lifecycle.cc",
+    "driver_lifecycle.h",
+    "environment_variables.cc",
+    "start_args.cc",
+    "start_args.h",
+    "test_environment.cc",
+    "test_environment.h",
+  ]
+
+  public_deps = [
+    ":test_node",
+    "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/runtime/testing/runtime",
+  ]
+}
