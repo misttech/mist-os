@@ -84,27 +84,3 @@ pub trait DirectoryEntry: IntoAny + Sync + Send {
     /// This method is used to populate ReadDirents() output.
     fn entry_info(&self) -> EntryInfo;
 }
-
-/// Transitional.
-pub trait DirectoryEntryForFxbug120673Transition {
-    /// Transitional.
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    );
-}
-
-impl<T: DirectoryEntry> DirectoryEntryForFxbug120673Transition for T {
-    fn open(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        flags: fio::OpenFlags,
-        path: Path,
-        server_end: ServerEnd<fio::NodeMarker>,
-    ) {
-        DirectoryEntry::open(self, scope, flags, path, server_end)
-    }
-}
