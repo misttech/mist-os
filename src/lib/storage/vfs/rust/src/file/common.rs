@@ -2,42 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Common utilities for pseudo file implementations
+//! Common utilities for implementing file nodes and connections.
 
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
-/// Validate that the requested flags for a new connection are valid.  This function will make sure
-/// that `flags` only requests read access when `readable` is true, or only write access when
-/// `writable` is true, or either when both are true.  It also does some sanity checking and
-/// normalization, matching `flags` with the `mode` value.
+/// Validate that the requested flags for a new connection are valid. This includes permission
+/// handling, only allowing certain operations, and disallowing invalid flag combinations.
 ///
 /// On success, returns the validated flags, with some ambiguities cleaned up. On failure, it
 /// returns a [`Status`] indicating the problem.
 ///
-/// `OPEN_FLAG_NODE_REFERENCE` is preserved and prohibits both read and write access.
+/// [`fio::OpenFlags::OPEN_FLAG_NODE_REFERENCE`] is preserved and prohibits read and write access.
 ///
 /// Changing this function can be dangerous! Flags operations may have security implications.
 pub fn new_connection_validate_flags(
     mut flags: fio::OpenFlags,
-    mut readable: bool,
-    mut writable: bool,
-    mut executable: bool,
-    append_allowed: bool,
+    readable: bool,
+    writable: bool,
+    executable: bool,
 ) -> Result<fio::OpenFlags, zx::Status> {
     // Nodes supporting both W+X rights are not supported.
     debug_assert!(!(writable && executable));
 
-    if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-        flags &= fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE;
-        readable = false;
-        writable = false;
-        executable = false;
-    }
-
+    // Check target type.
     if flags.intersects(fio::OpenFlags::DIRECTORY) {
         return Err(zx::Status::NOT_DIR);
     }
-
     if flags.intersects(fio::OpenFlags::NOT_DIRECTORY) {
         flags &= !fio::OpenFlags::NOT_DIRECTORY;
     }
@@ -45,55 +35,46 @@ pub fn new_connection_validate_flags(
     // For files, the OPEN_FLAG_POSIX_* flags are ignored as they have meaning only for directories.
     flags &= !(fio::OpenFlags::POSIX_WRITABLE | fio::OpenFlags::POSIX_EXECUTABLE);
 
-    let allowed_flags = fio::OpenFlags::NODE_REFERENCE
-        | fio::OpenFlags::DESCRIBE
-        | fio::OpenFlags::CREATE
-        | fio::OpenFlags::CREATE_IF_ABSENT
-        | if readable { fio::OpenFlags::RIGHT_READABLE } else { fio::OpenFlags::empty() }
-        | if writable {
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE
-        } else {
-            fio::OpenFlags::empty()
-        }
-        | if writable && append_allowed { fio::OpenFlags::APPEND } else { fio::OpenFlags::empty() }
-        | if executable { fio::OpenFlags::RIGHT_EXECUTABLE } else { fio::OpenFlags::empty() };
-
-    let prohibited_flags = (fio::OpenFlags::empty() | if readable {
-            fio::OpenFlags::TRUNCATE
-        } else {
-            fio::OpenFlags::empty()
-        } | if writable {
-            fio::OpenFlags::APPEND
-        } else {
-            fio::OpenFlags::empty()
-        })
-        // allowed_flags takes precedence over prohibited_flags.
-        & !allowed_flags
-        // TRUNCATE is only allowed if the file is writable.
-        | if !flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
-            fio::OpenFlags::TRUNCATE
-        } else {
-            fio::OpenFlags::empty()
-        };
-
+    // Validate permissions.
     if !readable && flags.intersects(fio::OpenFlags::RIGHT_READABLE) {
         return Err(zx::Status::ACCESS_DENIED);
     }
-
     if !writable && flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
         return Err(zx::Status::ACCESS_DENIED);
     }
-
     if !executable && flags.intersects(fio::OpenFlags::RIGHT_EXECUTABLE) {
         return Err(zx::Status::ACCESS_DENIED);
     }
 
-    if flags.intersects(prohibited_flags) {
-        return Err(zx::Status::INVALID_ARGS);
+    // Verify allowed operations/flags this node supports.
+    let flags_without_rights = flags.difference(
+        fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::RIGHT_EXECUTABLE,
+    );
+    let allowed_flags = fio::OpenFlags::NODE_REFERENCE
+        | fio::OpenFlags::DESCRIBE
+        | fio::OpenFlags::CREATE
+        | fio::OpenFlags::CREATE_IF_ABSENT
+        | if writable {
+            fio::OpenFlags::APPEND | fio::OpenFlags::TRUNCATE
+        } else {
+            fio::OpenFlags::empty()
+        };
+    if flags_without_rights.intersects(!allowed_flags) {
+        return Err(zx::Status::NOT_SUPPORTED);
     }
 
-    if flags.intersects(!allowed_flags) {
-        return Err(zx::Status::NOT_SUPPORTED);
+    // Disallow invalid flag combinations.
+    let mut prohibited_flags = fio::OpenFlags::empty();
+    if !(flags.intersects(fio::OpenFlags::RIGHT_WRITABLE)) {
+        prohibited_flags |= fio::OpenFlags::APPEND | fio::OpenFlags::TRUNCATE
+    }
+    if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
+        prohibited_flags |= !fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE;
+    }
+    if flags.intersects(prohibited_flags) {
+        return Err(zx::Status::INVALID_ARGS);
     }
 
     Ok(flags)
@@ -208,9 +189,7 @@ mod tests {
         expected_new_flags: fio::OpenFlags,
     ) {
         assert!(!(writable && executable), "Cannot specify both writable and executable!");
-        let res = new_connection_validate_flags(
-            flags, readable, writable, executable, /*append_allowed=*/ false,
-        );
+        let res = new_connection_validate_flags(flags, readable, writable, executable);
         match res {
             Ok(new_flags) => assert_eq!(
                 expected_new_flags, new_flags,
@@ -231,9 +210,7 @@ mod tests {
         executable: bool,
         expected_status: zx::Status,
     ) {
-        let res = new_connection_validate_flags(
-            flags, readable, writable, executable, /*append_allowed=*/ false,
-        );
+        let res = new_connection_validate_flags(flags, readable, writable, executable);
         match res {
             Ok(new_flags) => panic!(
                 "new_connection_validate_flags should have failed.  \
@@ -246,19 +223,6 @@ mod tests {
 
     #[test]
     fn new_connection_validate_flags_node_reference() {
-        // Should drop access flags but preserve OPEN_FLAG_NODE_REFERENCE and OPEN_FLAG_DESCRIBE.
-        let preserved_flags = fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DESCRIBE;
-        for open_flags in build_flag_combinations(
-            fio::OpenFlags::NODE_REFERENCE.bits(),
-            (fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DESCRIBE)
-                .bits(),
-        ) {
-            let open_flags = fio::OpenFlags::from_bits_truncate(open_flags);
-            ncvf_ok(open_flags, true, true, false, open_flags & preserved_flags);
-        }
-
         ncvf_err(
             fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::DIRECTORY,
             true,
@@ -336,7 +300,7 @@ mod tests {
             true,
             false,
             false,
-            zx::Status::INVALID_ARGS,
+            zx::Status::NOT_SUPPORTED,
         );
     }
 
@@ -350,11 +314,18 @@ mod tests {
             zx::Status::NOT_SUPPORTED,
         );
         ncvf_err(
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND,
             true,
             true,
             false,
             zx::Status::INVALID_ARGS,
+        );
+        ncvf_ok(
+            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND,
+            true,
+            true,
+            false,
+            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND,
         );
     }
 

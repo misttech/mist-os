@@ -144,9 +144,7 @@ async fn create_connection_async_impl<U: 'static + File + IoOpHandler + CloneFil
     // RAII helper that ensures that the file is closed if we fail to create the connection.
     let file = OpenFile::new(file, scope.clone());
 
-    let flags = match new_connection_validate_flags(
-        flags, readable, writable, executable, /*append_allowed=*/ true,
-    ) {
+    let flags = match new_connection_validate_flags(flags, readable, writable, executable) {
         Ok(updated) => updated,
         Err(status) => {
             send_on_open_with_error(flags, server_end, status);

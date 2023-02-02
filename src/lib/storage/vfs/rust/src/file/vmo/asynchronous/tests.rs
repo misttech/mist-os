@@ -805,59 +805,23 @@ fn clone_cannot_increase_access() {
 }
 
 #[test]
-fn node_reference_ignores_read_access() {
-    run_server_client(
-        fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::RIGHT_READABLE,
-        read_only(simple_init_vmo(b"")),
-        |proxy| async move {
-            assert_read_err!(proxy, Status::BAD_HANDLE);
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn node_reference_ignores_write_access() {
-    run_server_client(
-        fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::RIGHT_WRITABLE,
-        read_only(simple_init_vmo(b"")),
-        |proxy| async move {
-            assert_write_err!(proxy, "Can write", Status::BAD_HANDLE);
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
 fn clone_can_not_remove_node_reference() {
     run_server_client(
-        fio::OpenFlags::NODE_REFERENCE | fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::NODE_REFERENCE,
         read_write(simple_init_vmo(b"")),
-        |first_proxy| {
-            async move {
-                // first_proxy would not have OPEN_RIGHT_READABLE, as it will be dropped by the
-                // OPEN_FLAG_NODE_REFERENCE.  Even though we do not ask for
-                // OPEN_FLAG_NODE_REFERENCE here it is actually enforced.  Our
-                // OPEN_RIGHT_READABLE is beyond the allowed rights, but it is unrelated to the
-                // OPEN_FLAG_NODE_REFERENCE, really.
-                let second_proxy = clone_as_file_assert_err!(
-                    &first_proxy,
-                    fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
-                    Status::ACCESS_DENIED
-                );
-
-                assert_read_fidl_err_closed!(second_proxy);
-                assert_write_fidl_err_closed!(second_proxy, "Write attempt");
-
-                // We now try without OPEN_RIGHT_READABLE, as we might still be able to Seek.
-                let third_proxy =
-                    clone_get_vmo_file_proxy_assert_err!(&first_proxy, fio::OpenFlags::DESCRIBE);
-
-                assert_seek!(third_proxy, 0, Current, Err(Status::BAD_HANDLE));
-
-                assert_close!(third_proxy);
-                assert_close!(first_proxy);
-            }
+        |first_proxy| async move {
+            let second_proxy = clone_as_file_assert_err!(
+                &first_proxy,
+                fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
+                Status::ACCESS_DENIED
+            );
+            assert_read_fidl_err_closed!(second_proxy);
+            assert_write_fidl_err_closed!(second_proxy, "Write attempt");
+            let third_proxy =
+                clone_get_vmo_file_proxy_assert_err!(&first_proxy, fio::OpenFlags::DESCRIBE);
+            assert_seek!(third_proxy, 0, Current, Err(Status::BAD_HANDLE));
+            assert_close!(third_proxy);
+            assert_close!(first_proxy);
         },
     );
 }
