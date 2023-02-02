@@ -291,6 +291,7 @@ sdk_molecule("core_lib") {
   visibility = [ ":*" ]
 
   deps = [
+    "//sdk/lib/component/incoming/cpp:cpp_sdk",
     "//sdk/lib/fdio:fdio_sdk",
     "//sdk/lib/fidl/cpp:cpp_sdk",
     "//sdk/lib/fidl/cpp/wire:wire_sdk",

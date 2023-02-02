@@ -166,6 +166,7 @@ sdk://pkg/async-loop
 sdk://pkg/async-loop-cpp
 sdk://pkg/async-loop-default
 sdk://pkg/async-loop-testing
+sdk://pkg/component_incoming_cpp
 sdk://pkg/fdio
 sdk://pkg/fidl
 sdk://pkg/fidl_base
