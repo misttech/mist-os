@@ -22,7 +22,7 @@ use {
     note = "This command connects to a running target to take its screenshot.
 The `--dir` can be supplied to override the default
 screenshot saving location `/tmp/screenshot/YYYYMMDD_HHMMSS/`.
-The --format can be supplied to override the default format bgra.
+The --format can be supplied to override the default format png.
 Accepted format values: bgra, rgba, png.
 The screenshot file name is `screenshot.<format>`."
 )]
@@ -38,7 +38,7 @@ pub struct ScreenshotCommand {
 
     #[argh(
         option,
-        default = "Format::BGRA",
+        default = "Format::PNG",
         long = "format",
         description = "screenshot format. If no value is provided bgra will be used.
         Accepted values: bgra, rgba, png"
