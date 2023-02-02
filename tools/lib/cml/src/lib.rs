@@ -1657,15 +1657,15 @@ impl<'de> de::Deserialize<'de> for ConfigKey {
 #[derive(Clone, Deserialize, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", deny_unknown_fields, rename_all = "lowercase")]
 pub enum ConfigValueType {
-    Bool,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
+    Bool {},
+    Uint8 {},
+    Uint16 {},
+    Uint32 {},
+    Uint64 {},
+    Int8 {},
+    Int16 {},
+    Int32 {},
+    Int64 {},
     String { max_size: NonZeroU32 },
     Vector { max_count: NonZeroU32, element: ConfigNestedValueType },
 }
@@ -1674,15 +1674,15 @@ impl ConfigValueType {
     /// Update the hasher by digesting the ConfigValueType enum value
     pub fn update_digest(&self, hasher: &mut impl sha2::Digest) {
         let val = match self {
-            ConfigValueType::Bool => 0u8,
-            ConfigValueType::Uint8 => 1u8,
-            ConfigValueType::Uint16 => 2u8,
-            ConfigValueType::Uint32 => 3u8,
-            ConfigValueType::Uint64 => 4u8,
-            ConfigValueType::Int8 => 5u8,
-            ConfigValueType::Int16 => 6u8,
-            ConfigValueType::Int32 => 7u8,
-            ConfigValueType::Int64 => 8u8,
+            ConfigValueType::Bool {} => 0u8,
+            ConfigValueType::Uint8 {} => 1u8,
+            ConfigValueType::Uint16 {} => 2u8,
+            ConfigValueType::Uint32 {} => 3u8,
+            ConfigValueType::Uint64 {} => 4u8,
+            ConfigValueType::Int8 {} => 5u8,
+            ConfigValueType::Int16 {} => 6u8,
+            ConfigValueType::Int32 {} => 7u8,
+            ConfigValueType::Int64 {} => 8u8,
             ConfigValueType::String { max_size } => {
                 hasher.update(max_size.get().to_le_bytes());
                 9u8
@@ -1700,15 +1700,15 @@ impl ConfigValueType {
 #[derive(Clone, Deserialize, Debug, PartialEq, Serialize)]
 #[serde(tag = "type", deny_unknown_fields, rename_all = "lowercase")]
 pub enum ConfigNestedValueType {
-    Bool,
-    Uint8,
-    Uint16,
-    Uint32,
-    Uint64,
-    Int8,
-    Int16,
-    Int32,
-    Int64,
+    Bool {},
+    Uint8 {},
+    Uint16 {},
+    Uint32 {},
+    Uint64 {},
+    Int8 {},
+    Int16 {},
+    Int32 {},
+    Int64 {},
     String { max_size: NonZeroU32 },
 }
 
@@ -1716,15 +1716,15 @@ impl ConfigNestedValueType {
     /// Update the hasher by digesting the ConfigVectorElementType enum value
     pub fn update_digest(&self, hasher: &mut impl sha2::Digest) {
         let val = match self {
-            ConfigNestedValueType::Bool => 0u8,
-            ConfigNestedValueType::Uint8 => 1u8,
-            ConfigNestedValueType::Uint16 => 2u8,
-            ConfigNestedValueType::Uint32 => 3u8,
-            ConfigNestedValueType::Uint64 => 4u8,
-            ConfigNestedValueType::Int8 => 5u8,
-            ConfigNestedValueType::Int16 => 6u8,
-            ConfigNestedValueType::Int32 => 7u8,
-            ConfigNestedValueType::Int64 => 8u8,
+            ConfigNestedValueType::Bool {} => 0u8,
+            ConfigNestedValueType::Uint8 {} => 1u8,
+            ConfigNestedValueType::Uint16 {} => 2u8,
+            ConfigNestedValueType::Uint32 {} => 3u8,
+            ConfigNestedValueType::Uint64 {} => 4u8,
+            ConfigNestedValueType::Int8 {} => 5u8,
+            ConfigNestedValueType::Int16 {} => 6u8,
+            ConfigNestedValueType::Int32 {} => 7u8,
+            ConfigNestedValueType::Int64 {} => 8u8,
             ConfigNestedValueType::String { max_size } => {
                 hasher.update(max_size.get().to_le_bytes());
                 9u8
@@ -3712,6 +3712,32 @@ mod tests {
             Err(Error::Validate { schema_name: None, err, .. })
                 if err == "Found conflicting entry for config key `foo` in `some/path`."
         );
+    }
+
+    #[test]
+    fn deny_unknown_config_type_fields() {
+        let input = json!({ "config": { "foo": { "type": "bool", "unknown": "should error" } } });
+        serde_json5::from_str::<Document>(&input.to_string())
+            .expect_err("must reject unknown config field attributes");
+    }
+
+    #[test]
+    fn deny_unknown_config_nested_type_fields() {
+        let input = json!({
+            "config": {
+                "foo": {
+                    "type": "vector",
+                    "max_count": 10,
+                    "element": {
+                        "type": "bool",
+                        "unknown": "should error"
+                    },
+
+                }
+            }
+        });
+        serde_json5::from_str::<Document>(&input.to_string())
+            .expect_err("must reject unknown config field attributes");
     }
 
     #[test]

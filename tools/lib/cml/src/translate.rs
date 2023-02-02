@@ -900,15 +900,15 @@ fn translate_collections(
 /// Translates a nested value type to a [`fuchsia.config.decl.ConfigType`]
 fn translate_nested_value_type(nested_type: &ConfigNestedValueType) -> fdecl::ConfigType {
     let layout = match nested_type {
-        ConfigNestedValueType::Bool => fdecl::ConfigTypeLayout::Bool,
-        ConfigNestedValueType::Uint8 => fdecl::ConfigTypeLayout::Uint8,
-        ConfigNestedValueType::Uint16 => fdecl::ConfigTypeLayout::Uint16,
-        ConfigNestedValueType::Uint32 => fdecl::ConfigTypeLayout::Uint32,
-        ConfigNestedValueType::Uint64 => fdecl::ConfigTypeLayout::Uint64,
-        ConfigNestedValueType::Int8 => fdecl::ConfigTypeLayout::Int8,
-        ConfigNestedValueType::Int16 => fdecl::ConfigTypeLayout::Int16,
-        ConfigNestedValueType::Int32 => fdecl::ConfigTypeLayout::Int32,
-        ConfigNestedValueType::Int64 => fdecl::ConfigTypeLayout::Int64,
+        ConfigNestedValueType::Bool {} => fdecl::ConfigTypeLayout::Bool,
+        ConfigNestedValueType::Uint8 {} => fdecl::ConfigTypeLayout::Uint8,
+        ConfigNestedValueType::Uint16 {} => fdecl::ConfigTypeLayout::Uint16,
+        ConfigNestedValueType::Uint32 {} => fdecl::ConfigTypeLayout::Uint32,
+        ConfigNestedValueType::Uint64 {} => fdecl::ConfigTypeLayout::Uint64,
+        ConfigNestedValueType::Int8 {} => fdecl::ConfigTypeLayout::Int8,
+        ConfigNestedValueType::Int16 {} => fdecl::ConfigTypeLayout::Int16,
+        ConfigNestedValueType::Int32 {} => fdecl::ConfigTypeLayout::Int32,
+        ConfigNestedValueType::Int64 {} => fdecl::ConfigTypeLayout::Int64,
         ConfigNestedValueType::String { .. } => fdecl::ConfigTypeLayout::String,
     };
     let constraints = match nested_type {
@@ -930,15 +930,15 @@ fn translate_nested_value_type(nested_type: &ConfigNestedValueType) -> fdecl::Co
 /// Translates a value type to a [`fuchsia.sys2.ConfigType`]
 fn translate_value_type(value_type: &ConfigValueType) -> fdecl::ConfigType {
     let layout = match value_type {
-        ConfigValueType::Bool => fdecl::ConfigTypeLayout::Bool,
-        ConfigValueType::Uint8 => fdecl::ConfigTypeLayout::Uint8,
-        ConfigValueType::Uint16 => fdecl::ConfigTypeLayout::Uint16,
-        ConfigValueType::Uint32 => fdecl::ConfigTypeLayout::Uint32,
-        ConfigValueType::Uint64 => fdecl::ConfigTypeLayout::Uint64,
-        ConfigValueType::Int8 => fdecl::ConfigTypeLayout::Int8,
-        ConfigValueType::Int16 => fdecl::ConfigTypeLayout::Int16,
-        ConfigValueType::Int32 => fdecl::ConfigTypeLayout::Int32,
-        ConfigValueType::Int64 => fdecl::ConfigTypeLayout::Int64,
+        ConfigValueType::Bool {} => fdecl::ConfigTypeLayout::Bool,
+        ConfigValueType::Uint8 {} => fdecl::ConfigTypeLayout::Uint8,
+        ConfigValueType::Uint16 {} => fdecl::ConfigTypeLayout::Uint16,
+        ConfigValueType::Uint32 {} => fdecl::ConfigTypeLayout::Uint32,
+        ConfigValueType::Uint64 {} => fdecl::ConfigTypeLayout::Uint64,
+        ConfigValueType::Int8 {} => fdecl::ConfigTypeLayout::Int8,
+        ConfigValueType::Int16 {} => fdecl::ConfigTypeLayout::Int16,
+        ConfigValueType::Int32 {} => fdecl::ConfigTypeLayout::Int32,
+        ConfigValueType::Int64 {} => fdecl::ConfigTypeLayout::Int64,
         ConfigValueType::String { .. } => fdecl::ConfigTypeLayout::String,
         ConfigValueType::Vector { .. } => fdecl::ConfigTypeLayout::Vector,
     };
