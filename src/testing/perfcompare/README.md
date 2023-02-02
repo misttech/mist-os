@@ -7,14 +7,14 @@ The perfcompare tool requires Python 3.
 There are two ways to run the perfcompare tool with the required
 dependencies (currently just the `scipy` Python library):
 
-* Via `vpython`:
+* Via `vpython3`:
 
   ```sh
-  ./prebuilt/third_party/vpython/vpython src/testing/perfcompare/perfcompare.py
+  ./prebuilt/third_party/vpython/vpython3 src/testing/perfcompare/perfcompare.py
   ```
 
   This will automatically download prebuilt, hermetic versions of
-  dependencies.  `vpython` is used for running perfcompare on the
+  dependencies.  `vpython3` is used for running perfcompare on the
   Infra builders.
 
 * On Linux, when using Debian/Ubuntu, the dependencies can be
