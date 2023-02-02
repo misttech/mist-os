@@ -35,7 +35,7 @@ pub struct EventStream {
     /// destroyed when this EventStream is destroyed.
     dispatchers: Vec<Arc<EventDispatcher>>,
 
-    /// The route taken for this event stream, if a v2 stream.
+    /// The route taken for this event stream.
     /// This is used for access control and namespacing during
     /// serving of the event stream.
     pub route: Vec<ComponentEventRoute>,

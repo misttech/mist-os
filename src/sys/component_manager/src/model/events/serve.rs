@@ -267,7 +267,7 @@ async fn try_handle_get_next_request(
     }
 }
 
-/// Serves the event_stream_v2 protocol implemented for EventStream2RequestStream
+/// Serves the event_stream protocol implemented for EventStreamRequestStream
 /// This is needed because we get the request stream directly as a stream from FDIO
 /// but as a ServerEnd from the hooks system.
 pub async fn serve_event_stream_as_stream(

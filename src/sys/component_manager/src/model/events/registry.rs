@@ -95,10 +95,6 @@ impl RouteEventsResult {
     }
 }
 
-fn event_name_remap(value: &str) -> &str {
-    value.trim_end_matches("_v2")
-}
-
 /// Subscribes to events from multiple tasks and sends events to all of them.
 pub struct EventRegistry {
     model: Weak<Model>,
@@ -184,7 +180,7 @@ impl EventRegistry {
                 })
                 .collect(),
             ExtendedMoniker::ComponentInstance(target_moniker) => {
-                let route_result = self.route_events_v2(&target_moniker, &event_names).await?;
+                let route_result = self.route_events(&target_moniker, &event_names).await?;
                 // Each target name that we routed, will have an associated scope. The number of
                 // scopes must be equal to the number of target names.
                 let total_scopes: usize =
@@ -213,7 +209,7 @@ impl EventRegistry {
 
         let mut dispatcher_map = self.dispatcher_map.lock().await;
         for event in &mut events {
-            event.source_name = CapabilityName::from(event_name_remap(event.source_name.str()));
+            event.source_name = CapabilityName::from(event.source_name.str());
             let dispatchers = dispatcher_map.entry(event.source_name.clone()).or_insert(vec![]);
             let dispatcher = event_stream.create_dispatcher(
                 subscriber.extended_moniker(),
@@ -222,10 +218,9 @@ impl EventRegistry {
             );
             dispatchers.push(dispatcher);
         }
-        // In the case of v2 events, this function will be called
-        // once per event. We need to preserve the routing information from
-        // that event in order to determine which events should and shouldn't
-        // be routed to the listener.
+        // This function will be called once per event. We need to preserve the routing information
+        // from that event in order to determine which events should and shouldn't be routed to the
+        // listener.
         if events.len() == 1 {
             event_stream.route = events[0].route.clone();
         }
@@ -281,7 +276,7 @@ impl EventRegistry {
 
     /// Routes a list of events to a specified moniker.
     /// Returns the event_stream capabilities.
-    pub async fn route_events_v2(
+    pub async fn route_events(
         &self,
         target_moniker: &AbsoluteMoniker,
         events: &HashSet<CapabilityName>,
@@ -297,7 +292,7 @@ impl EventRegistry {
                     // be resolved because we're routing events to it.
                     // If not, this is an internal error from which we can't recover,
                     // and indicates a bug in component manager.
-                    unreachable!("route_events_v2: not resolved");
+                    unreachable!("route_events: not resolved");
                 }
                 InstanceState::Resolved(ref s) => s.decl().clone(),
                 InstanceState::Destroyed => {
@@ -312,7 +307,7 @@ impl EventRegistry {
                 UseDecl::EventStream(event_decl) => {
                     if events.contains(&event_decl.source_name) {
                         let (source_name, scope_moniker, route) =
-                            Self::route_single_event_v2(event_decl.clone(), &component).await?;
+                            Self::route_single_event(event_decl.clone(), &component).await?;
                         let mut scope = EventDispatcherScope::new(scope_moniker);
                         if let Some(filter) = event_decl.filter {
                             scope = scope.with_filter(EventFilter::new(Some(filter)));
@@ -328,7 +323,7 @@ impl EventRegistry {
     }
 
     /// Routes an event and returns its source name and scope on success.
-    async fn route_single_event_v2(
+    async fn route_single_event(
         event_decl: UseEventStreamDecl,
         component: &Arc<ComponentInstance>,
     ) -> Result<(CapabilityName, ExtendedMoniker, Vec<ComponentEventRoute>), ModelError> {

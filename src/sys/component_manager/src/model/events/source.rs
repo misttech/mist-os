@@ -33,7 +33,7 @@ use {
     },
 };
 
-// Event source v2 (supporting event streams)
+// Event source (supporting event streams)
 #[derive(Clone)]
 pub struct EventSource {
     pub name: CapabilityName,
