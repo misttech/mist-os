@@ -543,23 +543,24 @@ func (t *FFXTester) EnabledForTest(test testsharder.Test) bool {
 
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
 	if t.EnabledForTest(test) {
-		err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
-			return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
-		}, nil)
-		if err != nil {
-			return nil, err
-		}
-		baseTestResult := BaseTestResultFromTest(test)
+		finalTestResult := BaseTestResultFromTest(test)
 		testResults, err := t.TestMultiple(ctx, []testsharder.Test{test}, stdout, stderr, outDir)
 		if err != nil {
-			baseTestResult.FailReason = err.Error()
-			return baseTestResult, nil
+			finalTestResult.FailReason = err.Error()
+		} else if len(testResults) != 1 {
+			finalTestResult.FailReason = fmt.Sprintf("expected 1 test result, got %d", len(testResults))
+		} else {
+			finalTestResult = testResults[0]
 		}
-		if len(testResults) != 1 {
-			baseTestResult.FailReason = fmt.Sprintf("expected 1 test result, got %d", len(testResults))
-			return baseTestResult, nil
+		if finalTestResult.Result != runtests.TestSuccess {
+			err = retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
+				return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
+			}, nil)
+			if err != nil {
+				return finalTestResult, err
+			}
 		}
-		return testResults[0], nil
+		return finalTestResult, nil
 	}
 	return t.sshTester.Test(ctx, test, stdout, stderr, outDir)
 }
