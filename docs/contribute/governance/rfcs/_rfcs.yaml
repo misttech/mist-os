@@ -2695,3 +2695,17 @@
   reviewers: ['atait@google.com', 'brunodalbo@google.com', 'ecstone@google.com', 'emircan@google.com', 'jamuraa@google.com', 'nmccracken@google.com', 'palmer@google.com', 'senj@google.com', 'paulfaria@google.com']
   submitted: '2022-12-08'
   reviewed: '2022-01-13'
+
+- name: 'RFC-0207'
+  title: 'Offline blob compression'
+  short_description: 'Download compressed blobs.'
+  authors: ['senj@google.com']
+  file: '0207_offline_blob_compression.md'
+  area: ['Software Delivery']
+  issue: ['111850']
+  gerrit_change_id: ['752282']
+  status: 'Accepted'
+  reviewers: ['jsankey@google.com', 'etryzelaar@google.com', 'mlindsay@google.com', 'csuter@google.com', 'bcastell@google.com', 'marvinpaul@google.com', 'aaronwood@google.com', 'amituttam@google.com', 'dschuyler@google.com', 'atyfto@google.com']
+  submitted: '2022-11-02'
+  reviewed: '2023-02-01'
+

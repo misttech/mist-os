@@ -428,3 +428,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0205_vulkan_loader.md
   - title: "RFC-0206: Deprecate stash"
     path: /docs/contribute/governance/rfcs/0206_deprecate_stash.md
+  - title: "RFC-0207: Offline blob compression"
+    path: /docs/contribute/governance/rfcs/0207_offline_blob_compression.md
