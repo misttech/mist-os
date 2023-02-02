@@ -505,8 +505,8 @@ func (s *serialSocket) runDiagnostics(ctx context.Context) error {
 
 // for testability
 type FFXInstance interface {
+	RunWithTarget(ctx context.Context, args ...string) error
 	SetStdoutStderr(stdout, stderr io.Writer)
-	TargetWait(ctx context.Context) error
 	Test(ctx context.Context, tests build.TestList, outDir string, args ...string) (*ffxutil.TestRunResult, error)
 	Snapshot(ctx context.Context, outDir string, snapshotFilename string) error
 	Stop() error
@@ -544,7 +544,7 @@ func (t *FFXTester) EnabledForTest(test testsharder.Test) bool {
 func (t *FFXTester) Test(ctx context.Context, test testsharder.Test, stdout, stderr io.Writer, outDir string) (*TestResult, error) {
 	if t.EnabledForTest(test) {
 		err := retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), maxReconnectAttempts), func() error {
-			return t.ffx.TargetWait(ctx)
+			return t.ffx.RunWithTarget(ctx, "target", "wait", "-t", "10")
 		}, nil)
 		if err != nil {
 			return nil, err

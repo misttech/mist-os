@@ -30,8 +30,7 @@ func (f *MockFFXInstance) run(cmd string, args ...string) error {
 	return nil
 }
 
-func (f *MockFFXInstance) TargetWait(_ context.Context) error {
-	f.run("target wait")
+func (f *MockFFXInstance) RunWithTarget(_ context.Context, args ...string) error {
 	return nil
 }
 
