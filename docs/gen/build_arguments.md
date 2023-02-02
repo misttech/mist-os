@@ -1247,9 +1247,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"socket"`
+**Current value (from the default):** `"libcurl"`
 
-From //third_party/crashpad/src/util/net/tls.gni:19
+From //third_party/crashpad/src/util/net/tls.gni:21
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
@@ -2650,7 +2650,7 @@ From //third_party/perfetto/gn/perfetto.gni:193
 
 ### enable_perfetto_ipc
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:150
 
@@ -2685,7 +2685,7 @@ From //third_party/perfetto/gn/perfetto.gni:235
 
 ### enable_perfetto_system_consumer
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //third_party/perfetto/gn/perfetto.gni:251
 
@@ -3645,7 +3645,7 @@ From //build/go/go_build.gni:22
     will have build and test results cached, and is safe to be written to
     concurrently. If overridden, this directory must be a full path.
 
-**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/.gocache"`
+**Current value (from the default):** `"/b/s/w/ir/x/w/fuchsia/out/not-default/dartlang/.gocache"`
 
 From //build/go/go_build.gni:18
 
@@ -7579,13 +7579,13 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:18
+From //src/proc/bin/starnix/BUILD.gn:19
 
 ### starnix_restricted_mode
 
 **Current value (from the default):** `true`
 
-From //src/proc/bin/starnix/BUILD.gn:15
+From //src/proc/bin/starnix/BUILD.gn:16
 
 ### starnix_wayland_protocol_logging
 
@@ -7593,7 +7593,7 @@ Whether wayland protocol logging should be enabled
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:13
+From //src/proc/bin/starnix/BUILD.gn:14
 
 ### target_cpu
 
@@ -7802,7 +7802,7 @@ From //build/security.gni:218
 
 ThinLTO cache directory path.
 
-**Current value (from the default):** `"thinlto-cache"`
+**Current value (from the default):** `"dartlang/thinlto-cache"`
 
 From //build/config/lto/config.gni:16
 
@@ -8141,7 +8141,7 @@ VkInstances or VkDevice will fail.
 This argument will affect all vulkan_{executable/test} build targets.
 
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //src/lib/vulkan/build/config.gni:40
 
