@@ -10,7 +10,6 @@ use std::hash::Hash;
 
 use anyhow::Context as _;
 use assert_matches::assert_matches;
-use async_utils::fold;
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_routes as fnet_routes;
@@ -288,29 +287,6 @@ async fn resolve_default_route_while_dhcp_is_running(name: &str) {
     );
 }
 
-// Collect all `existing` events from the stream.
-async fn collect_routes_until_idle<I: fnet_routes_ext::FidlRouteIpExt>(
-    event_stream: impl futures::Stream<Item = Result<fnet_routes_ext::Event<I>, fnet_routes_ext::WatchError>>
-        + Unpin,
-) -> Vec<fnet_routes_ext::InstalledRoute<I>> {
-    fold::fold_while(event_stream, Vec::new(), |mut existing_routes, event| {
-        use fnet_routes_ext::Event::*;
-        futures::future::ready(match event.expect("error in event stream") {
-            Existing(e) => {
-                existing_routes.push(e);
-                fold::FoldWhile::Continue(existing_routes)
-            }
-            Idle => fold::FoldWhile::Done(existing_routes),
-            e @ Unknown | e @ Added(_) | e @ Removed(_) => {
-                panic!("unexpected event received from the routes watcher: {e:?}")
-            }
-        })
-    })
-    .await
-    .short_circuited()
-    .expect("event stream unexpectedly ended")
-}
-
 fn new_installed_route<I: fnet_routes_ext::FidlRouteIpExt>(
     subnet: net_types::ip::Subnet<I::Addr>,
     interface: u64,
@@ -409,7 +385,9 @@ async fn watcher_existing<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext::F
         .expect("failed to connect to routes watcher");
 
     futures::pin_mut!(event_stream);
-    let existing = collect_routes_until_idle(event_stream.by_ref()).await;
+    let existing = fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream.by_ref())
+        .await
+        .expect("failed to collect existing routes");
 
     // Assert that the existing routes contain exactly the expected routes.
     assert_eq_unordered(existing, expected_routes);
@@ -459,7 +437,9 @@ async fn watcher_add_before_watch<
 
     // Verify that the previously added route is observed as `existing`.
     futures::pin_mut!(event_stream);
-    let existing = collect_routes_until_idle(event_stream).await;
+    let existing = fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream)
+        .await
+        .expect("failed to collect existing routes");
     let expected_route = new_installed_route(subnet, interface.id(), DEFAULT_UNSET_METRIC);
     assert!(
         existing.contains(&expected_route),
@@ -490,7 +470,10 @@ async fn watcher_add_remove<N: Netstack, I: net_types::ip::Ip + fnet_routes_ext:
     futures::pin_mut!(event_stream);
 
     // Skip all `existing` events.
-    let _existing_routes = collect_routes_until_idle(event_stream.by_ref()).await;
+    let _existing_routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream.by_ref())
+            .await
+            .expect("failed to collect existing routes");
 
     // Add a test route.
     interface.add_subnet_route(subnet.into_ext()).await.expect("failed to add route");
@@ -582,7 +565,10 @@ async fn watcher_outlives_state<
     futures::pin_mut!(event_stream);
 
     // Skip all `existing` events.
-    let _existing_routes = collect_routes_until_idle(event_stream.by_ref()).await;
+    let _existing_routes =
+        fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream.by_ref())
+            .await
+            .expect("failed to collect existing routes");
 
     // Drop the state proxy and verify the event_stream stays open
     drop(state_proxy);
@@ -630,7 +616,10 @@ async fn watcher_multiple_instances<
         let mut event_stream = fnet_routes_ext::event_stream_from_state::<I>(&state_proxy)
             .expect("failed to connect to routes watcher")
             .boxed_local();
-        let existing = collect_routes_until_idle(event_stream.by_ref()).await;
+        let existing =
+            fnet_routes_ext::collect_routes_until_idle::<I, Vec<_>>(event_stream.by_ref())
+                .await
+                .expect("failed to collect existing routes");
         for route in &expected_existing_routes {
             assert!(existing.contains(&route), "route: {:?}, existing: {:?}", route, existing)
         }

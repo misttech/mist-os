@@ -11,6 +11,7 @@ rustc_library("fidl_fuchsia_net_routes_ext") {
   deps = [
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
     "//src/connectivity/lib/net-types",
+    "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//third_party/rust_crates:futures",

@@ -15,6 +15,7 @@
 #[cfg(test)]
 mod testutil;
 
+use async_utils::fold;
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use fidl_fuchsia_net_routes as fnet_routes;
 use futures::{Future, Stream, StreamExt as _, TryStreamExt as _};
@@ -472,6 +473,64 @@ pub fn event_stream_from_state<I: FidlRouteIpExt>(
     })
     // Flatten the stream of event streams into a single event stream.
     .try_flatten())
+}
+
+/// Errors returned by [`collect_routes_until_idle`].
+#[derive(Clone, Debug, Error)]
+pub enum CollectRoutesUntilIdleError<I: FidlRouteIpExt> {
+    /// There was an error in the event stream.
+    #[error("there was an error in the event stream: {0}")]
+    ErrorInStream(WatchError),
+    /// There was an unexpected event in the event stream. Only `existing` or
+    /// `idle` events are expected.
+    #[error("there was an unexpected event in the event stream: {0:?}")]
+    UnexpectedEvent(Event<I>),
+    /// The event stream unexpectedly ended.
+    #[error("the event stream unexpectedly ended")]
+    StreamEnded,
+}
+
+/// Collects all `existing` events from the stream, stopping once the `idle`
+/// event is observed.
+pub async fn collect_routes_until_idle<
+    I: FidlRouteIpExt,
+    C: Extend<InstalledRoute<I>> + Default,
+>(
+    event_stream: impl futures::Stream<Item = Result<Event<I>, WatchError>> + Unpin,
+) -> Result<C, CollectRoutesUntilIdleError<I>> {
+    fold::fold_while(
+        event_stream,
+        Ok(C::default()),
+        |existing_routes: Result<C, CollectRoutesUntilIdleError<I>>, event| {
+            futures::future::ready(match existing_routes {
+                Err(_) => {
+                    unreachable!("`existing_routes` must be `Ok`, because we stop folding on err")
+                }
+                Ok(mut existing_routes) => match event {
+                    Err(e) => {
+                        fold::FoldWhile::Done(Err(CollectRoutesUntilIdleError::ErrorInStream(e)))
+                    }
+                    Ok(e) => match e {
+                        Event::Existing(e) => {
+                            existing_routes.extend([e]);
+                            fold::FoldWhile::Continue(Ok(existing_routes))
+                        }
+                        Event::Idle => fold::FoldWhile::Done(Ok(existing_routes)),
+                        e @ Event::Unknown | e @ Event::Added(_) | e @ Event::Removed(_) => {
+                            fold::FoldWhile::Done(Err(
+                                CollectRoutesUntilIdleError::UnexpectedEvent(e),
+                            ))
+                        }
+                    },
+                },
+            })
+        },
+    )
+    .await
+    .short_circuited()
+    .map_err(|_accumulated_thus_far: Result<C, CollectRoutesUntilIdleError<I>>| {
+        CollectRoutesUntilIdleError::StreamEnded
+    })?
 }
 
 #[cfg(test)]
@@ -1190,9 +1249,8 @@ mod tests {
             event_stream_from_state::<I>(&state).expect("failed to connect to watcher").fuse();
 
         futures::pin_mut!(watcher_fut, event_stream);
-        let ((), mut events) = futures::join!(watcher_fut, event_stream.collect::<Vec<_>>());
-        assert_matches!(events.pop(), Some(Err(WatchError::Conversion(_))));
-        assert_matches!(events[..], []);
+        let ((), events) = futures::join!(watcher_fut, event_stream.collect::<Vec<_>>());
+        assert_matches!(&events[..], &[Err(WatchError::Conversion(_))]);
     }
 
     // Verify that watching an empty batch results in an error and closes
@@ -1232,8 +1290,95 @@ mod tests {
             event_stream_from_state::<I>(&state).expect("failed to connect to watcher").fuse();
 
         futures::pin_mut!(watcher_fut, event_stream);
-        let ((), mut events) = futures::join!(watcher_fut, event_stream.collect::<Vec<_>>());
-        assert_matches!(events.pop(), Some(Err(WatchError::EmptyEventBatch)));
-        assert_matches!(events[..], []);
+        let ((), events) = futures::join!(watcher_fut, event_stream.collect::<Vec<_>>());
+        assert_matches!(&events[..], &[Err(WatchError::EmptyEventBatch)]);
+    }
+
+    fn arbitrary_test_route<I: Ip + FidlRouteIpExt>() -> InstalledRoute<I> {
+        #[derive(GenericOverIp)]
+        struct RouteHolder<I: Ip + FidlRouteIpExt>(InstalledRoute<I>);
+        let RouteHolder(route) = I::map_ip(
+            (),
+            |()| {
+                RouteHolder(fnet_routes::InstalledRouteV4::ARBITRARY_TEST_VALUE.try_into().unwrap())
+            },
+            |()| {
+                RouteHolder(fnet_routes::InstalledRouteV6::ARBITRARY_TEST_VALUE.try_into().unwrap())
+            },
+        );
+        route
+    }
+
+    enum CollectRoutesUntilIdleErrorTestCase {
+        ErrorInStream,
+        UnexpectedEvent,
+        StreamEnded,
+    }
+
+    #[netstack_test]
+    #[test_case(CollectRoutesUntilIdleErrorTestCase::ErrorInStream; "error_in_stream")]
+    #[test_case(CollectRoutesUntilIdleErrorTestCase::UnexpectedEvent; "unexpected_event")]
+    #[test_case(CollectRoutesUntilIdleErrorTestCase::StreamEnded; "stream_ended")]
+    async fn collect_routes_until_idle_error<I: net_types::ip::Ip + FidlRouteIpExt>(
+        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        _test_name: &str,
+        test_case: CollectRoutesUntilIdleErrorTestCase,
+    ) {
+        // Build up the test data and the expected outcome base on `test_case`.
+        // Note, that `netstack_test` doesn't support test cases whose args are
+        // generic functions (below, `test_assertion` is generic over `I`).
+        let route = arbitrary_test_route();
+        let (event, test_assertion): (_, Box<dyn FnOnce(_)>) = match test_case {
+            CollectRoutesUntilIdleErrorTestCase::ErrorInStream => (
+                Err(WatchError::EmptyEventBatch),
+                Box::new(|result| {
+                    assert_matches!(result, Err(CollectRoutesUntilIdleError::ErrorInStream(_)))
+                }),
+            ),
+            CollectRoutesUntilIdleErrorTestCase::UnexpectedEvent => (
+                Ok(Event::Added(route)),
+                Box::new(|result| {
+                    assert_matches!(result, Err(CollectRoutesUntilIdleError::UnexpectedEvent(_)))
+                }),
+            ),
+            CollectRoutesUntilIdleErrorTestCase::StreamEnded => (
+                Ok(Event::Existing(route)),
+                Box::new(|result| {
+                    assert_matches!(result, Err(CollectRoutesUntilIdleError::StreamEnded))
+                }),
+            ),
+        };
+
+        let event_stream = futures::stream::once(futures::future::ready(event));
+        futures::pin_mut!(event_stream);
+        let result = collect_routes_until_idle::<I, Vec<_>>(event_stream).await;
+        test_assertion(result);
+    }
+
+    // Verifies that `collect_routes_until_idle` collects all existing events,
+    // drops the idle event, and leaves all trailing events intact.
+    #[netstack_test]
+    async fn collect_routes_until_idle_success<I: net_types::ip::Ip + FidlRouteIpExt>(
+        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        _test_name: &str,
+    ) {
+        let route = arbitrary_test_route();
+        let event_stream = futures::stream::iter([
+            Ok(Event::Existing(route)),
+            Ok(Event::Idle),
+            Ok(Event::Added(route)),
+        ]);
+
+        futures::pin_mut!(event_stream);
+        let existing = collect_routes_until_idle::<I, Vec<_>>(event_stream.by_ref())
+            .await
+            .expect("failed to collect existing routes");
+        assert_eq!(&existing, &[route]);
+
+        let trailing_events = event_stream.collect::<Vec<_>>().await;
+        assert_matches!(
+            &trailing_events[..],
+            &[Ok(Event::Added(found_route))] if found_route == route
+        );
     }
 }
