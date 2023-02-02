@@ -279,6 +279,7 @@ pub enum ValueError {
 mod tests {
     use super::*;
     use fidl_fuchsia_component_config_ext::{config_decl, values_data};
+    use fidl_test_config_encoder::BasicSuccessSchema;
 
     use SingleValue::*;
     use Value::*;
@@ -338,65 +339,102 @@ mod tests {
             Vector(StringVector(vec!["valid".into(), "valid".into()])),
         ];
 
-        let expected = ConfigFields {
-            fields: vec![
-                ConfigField { key: "my_flag".to_string(), value: Single(Bool(false)) },
-                ConfigField { key: "my_uint8".to_string(), value: Single(Uint8(255)) },
-                ConfigField { key: "my_uint16".to_string(), value: Single(Uint16(65535)) },
-                ConfigField { key: "my_uint32".to_string(), value: Single(Uint32(4000000000)) },
-                ConfigField { key: "my_uint64".to_string(), value: Single(Uint64(8000000000)) },
-                ConfigField { key: "my_int8".to_string(), value: Single(Int8(-127)) },
-                ConfigField { key: "my_int16".to_string(), value: Single(Int16(-32766)) },
-                ConfigField { key: "my_int32".to_string(), value: Single(Int32(-2000000000)) },
-                ConfigField { key: "my_int64".to_string(), value: Single(Int64(-4000000000)) },
-                ConfigField {
-                    key: "my_string".to_string(),
-                    value: Single(String("hello, world!".into())),
-                },
-                ConfigField {
-                    key: "my_vector_of_flag".to_string(),
-                    value: Vector(BoolVector(vec![true, false])),
-                },
-                ConfigField {
-                    key: "my_vector_of_uint8".to_string(),
-                    value: Vector(Uint8Vector(vec![1, 2, 3])),
-                },
-                ConfigField {
-                    key: "my_vector_of_uint16".to_string(),
-                    value: Vector(Uint16Vector(vec![2, 3, 4])),
-                },
-                ConfigField {
-                    key: "my_vector_of_uint32".to_string(),
-                    value: Vector(Uint32Vector(vec![3, 4, 5])),
-                },
-                ConfigField {
-                    key: "my_vector_of_uint64".to_string(),
-                    value: Vector(Uint64Vector(vec![4, 5, 6])),
-                },
-                ConfigField {
-                    key: "my_vector_of_int8".to_string(),
-                    value: Vector(Int8Vector(vec![-1, -2, 3])),
-                },
-                ConfigField {
-                    key: "my_vector_of_int16".to_string(),
-                    value: Vector(Int16Vector(vec![-2, -3, 4])),
-                },
-                ConfigField {
-                    key: "my_vector_of_int32".to_string(),
-                    value: Vector(Int32Vector(vec![-3, -4, 5])),
-                },
-                ConfigField {
-                    key: "my_vector_of_int64".to_string(),
-                    value: Vector(Int64Vector(vec![-4, -5, 6])),
-                },
-                ConfigField {
-                    key: "my_vector_of_string".to_string(),
-                    value: Vector(StringVector(vec!["valid".into(), "valid".into()])),
-                },
-            ],
-            checksum: decl.checksum.clone(),
-        };
-        assert_eq!(ConfigFields::resolve(&decl, specs).unwrap(), expected);
+        let resolved = ConfigFields::resolve(&decl, specs).unwrap();
+        assert_eq!(
+            resolved,
+            ConfigFields {
+                fields: vec![
+                    ConfigField { key: "my_flag".to_string(), value: Single(Bool(false)) },
+                    ConfigField { key: "my_uint8".to_string(), value: Single(Uint8(255)) },
+                    ConfigField { key: "my_uint16".to_string(), value: Single(Uint16(65535)) },
+                    ConfigField { key: "my_uint32".to_string(), value: Single(Uint32(4000000000)) },
+                    ConfigField { key: "my_uint64".to_string(), value: Single(Uint64(8000000000)) },
+                    ConfigField { key: "my_int8".to_string(), value: Single(Int8(-127)) },
+                    ConfigField { key: "my_int16".to_string(), value: Single(Int16(-32766)) },
+                    ConfigField { key: "my_int32".to_string(), value: Single(Int32(-2000000000)) },
+                    ConfigField { key: "my_int64".to_string(), value: Single(Int64(-4000000000)) },
+                    ConfigField {
+                        key: "my_string".to_string(),
+                        value: Single(String("hello, world!".into())),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_flag".to_string(),
+                        value: Vector(BoolVector(vec![true, false])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_uint8".to_string(),
+                        value: Vector(Uint8Vector(vec![1, 2, 3])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_uint16".to_string(),
+                        value: Vector(Uint16Vector(vec![2, 3, 4])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_uint32".to_string(),
+                        value: Vector(Uint32Vector(vec![3, 4, 5])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_uint64".to_string(),
+                        value: Vector(Uint64Vector(vec![4, 5, 6])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_int8".to_string(),
+                        value: Vector(Int8Vector(vec![-1, -2, 3])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_int16".to_string(),
+                        value: Vector(Int16Vector(vec![-2, -3, 4])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_int32".to_string(),
+                        value: Vector(Int32Vector(vec![-3, -4, 5])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_int64".to_string(),
+                        value: Vector(Int64Vector(vec![-4, -5, 6])),
+                    },
+                    ConfigField {
+                        key: "my_vector_of_string".to_string(),
+                        value: Vector(StringVector(vec!["valid".into(), "valid".into()])),
+                    },
+                ],
+                checksum: decl.checksum.clone(),
+            }
+        );
+
+        let encoded = resolved.encode_as_fidl_struct();
+
+        let checksum_len = u16::from_le_bytes(encoded[..2].try_into().unwrap());
+        let struct_start = 2 + checksum_len as usize;
+        assert_eq!(&encoded[2..struct_start], [0; 32]);
+
+        let decoded: BasicSuccessSchema =
+            fidl::encoding::unpersist(&encoded[struct_start..]).unwrap();
+        assert_eq!(
+            decoded,
+            BasicSuccessSchema {
+                my_flag: false,
+                my_uint8: 255,
+                my_uint16: 65535,
+                my_uint32: 4000000000,
+                my_uint64: 8000000000,
+                my_int8: -127,
+                my_int16: -32766,
+                my_int32: -2000000000,
+                my_int64: -4000000000,
+                my_string: "hello, world!".into(),
+                my_vector_of_flag: vec![true, false],
+                my_vector_of_uint8: vec![1, 2, 3],
+                my_vector_of_uint16: vec![2, 3, 4],
+                my_vector_of_uint32: vec![3, 4, 5],
+                my_vector_of_uint64: vec![4, 5, 6],
+                my_vector_of_int8: vec![-1, -2, 3],
+                my_vector_of_int16: vec![-2, -3, 4],
+                my_vector_of_int32: vec![-3, -4, 5],
+                my_vector_of_int64: vec![-4, -5, 6],
+                my_vector_of_string: vec!["valid".into(), "valid".into()],
+            }
+        );
     }
 
     #[test]
