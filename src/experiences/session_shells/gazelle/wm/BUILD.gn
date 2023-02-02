@@ -66,6 +66,9 @@ fuchsia_unittest_package("wm-tests") {
     "//src/ui/testing/test_ui_stack:test-ui-stack-component",
   ]
   test_specs = {
+    # TODO(fxbug.dev/121166): scenic seems to crash when the system is
+    # overloaded.  Reducing parallelism seems to help reduce the flakiness.
+    parallel = 1
     log_settings = {
       max_severity = "ERROR"
     }
