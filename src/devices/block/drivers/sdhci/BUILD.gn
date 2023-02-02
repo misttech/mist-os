@@ -78,9 +78,7 @@ test("sdhci-test-bin") {
     "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/mmio",
     "//src/devices/testing/fake-bti",
-
-    # TODO(fxb/115051): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
     "//src/lib/vmo_store",
     "//zircon/system/ulib/fbl",
@@ -98,6 +96,9 @@ fuchsia_unittest_package("sdhci-test") {
   deps = [ ":sdhci-test-bin" ]
   test_specs = {
     environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 

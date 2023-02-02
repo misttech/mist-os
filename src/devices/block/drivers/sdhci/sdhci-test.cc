@@ -6,7 +6,6 @@
 
 #include <fuchsia/hardware/sdhci/cpp/banjo-mock.h>
 #include <lib/fake-bti/bti.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/sync/completion.h>
 
@@ -16,6 +15,8 @@
 #include <vector>
 
 #include <zxtest/zxtest.h>
+
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 // Stub out vmo_op_range to allow tests to use fake VMOs.
 __EXPORT
@@ -143,6 +144,8 @@ class SdhciTest : public zxtest::Test {
             0) {}
 
  protected:
+  void SetUp() { root_ = MockDevice::FakeRootParent(); }
+
   void CreateDut(std::vector<zx_paddr_t> dma_paddrs, uint64_t quirks = 0,
                  uint64_t dma_boundary_alignment = 0) {
     zx::bti fake_bti;
@@ -153,9 +156,11 @@ class SdhciTest : public zxtest::Test {
     memset(registers_.get(), 0, kRegisterSetSize);
 
     bti_ = fake_bti.borrow();
-    dut_.emplace(fake_ddk::kFakeParent, fdf::MmioView(mmio_), std::move(fake_bti),
-                 ddk::SdhciProtocolClient(mock_sdhci_.GetProto()), quirks, dma_boundary_alignment);
+    dut_ = new TestSdhci(root_.get(), fdf::MmioView(mmio_), std::move(fake_bti),
+                         ddk::SdhciProtocolClient(mock_sdhci_.GetProto()), quirks,
+                         dma_boundary_alignment);
 
+    dut_->DdkAdd("sdhci");
     HostControllerVersion::Get()
         .FromValue(0)
         .set_specification_version(HostControllerVersion::kSpecificationVersion300)
@@ -177,22 +182,18 @@ class SdhciTest : public zxtest::Test {
   ddk::MockSdhci mock_sdhci_;
   zx::interrupt irq_;
   std::vector<zx_paddr_t> dma_paddrs_;
-  std::optional<TestSdhci> dut_;
+  std::shared_ptr<MockDevice> root_;
+  TestSdhci* dut_;  // Managed by root_.
   fdf::MmioView mmio_;
   zx::unowned_bti bti_;
 };
 
 TEST_F(SdhciTest, DdkLifecycle) {
   ASSERT_NO_FATAL_FAILURE(CreateDut());
-
   mock_sdhci_.ExpectGetBaseClock(100'000'000);
-  EXPECT_OK(dut_->Init());
-
-  fake_ddk::Bind bind;
-  dut_->DdkAdd("sdhci");
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
-
-  EXPECT_TRUE(bind.Ok());
+  EXPECT_OK(dut_->Init());  // Not DdkInit.
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
+  root_->GetLatestChild()->WaitUntilUnbindReplyCalled();
 }
 
 TEST_F(SdhciTest, BaseClockZero) {
@@ -207,7 +208,7 @@ TEST_F(SdhciTest, BaseClockFromDriver) {
 
   mock_sdhci_.ExpectGetBaseClock(0xabcdef);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   EXPECT_EQ(dut_->base_clock(), 0xabcdef);
 }
@@ -217,7 +218,7 @@ TEST_F(SdhciTest, BaseClockFromHardware) {
 
   Capabilities0::Get().FromValue(0).set_base_clock_frequency(104).WriteTo(&mmio_);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   EXPECT_EQ(dut_->base_clock(), 104'000'000);
 }
@@ -239,7 +240,7 @@ TEST_F(SdhciTest, HostInfo) {
       .set_v3_64_bit_system_address_support(1)
       .WriteTo(&mmio_);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   sdmmc_host_info_t host_info = {};
   EXPECT_OK(dut_->SdmmcHostInfo(&host_info));
@@ -261,7 +262,7 @@ TEST_F(SdhciTest, HostInfoNoDma) {
       .set_v3_64_bit_system_address_support(1)
       .WriteTo(&mmio_);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   sdmmc_host_info_t host_info = {};
   EXPECT_OK(dut_->SdmmcHostInfo(&host_info));
@@ -277,7 +278,7 @@ TEST_F(SdhciTest, HostInfoNoTuning) {
   Capabilities1::Get().FromValue(0).WriteTo(&mmio_);
   Capabilities0::Get().FromValue(0).set_base_clock_frequency(1).WriteTo(&mmio_);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   sdmmc_host_info_t host_info = {};
   EXPECT_OK(dut_->SdmmcHostInfo(&host_info));
@@ -292,7 +293,7 @@ TEST_F(SdhciTest, SetSignalVoltage) {
   Capabilities0::Get().FromValue(0).set_voltage_3v3_support(1).set_voltage_1v8_support(1).WriteTo(
       &mmio_);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   PresentState::Get().FromValue(0).set_dat_3_0(0b0001).WriteTo(&mmio_);
 
@@ -325,7 +326,7 @@ TEST_F(SdhciTest, SetBusWidth) {
   mock_sdhci_.ExpectGetBaseClock(100'000'000);
   Capabilities0::Get().FromValue(0).set_bus_width_8_support(1).WriteTo(&mmio_);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   auto ctrl1 = HostControl1::Get().FromValue(0);
 
@@ -353,7 +354,7 @@ TEST_F(SdhciTest, SetBusFreq) {
 
   mock_sdhci_.ExpectGetBaseClock(100'000'000);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   auto clock = ClockControl::Get().FromValue(0);
 
@@ -382,7 +383,7 @@ TEST_F(SdhciTest, SetBusFreqTimeout) {
 
   mock_sdhci_.ExpectGetBaseClock(100'000'000);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   ClockControl::Get().FromValue(0).set_internal_clock_stable(1).WriteTo(&mmio_);
   EXPECT_OK(dut_->SdmmcSetBusFreq(12'500'000));
@@ -396,7 +397,7 @@ TEST_F(SdhciTest, SetBusFreqInternalClockEnable) {
 
   mock_sdhci_.ExpectGetBaseClock(100'000'000);
   EXPECT_OK(dut_->Init());
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 
   ClockControl::Get()
       .FromValue(0)
@@ -498,7 +499,7 @@ TEST_F(SdhciTest, RequestCommandOnly) {
   EXPECT_EQ(response[2], 0xc14b059e);
   EXPECT_EQ(response[3], 0x7329a9e3);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, RequestAbort) {
@@ -545,7 +546,7 @@ TEST_F(SdhciTest, RequestAbort) {
   EXPECT_EQ(dut_->reset_mask(),
             SoftwareReset::Get().FromValue(0).set_reset_dat(1).set_reset_cmd(1).reg_value());
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, SdioInBandInterrupt) {
@@ -589,7 +590,7 @@ TEST_F(SdhciTest, SdioInBandInterrupt) {
   dut_->TriggerCardInterrupt();
   sync_completion_wait(&callback_called, ZX_TIME_INFINITE);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, DmaRequest64Bit) {
@@ -693,7 +694,7 @@ TEST_F(SdhciTest, DmaRequest64Bit) {
   EXPECT_EQ(address, zx_system_get_page_size() + 208);
   EXPECT_EQ(descriptors[4].length, 512 * 7);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, DmaRequest32Bit) {
@@ -792,7 +793,7 @@ TEST_F(SdhciTest, DmaRequest32Bit) {
   EXPECT_EQ(descriptors[4].address, zx_system_get_page_size() + 208);
   EXPECT_EQ(descriptors[4].length, 512 * 7);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, DmaSplitOneBoundary) {
@@ -865,7 +866,7 @@ TEST_F(SdhciTest, DmaSplitOneBoundary) {
   EXPECT_EQ(descriptors[2].address, 0xb000'0000);
   EXPECT_EQ(descriptors[2].length, 256 - 4);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, DmaSplitManyBoundaries) {
@@ -939,7 +940,7 @@ TEST_F(SdhciTest, DmaSplitManyBoundaries) {
   EXPECT_EQ(descriptors[4].address, 0xabcd'0400);
   EXPECT_EQ(descriptors[4].length, 128);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, DmaNoBoundaries) {
@@ -1004,7 +1005,7 @@ TEST_F(SdhciTest, DmaNoBoundaries) {
   EXPECT_EQ(descriptors[1].address, 0xb000'0000);
   EXPECT_EQ(descriptors[1].length, 256 - 4);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, CommandSettingsMultiBlock) {
@@ -1076,7 +1077,7 @@ TEST_F(SdhciTest, CommandSettingsMultiBlock) {
   EXPECT_EQ(BlockCount::Get().ReadFrom(&mmio_).reg_value(), 2);
   EXPECT_EQ(Argument::Get().ReadFrom(&mmio_).reg_value(), 0x1234'abcd);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, CommandSettingsSingleBlock) {
@@ -1148,7 +1149,7 @@ TEST_F(SdhciTest, CommandSettingsSingleBlock) {
   EXPECT_EQ(BlockCount::Get().ReadFrom(&mmio_).reg_value(), 1);
   EXPECT_EQ(Argument::Get().ReadFrom(&mmio_).reg_value(), 0x1234'abcd);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, CommandSettingsBusyResponse) {
@@ -1206,7 +1207,7 @@ TEST_F(SdhciTest, CommandSettingsBusyResponse) {
   EXPECT_EQ(BlockCount::Get().ReadFrom(&mmio_).reg_value(), 0);
   EXPECT_EQ(Argument::Get().ReadFrom(&mmio_).reg_value(), 0x1234'abcd);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, ZeroBlockSize) {
@@ -1278,7 +1279,7 @@ TEST_F(SdhciTest, ZeroBlockSize) {
   uint32_t response[4] = {};
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, NoBuffers) {
@@ -1320,7 +1321,7 @@ TEST_F(SdhciTest, NoBuffers) {
   uint32_t response[4] = {};
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, OwnedAndUnownedBuffers) {
@@ -1433,7 +1434,7 @@ TEST_F(SdhciTest, OwnedAndUnownedBuffers) {
   EXPECT_EQ(address, zx_system_get_page_size() + 208);
   EXPECT_EQ(descriptors[4].length, 512 * 7);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, CombineContiguousRegions) {
@@ -1502,7 +1503,7 @@ TEST_F(SdhciTest, CombineContiguousRegions) {
   EXPECT_EQ(descriptors[1].address, 0xb000'0000);
   EXPECT_EQ(descriptors[1].length, 512);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, DiscontiguousRegions) {
@@ -1606,7 +1607,7 @@ TEST_F(SdhciTest, DiscontiguousRegions) {
   EXPECT_EQ(descriptors[8].get_address(), (8 * kDiscontiguousPageOffset) + kStartAddress);
   EXPECT_EQ(descriptors[8].length, zx_system_get_page_size() - 1024);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, RegionStartAndEndOffsets) {
@@ -1690,7 +1691,7 @@ TEST_F(SdhciTest, RegionStartAndEndOffsets) {
   EXPECT_EQ(descriptors[0].address, kStartAddress + (zx_system_get_page_size() * 3) + 512);
   EXPECT_EQ(descriptors[0].length, zx_system_get_page_size() - 1024);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, BufferZeroSize) {
@@ -1806,7 +1807,7 @@ TEST_F(SdhciTest, BufferZeroSize) {
     EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
   }
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, TransferError) {
@@ -1847,7 +1848,7 @@ TEST_F(SdhciTest, TransferError) {
   uint32_t response[4] = {};
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, MaxTransferSize) {
@@ -1906,7 +1907,7 @@ TEST_F(SdhciTest, MaxTransferSize) {
   EXPECT_EQ(descriptors[511].get_address(), zx_system_get_page_size() * 2 * 512);
   EXPECT_EQ(descriptors[511].length, zx_system_get_page_size());
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, TransferSizeExceeded) {
@@ -1953,7 +1954,7 @@ TEST_F(SdhciTest, TransferSizeExceeded) {
   uint32_t response[4] = {};
   EXPECT_NOT_OK(dut_->SdmmcRequest(&request, response));
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 TEST_F(SdhciTest, DmaSplitSizeAndAligntmentBoundaries) {
@@ -2031,7 +2032,7 @@ TEST_F(SdhciTest, DmaSplitSizeAndAligntmentBoundaries) {
   EXPECT_EQ(descriptors[4].get_address(), 0x1'0005'0000);
   EXPECT_EQ(descriptors[4].length, 0x8000);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(fake_ddk::kFakeDevice));
+  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
 }
 
 }  // namespace sdhci
