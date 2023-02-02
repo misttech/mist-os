@@ -1,7 +1,6 @@
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
 """Rule for defining a pavable Fuchsia image."""
 
 load(
@@ -17,12 +16,9 @@ load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 # Base source for running ffx assembly product
 _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE = """
 set -e
-
 ORIG_DIR=$(pwd)
 cd $ARTIFACTS_BASE_PATH
-
 mkdir -p $FFX_ISOLATE_DIR
-
 $ORIG_DIR/$FFX \
     --config "assembly_enabled=true,sdk.root=$ORIG_DIR/$SDK_ROOT" \
     --isolate-dir $FFX_ISOLATE_DIR \
@@ -33,7 +29,6 @@ $ORIG_DIR/$FFX \
     --legacy-bundle $ORIG_DIR/$LEGACY_AIB \
     --input-bundles-dir $ORIG_DIR/$PLATFORM_AIB_DIR \
     --outdir $ORIG_DIR/$OUTDIR
-
 $ORIG_DIR/$FFX \
     --config "assembly_enabled=true,sdk.root=$ORIG_DIR/$SDK_ROOT" \
     --isolate-dir $FFX_ISOLATE_DIR \
@@ -42,7 +37,6 @@ $ORIG_DIR/$FFX \
     --image-assembly-config $ORIG_DIR/$OUTDIR/image_assembly.json \
     --images $ORIG_DIR/$IMAGES_CONFIG_PATH \
     --outdir $ORIG_DIR/$OUTDIR
-
 """
 
 def _fuchsia_product_image_impl(ctx):
@@ -57,23 +51,18 @@ def _fuchsia_product_image_impl(ctx):
     images_config_file = images_config_info.config
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
     board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].board_config if ctx.attr.board_config else None
-
     shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
         board_config_arg = "--board-info $ORIG_DIR/$BOARD_CONFIG_PATH" if board_config_file else "",
     )
-
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
     ffx_inputs += ctx.files.product_config
     if board_config_file:
         ffx_inputs.append(board_config_file)
-
     ffx_inputs += legacy_aib.files
     ffx_inputs += platform_aibs.files
     ffx_inputs += ctx.files.product_config
     ffx_inputs += ctx.files.image
-
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
-
     shell_env = {
         "FFX": ffx_tool.path,
         "SDK_ROOT": ctx.attr._sdk_manifest.label.workspace_root,
@@ -87,7 +76,6 @@ def _fuchsia_product_image_impl(ctx):
     }
     if board_config_file:
         shell_env["BOARD_CONFIG_PATH"] = board_config_file.path
-
     ctx.actions.run_shell(
         inputs = ffx_inputs,
         outputs = [
@@ -100,12 +88,11 @@ def _fuchsia_product_image_impl(ctx):
         env = shell_env,
         progress_message = "Product Assembly and create-system for %s" % ctx.label.name,
     )
-
     return [
-        DefaultInfo(files = depset(direct = [out_dir] + ctx.files.product_config)),
+        DefaultInfo(files = depset(direct = [out_dir, ffx_isolate_dir] + ffx_inputs)),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
-            all_files = depset([out_dir, ffx_isolate_dir] + ctx.files.product_config),
+            all_files = depset([out_dir, ffx_isolate_dir] + ffx_inputs),
         ),
         FuchsiaProductImageInfo(
             images_out = out_dir,
