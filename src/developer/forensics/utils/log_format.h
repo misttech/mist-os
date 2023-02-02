@@ -11,7 +11,7 @@
 
 namespace forensics {
 
-// Format a log message as a string.
+// Format a log message as a string. Inserts a "dropped log" message if |message.dropped_logs| > 0.
 std::string Format(const fuchsia::logger::LogMessage& message);
 
 }  // namespace forensics

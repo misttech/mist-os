@@ -73,5 +73,25 @@ TEST(LogFormatTest, Check_CorrectTags) {
   EXPECT_EQ(log_message, "[15604.001][07559][07687][foo, bar] INFO: line 1\n");
 }
 
+TEST(LogFormatTest, Check_InsertsDroppedLogMessageSingular) {
+  fuchsia::logger::LogMessage message = BuildLogMessage(syslog::LOG_INFO, "line 1", zx::msec(1),
+                                                        /*tags=*/{"foo", "bar"});
+  message.dropped_logs = 1;
+
+  EXPECT_EQ(
+      Format(message),
+      "[15604.001][07559][07687][foo, bar] WARN: !!! DROPPED 1 LOG !!!\n[15604.001][07559][07687][foo, bar] INFO: line 1\n");
+}
+
+TEST(LogFormatTest, Check_InsertsDroppedLogMessageMultiple) {
+  fuchsia::logger::LogMessage message = BuildLogMessage(syslog::LOG_INFO, "line 1", zx::msec(1),
+                                                        /*tags=*/{"foo", "bar"});
+  message.dropped_logs = 2;
+
+  EXPECT_EQ(
+      Format(message),
+      "[15604.001][07559][07687][foo, bar] WARN: !!! DROPPED 2 LOGS !!!\n[15604.001][07559][07687][foo, bar] INFO: line 1\n");
+}
+
 }  // namespace
 }  // namespace forensics
