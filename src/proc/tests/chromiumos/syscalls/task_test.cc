@@ -13,6 +13,8 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <cstdint>
+
 #include <gtest/gtest.h>
 #include <linux/sched.h>
 
@@ -29,8 +31,80 @@ namespace {
 #endif
 #endif
 
-pid_t DoClone3(struct clone_args* cl_args, size_t size) {
+constexpr int kChildExpectedExitCode = 21;
+constexpr int kChildErrorExitCode = kChildExpectedExitCode + 1;
+
+pid_t ForkUsingClone3(const clone_args* cl_args, size_t size) {
   return static_cast<pid_t>(syscall(SYS_clone3, cl_args, size));
+}
+
+// calls clone3 and executes a function, calling exit with its return value.
+pid_t DoClone3(const clone_args* cl_args, size_t size, int (*func)(void*), void* param) {
+  pid_t pid;
+  // clone3 lets you specify a new stack, but not which function to run.
+  // This means that after the clone3 syscall, the child will be running on a
+  // new stack, not being able to access any local variables from before the
+  // clone.
+  //
+  // We have to manually call into the new function in assembly, being careful
+  // to not refer to any variables from the stack.
+#if defined(__aarch64__)
+  __asm__ volatile(
+      "mov x0, %[cl_args]\n"
+      "mov x1, %[size]\n"
+      "mov w8, %[clone3]\n"
+      "svc #0\n"
+      "cbnz x0, 1f\n"
+      "mov x0, %[param]\n"
+      "blr %[func]\n"
+      "mov w8, %[exit]\n"
+      "svc #0\n"
+      "brk #1\n"
+      "1:\n"
+      "mov %w[pid], w0\n"
+      : [pid] "=r"(pid)
+      : [cl_args] "r"(cl_args), "m"(*cl_args), [size] "r"(size), [func] "r"(func),
+        [param] "r"(param), [clone3] "i"(SYS_clone3), [exit] "i"(SYS_exit)
+      : "x0", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13",
+        "x14", "x15", "x16", "x17", "x30", "cc", "memory");
+#elif defined(__x86_64__)
+  __asm__ volatile(
+      "syscall\n"
+      "test %%rax, %%rax\n"
+      "jnz 1f\n"
+      "movq %[param], %%rdi\n"
+      "callq *%[func]\n"
+      "movl %%eax, %%edi\n"
+      "movl %[exit], %%eax\n"
+      "syscall\n"
+      "ud2\n"
+      "1:\n"
+      "movl %%eax, %[pid]\n"
+      : [pid] "=g"(pid)
+      : "D"(cl_args), "m"(*cl_args), "S"(size),
+        "a"(SYS_clone3), [func] "r"(func), [param] "r"(param), [exit] "i"(SYS_exit)
+      : "rcx", "rdx", "r8", "r9", "r10", "r11", "cc", "memory");
+#else
+#error clone3 needs a manual asm wrapper.
+#endif
+
+  if (pid < 0) {
+    errno = -pid;
+    pid = -1;
+  }
+  return pid;
+}
+
+int stack_test_func(void* a) {
+  // Force a stack write by creating an asm block
+  // that has an input that needs to come from memory.
+  int pid = *reinterpret_cast<int*>(a);
+  __asm__("" ::"m"(pid));
+
+  if (getpid() != pid)
+    return kChildErrorExitCode;
+
+  return kChildExpectedExitCode;
 }
 
 // Returns the full path to the syscall_test_exec_child binary. This is in a directory named
@@ -56,7 +130,45 @@ std::string GetTestExecChildBinary() {
   return std::string();
 }
 
+int empty_func(void*) { return 0; }
+
 }  // namespace
+
+// Creates a child process using the "clone3()" syscall and waits on it.
+// The child uses a different stack than the parent.
+TEST(Task, Clone3_ChangeStack) {
+  struct clone_args ca;
+  bzero(&ca, sizeof(ca));
+
+  ca.flags = CLONE_PARENT_SETTID | CLONE_CHILD_SETTID;
+  ca.exit_signal = SIGCHLD;  // Needed in order to wait on the child.
+
+  // Ask for the child PID to be reported to both the parent and the child for validation.
+  uint64_t child_pid_from_clone = 0;
+  ca.parent_tid = reinterpret_cast<uint64_t>(&child_pid_from_clone);
+  ca.child_tid = reinterpret_cast<uint64_t>(&child_pid_from_clone);
+
+  constexpr size_t kStackSize = 0x5000;
+  ca.stack = reinterpret_cast<uint64_t>(
+      mmap(NULL, kStackSize, PROT_WRITE | PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+  ca.stack_size = kStackSize;
+
+  auto child_pid = DoClone3(&ca, sizeof(ca), &stack_test_func, &child_pid_from_clone);
+  ASSERT_NE(child_pid, -1);
+
+  EXPECT_EQ(static_cast<pid_t>(child_pid_from_clone), child_pid);
+
+  // Wait for the child to terminate and validate the exit code. Note that it returns a different
+  // exit code above to indicate its state wasn't as expected.
+  int wait_status = 0;
+  pid_t wait_result = waitpid(child_pid, &wait_status, 0);
+  EXPECT_EQ(wait_result, child_pid);
+
+  EXPECT_TRUE(WIFEXITED(wait_status));
+  auto exit_status = WEXITSTATUS(wait_status);
+  EXPECT_NE(exit_status, kChildErrorExitCode) << "Child process reported state was unexpected.";
+  EXPECT_EQ(exit_status, kChildExpectedExitCode) << "Wrong exit code from child process.";
+}
 
 // Forks a child process using the "clone3()" syscall and waits on it, validating some parameters.
 TEST(Task, Clone3_Fork) {
@@ -71,11 +183,8 @@ TEST(Task, Clone3_Fork) {
   ca.parent_tid = reinterpret_cast<uint64_t>(&child_pid_from_clone);
   ca.child_tid = reinterpret_cast<uint64_t>(&child_pid_from_clone);
 
-  auto child_pid = DoClone3(&ca, sizeof(ca));
+  auto child_pid = ForkUsingClone3(&ca, sizeof(ca));
   ASSERT_NE(child_pid, -1);
-
-  constexpr int kChildExpectedExitCode = 21;
-  constexpr int kChildErrorExitCode = kChildExpectedExitCode + 1;
   if (child_pid == 0) {
     // In child process. We'd like to EXPECT_EQ the pid but this is a child process and the gtest
     // failure won't get caught. Instead, return a different result code and the parent will notice
@@ -84,7 +193,6 @@ TEST(Task, Clone3_Fork) {
       exit(kChildErrorExitCode);
     exit(kChildExpectedExitCode);
   } else {
-    // In parent process.
     EXPECT_EQ(static_cast<pid_t>(child_pid_from_clone), child_pid);
 
     // Wait for the child to terminate and validate the exit code. Note that it returns a different
@@ -93,6 +201,7 @@ TEST(Task, Clone3_Fork) {
     pid_t wait_result = waitpid(child_pid, &wait_status, 0);
     EXPECT_EQ(wait_result, child_pid);
 
+    EXPECT_TRUE(WIFEXITED(wait_status));
     auto exit_status = WEXITSTATUS(wait_status);
     EXPECT_NE(exit_status, kChildErrorExitCode) << "Child process reported state was unexpected.";
     EXPECT_EQ(exit_status, kChildExpectedExitCode) << "Wrong exit code from child process.";
@@ -104,7 +213,7 @@ TEST(Task, Clone3_InvalidSize) {
   bzero(&ca, sizeof(ca));
 
   // Pass a structure size smaller than the first supported version, it should report EINVAL.
-  EXPECT_EQ(-1, DoClone3(&ca, CLONE_ARGS_SIZE_VER0 - 8));
+  EXPECT_EQ(-1, DoClone3(&ca, CLONE_ARGS_SIZE_VER0 - 8, &empty_func, NULL));
   EXPECT_EQ(EINVAL, errno);
 }
 
