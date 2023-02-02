@@ -323,7 +323,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon-a"));
 
   auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
 
@@ -331,7 +331,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon_a"));
 
   auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
 
@@ -339,7 +339,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("ZiRcOn-A"));
 
   auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
 
@@ -347,7 +347,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconB) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon_b"));
 
   auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kB);
 }
 
@@ -355,7 +355,7 @@ TEST_F(CurrentSlotUuidTest, TestZirconR) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("ZIRCON-R"));
 
   auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kRecovery);
 }
 
@@ -369,19 +369,19 @@ TEST_F(CurrentSlotUuidTest, TestInvalid) {
 
 TEST(CurrentSlotTest, TestA) {
   auto result = abr::CurrentSlotToConfiguration("_a");
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
 
 TEST(CurrentSlotTest, TestB) {
   auto result = abr::CurrentSlotToConfiguration("_b");
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kB);
 }
 
 TEST(CurrentSlotTest, TestR) {
   auto result = abr::CurrentSlotToConfiguration("_r");
-  ASSERT_TRUE(result.is_ok());
+  ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kRecovery);
 }
 
