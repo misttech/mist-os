@@ -327,10 +327,10 @@ protocol Coordinator {
         has_children bool;
     }) error zx.status;
 
-    /// Attempt to bind a driver against this device.  If `driver_path` is null,
-    /// this will initiate the driver matching algorithm.
-    // TODO(teisenbe): Specify the behavior of invoking this multiple times.  I believe
-    // the current behavior is a bug.
+    /// Attempt to bind a driver against this device.
+    /// + request `driver_path` the driver to bind to this device.
+    ///           If this is null, the API will autobind.
+    /// * error `ZX_ERR_ALREADY_BOUND` if the device is already bound.
     BindDevice(struct {
         driver_path string:<DEVICE_PATH_MAX, optional>;
     }) -> () error zx.status;
