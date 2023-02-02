@@ -66,7 +66,7 @@ if (!(current_os == "fuchsia")) {
 
 if (!(current_os == "fuchsia")) {
   group("async-fs") {
-    public_deps = [ ":async-fs-v1_5_0" ]
+    public_deps = [ ":async-fs-v1_6_0" ]
   }
 }
 
@@ -77,7 +77,7 @@ if (!(current_os == "fuchsia")) {
 }
 
 group("async-lock") {
-  public_deps = [ ":async-lock-v2_3_0" ]
+  public_deps = [ ":async-lock-v2_6_0" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -115,7 +115,7 @@ group("bitflags") {
 }
 
 group("blocking") {
-  public_deps = [ ":blocking-v1_0_2" ]
+  public_deps = [ ":blocking-v1_3_0" ]
 }
 
 group("bumpalo") {
@@ -1603,15 +1603,15 @@ rust_library("async-executor-v1_4_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("async-fs-v1_5_0") {
+rust_library("async-fs-v1_6_0") {
   crate_name = "async_fs"
-  crate_root = "//third_party/rust_crates/vendor/async-fs-1.5.0/src/lib.rs"
-  output_name = "async_fs-c416b168eaffeca9"
+  crate_root = "//third_party/rust_crates/vendor/async-fs-1.6.0/src/lib.rs"
+  output_name = "async_fs-d08414b37762da39"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":async-lock-v2_3_0" ]
-  deps += [ ":blocking-v1_0_2" ]
+  deps += [ ":async-lock-v2_6_0" ]
+  deps += [ ":blocking-v1_3_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
 
   rustenv = []
@@ -1619,8 +1619,8 @@ rust_library("async-fs-v1_5_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=c416b168eaffeca9",
-    "-Cextra-filename=-c416b168eaffeca9",
+    "-Cmetadata=d08414b37762da39",
+    "-Cextra-filename=-d08414b37762da39",
   ]
 
   visibility = [ ":*" ]
@@ -1662,22 +1662,23 @@ rust_library("async-io-v1_4_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("async-lock-v2_3_0") {
+rust_library("async-lock-v2_6_0") {
   crate_name = "async_lock"
-  crate_root = "//third_party/rust_crates/vendor/async-lock-2.3.0/src/lib.rs"
-  output_name = "async_lock-f387e568e95b5301"
+  crate_root = "//third_party/rust_crates/vendor/async-lock-2.6.0/src/lib.rs"
+  output_name = "async_lock-1fb84a03f9a9c9cf"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":event-listener-v2_5_1" ]
+  deps += [ ":futures-lite-v1_11_3" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=f387e568e95b5301",
-    "-Cextra-filename=-f387e568e95b5301",
+    "-Cmetadata=1fb84a03f9a9c9cf",
+    "-Cextra-filename=-1fb84a03f9a9c9cf",
   ]
 
   visibility = [ ":*" ]
@@ -1691,7 +1692,7 @@ rust_library("async-net-v1_6_0") {
 
   deps = []
   deps += [ ":async-io-v1_4_1" ]
-  deps += [ ":blocking-v1_0_2" ]
+  deps += [ ":blocking-v1_3_0" ]
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
 
@@ -2047,27 +2048,27 @@ rust_library("block-buffer-v0_9_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("blocking-v1_0_2") {
+rust_library("blocking-v1_3_0") {
   crate_name = "blocking"
-  crate_root = "//third_party/rust_crates/vendor/blocking-1.0.2/src/lib.rs"
-  output_name = "blocking-b6dd8248f836f05"
+  crate_root = "//third_party/rust_crates/vendor/blocking-1.3.0/src/lib.rs"
+  output_name = "blocking-5bf234e93a32c1f"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":async-channel-v1_6_1" ]
+  deps += [ ":async-lock-v2_6_0" ]
   deps += [ ":async-task-v4_0_3" ]
   deps += [ ":atomic-waker-v1_0_0" ]
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
-  deps += [ ":once_cell-v1_5_2" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=b6dd8248f836f05",
-    "-Cextra-filename=-b6dd8248f836f05",
+    "-Cmetadata=5bf234e93a32c1f",
+    "-Cextra-filename=-5bf234e93a32c1f",
   ]
 
   visibility = [ ":*" ]
