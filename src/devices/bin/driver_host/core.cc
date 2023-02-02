@@ -583,7 +583,19 @@ zx_status_t DriverHostContext::DeviceRebind(const fbl::RefPtr<zx_device_t>& dev)
     // request that any existing children go away
     std::ignore = ScheduleUnbindChildren(dev);
   } else {
-    return DeviceBind(dev, dev->get_rebind_drv_name().c_str());
+    zx_status_t status = DeviceBind(dev, dev->get_rebind_drv_name().c_str());
+    if (status != ZX_OK) {
+      // DriverManager will return ZX_ERR_NOT_FOUND if it didn't find any drivers to bind.
+      // We don't want to surface this error to the end user.
+      if (status == ZX_ERR_NOT_FOUND) {
+        status = ZX_OK;
+      }
+      // Since device binding didn't work, we should reply to an outstanding rebind if it exists;
+      if (auto rebind_conn = dev->take_rebind_conn(); rebind_conn) {
+        rebind_conn(status);
+      }
+    }
+    return status;
   }
   return ZX_OK;
 }

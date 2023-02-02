@@ -26,6 +26,12 @@ using fuchsia_device::Controller;
 using fuchsia_device_lifecycle_test::Lifecycle;
 using fuchsia_device_lifecycle_test::TestDevice;
 
+namespace {
+constexpr char kLifecycleTopoPath[] = "sys/platform/11:10:0/ddk-lifecycle-test";
+constexpr char kChildTopoPath[] =
+    "sys/platform/11:10:0/ddk-lifecycle-test/ddk-lifecycle-test-child-0";
+}  // namespace
+
 class LifecycleTest : public zxtest::Test {
  public:
   ~LifecycleTest() override = default;
@@ -44,8 +50,8 @@ class LifecycleTest : public zxtest::Test {
 
     zx_status_t status = IsolatedDevmgr::Create(&args, &devmgr_);
     ASSERT_OK(status);
-    zx::result channel = device_watcher::RecursiveWaitForFile(
-        devmgr_.devfs_root().get(), "sys/platform/11:10:0/ddk-lifecycle-test");
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kLifecycleTopoPath);
     ASSERT_OK(channel.status_value());
     chan_ = fidl::ClientEnd<TestDevice>(std::move(channel.value()));
 
@@ -137,15 +143,14 @@ TEST_F(LifecycleTest, Init) {
   ASSERT_NO_FATAL_FAILURE(WaitPreRelease(child_id));
 }
 
-constexpr char kPath[] = "sys/platform/11:10:0/ddk-lifecycle-test/ddk-lifecycle-test-child-0";
-
 TEST_F(LifecycleTest, CloseAllConnectionsOnChildUnbind) {
   auto result = fidl::WireCall(chan_)->AddChild(true /* complete_init */, ZX_OK /* init_status */);
   ASSERT_OK(result.status());
   ASSERT_FALSE(result->is_error());
   auto child_id = result->value()->child_id;
 
-  zx::result channel = device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kPath);
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kChildTopoPath);
   ASSERT_OK(channel.status_value());
 
   zx::channel chan = std::move(channel.value());
@@ -181,13 +186,13 @@ TEST_F(LifecycleTest, CallsFailDuringUnbind) {
   const fbl::unique_fd& fd = devmgr_.devfs_root();
   async_dispatcher_t* const dispatcher = loop.dispatcher();
 
-  zx::result queryable = MakeClient<fuchsia_unknown::Queryable>(fd, kPath, dispatcher);
+  zx::result queryable = MakeClient<fuchsia_unknown::Queryable>(fd, kChildTopoPath, dispatcher);
   ASSERT_OK(queryable);
 
-  zx::result controller = MakeClient<fuchsia_device::Controller>(fd, kPath, dispatcher);
+  zx::result controller = MakeClient<fuchsia_device::Controller>(fd, kChildTopoPath, dispatcher);
   ASSERT_OK(controller);
 
-  zx::result device = MakeClient<fuchsia_hardware_serial::Device>(fd, kPath, dispatcher);
+  zx::result device = MakeClient<fuchsia_hardware_serial::Device>(fd, kChildTopoPath, dispatcher);
   ASSERT_OK(device);
 
   ASSERT_OK(loop.RunUntilIdle());
@@ -215,7 +220,7 @@ TEST_F(LifecycleTest, CallsFailDuringUnbind) {
 
   ASSERT_STATUS(loop.Run(), ZX_ERR_CANCELED);
 
-  ASSERT_EQ(open(kPath, O_RDWR), -1);
+  ASSERT_EQ(open(kChildTopoPath, O_RDWR), -1);
   ASSERT_EQ(errno, ENOENT);
 }
 
@@ -242,4 +247,15 @@ TEST_F(LifecycleTest, FailedInit) {
 
   // Wait for the child pre-release notification.
   ASSERT_NO_FATAL_FAILURE(WaitPreRelease(child_id));
+}
+
+TEST_F(LifecycleTest, RebindNoChildren) {
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kLifecycleTopoPath);
+  ASSERT_OK(channel);
+  fidl::WireSyncClient controller{
+      fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};
+  fidl::WireResult result = controller->Rebind({});
+  ASSERT_OK(result.status());
+  ASSERT_TRUE(result.value().is_ok(), "%s", zx_status_get_string(result.value().error_value()));
 }

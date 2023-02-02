@@ -419,15 +419,13 @@ void zx_device::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::
 
 void zx_device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
   set_rebind_drv_name(std::string(request->driver.get()));
-  zx_status_t status = device_rebind(this);
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  // These will be set, until device is unbound and then bound again.
+  // This will be called after the device is rebound. If DriverManager finds a driver for this
+  // device, this will be called after the new driver has been bound and has created a new device.
   set_rebind_conn([completer = completer.ToAsync()](zx_status_t status) mutable {
     completer.Reply(zx::make_result(status));
   });
+  // This function will always result in a call to the rebind connector callback.
+  device_rebind(this);
 }
 
 void zx_device::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {

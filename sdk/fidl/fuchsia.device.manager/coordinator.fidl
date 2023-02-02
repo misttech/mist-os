@@ -331,6 +331,7 @@ protocol Coordinator {
     /// + request `driver_path` the driver to bind to this device.
     ///           If this is null, the API will autobind.
     /// * error `ZX_ERR_ALREADY_BOUND` if the device is already bound.
+    /// * error `ZX_ERR_NOT_FOUND` no drivers were found.
     BindDevice(struct {
         driver_path string:<DEVICE_PATH_MAX, optional>;
     }) -> () error zx.status;

@@ -880,11 +880,7 @@ void Device::BindDevice(BindDeviceRequestView request, BindDeviceCompleter::Sync
   if (driver_path.empty()) {
     devfs.advertise_modified();
   }
-  if (status != ZX_OK) {
-    completer.ReplyError(status);
-  } else {
-    completer.ReplySuccess();
-  }
+  completer.Reply(zx::make_result(status));
 }
 
 void Device::GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) {
