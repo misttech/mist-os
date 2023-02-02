@@ -56,7 +56,6 @@ def _fuchsia_product_image_impl(ctx):
     images_config_info = ctx.attr.image[FuchsiaAssemblyConfigInfo]
     images_config_file = images_config_info.config
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config
-    product_config_pkg_files = ctx.attr.product_config[FuchsiaProductConfigInfo].pkg_files
     board_config_file = ctx.attr.board_config[FuchsiaBoardConfigInfo].board_config if ctx.attr.board_config else None
 
     shell_src = _PRODUCT_ASSEMBLY_RUNNER_SH_TEMPLATE.format(
@@ -64,8 +63,7 @@ def _fuchsia_product_image_impl(ctx):
     )
 
     ffx_inputs = get_ffx_assembly_inputs(fuchsia_toolchain)
-    ffx_inputs.append(product_config_file)
-    ffx_inputs += product_config_pkg_files
+    ffx_inputs += ctx.files.product_config
     if board_config_file:
         ffx_inputs.append(board_config_file)
 

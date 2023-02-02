@@ -192,10 +192,9 @@ def _fuchsia_product_configuration_impl(ctx):
     )
 
     return [
-        DefaultInfo(files = depset(direct = [product_config_file])),
+        DefaultInfo(files = depset(direct = [product_config_file] + pkg_files)),
         FuchsiaProductConfigInfo(
             product_config = product_config_file,
-            pkg_files = pkg_files,
         ),
     ]
 

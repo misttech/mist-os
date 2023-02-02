@@ -85,7 +85,6 @@ FuchsiaProductConfigInfo = provider(
     doc = "A product-info used to containing the product_config.json and deps.",
     fields = {
         "product_config": "The JSON product configuration file.",
-        "pkg_files": "All files from packages (base, cache, and driver) included by this product config.",
     },
 )
 
