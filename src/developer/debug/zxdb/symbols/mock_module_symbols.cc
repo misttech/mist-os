@@ -4,7 +4,7 @@
 
 #include "src/developer/debug/zxdb/symbols/mock_module_symbols.h"
 
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/symbols/function.h"
 #include "src/developer/debug/zxdb/symbols/input_location.h"
 #include "src/developer/debug/zxdb/symbols/lazy_symbol.h"
@@ -114,7 +114,7 @@ std::vector<std::string> MockModuleSymbols::FindFileMatches(std::string_view nam
   for (const std::string& cur : files_) {
     std::string with_slash("/");
     with_slash += std::string(name);
-    if (cur == name || StringEndsWith(cur, with_slash))
+    if (cur == name || debug::StringEndsWith(cur, with_slash))
       result.push_back(cur);
   }
   return result;

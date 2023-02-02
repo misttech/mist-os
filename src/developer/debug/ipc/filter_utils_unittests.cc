@@ -22,6 +22,10 @@ TEST(FilterUtils, FilterMatches) {
   EXPECT_TRUE(FilterMatches(filter, "", ComponentInfo{.moniker = "/core/abc"}));
   EXPECT_FALSE(FilterMatches(filter, "", ComponentInfo{.moniker = "/core/abc/def"}));
 
+  filter = {.type = debug_ipc::Filter::Type::kComponentMonikerSuffix, .pattern = "abc/def"};
+  EXPECT_TRUE(FilterMatches(filter, "", ComponentInfo{.moniker = "/core/abc/def"}));
+  EXPECT_FALSE(FilterMatches(filter, "", ComponentInfo{.moniker = "/core/abc"}));
+
   filter = {.type = debug_ipc::Filter::Type::kComponentName, .pattern = "foo.cm"};
   EXPECT_TRUE(FilterMatches(filter, "", ComponentInfo{.url = "pkg://host#meta/foo.cm"}));
 

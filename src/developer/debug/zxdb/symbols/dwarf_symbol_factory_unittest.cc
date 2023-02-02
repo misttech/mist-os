@@ -8,7 +8,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/symbols/array_type.h"
 #include "src/developer/debug/zxdb/symbols/base_type.h"
 #include "src/developer/debug/zxdb/symbols/collection.h"
@@ -82,7 +82,7 @@ TEST(DwarfSymbolFactory, Function) {
 
   // Declaration location.
   EXPECT_TRUE(function->decl_line().is_valid());
-  EXPECT_TRUE(StringEndsWith(function->decl_line().file(), "/type_test.cc"))
+  EXPECT_TRUE(debug::StringEndsWith(function->decl_line().file(), "/type_test.cc"))
       << function->decl_line().file();
   EXPECT_EQ(15, function->decl_line().line());
   EXPECT_EQ("/build_dir", function->decl_line().comp_dir());

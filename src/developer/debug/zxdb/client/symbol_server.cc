@@ -4,8 +4,8 @@
 
 #include "src/developer/debug/zxdb/client/symbol_server.h"
 
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/client/cloud_storage_symbol_server.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 
 namespace zxdb {
 namespace {
@@ -39,7 +39,7 @@ void SymbolServer::ChangeState(SymbolServer::State state) {
 
 std::unique_ptr<SymbolServer> SymbolServer::FromURL(Session* session, const std::string& url,
                                                     bool require_authentication) {
-  if (StringStartsWith(url, "gs://")) {
+  if (debug::StringStartsWith(url, "gs://")) {
     return CloudStorageSymbolServer::Impl(session, url, require_authentication);
   }
 

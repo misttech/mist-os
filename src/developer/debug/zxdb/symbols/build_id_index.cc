@@ -20,7 +20,7 @@
 
 #include "lib/syslog/cpp/macros.h"
 #include "src/developer/debug/shared/logging/logging.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/lib/elflib/elflib.h"
 #include "src/lib/files/glob.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -111,7 +111,7 @@ void BuildIDIndex::SetCacheDir(const std::string& cache_dir) {
 }
 
 void BuildIDIndex::AddSymbolIndexFile(const std::string& path) {
-  if (StringEndsWith(path, ".json")) {
+  if (debug::StringEndsWith(path, ".json")) {
     LoadSymbolIndexFileJSON(path);
   } else {
     LoadSymbolIndexFilePlain(path);

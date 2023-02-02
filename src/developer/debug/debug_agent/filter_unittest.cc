@@ -54,6 +54,14 @@ TEST(Filter, MatchProcess) {
   filter = {.type = debug_ipc::Filter::Type::kComponentUrl,
             .pattern = "fuchsia-pkg://devhost/package#meta/component.cm"};
   EXPECT_TRUE(Filter(filter).MatchesProcess(*process, *system_interface));
+
+  //  j: 1 root
+  //    j: 25 /a/long/generated_to_here/fixed/moniker
+  //        fuchsia-pkg://devhost/test_package#meta/component2.cm
+  //      j: 26 job2-p1
+  process = system_interface->GetProcess(26);
+  filter = {.type = debug_ipc::Filter::Type::kComponentMonikerSuffix, .pattern = "fixed/moniker"};
+  EXPECT_TRUE(Filter(filter).MatchesProcess(*process, *system_interface));
 }
 
 TEST(Filter, ApplyToJob) {
@@ -63,7 +71,7 @@ TEST(Filter, ApplyToJob) {
   debug_ipc::Filter filter{.type = debug_ipc::Filter::Type::kProcessName, .pattern = "root-p1"};
   EXPECT_EQ(1ull, Filter(filter).ApplyToJob(*root, *system_interface).size());
   filter = {.type = debug_ipc::Filter::Type::kProcessNameSubstr, .pattern = "p1"};
-  EXPECT_EQ(4ull, Filter(filter).ApplyToJob(*root, *system_interface).size());
+  EXPECT_EQ(5ull, Filter(filter).ApplyToJob(*root, *system_interface).size());
   filter = {.type = debug_ipc::Filter::Type::kProcessNameSubstr, .pattern = "p1", .job_koid = 8};
   EXPECT_EQ(3ull, Filter(filter).ApplyToJob(*root, *system_interface).size());
   filter = {.type = debug_ipc::Filter::Type::kComponentName, .pattern = "component.cm"};

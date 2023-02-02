@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 
 #include <gtest/gtest.h>
 
-namespace zxdb {
+namespace debug {
 
 TEST(StringUtil, StringEndsWith) {
   EXPECT_FALSE(StringEndsWith("short", "much too long"));
@@ -18,4 +18,4 @@ TEST(StringUtil, StringEndsWith) {
   EXPECT_TRUE(StringEndsWith("aaab", ""));
 }
 
-}  // namespace zxdb
+}  // namespace debug

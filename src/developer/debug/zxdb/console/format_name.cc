@@ -6,7 +6,7 @@
 
 #include <ctype.h>
 
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/console/command_utils.h"
 #include "src/developer/debug/zxdb/expr/expr_tokenizer.h"
 #include "src/developer/debug/zxdb/symbols/collection.h"
@@ -46,7 +46,7 @@ bool FormatClangLambda(const Function* function, OutputBuffer* out) {
     out->Append("λ");
     return true;
   } else if (coll && coll->tag() == DwarfTag::kStructureType &&
-             StringStartsWith(coll->GetAssignedName(), "<lambda(")) {
+             debug::StringStartsWith(coll->GetAssignedName(), "<lambda(")) {
     // GCC-style.
     out->Append("λ");
     return true;
@@ -118,7 +118,7 @@ bool NeedsEscaping(const std::string& name) {
   // Assume anything with "operator" doesn't need escaping. We could actually parse the operator
   // declaration to make sure it's valid. But this only needs to deal with names the compiler
   // actually generates and not escaping something in the UI isn't a huge deal if we're wrong.
-  if (StringStartsWith(name, "operator"))
+  if (debug::StringStartsWith(name, "operator"))
     return false;
 
   return true;
@@ -133,13 +133,13 @@ bool FormatPrettyComponent(const std::string& name, OutputBuffer* out) {
   //   - {closure_env#0}
   //   - {async_fn_env#0}
   //   - {closure#0}<...>
-  if (StringStartsWith(name, "{closure") || StringStartsWith(name, "{async")) {
+  if (debug::StringStartsWith(name, "{closure") || debug::StringStartsWith(name, "{async")) {
     out->Append("λ");
     return true;
   }
 
   // Handle Rust impl annotations like "{impl#1}".
-  if (StringStartsWith(name, "{impl")) {
+  if (debug::StringStartsWith(name, "{impl")) {
     out->Append(Syntax::kComment, "«impl»");
     return true;
   }

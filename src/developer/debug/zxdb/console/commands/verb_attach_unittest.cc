@@ -158,6 +158,12 @@ TEST_F(VerbAttach, Filter) {
   EXPECT_EQ(debug_ipc::Filter::Type::kComponentMoniker, GetLastFilter().type);
   EXPECT_EQ(kComponentMoniker, GetLastFilter().pattern);
 
+  // Component moniker substr.
+  const std::string kComponentMonikerSubstr = "some_ending_realm/" + kSuperLongName;
+  console().ProcessInputLine("attach " + kComponentMonikerSubstr);
+  EXPECT_EQ(debug_ipc::Filter::Type::kComponentMonikerSuffix, GetLastFilter().type);
+  EXPECT_EQ(kComponentMonikerSubstr, GetLastFilter().pattern);
+
   // Component name.
   const std::string kComponentName = kSuperLongName + ".cm";
   console().ProcessInputLine("attach " + kComponentName);

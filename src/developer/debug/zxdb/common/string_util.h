@@ -11,12 +11,6 @@
 
 namespace zxdb {
 
-// Returns true if the first argument begins in exactly the second.
-bool StringStartsWith(std::string_view str, std::string_view begins_with);
-
-// Returns true if the first argument ends in exactly the second.
-bool StringEndsWith(std::string_view str, std::string_view ends_with);
-
 // This is a version of std::to_string for hex numbers. The output is always treated as unsigned
 // so signed negative numbers will be the two's compliment using printf rules.
 //

@@ -4,10 +4,10 @@
 
 #include "src/developer/debug/zxdb/console/commands/verb_run_component.h"
 
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/client/remote_api.h"
 #include "src/developer/debug/zxdb/client/session.h"
 #include "src/developer/debug/zxdb/client/target.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/console.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
@@ -60,12 +60,13 @@ void RunVerbRunComponent(const Command& cmd, fxl::RefPtr<CommandContext> cmd_con
   }
 
   if (cmd.args()[0].find("://") == std::string::npos ||
-      (!StringEndsWith(cmd.args()[0], ".cm") && !StringEndsWith(cmd.args()[0], ".cmx"))) {
+      (!debug::StringEndsWith(cmd.args()[0], ".cm") &&
+       !debug::StringEndsWith(cmd.args()[0], ".cmx"))) {
     return cmd_context->ReportError(
         Err("The first argument must be a component URL. Try \"help run-component\"."));
   }
 
-  if (StringEndsWith(cmd.args()[0], ".cm")) {
+  if (debug::StringEndsWith(cmd.args()[0], ".cm")) {
     // Output warning about this possibly not working.
     OutputBuffer warning(Syntax::kWarning, GetExclamation());
     warning.Append(

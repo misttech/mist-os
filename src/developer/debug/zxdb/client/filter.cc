@@ -32,13 +32,15 @@ namespace {
 
 fxl::RefPtr<SettingSchema> CreateSchema() {
   auto schema = fxl::MakeRefCounted<SettingSchema>();
-  schema->AddString(ClientSettings::Filter::kType, ClientSettings::Filter::kTypeDescription,
-                    debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kUnset),
-                    {debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kProcessNameSubstr),
-                     debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kProcessName),
-                     debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kComponentName),
-                     debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kComponentUrl),
-                     debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kComponentMoniker)});
+  schema->AddString(
+      ClientSettings::Filter::kType, ClientSettings::Filter::kTypeDescription,
+      debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kUnset),
+      {debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kProcessNameSubstr),
+       debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kProcessName),
+       debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kComponentName),
+       debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kComponentUrl),
+       debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kComponentMoniker),
+       debug_ipc::Filter::TypeToString(debug_ipc::Filter::Type::kComponentMonikerSuffix)});
   schema->AddString(ClientSettings::Filter::kPattern, ClientSettings::Filter::kPatternDescription);
   schema->AddInt(ClientSettings::Filter::kJob, ClientSettings::Filter::kJobDescription);
   return schema;

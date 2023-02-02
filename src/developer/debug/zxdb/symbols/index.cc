@@ -7,9 +7,9 @@
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugInfoEntry.h"
 #include "llvm/DebugInfo/DWARF/DWARFUnit.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/common/adapters.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_die_decoder.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_die_scanner.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
@@ -682,7 +682,7 @@ std::vector<std::string> Index::FindFilePrefixes(const std::string& prefix) cons
   std::vector<std::string> result;
 
   auto found = file_name_index_.lower_bound(prefix);
-  while (found != file_name_index_.end() && StringStartsWith(found->first, prefix)) {
+  while (found != file_name_index_.end() && debug::StringStartsWith(found->first, prefix)) {
     result.push_back(std::string(found->first));
     ++found;
   }

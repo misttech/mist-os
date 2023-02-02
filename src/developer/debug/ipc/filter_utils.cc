@@ -5,6 +5,7 @@
 #include "src/developer/debug/ipc/filter_utils.h"
 
 #include "src/developer/debug/ipc/records.h"
+#include "src/developer/debug/shared/string_util.h"
 
 namespace debug_ipc {
 
@@ -39,6 +40,8 @@ bool FilterMatches(const Filter& filter, const std::string& process_name,
       return component && MatchComponentUrl(component->url, filter.pattern);
     case Filter::Type::kComponentMoniker:
       return component && component->moniker == filter.pattern;
+    case Filter::Type::kComponentMonikerSuffix:
+      return component && debug::StringEndsWith(component->moniker, filter.pattern);
     case Filter::Type::kUnset:
     case Filter::Type::kLast:
       return false;

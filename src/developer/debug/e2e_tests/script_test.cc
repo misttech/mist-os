@@ -13,8 +13,8 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/debug/e2e_tests/fuzzy_matcher.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/common/host_util.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/lib/fxl/strings/trim.h"
 
 namespace zxdb {
@@ -37,19 +37,19 @@ void ScriptTest::TestBody() {
     line_number_++;
     if (line.empty())
       continue;
-    if (StringStartsWith(line, "##")) {
+    if (debug::StringStartsWith(line, "##")) {
       std::string directive = std::string(fxl::TrimString(line.substr(2), " "));
-      if (StringStartsWith(directive, "require ")) {
+      if (debug::StringStartsWith(directive, "require ")) {
         std::string requirement = directive.substr(8);
         if (kBuildType.find(requirement) == std::string::npos) {
           GTEST_SKIP() << "Skipped because of unmet requirement " << requirement;
         }
-      } else if (StringStartsWith(directive, "set timeout ")) {
+      } else if (debug::StringStartsWith(directive, "set timeout ")) {
         timeout = std::stoul(directive.substr(12));
       } else {
         GTEST_FAIL() << "Unknown directive: " << directive;
       }
-    } else if (StringStartsWith(line, "#")) {
+    } else if (debug::StringStartsWith(line, "#")) {
       continue;
     } else {
       // Put the line back.
@@ -100,12 +100,12 @@ void ScriptTest::ProcessUntilNextOutput() {
   while (std::getline(script_file_, line)) {
     line_number_++;
 
-    if (line.empty() || StringStartsWith(line, "#")) {
+    if (line.empty() || debug::StringStartsWith(line, "#")) {
       continue;
     }
 
     // Inputs
-    if (StringStartsWith(line, "[zxdb]")) {
+    if (debug::StringStartsWith(line, "[zxdb]")) {
       std::string command = std::string(fxl::TrimString(line.substr(6), " "));
       // Defer ProcessInputLine because it will trigger OnOutput synchronously.
       loop().PostTask(FROM_HERE,

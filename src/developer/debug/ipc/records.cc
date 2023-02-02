@@ -199,6 +199,8 @@ const char* Filter::TypeToString(Type type) {
       return "component url";
     case Type::kComponentMoniker:
       return "component moniker";
+    case Type::kComponentMonikerSuffix:
+      return "component moniker substr";
     case Type::kLast:
       break;
   }

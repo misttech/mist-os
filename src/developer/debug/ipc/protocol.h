@@ -34,7 +34,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in platform_version.json.
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 54;
+constexpr uint32_t kCurrentProtocolVersion = 55;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -59,8 +59,8 @@ constexpr uint32_t kCurrentProtocolVersion = 54;
 
 #define INITIAL_VERSION_FOR_API_LEVEL_MINUS_2 52
 #define INITIAL_VERSION_FOR_API_LEVEL_MINUS_1 52
-#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 52
-#define CURRENT_SUPPORTED_API_LEVEL 10
+#define INITIAL_VERSION_FOR_API_LEVEL_CURRENT 55
+#define CURRENT_SUPPORTED_API_LEVEL 11
 
 #if !defined(FUCHSIA_API_LEVEL)
 // This is a workaround when using this library in the @internal_sdk, as the SDK

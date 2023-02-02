@@ -275,7 +275,6 @@ source_set("tests") {
     "step_over_thread_controller_unittest.cc",
     "step_thread_controller_unittest.cc",
     "step_through_plt_thread_controller_unittest.cc",
-    "string_util_unittest.cc",
     "substatement_unittest.cc",
     "symbol_server_unittest.cc",
     "system_unittest.cc",

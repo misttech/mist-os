@@ -96,7 +96,6 @@ source_set("tests") {
     "inet_util_unittest.cc",
     "join_callbacks_unittest.cc",
     "leb_unittest.cc",
-    "string_util_unittest.cc",
     "tagged_data_unittest.cc",
   ]
 

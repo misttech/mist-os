@@ -4,8 +4,8 @@
 
 #include "src/developer/debug/zxdb/console/command_context.h"
 
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/common/ref_ptr_to.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/console/console.h"
 
 namespace zxdb {
@@ -86,7 +86,7 @@ void OfflineCommandContext::ReportError(const Err& err) {
 
   OutputBuffer out;
   out.Append(err);
-  if (!StringEndsWith(err.msg(), "\n"))
+  if (!debug::StringEndsWith(err.msg(), "\n"))
     out.Append("\n");
   Output(out);
 }

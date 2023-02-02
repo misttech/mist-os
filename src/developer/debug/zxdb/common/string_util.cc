@@ -27,22 +27,6 @@ std::string DoToHexString(uint64_t value, int digits, bool include_prefix) {
 
 }  // namespace
 
-bool StringStartsWith(std::string_view str, std::string_view begins_with) {
-  if (begins_with.size() > str.size())
-    return false;
-
-  std::string_view source = str.substr(0, begins_with.size());
-  return source == begins_with;
-}
-
-bool StringEndsWith(std::string_view str, std::string_view ends_with) {
-  if (ends_with.size() > str.size())
-    return false;
-
-  std::string_view source = str.substr(str.size() - ends_with.size(), ends_with.size());
-  return source == ends_with;
-}
-
 // Cast signed numbers to their unsigned variant before converting to 64-bit to avoid sign
 // extension.
 std::string to_hex_string(int8_t i, int digits, bool include_prefix) {

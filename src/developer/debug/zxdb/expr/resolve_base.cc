@@ -4,8 +4,8 @@
 
 #include "src/developer/debug/zxdb/expr/resolve_base.h"
 
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/common/ref_ptr_to.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/expr/cast.h"
 #include "src/developer/debug/zxdb/expr/eval_context.h"
 #include "src/developer/debug/zxdb/expr/expr_language.h"
@@ -64,7 +64,7 @@ void PromoteRustDynPtrToDerived(const fxl::RefPtr<EvalContext>& context, ExprVal
   // 0x000957e0:     NULL
 
   fxl::RefPtr<Collection> coll_type = context->GetConcreteTypeAs<Collection>(value.type());
-  if (!coll_type || !StringStartsWith(coll_type->GetAssignedName(), kFatPointerTypePrefix))
+  if (!coll_type || !debug::StringStartsWith(coll_type->GetAssignedName(), kFatPointerTypePrefix))
     return cb(std::move(value));
 
   // Extract pointer and vtable from the fat pointer.
@@ -213,14 +213,15 @@ fxl::RefPtr<DataMember> GetVtableMember(const Collection* coll) {
     if (!member)
       continue;
 
-    if (member->artificial() && StringStartsWith(member->GetAssignedName(), kVtableMemberPrefix))
+    if (member->artificial() &&
+        debug::StringStartsWith(member->GetAssignedName(), kVtableMemberPrefix))
       return RefPtrTo(member);
   }
   return fxl::RefPtr<DataMember>();
 }
 
 std::string TypeNameForVtableSymbolName(const std::string& sym_name) {
-  if (!StringStartsWith(sym_name, kVtableSymbolNamePrefix))
+  if (!debug::StringStartsWith(sym_name, kVtableSymbolNamePrefix))
     return std::string();
   return sym_name.substr(std::size(kVtableSymbolNamePrefix) - 1);  // Trim the prefix w/o the null.
 }

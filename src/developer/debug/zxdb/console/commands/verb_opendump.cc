@@ -6,8 +6,8 @@
 
 #include <filesystem>
 
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/client/session.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/console.h"
 #include "src/developer/debug/zxdb/console/nouns.h"
@@ -72,7 +72,7 @@ void DoCompleteOpenDump(const Command& cmd, const std::string& prefix,
   for (const auto& item : std::filesystem::directory_iterator(path, ec)) {
     auto found = std::string(item.path().filename());
 
-    if (!StringStartsWith(found, filename))
+    if (!debug::StringStartsWith(found, filename))
       continue;
 
     auto completion = prefix + found.substr(filename.size());

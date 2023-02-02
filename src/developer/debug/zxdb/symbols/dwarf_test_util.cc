@@ -4,7 +4,7 @@
 
 #include "src/developer/debug/zxdb/symbols/dwarf_test_util.h"
 
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_die_decoder.h"
 
 namespace zxdb {
@@ -30,7 +30,7 @@ llvm::DWARFUnit* GetUnitWithNameEndingIn(llvm::DWARFContext* context, llvm::DWAR
   for (unsigned i = 0; i < units.size(); i++) {
     llvm::DWARFUnit* unit = units[i].get();
     std::string unit_name = GetDIEName(context, unit->getUnitDIE());
-    if (StringEndsWith(unit_name, name))
+    if (debug::StringEndsWith(unit_name, name))
       return unit;
   }
   return nullptr;

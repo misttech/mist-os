@@ -52,6 +52,13 @@ std::unique_ptr<MockSystemInterface> MockSystemInterface::CreateWithData() {
   job1.set_child_processes({job1_p1, job1_p2});
   job1.set_child_jobs({job11, job12});
 
+  // Job 2
+  MockProcessHandle job2_p1(26, "job2-p1");
+  job2_p1.set_threads({MockThreadHandle(27, "initial-thread")});
+
+  MockJobHandle job2(25, "job2");
+  job2.set_child_processes({job2_p1});
+
   // Root.
   MockProcessHandle root_p1(2, "root-p1");
   root_p1.set_threads({MockThreadHandle(3, "initial-thread")});
@@ -64,7 +71,7 @@ std::unique_ptr<MockSystemInterface> MockSystemInterface::CreateWithData() {
 
   MockJobHandle root(1, "root");
   root.set_child_processes({root_p1, root_p2, root_p3});
-  root.set_child_jobs({job1});
+  root.set_child_jobs({job1, job2});
 
   auto system_interface = std::make_unique<MockSystemInterface>(std::move(root));
 
@@ -72,6 +79,11 @@ std::unique_ptr<MockSystemInterface> MockSystemInterface::CreateWithData() {
       job1.GetKoid(),
       debug_ipc::ComponentInfo{.moniker = "/moniker",
                                .url = "fuchsia-pkg://devhost/package#meta/component.cm"});
+
+  system_interface->mock_component_manager().component_info().emplace(
+      job2.GetKoid(),
+      debug_ipc::ComponentInfo{.moniker = "/a/long/generated_to_here/fixed/moniker",
+                               .url = "fuchsia-pkg://devhost/test_package#meta/component2.cm"});
 
   return system_interface;
 }

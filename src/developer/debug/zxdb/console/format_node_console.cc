@@ -4,8 +4,8 @@
 
 #include "src/developer/debug/zxdb/console/format_node_console.h"
 
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/common/ref_ptr_to.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/console/command_utils.h"
 #include "src/developer/debug/zxdb/console/format_name.h"
 #include "src/developer/debug/zxdb/console/string_util.h"
@@ -192,7 +192,7 @@ void AppendRustCollectionName(const FormatNode* node, const RecursiveState& stat
   }
 
   // Special-case "Vec" with the macro that's normally used and omit the type.
-  if (StringStartsWith(node->type(), "alloc::vec::Vec<")) {
+  if (debug::StringStartsWith(node->type(), "alloc::vec::Vec<")) {
     out->Append("vec!");
     return;
   }

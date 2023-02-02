@@ -40,6 +40,8 @@ sdk_source_set("shared") {
     "status.h",
     "stream_buffer.cc",
     "stream_buffer.h",
+    "string_util.cc",
+    "string_util.h",
     "test_stream_buffer.cc",
     "test_stream_buffer.h",
     "zx_status.cc",
@@ -122,6 +124,7 @@ source_set("tests") {
     "regex_unittest.cc",
     "register_info_unittest.cc",
     "stream_buffer_unittest.cc",
+    "string_util_unittest.cc",
   ]
 
   if (is_linux) {

@@ -476,6 +476,7 @@ struct Filter {
     kComponentName,
     kComponentUrl,
     kComponentMoniker,
+    kComponentMonikerSuffix,
 
     kLast,
   } type = Type::kUnset;

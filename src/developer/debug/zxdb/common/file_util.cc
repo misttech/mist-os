@@ -9,7 +9,7 @@
 #include <chrono>
 #include <filesystem>
 
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 
 namespace zxdb {
 
@@ -23,7 +23,7 @@ std::string_view ExtractLastFileComponent(std::string_view path) {
 bool IsPathAbsolute(const std::string& path) { return !path.empty() && path[0] == '/'; }
 
 bool PathEndsWith(std::string_view path, std::string_view right_query) {
-  return StringEndsWith(path, right_query) &&
+  return debug::StringEndsWith(path, right_query) &&
          (path.size() == right_query.size() || path[path.size() - right_query.size() - 1] == '/');
 }
 

@@ -9,11 +9,11 @@
 #include <string>
 #include <string_view>
 
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/client/frame.h"
 #include "src/developer/debug/zxdb/client/target.h"
 #include "src/developer/debug/zxdb/client/thread.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/console/async_output_buffer.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/command_utils.h"
@@ -123,7 +123,7 @@ bool IsAsyncFunctionOrBlock(Type* type) {
     return false;
 
   // {async_fn_env#0} or {async_block_env#0}
-  return StringStartsWith(type->GetIdentifier().components().back().name(), "{async_");
+  return debug::StringStartsWith(type->GetIdentifier().components().back().name(), "{async_");
 }
 
 fxl::RefPtr<AsyncOutputBuffer> FormatAsyncFunctionOrBlock(const ExprValue& future,
@@ -147,7 +147,7 @@ fxl::RefPtr<AsyncOutputBuffer> FormatAsyncFunctionOrBlock(const ExprValue& futur
   ident.components().resize(ident.components().size() - 2);
   out->Append(FormatIdentifier(ident, {}));
 
-  if (!StringStartsWith(state, "Suspend"))
+  if (!debug::StringStartsWith(state, "Suspend"))
     out->Append(Syntax::kComment, " (" + state + ")");
 
   std::string filename;

@@ -5,14 +5,13 @@
 #include "src/developer/debug/zxdb/console/commands/verb_attach.h"
 
 #include "src/developer/debug/ipc/records.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/client/filter.h"
 #include "src/developer/debug/zxdb/client/session.h"
-#include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/developer/debug/zxdb/console/command.h"
 #include "src/developer/debug/zxdb/console/command_utils.h"
 #include "src/developer/debug/zxdb/console/console.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
-#include "src/developer/debug/zxdb/console/string_util.h"
 #include "src/developer/debug/zxdb/console/verbs.h"
 
 namespace zxdb {
@@ -54,9 +53,17 @@ Attaching to a process by a process id
 
 Attaching to processes by a component moniker
 
-  Arguments starting with "/" will be interpreted as a component moniker.
-  This will create a filter that matches all processes in the component with
-  the given moniker.
+  Arguments starting with "/" will be interpreted as an exact component moniker.
+  This will create a filter that matches all processes in the component with the
+  given moniker.
+
+  Arguments that contain, but do not begin with, a "/" will be interpreted as a
+  component moniker suffix.  This will create a filter similar to the exact
+  component moniker matcher, but will match any monikers that end with the
+  argument.
+
+  NOTE: the latter interpretation happens only after inspecting the argument for
+  a leading "/", and component URL.
 
 Attaching to processes by a component URL
 
@@ -110,6 +117,9 @@ Examples
 
   attach /core/foobar
       Attaches to processes in the component /core/foobar.
+
+  attach foo/bar
+      Attaches to processes in the component(s) with foo/bar in their moniker.
 
   attach fuchsia-pkg://devhost/foobar#meta/foobar.cm
       Attaches to processes in components with the above component URL.
@@ -202,14 +212,17 @@ void RunVerbAttach(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) 
   if (cmd.HasSwitch(kSwitchExact)) {
     filter->SetType(debug_ipc::Filter::Type::kProcessName);
     filter->SetPattern(TrimToZirconMaxNameLength(pattern));
-  } else if (StringStartsWith(pattern, "fuchsia-pkg://") ||
-             StringStartsWith(pattern, "fuchsia-boot://")) {
+  } else if (debug::StringStartsWith(pattern, "fuchsia-pkg://") ||
+             debug::StringStartsWith(pattern, "fuchsia-boot://")) {
     filter->SetType(debug_ipc::Filter::Type::kComponentUrl);
     filter->SetPattern(pattern);
-  } else if (StringStartsWith(pattern, "/")) {
+  } else if (debug::StringStartsWith(pattern, "/")) {
     filter->SetType(debug_ipc::Filter::Type::kComponentMoniker);
     filter->SetPattern(pattern);
-  } else if (StringEndsWith(pattern, ".cm")) {
+  } else if (pattern.find('/') != std::string::npos) {
+    filter->SetType(debug_ipc::Filter::Type::kComponentMonikerSuffix);
+    filter->SetPattern(pattern);
+  } else if (debug::StringEndsWith(pattern, ".cm")) {
     filter->SetType(debug_ipc::Filter::Type::kComponentName);
     filter->SetPattern(pattern);
   } else {

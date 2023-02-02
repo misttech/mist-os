@@ -57,6 +57,10 @@ class MockSystemInterface final : public SystemInterface {
   //            t: 22 initial-thread
   //            t: 23 second-thread
   //            t: 24 third-thread
+  //    j: 25 job2 /a/long/generated_to_here/fixed/moniker
+  //        fuchsia-pkg://devhost/test_package#meta/component2.cm
+  //      p: 26 job2-p1
+  //        t: 27 initial-thread
   static std::unique_ptr<MockSystemInterface> CreateWithData();
 
  private:

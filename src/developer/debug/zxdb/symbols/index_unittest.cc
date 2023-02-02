@@ -12,7 +12,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_binary_impl.h"
 #include "src/developer/debug/zxdb/symbols/module_symbols_impl.h"
 #include "src/developer/debug/zxdb/symbols/symbol_factory.h"
@@ -192,7 +192,7 @@ TEST(Index, FindFileMatches) {
   // Simple filename-only query that succeeds.
   std::vector<std::string> result = index.FindFileMatches("zxdb_symbol_test.cc");
   ASSERT_EQ(1u, result.size());
-  EXPECT_TRUE(StringEndsWith(result[0], "symbols/test_data/zxdb_symbol_test.cc"));
+  EXPECT_TRUE(debug::StringEndsWith(result[0], "symbols/test_data/zxdb_symbol_test.cc"));
 
   // Save the full path for later.
   std::string full_path = result[0];

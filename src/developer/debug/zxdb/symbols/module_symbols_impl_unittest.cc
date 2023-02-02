@@ -10,7 +10,7 @@
 
 #include <gtest/gtest.h>
 
-#include "src/developer/debug/zxdb/common/string_util.h"
+#include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/symbols/compile_unit.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_binary_impl.h"
 #include "src/developer/debug/zxdb/symbols/elf_symbol.h"
@@ -101,7 +101,7 @@ TEST(ModuleSymbols, Basic) {
       setup.symbols()->ResolveInputLocation(symbol_context, InputLocation(addrs[0].address()));
   ASSERT_EQ(1u, locations.size());
   EXPECT_TRUE(locations[0].is_symbolized());
-  EXPECT_TRUE(StringEndsWith(locations[0].file_line().file(), "/zxdb_symbol_test.cc"));
+  EXPECT_TRUE(debug::StringEndsWith(locations[0].file_line().file(), "/zxdb_symbol_test.cc"));
   EXPECT_EQ(109, locations[0].file_line().line());
   EXPECT_EQ("/build_dir", locations[0].file_line().comp_dir());
 
