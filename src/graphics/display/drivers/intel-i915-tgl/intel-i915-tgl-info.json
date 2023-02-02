@@ -1,10 +1,9 @@
 {
-    "short_description": "PCI Intel display and GPU core driver",
+    "short_description": "PCI Intel display and GPU core driver (stub pending deletion)",
     "manufacturer": "Intel",
     "families": [
-        "Sky Lake",
         "Kaby Lake",
-        "Tiger Lake"
+        "Sky Lake"
     ],
     "models": [],
     "areas": [

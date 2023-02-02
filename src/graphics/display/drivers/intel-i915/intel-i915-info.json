@@ -1,9 +1,10 @@
 {
-    "short_description": "PCI Intel display and GPU core driver (legacy version for Skylake and Kaby Lake)",
+    "short_description": "PCI Intel display and GPU core driver",
     "manufacturer": "Intel",
     "families": [
+        "Sky Lake",
         "Kaby Lake",
-        "Sky Lake"
+        "Tiger Lake"
     ],
     "models": [],
     "areas": [
