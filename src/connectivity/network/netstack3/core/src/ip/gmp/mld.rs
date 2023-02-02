@@ -82,7 +82,7 @@ pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
 {
     /// Gets the IPv6 link local address on `device`.
     fn get_ipv6_link_local_addr(
-        &self,
+        &mut self,
         device: &Self::DeviceId,
     ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>>;
 
@@ -481,7 +481,7 @@ mod tests {
 
     impl MldContext<FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
         fn get_ipv6_link_local_addr(
-            &self,
+            &mut self,
             _device: &FakeDeviceId,
         ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
             self.get_ref().ipv6_link_local

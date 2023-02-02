@@ -76,7 +76,7 @@ pub(crate) trait IgmpContext<C: IgmpNonSyncContext<Self::DeviceId>>:
     IpDeviceIdContext<Ipv4> + FrameContext<C, EmptyBuf, IgmpPacketMetadata<Self::DeviceId>>
 {
     /// Gets an IP address and subnet associated with this device.
-    fn get_ip_addr_subnet(&self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>>;
+    fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>>;
 
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.
@@ -564,7 +564,7 @@ mod tests {
         crate::context::testutil::FakeNonSyncCtx<IgmpTimerId<FakeDeviceId>, (), ()>;
 
     impl IgmpContext<FakeNonSyncCtx> for FakeSyncCtx {
-        fn get_ip_addr_subnet(&self, _device: &FakeDeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
+        fn get_ip_addr_subnet(&mut self, _device: &FakeDeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
             self.get_ref().addr_subnet
         }
 

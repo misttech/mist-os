@@ -104,7 +104,7 @@ impl<
         O,
         F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntry<C::Instant>> + '_>) -> O,
     >(
-        &self,
+        &mut self,
         cb: F,
     ) -> O {
         let SlaacAddrs { sync_ctx, device_id, _marker } = self;
@@ -243,7 +243,7 @@ impl<
         SC: device::BufferIpDeviceContext<Ipv4, C, EmptyBuf>,
     > IgmpContext<C> for SC
 {
-    fn get_ip_addr_subnet(&self, device: &SC::DeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
+    fn get_ip_addr_subnet(&mut self, device: &SC::DeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
         get_ipv4_addr_subnet(self, device)
     }
 
@@ -291,7 +291,7 @@ impl<
     > MldContext<C> for SC
 {
     fn get_ipv6_link_local_addr(
-        &self,
+        &mut self,
         device: &SC::DeviceId,
     ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
         self.with_ip_device_state(device, |state| {
@@ -397,7 +397,7 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::Ipv6DeviceContex
         })
     }
 
-    fn get_link_layer_addr_bytes(&self, device_id: &SC::DeviceId) -> Option<SC::LinkLayerAddr> {
+    fn get_link_layer_addr_bytes(&mut self, device_id: &SC::DeviceId) -> Option<SC::LinkLayerAddr> {
         device::Ipv6DeviceContext::get_link_layer_addr_bytes(self, device_id)
     }
 }
@@ -485,12 +485,12 @@ where
 impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<Ipv4, C>>
     ip::IpDeviceContext<Ipv4, C> for SC
 {
-    fn is_ip_device_enabled(&self, device_id: &SC::DeviceId) -> bool {
+    fn is_ip_device_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
         is_ip_device_enabled(self, device_id)
     }
 
     fn get_local_addr_for_remote(
-        &self,
+        &mut self,
         device_id: &Self::DeviceId,
         _remote: SpecifiedAddr<Ipv4Addr>,
     ) -> Option<SpecifiedAddr<Ipv4Addr>> {
@@ -504,7 +504,7 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
                 Self: 's;
 
     fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
-        &'a self,
+        &'a mut self,
         addr: SpecifiedAddr<Ipv4Addr>,
         cb: F,
     ) -> R {
@@ -514,7 +514,7 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
     }
 
     fn address_status_for_device(
-        &self,
+        &mut self,
         dst_ip: SpecifiedAddr<Ipv4Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<Ipv4PresentAddressStatus> {
@@ -525,15 +525,15 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         self.with_ip_device_state(device_id, |state| assignment_state_v4(dst_ip, &state.ip_state))
     }
 
-    fn is_device_routing_enabled(&self, device_id: &SC::DeviceId) -> bool {
+    fn is_device_routing_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
         is_ip_routing_enabled(self, device_id)
     }
 
-    fn get_hop_limit(&self, _device_id: &SC::DeviceId) -> NonZeroU8 {
+    fn get_hop_limit(&mut self, _device_id: &SC::DeviceId) -> NonZeroU8 {
         DEFAULT_TTL
     }
 
-    fn get_mtu(&self, device_id: &Self::DeviceId) -> u32 {
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32 {
         self.get_mtu(device_id)
     }
 }
@@ -541,12 +541,12 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
 impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<Ipv6, C>>
     ip::IpDeviceContext<Ipv6, C> for SC
 {
-    fn is_ip_device_enabled(&self, device_id: &SC::DeviceId) -> bool {
+    fn is_ip_device_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
         is_ip_device_enabled(self, device_id)
     }
 
     fn get_local_addr_for_remote(
-        &self,
+        &mut self,
         device_id: &Self::DeviceId,
         remote: SpecifiedAddr<Ipv6Addr>,
     ) -> Option<SpecifiedAddr<Ipv6Addr>> {
@@ -565,7 +565,7 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
                 Self: 's;
 
     fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
-        &'a self,
+        &'a mut self,
         addr: SpecifiedAddr<Ipv6Addr>,
         cb: F,
     ) -> R {
@@ -575,22 +575,22 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
     }
 
     fn address_status_for_device(
-        &self,
+        &mut self,
         addr: SpecifiedAddr<Ipv6Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<<Ipv6 as IpLayerIpExt>::AddressStatus> {
         self.with_ip_device_state(device_id, |state| assignment_state_v6(addr, &state.ip_state))
     }
 
-    fn is_device_routing_enabled(&self, device_id: &SC::DeviceId) -> bool {
+    fn is_device_routing_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
         is_ip_routing_enabled(self, device_id)
     }
 
-    fn get_hop_limit(&self, device_id: &SC::DeviceId) -> NonZeroU8 {
+    fn get_hop_limit(&mut self, device_id: &SC::DeviceId) -> NonZeroU8 {
         get_ipv6_hop_limit(self, device_id)
     }
 
-    fn get_mtu(&self, device_id: &Self::DeviceId) -> u32 {
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32 {
         self.get_mtu(device_id)
     }
 }

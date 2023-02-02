@@ -327,7 +327,7 @@ where
     /// If `device` is specified, the available routes are limited to those that
     /// egress over the device.
     fn lookup_route(
-        &self,
+        &mut self,
         ctx: &mut C,
         device: Option<&Self::DeviceId>,
         src_ip: Option<SpecifiedAddr<I::Addr>>,
@@ -812,7 +812,7 @@ pub(crate) mod testutil {
             DeviceId: IpDeviceId + 'static,
         > TransportIpContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
-        fn get_default_hop_limits(&self, device: Option<&Self::DeviceId>) -> HopLimits {
+        fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
                 let hop_limit = self.get_device_state(device).default_hop_limit;
                 HopLimits { unicast: hop_limit, multicast: hop_limit }
@@ -822,7 +822,7 @@ pub(crate) mod testutil {
         type DevicesWithAddrIter<'a> = alloc::boxed::Box<dyn Iterator<Item = DeviceId> + 'a>;
 
         fn get_devices_with_assigned_addr(
-            &self,
+            &mut self,
             addr: SpecifiedAddr<<I>::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
             Box::new(self.find_devices_with_addr(addr))
@@ -846,7 +846,7 @@ pub(crate) mod testutil {
         > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
         fn lookup_route(
-            &self,
+            &mut self,
             _ctx: &mut C,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
@@ -894,13 +894,13 @@ pub(crate) mod testutil {
         for FakeSyncCtx<S, Meta, DeviceId>
     {
         fn lookup_route(
-            &self,
+            &mut self,
             ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             device: Option<&Self::DeviceId>,
             local_ip: Option<SpecifiedAddr<I::Addr>>,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Result<IpSockRoute<I, Self::DeviceId>, IpSockRouteError> {
-            self.get_ref().as_ref().lookup_route(ctx, device, local_ip, addr)
+            self.get_mut().as_mut().lookup_route(ctx, device, local_ip, addr)
         }
     }
 
@@ -1067,15 +1067,15 @@ pub(crate) mod testutil {
             where Self: 'a;
 
         fn get_devices_with_assigned_addr(
-            &self,
+            &mut self,
             addr: SpecifiedAddr<I::Addr>,
         ) -> Self::DevicesWithAddrIter<'_> {
-            let FakeBufferIpSocketCtx { ip_socket_ctx } = self.get_ref();
+            let FakeBufferIpSocketCtx { ip_socket_ctx } = self.get_mut();
             TransportIpContext::<I, C>::get_devices_with_assigned_addr(ip_socket_ctx, addr)
         }
 
-        fn get_default_hop_limits(&self, device: Option<&Self::DeviceId>) -> HopLimits {
-            let FakeBufferIpSocketCtx { ip_socket_ctx } = self.get_ref();
+        fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
+            let FakeBufferIpSocketCtx { ip_socket_ctx } = self.get_mut();
             TransportIpContext::<I, C>::get_default_hop_limits(ip_socket_ctx, device)
         }
     }

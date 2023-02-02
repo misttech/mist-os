@@ -235,8 +235,8 @@ mod tests {
             .expect("error adding loopback device");
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
-        assert_eq!(crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&sync_ctx, &device), MTU);
-        assert_eq!(crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&sync_ctx, &device), MTU);
+        assert_eq!(crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut sync_ctx, &device), MTU);
+        assert_eq!(crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut sync_ctx, &device), MTU);
 
         fn test<I: TestIpExt + IpDeviceStateIpExt, NonSyncCtx: NonSyncContext>(
             sync_ctx: &mut &SyncCtx<NonSyncCtx>,

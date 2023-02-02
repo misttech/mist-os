@@ -1163,6 +1163,12 @@ fn send_neighbor_advertisement<
     let src_ll = sync_ctx.get_link_layer_addr_bytes(&device_id);
 
     // Nothing reasonable to do with the error.
+    let advertisement = NeighborAdvertisement::new(
+        sync_ctx.is_router_device(&device_id),
+        solicited,
+        false,
+        device_addr.get(),
+    );
     let _: Result<(), _> = send_ndp_packet(
         sync_ctx,
         ctx,
@@ -1174,12 +1180,7 @@ fn send_neighbor_advertisement<
         )
         .into_serializer(),
         IcmpUnusedCode,
-        NeighborAdvertisement::new(
-            sync_ctx.is_router_device(&device_id),
-            solicited,
-            false,
-            device_addr.get(),
-        ),
+        advertisement,
     );
 }
 
@@ -4152,7 +4153,7 @@ mod tests {
     }
 
     impl IpDeviceHandler<Ipv6, Fakev6NonSyncCtx> for Fakev6SyncCtx {
-        fn is_router_device(&self, _device_id: &Self::DeviceId) -> bool {
+        fn is_router_device(&mut self, _device_id: &Self::DeviceId) -> bool {
             unimplemented!()
         }
 
@@ -4164,7 +4165,7 @@ mod tests {
     impl Ipv6DeviceHandler<Fakev6NonSyncCtx> for Fakev6SyncCtx {
         type LinkLayerAddr = [u8; 0];
 
-        fn get_link_layer_addr_bytes(&self, _device_id: &Self::DeviceId) -> Option<[u8; 0]> {
+        fn get_link_layer_addr_bytes(&mut self, _device_id: &Self::DeviceId) -> Option<[u8; 0]> {
             unimplemented!()
         }
 

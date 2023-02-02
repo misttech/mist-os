@@ -143,7 +143,7 @@ pub(crate) trait NudContext<I: Ip, D: LinkDevice, C: NonSyncNudContext<I, D, Sel
     DeviceIdContext<D>
 {
     /// Returns the amount of time between neighbor probe/solicitation messages.
-    fn retrans_timer(&self, device_id: &Self::DeviceId) -> NonZeroDuration;
+    fn retrans_timer(&mut self, device_id: &Self::DeviceId) -> NonZeroDuration;
 
     /// Calls the function with a mutable reference to the NUD state.
     fn with_nud_state_mut<O, F: FnOnce(&mut NudState<I, D::Address>) -> O>(
@@ -615,7 +615,7 @@ mod tests {
         FakeNonSyncCtx<NudTimerId<I, FakeLinkDevice, FakeLinkDeviceId>, (), ()>;
 
     impl<I: Ip> NudContext<I, FakeLinkDevice, FakeNonSyncCtxImpl<I>> for FakeCtxImpl<I> {
-        fn retrans_timer(&self, &FakeLinkDeviceId: &FakeLinkDeviceId) -> NonZeroDuration {
+        fn retrans_timer(&mut self, &FakeLinkDeviceId: &FakeLinkDeviceId) -> NonZeroDuration {
             self.get_ref().retrans_timer
         }
 

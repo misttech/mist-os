@@ -121,10 +121,14 @@ pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
     ///
     /// If `device_id` does not have any addresses associated with it, return
     /// `None`.
-    fn get_protocol_addr(&self, ctx: &mut C, device_id: &Self::DeviceId) -> Option<Ipv4Addr>;
+    fn get_protocol_addr(&mut self, ctx: &mut C, device_id: &Self::DeviceId) -> Option<Ipv4Addr>;
 
     /// Get the hardware address of this interface.
-    fn get_hardware_addr(&self, ctx: &mut C, device_id: &Self::DeviceId) -> UnicastAddr<D::HType>;
+    fn get_hardware_addr(
+        &mut self,
+        ctx: &mut C,
+        device_id: &Self::DeviceId,
+    ) -> UnicastAddr<D::HType>;
 
     /// Calls the function with a mutable reference to ARP state.
     fn with_arp_state_mut<O, F: FnOnce(&mut ArpState<D>) -> O>(
@@ -137,7 +141,7 @@ pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
 impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpContext<D, C>> NudContext<Ipv4, D, C>
     for SC
 {
-    fn retrans_timer(&self, _device_id: &SC::DeviceId) -> NonZeroDuration {
+    fn retrans_timer(&mut self, _device_id: &SC::DeviceId) -> NonZeroDuration {
         NonZeroDuration::new(DEFAULT_ARP_REQUEST_PERIOD).unwrap()
     }
 
@@ -489,7 +493,7 @@ mod tests {
 
     impl ArpContext<EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeCtxImpl {
         fn get_protocol_addr(
-            &self,
+            &mut self,
             _ctx: &mut FakeNonSyncCtxImpl,
             _device_id: &FakeLinkDeviceId,
         ) -> Option<Ipv4Addr> {
@@ -497,7 +501,7 @@ mod tests {
         }
 
         fn get_hardware_addr(
-            &self,
+            &mut self,
             _ctx: &mut FakeNonSyncCtxImpl,
             _device_id: &FakeLinkDeviceId,
         ) -> UnicastAddr<Mac> {

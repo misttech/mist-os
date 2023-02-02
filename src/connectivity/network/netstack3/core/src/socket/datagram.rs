@@ -224,8 +224,8 @@ where
     type LocalIdAllocator: LocalIdentifierAllocator<A, C, S>;
 
     /// Calls the function with an immutable reference to the datagram sockets.
-    fn with_sockets<O, F: FnOnce(&Self::IpSocketsCtx, &DatagramSockets<A, S>) -> O>(
-        &self,
+    fn with_sockets<O, F: FnOnce(&mut Self::IpSocketsCtx, &DatagramSockets<A, S>) -> O>(
+        &mut self,
         cb: F,
     ) -> O;
 
@@ -1132,7 +1132,7 @@ pub(crate) fn get_bound_device<
     SC: DatagramStateContext<A, C, S>,
     S: DatagramSocketSpec<A>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     _ctx: &C,
     id: impl Into<DatagramSocketId<S>>,
 ) -> Option<A::DeviceId>
@@ -1191,7 +1191,7 @@ fn pick_interface_for_addr<
     C: DatagramStateNonSyncContext<A>,
     SC: TransportIpContext<A::IpVersion, C, DeviceId = A::DeviceId>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     _remote_addr: MulticastAddr<A::IpAddr>,
     source_addr: Option<SpecifiedAddr<A::IpAddr>>,
 ) -> Result<A::DeviceId, SetMulticastMembershipError> {
@@ -1462,7 +1462,7 @@ pub(crate) fn get_ip_hop_limits<
     C: DatagramStateNonSyncContext<A>,
     S: DatagramSocketSpec<A>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     _ctx: &C,
     id: impl Into<DatagramSocketId<S>>,
 ) -> HopLimits
@@ -1663,11 +1663,11 @@ mod test {
         fn with_sockets<
             O,
             F: FnOnce(
-                &Self::IpSocketsCtx,
+                &mut Self::IpSocketsCtx,
                 &DatagramSockets<FakeAddrSpec<I, D>, FakeStateSpec<I, D>>,
             ) -> O,
         >(
-            &self,
+            &mut self,
             cb: F,
         ) -> O {
             let Self { sockets, state } = self;
@@ -1743,7 +1743,7 @@ mod test {
             }
         });
 
-        assert_eq!(get_ip_hop_limits(&sync_ctx, &non_sync_ctx, unbound), EXPECTED_HOP_LIMITS);
+        assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), EXPECTED_HOP_LIMITS);
     }
 
     #[ip_test]
@@ -1752,7 +1752,7 @@ mod test {
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
         let unbound = create_unbound(&mut sync_ctx);
-        assert_eq!(get_ip_hop_limits(&sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
+        assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
 
         update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound, |limits| {
             *limits =
@@ -1760,7 +1760,7 @@ mod test {
         });
 
         // The limits no longer match the default.
-        assert_ne!(get_ip_hop_limits(&sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
+        assert_ne!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
 
         // Clear the hop limits set on the socket.
         update_ip_hop_limit(&mut sync_ctx, &mut non_sync_ctx, unbound, |limits| {
@@ -1768,7 +1768,7 @@ mod test {
         });
 
         // The values should be back at the defaults.
-        assert_eq!(get_ip_hop_limits(&sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
+        assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
     }
 
     #[ip_test]
@@ -1779,9 +1779,9 @@ mod test {
         let unbound = create_unbound(&mut sync_ctx);
 
         set_unbound_device(&mut sync_ctx, &mut non_sync_ctx, unbound, Some(&FakeDeviceId));
-        assert_eq!(get_bound_device(&sync_ctx, &non_sync_ctx, unbound), Some(FakeDeviceId));
+        assert_eq!(get_bound_device(&mut sync_ctx, &non_sync_ctx, unbound), Some(FakeDeviceId));
 
         set_unbound_device(&mut sync_ctx, &mut non_sync_ctx, unbound, None);
-        assert_eq!(get_bound_device(&sync_ctx, &non_sync_ctx, unbound), None);
+        assert_eq!(get_bound_device(&mut sync_ctx, &non_sync_ctx, unbound), None);
     }
 }

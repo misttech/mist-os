@@ -238,7 +238,7 @@ pub(crate) trait TransportIpContext<I: IpExt, C>:
     /// associated address, and, for IPv6, for which it is in the "assigned"
     /// state.
     fn get_devices_with_assigned_addr(
-        &self,
+        &mut self,
         addr: SpecifiedAddr<I::Addr>,
     ) -> Self::DevicesWithAddrIter<'_>;
 
@@ -246,7 +246,7 @@ pub(crate) trait TransportIpContext<I: IpExt, C>:
     ///
     /// If `device` is not `None` and exists, its hop limits will be returned.
     /// Otherwise the system defaults are returned.
-    fn get_default_hop_limits(&self, device: Option<&Self::DeviceId>) -> HopLimits;
+    fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits;
 }
 
 /// Abstraction over the ability to join and leave multicast groups.
@@ -347,7 +347,7 @@ impl<C, SC: IpDeviceContext<Ipv4, C> + IpSocketHandler<Ipv4, C> + NonTestCtxMark
     type DevicesWithAddrIter<'s> = <Vec<SC::DeviceId> as IntoIterator>::IntoIter where SC: 's;
 
     fn get_devices_with_assigned_addr(
-        &self,
+        &mut self,
         addr: SpecifiedAddr<Ipv4Addr>,
     ) -> Self::DevicesWithAddrIter<'_> {
         self.with_address_statuses(addr, |it| {
@@ -357,7 +357,7 @@ impl<C, SC: IpDeviceContext<Ipv4, C> + IpSocketHandler<Ipv4, C> + NonTestCtxMark
         .into_iter()
     }
 
-    fn get_default_hop_limits(&self, device: Option<&Self::DeviceId>) -> HopLimits {
+    fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
             Some(device) => HopLimits { unicast: self.get_hop_limit(device), ..DEFAULT_HOP_LIMITS },
             None => DEFAULT_HOP_LIMITS,
@@ -371,7 +371,7 @@ impl<C, SC: IpDeviceContext<Ipv6, C> + IpSocketHandler<Ipv6, C> + NonTestCtxMark
     type DevicesWithAddrIter<'s> = <Vec<SC::DeviceId> as IntoIterator>::IntoIter where SC: 's;
 
     fn get_devices_with_assigned_addr(
-        &self,
+        &mut self,
         addr: SpecifiedAddr<Ipv6Addr>,
     ) -> Self::DevicesWithAddrIter<'_> {
         self.with_address_statuses(addr, |it| {
@@ -381,7 +381,7 @@ impl<C, SC: IpDeviceContext<Ipv6, C> + IpSocketHandler<Ipv6, C> + NonTestCtxMark
         .into_iter()
     }
 
-    fn get_default_hop_limits(&self, device: Option<&Self::DeviceId>) -> HopLimits {
+    fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
             Some(device) => HopLimits { unicast: self.get_hop_limit(device), ..DEFAULT_HOP_LIMITS },
             None => DEFAULT_HOP_LIMITS,
@@ -431,6 +431,10 @@ impl<S> AddressStatus<S> {
     }
 }
 
+impl<S: GenericOverIp<I>, I: Ip> GenericOverIp<I> for AddressStatus<S> {
+    type Type = AddressStatus<S::Type>;
+}
+
 /// The status of an IPv4 address.
 pub(crate) enum Ipv4PresentAddressStatus {
     LimitedBroadcast,
@@ -478,11 +482,11 @@ pub(crate) trait IpStateContext<I: IpLayerIpExt, Instant: crate::Instant>:
 /// The IP device context provided to the IP layer.
 pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
     /// Is the device enabled?
-    fn is_ip_device_enabled(&self, device_id: &Self::DeviceId) -> bool;
+    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
     /// Returns the best local address for communicating with the remote.
     fn get_local_addr_for_remote(
-        &self,
+        &mut self,
         device_id: &Self::DeviceId,
         remote: SpecifiedAddr<I::Addr>,
     ) -> Option<SpecifiedAddr<I::Addr>>;
@@ -497,7 +501,7 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
     /// the address is assigned and the status of the assignment for each
     /// device.
     fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
-        &'a self,
+        &'a mut self,
         addr: SpecifiedAddr<I::Addr>,
         cb: F,
     ) -> R;
@@ -508,19 +512,19 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
     /// [`AddressStatus::Unassigned`] if the address is not assigned to the
     /// device.
     fn address_status_for_device(
-        &self,
+        &mut self,
         addr: SpecifiedAddr<I::Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<I::AddressStatus>;
 
     /// Returns true iff the device has routing enabled.
-    fn is_device_routing_enabled(&self, device_id: &Self::DeviceId) -> bool;
+    fn is_device_routing_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
     /// Returns the hop limit.
-    fn get_hop_limit(&self, device_id: &Self::DeviceId) -> NonZeroU8;
+    fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
 
     /// Returns the MTU of the device.
-    fn get_mtu(&self, device_id: &Self::DeviceId) -> u32;
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32;
 }
 
 /// Events observed at the IP layer.
@@ -597,7 +601,7 @@ fn is_local_assigned_address<
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
     SC: IpLayerContext<I, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device: &SC::DeviceId,
     local_ip: SpecifiedAddr<I::Addr>,
 ) -> bool {
@@ -614,7 +618,7 @@ impl<
     > IpSocketContext<I, C> for SC
 {
     fn lookup_route(
-        &self,
+        &mut self,
         ctx: &mut C,
         device: Option<&SC::DeviceId>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
@@ -623,13 +627,14 @@ impl<
         // Returns the local IP address to use for sending packets from the
         // given device to `addr`, restricting to `local_ip` if it is not
         // `None`.
-        let get_local_addr = |device: &SC::DeviceId| {
+        let get_local_addr = |sync_ctx: &mut Self, device: &SC::DeviceId| {
             if let Some(local_ip) = local_ip {
-                is_local_assigned_address(self, device, local_ip)
+                is_local_assigned_address(sync_ctx, device, local_ip)
                     .then_some(local_ip)
                     .ok_or(IpSockUnroutableError::LocalAddrNotAssigned.into())
             } else {
-                self.get_local_addr_for_remote(device, addr)
+                sync_ctx
+                    .get_local_addr_for_remote(device, addr)
                     .ok_or(IpSockRouteError::NoLocalAddrAvailable)
             }
         };
@@ -689,7 +694,7 @@ impl<
                             .ok_or(IpSockUnroutableError::LocalAddrNotAssigned)?,
                         None => addr,
                     },
-                    LocalDelivery::StrongForDevice(device) => get_local_addr(device)?,
+                    LocalDelivery::StrongForDevice(device) => get_local_addr(self, device)?,
                 };
                 Ok(IpSockRoute {
                     local_ip,
@@ -699,7 +704,7 @@ impl<
             None => lookup_route_table(self, ctx, device, addr)
                 .map(|destination| {
                     let Destination { device, next_hop: _ } = &destination;
-                    Ok(IpSockRoute { local_ip: get_local_addr(device)?, destination })
+                    Ok(IpSockRoute { local_ip: get_local_addr(self, device)?, destination })
                 })
                 .unwrap_or(Err(IpSockUnroutableError::NoRouteToRemoteAddr.into())),
         }
@@ -2644,14 +2649,14 @@ pub(crate) mod testutil {
     }
 
     pub(crate) fn is_in_ip_multicast<A: IpAddress>(
-        sync_ctx: &FakeSyncCtx,
+        mut sync_ctx: &FakeSyncCtx,
         device: &DeviceId<FakeInstant>,
         addr: MulticastAddr<A>,
     ) -> bool {
         match addr.into() {
             IpAddr::V4(addr) => {
                 match IpDeviceContext::<Ipv4, _>::address_status_for_device(
-                    &sync_ctx,
+                    &mut sync_ctx,
                     addr.into_specified(),
                     device,
                 ) {
@@ -2666,7 +2671,7 @@ pub(crate) mod testutil {
             }
             IpAddr::V6(addr) => {
                 match IpDeviceContext::<Ipv6, _>::address_status_for_device(
-                    &sync_ctx,
+                    &mut sync_ctx,
                     addr.into_specified(),
                     device,
                 ) {

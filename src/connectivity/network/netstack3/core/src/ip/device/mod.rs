@@ -331,7 +331,7 @@ pub(crate) trait IpDeviceStateAccessor<I: IpDeviceIpExt, Instant>:
 {
     /// Calls the function with an immutable reference to IP device state.
     fn with_ip_device_state<O, F: FnOnce(&I::State<Instant>) -> O>(
-        &self,
+        &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
@@ -357,7 +357,7 @@ where
 
     /// Calls the function with an [`Iterator`] of IDs for all initialized
     /// devices.
-    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&self, cb: F) -> O;
+    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O;
 
     /// Calls the function with an [`Iterator`] of IDs for all initialized
     /// devices and an accessor for device state.
@@ -365,14 +365,14 @@ where
         O,
         F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
     >(
-        &self,
+        &mut self,
         cb: F,
     ) -> O;
 
     /// Gets the MTU for a device.
     ///
     /// The MTU is the maximum size of an IP packet.
-    fn get_mtu(&self, device_id: &Self::DeviceId) -> u32;
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32;
 
     /// Joins the link-layer multicast group associated with the given IP
     /// multicast group.
@@ -402,13 +402,16 @@ pub(crate) trait Ipv6DeviceContext<C: IpDeviceNonSyncContext<Ipv6, Self::DeviceI
 
     /// Gets the device's link-layer address bytes, if the device supports
     /// link-layer addressing.
-    fn get_link_layer_addr_bytes(&self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr>;
+    fn get_link_layer_addr_bytes(
+        &mut self,
+        device_id: &Self::DeviceId,
+    ) -> Option<Self::LinkLayerAddr>;
 
     /// Gets the device's EUI-64 based interface identifier.
     ///
     /// A `None` value indicates the device does not have an EUI-64 based
     /// interface identifier.
-    fn get_eui64_iid(&self, device_id: &Self::DeviceId) -> Option<[u8; 8]>;
+    fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]>;
 
     /// Sets the link MTU for the device.
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: NonZeroU32);
@@ -416,7 +419,7 @@ pub(crate) trait Ipv6DeviceContext<C: IpDeviceNonSyncContext<Ipv6, Self::DeviceI
 
 /// An implementation of an IP device.
 pub(crate) trait IpDeviceHandler<I: Ip, C>: IpDeviceIdContext<I> {
-    fn is_router_device(&self, device_id: &Self::DeviceId) -> bool;
+    fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool;
 
     fn set_default_hop_limit(&mut self, device_id: &Self::DeviceId, hop_limit: NonZeroU8);
 }
@@ -424,7 +427,7 @@ pub(crate) trait IpDeviceHandler<I: Ip, C>: IpDeviceIdContext<I> {
 impl<I: IpDeviceIpExt, C: IpDeviceNonSyncContext<I, SC::DeviceId>, SC: IpDeviceContext<I, C>>
     IpDeviceHandler<I, C> for SC
 {
-    fn is_router_device(&self, device_id: &Self::DeviceId) -> bool {
+    fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool {
         is_ip_routing_enabled(self, device_id)
     }
 
@@ -442,7 +445,10 @@ pub(crate) trait Ipv6DeviceHandler<C>: IpDeviceHandler<Ipv6, C> {
 
     /// Gets the device's link-layer address bytes, if the device supports
     /// link-layer addressing.
-    fn get_link_layer_addr_bytes(&self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr>;
+    fn get_link_layer_addr_bytes(
+        &mut self,
+        device_id: &Self::DeviceId,
+    ) -> Option<Self::LinkLayerAddr>;
 
     /// Sets the discovered retransmit timer for the device.
     fn set_discovered_retrans_timer(
@@ -475,7 +481,10 @@ impl<
 {
     type LinkLayerAddr = SC::LinkLayerAddr;
 
-    fn get_link_layer_addr_bytes(&self, device_id: &Self::DeviceId) -> Option<SC::LinkLayerAddr> {
+    fn get_link_layer_addr_bytes(
+        &mut self,
+        device_id: &Self::DeviceId,
+    ) -> Option<SC::LinkLayerAddr> {
         Ipv6DeviceContext::get_link_layer_addr_bytes(self, device_id)
     }
 
@@ -755,7 +764,7 @@ pub(crate) fn with_assigned_addr_subnets<
     O,
     F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<I::Addr>> + '_>) -> O,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
     cb: F,
 ) -> O {
@@ -775,7 +784,7 @@ pub(crate) fn with_assigned_ipv4_addr_subnets<
     O,
     F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv4Addr>> + '_>) -> O,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
     cb: F,
 ) -> O {
@@ -787,7 +796,7 @@ pub(super) fn get_ipv4_addr_subnet<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
     SC: IpDeviceContext<Ipv4, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> Option<AddrSubnet<Ipv4Addr>> {
     with_assigned_ipv4_addr_subnets(sync_ctx, device_id, |mut addrs| addrs.nth(0))
@@ -798,7 +807,7 @@ pub(crate) fn get_ipv6_hop_limit<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: IpDeviceContext<Ipv6, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device: &SC::DeviceId,
 ) -> NonZeroU8 {
     sync_ctx.with_ip_device_state(device, |state| state.ip_state.default_hop_limit)
@@ -810,7 +819,7 @@ pub(crate) fn is_ip_routing_enabled<
     C: IpDeviceNonSyncContext<I, SC::DeviceId>,
     SC: IpDeviceContext<I, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> bool {
     sync_ctx.with_ip_device_state(device_id, |state| {
@@ -1162,7 +1171,7 @@ pub(crate) fn get_ipv4_configuration<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
     SC: IpDeviceContext<Ipv4, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> Ipv4DeviceConfiguration {
     sync_ctx.with_ip_device_state(device_id, |state| state.config.clone())
@@ -1172,7 +1181,7 @@ pub(crate) fn get_ipv6_configuration<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: IpDeviceContext<Ipv6, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> Ipv6DeviceConfiguration {
     sync_ctx.with_ip_device_state(device_id, |state| state.config.clone())
@@ -1225,7 +1234,7 @@ pub(super) fn is_ip_device_enabled<
     C: IpDeviceNonSyncContext<I, SC::DeviceId>,
     SC: IpDeviceContext<I, C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> bool {
     sync_ctx.with_ip_device_state(device_id, |state| {
@@ -1297,7 +1306,7 @@ pub(crate) mod testutil {
         C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
         SC: IpDeviceContext<Ipv6, C>,
     >(
-        sync_ctx: &SC,
+        sync_ctx: &mut SC,
         device_id: &SC::DeviceId,
     ) -> Vec<Ipv6AddressEntry<C::Instant>> {
         sync_ctx.with_ip_device_state(device_id, |state| {
@@ -1336,7 +1345,7 @@ pub(crate) mod testutil {
         O,
         F: FnOnce(Box<dyn Iterator<Item = AddrSubnet<Ipv6Addr>> + '_>) -> O,
     >(
-        sync_ctx: &SC,
+        sync_ctx: &mut SC,
         device_id: &SC::DeviceId,
         cb: F,
     ) -> O {
@@ -1594,9 +1603,13 @@ mod tests {
             ]
         );
 
-        IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(&sync_ctx, &device_id, |state| {
-            assert_empty(state.ip_state.iter_addrs());
-        });
+        IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
+            &mut sync_ctx,
+            &device_id,
+            |state| {
+                assert_empty(state.ip_state.iter_addrs());
+            },
+        );
 
         let multicast_addr = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS;
         join_ip_multicast::<Ipv6, _, _>(
@@ -1615,7 +1628,7 @@ mod tests {
         .expect("add MAC based IPv6 link-local address");
         assert_eq!(
             IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                &sync_ctx,
+                &mut sync_ctx,
                 &device_id,
                 |state| {
                     state
@@ -1676,7 +1689,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                &sync_ctx,
+                &mut sync_ctx,
                 &device_id,
                 |state| {
                     state

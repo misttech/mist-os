@@ -82,7 +82,7 @@ pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncConte
 {
     /// Calls the function with the ethernet device's static state.
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
-        &self,
+        &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
@@ -93,7 +93,7 @@ pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncConte
         O,
         F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
     >(
-        &self,
+        &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
@@ -145,7 +145,7 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
     for &'_ SyncCtx<NonSyncCtx>
 {
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
-        &self,
+        &mut self,
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
@@ -156,7 +156,7 @@ impl<NonSyncCtx: NonSyncContext> EthernetIpLinkDeviceContext<NonSyncCtx>
         O,
         F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
     >(
-        &self,
+        &mut self,
         device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
@@ -254,7 +254,10 @@ impl<
 impl<NonSyncCtx: NonSyncContext> NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx>
     for &'_ SyncCtx<NonSyncCtx>
 {
-    fn retrans_timer(&self, device_id: &EthernetDeviceId<NonSyncCtx::Instant>) -> NonZeroDuration {
+    fn retrans_timer(
+        &mut self,
+        device_id: &EthernetDeviceId<NonSyncCtx::Instant>,
+    ) -> NonZeroDuration {
         with_ethernet_state(self, device_id, |state| {
             let ipv6 = state.ip.ipv6.read();
             ipv6.retrans_timer
@@ -741,7 +744,7 @@ pub(super) fn get_mtu<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceContext<C>,
 >(
-    sync_ctx: &SC,
+    sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> u32 {
     sync_ctx.with_ethernet_device_state(device_id, |_static_state, dynamic_state| dynamic_state.mtu)
@@ -819,7 +822,7 @@ impl<
 
 impl<C: NonSyncContext> ArpContext<EthernetLinkDevice, C> for &'_ SyncCtx<C> {
     fn get_protocol_addr(
-        &self,
+        &mut self,
         _ctx: &mut C,
         device_id: &EthernetDeviceId<C::Instant>,
     ) -> Option<Ipv4Addr> {
@@ -831,7 +834,7 @@ impl<C: NonSyncContext> ArpContext<EthernetLinkDevice, C> for &'_ SyncCtx<C> {
     }
 
     fn get_hardware_addr(
-        &self,
+        &mut self,
         _ctx: &mut C,
         device_id: &EthernetDeviceId<C::Instant>,
     ) -> UnicastAddr<Mac> {
@@ -869,7 +872,7 @@ pub(super) fn get_mac<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceContext<C>,
 >(
-    sync_ctx: &'a SC,
+    sync_ctx: &'a mut SC,
     device_id: &SC::DeviceId,
 ) -> UnicastAddr<Mac> {
     sync_ctx.with_static_ethernet_device_state(device_id, |state| state.mac)
@@ -974,7 +977,7 @@ mod tests {
 
     impl EthernetIpLinkDeviceContext<FakeNonSyncCtx> for FakeCtx {
         fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
-            &self,
+            &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
@@ -985,7 +988,7 @@ mod tests {
             O,
             F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
         >(
-            &self,
+            &mut self,
             &FakeDeviceId: &FakeDeviceId,
             cb: F,
         ) -> O {
@@ -1121,7 +1124,7 @@ mod tests {
     }
 
     fn contains_addr<A: IpAddress>(
-        sync_ctx: &&crate::testutil::FakeSyncCtx,
+        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
         device: &DeviceId<FakeInstant>,
         addr: SpecifiedAddr<A>,
     ) -> bool {
@@ -1306,7 +1309,7 @@ mod tests {
     }
 
     fn is_routing_enabled<I: Ip>(
-        sync_ctx: &&crate::testutil::FakeSyncCtx,
+        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
         device: &DeviceId<FakeInstant>,
     ) -> bool {
         match I::VERSION {
@@ -1318,7 +1321,7 @@ mod tests {
     #[ip_test]
     fn test_set_ip_routing<I: Ip + TestIpExt>() {
         fn check_other_is_routing_enabled<I: Ip>(
-            sync_ctx: &&crate::testutil::FakeSyncCtx,
+            sync_ctx: &mut &crate::testutil::FakeSyncCtx,
             device: &DeviceId<FakeInstant>,
             expected: bool,
         ) {
@@ -1381,8 +1384,8 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
 
         // Should not be a router (default).
-        assert!(!is_routing_enabled::<I>(&sync_ctx, &device));
-        check_other_is_routing_enabled::<I>(&sync_ctx, &device, false);
+        assert!(!is_routing_enabled::<I>(&mut sync_ctx, &device));
+        check_other_is_routing_enabled::<I>(&mut sync_ctx, &device, false);
 
         // Receiving a packet not destined for the node should only result in a
         // dest unreachable message if routing is enabled.
@@ -1398,9 +1401,9 @@ mod tests {
         // Set routing and expect packets to be forwarded.
         set_routing_enabled::<_, _, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
-        assert!(is_routing_enabled::<I>(&sync_ctx, &device));
+        assert!(is_routing_enabled::<I>(&mut sync_ctx, &device));
         // Should not update other Ip routing status.
-        check_other_is_routing_enabled::<I>(&sync_ctx, &device, false);
+        check_other_is_routing_enabled::<I>(&mut sync_ctx, &device, false);
 
         // Should route the packet since routing fully enabled (netstack &
         // device).
@@ -1447,8 +1450,8 @@ mod tests {
         // Attempt to unset router
         set_routing_enabled::<_, _, I>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting routing enabled");
-        assert!(!is_routing_enabled::<I>(&sync_ctx, &device));
-        check_other_is_routing_enabled::<I>(&sync_ctx, &device, false);
+        assert!(!is_routing_enabled::<I>(&mut sync_ctx, &device));
+        check_other_is_routing_enabled::<I>(&mut sync_ctx, &device, false);
 
         // Should not route packets anymore
         receive_ip_packet::<_, _, I>(
@@ -1559,36 +1562,36 @@ mod tests {
         let as1 = AddrSubnet::new(ip1.get(), prefix).unwrap();
         let as2 = AddrSubnet::new(ip2.get(), prefix).unwrap();
 
-        assert!(!contains_addr(&sync_ctx, &device, ip1));
-        assert!(!contains_addr(&sync_ctx, &device, ip2));
-        assert!(!contains_addr(&sync_ctx, &device, ip3));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip3));
 
         // Add ip1 (ok)
         crate::device::add_ip_addr_subnet(&mut sync_ctx, &mut non_sync_ctx, &device, as1).unwrap();
-        assert!(contains_addr(&sync_ctx, &device, ip1));
-        assert!(!contains_addr(&sync_ctx, &device, ip2));
-        assert!(!contains_addr(&sync_ctx, &device, ip3));
+        assert!(contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip3));
 
         // Add ip2 (ok)
         crate::device::add_ip_addr_subnet(&mut sync_ctx, &mut non_sync_ctx, &device, as2).unwrap();
-        assert!(contains_addr(&sync_ctx, &device, ip1));
-        assert!(contains_addr(&sync_ctx, &device, ip2));
-        assert!(!contains_addr(&sync_ctx, &device, ip3));
+        assert!(contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(contains_addr(&mut sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip3));
 
         // Del ip1 (ok)
         crate::device::del_ip_addr(&mut sync_ctx, &mut non_sync_ctx, &device, &ip1).unwrap();
-        assert!(!contains_addr(&sync_ctx, &device, ip1));
-        assert!(contains_addr(&sync_ctx, &device, ip2));
-        assert!(!contains_addr(&sync_ctx, &device, ip3));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(contains_addr(&mut sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip3));
 
         // Del ip1 again (ip1 not found)
         assert_eq!(
             crate::device::del_ip_addr(&mut sync_ctx, &mut non_sync_ctx, &device, &ip1),
             Err(NotFoundError)
         );
-        assert!(!contains_addr(&sync_ctx, &device, ip1));
-        assert!(contains_addr(&sync_ctx, &device, ip2));
-        assert!(!contains_addr(&sync_ctx, &device, ip3));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(contains_addr(&mut sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip3));
 
         // Add ip2 again (ip2 already exists)
         assert_eq!(
@@ -1596,9 +1599,9 @@ mod tests {
                 .unwrap_err(),
             ExistsError,
         );
-        assert!(!contains_addr(&sync_ctx, &device, ip1));
-        assert!(contains_addr(&sync_ctx, &device, ip2));
-        assert!(!contains_addr(&sync_ctx, &device, ip3));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(contains_addr(&mut sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip3));
 
         // Add ip2 with different subnet (ip2 already exists)
         assert_eq!(
@@ -1611,9 +1614,9 @@ mod tests {
             .unwrap_err(),
             ExistsError,
         );
-        assert!(!contains_addr(&sync_ctx, &device, ip1));
-        assert!(contains_addr(&sync_ctx, &device, ip2));
-        assert!(!contains_addr(&sync_ctx, &device, ip3));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(contains_addr(&mut sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip3));
     }
 
     fn receive_simple_ip_packet_test<A: IpAddress>(
@@ -1668,8 +1671,8 @@ mod tests {
         let ip2 = I::get_other_ip_address(2);
         let from_ip = I::get_other_ip_address(3).get();
 
-        assert!(!contains_addr(&sync_ctx, &device, ip1));
-        assert!(!contains_addr(&sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip2));
 
         // Should not receive packets on any IP.
         receive_simple_ip_packet_test(
@@ -1697,8 +1700,8 @@ mod tests {
             AddrSubnet::new(ip1.get(), I::Addr::BYTES * 8).unwrap(),
         )
         .unwrap();
-        assert!(contains_addr(&sync_ctx, &device, ip1));
-        assert!(!contains_addr(&sync_ctx, &device, ip2));
+        assert!(contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip2));
 
         // Should receive packets on ip1 but not ip2
         receive_simple_ip_packet_test(
@@ -1726,8 +1729,8 @@ mod tests {
             AddrSubnet::new(ip2.get(), I::Addr::BYTES * 8).unwrap(),
         )
         .unwrap();
-        assert!(contains_addr(&sync_ctx, &device, ip1));
-        assert!(contains_addr(&sync_ctx, &device, ip2));
+        assert!(contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(contains_addr(&mut sync_ctx, &device, ip2));
 
         // Should receive packets on both ips
         receive_simple_ip_packet_test(
@@ -1749,8 +1752,8 @@ mod tests {
 
         // Remove ip1
         crate::device::del_ip_addr(&mut sync_ctx, &mut non_sync_ctx, &device, &ip1).unwrap();
-        assert!(!contains_addr(&sync_ctx, &device, ip1));
-        assert!(contains_addr(&sync_ctx, &device, ip2));
+        assert!(!contains_addr(&mut sync_ctx, &device, ip1));
+        assert!(contains_addr(&mut sync_ctx, &device, ip2));
 
         // Should receive packets on ip2
         receive_simple_ip_packet_test(

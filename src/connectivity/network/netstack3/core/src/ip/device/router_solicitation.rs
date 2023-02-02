@@ -76,7 +76,10 @@ pub(super) trait Ipv6DeviceRsContext<C>: IpDeviceIdContext<Ipv6> {
 
     /// Gets the device's link-layer address bytes, if the device supports
     /// link-layer addressing.
-    fn get_link_layer_addr_bytes(&self, device_id: &Self::DeviceId) -> Option<Self::LinkLayerAddr>;
+    fn get_link_layer_addr_bytes(
+        &mut self,
+        device_id: &Self::DeviceId,
+    ) -> Option<Self::LinkLayerAddr>;
 }
 
 /// The IP layer context provided to RS.
@@ -275,7 +278,7 @@ mod tests {
             cb(router_soliciations_remaining, *max_router_solicitations)
         }
 
-        fn get_link_layer_addr_bytes(&self, &FakeDeviceId: &FakeDeviceId) -> Option<Vec<u8>> {
+        fn get_link_layer_addr_bytes(&mut self, &FakeDeviceId: &FakeDeviceId) -> Option<Vec<u8>> {
             let FakeRsContext {
                 max_router_solicitations: _,
                 router_soliciations_remaining: _,

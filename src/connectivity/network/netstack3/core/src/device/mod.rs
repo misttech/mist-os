@@ -192,7 +192,7 @@ fn get_mtu<NonSyncCtx: NonSyncContext>(
 ) -> u32 {
     match device.inner() {
         DeviceIdInner::Ethernet(id) => self::ethernet::get_mtu(&mut ctx, &id),
-        DeviceIdInner::Loopback(id) => self::loopback::get_mtu(ctx, id),
+        DeviceIdInner::Loopback(id) => self::loopback::get_mtu(&mut ctx, id),
     }
 }
 
@@ -284,7 +284,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
         with_ip_device_state(self, device, |state| cb(&mut state.ipv4.write()))
     }
 
-    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&self, cb: F) -> O {
+    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O {
         let Devices { ethernet, loopback } = &*self.state.device.devices.read();
 
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() })
@@ -294,7 +294,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
         O,
         F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
     >(
-        &self,
+        &mut self,
         cb: F,
     ) -> O {
         let Devices { ethernet, loopback } = &*self.state.device.devices.read();
@@ -302,7 +302,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, self)
     }
 
-    fn get_mtu(&self, device_id: &Self::DeviceId) -> u32 {
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32 {
         get_mtu(self, device_id)
     }
 
@@ -329,7 +329,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv4, NonSyncCtx::Instant
     for &'_ SyncCtx<NonSyncCtx>
 {
     fn with_ip_device_state<O, F: FnOnce(&Ipv4DeviceState<NonSyncCtx::Instant>) -> O>(
-        &self,
+        &mut self,
         device: &DeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
@@ -357,7 +357,7 @@ where
             self::ethernet::send_ip_frame(&mut sync_ctx, ctx, &id, local_addr, body)
         }
         DeviceIdInner::Loopback(id) => {
-            self::loopback::send_ip_frame(sync_ctx, ctx, id, local_addr, body)
+            self::loopback::send_ip_frame(&mut sync_ctx, ctx, id, local_addr, body)
         }
     }
 }
@@ -462,7 +462,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         with_ip_device_state(self, device, |state| cb(&mut state.ipv6.write()))
     }
 
-    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&self, cb: F) -> O {
+    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O {
         let Devices { ethernet, loopback } = &*self.state.device.devices.read();
 
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() })
@@ -472,7 +472,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         O,
         F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
     >(
-        &self,
+        &mut self,
         cb: F,
     ) -> O {
         let Devices { ethernet, loopback } = &*self.state.device.devices.read();
@@ -480,7 +480,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, self)
     }
 
-    fn get_mtu(&self, device_id: &Self::DeviceId) -> u32 {
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> u32 {
         get_mtu(self, device_id)
     }
 
@@ -507,7 +507,7 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv6, NonSyncCtx::Instant
     for &'_ SyncCtx<NonSyncCtx>
 {
     fn with_ip_device_state<O, F: FnOnce(&Ipv6DeviceState<NonSyncCtx::Instant>) -> O>(
-        &self,
+        &mut self,
         device: &DeviceId<NonSyncCtx::Instant>,
         cb: F,
     ) -> O {
@@ -532,7 +532,7 @@ impl<NonSyncCtx: NonSyncContext> Ipv6DeviceContext<NonSyncCtx> for &'_ SyncCtx<N
     type LinkLayerAddr = Ipv6DeviceLinkLayerAddr;
 
     fn get_link_layer_addr_bytes(
-        &self,
+        &mut self,
         device_id: &Self::DeviceId,
     ) -> Option<Ipv6DeviceLinkLayerAddr> {
         match device_id.inner() {
@@ -543,7 +543,7 @@ impl<NonSyncCtx: NonSyncContext> Ipv6DeviceContext<NonSyncCtx> for &'_ SyncCtx<N
         }
     }
 
-    fn get_eui64_iid(&self, device_id: &Self::DeviceId) -> Option<[u8; 8]> {
+    fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]> {
         match device_id.inner() {
             DeviceIdInner::Ethernet(id) => {
                 Some(ethernet::get_mac(self, &id).to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC))
@@ -1348,7 +1348,7 @@ mod tests {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
 
-        fn check(sync_ctx: &&FakeSyncCtx, expected: &[DeviceId<FakeInstant>]) {
+        fn check(sync_ctx: &mut &FakeSyncCtx, expected: &[DeviceId<FakeInstant>]) {
             assert_eq!(
                 IpDeviceContext::<Ipv4, _>::with_devices(sync_ctx, |devices| devices
                     .collect::<Vec<_>>()),
@@ -1360,12 +1360,12 @@ mod tests {
                 expected
             );
         }
-        check(&sync_ctx, &[][..]);
+        check(&mut sync_ctx, &[][..]);
 
         let loopback_device =
             crate::device::add_loopback_device(&mut sync_ctx, &mut non_sync_ctx, 55 /* mtu */)
                 .expect("error adding loopback device");
-        check(&sync_ctx, &[loopback_device.clone()][..]);
+        check(&mut sync_ctx, &[loopback_device.clone()][..]);
 
         let FakeEventDispatcherConfig {
             subnet: _,
@@ -1380,7 +1380,7 @@ mod tests {
             local_mac,
             0, /* mtu */
         );
-        check(&sync_ctx, &[ethernet_device, loopback_device][..]);
+        check(&mut sync_ctx, &[ethernet_device, loopback_device][..]);
     }
 
     fn get_routes<NonSyncCtx: NonSyncContext>(

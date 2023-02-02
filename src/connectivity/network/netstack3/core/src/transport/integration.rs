@@ -73,9 +73,9 @@ impl<C: NonSyncContext> udp::StateContext<Ipv4, C> for &'_ SyncCtx<C> {
 
     fn with_sockets<
         O,
-        F: FnOnce(&Self::IpSocketsCtx, &udp::Sockets<Ipv4, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &udp::Sockets<Ipv4, DeviceId<C::Instant>>) -> O,
     >(
-        &self,
+        &mut self,
         cb: F,
     ) -> O {
         cb(self, &self.state.transport.udpv4.sockets.read())
@@ -101,9 +101,9 @@ impl<C: NonSyncContext> udp::StateContext<Ipv6, C> for &'_ SyncCtx<C> {
 
     fn with_sockets<
         O,
-        F: FnOnce(&Self::IpSocketsCtx, &udp::Sockets<Ipv6, DeviceId<C::Instant>>) -> O,
+        F: FnOnce(&mut Self::IpSocketsCtx, &udp::Sockets<Ipv6, DeviceId<C::Instant>>) -> O,
     >(
-        &self,
+        &mut self,
         cb: F,
     ) -> O {
         cb(self, &self.state.transport.udpv6.sockets.read())

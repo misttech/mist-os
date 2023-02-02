@@ -123,7 +123,7 @@ pub(super) trait SlaacAddresses<C: InstantContext> {
 
     /// Returns an iterator over the SLAAC addresses.
     fn with_addrs<O, F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntry<C::Instant>> + '_>) -> O>(
-        &self,
+        &mut self,
         cb: F,
     ) -> O;
 
@@ -1597,7 +1597,7 @@ mod tests {
             O,
             F: FnOnce(Box<dyn Iterator<Item = SlaacAddressEntry<FakeInstant>> + '_>) -> O,
         >(
-            &self,
+            &mut self,
             cb: F,
         ) -> O {
             let FakeSlaacAddrs { slaac_addrs, non_slaac_addr: _ } = self;
@@ -2664,7 +2664,7 @@ mod tests {
         let stable_addr_sub =
             calculate_addr_sub(SUBNET, local_mac.to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC));
 
-        let addrs = with_assigned_ipv6_addr_subnets(&sync_ctx, &device_id, |addrs| {
+        let addrs = with_assigned_ipv6_addr_subnets(&mut sync_ctx, &device_id, |addrs| {
             addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
         });
         let (stable_addr_sub, temp_addr_sub) = assert_matches!(
@@ -2748,7 +2748,7 @@ mod tests {
 
         // Disabling IP should remove all the SLAAC addresses.
         set_ip_enabled(&mut sync_ctx, &mut non_sync_ctx, false /* enabled */);
-        let addrs = with_assigned_ipv6_addr_subnets(&sync_ctx, &device_id, |addrs| {
+        let addrs = with_assigned_ipv6_addr_subnets(&mut sync_ctx, &device_id, |addrs| {
             addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
         });
         assert_matches!(addrs[..], []);
