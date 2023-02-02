@@ -25,6 +25,7 @@ mod console;
 mod development;
 mod diagnostics;
 mod example;
+mod graphics;
 mod identity;
 mod input;
 mod session;
@@ -125,6 +126,13 @@ pub fn define_configuration(
         &mut builder,
     )
     .context("Configuring the 'console' subsystem")?;
+
+    graphics::GraphicsSubsystemConfig::define_configuration(
+        &context,
+        &config.platform.graphics,
+        &mut builder,
+    )
+    .context("Configuring the 'graphics' subsystem")?;
 
     identity::IdentitySubsystemConfig::define_configuration(
         &context,

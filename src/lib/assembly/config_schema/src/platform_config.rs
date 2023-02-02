@@ -8,6 +8,7 @@ pub mod connectivity_config;
 pub mod development_support_config;
 pub mod diagnostics_config;
 pub mod example_config;
+pub mod graphics_config;
 pub mod identity_config;
 pub mod input_config;
 pub mod starnix_config;
@@ -42,6 +43,10 @@ pub struct PlatformConfig {
     /// Appended to the list of tags defined for the platform.
     #[serde(default)]
     pub additional_serial_log_tags: Vec<String>,
+
+    /// Platform configuration options for graphics
+    #[serde(default)]
+    pub graphics: graphics_config::GraphicsConfig,
 
     /// Platform configuration options for the identity area.
     #[serde(default)]

@@ -20,6 +20,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/development.rs",
     "src/subsystems/diagnostics.rs",
     "src/subsystems/example.rs",
+    "src/subsystems/graphics.rs",
     "src/subsystems/identity.rs",
     "src/subsystems/input.rs",
     "src/subsystems/session.rs",
