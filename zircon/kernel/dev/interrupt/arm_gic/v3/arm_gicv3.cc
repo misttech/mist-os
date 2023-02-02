@@ -79,14 +79,13 @@ static void gic_set_enable(uint vector, bool enable) {
   uint32_t mask = (uint32_t)(1ULL << (vector % 32));
 
   if (vector < 32) {
-    for (cpu_num_t i = 0; i < arch_max_num_cpus(); i++) {
-      if (enable) {
-        GICREG(0, GICR_ISENABLER0(i)) = mask;
-      } else {
-        GICREG(0, GICR_ICENABLER0(i)) = mask;
-      }
-      gic_wait_for_rwp(GICR_CTLR(i));
+    cpu_num_t cpu_id = arch_curr_cpu_num();
+    if (enable) {
+      GICREG(0, GICR_ISENABLER0(cpu_id)) = mask;
+    } else {
+      GICREG(0, GICR_ICENABLER0(cpu_id)) = mask;
     }
+    gic_wait_for_rwp(GICR_CTLR(cpu_id));
   } else {
     if (enable) {
       GICREG(0, GICD_ISENABLER(reg)) = mask;

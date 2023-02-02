@@ -27,6 +27,12 @@ enum interrupt_polarity {
   IRQ_POLARITY_ACTIVE_LOW = 1,
 };
 
+// (mask|unmask)_interrupt will disable (mask) or enable (unmask) the interrupt
+// specified by |vector|.  In the case of interrupts which target a specific CPU
+// but share an interrupt vector number (for example, SGIs and PPIs in ARM's GIC
+// interrupt controller designs), these functions will affect the
+// masked/unmasked state of the interrupt vector for the caller's CPU only.
+// They will not mask/unmask the specified vector for any of the other CPUs.
 zx_status_t mask_interrupt(unsigned int vector);
 zx_status_t unmask_interrupt(unsigned int vector);
 zx_status_t deactivate_interrupt(unsigned int vector);
