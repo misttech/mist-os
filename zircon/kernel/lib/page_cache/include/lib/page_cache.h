@@ -41,9 +41,6 @@ namespace page_cache {
 class PageCache {
   static constexpr bool kTraceEnabled = false;
 
-  using LocalTraceDuration =
-      TraceDuration<TraceEnabled<kTraceEnabled>, "kernel:sched"_category, TraceContext::Thread>;
-
  public:
   // Creates a page cache with the given number of reserve pages per CPU.
   // Filling the per-CPU page caches is deferred until the first allocation
@@ -109,7 +106,9 @@ class PageCache {
   // Allocates the given number of pages from the page cache. Falls back to the
   // PMM if the cache is insufficient to fulfill the request.
   zx::result<AllocateResult> Allocate(size_t page_count, uint alloc_flags = 0) {
-    LocalTraceDuration trace{"PageCache::Allocate"_intern};
+    ktrace::Scope trace =
+        KTRACE_BEGIN_SCOPE_ENABLE(kTraceEnabled, "kernel:sched", "PageCache::Allocate",
+                                  ("page_count", page_count), ("alloc_flags", alloc_flags));
     DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
     DEBUG_ASSERT(per_cpu_caches_ != nullptr);
 
@@ -132,7 +131,8 @@ class PageCache {
   // Returns the given pages to the page cache. Excess pages are returned to the
   // PMM.
   void Free(PageList page_list) {
-    LocalTraceDuration trace{"PageCache::Free"_intern};
+    ktrace::Scope trace =
+        KTRACE_BEGIN_SCOPE_ENABLE(kTraceEnabled, "kernel:sched", "PageCache::Free");
     DEBUG_ASSERT(per_cpu_caches_ != nullptr);
 
     if (!page_list.is_empty()) {
@@ -242,7 +242,9 @@ class PageCache {
   zx::result<AllocateResult> AllocatePagesAndFillCache(CpuCache& entry, size_t requested_pages,
                                                        uint alloc_flags) const
       TA_EXCL(entry.fill_lock, entry.cache_lock) {
-    LocalTraceDuration trace{"PageCache::AllocatePagesAndFillCache"_intern};
+    ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
+        kTraceEnabled, "kernel:sched", "PageCache::AllocatePagesAndFillCache",
+        ("requested_pages", requested_pages), ("alloc_flags", alloc_flags));
 
     // Serialize cache fill + allocate operations on this cache. Contention
     // means another thread tried to allocate from the PMM and blocked on the

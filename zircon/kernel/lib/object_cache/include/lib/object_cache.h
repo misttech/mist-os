@@ -170,12 +170,8 @@ class ObjectCache<T, Option::Single, Allocator> {
 
   static constexpr int kTraceLevel = 0;
 
-  using Basic = TraceEnabled<(kTraceLevel > 0)>;
-  using Detail = TraceEnabled<(kTraceLevel > 1)>;
-
-  template <typename EnabledOption>
-  using LocalTraceDuration =
-      TraceDuration<EnabledOption, "kernel:sched"_category, TraceContext::Thread>;
+  static constexpr int kBasic = 1;
+  static constexpr int kDetail = 2;
 
   static_assert(ktl::has_single_bit(Allocator::kSlabSize), "Slabs must be a power of two!");
   static constexpr uintptr_t kSlabAddrMask = Allocator::kSlabSize - 1;
@@ -184,11 +180,13 @@ class ObjectCache<T, Option::Single, Allocator> {
   // Constructs an ObjectCache with the given slab reservation value. Reserve
   // slabs are not immediately allocated.
   explicit ObjectCache(size_t reserve_slabs) : reserve_slabs_{reserve_slabs} {
-    LocalTraceDuration<Detail> trace{"ObjectCache::ObjectCache"_intern};
+    ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched",
+                                                    "ObjectCache::ObjectCache");
   }
 
   ~ObjectCache() {
-    LocalTraceDuration<Detail> trace{"ObjectCache::~ObjectCache"_intern};
+    ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched",
+                                                    "ObjectCache::~ObjectCache");
 
     {
       Guard<Mutex> guard{&lock_};
@@ -227,7 +225,8 @@ class ObjectCache<T, Option::Single, Allocator> {
   // If the object is ref counted it is not yet adopted.
   template <typename... Args>
   EnableIfConstructible<zx::result<PtrType>, Args...> Allocate(Args&&... args) TA_EXCL(lock_) {
-    LocalTraceDuration<Basic> trace{"ObjectCache::Allocate"_intern};
+    ktrace::Scope trace =
+        KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kBasic, "kernel:sched", "ObjectCache::Allocate");
     DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
     AutoPreemptDisabler preempt_disable;
 
@@ -268,7 +267,8 @@ class ObjectCache<T, Option::Single, Allocator> {
   // Returns the given object that has already been destroyed to the slab it was
   // allocated from.
   static void Delete(void* pointer) {
-    LocalTraceDuration<Basic> trace{"ObjectCache::Release"_intern};
+    ktrace::Scope trace =
+        KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kBasic, "kernel:sched", "ObjectCache::Release");
     AutoPreemptDisabler preempt_disable;
     SlabPtr slab = Slab::FromAllocatedPointer(pointer);
     Entry* entry = Entry::ToListNode(pointer);
@@ -295,7 +295,8 @@ class ObjectCache<T, Option::Single, Allocator> {
     // dependencies.
     template <typename... Args>
     T* ToObject(Args&&... args) {
-      LocalTraceDuration<Detail> trace{"Entry::ToObject"_intern};
+      ktrace::Scope trace =
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Entry::ToObject");
       list_node.~NodeState();
       new (&object) T(ktl::forward<Args>(args)...);
       return &object;
@@ -303,7 +304,8 @@ class ObjectCache<T, Option::Single, Allocator> {
 
     // Converts this entry to a list node. The object must already be destroyed.
     static Entry* ToListNode(void* pointer) {
-      LocalTraceDuration<Detail> trace{"Entry::ToListNode"_intern};
+      ktrace::Scope trace =
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Entry::ToListNode");
       Entry* entry = static_cast<Entry*>(pointer);
       new (&entry->list_node) NodeState{};
       return entry;
@@ -347,14 +349,16 @@ class ObjectCache<T, Option::Single, Allocator> {
   // of two aligned memory.
   struct Slab {
     explicit Slab(ObjectCache* object_cache) : control{object_cache} {
-      LocalTraceDuration<Detail> trace{"Slab::Slab"_intern};
+      ktrace::Scope trace =
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::Slab");
       for (Entry& entry : entries) {
         control.free_list.push_front(&entry);
       }
     }
 
     ~Slab() {
-      LocalTraceDuration<Detail> trace{"Slab::~Slab"_intern};
+      ktrace::Scope trace =
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::~Slab");
       DEBUG_ASSERT(is_empty());
       if constexpr (kEntryNodeOptions & fbl::NodeOptions::AllowClearUnsafe) {
         control.free_list.clear_unsafe();
@@ -370,7 +374,8 @@ class ObjectCache<T, Option::Single, Allocator> {
     // Returns the raw memory for the slab to the allocator when the last
     // reference is released.
     static void operator delete(void* slab, size_t size) {
-      LocalTraceDuration<Detail> trace{"Slab::delete"_intern};
+      ktrace::Scope trace =
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::delete");
       DEBUG_ASSERT(size == sizeof(Slab));
       Allocator::CountSlabFree();
       Allocator::Release(slab);
@@ -388,7 +393,8 @@ class ObjectCache<T, Option::Single, Allocator> {
     static auto& node_state(Slab& slab) { return slab.control.list_node; }
 
     void SetOrphan() {
-      LocalTraceDuration<Detail> trace{"Slab::SetOrphan"_intern};
+      ktrace::Scope trace =
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::SetOrphan");
       control.orphan_flag = true;
     }
 
@@ -410,7 +416,8 @@ class ObjectCache<T, Option::Single, Allocator> {
     // Allocates an entry from the slab and moves the slab to the appropriate
     // list in the cache. The caller must hold a reference to this slab.
     zx::result<Entry*> Allocate() {
-      LocalTraceDuration<Detail> trace{"Slab::Allocate"_intern};
+      ktrace::Scope trace =
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::Allocate");
 
       Guard<Mutex> slab_guard{&control.lock};
       DEBUG_ASSERT(!is_orphan());
@@ -455,7 +462,8 @@ class ObjectCache<T, Option::Single, Allocator> {
     // Returns the given entry to the free list. The caller must hold a
     // reference to the slab.
     void Free(void* pointer) {
-      LocalTraceDuration<Detail> trace{"Slab::Free"_intern};
+      ktrace::Scope trace =
+          KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::Free");
       Entry* entry = reinterpret_cast<Entry*>(pointer);
       DEBUG_ASSERT(entry >= entries.begin() && entry < entries.end());
 
@@ -512,7 +520,8 @@ class ObjectCache<T, Option::Single, Allocator> {
   // Returns a reference to a slab with at least one available entry. Allocates
   // a new slab if no slabs have available entries.
   zx::result<SlabPtr> GetSlab() TA_EXCL(lock_) {
-    LocalTraceDuration<Detail> trace{"ObjectCache::GetSlab"_intern};
+    ktrace::Scope trace =
+        KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::GetSlab");
     Guard<Mutex> guard{&lock_};
 
     if (partial_list_.is_empty() && empty_list_.is_empty()) {
@@ -525,7 +534,8 @@ class ObjectCache<T, Option::Single, Allocator> {
 
   // Allocates a new slab and adds it to the empty list.
   zx::result<Slab*> AllocateSlab() TA_REQ(lock_) {
-    LocalTraceDuration<Detail> trace{"ObjectCache::AllocateSlab"_intern};
+    ktrace::Scope trace =
+        KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::AllocateSlab");
 
     zx::result<void*> result = Allocator::Allocate();
     if (result.is_ok()) {
@@ -547,7 +557,8 @@ class ObjectCache<T, Option::Single, Allocator> {
 
   // Removes the given slab from this cache.
   void RemoveSlab(Slab* slab) TA_REQ(lock_) {
-    LocalTraceDuration<Detail> trace{"ObjectCache::RemoveSlab"_intern};
+    ktrace::Scope trace =
+        KTRACE_BEGIN_SCOPE_ENABLE(kTraceLevel >= kDetail, "kernel:sched", "Slab::RemoveSlab");
     empty_list_.erase(*slab);
     slab_count_--;
   }

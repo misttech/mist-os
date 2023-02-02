@@ -539,7 +539,7 @@ void VmAspace::AttachToThread(Thread* t) {
 }
 
 zx_status_t VmAspace::PageFault(vaddr_t va, uint flags) {
-  VM_KTRACE_DURATION(2, "VmAspace::PageFault", va, flags);
+  VM_KTRACE_DURATION(2, "VmAspace::PageFault", ("va", va), ("flags", flags));
   canary_.Assert();
   LTRACEF("va %#" PRIxPTR ", flags %#x\n", va, flags);
 
@@ -590,7 +590,7 @@ zx_status_t VmAspace::SoftFault(vaddr_t va, uint flags) {
 }
 
 zx_status_t VmAspace::AccessedFault(vaddr_t va) {
-  VM_KTRACE_DURATION(2, "VmAspace::AccessedFault", va, 0);
+  VM_KTRACE_DURATION(2, "VmAspace::AccessedFault", ("va", ktrace::Pointer{va}));
   // There are no permissions etc associated with accessed bits so we can skip any vmar walking and
   // just let the hardware aspace walk for the virtual address.
   // Similar to a page fault, multiple additional pages in the page table will be marked active to

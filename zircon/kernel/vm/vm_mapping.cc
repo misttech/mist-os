@@ -811,7 +811,10 @@ zx_status_t VmMapping::DestroyLocked() {
 }
 
 zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageRequest* page_request) {
-  VM_KTRACE_DURATION(2, "VmMapping::PageFault", va, pf_flags);
+  VM_KTRACE_DURATION(
+      2, "VmMapping::PageFault",
+      ("user_id", KTRACE_ANNOTATED_VALUE(AssertHeld(lock_ref()), object_->user_id())),
+      ("va", ktrace::Pointer{va}));
   canary_.Assert();
 
   DEBUG_ASSERT(is_in_range(va, 1));
@@ -947,7 +950,7 @@ zx_status_t VmMapping::PageFault(vaddr_t va, const uint pf_flags, LazyPageReques
   }
 #endif
 
-  VM_KTRACE_DURATION(2, "map_page", va, pf_flags);
+  VM_KTRACE_DURATION(2, "map_page", ("va", ktrace::Pointer{va}), ("pf_flags", pf_flags));
 
   // see if something is mapped here now
   // this may happen if we are one of multiple threads racing on a single address

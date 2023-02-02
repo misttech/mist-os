@@ -290,10 +290,7 @@ zx::result<> Vcpu::Enter(zx_port_packet_t& packet) {
         return zx::error(ZX_ERR_CANCELED);
       }
 
-      if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
-        fxt_duration_begin("kernel:vcpu"_category, current_ticks(), current_thread->fxt_ref(),
-                           fxt::StringRef{"vcpu"_intern});
-      }
+      KTRACE_DURATION_BEGIN("kernel:vcpu", "vcpu");
 
       GUEST_STATS_INC(vm_entries);
       status = arm64_el2_enter(vttbr, el2_state_.PhysicalAddress(), hcr_);

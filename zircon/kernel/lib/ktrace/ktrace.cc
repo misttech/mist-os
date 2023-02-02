@@ -92,8 +92,8 @@ void ktrace_report_cpu_pseudo_threads() {
   char name[32];
   for (uint i = 0; i < max_cpus; i++) {
     snprintf(name, sizeof(name), "cpu-%u", i);
-    fxt_kernel_object(ktrace::CpuContextMap::GetCpuKoid(i), ZX_OBJ_TYPE_THREAD,
-                      fxt::StringRef(name), fxt::Argument{"process"_intern, fxt::Koid{kNoProcess}});
+    KTRACE_KERNEL_OBJECT_ALWAYS(ktrace::CpuContextMap::GetCpuKoid(i), ZX_OBJ_TYPE_THREAD, name,
+                                ("process", kNoProcess));
   }
 }
 
@@ -600,15 +600,9 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr) {
   switch (action) {
     case KTRACE_ACTION_START:
     case KTRACE_ACTION_START_CIRCULAR: {
-      StartMode start_mode =
+      const StartMode start_mode =
           (action == KTRACE_ACTION_START) ? StartMode::Saturate : StartMode::Circular;
-
-      zx_status_t res = KTRACE_STATE.Start(options ? options : KTRACE_GRP_ALL, start_mode);
-      if (res == ZX_OK) {
-        ktrace_probe(TraceAlways, TraceContext::Thread, "ktrace_ready"_intern);
-      }
-
-      return res;
+      return KTRACE_STATE.Start(options ? options : KTRACE_GRP_ALL, start_mode);
     }
 
     case KTRACE_ACTION_STOP:

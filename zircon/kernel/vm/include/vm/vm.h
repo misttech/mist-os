@@ -33,28 +33,21 @@
 #define VM_MAKE_UNIQUE_TOKEN2(a, b) VM_MAKE_UNIQUE_TOKEN3(a, b)
 #define VM_MAKE_UNIQUE_TOKEN(a) VM_MAKE_UNIQUE_TOKEN2(a, __LINE__)
 
-#define VM_KTRACE_DURATION(level, string, args...)                                  \
-  TraceDuration<TraceEnabled<VM_KTRACE_LEVEL_ENABLED(level)>, "kernel:vm"_category, \
-                TraceContext::Thread>                                               \
-  VM_MAKE_UNIQUE_TOKEN(_duration_) {                                                \
-    KTRACE_INTERN_STRING(string), ##args                                            \
-  }
+#define VM_KTRACE_DURATION(level, string, args...) \
+  ktrace::Scope VM_MAKE_UNIQUE_TOKEN(_duration_) = \
+      KTRACE_BEGIN_SCOPE_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, ##args)
 
-#define VM_KTRACE_DURATION_BEGIN(level, string, args...)                                  \
-  ktrace_begin_duration(LocalTrace<VM_KTRACE_LEVEL_ENABLED(level)>, "kernel:vm"_category, \
-                        TraceContext::Thread, KTRACE_INTERN_STRING(string), ##args)
+#define VM_KTRACE_DURATION_BEGIN(level, string, args...) \
+  KTRACE_DURATION_BEGIN_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, ##args)
 
-#define VM_KTRACE_DURATION_END(level, string, args...)                                  \
-  ktrace_end_duration(LocalTrace<VM_KTRACE_LEVEL_ENABLED(level)>, "kernel:vm"_category, \
-                      TraceContext::Thread, KTRACE_INTERN_STRING(string), ##args)
+#define VM_KTRACE_DURATION_END(level, string, args...) \
+  KTRACE_DURATION_END_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, ##args)
 
-#define VM_KTRACE_FLOW_BEGIN(level, string, flow_id, args...)                         \
-  ktrace_flow_begin(LocalTrace<VM_KTRACE_LEVEL_ENABLED(level)>, "kernel:vm"_category, \
-                    TraceContext::Thread, KTRACE_INTERN_STRING(string), flow_id, ##args)
+#define VM_KTRACE_FLOW_BEGIN(level, string, flow_id, args...) \
+  KTRACE_FLOW_BEGIN_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, flow_id, ##args)
 
-#define VM_KTRACE_FLOW_END(level, string, flow_id, args...)                         \
-  ktrace_flow_end(LocalTrace<VM_KTRACE_LEVEL_ENABLED(level)>, "kernel:vm"_category, \
-                  TraceContext::Thread, KTRACE_INTERN_STRING(string), flow_id, ##args)
+#define VM_KTRACE_FLOW_END(level, string, flow_id, args...) \
+  KTRACE_FLOW_END_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, flow_id, ##args)
 
 class VmAspace;
 

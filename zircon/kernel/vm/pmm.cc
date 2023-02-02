@@ -82,33 +82,33 @@ zx_status_t pmm_get_arena_info(size_t count, uint64_t i, pmm_arena_info_t* buffe
 }
 
 zx_status_t pmm_alloc_page(uint alloc_flags, paddr_t* pa) {
-  VM_KTRACE_DURATION(3, "pmm_alloc_page");
+  VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
   return pmm_node.AllocPage(alloc_flags, nullptr, pa);
 }
 
 zx_status_t pmm_alloc_page(uint alloc_flags, vm_page_t** page) {
-  VM_KTRACE_DURATION(3, "pmm_alloc_page");
+  VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
   return pmm_node.AllocPage(alloc_flags, page, nullptr);
 }
 
 zx_status_t pmm_alloc_page(uint alloc_flags, vm_page_t** page, paddr_t* pa) {
-  VM_KTRACE_DURATION(3, "pmm_alloc_page");
+  VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
   return pmm_node.AllocPage(alloc_flags, page, pa);
 }
 
 zx_status_t pmm_alloc_pages(size_t count, uint alloc_flags, list_node* list) {
-  VM_KTRACE_DURATION(3, "pmm_alloc_pages");
+  VM_KTRACE_DURATION(3, "pmm_alloc_pages", ("count", count), ("alloc_flags", alloc_flags));
   return pmm_node.AllocPages(count, alloc_flags, list);
 }
 
 zx_status_t pmm_alloc_range(paddr_t address, size_t count, list_node* list) {
-  VM_KTRACE_DURATION(3, "pmm_alloc_range");
+  VM_KTRACE_DURATION(3, "pmm_alloc_range", ("address", ktrace::Pointer{address}), ("count", count));
   return pmm_node.AllocRange(address, count, list);
 }
 
 zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t alignment_log2,
                                  paddr_t* pa, list_node* list) {
-  VM_KTRACE_DURATION(3, "pmm_alloc_contiguous");
+  VM_KTRACE_DURATION(3, "pmm_alloc_contiguous", ("count", count), ("alloc_flags", alloc_flags));
   // if we're called with a single page, just fall through to the regular allocation routine
   if (unlikely(count == 1 && alignment_log2 <= PAGE_SIZE_SHIFT)) {
     vm_page_t* page;
@@ -129,17 +129,18 @@ void pmm_begin_loan(list_node* page_list) {
 }
 
 void pmm_cancel_loan(paddr_t address, size_t count) {
-  VM_KTRACE_DURATION(3, "pmm_cancel_loan");
+  VM_KTRACE_DURATION(3, "pmm_cancel_loan", ("address", ktrace::Pointer{address}), ("count", count));
   pmm_node.CancelLoan(address, count);
 }
 
 void pmm_end_loan(paddr_t address, size_t count, list_node* page_list) {
-  VM_KTRACE_DURATION(3, "pmm_end_loan");
+  VM_KTRACE_DURATION(3, "pmm_end_loan", ("address", ktrace::Pointer{address}), ("count", count));
   pmm_node.EndLoan(address, count, page_list);
 }
 
 void pmm_delete_lender(paddr_t address, size_t count) {
-  VM_KTRACE_DURATION(3, "pmm_delete_lender");
+  VM_KTRACE_DURATION(3, "pmm_delete_lender", ("address", ktrace::Pointer{address}),
+                     ("count", count));
   pmm_node.DeleteLender(address, count);
 }
 

@@ -57,32 +57,19 @@ static_assert((sizeof(vcpu_exit) / sizeof(vcpu_exit[0])) == VCPU_EXIT_COUNT,
               "vcpu_exit array must match enum VcpuExit");
 
 void ktrace_vcpu(VcpuBlockOp block_op, VcpuMeta meta) {
-  if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
-    const fxt::ThreadRef thread = ThreadRefFromContext(TraceContext::Thread);
-    const fxt::Argument arg = {"meta #"_intern, meta};
-    const fxt::StringRef name = meta < VCPU_META_COUNT ? vcpu_meta[meta] : "vcpu meta"_intern;
-    if (block_op == VCPU_BLOCK) {
-      fxt_duration_begin("kernel:vcpu"_category, current_ticks(), thread, name, arg);
-    } else if (block_op == VCPU_UNBLOCK) {
-      fxt_duration_end("kernel:vcpu"_category, current_ticks(), thread, name, arg);
-    }
+  const fxt::StringRef name = meta < VCPU_META_COUNT ? vcpu_meta[meta] : "vcpu meta"_intern;
+  if (block_op == VCPU_BLOCK) {
+    KTRACE_DURATION_BEGIN_LABEL_REF("kernel:vcpu", name, ("meta #", meta));
+  } else if (block_op == VCPU_UNBLOCK) {
+    KTRACE_DURATION_END_LABEL_REF("kernel:vcpu", name);
   }
 }
 
 void ktrace_vcpu_exit(VcpuExit exit, uint64_t exit_address) {
-  if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
-    const fxt::ThreadRef thread = ThreadRefFromContext(TraceContext::Thread);
-    const fxt::Argument addr_arg = {"exit_address"_intern, exit_address};
-    const fxt::StringRef name = "vcpu"_intern;
-
-    if (exit < VCPU_EXIT_COUNT) {
-      const fxt::Argument exit_type_arg = {"exit_address"_intern, vcpu_exit[exit]};
-      fxt_duration_end("kernel:vcpu"_category, current_ticks(), thread, name, addr_arg,
-                       exit_type_arg);
-    } else {
-      const fxt::Argument exit_type_arg = {"exit_address"_intern, exit};
-      fxt_duration_end("kernel:vcpu"_category, current_ticks(), thread, name, addr_arg,
-                       exit_type_arg);
-    }
+  if (exit < VCPU_EXIT_COUNT) {
+    KTRACE_DURATION_END("kernel:vcpu", "vcpu", ("exit_address", exit_address),
+                        ("exit_type", vcpu_exit[exit]));
+  } else {
+    KTRACE_DURATION_END("kernel:vcpu", "vcpu", ("exit_address", exit_address), ("exit_type", exit));
   }
 }

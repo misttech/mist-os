@@ -528,20 +528,8 @@ extern "C" void arm64_serror_exception(iframe_t* iframe, uint exception_flags);
 extern "C" void arm64_serror_exception(iframe_t* iframe, uint exception_flags) {
   // SError is largely implementation defined and may or may not be fatal. For now, just count the
   // occurrences and add a tracer to help analyze possible causes.
-
-  if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
-    fxt_duration_begin("kernel:irq"_category, current_ticks(),
-                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
-                       fxt::Argument{"irq #"_intern, 0xaa55});
-  }
-
+  ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE("kernel:irq", "irq", ("irq #", "SError"));
   exceptions_serror.Add(1);
-
-  if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
-    fxt_duration_end("kernel:irq"_category, current_ticks(),
-                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
-                     fxt::Argument{"irq #"_intern, 0xaa55});
-  }
 }
 
 /* called from assembly */

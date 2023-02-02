@@ -467,6 +467,15 @@ class Scheduler {
   mutable DECLARE_SPINLOCK_WITH_TYPE(Scheduler, MonitoredSpinLock,
                                      lockdep::LockFlagsLeaf) queue_lock_;
 
+  // Alias of the queue lock wrapper type.
+  using QueueLock = decltype(queue_lock_);
+
+  // Simplified static assertion on the wrapped queue lock type to avoid the more verbose template
+  // parameters required by lockdep::AssertHeld.
+  static void AssertHeld(const QueueLock& lock) TA_ASSERT(lock) TA_ASSERT(lock.lock()) {
+    lock.lock().AssertHeld();
+  }
+
   // The run queue of fair scheduled threads ready to run, but not currently running.
   TA_GUARDED(queue_lock_)
   RunQueue fair_run_queue_;

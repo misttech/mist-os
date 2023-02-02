@@ -340,11 +340,7 @@ static void gic_handle_irq(iframe_t* frame) {
     CPU_STATS_INC(interrupts);
   }
 
-  if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
-    fxt_duration_begin("kernel:irq"_category, current_ticks(),
-                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
-                       fxt::Argument{"irq #"_intern, vector});
-  }
+  ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE("kernel:irq", "irq", ("irq #", vector));
 
   LTRACEF_LEVEL(2, "iar 0x%x cpu %u currthread %p vector %u pc %#" PRIxPTR "\n", iar,
                 arch_curr_cpu_num(), Thread::Current::Get(), vector, (uintptr_t)IFRAME_PC(frame));
@@ -354,12 +350,6 @@ static void gic_handle_irq(iframe_t* frame) {
   gic_write_eoir(vector);
 
   LTRACEF_LEVEL(2, "cpu %u exit\n", arch_curr_cpu_num());
-
-  if (unlikely(ktrace_category_enabled("kernel:irq"_category))) {
-    fxt_duration_end("kernel:irq"_category, current_ticks(),
-                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
-                     fxt::Argument{"irq #"_intern, vector});
-  }
 }
 
 static void gic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) {

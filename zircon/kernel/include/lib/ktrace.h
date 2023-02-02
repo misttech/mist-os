@@ -738,62 +738,8 @@ static inline uint64_t ktrace_timestamp() { return current_ticks(); }
 using fxt::operator""_category;
 using fxt::operator""_intern;
 
-// Indicate that the current time should be recorded when writing a trace record.
-//
-// Used for ktrace calls which accept a custom timestamp as a parameter.
-inline constexpr uint64_t kRecordCurrentTimestamp = 0xffffffff'ffffffff;
-
-// Utility macro to convert string literals passed to local tracing macros into
-// fxt::InternedString literals.
-//
-// Example:
-//
-// #define LOCAL_KTRACE_ENABLE 0
-//
-// #define LOCAL_KTRACE(string, args...)
-//     ktrace_probe(LocalTrace<LOCAL_KTRACE_ENABLE>, TraceContext::Cpu,
-//                  KTRACE_INTERN_STRING(string), ##args)
-//
-#define KTRACE_INTERN_STRING_CAT(a, b) a##b
-#define KTRACE_INTERN_STRING(string) KTRACE_INTERN_STRING_CAT(string, _intern)
-
 inline bool ktrace_category_enabled(const fxt::InternedCategory& category) {
   return ktrace_thunks::category_enabled(category);
-}
-
-template <bool enabled>
-inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
-                         const fxt::InternedString& label) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled("kernel:probe"_category)) {
-      ktrace_thunks::fxt_instant("kernel:probe"_category, current_ticks(),
-                                 ThreadRefFromContext(context), fxt::StringRef{label});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
-                         const fxt::InternedString& label, uint32_t a, uint32_t b) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled("kernel:probe"_category)) {
-      ktrace_thunks::fxt_instant("kernel:probe"_category, current_ticks(),
-                                 ThreadRefFromContext(context), fxt::StringRef(label),
-                                 fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
-                         const fxt::InternedString& label, uint64_t a) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled("kernel:probe"_category)) {
-      ktrace_thunks::fxt_instant("kernel:probe"_category, current_ticks(),
-                                 ThreadRefFromContext(context), fxt::StringRef{label},
-                                 fxt::Argument{"arg0"_intern, a});
-    }
-  }
 }
 
 template <bool enabled>
@@ -804,104 +750,6 @@ inline void ktrace_probe(TraceEnabled<enabled>, TraceContext context,
       ktrace_thunks::fxt_instant("kernel:probe"_category, current_ticks(),
                                  ThreadRefFromContext(context), fxt::StringRef{label},
                                  fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_begin_duration(TraceEnabled<enabled>, const fxt::InternedCategory& category,
-                                  TraceContext context, const fxt::InternedString& label) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled(category)) {
-      ktrace_thunks::fxt_duration_begin(category, current_ticks(), ThreadRefFromContext(context),
-                                        fxt::StringRef{label});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_end_duration(TraceEnabled<enabled>, const fxt::InternedCategory& category,
-                                TraceContext context, const fxt::InternedString& label) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled(category)) {
-      ktrace_thunks::fxt_duration_end(category, current_ticks(), ThreadRefFromContext(context),
-                                      fxt::StringRef{label});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_begin_duration(TraceEnabled<enabled>, const fxt::InternedCategory& category,
-                                  TraceContext context, const fxt::InternedString& label,
-                                  uint64_t a, uint64_t b) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled(category)) {
-      ktrace_thunks::fxt_duration_begin(category, current_ticks(), ThreadRefFromContext(context),
-                                        fxt::StringRef{label}, fxt::Argument{"arg0"_intern, a},
-                                        fxt::Argument{"arg1"_intern, b});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_end_duration(TraceEnabled<enabled>, const fxt::InternedCategory& category,
-                                TraceContext context, const fxt::InternedString& label, uint64_t a,
-                                uint64_t b) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled(category)) {
-      ktrace_thunks::fxt_duration_end(category, current_ticks(), ThreadRefFromContext(context),
-                                      fxt::StringRef{label}, fxt::Argument{"arg0"_intern, a},
-                                      fxt::Argument{"arg1"_intern, b});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_flow_begin(TraceEnabled<enabled>, const fxt::InternedCategory& category,
-                              TraceContext context, const fxt::InternedString& label,
-                              uint64_t flow_id, uint64_t a = 0) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled(category)) {
-      ktrace_thunks::fxt_flow_begin(category, current_ticks(), ThreadRefFromContext(context),
-                                    fxt::StringRef{label}, flow_id,
-                                    fxt::Argument{"arg0"_intern, a});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_flow_end(TraceEnabled<enabled>, const fxt::InternedCategory& category,
-                            TraceContext context, const fxt::InternedString& label,
-                            uint64_t flow_id, uint64_t a = 0) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled(category)) {
-      ktrace_thunks::fxt_flow_end(category, current_ticks(), ThreadRefFromContext(context),
-                                  fxt::StringRef{label}, flow_id, fxt::Argument{"arg0"_intern, a});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_flow_step(TraceEnabled<enabled>, const fxt::InternedCategory& category,
-                             TraceContext context, const fxt::InternedString& label,
-                             uint64_t flow_id, uint64_t a = 0) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled(category)) {
-      ktrace_thunks::fxt_flow_step(category, current_ticks(), ThreadRefFromContext(context),
-                                   fxt::StringRef{label}, flow_id, fxt::Argument{"arg0"_intern, a});
-    }
-  }
-}
-
-template <bool enabled>
-inline void ktrace_counter(TraceEnabled<enabled>, const fxt::InternedCategory& category,
-                           const fxt::InternedString& label, int64_t value,
-                           uint64_t counter_id = 0) {
-  if constexpr (enabled) {
-    if (ktrace_thunks::category_enabled(category)) {
-      ktrace_thunks::fxt_counter(category, current_ticks(), ThreadRefFromContext(TraceContext::Cpu),
-                                 fxt::StringRef{label}, counter_id,
-                                 fxt::Argument{"arg0"_intern, value});
     }
   }
 }
@@ -1009,58 +857,6 @@ zx_status_t ktrace_control(uint32_t action, uint32_t options, void* ptr);
 
 void ktrace_report_live_threads();
 void ktrace_report_live_processes();
-
-// RAII type that emits begin/end duration events covering the lifetime of the
-// instance for use in tracing scopes.
-// TODO(eieio): Add option to combine begin/end traces as a single complete
-// event for better trace buffer efficiency.
-template <typename Enabled, const fxt::InternedCategory& category,
-          TraceContext = TraceContext::Thread>
-class TraceDuration;
-
-template <bool enabled, const fxt::InternedCategory& category, TraceContext context>
-class TraceDuration<TraceEnabled<enabled>, category, context> {
- public:
-  explicit TraceDuration(const fxt::InternedString& label) : label_{&label} {
-    ktrace_begin_duration(TraceEnabled<enabled>{}, category, context, label);
-  }
-  TraceDuration(const fxt::InternedString& label, uint64_t a, uint64_t b) : label_{&label} {
-    ktrace_begin_duration(TraceEnabled<enabled>{}, category, context, label, a, b);
-  }
-
-  ~TraceDuration() { End(); }
-
-  TraceDuration(const TraceDuration&) = delete;
-  TraceDuration& operator=(const TraceDuration&) = delete;
-  TraceDuration(TraceDuration&&) = delete;
-  TraceDuration& operator=(TraceDuration&&) = delete;
-
-  // Emits the end trace early, before this instance destructs.
-  void End() {
-    if (label_) {
-      ktrace_end_duration(TraceEnabled<enabled>{}, category, context, *label_);
-      label_ = nullptr;
-    }
-  }
-  // Similar to the overload above, taking the given arguments for the end
-  // event.
-  void End(uint64_t a, uint64_t b) {
-    if (label_) {
-      ktrace_end_duration(TraceEnabled<enabled>{}, category, context, *label_, a, b);
-      label_ = nullptr;
-    }
-  }
-
-  // Returns a callable to complete this duration trace. This is useful to
-  // delegate closing the duration to a callee. The lifetime of the
-  // TraceDuration instance must not end before the completer is invoked.
-  auto Completer() {
-    return [this]() { End(); };
-  }
-
- private:
-  const fxt::InternedString* label_;
-};
 
 namespace ktrace {
 

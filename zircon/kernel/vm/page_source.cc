@@ -398,7 +398,8 @@ void PageSource::SendRequestToProviderLocked(PageRequest* request) {
 }
 
 void PageSource::CompleteRequestLocked(PageRequest* request, zx_status_t status) {
-  VM_KTRACE_DURATION(1, "page_request_complete", request->offset_, request->len_);
+  VM_KTRACE_DURATION(1, "page_request_complete", ("offset", request->offset_),
+                     ("len", request->len_));
   DEBUG_ASSERT(request->type_ < page_request_type::COUNT);
   DEBUG_ASSERT(page_provider_->SupportsPageRequestType(request->type_));
 
@@ -569,7 +570,7 @@ void PageRequest::Init(fbl::RefPtr<PageRequestInterface> src, uint64_t offset,
 
 zx_status_t PageRequest::Wait() {
   lockdep::AssertNoLocksHeld();
-  VM_KTRACE_DURATION(1, "page_request_wait", offset_, len_);
+  VM_KTRACE_DURATION(1, "page_request_wait", ("offset", offset_), ("len", len_));
   // It is possible that between this request being send to the provider and here that is has
   // already been completed. This means we cannot check offset_ to determine if the request has been
   // initialized or not, since it could legitimately have already been completed and cleared.

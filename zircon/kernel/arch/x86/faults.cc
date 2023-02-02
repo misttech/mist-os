@@ -498,28 +498,14 @@ void x86_exception_handler(iframe_t* frame) {
   int_handler_start(&state);
 
   // did we come from user or kernel space?
-  bool from_user = is_from_user(frame);
-
+  const bool from_user = is_from_user(frame);
   const auto entry_vector = frame->vector;
-  if (entry_vector != X86_INT_PAGE_FAULT &&
-      unlikely(ktrace_category_enabled("kernel:irq"_category))) {
-    // For page faults, the cpu number for the IRQ_ENTER event might be different from the IRQ_EXIT
-    // event. A context switch can occur if the page fault is fulfilled asynchronously by a pager.
-    // Hence page fault events are emitted in the thread context, not the cpu context like other
-    // irq's. See TAG_PAGE_FAULT in vmm_page_fault_handler().
-    fxt_duration_begin("kernel:irq"_category, current_ticks(),
-                       ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
-                       fxt::Argument{"irq #"_intern, entry_vector});
-  }
 
-  // deliver the interrupt
-  handle_exception_types(frame);
-
-  if (entry_vector != X86_INT_PAGE_FAULT &&
-      unlikely(ktrace_category_enabled("kernel:irq"_category))) {
-    fxt_duration_end("kernel:irq"_category, current_ticks(),
-                     ThreadRefFromContext(TraceContext::Cpu), fxt::StringRef{"irq"_intern},
-                     fxt::Argument{"irq #"_intern, entry_vector});
+  {
+    ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_COND(entry_vector != X86_INT_PAGE_FAULT,
+                                                      "kernel:irq", "irq", ("irq #", entry_vector));
+    // deliver the interrupt
+    handle_exception_types(frame);
   }
 
   bool do_preempt = int_handler_finish(&state);

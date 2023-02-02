@@ -49,12 +49,8 @@
 /* ktraces just local to this file */
 #define LOCAL_KTRACE_ENABLE 0
 
-#define LOCAL_KTRACE(string, args...)                                                            \
-  ktrace_probe(LocalTrace<LOCAL_KTRACE_ENABLE>, TraceContext::Cpu, KTRACE_INTERN_STRING(string), \
-               ##args)
-
-using LocalTraceDuration =
-    TraceDuration<TraceEnabled<LOCAL_KTRACE_ENABLE>, "kernel:vm"_category, TraceContext::Thread>;
+#define LOCAL_KTRACE(label, args...) \
+  KTRACE_CPU_INSTANT_ENABLE(LOCAL_KTRACE_ENABLE, "kernel:probe", label, ##args)
 
 // Use one of the ignored bits for a software simulated accessed flag for non-terminal entries.
 // TODO: Once the hardware setting of the terminal AF is supported usage of this for non-terminal AF
@@ -1053,7 +1049,8 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
   size_t harvested_size = 0;
 
   while (size > 0 && *entry_limit > 0) {
-    LocalTraceDuration trace{"page_table_loop"_intern};
+    ktrace::Scope trace =
+        KTRACE_BEGIN_SCOPE_ENABLE(LOCAL_KTRACE_ENABLE, "kernel:vm", "page_table_loop");
 
     const vaddr_t vaddr_rem = vaddr_rel & block_mask;
     const vaddr_t index = vaddr_rel >> index_shift;
@@ -1213,7 +1210,7 @@ ssize_t ArmArchVmAspace::MapPages(vaddr_t vaddr, paddr_t paddr, size_t size, pte
     return ZX_ERR_INVALID_ARGS;
   }
 
-  LOCAL_KTRACE("mmu map", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
+  LOCAL_KTRACE("mmu map", ("vaddr", vaddr), ("size", size));
   ssize_t ret = MapPageTable(vaddr, vaddr_rel, paddr, size, attrs, top_index_shift_, tt_virt_, cm);
   return ret;
 }
@@ -1231,7 +1228,7 @@ ssize_t ArmArchVmAspace::UnmapPages(vaddr_t vaddr, size_t size, EnlargeOperation
     return ZX_ERR_INVALID_ARGS;
   }
 
-  LOCAL_KTRACE("mmu unmap", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
+  LOCAL_KTRACE("mmu unmap", ("vaddr", vaddr), ("size", size));
 
   ssize_t ret = UnmapPageTable(vaddr, vaddr_rel, size, enlarge, top_index_shift_, tt_virt_, cm);
   return ret;
@@ -1252,7 +1249,7 @@ zx_status_t ArmArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t attr
     return ZX_ERR_INVALID_ARGS;
   }
 
-  LOCAL_KTRACE("mmu protect", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
+  LOCAL_KTRACE("mmu protect", ("vaddr", vaddr), ("size", size));
 
   zx_status_t ret = ProtectPageTable(vaddr, vaddr_rel, size, attrs, top_index_shift_, tt_virt_, cm);
   return ret;
@@ -1526,7 +1523,7 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
 zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
                                              NonTerminalAction non_terminal_action,
                                              TerminalAction terminal_action) {
-  VM_KTRACE_DURATION(2, "ArmArchVmAspace::HarvestAccessed", vaddr, count);
+  VM_KTRACE_DURATION(2, "ArmArchVmAspace::HarvestAccessed", ("vaddr", vaddr), ("count", count));
   canary_.Assert();
 
   if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
@@ -1551,8 +1548,7 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  LOCAL_KTRACE("mmu harvest accessed",
-               (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
+  LOCAL_KTRACE("mmu harvest accessed", ("vaddr", vaddr), ("size", size));
 
   // Limit harvesting to 32 entries per iteration with the arch aspace lock held
   // to avoid delays in accessed faults in the same aspace running in parallel.
@@ -1586,7 +1582,8 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
   vaddr_t current_vaddr_rel = vaddr_rel;
 
   while (remaining_size) {
-    LocalTraceDuration trace{"harvest_loop"_intern};
+    ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
+        LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));
     size_t entry_limit = kMaxEntriesPerIteration;
     const size_t harvested_size = HarvestAccessedPageTable(
         &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
@@ -1614,7 +1611,7 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
 }
 
 zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
-  VM_KTRACE_DURATION(2, "ArmArchVmAspace::MarkAccessed", vaddr, count);
+  VM_KTRACE_DURATION(2, "ArmArchVmAspace::MarkAccessed", ("vaddr", vaddr), ("count", count));
   canary_.Assert();
 
   if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
@@ -1635,7 +1632,7 @@ zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  LOCAL_KTRACE("mmu mark accessed", (vaddr & ~PAGE_MASK) | ((size >> PAGE_SIZE_SHIFT) & PAGE_MASK));
+  LOCAL_KTRACE("mmu mark accessed", ("vaddr", vaddr), ("size", size));
 
   ConsistencyManager cm(*this);
 

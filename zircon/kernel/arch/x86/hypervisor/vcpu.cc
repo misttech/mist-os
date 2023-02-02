@@ -961,10 +961,7 @@ zx::result<> Vcpu::EnterInternal(PreEnterFn pre_enter, PostExitFn post_exit,
       mds_buff_overwrite();
     }
 
-    if (unlikely(ktrace_category_enabled("kernel:vcpu"_category))) {
-      fxt_duration_begin("kernel:vcpu"_category, current_ticks(), current_thread->fxt_ref(),
-                         fxt::StringRef{"vcpu"_intern});
-    }
+    KTRACE_DURATION_BEGIN("kernel:vcpu", "vcpu");
 
     GUEST_STATS_INC(vm_entries);
     result = vmx_enter(&vmx_state_);

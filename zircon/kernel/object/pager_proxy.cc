@@ -88,7 +88,7 @@ void PagerProxy::QueuePacketLocked(PageRequest* request) {
     DEBUG_ASSERT(!add_overflow(offset, length, &unused));
 
     // Trace flow events require an enclosing duration.
-    VM_KTRACE_DURATION(1, "page_request_queue", offset, length);
+    VM_KTRACE_DURATION(1, "page_request_queue", ("offset", offset), ("length", length));
     VM_KTRACE_FLOW_BEGIN(1, "page_request_queue", reinterpret_cast<uintptr_t>(&packet_));
   } else {
     offset = length = 0;
@@ -117,8 +117,12 @@ void PagerProxy::ClearAsyncRequest(PageRequest* request) {
   if (request == active_request_) {
     if (request != &complete_request_) {
       // Trace flow events require an enclosing duration.
-      VM_KTRACE_DURATION(1, "page_request_queue", GetRequestOffset(active_request_),
-                         GetRequestLen(active_request_));
+      VM_KTRACE_DURATION(
+          1, "page_request_queue",
+          ("request offset",
+           KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestOffset(active_request_))),
+          ("request len",
+           KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestLen(active_request_))));
       VM_KTRACE_FLOW_END(1, "page_request_queue", reinterpret_cast<uintptr_t>(&packet_));
     }
     // This request is being taken back by the PageSource, so we can't hold a reference to it
@@ -242,8 +246,12 @@ void PagerProxy::Free(PortPacket* packet) {
     // ClearAsyncRequest. So we are responsible for relinquishing ownership of the request.
     if (active_request_ != nullptr) {
       // Trace flow events require an enclosing duration.
-      VM_KTRACE_DURATION(1, "page_request_queue", GetRequestOffset(active_request_),
-                         GetRequestLen(active_request_));
+      VM_KTRACE_DURATION(
+          1, "page_request_queue",
+          ("request offset",
+           KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestOffset(active_request_))),
+          ("request len",
+           KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestLen(active_request_))));
       VM_KTRACE_FLOW_END(1, "page_request_queue", reinterpret_cast<uintptr_t>(packet));
       active_request_ = nullptr;
     }

@@ -2281,7 +2281,10 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
                                           DirtyTrackingAction mark_dirty, uint64_t max_out_pages,
                                           uint64_t max_waitable_pages, list_node* alloc_list,
                                           LazyPageRequest* page_request, LookupInfo* out) {
-  VM_KTRACE_DURATION(2, "VmCowPages::LookupPagesLocked", page_attribution_user_id_, offset);
+  VM_KTRACE_DURATION(2, "VmCowPages::LookupPagesLocked",
+                     ("page_attribution_user_id",
+                      KTRACE_ANNOTATED_VALUE(AssertHeld(lock_ref()), page_attribution_user_id_)),
+                     ("offset", offset));
   canary_.Assert();
   DEBUG_ASSERT(!is_hidden_locked());
   DEBUG_ASSERT(out);

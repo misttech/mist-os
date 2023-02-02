@@ -133,11 +133,8 @@
 
 #include <kernel/auto_preempt_disabler.h>
 
-using LocalTraceDuration =
-    TraceDuration<TraceEnabled<false>, "kernel:sched"_category, TraceContext::Thread>;
-
 #define LOCAL_TRACE_DURATION(label, name, ...) \
-  LocalTraceDuration name { KTRACE_INTERN_STRING(label), ##__VA_ARGS__ }
+  ktrace::Scope name = KTRACE_BEGIN_SCOPE_ENABLE(false, "kernel:sched", label, ##__VA_ARGS__)
 
 #define LOCAL_TRACE_DURATION_END(name) name.End()
 
@@ -854,7 +851,7 @@ static_assert(SizeToIndexAllocating(kHeapMaxAllocSize).rounded_up + sizeof(heade
               HEAP_LARGE_ALLOC_BYTES);
 
 NO_ASAN void* cmpct_alloc(size_t size) {
-  LOCAL_TRACE_DURATION("cmpct_alloc", trace, size, 0);
+  LOCAL_TRACE_DURATION("cmpct_alloc", trace, ("size", size));
 
   if (size == 0u) {
     return NULL;
@@ -1062,7 +1059,7 @@ NO_ASAN void cmpct_sized_free(void* payload, size_t s) {
 }
 
 NO_ASAN void* cmpct_memalign(size_t alignment, size_t size) {
-  LOCAL_TRACE_DURATION("cmpct_memalign", trace, alignment, size);
+  LOCAL_TRACE_DURATION("cmpct_memalign", trace, ("alignment", alignment), ("size", size));
   if (size == 0u) {
     return NULL;
   }
