@@ -31,6 +31,10 @@
             from: "#feedback",
             to: "#context_provider",
         },
+
+        // TODO(crbug.com/1280703): Remove the offers in this next block once
+        // context_provider.cm is launching web_instance.cm rather than
+        // web_instance.cmx.
         {
             protocol: [
                 "fuchsia.sys.Environment",
@@ -41,16 +45,19 @@
             dependency: "weak_for_migration",
         },
         {
+            directory: "config-data",
+            from: "parent",
+            as: "config-data-for-web-instance",
+            to: "#context_provider",
+            subdir: "web_engine",
+        },
+
+        // Required when contexts supporting networking are requested.
+        {
             directory: "root-ssl-certificates",
             from: "parent",
             to: "#context_provider",
             availability: "optional",
-        },
-        {
-            directory: "tzdata-icu-44-le",
-            from: "#tzdata-provider",
-            to: "#context_provider",
-            source_availability: "unknown",
         },
     ],
 }

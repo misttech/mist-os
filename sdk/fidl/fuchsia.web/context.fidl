@@ -64,6 +64,7 @@ type ContextFeatureFlags = strict bits : uint64 {
     /// - [`fuchsia.net.interfaces/State`]
     /// - [`fuchsia.net.name/Lookup`]
     /// - [`fuchsia.posix.socket/Provider`]
+    /// And a `root-ssl-certificates` directory containing `cert.pem`.
     NETWORK = 0x1;
 
     /// Enables audio input and output. Requires the following services:
