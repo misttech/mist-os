@@ -6,6 +6,7 @@
   "fidl_deps": [
     "fuchsia.media"
   ],
+  "fidl_binding_deps": [],
   "headers": [
     "pkg/media_cpp/include/lib/media/cpp/type_converters.h"
   ],

@@ -3,6 +3,7 @@
   "deps": [
     "media_cpp_no_converters"
   ],
+  "fidl_binding_deps": [],
   "fidl_deps": [
     "fuchsia.media"
   ],

@@ -291,6 +291,10 @@ class GNBuilder(Frontend):
             dep_name = dep
             library.deps.append('../../fidl/' + dep_name)
 
+        for layer in atom['fidl_binding_deps']:
+            for dep in layer['deps']:
+                library.deps.append('../../fidl/{}:{}_{}'.format(dep, dep, layer['binding_type']))
+
         library.includes = os.path.relpath(atom['include_dir'], atom['root'])
 
         self.write_file(os.path.join(base, 'BUILD.gn'), 'cc_library', library)

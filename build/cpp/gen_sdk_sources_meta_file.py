@@ -87,13 +87,15 @@ def main():
             if dep_name.endswith('banjo_cpp'):
                 banjo_deps.append(name)
             else:
-                fidl_deps.append(name)
                 # Layer here is defined to be "cpp" plus everything after
                 # "_cpp" in the dependency name
                 if "_cpp" in dep_name:
                     layer = "cpp" + dep_name.split("_cpp", maxsplit=1)[1]
                     fidl_layers[layer].append(name)
                 else:
+                    # There was no suffix, so this is either non-cpp binding dep or it's an hlcpp dep.
+                    # this covers both of those bases.
+                    fidl_deps.append(name)
                     fidl_layers["hlcpp"].append(name)
         else:
             raise Exception('Unsupported dependency type: %s' % type)

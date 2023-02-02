@@ -3,6 +3,7 @@
         "zircon"
     ],
     "fidl_deps": [],
+    "fidl_binding_deps": [],
     "name": "fuchsia",
     "root": "dart/fuchsia",
     "sources": [
