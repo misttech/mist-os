@@ -58,7 +58,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// # Parameters
     /// - `task`: The task to which the user buffers belong (i.e., the task to which the read bytes
     ///           are written.
-    /// - `user_buffers`: The buffers to write the read data into.
+    /// - `data`: The buffers to write the read data into.
     ///
     /// Returns the number of bytes that were written to the user buffers, as well as any ancillary
     /// data associated with the read messages.
@@ -66,7 +66,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         &self,
         socket: &Socket,
         current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno>;
 
@@ -74,7 +74,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     ///
     /// # Parameters
     /// - `task`: The task to which the user buffers belong, used to read the memory.
-    /// - `user_buffers`: The data to write to the socket.
+    /// - `data`: The data to write to the socket.
     /// - `ancillary_data`: Optional ancillary data (a.k.a., control message) to write.
     ///
     /// Returns the number of bytes that were read from the user buffers and written to the socket,
@@ -83,7 +83,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         &self,
         socket: &Socket,
         current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno>;
@@ -385,10 +385,10 @@ impl Socket {
     pub fn read(
         &self,
         current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        self.ops.read(self, current_task, user_buffers, flags)
+        self.ops.read(self, current_task, data, flags)
     }
 
     /// Reads all the available messages out of this socket, blocking if no messages are immediately
@@ -406,11 +406,11 @@ impl Socket {
     pub fn write(
         &self,
         current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        self.ops.write(self, current_task, user_buffers, dest_address, ancillary_data)
+        self.ops.write(self, current_task, data, dest_address, ancillary_data)
     }
 
     /// Writes the provided message into this socket. If the write succeeds, all the bytes were
@@ -478,7 +478,6 @@ impl AcceptQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mm::MemoryAccessor;
     use crate::testing::*;
 
     #[::fuchsia::test]
@@ -538,32 +537,25 @@ mod tests {
 
         let xfer_value: u64 = 1234567819;
         let xfer_bytes = xfer_value.to_ne_bytes();
-        let source_mem = map_memory(&current_task, UserAddress::default(), xfer_bytes.len() as u64);
-        current_task.mm.write_memory(source_mem, &xfer_bytes).unwrap();
 
         let send = Socket::new(SocketDomain::Unix, SocketType::Datagram, SocketProtocol::default())
             .expect("Failed to connect socket.");
-        let source_buf = [UserBuffer { address: source_mem, length: xfer_bytes.len() }];
-        let mut source_iter = UserBufferIterator::new(&source_buf);
         let task_pid = current_task.get_pid();
         let credentials = ucred { pid: task_pid, uid: 0, gid: 0 };
         send.connect(SocketPeer::Handle(rec_dgram.clone()), credentials.clone()).unwrap();
-        let no_write = send.write(&current_task, &mut source_iter, &mut None, &mut vec![]).unwrap();
+        let no_write = send
+            .write(&current_task, &mut VecInputBuffer::new(&xfer_bytes), &mut None, &mut vec![])
+            .unwrap();
         assert_eq!(no_write, xfer_bytes.len());
         // Previously, this would cause the test to fail,
         // because rec_dgram was shut down.
         send.close();
 
-        let rec_mem = map_memory(&current_task, UserAddress::default(), xfer_bytes.len() as u64);
-        let mut recv_mem = [0u8; 8];
-        current_task.mm.write_memory(rec_mem, &recv_mem).unwrap();
-        let rec_buf = [UserBuffer { address: rec_mem, length: recv_mem.len() }];
-        let mut rec_iter = UserBufferIterator::new(&rec_buf);
+        let mut rec_buffer = VecOutputBuffer::new(8);
         let read_info =
-            rec_dgram.read(&current_task, &mut rec_iter, SocketMessageFlags::empty()).unwrap();
+            rec_dgram.read(&current_task, &mut rec_buffer, SocketMessageFlags::empty()).unwrap();
         assert_eq!(read_info.bytes_read, xfer_bytes.len());
-        current_task.mm.read_memory(rec_mem, &mut recv_mem).unwrap();
-        assert_eq!(recv_mem, xfer_bytes);
+        assert_eq!(rec_buffer.data(), xfer_bytes);
         assert_eq!(1, read_info.ancillary_data.len());
         assert_eq!(
             read_info.ancillary_data[0],

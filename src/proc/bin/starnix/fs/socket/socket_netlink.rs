@@ -9,7 +9,6 @@ use crate::fs::buffers::*;
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::not_implemented;
-use crate::mm::MemoryAccessor;
 use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
@@ -149,8 +148,7 @@ impl NetlinkSocketInner {
 
     fn read(
         &mut self,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn OutputBuffer,
         _flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
         let msg = self.messages.read_message();
@@ -162,12 +160,7 @@ impl NetlinkSocketInner {
                 nl_msg.nlmsg_type = NLMSG_DONE as u16;
                 nl_msg.nlmsg_flags &= NLM_F_MULTI as u16;
                 let msg_bytes = nl_msg.as_bytes();
-                let mut bytes_read = 0;
-                while let Some(user_buffer) = user_buffers.next(msg_bytes.len() - bytes_read) {
-                    let bytes_chunk = &msg_bytes[bytes_read..(bytes_read + user_buffer.length)];
-                    current_task.mm.write_memory(user_buffer.address, bytes_chunk)?;
-                    bytes_read += user_buffer.length;
-                }
+                let bytes_read = data.write(msg_bytes)?;
 
                 let info = MessageReadInfo {
                     bytes_read,
@@ -183,8 +176,7 @@ impl NetlinkSocketInner {
 
     fn write(
         &mut self,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
         address: Option<NetlinkAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
@@ -192,12 +184,7 @@ impl NetlinkSocketInner {
             Some(addr) => Some(SocketAddress::Netlink(addr)),
             None => self.address.as_ref().map(|addr| SocketAddress::Netlink(addr.clone())),
         };
-        let bytes_written = self.messages.write_datagram(
-            current_task,
-            user_buffers,
-            socket_address,
-            ancillary_data,
-        )?;
+        let bytes_written = self.messages.write_datagram(data, socket_address, ancillary_data)?;
         if bytes_written > 0 {
             self.waiters.notify_events(FdEvents::POLLIN);
         }
@@ -277,18 +264,18 @@ impl SocketOps for NetlinkSocket {
     fn read(
         &self,
         _socket: &Socket,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        _current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        self.lock().read(current_task, user_buffers, flags)
+        self.lock().read(data, flags)
     }
 
     fn write(
         &self,
         _socket: &Socket,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        _current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
@@ -301,24 +288,17 @@ impl SocketOps for NetlinkSocket {
             _ => match &mut local_address {
                 Some(addr) => addr,
                 _ => {
-                    let bytes = user_buffers.drain_to_vec();
-                    return Ok(bytes.len());
+                    return Ok(data.drain());
                 }
             },
         };
 
         if destination.groups != 0 {
             not_implemented!("?", "NetlinkSockets multicasting is stubbed");
-            let bytes = user_buffers.drain_to_vec();
-            return Ok(bytes.len());
+            return Ok(data.drain());
         }
 
-        self.lock().write(
-            current_task,
-            user_buffers,
-            Some(NetlinkAddress::default()),
-            ancillary_data,
-        )
+        self.lock().write(data, Some(NetlinkAddress::default()), ancillary_data)
     }
 
     fn wait_async(

@@ -486,11 +486,11 @@ impl SocketOps for UnixSocket {
     fn read(
         &self,
         socket: &Socket,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        _current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        let info = self.lock().read(current_task, user_buffers, socket.socket_type, flags)?;
+        let info = self.lock().read(data, socket.socket_type, flags)?;
         if info.bytes_read > 0 {
             let peer = {
                 let inner = self.lock();
@@ -510,7 +510,7 @@ impl SocketOps for UnixSocket {
         &self,
         socket: &Socket,
         current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
@@ -533,7 +533,7 @@ impl SocketOps for UnixSocket {
             let creds = creds.unwrap_or_else(|| current_task.as_ucred());
             ancillary_data.push(AncillaryData::Unix(UnixControlData::Credentials(creds)));
         }
-        peer.write(current_task, user_buffers, local_address, ancillary_data, socket.socket_type)
+        peer.write(data, local_address, ancillary_data, socket.socket_type)
     }
 
     fn wait_async(
@@ -836,21 +836,19 @@ impl UnixSocketInner {
         }
     }
 
-    /// Reads the the contents of this socket into `UserBufferIterator`.
+    /// Reads the the contents of this socket into `InputBuffer`.
     ///
     /// Will stop reading if a message with ancillary data is encountered (after the message with
     /// ancillary data has been read).
     ///
     /// # Parameters
-    /// - `task`: The task to read memory from.
-    /// - `user_buffers`: The `UserBufferIterator` to write the data to.
+    /// - `data`: The `OutputBuffer` to write the data to.
     ///
     /// Returns the number of bytes that were read into the buffer, and any ancillary data that was
     /// read from the socket.
     fn read(
         &mut self,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn OutputBuffer,
         socket_type: SocketType,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
@@ -858,19 +856,19 @@ impl UnixSocketInner {
             return error!(ECONNRESET);
         }
         let mut info = if socket_type == SocketType::Stream {
-            if user_buffers.remaining() == 0 {
+            if data.available() == 0 {
                 return Ok(MessageReadInfo::default());
             }
 
             if flags.contains(SocketMessageFlags::PEEK) {
-                self.messages.peek_stream(current_task, user_buffers)?
+                self.messages.peek_stream(data)?
             } else {
-                self.messages.read_stream(current_task, user_buffers)?
+                self.messages.read_stream(data)?
             }
         } else if flags.contains(SocketMessageFlags::PEEK) {
-            self.messages.peek_datagram(current_task, user_buffers)?
+            self.messages.peek_datagram(data)?
         } else {
-            self.messages.read_datagram(current_task, user_buffers)?
+            self.messages.read_datagram(data)?
         };
         if info.message_length == 0 && !self.is_shutdown {
             return error!(EAGAIN);
@@ -917,19 +915,17 @@ impl UnixSocketInner {
         Ok(messages)
     }
 
-    /// Writes the the contents of `UserBufferIterator` into this socket.
+    /// Writes the the contents of `InputBuffer` into this socket.
     ///
     /// # Parameters
-    /// - `task`: The task to read memory from.
-    /// - `user_buffers`: The `UserBufferIterator` to read the data from.
+    /// - `data`: The `InputBuffer` to read the data from.
     /// - `ancillary_data`: Any ancillary data to write to the socket. Note that the ancillary data
     ///                     will only be written if the entirety of the requested write completes.
     ///
     /// Returns the number of bytes that were written to the socket.
     fn write(
         &mut self,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
         socket_type: SocketType,
@@ -938,9 +934,9 @@ impl UnixSocketInner {
             return error!(EPIPE);
         }
         let bytes_written = if socket_type == SocketType::Stream {
-            self.messages.write_stream(current_task, user_buffers, address, ancillary_data)?
+            self.messages.write_stream(data, address, ancillary_data)?
         } else {
-            self.messages.write_datagram(current_task, user_buffers, address, ancillary_data)?
+            self.messages.write_datagram(data, address, ancillary_data)?
         };
         if bytes_written > 0 {
             self.waiters.notify_events(FdEvents::POLLIN);

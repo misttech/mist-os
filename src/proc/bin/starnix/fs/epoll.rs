@@ -9,6 +9,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
 use zerocopy::{AsBytes, FromBytes};
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::RwLock;
 use crate::logging::*;
@@ -473,7 +474,7 @@ impl FileOps for EpollFileObject {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL)
     }
@@ -482,7 +483,7 @@ impl FileOps for EpollFileObject {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL)
     }
@@ -532,13 +533,11 @@ impl FileOps for EpollFileObject {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::fs::fuchsia::create_fuchsia_pipe;
     use crate::fs::pipe::new_pipe;
     use crate::fs::socket::{SocketDomain, SocketType, UnixSocket};
     use crate::fs::FdEvents;
-    use crate::mm::MemoryAccessor;
-    use crate::mm::PAGE_SIZE;
-    use crate::types::UserBuffer;
     use fuchsia_zircon::HandleBased;
     use std::sync::atomic::{AtomicU64, Ordering};
     use syncio::Zxio;
@@ -557,14 +556,7 @@ mod tests {
         let (pipe_out, pipe_in) = new_pipe(&current_task).unwrap();
 
         let test_string = "hello starnix".to_string();
-        let test_bytes = test_string.as_bytes();
-        let test_len = test_bytes.len();
-        let read_mem = map_memory(&current_task, UserAddress::default(), test_len as u64);
-        let read_buf = [UserBuffer { address: read_mem, length: test_len }];
-
-        let write_mem = map_memory(&writer_task, UserAddress::default(), test_len as u64);
-        let write_buf = [UserBuffer { address: write_mem, length: test_len }];
-        writer_task.mm.write_memory(write_mem, test_bytes).unwrap();
+        let test_len = test_string.len();
 
         let epoll_file_handle = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
@@ -577,8 +569,11 @@ mod tests {
             )
             .unwrap();
 
+        let test_string_copy = test_string.clone();
         let thread = std::thread::spawn(move || {
-            let bytes_written = pipe_in.write(&writer_task, &write_buf).unwrap();
+            let bytes_written = pipe_in
+                .write(&writer_task, &mut VecInputBuffer::new(test_string_copy.as_bytes()))
+                .unwrap();
             assert_eq!(bytes_written, test_len);
             WRITE_COUNT.fetch_add(bytes_written as u64, Ordering::Relaxed);
         });
@@ -590,12 +585,11 @@ mod tests {
         let data = event.data;
         assert_eq!(EVENT_DATA, data);
 
-        let bytes_read = pipe_out.read(&current_task, &read_buf).unwrap();
+        let mut buffer = VecOutputBuffer::new(test_len);
+        let bytes_read = pipe_out.read(&current_task, &mut buffer).unwrap();
         assert_eq!(bytes_read as u64, WRITE_COUNT.load(Ordering::Relaxed));
         assert_eq!(bytes_read, test_len);
-        let mut read_data = vec![0u8; test_len];
-        current_task.mm.read_memory(read_buf[0].address, &mut read_data).unwrap();
-        assert_eq!(read_data.as_bytes(), test_bytes);
+        assert_eq!(buffer.data(), test_string.as_bytes());
     }
 
     #[::fuchsia::test]
@@ -609,14 +603,11 @@ mod tests {
         let test_string = "hello starnix".to_string();
         let test_bytes = test_string.as_bytes();
         let test_len = test_bytes.len();
-        let read_mem = map_memory(&current_task, UserAddress::default(), test_len as u64);
-        let read_buf = [UserBuffer { address: read_mem, length: test_len }];
-        let write_mem = map_memory(&current_task, UserAddress::default(), test_len as u64);
-        let write_buf = [UserBuffer { address: write_mem, length: test_len }];
 
-        current_task.mm.write_memory(write_mem, test_bytes).unwrap();
-
-        assert_eq!(pipe_in.write(&current_task, &write_buf).unwrap(), test_bytes.len());
+        assert_eq!(
+            pipe_in.write(&current_task, &mut VecInputBuffer::new(test_bytes)).unwrap(),
+            test_bytes.len()
+        );
 
         let epoll_file_handle = EpollFileObject::new_file(&current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
@@ -636,11 +627,10 @@ mod tests {
         let data = event.data;
         assert_eq!(EVENT_DATA, data);
 
-        let bytes_read = pipe_out.read(&current_task, &read_buf).unwrap();
+        let mut buffer = VecOutputBuffer::new(test_len);
+        let bytes_read = pipe_out.read(&current_task, &mut buffer).unwrap();
         assert_eq!(bytes_read, test_len);
-        let mut read_data = vec![0u8; test_len];
-        current_task.mm.read_memory(read_buf[0].address, &mut read_data).unwrap();
-        assert_eq!(read_data.as_bytes(), test_bytes);
+        assert_eq!(buffer.data(), test_bytes);
     }
 
     #[::fuchsia::test]
@@ -682,15 +672,13 @@ mod tests {
                 event.cancel_wait(&current_task, &waiter, key);
             }
 
-            let write_mem = map_memory(
-                &current_task,
-                UserAddress::default(),
-                std::mem::size_of::<u64>() as u64,
-            );
             let add_val = 1u64;
-            current_task.mm.write_memory(write_mem, &add_val.to_ne_bytes()).unwrap();
-            let data = [UserBuffer { address: write_mem, length: std::mem::size_of::<u64>() }];
-            assert_eq!(event.write(&current_task, &data).unwrap(), std::mem::size_of::<u64>());
+            assert_eq!(
+                event
+                    .write(&current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes()))
+                    .unwrap(),
+                std::mem::size_of::<u64>()
+            );
 
             let events = epoll_file.wait(&current_task, 10, zx::Duration::from_seconds(0)).unwrap();
 
@@ -709,7 +697,6 @@ mod tests {
     #[::fuchsia::test]
     fn test_multiple_events() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let (client1, server1) =
             zx::Socket::create(zx::SocketOpts::empty()).expect("Socket::create");
         let (client2, server2) =
@@ -753,10 +740,7 @@ mod tests {
         assert_eq!(FdEvents::from_bits_truncate(fds[0].events), FdEvents::POLLIN);
         let data = fds[0].data;
         assert_eq!(data, 1);
-        assert_eq!(
-            pipe1.read(&current_task, &[UserBuffer { address, length: 64 }]).expect("read"),
-            1
-        );
+        assert_eq!(pipe1.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
 
         let fds = poll();
         assert!(fds.is_empty());
@@ -768,10 +752,7 @@ mod tests {
         assert_eq!(FdEvents::from_bits_truncate(fds[0].events), FdEvents::POLLIN);
         let data = fds[0].data;
         assert_eq!(data, 2);
-        assert_eq!(
-            pipe2.read(&current_task, &[UserBuffer { address, length: 64 }]).expect("read"),
-            1
-        );
+        assert_eq!(pipe2.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
 
         let fds = poll();
         assert!(fds.is_empty());
@@ -796,12 +777,11 @@ mod tests {
             .unwrap();
 
         // Make the thing send a notification, wait for it
-        let write_mem =
-            map_memory(&current_task, UserAddress::default(), std::mem::size_of::<u64>() as u64);
         let add_val = 1u64;
-        current_task.mm.write_memory(write_mem, &add_val.to_ne_bytes()).unwrap();
-        let data = [UserBuffer { address: write_mem, length: std::mem::size_of::<u64>() }];
-        assert_eq!(event.write(&current_task, &data).unwrap(), std::mem::size_of::<u64>());
+        assert_eq!(
+            event.write(&current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes())).unwrap(),
+            std::mem::size_of::<u64>()
+        );
 
         assert_eq!(
             epoll_file.wait(&current_task, 10, zx::Duration::from_seconds(0)).unwrap().len(),

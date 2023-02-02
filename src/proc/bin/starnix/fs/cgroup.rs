@@ -10,12 +10,12 @@
 use std::sync::{Arc, Weak};
 
 use crate::auth::FsCred;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::{
     fileops_impl_nonblocking, fileops_impl_seekable, FileObject, FileOps, FsNode, FsNodeHandle,
     FsNodeOps, FsStr, MemoryDirectoryFile, SeqFileBuf, SeqFileState,
 };
 use crate::lock::Mutex;
-use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, Task};
 use crate::types::*;
 
@@ -143,7 +143,7 @@ impl FileOps for ControlGroupFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let remaining_tasks = {
             let control_group = &mut *self.control_group.lock();
@@ -175,13 +175,11 @@ impl FileOps for ControlGroupFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let write_size = UserBuffer::get_total_length(data)?;
-        let mut buf = vec![0u8; write_size];
-        current_task.mm.read_all(data, &mut buf[..])?;
+        let bytes = data.read_all()?;
 
-        let pid_string = std::str::from_utf8(&buf).map_err(|_| errno!(EINVAL))?;
+        let pid_string = std::str::from_utf8(&bytes).map_err(|_| errno!(EINVAL))?;
         let pid = pid_string.parse::<pid_t>().map_err(|_| errno!(ENOENT))?;
         let task = current_task.get_task(pid).ok_or_else(|| errno!(EINVAL))?;
 
@@ -189,6 +187,6 @@ impl FileOps for ControlGroupFile {
         // being added to a new one.
         self.control_group.lock().tasks.push(Arc::downgrade(&task));
 
-        Ok(write_size)
+        Ok(bytes.len())
     }
 }

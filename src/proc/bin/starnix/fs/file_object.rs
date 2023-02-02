@@ -7,6 +7,7 @@ use fuchsia_zircon as zx;
 use std::fmt;
 use std::sync::Arc;
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::{impossible_error, not_implemented};
@@ -73,7 +74,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>;
     /// Read from the file at an offset. If your file is seekable, consider implementing this with
     /// [`fileops_impl_nonseekable`].
@@ -82,7 +83,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno>;
     /// Write to the file without an offset. If your file is seekable, consider implementing this
     /// with [`fileops_impl_seekable`].
@@ -90,7 +91,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>;
     /// Write to the file at a offset. If your file is nonseekable, consider implementing this with
     /// [`fileops_impl_nonseekable`].
@@ -99,7 +100,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno>;
 
     /// Adjust the seek offset if the file is seekable.
@@ -251,7 +252,7 @@ macro_rules! fileops_impl_nonseekable {
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
-            _data: &[crate::types::UserBuffer],
+            _data: &mut dyn crate::fs::buffers::OutputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             use crate::types::errno::*;
             error!(ESPIPE)
@@ -261,7 +262,7 @@ macro_rules! fileops_impl_nonseekable {
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
-            _data: &[crate::types::UserBuffer],
+            _data: &mut dyn crate::fs::buffers::InputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             use crate::types::errno::*;
             error!(ESPIPE)
@@ -287,7 +288,7 @@ macro_rules! fileops_impl_seekable {
             &self,
             file: &crate::fs::FileObject,
             current_task: &crate::task::CurrentTask,
-            data: &[crate::types::UserBuffer],
+            data: &mut dyn crate::fs::buffers::OutputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             let mut offset = file.offset.lock();
             let size = self.read_at(file, current_task, *offset as usize, data)?;
@@ -298,7 +299,7 @@ macro_rules! fileops_impl_seekable {
             &self,
             file: &crate::fs::FileObject,
             current_task: &crate::task::CurrentTask,
-            data: &[crate::types::UserBuffer],
+            data: &mut dyn crate::fs::buffers::InputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             let mut offset = file.offset.lock();
             if file.flags().contains(OpenFlags::APPEND) {
@@ -346,7 +347,7 @@ macro_rules! fileops_impl_seekless {
             &self,
             file: &crate::fs::FileObject,
             current_task: &crate::task::CurrentTask,
-            data: &[crate::types::UserBuffer],
+            data: &mut dyn crate::fs::buffers::OutputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             self.read_at(file, current_task, 0, data)
         }
@@ -354,7 +355,7 @@ macro_rules! fileops_impl_seekless {
             &self,
             file: &crate::fs::FileObject,
             current_task: &crate::task::CurrentTask,
-            data: &[crate::types::UserBuffer],
+            data: &mut dyn crate::fs::buffers::InputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             self.write_at(file, current_task, 0, data)
         }
@@ -380,7 +381,7 @@ macro_rules! fileops_impl_directory {
             &self,
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
-            _data: &[crate::types::UserBuffer],
+            _data: &mut dyn crate::fs::buffers::OutputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             use crate::types::errno::*;
             error!(EISDIR)
@@ -391,7 +392,7 @@ macro_rules! fileops_impl_directory {
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
-            _data: &[crate::types::UserBuffer],
+            _data: &mut dyn crate::fs::buffers::OutputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             use crate::types::errno::*;
             error!(EISDIR)
@@ -401,7 +402,7 @@ macro_rules! fileops_impl_directory {
             &self,
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
-            _data: &[crate::types::UserBuffer],
+            _data: &mut dyn crate::fs::buffers::InputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             use crate::types::errno::*;
             error!(EISDIR)
@@ -412,7 +413,7 @@ macro_rules! fileops_impl_directory {
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
-            _data: &[crate::types::UserBuffer],
+            _data: &mut dyn crate::fs::buffers::InputBuffer,
         ) -> Result<usize, crate::types::Errno> {
             use crate::types::errno::*;
             error!(EISDIR)
@@ -501,7 +502,7 @@ impl FileOps for OPathOps {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         error!(EBADF)
     }
@@ -510,7 +511,7 @@ impl FileOps for OPathOps {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         error!(EBADF)
     }
@@ -518,7 +519,7 @@ impl FileOps for OPathOps {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EBADF)
     }
@@ -527,7 +528,7 @@ impl FileOps for OPathOps {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EBADF)
     }
@@ -726,7 +727,11 @@ impl FileObject {
         }
     }
 
-    pub fn read(&self, current_task: &CurrentTask, data: &[UserBuffer]) -> Result<usize, Errno> {
+    pub fn read(
+        &self,
+        current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
         if !self.can_read() {
             return error!(EBADF);
         }
@@ -738,7 +743,7 @@ impl FileObject {
         &self,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         if !self.can_read() {
             return error!(EBADF);
@@ -746,7 +751,11 @@ impl FileObject {
         self.ops().read_at(self, current_task, offset, data)
     }
 
-    pub fn write(&self, current_task: &CurrentTask, data: &[UserBuffer]) -> Result<usize, Errno> {
+    pub fn write(
+        &self,
+        current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
         if !self.can_write() {
             return error!(EBADF);
         }
@@ -763,7 +772,7 @@ impl FileObject {
         &self,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         if !self.can_write() {
             return error!(EBADF);

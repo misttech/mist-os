@@ -6,6 +6,7 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use std::sync::Arc;
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::mm::{MemoryAccessor, ProcMapsFile, ProcStatFile, ProcStatusFile};
@@ -72,7 +73,7 @@ impl FileOps for SeLinuxAttribute {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         Ok(0)
     }
@@ -81,9 +82,9 @@ impl FileOps for SeLinuxAttribute {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        UserBuffer::get_total_length(data)
+        Ok(data.drain())
     }
 }
 
@@ -413,7 +414,7 @@ impl FileOps for CmdlineFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let iter = move |_, sink: &mut SeqFileBuf| {
             let (argv_start, argv_end) = {
@@ -435,7 +436,7 @@ impl FileOps for CmdlineFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }
@@ -466,7 +467,7 @@ impl FileOps for CommFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let comm = self.task.command();
         let mut seq = self.seq.lock();
@@ -483,7 +484,7 @@ impl FileOps for CommFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }

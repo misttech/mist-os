@@ -13,6 +13,7 @@ use std::sync::Arc;
 use super::ffi::*;
 use super::magma::*;
 use crate::device::wayland::image_file::*;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::{impossible_error, log_error, log_warn};
@@ -613,7 +614,7 @@ impl FileOps for MagmaFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL)
     }
@@ -622,7 +623,7 @@ impl FileOps for MagmaFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL)
     }

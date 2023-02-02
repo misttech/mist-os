@@ -14,6 +14,7 @@ use zerocopy::{AsBytes, FromBytes};
 use std::sync::Arc;
 
 use super::BufferCollectionFile;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::mm::vmo::round_up_to_increment;
 use crate::mm::MemoryAccessorExt;
@@ -267,7 +268,7 @@ impl FileOps for DmaBufFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL)
     }
@@ -276,7 +277,7 @@ impl FileOps for DmaBufFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL)
     }

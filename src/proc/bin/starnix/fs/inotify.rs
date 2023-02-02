@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::logging::not_implemented;
 use crate::task::{CurrentTask, EventHandler, WaitKey, Waiter};
@@ -26,7 +27,7 @@ impl FileOps for InotifyFileObject {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL)
     }
@@ -35,7 +36,7 @@ impl FileOps for InotifyFileObject {
         &self,
         _file: &FileObject,
         current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         not_implemented!(current_task, "InotifyFileObject.read() is stubbed.");
         Waiter::new().wait_until(current_task, zx::Time::INFINITE)?;

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::task::*;
 use crate::types::*;
@@ -41,12 +42,12 @@ impl FileOps for StubSysctl {
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         if offset != 0 {
             return error!(EINVAL);
         }
-        UserBuffer::get_total_length(data)
+        Ok(data.drain())
     }
 
     fn read_at(
@@ -54,7 +55,7 @@ impl FileOps for StubSysctl {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _buffer: &[UserBuffer],
+        _buffer: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         Ok(0)
     }

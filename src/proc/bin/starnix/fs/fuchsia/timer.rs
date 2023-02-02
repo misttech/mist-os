@@ -7,9 +7,9 @@ use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
 use zerocopy::AsBytes;
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
-use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
 
@@ -160,7 +160,7 @@ impl FileOps for TimerFile {
         &self,
         file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         // The expected error seems to vary depending on the open flags..
         if file.flags().contains(OpenFlags::NONBLOCK) {
@@ -174,7 +174,7 @@ impl FileOps for TimerFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
@@ -217,9 +217,7 @@ impl FileOps for TimerFile {
                     1
                 };
 
-                let bytes = count.as_bytes();
-                current_task.mm.write_all(data, bytes)?;
-                Ok(BlockableOpsResult::Done(bytes.len()))
+                Ok(BlockableOpsResult::Done(data.write(count.as_bytes())?))
             },
             FdEvents::POLLIN | FdEvents::POLLHUP,
             None,

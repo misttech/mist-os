@@ -8,6 +8,7 @@ use crate::auth::Credentials;
 use crate::device::mem::new_null_file;
 use crate::device::DeviceOps;
 use crate::dynamic_thread_pool::DynamicThreadPool;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::fuchsia::new_remote_file;
 use crate::fs::{
@@ -202,7 +203,7 @@ impl FileOps for BinderConnection {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         error!(EOPNOTSUPP)
     }
@@ -210,7 +211,7 @@ impl FileOps for BinderConnection {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EOPNOTSUPP)
     }
@@ -230,7 +231,7 @@ impl FileOps for BinderConnection {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         error!(EOPNOTSUPP)
     }
@@ -240,7 +241,7 @@ impl FileOps for BinderConnection {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EOPNOTSUPP)
     }

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
-use crate::mm::MemoryAccessorExt;
 use crate::signals::*;
 use crate::task::*;
 use crate::types::*;
@@ -32,12 +32,12 @@ impl FileOps for SignalFd {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
             || {
-                let data_len = UserBuffer::get_total_length(data)?;
+                let data_len = data.available();
                 let mut buf = Vec::new();
                 while buf.len() + std::mem::size_of::<signalfd_siginfo>() <= data_len {
                     let signal = current_task
@@ -89,7 +89,7 @@ impl FileOps for SignalFd {
                     }
                     buf.extend_from_slice(siginfo.as_bytes());
                 }
-                current_task.mm.write_all(data, &buf).map(BlockableOpsResult::Done)
+                data.write_all(&buf).map(BlockableOpsResult::Done)
             },
             FdEvents::POLLIN | FdEvents::POLLHUP,
             None,
@@ -133,7 +133,7 @@ impl FileOps for SignalFd {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL)
     }

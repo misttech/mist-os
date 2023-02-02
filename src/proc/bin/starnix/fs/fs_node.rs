@@ -893,7 +893,7 @@ impl Drop for FsNode {
 mod tests {
     use super::*;
     use crate::auth::Credentials;
-    use crate::mm::MemoryAccessor;
+    use crate::fs::buffers::VecOutputBuffer;
     use crate::testing::*;
 
     #[::fuchsia::test]
@@ -908,22 +908,16 @@ mod tests {
             .create_node(&current_task, b"zero", mode!(IFCHR, 0o666), DeviceType::ZERO)
             .expect("create_node");
 
-        // Prepare the user buffer with some values other than the expected content (non-zero).
         const CONTENT_LEN: usize = 10;
-        let address = map_memory(&current_task, UserAddress::default(), CONTENT_LEN as u64);
-        current_task.mm.write_memory(address, &[0xff; CONTENT_LEN]).expect("write memory");
+        let mut buffer = VecOutputBuffer::new(CONTENT_LEN);
 
         // Read from the zero device.
         let device_file =
             current_task.open_file(b"zero", OpenFlags::RDONLY).expect("open device file");
-        device_file
-            .read(&current_task, &[UserBuffer { address, length: CONTENT_LEN }])
-            .expect("read from zero");
+        device_file.read(&current_task, &mut buffer).expect("read from zero");
 
         // Assert the contents.
-        let content = &mut [0xff; CONTENT_LEN];
-        current_task.mm.read_memory(address, content).expect("read memory");
-        assert_eq!(&[0; CONTENT_LEN], content);
+        assert_eq!(&[0; CONTENT_LEN], buffer.data());
     }
 
     #[::fuchsia::test]

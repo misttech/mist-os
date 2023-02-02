@@ -6,6 +6,7 @@ use super::pid_directory::*;
 use super::sysctl::*;
 
 use crate::auth::FsCred;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::logging::not_implemented;
 use crate::task::*;
@@ -177,7 +178,7 @@ impl FileOps for ProcKmsgFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         not_implemented!(current_task, "ProcKmsgFile.read() is stubbed.");
         Waiter::new().wait_until(current_task, zx::Time::INFINITE)?;
@@ -189,7 +190,7 @@ impl FileOps for ProcKmsgFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EIO)
     }

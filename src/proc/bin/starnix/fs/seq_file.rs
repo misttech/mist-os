@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::MemoryAccessorExt;
+use crate::fs::buffers::OutputBuffer;
 use crate::task::CurrentTask;
 use crate::types::*;
 
@@ -29,7 +29,7 @@ use crate::types::*;
 ///         _file: &FileObject,
 ///         current_task: &CurrentTask,
 ///         offset: usize,
-///         data: &[UserBuffer],
+///         data: &mut dyn InputBuffer,
 ///     ) -> Result<usize, Errno> {
 ///         // The cursor starts at i32::default(), which is 0.
 ///         self.seq.lock().read_at(current_task, |cursor: i32, sink: &mut SeqFileBuf| {
@@ -70,15 +70,15 @@ impl<C: Default> SeqFileState<C> {
 
     pub fn read_at<'a>(
         &mut self,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         mut iter: impl SeqIterator<'a, C>,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         if offset < self.byte_offset {
             self.reset();
         }
-        let read_size = UserBuffer::get_total_length(data)?;
+        let read_size = data.available();
 
         // 1. Grow the buffer until either EOF or it's at least as big as the read request
         while self.byte_offset + self.buf.0.len() < offset + read_size {
@@ -104,7 +104,7 @@ impl<C: Default> SeqFileState<C> {
         std::mem::drop(iter);
 
         // 2. Write out as much of the buffer as possible and shift the rest down
-        let written = current_task.mm.write_all(data, &self.buf.0)?;
+        let written = data.write(&self.buf.0)?;
         self.buf.0.drain(..written);
         self.byte_offset += written;
         Ok(written)
@@ -143,8 +143,8 @@ where
 mod test {
     use super::*;
 
+    use crate::fs::buffers::{InputBuffer, VecOutputBuffer};
     use crate::fs::*;
-    use crate::mm::*;
     use crate::task::*;
     use crate::testing::*;
 
@@ -167,7 +167,7 @@ mod test {
             _file: &FileObject,
             current_task: &CurrentTask,
             offset: usize,
-            data: &[UserBuffer],
+            data: &mut dyn OutputBuffer,
         ) -> Result<usize, Errno> {
             self.seq.lock().read_at(
                 current_task,
@@ -185,7 +185,7 @@ mod test {
             _file: &FileObject,
             _current_task: &CurrentTask,
             _offset: usize,
-            _data: &[UserBuffer],
+            _data: &mut dyn InputBuffer,
         ) -> Result<usize, Errno> {
             error!(ENOSYS)
         }
@@ -194,14 +194,12 @@ mod test {
     #[::fuchsia::test]
     fn test_stuff() -> Result<(), Errno> {
         let (_kern, current_task) = create_kernel_and_task();
-        let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let file = Anon::new_file(&current_task, Box::<TestSeqFile>::default(), OpenFlags::RDONLY);
 
         let read_test = |offset: usize, length: usize| -> Result<Vec<u8>, Errno> {
-            let size = file.read_at(&current_task, offset, &[UserBuffer { address, length }])?;
-            let mut data = vec![0u8; size];
-            current_task.mm.read_memory(address, &mut data)?;
-            Ok(data)
+            let mut buffer = VecOutputBuffer::new(length);
+            file.read_at(&current_task, offset, &mut buffer)?;
+            Ok(buffer.data().to_vec())
         };
 
         assert_eq!(read_test(0, 2)?, &[0, 1]);

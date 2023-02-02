@@ -255,10 +255,8 @@ impl FsNodeOps for TmpfsSpecialNode {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::mm::*;
+    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::testing::*;
-    use fuchsia_zircon as zx;
-    use std::sync::Arc;
     use zerocopy::AsBytes;
 
     #[::fuchsia::test]
@@ -278,9 +276,6 @@ mod test {
     fn test_write_read() {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        let test_mem_size = 0x10000;
-        let test_vmo = Arc::new(zx::Vmo::create(test_mem_size).unwrap());
-
         let path = b"test.bin";
         let _file = current_task
             .fs()
@@ -290,34 +285,17 @@ mod test {
 
         let wr_file = current_task.open_file(path, OpenFlags::RDWR).unwrap();
 
-        let flags = zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE;
-        let test_addr = current_task
-            .mm
-            .map(
-                DesiredAddress::Hint(UserAddress::default()),
-                test_vmo,
-                0,
-                test_mem_size as usize,
-                flags,
-                MappingOptions::empty(),
-                None,
-            )
-            .unwrap();
-
-        let seq_addr = UserAddress::from_ptr(test_addr.ptr() + path.len());
         let test_seq = 0..10000u16;
         let test_vec = test_seq.collect::<Vec<_>>();
         let test_bytes = test_vec.as_slice().as_bytes();
-        current_task.mm.write_memory(seq_addr, test_bytes).unwrap();
-        let buf = [UserBuffer { address: seq_addr, length: test_bytes.len() }];
 
-        let written = wr_file.write(&current_task, &buf).unwrap();
+        let written = wr_file.write(&current_task, &mut VecInputBuffer::new(test_bytes)).unwrap();
         assert_eq!(written, test_bytes.len());
 
-        let mut read_vec = vec![0u8; test_bytes.len()];
-        current_task.mm.read_memory(seq_addr, read_vec.as_bytes_mut()).unwrap();
-
-        assert_eq!(test_bytes, &*read_vec);
+        let mut read_buffer = VecOutputBuffer::new(test_bytes.len() + 1);
+        let read = wr_file.read_at(&current_task, 0, &mut read_buffer).unwrap();
+        assert_eq!(read, test_bytes.len());
+        assert_eq!(test_bytes, read_buffer.data());
     }
 
     #[::fuchsia::test]
@@ -334,24 +312,10 @@ mod test {
         let rd_file = current_task.open_file(path, OpenFlags::RDONLY).unwrap();
 
         // Verify that attempting to read past the EOF (i.e. at a non-zero offset) returns 0
-        let test_mem_size = 0x10000;
-        let test_vmo = Arc::new(zx::Vmo::create(test_mem_size).unwrap());
-        let flags = zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE;
-        let test_addr = current_task
-            .mm
-            .map(
-                DesiredAddress::Hint(UserAddress::default()),
-                test_vmo,
-                0,
-                test_mem_size as usize,
-                flags,
-                MappingOptions::empty(),
-                None,
-            )
-            .unwrap();
-        let buf = [UserBuffer { address: test_addr, length: test_mem_size as usize }];
+        let buffer_size = 0x10000;
+        let mut output_buffer = VecOutputBuffer::new(buffer_size);
         let test_offset = 100;
-        let result = rd_file.read_at(&current_task, test_offset, &buf).unwrap();
+        let result = rd_file.read_at(&current_task, test_offset, &mut output_buffer).unwrap();
         assert_eq!(result, 0);
     }
 
@@ -368,20 +332,32 @@ mod test {
                 FileMode::from_bits(0o777),
             )
             .expect("failed to create file");
-        assert_eq!(0, file.read(&current_task, &[]).expect("failed to read"));
-        assert!(file.write(&current_task, &[]).is_err());
+        assert_eq!(
+            0,
+            file.read(&current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
+        );
+        assert!(file.write(&current_task, &mut VecInputBuffer::new(&[])).is_err());
 
         let file = current_task
             .open_file_at(FdNumber::AT_FDCWD, path, OpenFlags::WRONLY, FileMode::EMPTY)
             .expect("failed to open file WRONLY");
-        assert!(file.read(&current_task, &[]).is_err());
-        assert_eq!(0, file.write(&current_task, &[]).expect("failed to write"));
+        assert!(file.read(&current_task, &mut VecOutputBuffer::new(0)).is_err());
+        assert_eq!(
+            0,
+            file.write(&current_task, &mut VecInputBuffer::new(&[])).expect("failed to write")
+        );
 
         let file = current_task
             .open_file_at(FdNumber::AT_FDCWD, path, OpenFlags::RDWR, FileMode::EMPTY)
             .expect("failed to open file RDWR");
-        assert_eq!(0, file.read(&current_task, &[]).expect("failed to read"));
-        assert_eq!(0, file.write(&current_task, &[]).expect("failed to write"));
+        assert_eq!(
+            0,
+            file.read(&current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
+        );
+        assert_eq!(
+            0,
+            file.write(&current_task, &mut VecInputBuffer::new(&[])).expect("failed to write")
+        );
     }
 
     #[::fuchsia::test]
@@ -432,7 +408,10 @@ mod test {
             usr_bin.name.unlink(&current_task, b"test.txt", UnlinkKind::NonDirectory).unwrap_err()
         );
 
-        assert_eq!(0, txt.read(&current_task, &[]).expect("failed to read"));
+        assert_eq!(
+            0,
+            txt.read(&current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
+        );
         std::mem::drop(txt);
         assert_eq!(
             errno!(ENOENT),

@@ -5,8 +5,8 @@
 use std::sync::Arc;
 
 use super::*;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::{fileops_impl_nonblocking, fileops_impl_seekable};
-use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
 
@@ -54,11 +54,11 @@ impl FileOps for ByteVecFile {
     fn read_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        current_task.mm.write_all(data, &self.0[offset..])
+        data.write(&self.0[offset..])
     }
 
     fn write_at(
@@ -66,7 +66,7 @@ impl FileOps for ByteVecFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }

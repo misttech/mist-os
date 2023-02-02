@@ -369,7 +369,13 @@ fn recvmsg_internal(
 
     let flags = SocketMessageFlags::from_bits_truncate(flags);
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
-    let info = socket_ops.recvmsg(current_task, file, &iovec, flags, deadline)?;
+    let info = socket_ops.recvmsg(
+        current_task,
+        file,
+        &mut UserBuffersOutputBuffer::new(&current_task.mm, iovec)?,
+        flags,
+        deadline,
+    )?;
 
     message_header.msg_flags = 0;
 
@@ -515,7 +521,7 @@ pub fn sys_recvfrom(
     let info = socket_ops.recvmsg(
         current_task,
         &file,
-        &[UserBuffer { address: user_buffer, length: buffer_length }],
+        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, user_buffer, buffer_length),
         flags,
         None,
     )?;
@@ -590,7 +596,14 @@ fn sendmsg_internal(
 
     let flags = SocketMessageFlags::from_bits_truncate(flags);
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
-    socket_ops.sendmsg(current_task, file, &iovec, dest_address, ancillary_data, flags)
+    socket_ops.sendmsg(
+        current_task,
+        file,
+        &mut UserBuffersInputBuffer::new(&current_task.mm, iovec)?,
+        dest_address,
+        ancillary_data,
+        flags,
+    )
 }
 
 pub fn sys_sendmsg(
@@ -662,11 +675,11 @@ pub fn sys_sendto(
 
     let dest_address =
         maybe_parse_socket_address(current_task, user_dest_address, dest_address_length as usize)?;
-    let data = &[UserBuffer { address: user_buffer, length: buffer_length }];
+    let mut data = UserBuffersInputBuffer::new_at(&current_task.mm, user_buffer, buffer_length);
 
     let flags = SocketMessageFlags::from_bits_truncate(flags);
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();
-    socket_ops.sendmsg(current_task, &file, data, dest_address, vec![], flags)
+    socket_ops.sendmsg(current_task, &file, &mut data, dest_address, vec![], flags)
 }
 
 pub fn sys_getsockopt(

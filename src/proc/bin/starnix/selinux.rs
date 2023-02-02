@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::{Mutex, RwLock};
 use crate::logging::not_implemented;
-use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::as_any::AsAny;
 use crate::types::*;
@@ -96,7 +96,8 @@ where
 }
 
 trait SeLinuxFile {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno>;
+    fn write(&self, current_task: &CurrentTask, data: &mut dyn InputBuffer)
+        -> Result<usize, Errno>;
     fn read(&self, _current_task: &CurrentTask) -> Result<Vec<u8>, Errno> {
         error!(ENOSYS)
     }
@@ -111,16 +112,12 @@ impl<T: SeLinuxFile + Send + Sync + AsAny + 'static> FileOps for T {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         if offset != 0 {
             return error!(EINVAL);
         }
-        let size = UserBuffer::get_total_length(data)?;
-        let mut buf = vec![0u8; size];
-        current_task.mm.read_all(data, &mut buf)?;
-        self.write(current_task, buf)?;
-        Ok(size)
+        self.write(current_task, data)
     }
 
     fn read_at(
@@ -128,10 +125,10 @@ impl<T: SeLinuxFile + Send + Sync + AsAny + 'static> FileOps for T {
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
-        buffer: &[UserBuffer],
+        buffer: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let data = self.read(current_task)?;
-        current_task.mm.write_all(buffer, &data)
+        buffer.write(&data)
     }
 }
 
@@ -155,18 +152,28 @@ struct selinux_status_t {
 
 struct SeLoad;
 impl SeLinuxFile for SeLoad {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        not_implemented!(current_task, "got selinux policy, length {}, ignoring", data.len());
-        Ok(())
+    fn write(
+        &self,
+        current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        let length = data.drain();
+        not_implemented!(current_task, "got selinux policy, length {}, ignoring", length);
+        Ok(length)
     }
 }
 
 struct SeEnforce;
 impl SeLinuxFile for SeEnforce {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let enforce = parse_int(&data)?;
+    fn write(
+        &self,
+        current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        let bytes = data.read_all()?;
+        let enforce = parse_int(&bytes)?;
         not_implemented!(current_task, "selinux setenforce: {}", enforce);
-        Ok(())
+        Ok(bytes.len())
     }
 
     fn read(&self, _current_task: &CurrentTask) -> Result<Vec<u8>, Errno> {
@@ -176,22 +183,32 @@ impl SeLinuxFile for SeEnforce {
 
 struct SeCheckReqProt;
 impl SeLinuxFile for SeCheckReqProt {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let checkreqprot = parse_int(&data)?;
+    fn write(
+        &self,
+        current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        let bytes = data.read_all()?;
+        let checkreqprot = parse_int(&bytes)?;
         not_implemented!(current_task, "selinux checkreqprot: {}", checkreqprot);
-        Ok(())
+        Ok(bytes.len())
     }
 }
 
 struct SeContext;
 impl SeLinuxFile for SeContext {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+    fn write(
+        &self,
+        current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        let bytes = data.read_all()?;
         not_implemented!(
             current_task,
             "selinux validate context: {}",
-            String::from_utf8_lossy(&data)
+            String::from_utf8_lossy(&bytes)
         );
-        Ok(())
+        Ok(bytes.len())
     }
 }
 
@@ -206,23 +223,22 @@ impl FileOps for AccessFile {
     fn read(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
-        data: &[UserBuffer],
+        _current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         // Format is allowed decided autitallow auditdeny seqno flags
         // Everything but seqno must be in hexadecimal format and represents a bits field.
         let content = format!("ffffffff ffffffff 0 ffffffff {} 0\n", self.seqno);
-        let bytes = content.as_bytes();
-        current_task.mm.write_all(data, bytes)
+        data.write(content.as_bytes())
     }
 
     fn write(
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        UserBuffer::get_total_length(data)
+        Ok(data.drain())
     }
 }
 

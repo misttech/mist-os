@@ -18,6 +18,7 @@ use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::auth::*;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::RwLock;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
@@ -40,7 +41,7 @@ impl FileOps for BpfHandle {
         &self,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL) // TODO
     }
@@ -48,7 +49,7 @@ impl FileOps for BpfHandle {
         &self,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EINVAL) // TODO
     }

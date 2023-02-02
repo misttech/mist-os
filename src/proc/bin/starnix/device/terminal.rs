@@ -7,10 +7,10 @@ use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::sync::{Arc, Weak};
 
 use crate::auth::FsCred;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::devpts::*;
 use crate::fs::*;
 use crate::lock::{Mutex, RwLock};
-use crate::mm::MemoryAccessorExt;
 use crate::mutable_state::*;
 use crate::task::*;
 use crate::types::*;
@@ -194,7 +194,7 @@ impl Terminal {
     pub fn main_read(
         self: &Arc<Self>,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let (bytes, signals) = self.write().main_read(current_task, data)?;
         self.send_signals(signals);
@@ -205,7 +205,7 @@ impl Terminal {
     pub fn main_write(
         self: &Arc<Self>,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let (bytes, signals) = self.write().main_write(current_task, data)?;
         self.send_signals(signals);
@@ -247,7 +247,7 @@ impl Terminal {
     pub fn replica_read(
         self: &Arc<Self>,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let (bytes, signals) = self.write().replica_read(current_task, data)?;
         self.send_signals(signals);
@@ -258,7 +258,7 @@ impl Terminal {
     pub fn replica_write(
         self: &Arc<Self>,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let (bytes, signals) = self.write().replica_write(current_task, data)?;
         self.send_signals(signals);
@@ -442,7 +442,7 @@ impl TerminalMutableState<Base = Terminal> {
     fn main_read(
         &mut self,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<(usize, PendingSignals), Errno> {
         if self.is_replica_closed() {
             return error!(EIO);
@@ -456,7 +456,7 @@ impl TerminalMutableState<Base = Terminal> {
     fn main_write(
         &mut self,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<(usize, PendingSignals), Errno> {
         let result = with_queue!(self.input_queue.write(self.as_mut(), current_task, data))?;
         self.notify_waiters();
@@ -512,7 +512,7 @@ impl TerminalMutableState<Base = Terminal> {
     fn replica_read(
         &mut self,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<(usize, PendingSignals), Errno> {
         if self.is_main_closed() {
             return Ok((0, PendingSignals::new()));
@@ -526,7 +526,7 @@ impl TerminalMutableState<Base = Terminal> {
     fn replica_write(
         &mut self,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<(usize, PendingSignals), Errno> {
         if self.is_main_closed() {
             return error!(EIO);
@@ -968,15 +968,14 @@ impl Queue {
     pub fn read(
         &mut self,
         terminal: TerminalStateMutRef<'_>,
-        current_task: &CurrentTask,
-        data: &[UserBuffer],
+        _current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
     ) -> Result<(usize, PendingSignals), Errno> {
         if !self.readable {
             return error!(EAGAIN);
         }
         let max_bytes_to_write = std::cmp::min(self.read_buffer.len(), CANON_MAX_BYTES);
-        let written_to_userspace =
-            current_task.mm.write_all(data, &self.read_buffer[..max_bytes_to_write])?;
+        let written_to_userspace = data.write(&self.read_buffer[..max_bytes_to_write])?;
         self.read_buffer.drain(0..written_to_userspace);
         // If everything has been read, this queue is no longer readable.
         if self.read_buffer.is_empty() {
@@ -992,16 +991,16 @@ impl Queue {
     pub fn write(
         &mut self,
         terminal: TerminalStateMutRef<'_>,
-        current_task: &CurrentTask,
-        data: &[UserBuffer],
+        _current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
     ) -> Result<(usize, PendingSignals), Errno> {
         let room = WAIT_BUFFER_MAX_BYTES - self.total_wait_buffer_length;
-        let data_length = UserBuffer::get_total_length(data)?;
+        let data_length = data.available();
         if room == 0 && data_length > 0 {
             return error!(EAGAIN);
         }
         let mut buffer = vec![0 as RawByte; std::cmp::min(room, data_length)];
-        let read_from_userspace = current_task.mm.read_all(data, &mut buffer)?;
+        let read_from_userspace = data.read_exact(&mut buffer)?;
         assert!(read_from_userspace == buffer.len());
         let signals = self.push_to_waiting_buffer(terminal, buffer);
         Ok((read_from_userspace, signals))

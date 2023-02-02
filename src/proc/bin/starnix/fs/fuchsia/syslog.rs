@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::logging::log;
-use crate::mm::MemoryAccessorExt;
 use crate::syscalls::SyscallResult;
 use crate::task::*;
 use crate::types::*;
@@ -24,10 +24,10 @@ impl FileOps for SyslogFile {
     fn write(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
-        data: &[UserBuffer],
+        _current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        current_task.mm.read_each(data, |bytes| {
+        data.read_each(&mut |bytes| {
             log!(level = info, tag = "stdio", "{}", String::from_utf8_lossy(bytes));
             Ok(bytes.len())
         })
@@ -37,7 +37,7 @@ impl FileOps for SyslogFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         Ok(0)
     }

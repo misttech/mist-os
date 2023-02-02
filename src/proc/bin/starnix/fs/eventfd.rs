@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
-use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
 
@@ -70,15 +70,13 @@ impl FileOps for EventFdFileObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
             || {
                 let mut written_data = [0; DATA_SIZE];
-                if current_task.mm.read_all(data, &mut written_data)? < DATA_SIZE {
-                    return error!(EINVAL);
-                }
+                data.read_exact(&mut written_data)?;
                 let add_value = u64::from_ne_bytes(written_data);
                 if add_value == u64::MAX {
                     return error!(EINVAL);
@@ -105,12 +103,12 @@ impl FileOps for EventFdFileObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
             || {
-                if UserBuffer::get_total_length(data)? < DATA_SIZE {
+                if data.available() < DATA_SIZE {
                     return error!(EINVAL);
                 }
 
@@ -130,7 +128,7 @@ impl FileOps for EventFdFileObject {
                         1
                     }
                 };
-                current_task.mm.write_all(data, &return_value.to_ne_bytes())?;
+                data.write_all(&return_value.to_ne_bytes())?;
                 inner.wait_queue.notify_mask(FdEvents::POLLOUT.bits());
 
                 Ok(BlockableOpsResult::Done(DATA_SIZE))

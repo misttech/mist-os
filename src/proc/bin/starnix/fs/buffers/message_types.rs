@@ -5,10 +5,10 @@
 use zerocopy::byteorder::{ByteOrder, NativeEndian};
 use zerocopy::{AsBytes, FromBytes};
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::socket::{SocketAddress, SocketMessageFlags};
 use crate::fs::*;
-use crate::mm::MemoryAccessor;
-use crate::task::{CurrentTask, Task};
+use crate::task::CurrentTask;
 use crate::types::*;
 
 /// A `Message` represents a typed segment of bytes within a `MessageQueue`.
@@ -303,17 +303,9 @@ pub struct MessageData {
 
 impl MessageData {
     /// Copies data from user memory into a new MessageData object.
-    pub fn copy_from_user(
-        task: &Task,
-        user_buffers: &mut UserBufferIterator<'_>,
-        limit: usize,
-    ) -> Result<MessageData, Errno> {
+    pub fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<MessageData, Errno> {
         let mut bytes = vec![0u8; limit];
-        let mut offset = 0;
-        while let Some(buffer) = user_buffers.next(limit - offset) {
-            task.mm.read_memory(buffer.address, &mut bytes[offset..(offset + buffer.length)])?;
-            offset += buffer.length;
-        }
+        data.read_exact(&mut bytes)?;
         Ok(bytes.into())
     }
 
@@ -340,21 +332,11 @@ impl MessageData {
         &self.bytes
     }
 
-    /// Copies the message out to the user buffers in the given task.
+    /// Copies the message out to the output buffer.
     ///
     /// Returns the number of bytes that were read into the buffer.
-    pub fn copy_to_user(
-        &self,
-        task: &Task,
-        user_buffers: &mut UserBufferIterator<'_>,
-    ) -> Result<usize, Errno> {
-        let mut bytes_read = 0;
-        while let Some(user_buffer) = user_buffers.next(self.bytes.len() - bytes_read) {
-            let bytes_chunk = &self.bytes[bytes_read..(bytes_read + user_buffer.length)];
-            task.mm.write_memory(user_buffer.address, bytes_chunk)?;
-            bytes_read += user_buffer.length;
-        }
-        Ok(bytes_read)
+    pub fn copy_to_user(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+        data.write(self.bytes())
     }
 }
 

@@ -7,6 +7,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::ffi::CStr;
 use std::sync::Arc;
 
+use crate::fs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::fs::*;
 use crate::logging::*;
 use crate::mm::*;
@@ -227,14 +228,9 @@ pub fn sys_process_vm_readv(
     // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
-    let len = std::cmp::min(
-        UserBuffer::get_total_length(&local_iov)?,
-        UserBuffer::get_total_length(&remote_iov)?,
-    );
-    let mut buf = vec![0u8; len];
-    let len = task.mm.read_all(&remote_iov, &mut buf)?;
-    let len = task.mm.write_all(&local_iov, &buf[..len])?;
-    Ok(len)
+    let mut input = UserBuffersInputBuffer::new(&current_task.mm, local_iov)?;
+    let mut output = UserBuffersOutputBuffer::new(&current_task.mm, remote_iov)?;
+    output.write_buffer(&mut input)
 }
 
 pub fn sys_membarrier(

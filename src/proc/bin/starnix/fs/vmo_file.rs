@@ -6,9 +6,9 @@ use fuchsia_zircon::{self as zx, HandleBased};
 use std::sync::Arc;
 
 use super::*;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::logging::impossible_error;
 use crate::mm::vmo::round_up_to_system_page_size;
-use crate::mm::MemoryAccessorExt;
 use crate::syscalls::{SyscallResult, SUCCESS};
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -77,14 +77,13 @@ impl VmoFileObject {
     pub fn read_at(
         vmo: &zx::Vmo,
         file: &FileObject,
-        current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let actual = {
             let info = file.node().info();
             let file_length = info.size;
-            let want_read = UserBuffer::get_total_length(data)?;
+            let want_read = data.available();
             if want_read > MAX_LFS_FILESIZE - offset {
                 return error!(EINVAL);
             }
@@ -94,8 +93,7 @@ impl VmoFileObject {
                 let mut buf = vec![0u8; to_read];
                 vmo.read(&mut buf[..], offset as u64).map_err(|_| errno!(EIO))?;
                 drop(info);
-                // TODO(steveaustin) - write_each might might be more efficient
-                current_task.mm.write_all(data, &buf[..])?;
+                data.write_all(&buf[..])?;
                 to_read
             } else {
                 0
@@ -110,16 +108,15 @@ impl VmoFileObject {
     pub fn write_at(
         vmo: &zx::Vmo,
         file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let want_write = UserBuffer::get_total_length(data)?;
+        let want_write = data.available();
         if want_write > MAX_LFS_FILESIZE - offset {
             return error!(EINVAL);
         }
-        let mut buf = vec![0u8; want_write];
-        current_task.mm.read_all(data, &mut buf[..])?;
+        let buf = data.read_all()?;
 
         let mut info = file.node().info_write();
         let write_end = offset + want_write;
@@ -132,7 +129,7 @@ impl VmoFileObject {
             }
             update_content_size = true;
         }
-        vmo.write(&buf[..], offset as u64).map_err(|_| errno!(EIO))?;
+        vmo.write(&buf, offset as u64).map_err(|_| errno!(EIO))?;
 
         if update_content_size {
             info.size = write_end;
@@ -169,11 +166,11 @@ impl FileOps for VmoFileObject {
     fn read_at(
         &self,
         file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::read_at(&self.vmo, file, current_task, offset, data)
+        VmoFileObject::read_at(&self.vmo, file, offset, data)
     }
 
     fn write_at(
@@ -181,7 +178,7 @@ impl FileOps for VmoFileObject {
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         VmoFileObject::write_at(&self.vmo, file, current_task, offset, data)
     }

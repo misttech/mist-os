@@ -12,6 +12,7 @@ use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::collections::*;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::{Mutex, RwLock};
 use crate::logging::*;
@@ -999,41 +1000,6 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         Ok(data)
     }
 
-    fn read_each<F>(&self, data: &[UserBuffer], mut callback: F) -> Result<usize, Errno>
-    where
-        F: FnMut(&[u8]) -> Result<usize, Errno>,
-    {
-        let mut bytes_read = 0;
-        for buffer in data {
-            if buffer.address.is_null() && buffer.length == 0 {
-                continue;
-            }
-            let bytes = self.read_buffer(buffer)?;
-            let consumed = callback(&bytes)?;
-            bytes_read += consumed;
-            if consumed != bytes.len() {
-                break;
-            }
-        }
-        Ok(bytes_read)
-    }
-
-    fn read_all(&self, data: &[UserBuffer], bytes: &mut [u8]) -> Result<usize, Errno> {
-        let mut offset = 0;
-        for buffer in data {
-            if buffer.address.is_null() && buffer.length == 0 {
-                continue;
-            }
-            let end = std::cmp::min(offset + buffer.length, bytes.len());
-            self.read_memory(buffer.address, &mut bytes[offset..end])?;
-            offset = end;
-            if offset == bytes.len() {
-                break;
-            }
-        }
-        Ok(offset)
-    }
-
     fn read_c_string<'a>(
         &self,
         string: UserCString,
@@ -1055,42 +1021,6 @@ pub trait MemoryAccessorExt: MemoryAccessor {
             bytes_written += self.write_object(user.at(index), object)?;
         }
         Ok(bytes_written)
-    }
-
-    fn write_each<F>(&self, data: &[UserBuffer], mut callback: F) -> Result<usize, Errno>
-    where
-        F: FnMut(&mut [u8]) -> Result<usize, Errno>,
-    {
-        let mut bytes_written = 0;
-        for buffer in data {
-            if buffer.address.is_null() && buffer.length == 0 {
-                continue;
-            }
-            let mut bytes = vec![0; buffer.length];
-            let produced = callback(&mut bytes)?;
-            // if write_memory success, it will returned Ok(produced)
-            bytes_written += self.write_memory(buffer.address, &bytes[0..produced])?;
-            if produced != bytes.len() {
-                break;
-            }
-        }
-        Ok(bytes_written)
-    }
-
-    fn write_all(&self, data: &[UserBuffer], bytes: &[u8]) -> Result<usize, Errno> {
-        let mut offset = 0;
-        for buffer in data {
-            if buffer.address.is_null() && buffer.length == 0 {
-                continue;
-            }
-            let end = std::cmp::min(offset + buffer.length, bytes.len());
-            self.write_memory(buffer.address, &bytes[offset..end])?;
-            offset = end;
-            if offset == bytes.len() {
-                break;
-            }
-        }
-        Ok(offset)
     }
 }
 
@@ -1627,7 +1557,7 @@ impl FileOps for ProcMapsFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let iter = move |cursor: UserAddress, sink: &mut SeqFileBuf| {
             let state = self.task.mm.state.read();
@@ -1669,7 +1599,7 @@ impl FileOps for ProcMapsFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }
@@ -1698,7 +1628,7 @@ impl FileOps for ProcStatFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let command = self.task.command();
         let mut seq = self.seq.lock();
@@ -1724,7 +1654,7 @@ impl FileOps for ProcStatFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }
@@ -1753,7 +1683,7 @@ impl FileOps for ProcStatusFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         let creds = self.task.creds();
         let iter = move |_cursor, sink: &mut SeqFileBuf| {
@@ -1774,7 +1704,7 @@ impl FileOps for ProcStatusFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }
@@ -1970,155 +1900,6 @@ mod tests {
             mm_state.get_contiguous_mappings_at(mm_state.max_address() + 1u64, 0).err().unwrap(),
             errno!(EFAULT)
         );
-    }
-
-    #[::fuchsia::test]
-    fn test_read_each() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
-
-        let page_size = *PAGE_SIZE;
-        let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);
-
-        let data: Vec<u8> = (0..1024).map(|i| (i % 256) as u8).collect();
-        mm.write_memory(addr, &data).expect("failed to write test data");
-
-        let iovec = vec![
-            UserBuffer { address: addr, length: 25 },
-            UserBuffer { address: addr + 64usize, length: 12 },
-        ];
-
-        let mut read_count = 0;
-        mm.read_each(&iovec, |buffer| {
-            match read_count {
-                0 => {
-                    assert_eq!(&data[..25], buffer);
-                }
-                1 => {
-                    assert_eq!(&data[64..76], buffer);
-                }
-                _ => {
-                    panic!();
-                }
-            };
-            read_count += 1;
-            Ok(buffer.len())
-        })
-        .expect("failed to read each");
-        assert_eq!(read_count, 2);
-
-        read_count = 0;
-        mm.read_each(&iovec, |_| {
-            read_count += 1;
-            Ok(0)
-        })
-        .expect("failed to read each");
-        assert_eq!(read_count, 1);
-    }
-
-    #[::fuchsia::test]
-    fn test_read_all() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
-
-        let page_size = *PAGE_SIZE;
-        let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);
-
-        let data: Vec<u8> = (0..1024).map(|i| (i % 256) as u8).collect();
-        mm.write_memory(addr, &data).expect("failed to write test data");
-
-        let iovec = vec![
-            UserBuffer { address: addr, length: 25 },
-            UserBuffer { address: addr + 64usize, length: 12 },
-        ];
-
-        let mut buffer = vec![0u8; 37];
-        mm.read_all(&iovec, &mut buffer).expect("failed to read all");
-        assert_eq!(&data[..25], &buffer[..25]);
-        assert_eq!(&data[64..76], &buffer[25..]);
-
-        buffer = vec![0u8; 27];
-        mm.read_all(&iovec, &mut buffer).expect("failed to read all");
-        assert_eq!(&data[..25], &buffer[..25]);
-        assert_eq!(&data[64..66], &buffer[25..27]);
-
-        buffer = vec![0u8; 42];
-        assert_eq!(Ok(37), mm.read_all(&iovec, &mut buffer));
-    }
-
-    #[::fuchsia::test]
-    fn test_write_each() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
-
-        let page_size = *PAGE_SIZE;
-        let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);
-
-        let data: Vec<u8> = (0..1024).map(|i| (i % 256) as u8).collect();
-
-        let iovec = vec![
-            UserBuffer { address: addr, length: 25 },
-            UserBuffer { address: addr + 64usize, length: 12 },
-        ];
-
-        let mut write_count = 0;
-        mm.write_each(&iovec, |buffer| {
-            match write_count {
-                0 => {
-                    assert_eq!(buffer.len(), 25);
-                    buffer.copy_from_slice(&data[..25]);
-                }
-                1 => {
-                    assert_eq!(buffer.len(), 12);
-                    buffer.copy_from_slice(&data[25..37]);
-                }
-                _ => {
-                    panic!();
-                }
-            };
-            write_count += 1;
-            Ok(buffer.len())
-        })
-        .expect("failed to write each");
-        assert_eq!(write_count, 2);
-
-        let mut written = vec![0u8; 1024];
-        mm.read_memory(addr, &mut written).expect("failed to read back memory");
-        assert_eq!(&written[..25], &data[..25]);
-        assert_eq!(&written[64..76], &data[25..37]);
-    }
-
-    #[::fuchsia::test]
-    fn test_write_all() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
-
-        let page_size = *PAGE_SIZE;
-        let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);
-
-        let data: Vec<u8> = (0..1024).map(|i| (i % 256) as u8).collect();
-
-        let iovec = vec![
-            UserBuffer { address: addr, length: 25 },
-            UserBuffer { address: addr + 64usize, length: 12 },
-        ];
-
-        mm.write_all(&iovec, &data[..37]).expect("failed to write all");
-
-        let mut written = vec![0u8; 1024];
-        mm.read_memory(addr, &mut written).expect("failed to read back memory");
-
-        assert_eq!(&written[..25], &data[..25]);
-        assert_eq!(&written[64..76], &data[25..37]);
-
-        written = vec![0u8; 1024];
-        mm.write_memory(addr, &written).expect("clear memory");
-        mm.write_all(&iovec, &data[..27]).expect("failed to write all");
-        mm.read_memory(addr, &mut written).expect("failed to read back memory");
-        assert_eq!(&written[..25], &data[..25]);
-        assert_eq!(&written[64..66], &data[25..27]);
-
-        assert_eq!(Ok(37), mm.write_all(&iovec, &data[..42]));
     }
 
     #[::fuchsia::test]

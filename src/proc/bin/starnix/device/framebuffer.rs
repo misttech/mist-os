@@ -6,6 +6,7 @@ use super::framebuffer_server::{
     spawn_view_provider, FramebufferServer, IMAGE_HEIGHT, IMAGE_WIDTH,
 };
 use crate::device::DeviceOps;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::RwLock;
 use crate::logging::*;
@@ -144,11 +145,11 @@ impl FileOps for Arc<Framebuffer> {
     fn read_at(
         &self,
         file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::read_at(&self.vmo, file, current_task, offset, data)
+        VmoFileObject::read_at(&self.vmo, file, offset, data)
     }
 
     fn write_at(
@@ -156,7 +157,7 @@ impl FileOps for Arc<Framebuffer> {
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         VmoFileObject::write_at(&self.vmo, file, current_task, offset, data)
     }

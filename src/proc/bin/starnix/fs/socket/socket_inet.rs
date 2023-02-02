@@ -8,7 +8,7 @@ use crate::fs::buffers::*;
 use crate::fs::fuchsia::*;
 use crate::fs::*;
 use crate::logging::*;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
 use fidl::endpoints::ProtocolMarker;
@@ -69,7 +69,7 @@ impl InetSocket {
     pub fn sendmsg(
         &self,
         addr: &Option<SocketAddress>,
-        buf: Vec<u8>,
+        data: &mut dyn InputBuffer,
         cmsg: Vec<u8>,
         flags: SocketMessageFlags,
     ) -> Result<usize, Errno> {
@@ -81,10 +81,14 @@ impl InetSocket {
             None => vec![],
         };
 
-        self.zxio
-            .sendmsg(addr, buf, cmsg, flags.bits() & !MSG_DONTWAIT)
+        let bytes = data.peek_all()?;
+        let send_bytes = self
+            .zxio
+            .sendmsg(addr, bytes, cmsg, flags.bits() & !MSG_DONTWAIT)
             .map_err(|status| from_status_like_fdio!(status))?
-            .map_err(|out_code| errno_from_zxio_code!(out_code))
+            .map_err(|out_code| errno_from_zxio_code!(out_code))?;
+        data.advance(send_bytes)?;
+        Ok(send_bytes)
     }
 
     pub fn recvmsg(
@@ -158,19 +162,14 @@ impl SocketOps for InetSocket {
     fn read(
         &self,
         _socket: &Socket,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        _current_task: &CurrentTask,
+        data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
-        let iovec_length = user_buffers.remaining();
+        let iovec_length = data.available();
         let info = self.recvmsg(iovec_length, flags)?;
 
-        let mut bytes_read = 0;
-        while let Some(user_buffer) = user_buffers.next(info.message_length - bytes_read) {
-            let bytes_chunk = &info.message[bytes_read..user_buffer.length];
-            current_task.mm.write_memory(user_buffer.address, bytes_chunk)?;
-            bytes_read += user_buffer.length;
-        }
+        let bytes_read = data.write_all(&info.message)?;
 
         let address = if !info.address.is_empty() {
             Some(SocketAddress::from_bytes(info.address)?)
@@ -190,17 +189,11 @@ impl SocketOps for InetSocket {
     fn write(
         &self,
         _socket: &Socket,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        _current_task: &CurrentTask,
+        data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        let buffers = user_buffers.drain_to_vec();
-
-        let iovec_length = UserBuffer::get_total_length(&buffers)?;
-        let mut data = vec![0u8; iovec_length];
-        current_task.mm.read_all(&buffers, &mut data)?;
-
         // TODO: Handle ancillary_data.
         self.sendmsg(dest_address, data, vec![], SocketMessageFlags::empty())
     }

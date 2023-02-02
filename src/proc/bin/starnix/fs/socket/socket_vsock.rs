@@ -159,7 +159,7 @@ impl SocketOps for VsockSocket {
         &self,
         _socket: &Socket,
         current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn OutputBuffer,
         _flags: SocketMessageFlags,
     ) -> Result<MessageReadInfo, Errno> {
         let inner = self.lock();
@@ -167,8 +167,7 @@ impl SocketOps for VsockSocket {
 
         match &inner.state {
             VsockSocketState::Connected(file) => {
-                let buffers = user_buffers.drain_to_vec();
-                let bytes_read = file.read(current_task, &buffers)?;
+                let bytes_read = file.read(current_task, data)?;
                 Ok(MessageReadInfo {
                     bytes_read,
                     message_length: bytes_read,
@@ -184,16 +183,13 @@ impl SocketOps for VsockSocket {
         &self,
         _socket: &Socket,
         current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
         _dest_address: &mut Option<SocketAddress>,
         _ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
         let inner = self.lock();
         match &inner.state {
-            VsockSocketState::Connected(file) => {
-                let buffers = user_buffers.drain_to_vec();
-                file.write(current_task, &buffers)
-            }
+            VsockSocketState::Connected(file) => file.write(current_task, data),
             _ => error!(EBADF),
         }
     }
@@ -299,8 +295,9 @@ impl VsockSocketInner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::fs::fuchsia::create_fuchsia_pipe;
-    use crate::mm::{MemoryAccessor, PAGE_SIZE};
+    use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use fidl::SocketOpts as ZirconSocketOpts;
     use fuchsia_zircon as zx;
@@ -334,32 +331,15 @@ mod tests {
 
         let test_bytes_in: [u8; 5] = [0, 1, 2, 3, 4];
         assert_eq!(fs1.write(&test_bytes_in[..]).unwrap(), test_bytes_in.len());
-        let buffer_to = UserBuffer {
-            address: map_memory(&current_task, UserAddress::default(), *PAGE_SIZE),
-            length: *PAGE_SIZE as usize,
-        };
-        let buffers = [buffer_to];
-        let mut buffer_iterator = UserBufferIterator::new(&buffers[..]);
+        let mut buffer_iterator = VecOutputBuffer::new(*PAGE_SIZE as usize);
         let read_message_info = server_socket
             .read(&current_task, &mut buffer_iterator, SocketMessageFlags::empty())
             .unwrap();
         assert_eq!(read_message_info.bytes_read, test_bytes_in.len());
-
-        let mut result_bytes = vec![0u8; test_bytes_in.len()];
-        current_task.mm.read_memory(buffer_to.address, &mut result_bytes).unwrap();
-        assert_eq!(result_bytes, test_bytes_in);
+        assert_eq!(buffer_iterator.data(), test_bytes_in);
 
         let test_bytes_out: [u8; 10] = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-        let buffer_from = UserBuffer {
-            address: map_memory(&current_task, UserAddress::default(), test_bytes_out.len() as u64),
-            length: test_bytes_out.len(),
-        };
-        assert_eq!(
-            test_bytes_out.len(),
-            current_task.mm.write_memory(buffer_from.address, &test_bytes_out).unwrap()
-        );
-        let buffers = [buffer_from];
-        let mut buffer_iterator = UserBufferIterator::new(&buffers[..]);
+        let mut buffer_iterator = VecInputBuffer::new(&test_bytes_out);
         let bytes_written = server_socket
             .write(&current_task, &mut buffer_iterator, &mut None, &mut vec![])
             .unwrap();
@@ -390,18 +370,15 @@ mod tests {
 
         let socket_clone = socket_file.clone();
         let thread = std::thread::spawn(move || {
-            let address = map_memory(&current_task_2, UserAddress::default(), *PAGE_SIZE);
-            let bytes_read = socket_clone
-                .read(&current_task_2, &[UserBuffer { address, length: XFER_SIZE }])
-                .unwrap();
+            let bytes_read =
+                socket_clone.read(&current_task_2, &mut VecOutputBuffer::new(XFER_SIZE)).unwrap();
             assert_eq!(XFER_SIZE, bytes_read);
         });
 
         // Wait for the thread to become blocked on the read.
         zx::Duration::from_seconds(2).sleep();
 
-        let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-        socket_file.write(&current_task, &[UserBuffer { address, length: XFER_SIZE }]).unwrap();
+        socket_file.write(&current_task, &mut VecInputBuffer::new(&[0; XFER_SIZE])).unwrap();
 
         let mut buffer = [0u8; 1024];
         assert_eq!(XFER_SIZE, fs1.read(&mut buffer).unwrap());
@@ -413,7 +390,6 @@ mod tests {
     fn test_vsock_poll() {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let (client, server) = zx::Socket::create(zx::SocketOpts::empty()).expect("Socket::create");
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
@@ -440,10 +416,7 @@ mod tests {
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
         assert_eq!(fds.len(), 1);
 
-        assert_eq!(
-            socket.read(&current_task, &[UserBuffer { address, length: 64 }]).expect("read"),
-            1
-        );
+        assert_eq!(socket.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
 
         assert_eq!(socket.query_events(&current_task), FdEvents::POLLOUT);
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");

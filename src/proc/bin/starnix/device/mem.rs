@@ -6,9 +6,9 @@ use fuchsia_zircon::{self as zx, cprng_draw};
 
 use crate::auth::FsCred;
 use crate::device::DeviceOps;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::logging::*;
-use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
 
@@ -33,9 +33,9 @@ impl FileOps for DevNull {
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        current_task.mm.read_each(data, |bytes| {
+        data.read_each(&mut |bytes| {
             log_info!(current_task, "write to devnull: {:?}", String::from_utf8_lossy(bytes));
             Ok(bytes.len())
         })
@@ -46,7 +46,7 @@ impl FileOps for DevNull {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         Ok(0)
     }
@@ -66,19 +66,19 @@ impl FileOps for DevZero {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        UserBuffer::get_total_length(data)
+        Ok(data.drain())
     }
 
     fn read_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        current_task.mm.write_each(data, |bytes| {
+        data.write_each(&mut |bytes| {
             bytes.fill(0);
             Ok(bytes.len())
         })
@@ -95,7 +95,7 @@ impl FileOps for DevFull {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSPC)
     }
@@ -103,11 +103,11 @@ impl FileOps for DevFull {
     fn read_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        current_task.mm.write_each(data, |bytes| {
+        data.write_each(&mut |bytes| {
             bytes.fill(0);
             Ok(bytes.len())
         })
@@ -124,19 +124,19 @@ impl FileOps for DevRandom {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        UserBuffer::get_total_length(data)
+        Ok(data.drain())
     }
 
     fn read_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        current_task.mm.write_each(data, |bytes| {
+        data.write_each(&mut |bytes| {
             cprng_draw(bytes);
             Ok(bytes.len())
         })
@@ -153,7 +153,7 @@ impl FileOps for DevKmsg {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         Ok(0)
     }
@@ -161,20 +161,18 @@ impl FileOps for DevKmsg {
     fn write_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let total = UserBuffer::get_total_length(data)?;
-        let mut bytes = vec![0; total];
-        current_task.mm.read_all(data, &mut bytes)?;
+        let bytes = data.read_all()?;
         log!(
             level = info,
             tag = "kmsg",
             "{}",
             String::from_utf8_lossy(&bytes).trim_end_matches('\n')
         );
-        Ok(total)
+        Ok(bytes.len())
     }
 }
 

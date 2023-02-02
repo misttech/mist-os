@@ -18,6 +18,7 @@ use super::tmpfs::TmpFs;
 use super::*;
 use crate::bpf::BpfFs;
 use crate::device::BinderFs;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::lock::{Mutex, RwLock};
 use crate::mutable_state::*;
 use crate::selinux::selinux_fs;
@@ -531,7 +532,7 @@ impl FileOps for ProcMountsFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
@@ -562,7 +563,7 @@ impl FileOps for ProcMountsFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }
@@ -591,7 +592,7 @@ impl FileOps for ProcMountinfoFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         // TODO(tbodt): We should figure out a way to have a real iterator instead of grabbing the
         // entire list in one go. Should we have a BTreeMap<u64, Weak<Mount>> in the Namespace?
@@ -635,7 +636,7 @@ impl FileOps for ProcMountinfoFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &[UserBuffer],
+        _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(ENOSYS)
     }

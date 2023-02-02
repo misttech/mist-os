@@ -518,13 +518,10 @@ impl WaitQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::fs::fuchsia::*;
-    use crate::fs::FdEvents;
-    use crate::fs::{new_eventfd, EventFdType};
-    use crate::mm::PAGE_SIZE;
-    use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+    use crate::fs::{new_eventfd, EventFdType, FdEvents};
     use crate::testing::*;
-    use crate::types::UserBuffer;
     use std::sync::atomic::AtomicU64;
 
     static INIT_VAL: u64 = 0;
@@ -540,8 +537,7 @@ mod tests {
         let pipe = create_fuchsia_pipe(&current_task, remote_socket, OpenFlags::RDWR).unwrap();
 
         const MEM_SIZE: usize = 1024;
-        let proc_mem = map_memory(&current_task, UserAddress::default(), MEM_SIZE as u64);
-        let proc_read_buf = [UserBuffer { address: proc_mem, length: MEM_SIZE }];
+        let mut output_buffer = VecOutputBuffer::new(MEM_SIZE);
 
         let test_string = "hello startnix".to_string();
         let report_packet: EventHandler = Box::new(|observed: FdEvents| {
@@ -571,15 +567,12 @@ mod tests {
         let _ = thread.join();
         assert_eq!(FINAL_VAL, COUNTER.load(Ordering::Relaxed));
 
-        let read_size = pipe.read(&current_task, &proc_read_buf).unwrap();
-        let mut read_mem = [0u8; MEM_SIZE];
-        current_task.mm.read_all(&proc_read_buf, &mut read_mem).unwrap();
+        let read_size = pipe.read(&current_task, &mut output_buffer).unwrap();
 
         let no_written = WRITE_COUNT.load(Ordering::Relaxed);
         assert_eq!(no_written, read_size as u64);
 
-        let read_mem_valid = &read_mem[0..read_size];
-        assert_eq!(read_mem_valid, test_string.as_bytes());
+        assert_eq!(output_buffer.data(), test_string.as_bytes());
     }
 
     #[::fuchsia::test]
@@ -603,11 +596,13 @@ mod tests {
             if do_cancel {
                 event.cancel_wait(&current_task, &waiter, key);
             }
-            let write_mem = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
             let add_val = 1u64;
-            current_task.mm.write_memory(write_mem, &add_val.to_ne_bytes()).unwrap();
-            let data = [UserBuffer { address: write_mem, length: std::mem::size_of::<u64>() }];
-            assert_eq!(event.write(&current_task, &data).unwrap(), std::mem::size_of::<u64>());
+            assert_eq!(
+                event
+                    .write(&current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes()))
+                    .unwrap(),
+                std::mem::size_of::<u64>()
+            );
 
             let wait_result = waiter.wait_until(&current_task, zx::Time::ZERO);
             let final_count = callback_count.load(Ordering::Relaxed);

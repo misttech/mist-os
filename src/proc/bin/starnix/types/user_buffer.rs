@@ -27,112 +27,20 @@ impl UserBuffer {
         }
         Ok(total)
     }
-}
 
-pub struct UserBufferIterator<'a> {
-    buffers: &'a [UserBuffer],
-    index: usize,
-    offset: usize,
-}
-
-impl<'a> UserBufferIterator<'a> {
-    pub fn new(buffers: &'a [UserBuffer]) -> UserBufferIterator<'a> {
-        UserBufferIterator { buffers, index: 0, offset: 0 }
+    pub fn advance(&mut self, length: usize) -> Result<(), Errno> {
+        self.address = self.address.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
+        self.length = self.length.checked_sub(length).ok_or_else(|| errno!(EINVAL))?;
+        Ok(())
     }
 
-    pub fn remaining(&self) -> usize {
-        let remaining =
-            self.buffers[self.index..].iter().fold(0, |sum, buffer| sum + buffer.length);
-        remaining - self.offset
+    /// Returns whether the buffer address is 0 and its length is 0.
+    pub fn is_null(&self) -> bool {
+        self.address.is_null() && self.is_empty()
     }
 
-    pub fn next(&mut self, limit: usize) -> Option<UserBuffer> {
-        if self.index >= self.buffers.len() || limit == 0 {
-            return None;
-        }
-        let buffer = &self.buffers[self.index];
-        let chunk_size = std::cmp::min(limit, buffer.length - self.offset);
-        let result = UserBuffer { address: buffer.address + self.offset, length: chunk_size };
-        self.offset += chunk_size;
-        while self.index < self.buffers.len() && self.offset == self.buffers[self.index].length {
-            self.index += 1;
-            self.offset = 0;
-        }
-        Some(result)
-    }
-
-    pub fn drain_to_vec(&mut self) -> Vec<UserBuffer> {
-        let mut buffers = Vec::<UserBuffer>::new();
-        while let Some(buffer) = self.next(usize::MAX) {
-            buffers.push(buffer);
-        }
-        buffers
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[::fuchsia::test]
-    fn test_get_total_length_overflow() {
-        let buffers = vec![
-            UserBuffer { address: UserAddress::from_ptr(0x20), length: usize::MAX - 10 },
-            UserBuffer { address: UserAddress::from_ptr(0x820), length: usize::MAX - 10 },
-            UserBuffer { address: UserAddress::from_ptr(0x3820), length: usize::MAX - 10 },
-        ];
-        assert!(UserBuffer::get_total_length(&buffers).is_err());
-        let buffers = vec![
-            UserBuffer { address: UserAddress::from_ptr(0x20), length: (isize::MAX - 10) as usize },
-            UserBuffer {
-                address: UserAddress::from_ptr(0x820),
-                length: (isize::MAX - 10) as usize,
-            },
-            UserBuffer {
-                address: UserAddress::from_ptr(0x3820),
-                length: (isize::MAX - 10) as usize,
-            },
-        ];
-        assert!(UserBuffer::get_total_length(&buffers).is_err());
-    }
-
-    #[::fuchsia::test]
-    fn test_user_buffer_iterator() {
-        let buffers = vec![
-            UserBuffer { address: UserAddress::from_ptr(0x20), length: 7 },
-            UserBuffer { address: UserAddress::from_ptr(0x820), length: 0 },
-            UserBuffer { address: UserAddress::from_ptr(0x3820), length: 42 },
-        ];
-        let data = &buffers[..];
-        let mut user_buffers = UserBufferIterator::new(data);
-        assert_eq!(49, user_buffers.remaining());
-        assert_eq!(None, user_buffers.next(0));
-        assert_eq!(
-            Some(UserBuffer { address: UserAddress::from_ptr(0x20), length: 1 }),
-            user_buffers.next(1)
-        );
-        assert_eq!(48, user_buffers.remaining());
-        assert_eq!(
-            Some(UserBuffer { address: UserAddress::from_ptr(0x21), length: 2 }),
-            user_buffers.next(2)
-        );
-        assert_eq!(46, user_buffers.remaining());
-        assert_eq!(
-            Some(UserBuffer { address: UserAddress::from_ptr(0x23), length: 4 }),
-            user_buffers.next(31)
-        );
-        assert_eq!(42, user_buffers.remaining());
-        assert_eq!(
-            Some(UserBuffer { address: UserAddress::from_ptr(0x3820), length: 9 }),
-            user_buffers.next(9)
-        );
-        assert_eq!(33, user_buffers.remaining());
-        assert_eq!(
-            Some(UserBuffer { address: UserAddress::from_ptr(0x3829), length: 33 }),
-            user_buffers.next(40)
-        );
-        assert_eq!(0, user_buffers.remaining());
-        assert_eq!(None, user_buffers.next(40));
-        assert_eq!(0, user_buffers.remaining());
+    /// Returns whether the buffer length is 0.
+    pub fn is_empty(&self) -> bool {
+        self.length == 0
     }
 }

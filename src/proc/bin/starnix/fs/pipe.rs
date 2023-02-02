@@ -119,11 +119,7 @@ impl Pipe {
         self.messages.available_capacity() > 0 && self.had_reader
     }
 
-    pub fn read(
-        &mut self,
-        current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
-    ) -> Result<usize, Errno> {
+    pub fn read(&mut self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
         // If there isn't any data to read from the pipe, then the behavior
         // depends on whether there are any open writers. If there is an
         // open writer, then we return EAGAIN, to signal that the callers
@@ -136,13 +132,13 @@ impl Pipe {
             return error!(EAGAIN);
         }
 
-        self.messages.read_stream(current_task, user_buffers).map(|info| info.bytes_read)
+        self.messages.read_stream(data).map(|info| info.bytes_read)
     }
 
     pub fn write(
         &mut self,
         current_task: &CurrentTask,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         if !self.had_reader {
             return error!(EAGAIN);
@@ -153,7 +149,7 @@ impl Pipe {
             return error!(EPIPE);
         }
 
-        self.messages.write_stream(current_task, user_buffers, None, &mut vec![])
+        self.messages.write_stream(data, None, &mut vec![])
     }
 
     fn query_events(&self) -> FdEvents {
@@ -286,14 +282,13 @@ impl FileOps for PipeFileObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
             || {
-                let mut user_buffers = UserBufferIterator::new(data);
                 let mut pipe = self.pipe.lock();
-                let actual = pipe.read(current_task, &mut user_buffers)?;
+                let actual = pipe.read(data)?;
                 if actual > 0 {
                     pipe.waiters.notify_events(FdEvents::POLLOUT);
                 }
@@ -308,31 +303,27 @@ impl FileOps for PipeFileObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let requested = UserBuffer::get_total_length(data)?;
-        let mut actual = 0;
-        let mut user_buffers = UserBufferIterator::new(data);
         file.blocking_op(
             current_task,
             || {
                 let mut pipe = self.pipe.lock();
-                actual += match pipe.write(current_task, &mut user_buffers) {
+                match pipe.write(current_task, data) {
                     Ok(chunk) => {
                         if chunk > 0 {
                             pipe.waiters.notify_events(FdEvents::POLLIN);
                         }
-                        chunk
                     }
-                    Err(errno) if errno == EPIPE && actual > 0 => {
-                        return Ok(BlockableOpsResult::Done(actual))
+                    Err(errno) if errno == EPIPE && data.bytes_read() > 0 => {
+                        return Ok(BlockableOpsResult::Done(data.bytes_read()))
                     }
                     Err(errno) => return Err(errno),
                 };
-                if actual < requested {
-                    Ok(BlockableOpsResult::Partial(actual))
+                if data.available() > 0 {
+                    Ok(BlockableOpsResult::Partial(data.bytes_read()))
                 } else {
-                    Ok(BlockableOpsResult::Done(actual))
+                    Ok(BlockableOpsResult::Done(data.bytes_read()))
                 }
             },
             FdEvents::POLLOUT,

@@ -5,9 +5,9 @@
 use std::collections::VecDeque;
 
 use super::message_types::*;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::socket::SocketAddress;
 use crate::fs::FdEvents;
-use crate::task::Task;
 use crate::types::*;
 
 #[derive(Debug, Default, Clone)]
@@ -91,21 +91,16 @@ impl MessageQueue {
     }
 
     /// Reads messages until there are no more messages, a message with ancillary data is
-    /// encountered, or `user_buffers` are full.
+    /// encountered, or `data` are full.
     ///
     /// To read data from the queue without consuming the messages, see `peek_stream`.
     ///
     /// # Parameters
-    /// - `task`: The task to read memory from.
-    /// - `user_buffers`: The `UserBufferIterator` to write the data to.
+    /// - `data`: The `OutputBuffer` to write the data to.
     ///
     /// Returns the number of bytes that were read into the buffer, and any ancillary data that was
     /// read.
-    pub fn read_stream(
-        &mut self,
-        task: &Task,
-        user_buffers: &mut UserBufferIterator<'_>,
-    ) -> Result<MessageReadInfo, Errno> {
+    pub fn read_stream(&mut self, data: &mut dyn OutputBuffer) -> Result<MessageReadInfo, Errno> {
         let mut total_bytes_read = 0;
         let mut address = None;
         let mut ancillary_data = vec![];
@@ -119,7 +114,7 @@ impl MessageQueue {
                 break;
             }
 
-            let bytes_read = message.data.copy_to_user(task, user_buffers)?;
+            let bytes_read = message.data.copy_to_user(data)?;
             total_bytes_read += bytes_read;
 
             if let Some(remaining_data) = message.data.split_off(bytes_read) {
@@ -148,23 +143,18 @@ impl MessageQueue {
     }
 
     /// Peeks messages until there are no more messages, a message with ancillary data is
-    /// encountered, or `user_buffers` are full.
+    /// encountered, or `data` are full.
     ///
     /// Unlike `read_stream`, this function does not remove the messages from the queue.
     ///
     /// Used to implement MSG_PEEK.
     ///
     /// # Parameters
-    /// - `task`: The task to read memory from.
-    /// - `user_buffers`: The `UserBufferIterator` to write the data to.
+    /// - `data`: The `OutputBuffer` to write the data to.
     ///
     /// Returns the number of bytes that were read into the buffer, and any ancillary data that was
     /// read.
-    pub fn peek_stream(
-        &self,
-        task: &Task,
-        user_buffers: &mut UserBufferIterator<'_>,
-    ) -> Result<MessageReadInfo, Errno> {
+    pub fn peek_stream(&self, data: &mut dyn OutputBuffer) -> Result<MessageReadInfo, Errno> {
         let mut total_bytes_read = 0;
         let mut address = None;
         let mut ancillary_data = vec![];
@@ -174,7 +164,7 @@ impl MessageQueue {
                 break;
             }
 
-            let bytes_read = message.data.copy_to_user(task, user_buffers)?;
+            let bytes_read = message.data.copy_to_user(data)?;
             total_bytes_read += bytes_read;
 
             if bytes_read < message.len() {
@@ -195,14 +185,10 @@ impl MessageQueue {
         })
     }
 
-    pub fn read_datagram(
-        &mut self,
-        task: &Task,
-        user_buffers: &mut UserBufferIterator<'_>,
-    ) -> Result<MessageReadInfo, Errno> {
+    pub fn read_datagram(&mut self, data: &mut dyn OutputBuffer) -> Result<MessageReadInfo, Errno> {
         if let Some(message) = self.read_message() {
             Ok(MessageReadInfo {
-                bytes_read: message.data.copy_to_user(task, user_buffers)?,
+                bytes_read: message.data.copy_to_user(data)?,
                 message_length: message.len(),
                 address: message.address,
                 ancillary_data: message.ancillary_data,
@@ -212,14 +198,10 @@ impl MessageQueue {
         }
     }
 
-    pub fn peek_datagram(
-        &mut self,
-        task: &Task,
-        user_buffers: &mut UserBufferIterator<'_>,
-    ) -> Result<MessageReadInfo, Errno> {
+    pub fn peek_datagram(&mut self, data: &mut dyn OutputBuffer) -> Result<MessageReadInfo, Errno> {
         if let Some(message) = self.peek_message() {
             Ok(MessageReadInfo {
-                bytes_read: message.data.copy_to_user(task, user_buffers)?,
+                bytes_read: message.data.copy_to_user(data)?,
                 message_length: message.len(),
                 address: message.address.clone(),
                 ancillary_data: message.ancillary_data.clone(),
@@ -242,53 +224,51 @@ impl MessageQueue {
         self.messages.front()
     }
 
-    /// Writes the the contents of `UserBufferIterator` into this socket.
+    /// Writes the the contents of `InputBuffer` into this socket.
     /// Will return EAGAIN if not enough capacity is available.
     ///
     /// # Parameters
     /// - `task`: The task to read memory from.
-    /// - `user_buffers`: The `UserBufferIterator` to read the data from.
+    /// - `data`: The `InputBuffer` to read the data from.
     ///
     /// Returns the number of bytes that were written to the socket.
     pub fn write_stream(
         &mut self,
-        task: &Task,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        let actual = std::cmp::min(self.available_capacity(), user_buffers.remaining());
-        if actual == 0 && user_buffers.remaining() > 0 {
+        let actual = std::cmp::min(self.available_capacity(), data.available());
+        if actual == 0 && data.available() > 0 {
             return error!(EAGAIN);
         }
-        let data = MessageData::copy_from_user(task, user_buffers, actual)?;
+        let data = MessageData::copy_from_user(data, actual)?;
         self.write_message(Message::new(data, address, std::mem::take(ancillary_data)));
         Ok(actual)
     }
 
-    /// Writes the the contents of `UserBufferIterator` into this socket as
+    /// Writes the the contents of `InputBuffer` into this socket as
     /// single message. Will return EAGAIN if not enough capacity is available.
     ///
     /// # Parameters
     /// - `task`: The task to read memory from.
-    /// - `user_buffers`: The `UserBufferIterator` to read the data from.
+    /// - `data`: The `InputBuffer` to read the data from.
     ///
     /// Returns the number of bytes that were written to the socket.
     pub fn write_datagram(
         &mut self,
-        task: &Task,
-        user_buffers: &mut UserBufferIterator<'_>,
+        data: &mut dyn InputBuffer,
         address: Option<SocketAddress>,
         ancillary_data: &mut Vec<AncillaryData>,
     ) -> Result<usize, Errno> {
-        let actual = user_buffers.remaining();
+        let actual = data.available();
         if actual > self.capacity() {
             return error!(EMSGSIZE);
         }
         if actual > self.available_capacity() {
             return error!(EAGAIN);
         }
-        let data = MessageData::copy_from_user(task, user_buffers, actual)?;
+        let data = MessageData::copy_from_user(data, actual)?;
         self.write_message(Message::new(data, address, std::mem::take(ancillary_data)));
         Ok(actual)
     }

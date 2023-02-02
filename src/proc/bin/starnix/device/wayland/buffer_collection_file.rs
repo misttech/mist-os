@@ -7,6 +7,7 @@ use fuchsia_zircon as zx;
 
 use std::sync::Arc;
 
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::task::CurrentTask;
 use crate::types::*;
@@ -42,11 +43,11 @@ impl FileOps for BufferCollectionFile {
     fn read_at(
         &self,
         file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        VmoFileObject::read_at(&self.vmo, file, current_task, offset, data)
+        VmoFileObject::read_at(&self.vmo, file, offset, data)
     }
 
     fn write_at(
@@ -54,7 +55,7 @@ impl FileOps for BufferCollectionFile {
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         VmoFileObject::write_at(&self.vmo, file, current_task, offset, data)
     }

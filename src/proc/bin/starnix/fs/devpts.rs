@@ -7,6 +7,7 @@ use std::sync::{Arc, Weak};
 use crate::auth::FsCred;
 use crate::device::terminal::*;
 use crate::device::DeviceOps;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::logging::log_error;
 use crate::mm::MemoryAccessorExt;
@@ -253,7 +254,7 @@ impl FileOps for DevPtmxFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
@@ -267,7 +268,7 @@ impl FileOps for DevPtmxFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
@@ -361,7 +362,7 @@ impl FileOps for DevPtsFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
@@ -375,7 +376,7 @@ impl FileOps for DevPtsFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
@@ -547,6 +548,7 @@ fn shared_ioctl(
 mod tests {
     use super::*;
     use crate::auth::{Credentials, FsCred};
+    use crate::fs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::fs::tmpfs::TmpFs;
     use crate::testing::*;
 
@@ -989,25 +991,18 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let pts = open_file(&task, fs, b"0").expect("open file");
 
-        let mm = &task.mm;
-        let addr = map_memory(&task, UserAddress::default(), 4096);
-        let mut buffer = vec![0; 4096];
-        let get_buffer = |size: usize| [UserBuffer { address: addr, length: size }];
-
         let has_data_ready_to_read =
             |fd: &FileHandle| fd.query_events(&task).contains(FdEvents::POLLIN);
 
         let write_and_assert = |fd: &FileHandle, data: &[u8]| {
-            mm.write_all(&get_buffer(data.len()), data).expect("write_all");
-            assert_eq!(fd.write(&task, &get_buffer(data.len())).expect("write"), data.len());
+            assert_eq!(fd.write(&task, &mut VecInputBuffer::new(data)).expect("write"), data.len());
         };
 
-        let mut read_and_check = |fd: &FileHandle, data: &[u8]| {
+        let read_and_check = |fd: &FileHandle, data: &[u8]| {
             assert!(has_data_ready_to_read(fd));
-            assert_eq!(fd.read(&task, &get_buffer(data.len() + 1)).expect("read"), data.len());
-            mm.read_all(&get_buffer(data.len()), &mut buffer).expect("read_all");
-
-            assert_eq!(data, buffer[..data.len()].to_vec());
+            let mut buffer = VecOutputBuffer::new(data.len() + 1);
+            assert_eq!(fd.read(&task, &mut buffer).expect("read"), data.len());
+            assert_eq!(data, buffer.data());
         };
 
         let hello_buffer = b"hello\n";

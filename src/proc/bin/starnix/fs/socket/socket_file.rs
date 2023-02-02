@@ -20,11 +20,11 @@ impl FileOps for SocketFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         // The behavior of recv differs from read: recv will block if given a zero-size buffer when
         // there's no data available, but read will immediately return 0.
-        if UserBuffer::get_total_length(data)? == 0 {
+        if data.available() == 0 {
             return Ok(0);
         }
         let info = self.recvmsg(current_task, file, data, SocketMessageFlags::empty(), None)?;
@@ -35,7 +35,7 @@ impl FileOps for SocketFile {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         self.sendmsg(current_task, file, data, None, vec![], SocketMessageFlags::empty())
     }
@@ -93,39 +93,28 @@ impl SocketFile {
         &self,
         current_task: &CurrentTask,
         file: &FileObject,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
         mut dest_address: Option<SocketAddress>,
         mut ancillary_data: Vec<AncillaryData>,
         flags: SocketMessageFlags,
     ) -> Result<usize, Errno> {
         // TODO: Implement more `flags`.
 
-        let requested = UserBuffer::get_total_length(data)?;
-        let mut actual = 0;
-        let mut user_buffers = UserBufferIterator::new(data);
-
         let mut op = || {
-            let bytes_written = match self.socket.write(
-                current_task,
-                &mut user_buffers,
-                &mut dest_address,
-                &mut ancillary_data,
-            ) {
-                Err(e) if e == ENOTCONN && actual > 0 => {
+            match self.socket.write(current_task, data, &mut dest_address, &mut ancillary_data) {
+                Err(e) if e == ENOTCONN && data.bytes_read() > 0 => {
                     // If the error is ENOTCONN (that is, the write failed because the socket was
                     // disconnected), then return the amount of bytes that were written before
                     // the disconnect.
-                    return Ok(BlockableOpsResult::Done(actual));
+                    return Ok(BlockableOpsResult::Done(data.bytes_read()));
                 }
                 result => result,
             }?;
 
-            actual += bytes_written;
-
-            if actual < requested {
-                Ok(BlockableOpsResult::Partial(actual))
+            if data.available() > 0 {
+                Ok(BlockableOpsResult::Partial(data.bytes_read()))
             } else {
-                Ok(BlockableOpsResult::Done(actual))
+                Ok(BlockableOpsResult::Done(data.bytes_read()))
             }
         };
 
@@ -149,31 +138,27 @@ impl SocketFile {
         &self,
         current_task: &CurrentTask,
         file: &FileObject,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
         deadline: Option<zx::Time>,
     ) -> Result<MessageReadInfo, Errno> {
         // TODO: Implement more `flags`.
-        let mut read_all_buffers = UserBufferIterator::new(data);
         let mut read_all_info = MessageReadInfo::default();
 
         let mut op = || {
             if self.wait_all(current_task, flags) {
-                self.socket.read(current_task, &mut read_all_buffers, flags).map(|mut read_info| {
+                self.socket.read(current_task, data, flags).map(|mut read_info| {
                     read_all_info.append(&mut read_info);
                     read_all_info.address = read_info.address;
 
-                    if read_all_buffers.remaining() > 0 {
+                    if data.available() > 0 {
                         BlockableOpsResult::Partial(read_all_info.clone())
                     } else {
                         BlockableOpsResult::Done(read_all_info.clone())
                     }
                 })
             } else {
-                let mut user_buffers = UserBufferIterator::new(data);
-                self.socket
-                    .read(current_task, &mut user_buffers, flags)
-                    .map(BlockableOpsResult::Done)
+                self.socket.read(current_task, data, flags).map(BlockableOpsResult::Done)
             }
         };
 

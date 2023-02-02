@@ -6,6 +6,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use std::usize;
 
+use crate::fs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::fs::eventfd::*;
 use crate::fs::fuchsia::*;
 use crate::fs::inotify::*;
@@ -26,7 +27,8 @@ pub fn sys_read(
     length: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    file.read(current_task, &[UserBuffer { address, length }]).map_eintr(errno!(ERESTARTSYS))
+    file.read(current_task, &mut UserBuffersOutputBuffer::new_at(&current_task.mm, address, length))
+        .map_eintr(errno!(ERESTARTSYS))
 }
 
 pub fn sys_write(
@@ -36,7 +38,8 @@ pub fn sys_write(
     length: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    file.write(current_task, &[UserBuffer { address, length }]).map_eintr(errno!(ERESTARTSYS))
+    file.write(current_task, &mut UserBuffersInputBuffer::new_at(&current_task.mm, address, length))
+        .map_eintr(errno!(ERESTARTSYS))
 }
 
 pub fn sys_close(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
@@ -121,7 +124,11 @@ pub fn sys_pread64(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     let offset = offset.try_into().map_err(|_| errno!(EINVAL))?;
-    file.read_at(current_task, offset, &[UserBuffer { address, length }])
+    file.read_at(
+        current_task,
+        offset,
+        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, address, length),
+    )
 }
 
 pub fn sys_pwrite64(
@@ -133,7 +140,11 @@ pub fn sys_pwrite64(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     let offset = offset.try_into().map_err(|_| errno!(EINVAL))?;
-    file.write_at(current_task, offset, &[UserBuffer { address, length }])
+    file.write_at(
+        current_task,
+        offset,
+        &mut UserBuffersInputBuffer::new_at(&current_task.mm, address, length),
+    )
 }
 
 pub fn sys_preadv(
@@ -145,7 +156,11 @@ pub fn sys_preadv(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
-    file.read_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &iovec)
+    file.read_at(
+        current_task,
+        offset.try_into().map_err(|_| errno!(EINVAL))?,
+        &mut UserBuffersOutputBuffer::new(&current_task.mm, iovec)?,
+    )
 }
 
 pub fn sys_pwritev(
@@ -158,7 +173,11 @@ pub fn sys_pwritev(
     // TODO(fxbug.dev/117677) Allow partial writes.
     let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
     let file = current_task.files.get(fd)?;
-    file.write_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &iovec)
+    file.write_at(
+        current_task,
+        offset.try_into().map_err(|_| errno!(EINVAL))?,
+        &mut UserBuffersInputBuffer::new(&current_task.mm, iovec)?,
+    )
 }
 
 pub fn sys_readv(
@@ -169,7 +188,7 @@ pub fn sys_readv(
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
     let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
-    file.read(current_task, &iovec)
+    file.read(current_task, &mut UserBuffersOutputBuffer::new(&current_task.mm, iovec)?)
 }
 
 pub fn sys_writev(
@@ -181,7 +200,7 @@ pub fn sys_writev(
     // TODO(fxbug.dev/117677) Allow partial writes.
     let iovec = current_task.mm.read_iovec(iovec_addr, iovec_count)?;
     let file = current_task.files.get(fd)?;
-    file.write(current_task, &iovec)
+    file.write(current_task, &mut UserBuffersInputBuffer::new(&current_task.mm, iovec)?)
 }
 
 pub fn sys_fstatfs(

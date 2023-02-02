@@ -12,10 +12,10 @@ use syncio::{
 };
 
 use crate::auth::FsCred;
+use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::{Mutex, RwLockReadGuard, RwLockWriteGuard};
 use crate::logging::*;
-use crate::mm::MemoryAccessorExt;
 use crate::task::*;
 use crate::types::*;
 use crate::vmex_resource::VMEX_RESOURCE;
@@ -265,52 +265,39 @@ impl FsNodeOps for RemoteNode {
     }
 }
 
-fn zxio_read(zxio: &Zxio, current_task: &CurrentTask, data: &[UserBuffer]) -> Result<usize, Errno> {
-    let total = UserBuffer::get_total_length(data)?;
+fn zxio_read(zxio: &Zxio, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+    let total = data.available();
     let mut bytes = vec![0u8; total];
     let actual = zxio.read(&mut bytes).map_err(|status| from_status_like_fdio!(status))?;
-    current_task.mm.write_all(data, &bytes[0..actual])?;
-    Ok(actual)
+    data.write_all(&bytes[0..actual])
 }
 
-fn zxio_read_at(
-    zxio: &Zxio,
-    current_task: &CurrentTask,
-    offset: usize,
-    data: &[UserBuffer],
-) -> Result<usize, Errno> {
-    let total = UserBuffer::get_total_length(data)?;
+fn zxio_read_at(zxio: &Zxio, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+    let total = data.available();
     let mut bytes = vec![0u8; total];
     let actual =
         zxio.read_at(offset as u64, &mut bytes).map_err(|status| from_status_like_fdio!(status))?;
-    current_task.mm.write_all(data, &bytes[0..actual])?;
+    data.write_all(&bytes)?;
     Ok(actual)
 }
 
 fn zxio_write(
     zxio: &Zxio,
-    current_task: &CurrentTask,
-    data: &[UserBuffer],
+    _current_task: &CurrentTask,
+    data: &mut dyn InputBuffer,
 ) -> Result<usize, Errno> {
-    let total = UserBuffer::get_total_length(data)?;
-    let mut bytes = vec![0u8; total];
-    current_task.mm.read_all(data, &mut bytes)?;
-    let actual = zxio.write(&bytes).map_err(|status| from_status_like_fdio!(status))?;
-    Ok(actual)
+    let bytes = data.read_all()?;
+    zxio.write(&bytes).map_err(|status| from_status_like_fdio!(status))
 }
 
 fn zxio_write_at(
     zxio: &Zxio,
-    current_task: &CurrentTask,
+    _current_task: &CurrentTask,
     offset: usize,
-    data: &[UserBuffer],
+    data: &mut dyn InputBuffer,
 ) -> Result<usize, Errno> {
-    let total = UserBuffer::get_total_length(data)?;
-    let mut bytes = vec![0u8; total];
-    current_task.mm.read_all(data, &mut bytes)?;
-    let actual =
-        zxio.write_at(offset as u64, &bytes).map_err(|status| from_status_like_fdio!(status))?;
-    Ok(actual)
+    let bytes = data.read_all()?;
+    zxio.write_at(offset as u64, &bytes).map_err(|status| from_status_like_fdio!(status))
 }
 
 pub fn zxio_wait_async(
@@ -527,11 +514,11 @@ impl FileOps for RemoteFileObject {
     fn read_at(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        zxio_read_at(&self.zxio, current_task, offset, data)
+        zxio_read_at(&self.zxio, offset, data)
     }
 
     fn write_at(
@@ -539,7 +526,7 @@ impl FileOps for RemoteFileObject {
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         zxio_write_at(&self.zxio, current_task, offset, data)
     }
@@ -611,11 +598,11 @@ impl FileOps for RemotePipeObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
-            || zxio_read(&self.zxio, current_task, data).map(BlockableOpsResult::Done),
+            || zxio_read(&self.zxio, data).map(BlockableOpsResult::Done),
             FdEvents::POLLIN | FdEvents::POLLHUP,
             None,
         )
@@ -625,7 +612,7 @@ impl FileOps for RemotePipeObject {
         &self,
         file: &FileObject,
         current_task: &CurrentTask,
-        data: &[UserBuffer],
+        data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         file.blocking_op(
             current_task,
@@ -668,6 +655,7 @@ impl FileOps for RemotePipeObject {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::fs::buffers::VecOutputBuffer;
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use fidl::endpoints::Proxy;
@@ -703,15 +691,11 @@ mod test {
     fn test_blocking_io() -> Result<(), anyhow::Error> {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let (client, server) = zx::Socket::create(zx::SocketOpts::empty())?;
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)?;
 
         let thread = std::thread::spawn(move || {
-            assert_eq!(
-                64,
-                pipe.read(&current_task, &[UserBuffer { address, length: 64 }]).unwrap()
-            );
+            assert_eq!(64, pipe.read(&current_task, &mut VecOutputBuffer::new(64)).unwrap());
         });
 
         // Wait for the thread to become blocked on the read.
@@ -730,7 +714,6 @@ mod test {
     fn test_poll() {
         let (_kernel, current_task) = create_kernel_and_task();
 
-        let address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let (client, server) = zx::Socket::create(zx::SocketOpts::empty()).expect("Socket::create");
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
@@ -752,10 +735,7 @@ mod test {
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
         assert_eq!(fds.len(), 1);
 
-        assert_eq!(
-            pipe.read(&current_task, &[UserBuffer { address, length: 64 }]).expect("read"),
-            1
-        );
+        assert_eq!(pipe.read(&current_task, &mut VecOutputBuffer::new(64)).expect("read"), 1);
 
         assert_eq!(pipe.query_events(&current_task), FdEvents::POLLOUT);
         let fds = epoll_file.wait(&current_task, 1, zx::Duration::from_millis(0)).expect("wait");
