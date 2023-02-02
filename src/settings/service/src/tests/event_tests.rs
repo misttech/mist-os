@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::agent::{AgentError, AgentRegistrar, Context, Payload};
+use crate::agent::{AgentCreator, AgentError, AgentRegistrar, Context, CreationFunc, Payload};
 use crate::event;
 use crate::service;
 use crate::storage::testing::InMemoryStorageFactory;
@@ -41,7 +41,8 @@ async fn test_agent_event_propagation() {
 
     // This agent simply captures the context and returns unhandled for all
     // subsequent invocations (allowing the authority to progress).
-    let create_agent = Arc::new(move |mut context: Context| -> BoxFuture<'static, ()> {
+
+    let f = Arc::new(move |mut context: Context| -> BoxFuture<'static, ()> {
         let publisher_capture = publisher_capture.clone();
 
         Box::pin(async move {
@@ -60,11 +61,11 @@ async fn test_agent_event_propagation() {
         })
     });
 
+    let create_agent = AgentCreator { debug_id: "TestAgent", create: CreationFunc::Dynamic(f) };
+
     let _ = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
         .event_subscribers(&[scaffold::event::subscriber::Blueprint::create(create_subscriber)])
-        .agents(vec![AgentRegistrar::Blueprint(Arc::new(scaffold::agent::Blueprint::new(
-            scaffold::agent::Generate::Async(create_agent),
-        )))])
+        .agents(vec![AgentRegistrar::Creator(create_agent)])
         .spawn_and_get_protocol_connector(ENV_NAME)
         .await
         .unwrap();

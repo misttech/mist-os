@@ -8,7 +8,6 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub(crate) enum Generate {
     Sync(Arc<dyn Fn(agent::Context) + Send + Sync>),
-    Async(Arc<dyn Fn(agent::Context) -> BoxFuture<'static, ()> + Send + Sync>),
 }
 
 /// This blueprint allows tests to specify either an asynchronous or syncronous
@@ -37,7 +36,6 @@ impl agent::Blueprint for Blueprint {
                     (func)(context);
                 })
             }
-            Generate::Async(func) => (func)(context),
         }
     }
 }
