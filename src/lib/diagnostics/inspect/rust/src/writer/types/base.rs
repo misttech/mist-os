@@ -4,6 +4,7 @@
 
 use crate::writer::{Error, Node, State};
 use derivative::Derivative;
+use inspect_format::BlockIndex;
 use private::InspectTypeInternal;
 use std::{
     fmt::Debug,
@@ -15,15 +16,16 @@ pub trait InspectType: Send + Sync {}
 
 pub(crate) mod private {
     use crate::writer::State;
+    use inspect_format::BlockIndex;
 
     /// Trait implemented by all inspect types. It provides constructor functions that are not
     /// intended for use outside the crate.
     /// Use `impl_inspect_type_internal` for easy implementation.
     pub trait InspectTypeInternal {
-        fn new(state: State, block_index: u32) -> Self;
+        fn new(state: State, block_index: BlockIndex) -> Self;
         fn new_no_op() -> Self;
         fn is_valid(&self) -> bool;
-        fn block_index(&self) -> Option<u32>;
+        fn block_index(&self) -> Option<BlockIndex>;
         fn state(&self) -> Option<State>;
     }
 }
@@ -64,7 +66,10 @@ impl<T: private::InspectTypeInternal> InspectTypeReparentable for T {}
 macro_rules! impl_inspect_type_internal {
     ($type_name:ident) => {
         impl $crate::private::InspectTypeInternal for $type_name {
-            fn new(state: $crate::writer::State, block_index: u32) -> $type_name {
+            fn new(
+                state: $crate::writer::State,
+                block_index: inspect_format::BlockIndex,
+            ) -> $type_name {
                 $type_name { inner: $crate::writer::types::base::Inner::new(state, block_index) }
             }
 
@@ -80,7 +85,7 @@ macro_rules! impl_inspect_type_internal {
                 Some(self.inner.inner_ref()?.state.clone())
             }
 
-            fn block_index(&self) -> Option<u32> {
+            fn block_index(&self) -> Option<inspect_format::BlockIndex> {
                 if let Some(ref inner_ref) = self.inner.inner_ref() {
                     Some(inner_ref.block_index)
                 } else {
@@ -112,7 +117,7 @@ pub(crate) enum Inner<T: InnerType> {
 
 impl<T: InnerType> Inner<T> {
     /// Creates a new Inner with the desired block index within the inspect VMO
-    pub(crate) fn new(state: State, block_index: u32) -> Self {
+    pub(crate) fn new(state: State, block_index: BlockIndex) -> Self {
         Self::Strong(Arc::new(InnerRef { state, block_index, data: T::Data::default() }))
     }
 
@@ -166,7 +171,7 @@ impl<T: InnerType> Eq for Inner<T> {}
 #[derive(Debug)]
 pub(crate) struct InnerRef<T: InnerType> {
     /// Index of the block in the VMO.
-    pub(crate) block_index: u32,
+    pub(crate) block_index: BlockIndex,
 
     /// Reference to the VMO heap.
     pub(crate) state: State,
@@ -189,7 +194,7 @@ pub(crate) trait InnerType {
     type Data: Default + Debug;
 
     /// De-allocation behavior for when the InnerRef gets dropped
-    fn free(state: &State, block_index: u32) -> Result<(), Error>;
+    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error>;
 }
 
 #[derive(Default, Debug)]
@@ -197,7 +202,7 @@ pub(crate) struct InnerValueType;
 
 impl InnerType for InnerValueType {
     type Data = ();
-    fn free(state: &State, block_index: u32) -> Result<(), Error> {
+    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error> {
         let mut state_lock = state.try_lock()?;
         state_lock.free_value(block_index).map_err(|err| Error::free("value", block_index, err))
     }

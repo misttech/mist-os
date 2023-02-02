@@ -10,7 +10,9 @@ use {
         reader::{error::ReaderError, ReadSnapshot, SnapshotSource},
         Inspector,
     },
-    inspect_format::{constants, utils, Block, BlockType, Container, ReadableBlockContainer},
+    inspect_format::{
+        constants, utils, Block, BlockIndex, BlockType, Container, ReadableBlockContainer,
+    },
     std::{
         cmp,
         convert::TryFrom,
@@ -42,8 +44,8 @@ impl Snapshot {
     }
 
     /// Gets the block at the given |index|.
-    pub fn get_block(&self, index: u32) -> Option<ScannedBlock<'_>> {
-        if utils::offset_for_index(index) < self.buffer.len() {
+    pub fn get_block(&self, index: BlockIndex) -> Option<ScannedBlock<'_>> {
+        if index.offset() < self.buffer.len() {
             Some(Block::new(&self.buffer, index))
         } else {
             None
@@ -73,7 +75,7 @@ impl Snapshot {
         // Read the generation count one time
         let mut header_bytes: [u8; 32] = [0; 32];
         source.read_bytes(&mut header_bytes, 0)?;
-        let header_block = Block::new(&header_bytes[..], 0);
+        let header_block = Block::new(&header_bytes[..], BlockIndex::HEADER);
         let generation = header_block.header_generation_count();
 
         if let Ok(gen) = generation {
@@ -153,7 +155,7 @@ fn header_generation_count(bytes: &[u8]) -> Option<u64> {
     if bytes.len() < 16 {
         return None;
     }
-    let block = Block::new(&bytes[..16], 0);
+    let block = Block::new(&bytes[..16], BlockIndex::HEADER);
     if block.block_type_or().unwrap_or(BlockType::Reserved) == BlockType::Header
         && block.header_magic().unwrap() == constants::HEADER_MAGIC_NUMBER
         && block.header_version().unwrap() <= constants::HEADER_VERSION_NUMBER
@@ -240,7 +242,7 @@ impl<'a> Iterator for BlockIterator<'a> {
         if self.offset >= self.container.len() {
             return None;
         }
-        let index = utils::index_for_offset(self.offset);
+        let index = BlockIndex::from_offset(self.offset);
         let block = Block::new(self.container, index);
         if self.container.len() - self.offset < utils::order_to_size(block.order()) {
             return None;
@@ -339,17 +341,21 @@ mod tests {
     fn scan() -> Result<(), Error> {
         let size = 4096;
         let (mapping_ref, vmo) = create_mapping(size);
-        let mut header =
-            Block::new_free(mapping_ref.clone(), 0, constants::HEADER_ORDER as usize, 0)?;
+        let mut header = Block::new_free(
+            mapping_ref.clone(),
+            0.into(),
+            constants::HEADER_ORDER as usize,
+            0.into(),
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
 
-        let b = Block::new_free(mapping_ref.clone(), 2, 2, 0)?;
+        let b = Block::new_free(mapping_ref.clone(), 2.into(), 2, 0.into())?;
         b.become_reserved()?;
-        b.become_extent(6)?;
-        let b = Block::new_free(mapping_ref.clone(), 6, 0, 0)?;
+        b.become_extent(6.into())?;
+        let b = Block::new_free(mapping_ref.clone(), 6.into(), 0, 0.into())?;
         b.become_reserved()?;
-        b.become_int_value(1, 3, 4)?;
+        b.become_int_value(1, 3.into(), 4.into())?;
 
         let snapshot = Snapshot::try_from(&vmo)?;
 
@@ -357,31 +363,31 @@ mod tests {
         let blocks = snapshot.scan().collect::<Vec<ScannedBlock<'_>>>();
 
         assert_eq!(blocks[0].block_type(), BlockType::Header);
-        assert_eq!(blocks[0].index(), 0);
+        assert_eq!(*blocks[0].index(), 0);
         assert_eq!(blocks[0].order(), constants::HEADER_ORDER as usize);
         assert_eq!(blocks[0].header_magic().unwrap(), constants::HEADER_MAGIC_NUMBER);
         assert_eq!(blocks[0].header_version().unwrap(), constants::HEADER_VERSION_NUMBER);
 
         assert_eq!(blocks[1].block_type(), BlockType::Extent);
-        assert_eq!(blocks[1].index(), 2);
+        assert_eq!(*blocks[1].index(), 2);
         assert_eq!(blocks[1].order(), 2);
-        assert_eq!(blocks[1].next_extent().unwrap(), 6);
+        assert_eq!(*blocks[1].next_extent().unwrap(), 6);
 
         assert_eq!(blocks[2].block_type(), BlockType::IntValue);
-        assert_eq!(blocks[2].index(), 6);
+        assert_eq!(*blocks[2].index(), 6);
         assert_eq!(blocks[2].order(), 0);
-        assert_eq!(blocks[2].name_index().unwrap(), 3);
-        assert_eq!(blocks[2].parent_index().unwrap(), 4);
+        assert_eq!(*blocks[2].name_index().unwrap(), 3);
+        assert_eq!(*blocks[2].parent_index().unwrap(), 4);
         assert_eq!(blocks[2].int_value().unwrap(), 1);
 
         assert!(blocks[3..].iter().all(|b| b.block_type() == BlockType::Free));
 
         // Verify get_block
-        assert_eq!(snapshot.get_block(0).unwrap().block_type(), BlockType::Header);
-        assert_eq!(snapshot.get_block(2).unwrap().block_type(), BlockType::Extent);
-        assert_eq!(snapshot.get_block(6).unwrap().block_type(), BlockType::IntValue);
-        assert_eq!(snapshot.get_block(7).unwrap().block_type(), BlockType::Free);
-        assert!(snapshot.get_block(4096).is_none());
+        assert_eq!(snapshot.get_block(0.into()).unwrap().block_type(), BlockType::Header);
+        assert_eq!(snapshot.get_block(2.into()).unwrap().block_type(), BlockType::Extent);
+        assert_eq!(snapshot.get_block(6.into()).unwrap().block_type(), BlockType::IntValue);
+        assert_eq!(snapshot.get_block(7.into()).unwrap().block_type(), BlockType::Free);
+        assert!(snapshot.get_block(4096.into()).is_none());
 
         Ok(())
     }
@@ -425,8 +431,12 @@ mod tests {
     fn invalid_pending_write() -> Result<(), Error> {
         let size = 4096;
         let (mapping_ref, vmo) = create_mapping(size);
-        let mut header =
-            Block::new_free(mapping_ref.clone(), 0, constants::HEADER_ORDER as usize, 0)?;
+        let mut header = Block::new_free(
+            mapping_ref.clone(),
+            0.into(),
+            constants::HEADER_ORDER as usize,
+            0.into(),
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
         header.lock_header()?;
@@ -438,8 +448,12 @@ mod tests {
     fn invalid_magic_number() -> Result<(), Error> {
         let size = 4096;
         let (mapping_ref, vmo) = create_mapping(size);
-        let mut header =
-            Block::new_free(mapping_ref.clone(), 0, constants::HEADER_ORDER as usize, 0)?;
+        let mut header = Block::new_free(
+            mapping_ref.clone(),
+            0.into(),
+            constants::HEADER_ORDER as usize,
+            0.into(),
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
         header.set_header_magic(3)?;
@@ -451,8 +465,12 @@ mod tests {
     fn invalid_generation_count() -> Result<(), Error> {
         let size = 4096;
         let (mapping_ref, vmo) = create_mapping(size);
-        let mut header =
-            Block::new_free(mapping_ref.clone(), 0, constants::HEADER_ORDER as usize, 0)?;
+        let mut header = Block::new_free(
+            mapping_ref.clone(),
+            0.into(),
+            constants::HEADER_ORDER as usize,
+            0.into(),
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
         assert!(Snapshot::try_from_with_callback(&vmo, || {
@@ -476,8 +494,12 @@ mod tests {
     fn snapshot_frozen_vmo() -> Result<(), Error> {
         let size = 4096;
         let (mapping_ref, vmo) = create_mapping(size);
-        let mut header =
-            Block::new_free(mapping_ref.clone(), 0, constants::HEADER_ORDER as usize, 0)?;
+        let mut header = Block::new_free(
+            mapping_ref.clone(),
+            0.into(),
+            constants::HEADER_ORDER as usize,
+            0.into(),
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
         mapping_ref.write_bytes(8, &[0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
@@ -501,8 +523,12 @@ mod tests {
     fn snapshot_vmo_with_unused_space() -> Result<(), Error> {
         let size = 4 * constants::PAGE_SIZE_BYTES;
         let (mapping_ref, vmo) = create_mapping(size);
-        let mut header =
-            Block::new_free(mapping_ref.clone(), 0, constants::HEADER_ORDER as usize, 0)?;
+        let mut header = Block::new_free(
+            mapping_ref.clone(),
+            0.into(),
+            constants::HEADER_ORDER as usize,
+            0.into(),
+        )?;
         header.become_reserved()?;
         header.become_header(constants::PAGE_SIZE_BYTES)?;
 
@@ -516,8 +542,12 @@ mod tests {
     fn snapshot_vmo_with_very_large_vmo() -> Result<(), Error> {
         let size = 2 * constants::MAX_VMO_SIZE;
         let (mapping_ref, vmo) = create_mapping(size);
-        let mut header =
-            Block::new_free(mapping_ref.clone(), 0, constants::HEADER_ORDER as usize, 0)?;
+        let mut header = Block::new_free(
+            mapping_ref.clone(),
+            0.into(),
+            constants::HEADER_ORDER as usize,
+            0.into(),
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
 
@@ -531,7 +561,7 @@ mod tests {
     fn snapshot_vmo_with_header_without_size_info() -> Result<(), Error> {
         let size = 2 * constants::PAGE_SIZE_BYTES;
         let (mapping_ref, vmo) = create_mapping(size);
-        let mut header = Block::new_free(mapping_ref.clone(), 0, 0, 0)?;
+        let mut header = Block::new_free(mapping_ref.clone(), 0.into(), 0, 0.into())?;
         header.become_reserved()?;
         header.become_header(constants::PAGE_SIZE_BYTES)?;
         header.set_order(0)?;

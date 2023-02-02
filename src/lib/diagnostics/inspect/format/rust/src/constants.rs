@@ -12,15 +12,6 @@ pub const PAGE_SIZE_BYTES: usize = 4096;
 /// Size of the a VMO block header.
 pub const HEADER_SIZE_BYTES: usize = 8;
 
-/// Index of the virtual root NODE block (this block is *not* in the VMO).
-pub const ROOT_INDEX: u32 = 0;
-
-/// Index of the HEADER block.
-pub const HEADER_INDEX: u32 = 0;
-
-/// Index value indicating an empty string in a string array.
-pub const EMPTY_STRING_SLOT_INDEX: u32 = 0;
-
 /// Magic number for the Header block. "INSP" in UTF-8 little-endian.
 pub const HEADER_MAGIC_NUMBER: u32 = 0x50534e49;
 

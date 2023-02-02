@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::block_index::BlockIndex;
 use crate::block_type::BlockType;
 
 /// Errors that Inspect API functions can return.
@@ -23,10 +24,10 @@ pub enum Error {
     InvalidBlockSwap,
 
     #[error("Invalid block type at index {0}: {1}")]
-    InvalidBlockTypeNumber(u32, u8),
+    InvalidBlockTypeNumber(BlockIndex, u8),
 
     #[error("Invalid {value_type} flags={flags} at index {index}")]
-    InvalidFlags { value_type: &'static str, flags: u8, index: u32 },
+    InvalidFlags { value_type: &'static str, flags: u8, index: BlockIndex },
 
     #[error("Failed to convert array slots to usize")]
     FailedToConvertArraySlotsToUsize,
@@ -35,7 +36,7 @@ pub enum Error {
     NameNotUtf8,
 
     #[error("Expected a valid entry type for the array at index {0}")]
-    InvalidArrayType(u32),
+    InvalidArrayType(BlockIndex),
 
     #[error("Invalid block type. Expected: {0}, actual: {1}")]
     UnexpectedBlockType(BlockType, BlockType),
@@ -55,7 +56,7 @@ impl Error {
         Self::ArrayCapacityExceeded { slots, order, max_capacity }
     }
 
-    pub fn invalid_flags(value_type: &'static str, flags: u8, index: u32) -> Self {
+    pub fn invalid_flags(value_type: &'static str, flags: u8, index: BlockIndex) -> Self {
         Self::InvalidFlags { value_type, flags, index }
     }
 }

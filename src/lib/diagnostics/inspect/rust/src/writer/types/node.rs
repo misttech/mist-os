@@ -12,7 +12,7 @@ use crate::writer::{
 };
 use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams, LinearHistogramParams};
 use futures::future::BoxFuture;
-use inspect_format::{constants, LinkNodeDisposition, PropertyFormat};
+use inspect_format::{BlockIndex, LinkNodeDisposition, PropertyFormat};
 
 #[cfg(test)]
 use inspect_format::{Block, Container};
@@ -531,7 +531,7 @@ impl Node {
 
     /// Creates a new root node.
     pub(crate) fn new_root(state: State) -> Node {
-        Node::new(state, constants::ROOT_INDEX)
+        Node::new(state, BlockIndex::ROOT)
     }
 }
 
@@ -542,8 +542,8 @@ impl InnerType for InnerNodeType {
     // Each node has a list of recorded values.
     type Data = ValueList;
 
-    fn free(state: &State, block_index: u32) -> Result<(), Error> {
-        if block_index == constants::ROOT_INDEX {
+    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error> {
+        if block_index == BlockIndex::ROOT {
             return Ok(());
         }
         let mut state_lock = state.try_lock()?;

@@ -30,6 +30,7 @@ rustc_library("lib") {
   sources = [
     "src/bitfields.rs",
     "src/block.rs",
+    "src/block_index.rs",
     "src/block_type.rs",
     "src/constants.rs",
     "src/container.rs",

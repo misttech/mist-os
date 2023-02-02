@@ -10,6 +10,7 @@
 
 mod bitfields;
 mod block;
+mod block_index;
 mod block_type;
 mod container;
 mod error;
@@ -19,6 +20,7 @@ pub mod utils;
 
 pub use bitfields::*;
 pub use block::*;
+pub use block_index::*;
 pub use block_type::*;
 pub use container::*;
 pub use error::*;

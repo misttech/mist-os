@@ -101,7 +101,7 @@ impl Inspector {
         let vmo = self.vmo.as_ref().unwrap();
         let mut buffer: [u8; 16] = [0; 16];
         vmo.read(&mut buffer, 0).unwrap();
-        let block = Block::new(&buffer[..16], 0);
+        let block = Block::new(&buffer[..16], inspect_format::BlockIndex::EMPTY);
         if block.header_generation_count().unwrap() == constants::VMO_FROZEN {
             Ok(())
         } else {
@@ -413,7 +413,7 @@ mod fuchsia_tests {
         let (vmo, root_node) = InspectorConfig::new_root(100).unwrap();
         assert_eq!(vmo.get_size().unwrap(), 4096);
         let inner = root_node.inner.inner_ref().unwrap();
-        assert_eq!(inner.block_index, 0);
+        assert_eq!(*inner.block_index, 0);
         assert_eq!(CString::new("InspectHeap").unwrap(), vmo.get_name().expect("Has name"));
     }
 

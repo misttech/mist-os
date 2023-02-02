@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{private::InspectTypeInternal, Error, InnerType, State};
+use inspect_format::BlockIndex;
 
 /// Trait implemented by properties.
 pub trait Property<'t> {
@@ -84,7 +85,7 @@ pub(crate) struct InnerPropertyType;
 
 impl InnerType for InnerPropertyType {
     type Data = ();
-    fn free(state: &State, block_index: u32) -> Result<(), Error> {
+    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error> {
         let mut state_lock = state.try_lock()?;
         state_lock
             .free_property(block_index)

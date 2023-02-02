@@ -6,6 +6,7 @@ use crate::writer::{
     private::InspectTypeInternal, ArrayProperty, Inner, InnerValueType, InspectType, State,
     StringReference,
 };
+use inspect_format::BlockIndex;
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct StringArrayProperty {
@@ -15,7 +16,7 @@ pub struct StringArrayProperty {
 impl InspectType for StringArrayProperty {}
 
 impl InspectTypeInternal for StringArrayProperty {
-    fn new(state: State, block_index: u32) -> Self {
+    fn new(state: State, block_index: BlockIndex) -> Self {
         Self { inner: Inner::new(state, block_index) }
     }
 
@@ -31,7 +32,7 @@ impl InspectTypeInternal for StringArrayProperty {
         Some(self.inner.inner_ref()?.state.clone())
     }
 
-    fn block_index(&self) -> Option<u32> {
+    fn block_index(&self) -> Option<BlockIndex> {
         Some(self.inner.inner_ref()?.block_index)
     }
 }

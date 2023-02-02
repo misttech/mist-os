@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use {
-    super::{validate::ROOT_ID, Data, LazyNode, Metrics, Node, Payload, Property, ROOT_NAME},
+    super::{Data, LazyNode, Metrics, Node, Payload, Property, ROOT_NAME},
     crate::metrics::{BlockMetrics, BlockStatus},
     anyhow::{bail, format_err, Error},
     fuchsia_inspect::{reader as ireader, reader::snapshot::ScannedBlock},
     fuchsia_zircon::Vmo,
     inspect_format::{
-        constants::EMPTY_STRING_SLOT_INDEX, constants::MIN_ORDER_SIZE, ArrayFormat, BlockType,
-        LinkNodeDisposition, PropertyFormat,
+        constants::MIN_ORDER_SIZE, ArrayFormat, BlockIndex, BlockType, LinkNodeDisposition,
+        PropertyFormat,
     },
     std::{
         self,
@@ -42,13 +42,13 @@ use {
 
 #[derive(Debug)]
 pub struct Scanner {
-    nodes: HashMap<u32, ScannedNode>,
-    names: HashMap<u32, ScannedName>,
-    properties: HashMap<u32, ScannedProperty>,
-    extents: HashMap<u32, ScannedExtent>,
-    final_dereferenced_strings: HashMap<u32, String>,
-    final_nodes: HashMap<u32, Node>,
-    final_properties: HashMap<u32, Property>,
+    nodes: HashMap<BlockIndex, ScannedNode>,
+    names: HashMap<BlockIndex, ScannedName>,
+    properties: HashMap<BlockIndex, ScannedProperty>,
+    extents: HashMap<BlockIndex, ScannedExtent>,
+    final_dereferenced_strings: HashMap<BlockIndex, String>,
+    final_nodes: HashMap<BlockIndex, Node>,
+    final_properties: HashMap<BlockIndex, Property>,
     metrics: Metrics,
     child_trees: Option<HashMap<String, LazyNode>>,
 }
@@ -124,7 +124,7 @@ fn check_zero_bits(
         return Ok(());
     }
     let end = min(end, bits_in_block - 1);
-    let block_offset = block.index() as usize * MIN_ORDER_SIZE;
+    let block_offset = usize::from(block.index()) * MIN_ORDER_SIZE;
     let low_byte = start / BITS_PER_BYTE;
     let high_byte = end / BITS_PER_BYTE;
     let bottom_bits = high_bits(buffer[low_byte + block_offset], 8 - (start % 8));
@@ -190,11 +190,11 @@ impl Scanner {
         // The ScannedNode at 0 is the "root" node. It exists to receive pointers to objects
         // whose parent is 0 while scanning the VMO.
         ret.nodes.insert(
-            0,
+            BlockIndex::ROOT,
             ScannedNode {
                 validated: true,
-                parent: 0,
-                name: 0,
+                parent: BlockIndex::ROOT,
+                name: BlockIndex::ROOT,
                 children: HashSet::new(),
                 properties: HashSet::new(),
                 metrics: None,
@@ -240,7 +240,7 @@ impl Scanner {
             self.process_property(block, buffer)?
         }
 
-        let (mut new_nodes, mut new_properties) = self.make_valid_node_tree(ROOT_ID)?;
+        let (mut new_nodes, mut new_properties) = self.make_valid_node_tree(BlockIndex::ROOT)?;
         for (node, id) in new_nodes.drain(..) {
             self.final_nodes.insert(id, node);
         }
@@ -278,12 +278,12 @@ impl Scanner {
         }
     }
 
-    fn use_node(&mut self, node_id: u32) -> Result<ScannedNode, Error> {
+    fn use_node(&mut self, node_id: BlockIndex) -> Result<ScannedNode, Error> {
         let mut node =
             self.nodes.remove(&node_id).ok_or(format_err!("No node at index {}", node_id))?;
         match node.metrics {
             None => {
-                if node_id != 0 {
+                if node_id != BlockIndex::ROOT {
                     return Err(format_err!("Invalid node (no metrics) at index {}", node_id));
                 }
             }
@@ -296,7 +296,7 @@ impl Scanner {
         Ok(node)
     }
 
-    fn use_property(&mut self, property_id: u32) -> Result<ScannedProperty, Error> {
+    fn use_property(&mut self, property_id: BlockIndex) -> Result<ScannedProperty, Error> {
         let property = self
             .properties
             .remove(&property_id)
@@ -307,7 +307,7 @@ impl Scanner {
 
     // Used to find the value of a name index. This index, `name_id`, may refer to either a
     // NAME block or a STRING_REFERENCE. If the block is a NAME, it will be removed.
-    fn use_owned_name(&mut self, name_id: u32) -> Result<String, Error> {
+    fn use_owned_name(&mut self, name_id: BlockIndex) -> Result<String, Error> {
         match self.names.remove(&name_id) {
             Some(name) => {
                 self.metrics.record(&name.metrics, BlockStatus::Used);
@@ -326,7 +326,7 @@ impl Scanner {
 
     // Used to find the value of an index that points to a NAME or STRING_REFERENCE. In either
     // case, the value is not consumed.
-    fn lookup_name_or_string_reference(&mut self, name_id: u32) -> Result<String, Error> {
+    fn lookup_name_or_string_reference(&mut self, name_id: BlockIndex) -> Result<String, Error> {
         match self.names.get(&name_id) {
             Some(name) => {
                 self.metrics.record(&name.metrics, BlockStatus::Used);
@@ -425,10 +425,10 @@ impl Scanner {
         Ok(())
     }
 
-    fn add_to_parent<F: FnOnce(&mut ScannedNode) -> &mut HashSet<u32>>(
+    fn add_to_parent<F: FnOnce(&mut ScannedNode) -> &mut HashSet<BlockIndex>>(
         &mut self,
-        parent: u32,
-        id: u32,
+        parent: BlockIndex,
+        id: BlockIndex,
         get_the_hashset: F, // Gets children or properties
     ) {
         if !self.nodes.contains_key(&parent) {
@@ -436,8 +436,8 @@ impl Scanner {
                 parent,
                 ScannedNode {
                     validated: false,
-                    name: 0,
-                    parent: 0,
+                    name: BlockIndex::EMPTY,
+                    parent: BlockIndex::ROOT,
                     children: HashSet::new(),
                     properties: HashSet::new(),
                     metrics: None,
@@ -489,7 +489,7 @@ impl Scanner {
                         ScannedPayload::DoubleArray(numbers?, array_format)
                     }
                     BlockType::StringReference => {
-                        let indexes: Result<Vec<u32>, _> =
+                        let indexes: Result<Vec<BlockIndex>, _> =
                             (0..slots).map(|i| block.array_get_string_index_slot(i)).collect();
                         ScannedPayload::StringArray(indexes?, array_format)
                     }
@@ -564,8 +564,8 @@ impl Scanner {
 
     fn make_valid_node_tree(
         &mut self,
-        id: u32,
-    ) -> Result<(Vec<(Node, u32)>, Vec<(Property, u32)>), Error> {
+        id: BlockIndex,
+    ) -> Result<(Vec<(Node, BlockIndex)>, Vec<(Property, BlockIndex)>), Error> {
         let scanned_node = self.use_node(id)?;
         if !scanned_node.validated {
             return Err(format_err!("No node at {}", id));
@@ -580,8 +580,11 @@ impl Scanner {
         for property_id in scanned_node.properties.iter() {
             properties_under.push((self.make_valid_property(*property_id)?, *property_id));
         }
-        let name =
-            if id == 0 { ROOT_NAME.to_owned() } else { self.use_owned_name(scanned_node.name)? };
+        let name = if id == BlockIndex::ROOT {
+            ROOT_NAME.to_owned()
+        } else {
+            self.use_owned_name(scanned_node.name)?
+        };
         let this_node = Node {
             name,
             parent: scanned_node.parent,
@@ -592,7 +595,7 @@ impl Scanner {
         Ok((nodes_in_tree, properties_under))
     }
 
-    fn make_valid_property(&mut self, id: u32) -> Result<Property, Error> {
+    fn make_valid_property(&mut self, id: BlockIndex) -> Result<Property, Error> {
         let scanned_property = self.use_property(id)?;
         let name = self.use_owned_name(scanned_property.name)?;
         let payload = self.make_valid_payload(scanned_property.payload)?;
@@ -612,7 +615,7 @@ impl Scanner {
                 indexes
                     .iter()
                     .map(|i| {
-                        if *i == EMPTY_STRING_SLOT_INDEX {
+                        if *i == BlockIndex::EMPTY {
                             return "".into();
                         }
                         self.final_dereferenced_strings.get(i).unwrap().clone()
@@ -636,7 +639,7 @@ impl Scanner {
         mut block: ScannedStringReference,
     ) -> Result<String, Error> {
         let length_of_inlined = block.value.len();
-        if block.next_extent != 0 {
+        if block.next_extent != BlockIndex::EMPTY {
             block.value.append(
                 &mut self.make_valid_vector(block.length - length_of_inlined, block.next_extent)?,
             );
@@ -645,7 +648,7 @@ impl Scanner {
         Ok(String::from_utf8(block.value)?)
     }
 
-    fn make_valid_vector(&mut self, length: usize, link: u32) -> Result<Vec<u8>, Error> {
+    fn make_valid_vector(&mut self, length: usize, link: BlockIndex) -> Result<Vec<u8>, Error> {
         let mut dest = vec![];
         let mut length_remaining = length;
         let mut next_link = link;
@@ -673,27 +676,27 @@ struct ScannedNode {
     // validated refers to the binary contents of this block; it doesn't
     // guarantee that properties, descendents, name, etc. are valid.
     validated: bool,
-    name: u32,
-    parent: u32,
-    children: HashSet<u32>,
-    properties: HashSet<u32>,
+    name: BlockIndex,
+    parent: BlockIndex,
+    children: HashSet<BlockIndex>,
+    properties: HashSet<BlockIndex>,
     metrics: Option<BlockMetrics>,
 }
 
 #[derive(Debug)]
 struct ScannedProperty {
-    name: u32,
-    parent: u32,
+    name: BlockIndex,
+    parent: BlockIndex,
     payload: ScannedPayload,
     metrics: BlockMetrics,
 }
 
 #[derive(Debug)]
 struct ScannedStringReference {
-    index: u32,
+    index: BlockIndex,
     value: Vec<u8>,
     length: usize,
-    next_extent: u32,
+    next_extent: BlockIndex,
 }
 
 #[derive(Debug)]
@@ -704,15 +707,15 @@ struct ScannedName {
 
 #[derive(Debug)]
 struct ScannedExtent {
-    next: u32,
+    next: BlockIndex,
     data: Vec<u8>,
     metrics: BlockMetrics,
 }
 
 #[derive(Debug)]
 enum ScannedPayload {
-    String { length: usize, link: u32 },
-    Bytes { length: usize, link: u32 },
+    String { length: usize, link: BlockIndex },
+    Bytes { length: usize, link: BlockIndex },
     Int(i64),
     Uint(u64),
     Double(f64),
@@ -720,7 +723,7 @@ enum ScannedPayload {
     IntArray(Vec<i64>, ArrayFormat),
     UintArray(Vec<u64>, ArrayFormat),
     DoubleArray(Vec<f64>, ArrayFormat),
-    StringArray(Vec<u32>, ArrayFormat),
+    StringArray(Vec<BlockIndex>, ArrayFormat),
     Link { disposition: LinkNodeDisposition, scanned_tree: Scanner },
 }
 
@@ -732,7 +735,9 @@ mod tests {
         crate::*,
         fidl_test_inspect_validate::Value,
         fuchsia_inspect::reader::snapshot::BackingBuffer,
-        inspect_format::{constants, Block, BlockHeader, BlockType, Payload as BlockPayload},
+        inspect_format::{
+            constants, Block, BlockHeader, BlockIndex, BlockType, Payload as BlockPayload,
+        },
     };
 
     // TODO(fxbug.dev/39975): Depending on the resolution of fxbug.dev/40012, move this const out of mod test.
@@ -811,10 +816,9 @@ mod tests {
     #[fuchsia::test]
     fn test_scanning_string_reference() {
         let mut buffer = [0u8; 4096];
-        const HEADER: usize = 0;
-        const NODE: usize = 3;
-        const NUMBER_NAME: usize = 4;
-        const NUMBER_EXTENT: usize = 5;
+        const NODE: BlockIndex = BlockIndex::new(3);
+        const NUMBER_NAME: BlockIndex = BlockIndex::new(4);
+        const NUMBER_EXTENT: BlockIndex = BlockIndex::new(5);
 
         // VMO Header block (index 0)
         let mut header = BlockHeader(0);
@@ -822,28 +826,28 @@ mod tests {
         header.set_block_type(BlockType::Header.to_u8().unwrap());
         header.set_header_magic(constants::HEADER_MAGIC_NUMBER);
         header.set_header_version(constants::HEADER_VERSION_NUMBER);
-        put_header(&header, &mut buffer, HEADER);
+        put_header(&header, &mut buffer, (*BlockIndex::HEADER).try_into().unwrap());
 
         // create a Node named number
         header.set_order(0);
         header.set_block_type(BlockType::NodeValue.to_u8().unwrap());
-        header.set_value_name_index(NUMBER_NAME as u32);
-        header.set_value_parent_index(HEADER as u32);
-        put_header(&header, &mut buffer, NODE);
+        header.set_value_name_index(*NUMBER_NAME);
+        header.set_value_parent_index(*BlockIndex::HEADER);
+        put_header(&header, &mut buffer, (*NODE).try_into().unwrap());
 
         // create a STRING_REFERENCE with value "number" that is the above Node's name.
         header.set_order(0);
         header.set_block_type(BlockType::StringReference.to_u8().unwrap());
-        header.set_extent_next_index(NUMBER_EXTENT as u32);
-        put_header(&header, &mut buffer, NUMBER_NAME);
-        copy_into(&[6, 0, 0, 0], &mut buffer, NUMBER_NAME * 16 + 8);
-        copy_into(b"numb", &mut buffer, NUMBER_NAME * 16 + 12);
+        header.set_extent_next_index(*NUMBER_EXTENT);
+        put_header(&header, &mut buffer, (*NUMBER_NAME).try_into().unwrap());
+        copy_into(&[6, 0, 0, 0], &mut buffer, (*NUMBER_NAME * 16 + 8).try_into().unwrap());
+        copy_into(b"numb", &mut buffer, (*NUMBER_NAME * 16 + 12).try_into().unwrap());
         let mut number_extent = BlockHeader(0);
         number_extent.set_order(0);
         number_extent.set_block_type(BlockType::Extent.to_u8().unwrap());
         number_extent.set_extent_next_index(0);
-        put_header(&number_extent, &mut buffer, NUMBER_EXTENT);
-        copy_into(b"er", &mut buffer, NUMBER_EXTENT * 16 + 8);
+        put_header(&number_extent, &mut buffer, (*NUMBER_EXTENT).try_into().unwrap());
+        copy_into(b"er", &mut buffer, (*NUMBER_EXTENT * 16 + 8).try_into().unwrap());
 
         try_byte(&mut buffer, (16, 0), 0, Some("root ->\n> number ->"));
     }
@@ -970,26 +974,44 @@ mod tests {
     async fn test_to_string_order() -> Result<(), Error> {
         // Make sure property payloads are distinguished by name, value, and type
         // but ignore id and parent, and that prefix is used.
-        let int0 = Property { name: "int0".into(), id: 2, parent: 1, payload: Payload::Int(0) }
-            .to_string("");
-        let int1_struct =
-            Property { name: "int1".into(), id: 2, parent: 1, payload: Payload::Int(1) };
+        let int0 = Property {
+            name: "int0".into(),
+            id: 2.into(),
+            parent: 1.into(),
+            payload: Payload::Int(0),
+        }
+        .to_string("");
+        let int1_struct = Property {
+            name: "int1".into(),
+            id: 2.into(),
+            parent: 1.into(),
+            payload: Payload::Int(1),
+        };
         let int1 = int1_struct.to_string("");
         assert_ne!(int0, int1);
-        let uint0 = Property { name: "uint0".into(), id: 2, parent: 1, payload: Payload::Uint(0) }
-            .to_string("");
+        let uint0 = Property {
+            name: "uint0".into(),
+            id: 2.into(),
+            parent: 1.into(),
+            payload: Payload::Uint(0),
+        }
+        .to_string("");
         assert_ne!(int0, uint0);
         let int0_different_name = Property {
             name: "int0_different_name".into(),
-            id: 2,
-            parent: 1,
+            id: 2.into(),
+            parent: 1.into(),
             payload: Payload::Int(0),
         }
         .to_string("");
         assert_ne!(int0, int0_different_name);
-        let uint0_different_ids =
-            Property { name: "uint0".into(), id: 3, parent: 4, payload: Payload::Uint(0) }
-                .to_string("");
+        let uint0_different_ids = Property {
+            name: "uint0".into(),
+            id: 3.into(),
+            parent: 4.into(),
+            payload: Payload::Uint(0),
+        }
+        .to_string("");
         assert_eq!(uint0, uint0_different_ids);
         let int1_different_prefix = int1_struct.to_string("foo");
         assert_ne!(int1, int1_different_prefix);
@@ -1058,7 +1080,7 @@ mod tests {
         }
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 1, 0).is_err());
             assert!(check_zero_bits(&buffer, &block, 0, 0).is_ok());
             assert!(check_zero_bits(&buffer, &block, 0, MAX_BLOCK_BITS).is_ok());
@@ -1071,7 +1093,7 @@ mod tests {
         // error (even single-bit 8...8). Other ranges should succeed.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 8, 8).is_err());
             assert!(check_zero_bits(&buffer, &block, 8, MAX_BLOCK_BITS).is_err());
             assert!(check_zero_bits(&buffer, &block, 9, MAX_BLOCK_BITS).is_ok());
@@ -1081,7 +1103,7 @@ mod tests {
         // 9...22 and 24...MAX_BLOCK_BITS should succeed. So should 24...63.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 9, MAX_BLOCK_BITS).is_err());
             assert!(check_zero_bits(&buffer, &block, 9, 22).is_ok());
             assert!(check_zero_bits(&buffer, &block, 24, MAX_BLOCK_BITS).is_ok());
@@ -1091,7 +1113,7 @@ mod tests {
         // Now bits 8 and 21 are 1. This tests bit-checks in the middle of the byte.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 16, 20).is_ok());
             assert!(check_zero_bits(&buffer, &block, 21, 21).is_err());
             assert!(check_zero_bits(&buffer, &block, 22, 63).is_ok());
@@ -1100,7 +1122,7 @@ mod tests {
         // Now bits 8, 21, and 63 are 1. Checking 22...63 should fail; 22...62 should succeed.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 63).is_err());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_ok());
         }
@@ -1109,28 +1131,28 @@ mod tests {
         // detected (cause the check to fail) (to make sure my loop doesn't have an off by 1 error).
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_err());
         }
         buffer[3 + 16] = 0;
         buffer[4 + 16] = 0x10;
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_err());
         }
         buffer[4 + 16] = 0;
         buffer[5 + 16] = 0x10;
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_err());
         }
         buffer[5 + 16] = 0;
         buffer[6 + 16] = 0x10;
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 22, 62).is_err());
         }
         buffer[1 + 16] = 0x81;
@@ -1138,7 +1160,7 @@ mod tests {
         // the specified range, and detect 1 bits that are inside the range.
         {
             let backing_buffer = BackingBuffer::from(buffer.to_vec());
-            let block = Block::new(&backing_buffer, 1);
+            let block = Block::new(&backing_buffer, 1.into());
             assert!(check_zero_bits(&buffer, &block, 9, 14).is_ok());
             assert!(check_zero_bits(&buffer, &block, 8, 14).is_err());
             assert!(check_zero_bits(&buffer, &block, 9, 15).is_err());

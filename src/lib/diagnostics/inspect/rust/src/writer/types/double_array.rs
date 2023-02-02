@@ -95,11 +95,6 @@ impl DoubleArrayProperty {
                 .ok()
         })
     }
-
-    /// Returns the index of the value's block in the VMO.
-    pub fn block_index(&self) -> u32 {
-        self.inner.inner_ref().unwrap().block_index
-    }
 }
 
 #[cfg(test)]

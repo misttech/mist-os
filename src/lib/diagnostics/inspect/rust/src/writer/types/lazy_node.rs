@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{Error, Inner, InnerType, InspectType, State};
+use inspect_format::BlockIndex;
 
 #[cfg(test)]
 use inspect_format::{Block, Container};
@@ -26,7 +27,7 @@ struct InnerLazyNodeType;
 
 impl InnerType for InnerLazyNodeType {
     type Data = ();
-    fn free(state: &State, block_index: u32) -> Result<(), Error> {
+    fn free(state: &State, block_index: BlockIndex) -> Result<(), Error> {
         let mut state_lock = state.try_lock()?;
         state_lock
             .free_lazy_node(block_index)
@@ -45,11 +46,6 @@ impl LazyNode {
                 .and_then(|state| state.heap().get_block(inner_ref.block_index))
                 .ok()
         })
-    }
-
-    /// Returns the index of the value's block in the VMO.
-    pub fn block_index(&self) -> u32 {
-        self.inner.inner_ref().unwrap().block_index
     }
 }
 
@@ -73,7 +69,7 @@ mod tests {
                 lazy_node_block.link_node_disposition().unwrap(),
                 LinkNodeDisposition::Inline
             );
-            assert_eq!(lazy_node_block.link_content_index().unwrap(), 6);
+            assert_eq!(*lazy_node_block.link_content_index().unwrap(), 6);
             assert_eq!(node_block.child_count().unwrap(), 1);
         }
         assert_eq!(node_block.child_count().unwrap(), 0);
@@ -93,7 +89,7 @@ mod tests {
                 lazy_node_block.link_node_disposition().unwrap(),
                 LinkNodeDisposition::Child
             );
-            assert_eq!(lazy_node_block.link_content_index().unwrap(), 6);
+            assert_eq!(*lazy_node_block.link_content_index().unwrap(), 6);
             assert_eq!(node_block.child_count().unwrap(), 1);
         }
         assert_eq!(node_block.child_count().unwrap(), 0);

@@ -15,16 +15,6 @@ pub fn fit_order(size: usize) -> usize {
         .unwrap_or(0)
 }
 
-/// Get index in the VMO for a given |offset|.
-pub fn index_for_offset(offset: usize) -> u32 {
-    (offset / constants::MIN_ORDER_SIZE).to_u32().unwrap()
-}
-
-/// Get offset in the VMO for a given |index|.
-pub fn offset_for_index(index: u32) -> usize {
-    index.to_usize().unwrap() * constants::MIN_ORDER_SIZE
-}
-
 /// Get size in bytes of a given |order|.
 pub fn order_to_size(order: usize) -> usize {
     constants::MIN_ORDER_SIZE << order

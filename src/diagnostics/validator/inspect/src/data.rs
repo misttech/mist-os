@@ -5,14 +5,14 @@
 use {
     super::{
         metrics::Metrics,
-        validate::{self, Value, ROOT_ID},
+        validate::{self, Value},
         DiffType,
     },
     anyhow::{bail, format_err, Error},
     base64,
     diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchy, Property as iProperty},
     difference,
-    inspect_format::{ArrayFormat, LinkNodeDisposition},
+    inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition},
     num_derive::{FromPrimitive, ToPrimitive},
     std::{
         self,
@@ -38,10 +38,10 @@ const ROOT_NAME: &str = "root";
 /// properties with the same name, and does not truncate any data or names.
 #[derive(Debug, Clone)]
 pub struct Data {
-    nodes: HashMap<u32, Node>,
-    properties: HashMap<u32, Property>,
-    tombstone_nodes: HashSet<u32>,
-    tombstone_properties: HashSet<u32>,
+    nodes: HashMap<BlockIndex, Node>,
+    properties: HashMap<BlockIndex, Property>,
+    tombstone_nodes: HashSet<BlockIndex>,
+    tombstone_properties: HashSet<BlockIndex>,
 }
 
 // Data is the only public struct in this file. The internal data structures are
@@ -63,9 +63,9 @@ pub struct Data {
 #[derive(Debug, Clone)]
 pub struct Node {
     name: String,
-    parent: u32,
-    children: HashSet<u32>,
-    properties: HashSet<u32>,
+    parent: BlockIndex,
+    children: HashSet<BlockIndex>,
+    properties: HashSet<BlockIndex>,
 }
 
 #[derive(Debug, Clone)]
@@ -73,8 +73,8 @@ pub struct Property {
     name: String,
     // TODO(fxbug.dev/84729)
     #[allow(unused)]
-    id: u32,
-    parent: u32,
+    id: BlockIndex,
+    parent: BlockIndex,
     payload: Payload,
 }
 
@@ -176,14 +176,14 @@ impl Property {
                         "{}{} ->\n{}",
                         prefix,
                         self.name,
-                        parsed_data.nodes[&0].to_string(&prefix, &parsed_data, true)
+                        parsed_data.nodes[&0.into()].to_string(&prefix, &parsed_data, true)
                     )],
                     properties: vec![],
                 },
                 // Return the nodes and properties (which may themselves have linked nodes) inline
                 // from this property.
                 LinkNodeDisposition::Inline => {
-                    let root = &parsed_data.nodes[&0];
+                    let root = &parsed_data.nodes[&BlockIndex::ROOT];
                     let mut nodes = root
                         .children
                         .iter()
@@ -355,17 +355,19 @@ impl Data {
     pub fn apply(&mut self, action: &validate::Action) -> Result<(), Error> {
         match action {
             validate::Action::CreateNode(validate::CreateNode { parent, id, name }) => {
-                self.create_node(*parent, *id, name)
+                self.create_node(parent.into(), id.into(), name)
             }
-            validate::Action::DeleteNode(validate::DeleteNode { id }) => self.delete_node(*id),
+            validate::Action::DeleteNode(validate::DeleteNode { id }) => {
+                self.delete_node(id.into())
+            }
             validate::Action::CreateNumericProperty(validate::CreateNumericProperty {
                 parent,
                 id,
                 name,
                 value,
             }) => self.add_property(
-                *parent,
-                *id,
+                parent.into(),
+                id.into(),
                 name,
                 match value {
                     validate::Value::IntT(value) => Payload::Int(*value),
@@ -379,39 +381,44 @@ impl Data {
                 id,
                 name,
                 value,
-            }) => self.add_property(*parent, *id, name, Payload::Bytes(value.clone())),
+            }) => self.add_property(parent.into(), id.into(), name, Payload::Bytes(value.clone())),
             validate::Action::CreateStringProperty(validate::CreateStringProperty {
                 parent,
                 id,
                 name,
                 value,
-            }) => self.add_property(*parent, *id, name, Payload::String(value.to_string())),
+            }) => self.add_property(
+                parent.into(),
+                id.into(),
+                name,
+                Payload::String(value.to_string()),
+            ),
             validate::Action::CreateBoolProperty(validate::CreateBoolProperty {
                 parent,
                 id,
                 name,
                 value,
-            }) => self.add_property(*parent, *id, name, Payload::Bool(*value)),
+            }) => self.add_property(parent.into(), id.into(), name, Payload::Bool(*value)),
             validate::Action::DeleteProperty(validate::DeleteProperty { id }) => {
-                self.delete_property(*id)
+                self.delete_property(id.into())
             }
             validate::Action::SetNumber(validate::SetNumber { id, value }) => {
-                self.modify_number(*id, value, SET)
+                self.modify_number(id.into(), value, SET)
             }
             validate::Action::AddNumber(validate::AddNumber { id, value }) => {
-                self.modify_number(*id, value, ADD)
+                self.modify_number(id.into(), value, ADD)
             }
             validate::Action::SubtractNumber(validate::SubtractNumber { id, value }) => {
-                self.modify_number(*id, value, SUBTRACT)
+                self.modify_number(id.into(), value, SUBTRACT)
             }
             validate::Action::SetBytes(validate::SetBytes { id, value }) => {
-                self.set_bytes(*id, value)
+                self.set_bytes(id.into(), value)
             }
             validate::Action::SetString(validate::SetString { id, value }) => {
-                self.set_string(*id, value)
+                self.set_string(id.into(), value)
             }
             validate::Action::SetBool(validate::SetBool { id, value }) => {
-                self.set_bool(*id, *value)
+                self.set_bool(id.into(), *value)
             }
             validate::Action::CreateArrayProperty(validate::CreateArrayProperty {
                 parent,
@@ -420,8 +427,8 @@ impl Data {
                 slots,
                 value_type,
             }) => self.add_property(
-                *parent,
-                *id,
+                parent.into(),
+                id.into(),
                 name,
                 match value_type {
                     validate::ValueType::Int => {
@@ -439,13 +446,13 @@ impl Data {
                 },
             ),
             validate::Action::ArrayAdd(validate::ArrayAdd { id, index, value }) => {
-                self.modify_array(*id, *index, value, ADD)
+                self.modify_array(id.into(), *index, value, ADD)
             }
             validate::Action::ArraySubtract(validate::ArraySubtract { id, index, value }) => {
-                self.modify_array(*id, *index, value, SUBTRACT)
+                self.modify_array(id.into(), *index, value, SUBTRACT)
             }
             validate::Action::ArraySet(validate::ArraySet { id, index, value }) => {
-                self.modify_array(*id, *index, value, SET)
+                self.modify_array(id.into(), *index, value, SET)
             }
             validate::Action::CreateLinearHistogram(validate::CreateLinearHistogram {
                 parent,
@@ -455,8 +462,8 @@ impl Data {
                 step_size,
                 buckets,
             }) => self.add_property(
-                *parent,
-                *id,
+                parent.into(),
+                id.into(),
                 name,
                 match (floor, step_size) {
                     (validate::Value::IntT(floor), validate::Value::IntT(step_size)) => {
@@ -496,8 +503,8 @@ impl Data {
                     buckets,
                 },
             ) => self.add_property(
-                *parent,
-                *id,
+                parent.into(),
+                id.into(),
                 name,
                 match (floor, initial_step, step_multiplier) {
                     (
@@ -542,7 +549,7 @@ impl Data {
                 },
             ),
             validate::Action::Insert(validate::Insert { id, value }) => {
-                if let Some(mut property) = self.properties.get_mut(&id) {
+                if let Some(mut property) = self.properties.get_mut(&id.into()) {
                     match (&mut property, value) {
                         (
                             Property {
@@ -604,7 +611,7 @@ impl Data {
                 }
             }
             validate::Action::InsertMultiple(validate::InsertMultiple { id, value, count }) => {
-                if let Some(mut property) = self.properties.get_mut(&id) {
+                if let Some(mut property) = self.properties.get_mut(&id.into()) {
                     match (&mut property, value) {
                         (
                             Property {
@@ -677,15 +684,15 @@ impl Data {
                 name,
                 disposition,
                 actions,
-            }) => self.add_lazy_node(*parent, *id, name, disposition, actions),
+            }) => self.add_lazy_node(parent.into(), id.into(), name, disposition, actions),
             validate::LazyAction::DeleteLazyNode(validate::DeleteLazyNode { id }) => {
-                self.delete_property(*id)
+                self.delete_property(id.into())
             }
             _ => Err(format_err!("Unknown lazy action {:?}", lazy_action)),
         }
     }
 
-    fn create_node(&mut self, parent: u32, id: u32, name: &str) -> Result<(), Error> {
+    fn create_node(&mut self, parent: BlockIndex, id: BlockIndex, name: &str) -> Result<(), Error> {
         let node = Node {
             name: name.to_owned(),
             parent,
@@ -706,8 +713,8 @@ impl Data {
         Ok(())
     }
 
-    fn delete_node(&mut self, id: u32) -> Result<(), Error> {
-        if id == 0 {
+    fn delete_node(&mut self, id: BlockIndex) -> Result<(), Error> {
+        if id == BlockIndex::ROOT {
             return Err(format_err!("Do not try to delete node 0"));
         }
         if self.tombstone_nodes.remove(&id) {
@@ -742,8 +749,8 @@ impl Data {
         Ok(())
     }
 
-    fn make_tombstone_node(&mut self, id: u32) -> Result<(), Error> {
-        if id == 0 {
+    fn make_tombstone_node(&mut self, id: BlockIndex) -> Result<(), Error> {
+        if id == BlockIndex::ROOT {
             return Err(format_err!("Internal error! Do not try to delete node 0."));
         }
         if let Some(node) = self.nodes.remove(&id) {
@@ -760,7 +767,7 @@ impl Data {
         Ok(())
     }
 
-    fn make_tombstone_property(&mut self, id: u32) -> Result<(), Error> {
+    fn make_tombstone_property(&mut self, id: BlockIndex) -> Result<(), Error> {
         if let None = self.properties.remove(&id) {
             return Err(format_err!(
                 "Internal error! Tried to tombstone nonexistent property {}",
@@ -773,8 +780,8 @@ impl Data {
 
     fn add_property(
         &mut self,
-        parent: u32,
-        id: u32,
+        parent: BlockIndex,
+        id: BlockIndex,
         name: &str,
         payload: Payload,
     ) -> Result<(), Error> {
@@ -793,7 +800,7 @@ impl Data {
         Ok(())
     }
 
-    fn delete_property(&mut self, id: u32) -> Result<(), Error> {
+    fn delete_property(&mut self, id: BlockIndex) -> Result<(), Error> {
         if self.tombstone_properties.remove(&id) {
             return Ok(());
         }
@@ -819,8 +826,13 @@ impl Data {
         Ok(())
     }
 
-    fn modify_number(&mut self, id: u32, value: &validate::Value, op: Op) -> Result<(), Error> {
-        if let Some(property) = self.properties.get_mut(&id) {
+    fn modify_number(
+        &mut self,
+        id: BlockIndex,
+        value: &validate::Value,
+        op: Op,
+    ) -> Result<(), Error> {
+        if let Some(property) = self.properties.get_mut(&id.into()) {
             match (&property, value) {
                 (Property { payload: Payload::Int(old), .. }, Value::IntT(value)) => {
                     property.payload = Payload::Int((op.int)(*old, *value));
@@ -843,7 +855,7 @@ impl Data {
 
     fn modify_array(
         &mut self,
-        id: u32,
+        id: BlockIndex,
         index64: u64,
         value: &validate::Value,
         op: Op,
@@ -898,7 +910,7 @@ impl Data {
         Ok(())
     }
 
-    fn set_string(&mut self, id: u32, value: &String) -> Result<(), Error> {
+    fn set_string(&mut self, id: BlockIndex, value: &String) -> Result<(), Error> {
         if let Some(property) = self.properties.get_mut(&id) {
             match &property {
                 Property { payload: Payload::String(_), .. } => {
@@ -914,7 +926,7 @@ impl Data {
         Ok(())
     }
 
-    fn set_bytes(&mut self, id: u32, value: &Vec<u8>) -> Result<(), Error> {
+    fn set_bytes(&mut self, id: BlockIndex, value: &Vec<u8>) -> Result<(), Error> {
         if let Some(property) = self.properties.get_mut(&id) {
             match &property {
                 Property { payload: Payload::Bytes(_), .. } => {
@@ -930,7 +942,7 @@ impl Data {
         Ok(())
     }
 
-    fn set_bool(&mut self, id: u32, value: bool) -> Result<(), Error> {
+    fn set_bool(&mut self, id: BlockIndex, value: bool) -> Result<(), Error> {
         if let Some(property) = self.properties.get_mut(&id) {
             match &property {
                 Property { payload: Payload::Bool(_), .. } => {
@@ -948,8 +960,8 @@ impl Data {
 
     fn add_lazy_node(
         &mut self,
-        parent: u32,
-        id: u32,
+        parent: BlockIndex,
+        id: BlockIndex,
         name: &str,
         disposition: &validate::LinkDisposition,
         actions: &Vec<validate::Action>,
@@ -998,7 +1010,7 @@ impl Data {
                     Some((id, v))
                 }
             })
-            .collect::<HashMap<u32, Property>>();
+            .collect::<HashMap<BlockIndex, Property>>();
 
         // Clean up removed properties.
         for (parent, id) in to_remove {
@@ -1080,10 +1092,10 @@ impl Data {
             tombstone_properties: HashSet::new(),
         };
         ret.nodes.insert(
-            0,
+            BlockIndex::ROOT,
             Node {
                 name: ROOT_NAME.into(),
-                parent: 0,
+                parent: BlockIndex::ROOT,
                 children: HashSet::new(),
                 properties: HashSet::new(),
             },
@@ -1091,7 +1103,7 @@ impl Data {
         ret
     }
 
-    fn build(nodes: HashMap<u32, Node>, properties: HashMap<u32, Property>) -> Data {
+    fn build(nodes: HashMap<BlockIndex, Node>, properties: HashMap<BlockIndex, Property>) -> Data {
         Data {
             nodes,
             properties,
@@ -1101,7 +1113,7 @@ impl Data {
     }
 
     fn to_string_internal(&self, hide_root: bool) -> String {
-        if let Some(node) = self.nodes.get(&ROOT_ID) {
+        if let Some(node) = self.nodes.get(&BlockIndex::ROOT) {
             node.to_string(&"".to_owned(), self, hide_root)
         } else {
             "No root node; internal error\n".to_owned()
@@ -1121,7 +1133,7 @@ impl Data {
             return;
         }
         let mut target_node_id = None;
-        let root = &self.nodes[&0];
+        let root = &self.nodes[&BlockIndex::ROOT];
         for child_id in &root.children {
             if let Some(node) = self.nodes.get(&child_id) {
                 if node.name == name {
@@ -1137,7 +1149,7 @@ impl Data {
 
     /// Return true if this data is not just an empty root node.
     pub fn is_empty(&self) -> bool {
-        if !self.nodes.contains_key(&0) {
+        if !self.nodes.contains_key(&BlockIndex::ROOT) {
             // No root
             return true;
         }
@@ -1149,7 +1161,7 @@ impl Data {
         }
 
         // Root has no properties and any children it may have are tombstoned.
-        let root = &self.nodes[&0];
+        let root = &self.nodes[&BlockIndex::ROOT];
         return root.children.is_subset(&self.tombstone_nodes) && root.properties.len() == 0;
     }
 }
@@ -1169,17 +1181,17 @@ impl From<DiagnosticsHierarchy> for Data {
         let mut properties = HashMap::new();
 
         nodes.insert(
-            0u32,
+            0.into(),
             Node {
                 name: hierarchy.name.clone(),
-                parent: 0u32,
+                parent: 0.into(),
                 children: HashSet::new(),
                 properties: HashSet::new(),
             },
         );
 
-        let mut queue = vec![(0u32, &hierarchy)];
-        let mut next_id: u32 = 1;
+        let mut queue = vec![(0.into(), &hierarchy)];
+        let mut next_id = BlockIndex::new(1);
 
         while let Some((id, value)) = queue.pop() {
             for ref node in value.children.iter() {

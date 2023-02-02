@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow;
-use inspect_format::{BlockType, Error as FormatError};
+use inspect_format::{BlockIndex, BlockType, Error as FormatError};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_zircon as zx;
@@ -25,7 +25,7 @@ pub enum Error {
     #[error("Failed to free {value_type} index={index}")]
     Free {
         value_type: &'static str,
-        index: u32,
+        index: BlockIndex,
         #[source]
         error: Box<Error>,
     },
@@ -47,10 +47,10 @@ pub enum Error {
     CreateState(#[source] Box<Error>),
 
     #[error("Attempted to free a FREE block at index {0}")]
-    BlockAlreadyFree(u32),
+    BlockAlreadyFree(BlockIndex),
 
     #[error("Invalid index {0}: {1}")]
-    InvalidIndex(u32, &'static str),
+    InvalidIndex(BlockIndex, &'static str),
 
     #[error("Heap already at its maximum size")]
     HeapMaxSizeReached,
@@ -59,10 +59,10 @@ pub enum Error {
     BlockSizeTooBig(usize),
 
     #[error("Invalid block type at index {0}: {1:?}")]
-    InvalidBlockType(usize, BlockType),
+    InvalidBlockType(BlockIndex, BlockType),
 
     #[error("Invalid block type at index {0}: {1}")]
-    InvalidBlockTypeNumber(u32, u8),
+    InvalidBlockTypeNumber(BlockIndex, u8),
 
     #[error("Invalid block type. Expected: {0}, actual: {1}")]
     UnexpectedBlockType(BlockType, BlockType),
@@ -77,19 +77,19 @@ pub enum Error {
     InvalidBlockOrder(usize),
 
     #[error("Invalid order {0} at index {1}")]
-    InvalidBlockOrderAtIndex(usize, u32),
+    InvalidBlockOrderAtIndex(usize, BlockIndex),
 
     #[error("Cannot swap blocks of different order or container")]
     InvalidBlockSwap,
 
     #[error("Expected a valid entry type for the array at index {0}")]
-    InvalidArrayType(u32),
+    InvalidArrayType(BlockIndex),
 
     #[error("{slots} exceeds the maximum number of slots for order {order}: {max_capacity}")]
     ArrayCapacityExceeded { slots: usize, order: usize, max_capacity: usize },
 
     #[error("Invalid {value_type} flags={flags} at index {index}")]
-    InvalidFlags { value_type: &'static str, flags: u8, index: u32 },
+    InvalidFlags { value_type: &'static str, flags: u8, index: BlockIndex },
 
     #[error("Name is not utf8")]
     NameNotUtf8,
@@ -118,7 +118,7 @@ impl Error {
         Self::Fidl(format!("{}", err))
     }
 
-    pub fn free(value_type: &'static str, index: u32, error: Error) -> Self {
+    pub fn free(value_type: &'static str, index: BlockIndex, error: Error) -> Self {
         Self::Free { value_type, index, error: Box::new(error) }
     }
 
@@ -126,11 +126,11 @@ impl Error {
         Self::Create { value_type, error: Box::new(error) }
     }
 
-    pub fn invalid_index(index: u32, reason: &'static str) -> Self {
+    pub fn invalid_index(index: BlockIndex, reason: &'static str) -> Self {
         Self::InvalidIndex(index, reason)
     }
 
-    pub fn invalid_flags(value_type: &'static str, flags: u8, index: u32) -> Self {
+    pub fn invalid_flags(value_type: &'static str, flags: u8, index: BlockIndex) -> Self {
         Self::InvalidFlags { value_type, flags, index }
     }
 

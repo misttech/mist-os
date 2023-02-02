@@ -34,7 +34,7 @@
 use {
     crate::reader::snapshot::{ScannedBlock, Snapshot},
     diagnostics_hierarchy::{testing::DiagnosticsHierarchyGetter, *},
-    inspect_format::{constants, utils, BlockType, PropertyFormat},
+    inspect_format::{utils, BlockIndex, BlockType, PropertyFormat},
     maplit::btreemap,
     std::{borrow::Cow, cmp::min, collections::BTreeMap, convert::TryFrom},
 };
@@ -189,7 +189,7 @@ fn read_snapshot(snapshot: &Snapshot) -> Result<PartialNodeHierarchy, ReaderErro
 fn scan_blocks<'a>(snapshot: &'a Snapshot) -> Result<ScanResult<'a>, ReaderError> {
     let mut result = ScanResult::new(snapshot);
     for block in snapshot.scan() {
-        if block.index() == 0
+        if block.index() == BlockIndex::ROOT
             && block.block_type_or().map_err(ReaderError::VmoFormat)? != BlockType::Header
         {
             return Err(ReaderError::MissingHeader);
@@ -223,7 +223,7 @@ fn scan_blocks<'a>(snapshot: &'a Snapshot) -> Result<ScanResult<'a>, ReaderError
 struct ScanResult<'a> {
     /// All the nodes found while scanning the snapshot.
     /// Scanned nodes NodeHierarchies won't have their children filled.
-    parsed_nodes: BTreeMap<u32, ScannedNode>,
+    parsed_nodes: BTreeMap<BlockIndex, ScannedNode>,
 
     /// A snapshot of the Inspect VMO tree.
     snapshot: &'a Snapshot,
@@ -239,7 +239,7 @@ struct ScannedNode {
     child_nodes_count: usize,
 
     /// The index of the parent node of this node.
-    parent_index: u32,
+    parent_index: BlockIndex,
 
     /// True only if this node was intialized. Uninitialized nodes will be ignored.
     initialized: bool,
@@ -250,13 +250,13 @@ impl ScannedNode {
         ScannedNode {
             partial_hierarchy: PartialNodeHierarchy::empty(),
             child_nodes_count: 0,
-            parent_index: 0,
+            parent_index: BlockIndex::EMPTY,
             initialized: false,
         }
     }
 
     /// Sets the name and parent index of the node.
-    fn initialize(&mut self, name: String, parent_index: u32) {
+    fn initialize(&mut self, name: String, parent_index: BlockIndex) {
         self.partial_hierarchy.name = name;
         self.parent_index = parent_index;
         self.initialized = true;
@@ -283,9 +283,9 @@ macro_rules! get_or_create_scanned_node {
 impl<'a> ScanResult<'a> {
     fn new(snapshot: &'a Snapshot) -> Self {
         let mut root_node = ScannedNode::new();
-        root_node.initialize("root".to_string(), 0);
+        root_node.initialize("root".to_string(), BlockIndex::ROOT);
         let parsed_nodes = btreemap!(
-            0 => root_node,
+            BlockIndex::ROOT => root_node,
         );
         ScanResult { snapshot, parsed_nodes }
     }
@@ -296,7 +296,7 @@ impl<'a> ScanResult<'a> {
 
         // Maps a block index to the node there. These nodes are still not
         // complete.
-        let mut pending_nodes = BTreeMap::<u32, ScannedNode>::new();
+        let mut pending_nodes = BTreeMap::<BlockIndex, ScannedNode>::new();
 
         let mut uninitialized_nodes = std::collections::BTreeSet::new();
 
@@ -308,7 +308,7 @@ impl<'a> ScanResult<'a> {
                 continue;
             }
             if scanned_node.is_complete() {
-                if index == 0 {
+                if index == BlockIndex::ROOT {
                     return Ok(scanned_node.partial_hierarchy);
                 }
                 complete_nodes.push(scanned_node);
@@ -340,7 +340,7 @@ impl<'a> ScanResult<'a> {
                 .is_complete()
             {
                 let parent_node = pending_nodes.remove(&scanned_node.parent_index).unwrap();
-                if scanned_node.parent_index == 0 {
+                if scanned_node.parent_index == BlockIndex::ROOT {
                     return Ok(parent_node.partial_hierarchy);
                 }
                 complete_nodes.push(parent_node);
@@ -350,7 +350,7 @@ impl<'a> ScanResult<'a> {
         return Err(ReaderError::MalformedTree);
     }
 
-    fn get_name(&self, index: u32) -> Option<String> {
+    fn get_name(&self, index: BlockIndex) -> Option<String> {
         let block = self.snapshot.get_block(index)?;
 
         match block.block_type() {
@@ -476,7 +476,7 @@ impl<'a> ScanResult<'a> {
                         let string_idx = block.array_get_string_index_slot(i).unwrap();
                         // default initialize unset values -- 0 index is never a string, it is always
                         // the header block
-                        if string_idx == constants::EMPTY_STRING_SLOT_INDEX {
+                        if string_idx == BlockIndex::EMPTY {
                             return String::new();
                         }
 
@@ -532,11 +532,15 @@ impl<'a> ScanResult<'a> {
 
     // Incrementally add the contents of each extent in the extent linked list
     // until we reach the last extent or the maximum expected length.
-    fn read_extents(&self, total_length: usize, first_extent: u32) -> Result<Vec<u8>, ReaderError> {
+    fn read_extents(
+        &self,
+        total_length: usize,
+        first_extent: BlockIndex,
+    ) -> Result<Vec<u8>, ReaderError> {
         let mut buffer = vec![0u8; total_length];
         let mut offset = 0;
         let mut extent_index = first_extent;
-        while extent_index != 0 && offset < total_length {
+        while extent_index != BlockIndex::EMPTY && offset < total_length {
             let extent = self
                 .snapshot
                 .get_block(extent_index)
@@ -848,11 +852,13 @@ mod tests {
         // purpose to produce an invalid UTF8 string in the property.
         let vmo = inspector.vmo().await.unwrap();
         let snapshot = Snapshot::try_from(&vmo).expect("getting snapshot");
-        let block = snapshot.get_block(prop.block_index()).expect("getting block");
+        let block = snapshot
+            .get_block(prop.get_block().map(|b| b.index()).unwrap())
+            .expect("getting block");
 
         // The first byte of the actual property string is at this byte offset in the VMO.
         let byte_offset = constants::MIN_ORDER_SIZE
-            * (block.property_extent_index().unwrap() as usize)
+            * (*block.property_extent_index().unwrap() as usize)
             + constants::HEADER_SIZE_BYTES;
 
         // Get the raw VMO bytes to mess with.
@@ -885,7 +891,7 @@ mod tests {
         vmo.read_bytes(&mut buf[..], /*offset=*/ 0)?;
 
         // Mess up with the block slots by setting them to a too big number.
-        let offset = utils::offset_for_index(array.block_index()) + 8;
+        let offset = array.get_block().map(|b| b.index()).unwrap().offset() + 8;
         let mut payload =
             Payload(u64::from_le_bytes(*<&[u8; 8]>::try_from(&buf[offset..offset + 8])?));
         payload.set_array_slots_count(255);

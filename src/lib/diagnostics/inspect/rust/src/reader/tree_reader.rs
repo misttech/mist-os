@@ -270,7 +270,7 @@ mod tests {
                     "missing".into(),
                     "missing-404".into(),
                     LinkNodeDisposition::Child,
-                    0,
+                    0.into(),
                 )
                 .unwrap();
         });

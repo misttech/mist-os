@@ -4,7 +4,7 @@
 
 use crate::writer::Error as WriterError;
 use diagnostics_hierarchy::Error as HierarchyError;
-use inspect_format::{BlockType, Error as FormatError};
+use inspect_format::{BlockIndex, BlockType, Error as FormatError};
 use thiserror::Error;
 
 #[cfg(target_os = "fuchsia")]
@@ -22,7 +22,7 @@ pub enum ReaderError {
     MissingHeader,
 
     #[error("Cannot find parent block index {0}")]
-    ParentIndexNotFound(u32),
+    ParentIndexNotFound(BlockIndex),
 
     #[error("Malformed tree, no complete node with parent=0")]
     MalformedTree,
@@ -31,19 +31,19 @@ pub enum ReaderError {
     VmoFormat(#[source] FormatError),
 
     #[error("Tried to read more slots than available at block index {0}")]
-    AttemptedToReadTooManyArraySlots(u32),
+    AttemptedToReadTooManyArraySlots(BlockIndex),
 
     #[error("unexpected array entry type format: {0:?}")]
     UnexpectedArrayEntryFormat(BlockType),
 
     #[error("Failed to parse name at index {0}")]
-    ParseName(u32),
+    ParseName(BlockIndex),
 
     #[error("Failed to get link content at index {0}")]
-    GetLinkContent(u32),
+    GetLinkContent(BlockIndex),
 
     #[error("Failed to get extent at index {0}")]
-    GetExtent(u32),
+    GetExtent(BlockIndex),
 
     #[error("Failed to get consistent snapshot")]
     InconsistentSnapshot,
