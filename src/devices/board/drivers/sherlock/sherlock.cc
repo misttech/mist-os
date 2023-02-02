@@ -22,13 +22,8 @@
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 
-#include "src/devices/board/drivers/sherlock/sherlock-gpios.h"
-
-#if IS_LUIS
-#include "src/devices/board/drivers/sherlock/luis-bind.h"
-#else
 #include "src/devices/board/drivers/sherlock/sherlock-bind.h"
-#endif
+#include "src/devices/board/drivers/sherlock/sherlock-gpios.h"
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -49,18 +44,6 @@ zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
   }
 
   fdf::WireSyncClient<fpbus::PlatformBus> pbus(std::move(endpoints->client));
-  fdf::Arena arena('SHER');
-  auto board_info = pbus.buffer(arena)->GetBoardInfo();
-  if (!board_info.ok()) {
-    zxlogf(ERROR, "%s: GetBoardInfo request failed: %s", __func__,
-           board_info.FormatDescription().data());
-    return board_info.status();
-  }
-  if (board_info->is_error()) {
-    zxlogf(ERROR, "%s: GetBoardInfo failed: %s", __func__,
-           zx_status_get_string(board_info->error_value()));
-    return board_info->error_value();
-  }
 
   status = device_get_protocol(parent, ZX_PROTOCOL_IOMMU, &iommu);
   if (status != ZX_OK) {
@@ -68,8 +51,7 @@ zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
   }
 
   fbl::AllocChecker ac;
-  auto board = fbl::make_unique_checked<Sherlock>(&ac, parent, pbus.TakeClientEnd(), &iommu,
-                                                  board_info->value()->info.pid);
+  auto board = fbl::make_unique_checked<Sherlock>(&ac, parent, pbus.TakeClientEnd(), &iommu);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -173,11 +155,6 @@ int Sherlock::Thread() {
 
   if (ClkInit() != ZX_OK) {
     zxlogf(ERROR, "ClkInit() failed");
-    return -1;
-  }
-
-  if (PowerInit() != ZX_OK) {
-    zxlogf(ERROR, "PowerInit() failed");
     return -1;
   }
 
@@ -305,25 +282,6 @@ int Sherlock::Thread() {
       root_.CreateUint("display_id", GetDisplayVendor() | (GetDdicVersion() << 1));
 
   return 0;
-}
-
-zx_status_t Sherlock::PowerInit() {
-  if (pid_ == PDEV_PID_LUIS) {
-    return LuisPowerInit();
-  } else if (pid_ == PDEV_PID_SHERLOCK) {
-    // Sherlock does not implement a power driver yet.
-    return ZX_OK;
-  }
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t Sherlock::CpuInit() {
-  if (pid_ == PDEV_PID_LUIS) {
-    return LuisCpuInit();
-  } else if (pid_ == PDEV_PID_SHERLOCK) {
-    return SherlockCpuInit();
-  }
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t Sherlock::Start() {

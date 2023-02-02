@@ -179,8 +179,6 @@ config("fidl-wire-deprecated-mutable-tables") {
     "//src/devices/bin/driver_host2:unittests",
     "//src/devices/board/drivers/astro:astro-driver",
     "//src/devices/board/drivers/nelson:nelson-module-driver",
-    "//src/devices/board/drivers/sherlock:luis-driver",
-    "//src/devices/board/drivers/sherlock:luis-factory-driver",
     "//src/devices/board/drivers/sherlock:sherlock-dai-test-driver",
     "//src/devices/board/drivers/sherlock:sherlock-driver",
     "//src/devices/board/drivers/sherlock:sherlock-factory-driver",

@@ -20,9 +20,6 @@
 
 #include "sherlock-gpios.h"
 #include "sherlock.h"
-#include "src/devices/board/drivers/sherlock/ernie-tweeter-bind.h"
-#include "src/devices/board/drivers/sherlock/ernie-woofer-bind.h"
-#include "src/devices/board/drivers/sherlock/luis-codec-bind.h"
 #include "src/devices/board/drivers/sherlock/sherlock-tweeter-left-bind.h"
 #include "src/devices/board/drivers/sherlock/sherlock-tweeter-right-bind.h"
 #include "src/devices/board/drivers/sherlock/sherlock-woofer-bind.h"
@@ -94,17 +91,14 @@ zx_status_t Sherlock::AudioInit() {
   }
   auto& board_info = result->value()->info;
 
-  bool is_sherlock = board_info.pid == PDEV_PID_SHERLOCK;
-  bool is_ernie = board_info.pid != PDEV_PID_SHERLOCK && (board_info.board_revision & (1 << 4));
-  if (is_sherlock &&
-      (board_info.board_revision < BOARD_REV_EVT1 && board_info.board_revision != BOARD_REV_B72)) {
+  if (board_info.board_revision < BOARD_REV_EVT1 && board_info.board_revision != BOARD_REV_B72) {
     // For audio we don't support boards revision lower than EVT with the exception of the B72
     // board.
     zxlogf(WARNING, "%s: Board revision unsupported, skipping audio initialization.", __FILE__);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  const char* product_name = is_sherlock ? "sherlock" : (is_ernie ? "ernie" : "luis");
+  const char* product_name = "sherlock";
   constexpr size_t device_name_max_length = 32;
 
   // TODO(fxb/84194): Migrate remaining fragments once a solution for
@@ -131,23 +125,6 @@ zx_status_t Sherlock::AudioInit() {
       BI_ABORT_IF(NE, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS5720),
       BI_MATCH_IF(EQ, BIND_CODEC_INSTANCE, 3),
   };
-  constexpr zx_bind_inst_t luis_codec_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TI),
-      BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS58xx),
-  };
-  constexpr zx_bind_inst_t ernie_codec_woofer_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TI),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS58xx),
-      BI_MATCH_IF(EQ, BIND_CODEC_INSTANCE, 1),
-  };
-  constexpr zx_bind_inst_t ernie_codec_tweeter_match[] = {
-      BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_CODEC),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_TI),
-      BI_ABORT_IF(NE, BIND_PLATFORM_DEV_DID, PDEV_DID_TI_TAS58xx),
-      BI_MATCH_IF(EQ, BIND_CODEC_INSTANCE, 2),
-  };
 
   const device_fragment_part_t enable_gpio_fragment[] = {
       {std::size(enable_gpio_match), enable_gpio_match},
@@ -163,30 +140,12 @@ zx_status_t Sherlock::AudioInit() {
   const device_fragment_part_t codec_tweeter_right_fragment[] = {
       {std::size(codec_tweeter_right_match), codec_tweeter_right_match},
   };
-  const device_fragment_part_t luis_codec_fragment[] = {
-      {std::size(luis_codec_match), luis_codec_match},
-  };
-  const device_fragment_part_t ernie_codec_woofer_fragment[] = {
-      {std::size(ernie_codec_woofer_match), ernie_codec_woofer_match},
-  };
-  const device_fragment_part_t ernie_codec_tweeter_fragment[] = {
-      {std::size(ernie_codec_tweeter_match), ernie_codec_tweeter_match},
-  };
 
   const device_fragment_t sherlock_tdm_i2s_fragments[] = {
       {"gpio-enable", std::size(enable_gpio_fragment), enable_gpio_fragment},
       {"codec-01", std::size(codec_woofer_fragment), codec_woofer_fragment},
       {"codec-02", std::size(codec_tweeter_left_fragment), codec_tweeter_left_fragment},
       {"codec-03", std::size(codec_tweeter_right_fragment), codec_tweeter_right_fragment},
-  };
-  const device_fragment_t luis_tdm_i2s_fragments[] = {
-      {"gpio-enable", std::size(enable_gpio_fragment), enable_gpio_fragment},
-      {"codec-01", std::size(luis_codec_fragment), luis_codec_fragment},
-  };
-  const device_fragment_t ernie_tdm_i2s_fragments[] = {
-      {"gpio-enable", std::size(enable_gpio_fragment), enable_gpio_fragment},
-      {"codec-01", std::size(ernie_codec_woofer_fragment), ernie_codec_woofer_fragment},
-      {"codec-02", std::size(ernie_codec_tweeter_fragment), ernie_codec_tweeter_fragment},
   };
 
   zx_status_t status = clk_impl_.Disable(g12b_clk::CLK_HIFI_PLL);
@@ -215,12 +174,8 @@ zx_status_t Sherlock::AudioInit() {
   gpio_impl_.SetDriveStrength(T931_GPIOZ(7), ua, nullptr);
   gpio_impl_.SetDriveStrength(T931_GPIOZ(6), ua, nullptr);
   gpio_impl_.SetDriveStrength(T931_GPIOZ(2), ua, nullptr);
-  if (is_sherlock) {
-    gpio_impl_.SetAltFunction(T931_GPIOZ(3), T931_GPIOZ_3_TDMC_D1_FN);
-    gpio_impl_.SetDriveStrength(T931_GPIOZ(3), ua, nullptr);
-  } else {
-    gpio_impl_.SetAltFunction(T931_GPIOZ(3), 0);
-  }
+  gpio_impl_.SetAltFunction(T931_GPIOZ(3), T931_GPIOZ_3_TDMC_D1_FN);
+  gpio_impl_.SetDriveStrength(T931_GPIOZ(3), ua, nullptr);
 
   gpio_impl_.SetAltFunction(T931_GPIOAO(9), T931_GPIOAO_9_MCLK_FN);
   gpio_impl_.SetDriveStrength(T931_GPIOAO(9), ua, nullptr);
@@ -239,12 +194,9 @@ zx_status_t Sherlock::AudioInit() {
   // PDM pin assignments.
   gpio_impl_.SetAltFunction(T931_GPIOA(7), T931_GPIOA_7_PDM_DCLK_FN);
   gpio_impl_.SetAltFunction(T931_GPIOA(8), T931_GPIOA_8_PDM_DIN0_FN);
-  if (!is_sherlock) {
-    gpio_impl_.SetAltFunction(T931_GPIOA(9), T931_GPIOA_9_PDM_DIN1_FN);
-  }
 
   // Add TDM OUT to the codecs.
-  if (is_sherlock) {
+  {
     gpio_impl_.ConfigOut(T931_GPIOH(7), 1);  // SOC_AUDIO_EN.
     zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
                                 {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TAS5720},
@@ -292,79 +244,6 @@ zx_status_t Sherlock::AudioInit() {
       zxlogf(ERROR, "%s DdkAddComposite right tweeter failed %d", __FILE__, status);
       return status;
     }
-  } else {  // Luis/Ernie.
-    // From the TAS5805m codec reference manual:
-    // "9.5.3.1 Startup Procedures
-    // 1. Configure ADR/FAULT pin with proper settings for I2C device address.
-    // 2. Bring up power supplies (it does not matter if PVDD or DVDD comes up first).
-    // 3. Once power supplies are stable, bring up PDN to High and wait 5ms at least, then
-    // start SCLK, LRCLK.
-    // 4. Once I2S clocks are stable, set the device into HiZ state and enable DSP via the I2C
-    // control port.
-    // 5. Wait 5ms at least. Then initialize the DSP Coefficient, then set the device to Play
-    // state.
-    // 6. The device is now in normal operation."
-    // Step 3 PDN setup and 5ms delay is executed below.
-    gpio_impl_.ConfigOut(T931_GPIOH(7), 1);  // SOC_AUDIO_EN, Set PDN_N to High.
-    zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
-    // I2S clocks are configured by the controller and the rest of the initialization is done
-    // in the codec itself.
-
-    if (is_ernie) {
-      zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
-                                  {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TAS58xx},
-                                  {BIND_CODEC_INSTANCE, 0, 1}};
-      metadata::ti::TasConfig metadata = {};
-      metadata.instance_count = 1;
-
-      const device_metadata_t codec_metadata[] = {
-          {
-              .type = DEVICE_METADATA_PRIVATE,
-              .data = &metadata,
-              .length = sizeof(metadata),
-          },
-      };
-
-      composite_device_desc_t comp_desc = {};
-      comp_desc.props = props;
-      comp_desc.props_count = std::size(props);
-      comp_desc.spawn_colocated = false;
-      comp_desc.fragments = ernie_woofer_fragments;
-      comp_desc.fragments_count = std::size(ernie_woofer_fragments);
-      comp_desc.primary_fragment = "i2c";
-      comp_desc.metadata_list = codec_metadata;
-      comp_desc.metadata_count = std::size(codec_metadata);
-      status = DdkAddComposite("audio-tas58xx-woofer", &comp_desc);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "%s DdkAddComposite woofer failed %d", __FILE__, status);
-        return status;
-      }
-
-      metadata.instance_count = 2;
-      props[2].value = 2;
-      comp_desc.fragments = ernie_tweeter_fragments;
-      comp_desc.fragments_count = std::size(ernie_tweeter_fragments);
-      status = DdkAddComposite("audio-tas58xx-tweeter", &comp_desc);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "%s DdkAddComposite left tweeter failed %d", __FILE__, status);
-        return status;
-      }
-    } else {
-      zx_device_prop_t props[] = {{BIND_PLATFORM_DEV_VID, 0, PDEV_VID_TI},
-                                  {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_TI_TAS58xx}};
-      composite_device_desc_t comp_desc = {};
-      comp_desc.props = props;
-      comp_desc.props_count = std::size(props);
-      comp_desc.spawn_colocated = false;
-      comp_desc.fragments = luis_codec_fragments;
-      comp_desc.fragments_count = std::size(luis_codec_fragments);
-      comp_desc.primary_fragment = "i2c";
-      status = DdkAddComposite("audio-tas58xx", &comp_desc);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "%s DdkAddComposite failed %d", __FILE__, status);
-        return status;
-      }
-    }
   }
   metadata::AmlConfig metadata = {};
   snprintf(metadata.manufacturer, sizeof(metadata.manufacturer), "Spacely Sprockets");
@@ -377,78 +256,48 @@ zx_status_t Sherlock::AudioInit() {
   metadata.unique_id = AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS;
   metadata.bus = metadata::AmlBus::TDM_C;
   metadata.version = metadata::AmlVersion::kS905D2G;  // Also works with T931G.
-  if (is_sherlock) {
-    metadata.dai.type = metadata::DaiType::I2s;
-    metadata.dai.bits_per_sample = 16;
-    metadata.dai.bits_per_slot = 32;
-    // Ranges could be wider, but only using them crossed-over at 1'200 Hz in this product.
-    metadata.ring_buffer.frequency_ranges[0].min_frequency = 20;
-    metadata.ring_buffer.frequency_ranges[0].max_frequency = 1'600;
-    metadata.ring_buffer.frequency_ranges[1].min_frequency = 20;
-    metadata.ring_buffer.frequency_ranges[1].max_frequency = 1'600;
-    metadata.ring_buffer.frequency_ranges[2].min_frequency = 1'000;
-    metadata.ring_buffer.frequency_ranges[2].max_frequency = 40'000;
-    metadata.ring_buffer.frequency_ranges[3].min_frequency = 1'000;
-    metadata.ring_buffer.frequency_ranges[3].max_frequency = 40'000;
-    metadata.codecs.number_of_codecs = 3;
-    metadata.codecs.types[0] = metadata::CodecType::Tas5720;
-    metadata.codecs.types[1] = metadata::CodecType::Tas5720;
-    metadata.codecs.types[2] = metadata::CodecType::Tas5720;
-    // This driver advertises 4 channels.
-    // The samples in the first channel are unused (can be zero).
-    // The samples in the second channel are used for the woofer and are expected to have a mix of
-    // both left and right channel from stereo audio.
-    // The samples in the third channel are expected to come from the left channel of stereo audio
-    // and are used for the left tweeter.
-    // The samples in the fourth channel are expected to come from the right channel of stereo audio
-    // and are used for the right tweeter.
-    metadata.ring_buffer.number_of_channels = 4;
-    metadata.swaps = 0x0123;
-    metadata.lanes_enable_mask[0] = 3;
-    metadata.lanes_enable_mask[1] = 3;
+  metadata.dai.type = metadata::DaiType::I2s;
+  metadata.dai.bits_per_sample = 16;
+  metadata.dai.bits_per_slot = 32;
+  // Ranges could be wider, but only using them crossed-over at 1'200 Hz in this product.
+  metadata.ring_buffer.frequency_ranges[0].min_frequency = 20;
+  metadata.ring_buffer.frequency_ranges[0].max_frequency = 1'600;
+  metadata.ring_buffer.frequency_ranges[1].min_frequency = 20;
+  metadata.ring_buffer.frequency_ranges[1].max_frequency = 1'600;
+  metadata.ring_buffer.frequency_ranges[2].min_frequency = 1'000;
+  metadata.ring_buffer.frequency_ranges[2].max_frequency = 40'000;
+  metadata.ring_buffer.frequency_ranges[3].min_frequency = 1'000;
+  metadata.ring_buffer.frequency_ranges[3].max_frequency = 40'000;
+  metadata.codecs.number_of_codecs = 3;
+  metadata.codecs.types[0] = metadata::CodecType::Tas5720;
+  metadata.codecs.types[1] = metadata::CodecType::Tas5720;
+  metadata.codecs.types[2] = metadata::CodecType::Tas5720;
+  // This driver advertises 4 channels.
+  // The samples in the first channel are unused (can be zero).
+  // The samples in the second channel are used for the woofer and are expected to have a mix of
+  // both left and right channel from stereo audio.
+  // The samples in the third channel are expected to come from the left channel of stereo audio
+  // and are used for the left tweeter.
+  // The samples in the fourth channel are expected to come from the right channel of stereo audio
+  // and are used for the right tweeter.
+  metadata.ring_buffer.number_of_channels = 4;
+  metadata.swaps = 0x0123;
+  metadata.lanes_enable_mask[0] = 3;
+  metadata.lanes_enable_mask[1] = 3;
 #ifndef FACTORY_BUILD
-    // Delta between woofers and tweeters of 6.4dB.
-    metadata.codecs.delta_gains[0] = 0.f;
-    metadata.codecs.delta_gains[1] = -6.4f;
-    metadata.codecs.delta_gains[2] = -6.4f;
-#endif                                                 // FACTORY_BUILD
-    metadata.codecs.channels_to_use_bitmask[0] = 0x2;  // Woofer uses DAI right I2S channel.
-    metadata.codecs.channels_to_use_bitmask[1] = 0x1;  // L tweeter uses DAI left I2S channel.
-    metadata.codecs.channels_to_use_bitmask[2] = 0x2;  // R tweeter uses DAI right I2S channel.
-    // The woofer samples are expected in the second position out of four channels.
-    // In a 4-bit bitmask, counting from least-significant bit, this is index 1: value 2^1 = 2.
-    metadata.codecs.ring_buffer_channels_to_use_bitmask[0] = 0x2;  // Woofer uses index 1.
-    metadata.codecs.ring_buffer_channels_to_use_bitmask[1] = 0x4;  // L tweeter uses index 2.
-    metadata.codecs.ring_buffer_channels_to_use_bitmask[2] = 0x8;  // R tweeter uses index 3.
-  } else if (is_ernie) {
-    metadata.dai.type = metadata::DaiType::Tdm1;
-    metadata.codecs.number_of_codecs = 2;
-    metadata.codecs.types[0] = metadata::CodecType::Tas58xx;
-    metadata.codecs.types[1] = metadata::CodecType::Tas58xx;
-    metadata.dai.bits_per_sample = 16;
-    metadata.dai.bits_per_slot = 16;
-    metadata.ring_buffer.number_of_channels = 4;
-    metadata.dai.number_of_channels = 4;
-    metadata.swaps = 0x10;
-    metadata.lanes_enable_mask[0] = 0xf;
-    // Woofer uses one of first 2 channels in shared TDM.
-    metadata.codecs.channels_to_use_bitmask[0] = 0x3;
-    // Tweeters use last 2 channels in shared TDM.
-    metadata.codecs.channels_to_use_bitmask[1] = 0xc;
-    metadata.codecs.ring_buffer_channels_to_use_bitmask[0] = 0xC;  // Woofer uses index 2 or 3.
-    metadata.codecs.ring_buffer_channels_to_use_bitmask[1] = 0x3;  // L/R tweeters use index 0/1.
-  } else {                                                         // Luis
-    metadata.dai.type = metadata::DaiType::I2s;
-    metadata.dai.bits_per_sample = 16;
-    metadata.dai.bits_per_slot = 32;
-    metadata.codecs.number_of_codecs = 1;
-    metadata.codecs.types[0] = metadata::CodecType::Tas58xx;
-    metadata.ring_buffer.number_of_channels = 2;
-    metadata.swaps = 0x10;
-    metadata.lanes_enable_mask[0] = 3;
-    metadata.codecs.channels_to_use_bitmask[0] = 0x3;              // Woofer + Tweeter in I2S DAI.
-    metadata.codecs.ring_buffer_channels_to_use_bitmask[0] = 0x3;  // Woofer/Tweeter use index 0/1.
-  }
+  // Delta between woofers and tweeters of 6.4dB.
+  metadata.codecs.delta_gains[0] = 0.f;
+  metadata.codecs.delta_gains[1] = -6.4f;
+  metadata.codecs.delta_gains[2] = -6.4f;
+#endif                                               // FACTORY_BUILD
+  metadata.codecs.channels_to_use_bitmask[0] = 0x2;  // Woofer uses DAI right I2S channel.
+  metadata.codecs.channels_to_use_bitmask[1] = 0x1;  // L tweeter uses DAI left I2S channel.
+  metadata.codecs.channels_to_use_bitmask[2] = 0x2;  // R tweeter uses DAI right I2S channel.
+  // The woofer samples are expected in the second position out of four channels.
+  // In a 4-bit bitmask, counting from least-significant bit, this is index 1: value 2^1 = 2.
+  metadata.codecs.ring_buffer_channels_to_use_bitmask[0] = 0x2;  // Woofer uses index 1.
+  metadata.codecs.ring_buffer_channels_to_use_bitmask[1] = 0x4;  // L tweeter uses index 2.
+  metadata.codecs.ring_buffer_channels_to_use_bitmask[2] = 0x8;  // R tweeter uses index 3.
   std::vector<fpbus::Metadata> tdm_metadata{
       {{
           .type = DEVICE_METADATA_PRIVATE,
@@ -470,7 +319,8 @@ zx_status_t Sherlock::AudioInit() {
   tdm_dev.bti() = tdm_btis;
   tdm_dev.irq() = frddr_b_irqs;
   tdm_dev.metadata() = tdm_metadata;
-  if (is_sherlock) {
+
+  {
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('AUDI');
     auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
@@ -487,42 +337,6 @@ zx_status_t Sherlock::AudioInit() {
       zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s", __func__,
              zx_status_get_string(result->error_value()));
       return result->error_value();
-    }
-
-  } else {
-    if (is_ernie) {
-      auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-          fidl::ToWire(fidl_arena, tdm_dev),
-          platform_bus_composite::MakeFidlFragment(fidl_arena, ernie_tdm_i2s_fragments,
-                                                   std::size(ernie_tdm_i2s_fragments)),
-          {});
-      if (!result.ok()) {
-        zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
-               __func__, result.FormatDescription().data());
-        return result.status();
-      }
-      if (result->is_error()) {
-        zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s", __func__,
-               zx_status_get_string(result->error_value()));
-        return result->error_value();
-      }
-
-    } else {
-      auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-          fidl::ToWire(fidl_arena, tdm_dev),
-          platform_bus_composite::MakeFidlFragment(fidl_arena, luis_tdm_i2s_fragments,
-                                                   std::size(luis_tdm_i2s_fragments)),
-          {});
-      if (!result.ok()) {
-        zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) request failed: %s",
-               __func__, result.FormatDescription().data());
-        return result.status();
-      }
-      if (result->is_error()) {
-        zxlogf(ERROR, "%s: AddCompositeImplicitPbusFragment Audio(tdm_dev) failed: %s", __func__,
-               zx_status_get_string(result->error_value()));
-        return result->error_value();
-      }
     }
   }
 
@@ -623,7 +437,7 @@ zx_status_t Sherlock::AudioInit() {
     metadata::AmlPdmConfig metadata = {};
     snprintf(metadata.manufacturer, sizeof(metadata.manufacturer), "Spacely Sprockets");
     snprintf(metadata.product_name, sizeof(metadata.product_name), "sherlock");
-    metadata.number_of_channels = is_sherlock ? 2 : 3;
+    metadata.number_of_channels = 2;
     metadata.version = metadata::AmlVersion::kS905D2G;
     metadata.sysClockDivFactor = 4;
     metadata.dClockDivFactor = 250;

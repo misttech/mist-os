@@ -44,17 +44,6 @@ driver_bind_rules("sherlock-bind") {
   ]
 }
 
-driver_bind_rules("luis-bind") {
-  rules = "luis.bind"
-  header_output = "luis-bind.h"
-  bind_output = "luis.bindbc"
-  tests = "luis-bind-tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.hardware.platform.bus",
-  ]
-}
-
 driver_bind_rules("sherlock-buttons-bind") {
   rules = "bind/sherlock-buttons.bind"
   header_output = "sherlock-buttons-bind.h"
@@ -182,23 +171,6 @@ driver_bind_rules("sherlock-hevc-enc-bind") {
     "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
-  ]
-}
-
-driver_bind_rules("luis-cpu-bind") {
-  rules = "bind/luis-cpu.bind"
-  header_output = "luis-cpu-bind.h"
-  bind_output = "luis-cpu-bind.bc"
-  tests = "bind-tests/luis-cpu-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.meson",
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.power",
-    "//src/devices/bind/fuchsia.thermal",
   ]
 }
 
@@ -421,14 +393,6 @@ driver_bind_rules("camera-controller-bind") {
   ]
 }
 
-driver_bind_rules("luis-codec-bind") {
-  rules = "bind/luis-codec.bind"
-  header_output = "luis-codec-bind.h"
-  bind_output = "luis-codec-bind.bc"
-  tests = "bind-tests/luis-codec-test.json"
-  deps = [ "//src/devices/bind/fuchsia.i2c" ]
-}
-
 driver_bind_rules("sherlock-woofer-bind") {
   rules = "bind/sherlock-woofer.bind"
   header_output = "sherlock-woofer-bind.h"
@@ -453,61 +417,6 @@ driver_bind_rules("sherlock-tweeter-right-bind") {
   deps = [ "//src/devices/bind/fuchsia.i2c" ]
 }
 
-driver_bind_rules("ernie-tweeter-bind") {
-  rules = "bind/ernie-tweeter.bind"
-  header_output = "ernie-tweeter-bind.h"
-  bind_output = "ernie-tweeter-bind.bc"
-  tests = "bind-tests/ernie-tweeter-test.json"
-  deps = [ "//src/devices/bind/fuchsia.i2c" ]
-}
-
-driver_bind_rules("ernie-woofer-bind") {
-  rules = "bind/ernie-woofer.bind"
-  header_output = "ernie-woofer-bind.h"
-  bind_output = "ernie-woofer-bind.bc"
-  tests = "bind-tests/ernie-woofer-test.json"
-  deps = [ "//src/devices/bind/fuchsia.i2c" ]
-}
-
-driver_bind_rules("luis-power-domain-bind") {
-  rules = "bind/luis-power-domain.bind"
-  header_output = "luis-power-domain-bind.h"
-  bind_output = "luis-power-domain-bind.bc"
-  tests = "bind-tests/luis-power-domain-test.json"
-  deps = [ "//src/devices/bind/fuchsia.power" ]
-}
-
-driver_bind_rules("luis-power-impl-bind") {
-  rules = "bind/luis-power-impl.bind"
-  header_output = "luis-power-impl-bind.h"
-  bind_output = "luis-power-impl-bind.bc"
-  tests = "bind-tests/luis-power-impl-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform",
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.pwm",
-    "//src/devices/bind/fuchsia.vreg",
-  ]
-}
-
-driver_bind_rules("luis-0p8-ee-buck-bind") {
-  rules = "bind/luis-0p8-ee-buck.bind"
-  header_output = "luis-0p8-ee-buck-bind.h"
-  bind_output = "luis-0p8-ee-buck-bind.bc"
-  tests = "bind-tests/luis-0p8-ee-buck-test.json"
-  deps = [ "//src/devices/bind/fuchsia.i2c" ]
-}
-
-driver_bind_rules("luis-cpu-a-buck-bind") {
-  rules = "bind/luis-cpu-a-buck.bind"
-  header_output = "luis-cpu-a-buck-bind.h"
-  bind_output = "luis-cpu-a-buck-bind.bc"
-  tests = "bind-tests/luis-cpu-a-buck-test.json"
-  deps = [ "//src/devices/bind/fuchsia.i2c" ]
-}
-
 template("sherlock_driver") {
   fuchsia_driver(target_name + "-driver") {
     output_name = invoker.target_name
@@ -525,9 +434,6 @@ template("sherlock_driver") {
     }
 
     sources = [
-      "luis-cpu.cc",
-      "luis-power.cc",
-      "luis-thermal.cc",
       "sherlock-audio.cc",
       "sherlock-backlight.cc",
       "sherlock-bluetooth.cc",
@@ -569,15 +475,7 @@ template("sherlock_driver") {
       ":camera-gdc-bind_header",
       ":camera-ge2d-bind_header",
       ":camera-isp-bind_header",
-      ":ernie-tweeter-bind_header",
-      ":ernie-woofer-bind_header",
       ":imx227-sensor-bind_header",
-      ":luis-0p8-ee-buck-bind_header",
-      ":luis-codec-bind_header",
-      ":luis-cpu-a-buck-bind_header",
-      ":luis-cpu-bind_header",
-      ":luis-power-domain-bind_header",
-      ":luis-power-impl-bind_header",
       ":sherlock-aml-usb-phy-v2-bind_header",
       ":sherlock-bluetooth-bind_header",
       ":sherlock-buttons-bind_header",
@@ -648,6 +546,8 @@ template("sherlock_driver") {
       "//src/lib/ddk:ddk-metadata-headers",
 
       # TODO(fxb/38132): Migrate to the new bind rules and delete the below
+      ":sherlock-bind",
+      ":sherlock-bind_header",
       "//src/lib/ddk:ddk-deprecated-binding-headers",
       "//src/lib/ddktl",
       "//zircon/system/ulib/fbl",
@@ -656,19 +556,6 @@ template("sherlock_driver") {
       "//zircon/system/ulib/zircon-internal",
       "//zircon/system/ulib/zx",
     ]
-
-    # We need both headers to build but we can only depend on one bindfile at a time.
-    deps += [
-      ":luis-bind_header",
-      ":sherlock-bind_header",
-    ]
-
-    if (defined(is_luis) && is_luis) {
-      defines = [ "IS_LUIS=1" ]
-      deps += [ ":luis-bind" ]
-    } else {
-      deps += [ ":sherlock-bind" ]
-    }
 
     # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,
     # rather than builders.
@@ -701,18 +588,6 @@ sherlock_driver("sherlock-dai-test") {
   enable_dai_test = true
 }
 
-sherlock_driver("luis") {
-  use_factory = false
-  is_luis = true
-  enable_dai_test = false
-}
-
-sherlock_driver("luis-factory") {
-  use_factory = true
-  enable_dai_test = false
-  is_luis = true
-}
-
 group("tests") {
   testonly = true
   deps = [
@@ -720,16 +595,7 @@ group("tests") {
     ":camera-gdc-bind_test",
     ":camera-ge2d-bind_test",
     ":camera-isp-bind_test",
-    ":ernie-tweeter-bind_test",
-    ":ernie-woofer-bind_test",
     ":imx227-sensor-bind_test",
-    ":luis-0p8-ee-buck-bind_test",
-    ":luis-bind_test",
-    ":luis-codec-bind_test",
-    ":luis-cpu-a-buck-bind_test",
-    ":luis-cpu-bind_test",
-    ":luis-power-domain-bind_test",
-    ":luis-power-impl-bind_test",
     ":sherlock-aml-usb-phy-v2-bind_test",
     ":sherlock-bind_test",
     ":sherlock-dwc2-phy-bind_test",

@@ -78,8 +78,8 @@ class Sherlock : public SherlockType {
  public:
   explicit Sherlock(zx_device_t* parent,
                     fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
-                    iommu_protocol_t* iommu, uint32_t pid)
-      : SherlockType(parent), pbus_(std::move(pbus)), iommu_(iommu), pid_(pid) {}
+                    iommu_protocol_t* iommu)
+      : SherlockType(parent), pbus_(std::move(pbus)), iommu_(iommu) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -118,8 +118,6 @@ class Sherlock : public SherlockType {
   zx_status_t DisplayInit();
   zx_status_t AudioInit();
   zx_status_t ThermalInit();
-  zx_status_t LuisThermalInit();
-  zx_status_t SherlockThermalInit();
   zx_status_t TouchInit();
   zx_status_t LightInit();
   zx_status_t OtRadioInit();
@@ -129,25 +127,17 @@ class Sherlock : public SherlockType {
   zx_status_t PwmInit();
   zx_status_t RamCtlInit();
   zx_status_t CpuInit();
-  zx_status_t LuisCpuInit();
-  zx_status_t SherlockCpuInit();
   zx_status_t ThermistorInit();
-  zx_status_t PowerInit();
-  zx_status_t LuisPowerInit();
   zx_status_t DsiInit();
   int Thread();
 
   zx_status_t EnableWifi32K(void);
-  zx_status_t LuisPowerPublishBuck(const char* name, uint32_t bus_id, uint16_t address,
-                                   const device_fragment_t* fragments, size_t fragments_count);
 
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   ddk::IommuProtocolClient iommu_;
   ddk::GpioImplProtocolClient gpio_impl_;
   ddk::ClockImplProtocolClient clk_impl_;
   thrd_t thread_;
-
-  const uint32_t pid_;
 
   std::optional<uint8_t> board_rev_;
   std::optional<uint8_t> board_option_;

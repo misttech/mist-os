@@ -24,18 +24,5 @@
                 }
             }
         ]
-    },
-    {
-        "node": "cam-mute",
-        "tests": [
-            {
-                "name": "Match",
-                "expected": "match",
-                "device": {
-                    "fuchsia.BIND_GPIO_PIN": "fuchsia.amlogic.platform.t931.GPIOA_PIN_ID.PIN_13",
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE"
-                }
-            }
-        ]
     }
 ]

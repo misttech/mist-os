@@ -82,7 +82,6 @@ static const std::vector<fpbus::Bti> display_btis{
 }  // namespace
 
 zx_status_t Sherlock::DisplayInit() {
-  // Sherlock and Luis have the same display resolution (different size)
   display_panel_t display_panel_info[] = {
       {
           .width = 800,
@@ -90,21 +89,14 @@ zx_status_t Sherlock::DisplayInit() {
       },
   };
 
-  if (pid_ == PDEV_PID_SHERLOCK) {
-    if (GetDisplayVendor()) {
-      display_panel_info[0].panel_type = PANEL_G101B158_FT;
-    } else {
-      if (GetDdicVersion()) {
-        display_panel_info[0].panel_type = PANEL_TV101WXM_FT;
-      } else {
-        display_panel_info[0].panel_type = PANEL_TV101WXM_FT_9365;
-      }
-    }
-  } else if (pid_ == PDEV_PID_LUIS) {
-    display_panel_info[0].panel_type = PANEL_TV080WXM_FT;
+  if (GetDisplayVendor()) {
+    display_panel_info[0].panel_type = PANEL_G101B158_FT;
   } else {
-    zxlogf(ERROR, "%s: Unsupported board detected: pid = %u\n", __func__, pid_);
-    return ZX_ERR_NOT_SUPPORTED;
+    if (GetDdicVersion()) {
+      display_panel_info[0].panel_type = PANEL_TV101WXM_FT;
+    } else {
+      display_panel_info[0].panel_type = PANEL_TV101WXM_FT_9365;
+    }
   }
 
   std::vector<fpbus::Metadata> display_panel_metadata{

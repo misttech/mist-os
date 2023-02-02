@@ -276,7 +276,7 @@ const fpbus::Node thermal_dev_ddr = []() {
 
 }  // namespace
 
-zx_status_t Sherlock::SherlockThermalInit() {
+zx_status_t Sherlock::ThermalInit() {
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode. A53 cluster (Small)
   gpio_impl_.SetAltFunction(T931_GPIOE(1), kPwmDFn);
@@ -332,17 +332,6 @@ zx_status_t Sherlock::SherlockThermalInit() {
   }
 
   return status;
-}
-
-zx_status_t Sherlock::ThermalInit() {
-  switch (pid_) {
-    case PDEV_PID_LUIS:
-      return LuisThermalInit();
-    case PDEV_PID_SHERLOCK:
-      return SherlockThermalInit();
-    default:
-      return ZX_ERR_NOT_SUPPORTED;
-  }
 }
 
 }  // namespace sherlock

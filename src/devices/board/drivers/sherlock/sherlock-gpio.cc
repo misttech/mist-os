@@ -132,7 +132,7 @@ static const gpio_pin_t gpio_pins[] = {
     DECL_GPIO_PIN(T931_GPIOE(6)),     DECL_GPIO_PIN(T931_GPIOE(7)),
 };
 #else
-#define GPIO_PIN_COUNT 28
+#define GPIO_PIN_COUNT 26
 static const gpio_pin_t gpio_pins[] = {
     // For wifi.
     DECL_GPIO_PIN(T931_WIFI_HOST_WAKE),
@@ -170,12 +170,6 @@ static const gpio_pin_t gpio_pins[] = {
     // For Bluetooth.
     DECL_GPIO_PIN(GPIO_SOC_WIFI_LPO_32k768),
     DECL_GPIO_PIN(GPIO_SOC_BT_REG_ON),
-
-    // Luis Audio
-    DECL_GPIO_PIN(GPIO_AMP_24V_EN),
-
-    // Luis camera supplies, unused on Sherlock
-    DECL_GPIO_PIN(GPIO_CAM_VANA_ENABLE),
 };
 #endif  // FACTORY_BUILD
 
@@ -301,11 +295,6 @@ zx_status_t Sherlock::GpioInit() {
   if (!gpio_impl_.is_valid()) {
     zxlogf(ERROR, "%s: device_get_protocol failed", __func__);
     return ZX_ERR_INTERNAL;
-  }
-
-  // Luis audio
-  if (pid_ == PDEV_PID_LUIS) {
-    gpio_impl_.ConfigOut(GPIO_AMP_24V_EN, 1);
   }
 
   return ZX_OK;

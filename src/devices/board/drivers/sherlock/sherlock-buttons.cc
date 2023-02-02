@@ -19,24 +19,12 @@
 namespace sherlock {
 
 zx_status_t Sherlock::ButtonsInit() {
-  static constexpr buttons_button_config_t sherlock_buttons[] = {
+  static constexpr buttons_button_config_t buttons[] = {
       {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP, 0, 0, 0},
       {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_DOWN, 1, 0, 0},
       {BUTTONS_TYPE_DIRECT, BUTTONS_ID_FDR, 2, 0, 0},
       {BUTTONS_TYPE_DIRECT, BUTTONS_ID_MIC_AND_CAM_MUTE, 3, 0, 0},
   };
-  constexpr size_t kSherlockButtonCount = 4;
-
-  static constexpr buttons_button_config_t luis_buttons[] = {
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_UP, 0, 0, 0},
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_VOLUME_DOWN, 1, 0, 0},
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_FDR, 2, 0, 0},
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_MIC_MUTE, 3, 0, 0},
-      {BUTTONS_TYPE_DIRECT, BUTTONS_ID_CAM_MUTE, 4, 0, 0},
-  };
-  // TODO(fxbug.dev/58662): Re-enable camera mute switch.
-  // constexpr size_t kLuisButtonCount = 5;
-  constexpr size_t kLuisButtonCount = 4;
 
   // No need for internal pull, external pull-ups used.
   static constexpr buttons_gpio_config_t gpios[] = {
@@ -44,27 +32,18 @@ zx_status_t Sherlock::ButtonsInit() {
       {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_PULL_UP}}},
       {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_NO_PULL}}},
       {BUTTONS_GPIO_TYPE_INTERRUPT, 0, {.interrupt = {GPIO_NO_PULL}}},
-      // CAM_MUTE high means the camera is enabled, low means the camera is disabled.
-      {BUTTONS_GPIO_TYPE_INTERRUPT, BUTTONS_GPIO_FLAG_INVERTED, {.interrupt = {GPIO_NO_PULL}}},
   };
-
-  const void* buttons = &sherlock_buttons;
-  size_t button_count = kSherlockButtonCount;
-  if (pid_ == PDEV_PID_LUIS) {
-    buttons = &luis_buttons;
-    button_count = kLuisButtonCount;
-  }
 
   const device_metadata_t available_buttons_metadata[] = {
       {
           .type = DEVICE_METADATA_BUTTONS_BUTTONS,
-          .data = buttons,
-          .length = button_count * sizeof(buttons_button_config_t),
+          .data = &buttons,
+          .length = sizeof(buttons),
       },
       {
           .type = DEVICE_METADATA_BUTTONS_GPIOS,
           .data = &gpios,
-          .length = button_count * sizeof(gpios[0]),
+          .length = sizeof(gpios),
       },
   };
 
@@ -78,7 +57,7 @@ zx_status_t Sherlock::ButtonsInit() {
       .props = props,
       .props_count = std::size(props),
       .fragments = sherlock_buttons_fragments,
-      .fragments_count = kSherlockButtonCount,
+      .fragments_count = std::size(sherlock_buttons_fragments),
       .primary_fragment = "volume-up",  // ???
       .spawn_colocated = false,
       .metadata_list = available_buttons_metadata,

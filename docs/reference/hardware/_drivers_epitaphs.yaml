@@ -320,3 +320,9 @@
   available_in_git: 'e77f0783e89fcbfed969d5888eb7b3f34df5bdae'
   areas: ['Bluetooth']
   path: '/src/connectivity/bluetooth/hci/vendor/mediatek'
+- short_description: 'Luis board driver'
+  deletion_reason: 'Hardware is not actively supported'
+  gerrit_change_id: 'TBD'
+  available_in_git: 'c90782f99960bc373a79d1948575ff0eb92980e6'
+  areas: ['Board']
+  path: '/src/devices/board/drivers/sherlock'

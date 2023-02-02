@@ -58,8 +58,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/devices/board/drivers/buckeye:buckeye-driver",
     "//src/devices/board/drivers/nelson:nelson-driver",
     "//src/devices/board/drivers/nelson:nelson-module-driver",
-    "//src/devices/board/drivers/sherlock:luis-driver",
-    "//src/devices/board/drivers/sherlock:luis-factory-driver",
     "//src/devices/board/drivers/sherlock:sherlock-dai-test-driver",
     "//src/devices/board/drivers/sherlock:sherlock-driver",
     "//src/devices/board/drivers/sherlock:sherlock-factory-driver",

@@ -51,7 +51,7 @@ static const std::vector<fpbus::Bti> emmc_btis{
     }},
 };
 
-static aml_sdmmc_config_t sherlock_config = {
+static aml_sdmmc_config_t config = {
     .supports_dma = true,
     // As per AMlogic, on S912 chipset, HS400 mode can be operated at 125MHZ or low.
     .min_freq = 400'000,
@@ -61,15 +61,7 @@ static aml_sdmmc_config_t sherlock_config = {
     .use_new_tuning = true,
 };
 
-static aml_sdmmc_config_t luis_config = {
-    .supports_dma = true,
-    .min_freq = 400'000,
-    .max_freq = 166'666'667,  // The expected eMMC clock frequency on Luis is 166 MHz.
-    .version_3 = true,
-    .prefs = SDMMC_HOST_PREFS_DISABLE_HS400,
-};
-
-const emmc_config_t sherlock_emmc_config = {
+const emmc_config_t emmc_config = {
     // Maintain the current Sherlock behavior until we determine that trim is needed.
     .enable_trim = false,
 };
@@ -163,9 +155,8 @@ zx_status_t Sherlock::EmmcInit() {
   static const std::vector<fpbus::Metadata> sherlock_emmc_metadata{
       {{
           .type = DEVICE_METADATA_PRIVATE,
-          .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&sherlock_config),
-              reinterpret_cast<const uint8_t*>(&sherlock_config) + sizeof(sherlock_config)),
+          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&config),
+                                       reinterpret_cast<const uint8_t*>(&config) + sizeof(config)),
       }},
       {{
           .type = DEVICE_METADATA_GPT_INFO,
@@ -173,22 +164,9 @@ zx_status_t Sherlock::EmmcInit() {
       }},
       {{
           .type = DEVICE_METADATA_EMMC_CONFIG,
-          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&sherlock_emmc_config),
-                                       reinterpret_cast<const uint8_t*>(&sherlock_emmc_config) +
-                                           sizeof(sherlock_emmc_config)),
-      }},
-  };
-
-  static const std::vector<fpbus::Metadata> luis_emmc_metadata{
-      {{
-          .type = DEVICE_METADATA_PRIVATE,
           .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&luis_config),
-              reinterpret_cast<const uint8_t*>(&luis_config) + sizeof(luis_config)),
-      }},
-      {{
-          .type = DEVICE_METADATA_GPT_INFO,
-          .data = std::move(encoded.value()),
+              reinterpret_cast<const uint8_t*>(&emmc_config),
+              reinterpret_cast<const uint8_t*>(&emmc_config) + sizeof(emmc_config)),
       }},
   };
 
@@ -202,10 +180,6 @@ zx_status_t Sherlock::EmmcInit() {
   emmc_dev.bti() = emmc_btis;
   emmc_dev.metadata() = sherlock_emmc_metadata;
   emmc_dev.boot_metadata() = emmc_boot_metadata;
-
-  if (pid_ == PDEV_PID_LUIS) {
-    emmc_dev.metadata() = luis_emmc_metadata;
-  }
 
   fdf::Arena arena('EMMC');
   auto result = pbus_.buffer(arena)->AddComposite(

@@ -16,8 +16,6 @@ group("drivers") {
     "drivers/nelson",
     "drivers/pinecrest",
     "drivers/qemu-arm64",
-    "drivers/sherlock:luis",
-    "drivers/sherlock:luis-factory",
     "drivers/sherlock:sherlock",
     "drivers/sherlock:sherlock-dai-test",
     "drivers/sherlock:sherlock-factory",

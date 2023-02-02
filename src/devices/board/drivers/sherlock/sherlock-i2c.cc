@@ -51,98 +51,7 @@ static const std::vector<fpbus::Irq> i2c_irqs{
     }},
 };
 
-static const i2c_channel_t luis_ernie_i2c_channels[] = {
-    // Backlight I2C
-    {
-        .bus_id = SHERLOCK_I2C_3,
-        .address = 0x2C,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // Touch screen I2C
-    {
-        .bus_id = SHERLOCK_I2C_2,
-        .address = 0x40,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // Codec 0
-    {
-        .bus_id = SHERLOCK_I2C_A0_0,
-        .address = 0x4c,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // IMX355 Camera Sensor
-    {
-        .bus_id = SHERLOCK_I2C_3,
-        .address = 0x1a,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // Light Sensor
-    {
-        .bus_id = SHERLOCK_I2C_A0_0,
-        .address = 0x39,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // IMX355 Camera EEPROM
-    {
-        .bus_id = SHERLOCK_I2C_3,
-        .address = 0x51,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // 0P8_EE_BUCK - platform
-    {
-        .bus_id = SHERLOCK_I2C_A0_0,
-        .address = 0x60,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // CPU_A_BUCK - platform
-    {
-        .bus_id = SHERLOCK_I2C_3,
-        .address = 0x60,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // 0P8_EE_BUCK - form factor
-    {
-        .bus_id = SHERLOCK_I2C_A0_0,
-        .address = 0x6a,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // CPU_A_BUCK - form factor
-    {
-        .bus_id = SHERLOCK_I2C_A0_0,
-        .address = 0x69,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-    // Codec 1
-    {
-        .bus_id = SHERLOCK_I2C_A0_0,
-        .address = 0x2d,
-        .vid = 0,
-        .pid = 0,
-        .did = 0,
-    },
-};
-
-static const i2c_channel_t sherlock_i2c_channels[] = {
+static const i2c_channel_t i2c_channels[] = {
     // Backlight I2C
     {
         .bus_id = SHERLOCK_I2C_3,
@@ -215,10 +124,6 @@ zx_status_t Sherlock::I2cInit() {
   // i2c_ao_0
   gpio_impl_.SetAltFunction(T931_GPIOAO(2), 1);
   gpio_impl_.SetAltFunction(T931_GPIOAO(3), 1);
-  if (pid_ == PDEV_PID_LUIS) {
-    gpio_impl_.SetDriveStrength(T931_GPIOAO(2), 3000, nullptr);
-    gpio_impl_.SetDriveStrength(T931_GPIOAO(3), 3000, nullptr);
-  }
   // i2c2
   gpio_impl_.SetAltFunction(T931_GPIOZ(14), 3);
   gpio_impl_.SetAltFunction(T931_GPIOZ(15), 3);
@@ -234,19 +139,9 @@ zx_status_t Sherlock::I2cInit() {
   dev.mmio() = i2c_mmios;
   dev.irq() = i2c_irqs;
 
-  const i2c_channel_t* channels;
-  size_t channel_count;
   std::vector<fpbus::Metadata> metadata;
-  if (pid_ == PDEV_PID_SHERLOCK) {
-    channels = sherlock_i2c_channels;
-    channel_count = std::size(sherlock_i2c_channels);
-  } else {
-    channels = luis_ernie_i2c_channels;
-    channel_count = std::size(luis_ernie_i2c_channels);
-  };
 
-  auto i2c_status = fidl_metadata::i2c::I2CChannelsToFidl(
-      cpp20::span<const i2c_channel_t>(channels, channel_count));
+  auto i2c_status = fidl_metadata::i2c::I2CChannelsToFidl(i2c_channels);
   if (i2c_status.is_error()) {
     zxlogf(ERROR, "%s: failed to fidl encode i2c channels: %d", __func__, i2c_status.error_value());
     return i2c_status.error_value();

@@ -62,7 +62,7 @@ const fpbus::Node cpu_dev = []() {
 
 namespace sherlock {
 
-zx_status_t Sherlock::SherlockCpuInit() {
+zx_status_t Sherlock::CpuInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('SHER');
   auto result = pbus_.buffer(arena)->AddComposite(

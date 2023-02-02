@@ -85,80 +85,41 @@ zx_status_t Sherlock::ThermistorInit() {
   thermistor.mmio() = saradc_mmios;
   thermistor.irq() = saradc_irqs;
 
-  if (pid_ == PDEV_PID_LUIS) {
-    thermal::NtcChannel ntc_channels_luis[] = {
-        {.adc_channel = 1, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-mic"},
-        {.adc_channel = 2, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-amp"},
-        {.adc_channel = 3, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-ambient"},
-    };
+  thermal::NtcChannel ntc_channels[] = {
+      {.adc_channel = 1, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-base"},
+      {.adc_channel = 2, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-audio"},
+      {.adc_channel = 3, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-ambient"},
+  };
 
-    std::vector<fpbus::Metadata> therm_metadata_luis{
-        {{
-            .type = NTC_CHANNELS_METADATA_PRIVATE,
-            .data = std::vector<uint8_t>(
-                reinterpret_cast<const uint8_t*>(&ntc_channels_luis),
-                reinterpret_cast<const uint8_t*>(&ntc_channels_luis) + sizeof(ntc_channels_luis)),
-        }},
-        {{
-            .type = NTC_PROFILE_METADATA_PRIVATE,
-            .data = std::vector<uint8_t>(
-                reinterpret_cast<const uint8_t*>(&ntc_info),
-                reinterpret_cast<const uint8_t*>(&ntc_info) + sizeof(ntc_info)),
-        }},
-    };
+  std::vector<fpbus::Metadata> therm_metadata{
+      {{
+          .type = NTC_CHANNELS_METADATA_PRIVATE,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&ntc_channels),
+              reinterpret_cast<const uint8_t*>(&ntc_channels) + sizeof(ntc_channels)),
+      }},
+      {{
+          .type = NTC_PROFILE_METADATA_PRIVATE,
+          .data =
+              std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&ntc_info),
+                                   reinterpret_cast<const uint8_t*>(&ntc_info) + sizeof(ntc_info)),
+      }},
+  };
 
-    thermistor.pid() = PDEV_PID_LUIS;
-    thermistor.metadata() = std::move(therm_metadata_luis);
-    fidl::Arena<> fidl_arena;
-    fdf::Arena arena('THER');
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, thermistor));
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd Thermistor(thermistor) request failed: %s", __func__,
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd Thermistor(thermistor) failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
-  } else {
-    thermal::NtcChannel ntc_channels_sherlock[] = {
-        {.adc_channel = 1, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-base"},
-        {.adc_channel = 2, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-audio"},
-        {.adc_channel = 3, .pullup_ohms = 47000, .profile_idx = 0, .name = "therm-ambient"},
-    };
-
-    std::vector<fpbus::Metadata> therm_metadata_sherlock{
-        {{
-            .type = NTC_CHANNELS_METADATA_PRIVATE,
-            .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&ntc_channels_sherlock),
-                                         reinterpret_cast<const uint8_t*>(&ntc_channels_sherlock) +
-                                             sizeof(ntc_channels_sherlock)),
-        }},
-        {{
-            .type = NTC_PROFILE_METADATA_PRIVATE,
-            .data = std::vector<uint8_t>(
-                reinterpret_cast<const uint8_t*>(&ntc_info),
-                reinterpret_cast<const uint8_t*>(&ntc_info) + sizeof(ntc_info)),
-        }},
-    };
-
-    thermistor.pid() = PDEV_PID_SHERLOCK;
-    thermistor.metadata() = std::move(therm_metadata_sherlock);
-    fidl::Arena<> fidl_arena;
-    fdf::Arena arena('THER');
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, thermistor));
-    if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd Thermistor(thermistor) request failed: %s", __func__,
-             result.FormatDescription().data());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd Thermistor(thermistor) failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
+  thermistor.pid() = PDEV_PID_SHERLOCK;
+  thermistor.metadata() = std::move(therm_metadata);
+  fidl::Arena<> fidl_arena;
+  fdf::Arena arena('THER');
+  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, thermistor));
+  if (!result.ok()) {
+    zxlogf(ERROR, "%s: NodeAdd Thermistor(thermistor) request failed: %s", __func__,
+           result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "%s: NodeAdd Thermistor(thermistor) failed: %s", __func__,
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
   return ZX_OK;
