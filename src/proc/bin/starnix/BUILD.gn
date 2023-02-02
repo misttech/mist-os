@@ -33,316 +33,316 @@ group("tests") {
   }
 }
 
-if (target_cpu == "x64") {
-  static_library("restricted_trampoline") {
+static_library("restricted_trampoline") {
+  if (current_cpu == "x64") {
     sources = [ "execution/trampoline_x64.S" ]
   }
+}
 
-  rustc_binary("starnix_kernel_bin") {
-    name = "starnix_kernel"
-    edition = "2021"
-    with_unit_tests = true
-    exclude_toolchain_tags = [ "asan" ]
+rustc_binary("starnix_kernel_bin") {
+  name = "starnix_kernel"
+  edition = "2021"
+  with_unit_tests = true
+  exclude_toolchain_tags = [ "asan" ]
 
-    source_root = "main.rs"
-    deps = [
-      ":starnix_kernel_config",
-      "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
-      "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
-      "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-      "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-      "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
-      "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
-      "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
-      "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
-      "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
-      "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
-      "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
-      "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
-      "//sdk/fidl/fuchsia.starnix.developer:fuchsia.starnix.developer_rust",
-      "//sdk/fidl/fuchsia.starnix.galaxy:fuchsia.starnix.galaxy_rust",
-      "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
-      "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
-      "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
-      "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
-      "//src/graphics/lib/magma/src/libmagma",
-      "//src/lib/diagnostics/inspect/runtime/rust",
-      "//src/lib/diagnostics/inspect/rust",
-      "//src/lib/fdio/rust:fdio",
-      "//src/lib/fidl/rust/fidl",
-      "//src/lib/fuchsia",
-      "//src/lib/fuchsia-async",
-      "//src/lib/fuchsia-component",
-      "//src/lib/fuchsia-image-format",
-      "//src/lib/fuchsia-runtime",
-      "//src/lib/process_builder",
-      "//src/lib/trace/rust:trace",
-      "//src/lib/trace/rust:trace-provider",
-      "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
-      "//src/lib/ui/fuchsia-framebuffer",
-      "//src/lib/ui/fuchsia-scenic",
-      "//src/lib/ui/fuchsia-vulkan",
-      "//src/lib/ui/wayland/server",
-      "//src/lib/vulkan",
-      "//src/lib/zircon/rust:fuchsia-zircon",
-      "//src/proc/lib/kernel_config",
-      "//src/proc/lib/linux_uapi",
-      "//src/proc/lib/magma",
-      "//src/proc/lib/syncio",
-      "//src/storage/ext4/read-only:ext4-read-only",
-      "//src/sys/lib/runner",
-      "//third_party/rust_crates:anyhow",
-      "//third_party/rust_crates:bitflags",
-      "//third_party/rust_crates:derivative",
-      "//third_party/rust_crates:futures",
-      "//third_party/rust_crates:itertools",
-      "//third_party/rust_crates:lazy_static",
-      "//third_party/rust_crates:macro_rules_attribute",
-      "//third_party/rust_crates:maplit",
-      "//third_party/rust_crates:memchr",
-      "//third_party/rust_crates:memoffset",
-      "//third_party/rust_crates:once_cell",
-      "//third_party/rust_crates:parking_lot",
-      "//third_party/rust_crates:paste",
-      "//third_party/rust_crates:ref-cast",
-      "//third_party/rust_crates:regex",
-      "//third_party/rust_crates:scopeguard",
-      "//third_party/rust_crates:slab",
-      "//third_party/rust_crates:static_assertions",
-      "//third_party/rust_crates:tracing",
-      "//third_party/rust_crates:utf8parse",
-      "//third_party/rust_crates:vk-sys",
-      "//third_party/rust_crates:zerocopy",
-    ]
+  source_root = "main.rs"
+  deps = [
+    ":starnix_kernel_config",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
+    "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_rust",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
+    "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
+    "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
+    "//sdk/fidl/fuchsia.starnix.developer:fuchsia.starnix.developer_rust",
+    "//sdk/fidl/fuchsia.starnix.galaxy:fuchsia.starnix.galaxy_rust",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_rust",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+    "//src/graphics/lib/magma/src/libmagma",
+    "//src/lib/diagnostics/inspect/runtime/rust",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-image-format",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/process_builder",
+    "//src/lib/trace/rust:trace",
+    "//src/lib/trace/rust:trace-provider",
+    "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
+    "//src/lib/ui/fuchsia-framebuffer",
+    "//src/lib/ui/fuchsia-scenic",
+    "//src/lib/ui/fuchsia-vulkan",
+    "//src/lib/ui/wayland/server",
+    "//src/lib/vulkan",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/proc/lib/kernel_config",
+    "//src/proc/lib/linux_uapi",
+    "//src/proc/lib/magma",
+    "//src/proc/lib/syncio",
+    "//src/storage/ext4/read-only:ext4-read-only",
+    "//src/sys/lib/runner",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:derivative",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:macro_rules_attribute",
+    "//third_party/rust_crates:maplit",
+    "//third_party/rust_crates:memchr",
+    "//third_party/rust_crates:memoffset",
+    "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:parking_lot",
+    "//third_party/rust_crates:paste",
+    "//third_party/rust_crates:ref-cast",
+    "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:scopeguard",
+    "//third_party/rust_crates:slab",
+    "//third_party/rust_crates:static_assertions",
+    "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:utf8parse",
+    "//third_party/rust_crates:vk-sys",
+    "//third_party/rust_crates:zerocopy",
+  ]
 
-    if (is_debug) {
-      deps += [ "//third_party/rust_crates:tracing-mutex" ]
+  if (is_debug) {
+    deps += [ "//third_party/rust_crates:tracing-mutex" ]
+  }
+
+  test_deps = [
+    "//src/lib/fuchsia-fs",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:tracing-mutex",
+  ]
+
+  non_rust_deps = [ ":restricted_trampoline" ]
+
+  sources = [
+    "auth.rs",
+    "bpf.rs",
+    "collections/mod.rs",
+    "collections/range_map.rs",
+    "device/binder.rs",
+    "device/features.rs",
+    "device/framebuffer.rs",
+    "device/framebuffer_server.rs",
+    "device/magma/ffi.rs",
+    "device/magma/file.rs",
+    "device/magma/magma.rs",
+    "device/magma/mod.rs",
+    "device/mem.rs",
+    "device/mod.rs",
+    "device/registry.rs",
+    "device/terminal.rs",
+    "device/wayland/bridge_client.rs",
+    "device/wayland/buffer_collection_file.rs",
+    "device/wayland/dma_buf_file.rs",
+    "device/wayland/file_creation.rs",
+    "device/wayland/image_file.rs",
+    "device/wayland/mod.rs",
+    "device/wayland/vulkan.rs",
+    "device/wayland/wayland.rs",
+    "dynamic_thread_pool.rs",
+    "execution/component_runner.rs",
+    "execution/exception_executor.rs",
+    "execution/galaxy.rs",
+    "execution/mod.rs",
+    "execution/restricted_executor.rs",
+    "execution/serve_protocols.rs",
+    "execution/shared.rs",
+    "fs/anon_node.rs",
+    "fs/buffers/io_buffers.rs",
+    "fs/buffers/message_queue.rs",
+    "fs/buffers/message_types.rs",
+    "fs/buffers/mod.rs",
+    "fs/cgroup.rs",
+    "fs/devpts.rs",
+    "fs/devtmpfs.rs",
+    "fs/dir_entry.rs",
+    "fs/directory_file.rs",
+    "fs/dirent_sink.rs",
+    "fs/epoll.rs",
+    "fs/eventfd.rs",
+    "fs/ext4.rs",
+    "fs/fd_events.rs",
+    "fs/fd_number.rs",
+    "fs/fd_table.rs",
+    "fs/file_object.rs",
+    "fs/file_system.rs",
+    "fs/fs_context.rs",
+    "fs/fs_node.rs",
+    "fs/fuchsia/mod.rs",
+    "fs/fuchsia/remote.rs",
+    "fs/fuchsia/syslog.rs",
+    "fs/fuchsia/timer.rs",
+    "fs/inotify.rs",
+    "fs/layeredfs.rs",
+    "fs/mod.rs",
+    "fs/namespace.rs",
+    "fs/path.rs",
+    "fs/pipe.rs",
+    "fs/proc/fs.rs",
+    "fs/proc/mod.rs",
+    "fs/proc/pid_directory.rs",
+    "fs/proc/proc_directory.rs",
+    "fs/proc/sysctl.rs",
+    "fs/record_locks.rs",
+    "fs/seq_file.rs",
+    "fs/simple_file.rs",
+    "fs/socket/mod.rs",
+    "fs/socket/socket.rs",
+    "fs/socket/socket_file.rs",
+    "fs/socket/socket_fs.rs",
+    "fs/socket/socket_inet.rs",
+    "fs/socket/socket_netlink.rs",
+    "fs/socket/socket_types.rs",
+    "fs/socket/socket_unix.rs",
+    "fs/socket/socket_vsock.rs",
+    "fs/socket/syscalls.rs",
+    "fs/static_directory.rs",
+    "fs/symlink_node.rs",
+    "fs/syscalls.rs",
+    "fs/sysfs.rs",
+    "fs/tmpfs.rs",
+    "fs/vec_directory.rs",
+    "fs/vmo_file.rs",
+    "fs/xattr.rs",
+    "loader.rs",
+    "lock.rs",
+    "logging.rs",
+    "main.rs",
+    "mm/futex_table.rs",
+    "mm/memory_manager.rs",
+    "mm/mod.rs",
+    "mm/syscalls.rs",
+    "mm/vmo.rs",
+    "mutable_state.rs",
+    "selinux.rs",
+    "signals/mod.rs",
+    "signals/signal_handling.rs",
+    "signals/signalfd.rs",
+    "signals/syscalls.rs",
+    "signals/types.rs",
+    "syscalls/decls.rs",
+    "syscalls/misc.rs",
+    "syscalls/mod.rs",
+    "syscalls/syscall_result.rs",
+    "syscalls/table.rs",
+    "syscalls/time.rs",
+    "task/abstract_socket_namespace.rs",
+    "task/iptables.rs",
+    "task/kernel.rs",
+    "task/mod.rs",
+    "task/pid_table.rs",
+    "task/process_group.rs",
+    "task/session.rs",
+    "task/syscalls.rs",
+    "task/task.rs",
+    "task/thread_group.rs",
+    "task/timers.rs",
+    "task/waiter.rs",
+    "testing.rs",
+    "trace.rs",
+    "types/arc_key.rs",
+    "types/as_any.rs",
+    "types/auth.rs",
+    "types/device_type.rs",
+    "types/errno.rs",
+    "types/file_mode.rs",
+    "types/mod.rs",
+    "types/mount_flags.rs",
+    "types/open_flags.rs",
+    "types/range_ext.rs",
+    "types/resource_limits.rs",
+    "types/signals.rs",
+    "types/time.rs",
+    "types/uapi.rs",
+    "types/union.rs",
+    "types/user_address.rs",
+    "types/user_buffer.rs",
+    "vmex_resource.rs",
+  ]
+
+  features = []
+  if (starnix_restricted_mode) {
+    features += [ "restricted_mode" ]
+  }
+  if (starnix_disable_logging) {
+    features = [ "disable_logging" ]
+  }
+  if (starnix_wayland_protocol_logging) {
+    features += [ "wayland_protocol_logging" ]
+  }
+}
+
+# The starnix kernel manifest, used by all galaxies.
+fuchsia_component_manifest("starnix_kernel_manifest") {
+  manifest = "meta/starnix_kernel.cml"
+  component_name = "starnix_kernel"
+}
+
+# The starnix kernel configuration library, used by the Rust binary to parse configuration.
+fuchsia_structured_config_rust_lib("starnix_kernel_config") {
+  cm_label = ":starnix_kernel_manifest"
+}
+
+resource("starnix-test-files") {
+  sources = [ "data/testfile.txt" ]
+  outputs = [ "data/testfile.txt" ]
+}
+
+fuchsia_unittest_package("starnix-tests") {
+  manifest = "meta/starnix-tests.cml"
+  deps = [
+    ":starnix-test-files",
+    ":starnix_kernel_bin_test",
+    "//src/proc/examples/hello_starnix:bin",
+  ]
+  test_specs = {
+    log_settings = {
+      # Tests exercise failure cases, so ERROR logs are expected.
+      max_severity = "ERROR"
     }
-
-    test_deps = [
-      "//src/lib/fuchsia-fs",
-      "//third_party/rust_crates:assert_matches",
-      "//third_party/rust_crates:tracing-mutex",
-    ]
-
-    non_rust_deps = [ ":restricted_trampoline" ]
-
-    sources = [
-      "auth.rs",
-      "bpf.rs",
-      "collections/mod.rs",
-      "collections/range_map.rs",
-      "device/binder.rs",
-      "device/features.rs",
-      "device/framebuffer.rs",
-      "device/framebuffer_server.rs",
-      "device/magma/ffi.rs",
-      "device/magma/file.rs",
-      "device/magma/magma.rs",
-      "device/magma/mod.rs",
-      "device/mem.rs",
-      "device/mod.rs",
-      "device/registry.rs",
-      "device/terminal.rs",
-      "device/wayland/bridge_client.rs",
-      "device/wayland/buffer_collection_file.rs",
-      "device/wayland/dma_buf_file.rs",
-      "device/wayland/file_creation.rs",
-      "device/wayland/image_file.rs",
-      "device/wayland/mod.rs",
-      "device/wayland/vulkan.rs",
-      "device/wayland/wayland.rs",
-      "dynamic_thread_pool.rs",
-      "execution/component_runner.rs",
-      "execution/exception_executor.rs",
-      "execution/galaxy.rs",
-      "execution/mod.rs",
-      "execution/restricted_executor.rs",
-      "execution/serve_protocols.rs",
-      "execution/shared.rs",
-      "fs/anon_node.rs",
-      "fs/buffers/io_buffers.rs",
-      "fs/buffers/message_queue.rs",
-      "fs/buffers/message_types.rs",
-      "fs/buffers/mod.rs",
-      "fs/cgroup.rs",
-      "fs/devpts.rs",
-      "fs/devtmpfs.rs",
-      "fs/dir_entry.rs",
-      "fs/directory_file.rs",
-      "fs/dirent_sink.rs",
-      "fs/epoll.rs",
-      "fs/eventfd.rs",
-      "fs/ext4.rs",
-      "fs/fd_events.rs",
-      "fs/fd_number.rs",
-      "fs/fd_table.rs",
-      "fs/file_object.rs",
-      "fs/file_system.rs",
-      "fs/fs_context.rs",
-      "fs/fs_node.rs",
-      "fs/fuchsia/mod.rs",
-      "fs/fuchsia/remote.rs",
-      "fs/fuchsia/syslog.rs",
-      "fs/fuchsia/timer.rs",
-      "fs/inotify.rs",
-      "fs/layeredfs.rs",
-      "fs/mod.rs",
-      "fs/namespace.rs",
-      "fs/path.rs",
-      "fs/pipe.rs",
-      "fs/proc/fs.rs",
-      "fs/proc/mod.rs",
-      "fs/proc/pid_directory.rs",
-      "fs/proc/proc_directory.rs",
-      "fs/proc/sysctl.rs",
-      "fs/record_locks.rs",
-      "fs/seq_file.rs",
-      "fs/simple_file.rs",
-      "fs/socket/mod.rs",
-      "fs/socket/socket.rs",
-      "fs/socket/socket_file.rs",
-      "fs/socket/socket_fs.rs",
-      "fs/socket/socket_inet.rs",
-      "fs/socket/socket_netlink.rs",
-      "fs/socket/socket_types.rs",
-      "fs/socket/socket_unix.rs",
-      "fs/socket/socket_vsock.rs",
-      "fs/socket/syscalls.rs",
-      "fs/static_directory.rs",
-      "fs/symlink_node.rs",
-      "fs/syscalls.rs",
-      "fs/sysfs.rs",
-      "fs/tmpfs.rs",
-      "fs/vec_directory.rs",
-      "fs/vmo_file.rs",
-      "fs/xattr.rs",
-      "loader.rs",
-      "lock.rs",
-      "logging.rs",
-      "main.rs",
-      "mm/futex_table.rs",
-      "mm/memory_manager.rs",
-      "mm/mod.rs",
-      "mm/syscalls.rs",
-      "mm/vmo.rs",
-      "mutable_state.rs",
-      "selinux.rs",
-      "signals/mod.rs",
-      "signals/signal_handling.rs",
-      "signals/signalfd.rs",
-      "signals/syscalls.rs",
-      "signals/types.rs",
-      "syscalls/decls.rs",
-      "syscalls/misc.rs",
-      "syscalls/mod.rs",
-      "syscalls/syscall_result.rs",
-      "syscalls/table.rs",
-      "syscalls/time.rs",
-      "task/abstract_socket_namespace.rs",
-      "task/iptables.rs",
-      "task/kernel.rs",
-      "task/mod.rs",
-      "task/pid_table.rs",
-      "task/process_group.rs",
-      "task/session.rs",
-      "task/syscalls.rs",
-      "task/task.rs",
-      "task/thread_group.rs",
-      "task/timers.rs",
-      "task/waiter.rs",
-      "testing.rs",
-      "trace.rs",
-      "types/arc_key.rs",
-      "types/as_any.rs",
-      "types/auth.rs",
-      "types/device_type.rs",
-      "types/errno.rs",
-      "types/file_mode.rs",
-      "types/mod.rs",
-      "types/mount_flags.rs",
-      "types/open_flags.rs",
-      "types/range_ext.rs",
-      "types/resource_limits.rs",
-      "types/signals.rs",
-      "types/time.rs",
-      "types/uapi.rs",
-      "types/union.rs",
-      "types/user_address.rs",
-      "types/user_buffer.rs",
-      "vmex_resource.rs",
-    ]
-
-    features = []
-    if (starnix_restricted_mode) {
-      features += [ "restricted_mode" ]
-    }
-    if (starnix_disable_logging) {
-      features = [ "disable_logging" ]
-    }
-    if (starnix_wayland_protocol_logging) {
-      features += [ "wayland_protocol_logging" ]
-    }
   }
+}
 
-  # The starnix kernel manifest, used by all galaxies.
-  fuchsia_component_manifest("starnix_kernel_manifest") {
-    manifest = "meta/starnix_kernel.cml"
-    component_name = "starnix_kernel"
-  }
+# The default init executable. Used if the starnix kernel configuration has no init.
+resource("default_init") {
+  init_label = "//src/proc/bin/galaxies/default_init($target_linux_toolchain)"
+  out_dir = get_label_info(init_label, "root_out_dir")
+  sources = [ "${out_dir}/default_init" ]
+  outputs = [ "data/init" ]
+  deps = [ init_label ]
+}
 
-  # The starnix kernel configuration library, used by the Rust binary to parse configuration.
-  fuchsia_structured_config_rust_lib("starnix_kernel_config") {
-    cm_label = ":starnix_kernel_manifest"
-  }
+fuchsia_component("starnix_kernel") {
+  cm_label = ":starnix_kernel_manifest"
+  deps = [ ":starnix_kernel_bin" ]
+}
 
-  resource("starnix-test-files") {
-    sources = [ "data/testfile.txt" ]
-    outputs = [ "data/testfile.txt" ]
-  }
+fuchsia_structured_config_values("kernel_config") {
+  cm_label = ":starnix_kernel_manifest"
+  values_source = "//src/proc/bin/galaxies/starless/config.json5"
+}
 
-  fuchsia_unittest_package("starnix-tests") {
-    manifest = "meta/starnix-tests.cml"
-    deps = [
-      ":starnix-test-files",
-      ":starnix_kernel_bin_test",
-      "//src/proc/examples/hello_starnix:bin",
-    ]
-    test_specs = {
-      log_settings = {
-        # Tests exercise failure cases, so ERROR logs are expected.
-        max_severity = "ERROR"
-      }
-    }
-  }
-
-  # The default init executable. Used if the starnix kernel configuration has no init.
-  resource("default_init") {
-    init_label = "//src/proc/bin/galaxies/default_init($target_linux_toolchain)"
-    out_dir = get_label_info(init_label, "root_out_dir")
-    sources = [ "${out_dir}/default_init" ]
-    outputs = [ "data/init" ]
-    deps = [ init_label ]
-  }
-
-  fuchsia_component("starnix_kernel") {
-    cm_label = ":starnix_kernel_manifest"
-    deps = [ ":starnix_kernel_bin" ]
-  }
-
-  fuchsia_structured_config_values("kernel_config") {
-    cm_label = ":starnix_kernel_manifest"
-    values_source = "//src/proc/bin/galaxies/starless/config.json5"
-  }
-
-  fuchsia_package("starnix_kernel_package") {
-    package_name = "starnix_kernel"
-    deps = [
-      ":default_init",
-      ":kernel_config",
-      ":starnix_kernel",
-      ":starnix_kernel_manifest",
-    ]
-  }
+fuchsia_package("starnix_kernel_package") {
+  package_name = "starnix_kernel"
+  deps = [
+    ":default_init",
+    ":kernel_config",
+    ":starnix_kernel",
+    ":starnix_kernel_manifest",
+  ]
 }
