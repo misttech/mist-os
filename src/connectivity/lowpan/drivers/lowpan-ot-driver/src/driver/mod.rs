@@ -16,6 +16,7 @@ mod driver_state;
 mod error_adapter;
 mod host_to_thread;
 mod joiner;
+mod multicast_routing_manager;
 mod ot_ctl;
 mod srp_proxy;
 mod tasks;
@@ -32,6 +33,7 @@ pub use error_adapter::*;
 pub use host_to_thread::*;
 use lowpan_driver_common::net::{BackboneInterface, NetworkInterface};
 use lowpan_driver_common::AsyncCondition;
+use multicast_routing_manager::MulticastRoutingManager;
 pub use srp_proxy::*;
 pub use thread_to_host::*;
 
@@ -84,6 +86,9 @@ pub struct OtDriver<OT, NI, BI> {
 
     /// Additional TXT records set by `meshcop_update_txt_entries`.
     border_agent_vendor_txt_entries: futures::lock::Mutex<Vec<(String, Vec<u8>)>>,
+
+    /// Multicast routing manager:
+    multicast_routing_manager: MulticastRoutingManager,
 }
 
 impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
@@ -98,6 +103,7 @@ impl<OT: ot::Cli, NI, BI> OtDriver<OT, NI, BI> {
                 vec![],
             )),
             border_agent_vendor_txt_entries: futures::lock::Mutex::new(vec![]),
+            multicast_routing_manager: MulticastRoutingManager::new(),
         }
     }
 

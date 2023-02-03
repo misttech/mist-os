@@ -23,6 +23,10 @@ impl<'a, T: ?Sized + BackboneRouter> Iterator for MulticastListenerIterator<'a, 
 ///
 /// [1]: https://openthread.io/reference/group/api-backbone-router
 pub trait BackboneRouter {
+    /// Functional equilvanet of
+    /// [`otsys::otBackboneRouterSetEnabled`](crate::otsys::otBackboneRouterSetEnabled).
+    fn set_backbone_router_enabled(&self, enable: bool);
+
     /// Functional equivalent of
     /// [`otsys::otBackboneRouterMulticastListenerAdd`](crate::otsys::otBackboneRouterMulticastListenerAdd).
     fn multicast_listener_add(&self, addr: &Ip6Address, timeout: u32) -> Result;
@@ -65,6 +69,10 @@ pub trait BackboneRouter {
 }
 
 impl<T: BackboneRouter + Boxable> BackboneRouter for ot::Box<T> {
+    fn set_backbone_router_enabled(&self, enable: bool) {
+        self.as_ref().set_backbone_router_enabled(enable)
+    }
+
     fn multicast_listener_add(&self, addr: &Ip6Address, timeout: u32) -> Result {
         self.as_ref().multicast_listener_add(addr, timeout)
     }
@@ -93,6 +101,10 @@ impl<T: BackboneRouter + Boxable> BackboneRouter for ot::Box<T> {
 }
 
 impl BackboneRouter for Instance {
+    fn set_backbone_router_enabled(&self, enable: bool) {
+        unsafe { otBackboneRouterSetEnabled(self.as_ot_ptr(), enable) }
+    }
+
     fn multicast_listener_add(&self, addr: &Ip6Address, timeout: u32) -> Result {
         Error::from(unsafe {
             otBackboneRouterMulticastListenerAdd(self.as_ot_ptr(), addr.as_ot_ptr(), timeout)
