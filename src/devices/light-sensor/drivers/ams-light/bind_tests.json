@@ -1,19 +1,27 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Protocol"
+        "node": "i2c",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.ams.platform.BIND_PLATFORM_DEV_DID.LIGHT",
-            "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.ams.platform.BIND_PLATFORM_DEV_PID.TCS3400",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.ams.platform.BIND_PLATFORM_DEV_VID.AMS"
-        },
-        "expected": "match",
-        "name": "Vendor"
+        "node": "gpio",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.gpio.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.LIGHT_INTERRUPT"
+                }
+            }
+        ]
     }
 ]

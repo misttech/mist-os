@@ -87,18 +87,6 @@ driver_bind_rules("nelson_emmc_bind") {
   ]
 }
 
-driver_bind_rules("nelson_tcs3400_light_bind") {
-  rules = "bind/nelson_tcs3400_light.bind"
-  header_output = "nelson_tcs3400_light_bind.h"
-  bind_output = "nelson_tcs3400_light_bind.bc"
-  tests = "bind-tests/nelson_tcs3400_light-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-  ]
-}
-
 driver_bind_rules("nelson_mali_bind") {
   rules = "bind/nelson_mali.bind"
   header_output = "nelson_mali_bind.h"
@@ -404,7 +392,6 @@ fuchsia_driver("nelson-module-driver") {
     ":nelson_mali_bind_header",
     ":nelson_ot_radio_bind_header",
     ":nelson_selina_bind_header",
-    ":nelson_tcs3400_light_bind_header",
     ":nelson_tee_bind_header",
     ":nelson_wifi_bind_header",
     ":nelson_xhci_bind_header",
@@ -505,7 +492,6 @@ group("tests") {
     ":nelson_mali_bind_test",
     ":nelson_ot_radio_bind_test",
     ":nelson_selina_bind_test",
-    ":nelson_tcs3400_light_bind_test",
     ":nelson_wifi_bind_test",
     ":spi_0_bind_test",
     ":spi_1_bind_test",

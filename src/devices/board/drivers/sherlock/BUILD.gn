@@ -259,18 +259,6 @@ driver_bind_rules("sherlock-xhci-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-light-sensor-bind") {
-  rules = "bind/sherlock-light-sensor.bind"
-  header_output = "sherlock-light-sensor-bind.h"
-  bind_output = "sherlock-light-sensor-bind.bc"
-  tests = "bind-tests/sherlock-light-sensor-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-  ]
-}
-
 driver_bind_rules("sherlock-ot-radio-bind") {
   rules = "bind/sherlock-ot-radio.bind"
   header_output = "sherlock-ot-radio-bind.h"
@@ -486,7 +474,6 @@ template("sherlock_driver") {
       ":sherlock-dwc2-phy-bind_header",
       ":sherlock-emmc-bind_header",
       ":sherlock-hevc-enc-bind_header",
-      ":sherlock-light-sensor-bind_header",
       ":sherlock-mali-bind_header",
       ":sherlock-nna-bind_header",
       ":sherlock-ot-radio-bind_header",

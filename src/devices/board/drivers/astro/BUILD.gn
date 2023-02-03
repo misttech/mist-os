@@ -144,18 +144,6 @@ driver_bind_rules("astro-video-bind") {
   ]
 }
 
-driver_bind_rules("tcs3400-light-bind") {
-  rules = "bind/tcs3400-light.bind"
-  header_output = "tcs3400-light-bind.h"
-  bind_output = "tcs3400-light-bind.bc"
-  tests = "bind-tests/tcs3400-light-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d2",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-  ]
-}
-
 driver_bind_rules("pd-armcore-bind") {
   rules = "bind/pd-armcore.bind"
   header_output = "pd-armcore-bind.h"
@@ -329,7 +317,6 @@ fuchsia_driver("astro-driver") {
     ":audio-codec-tas27xx-bind_header",
     ":pd-armcore-bind_header",
     ":pwm-ao-d-bind_header",
-    ":tcs3400-light-bind_header",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
@@ -424,6 +411,5 @@ group("tests") {
     ":audio-codec-tas27xx-bind_test",
     ":pd-armcore-bind_test",
     ":pwm-ao-d-bind_test",
-    ":tcs3400-light-bind_test",
   ]
 }

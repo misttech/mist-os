@@ -16,6 +16,7 @@
 #include <bind/fuchsia/ams/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <ddk/metadata/lights.h>
 #include <ddktl/metadata/light-sensor.h>
@@ -24,7 +25,6 @@
 
 #include "nelson-gpios.h"
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/nelson_tcs3400_light_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace nelson {
@@ -76,26 +76,37 @@ zx_status_t Nelson::LightInit() {
           .length = sizeof(params),
       },
   };
-  constexpr zx_device_prop_t props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, bind_fuchsia_ams_platform::BIND_PLATFORM_DEV_VID_AMS},
-      {BIND_PLATFORM_DEV_PID, 0, bind_fuchsia_ams_platform::BIND_PLATFORM_DEV_PID_TCS3400},
-      {BIND_PLATFORM_DEV_DID, 0, bind_fuchsia_ams_platform::BIND_PLATFORM_DEV_DID_LIGHT},
+
+  const ddk::BindRule kI2cRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                              bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
+      ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                              bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
+  };
+  const device_bind_prop_t kI2cProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_A0_0),
+      ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_AMBIENTLIGHT),
   };
 
-  const composite_device_desc_t comp_desc = {
-      .props = props,
-      .props_count = std::size(props),
-      .fragments = tcs3400_light_fragments,
-      .fragments_count = std::size(tcs3400_light_fragments),
-      .primary_fragment = "i2c",
-      .spawn_colocated = false,
-      .metadata_list = metadata,
-      .metadata_count = std::size(metadata),
+  const ddk::BindRule kGpioLightInterruptRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                              bind_fuchsia_amlogic_platform_s905d3::GPIOAO_PIN_ID_PIN_5),
+  };
+  const device_bind_prop_t kGpioLightInterruptProperties[] = {
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LIGHT_INTERRUPT),
   };
 
-  zx_status_t status = DdkAddComposite("tcs3400-light", &comp_desc);
+  zx_status_t status = DdkAddCompositeNodeSpec(
+      "tcs3400-light", ddk::CompositeNodeSpec(kI2cRules, kI2cProperties)
+                           .AddParentSpec(kGpioLightInterruptRules, kGpioLightInterruptProperties)
+                           .set_metadata(metadata));
+
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s(tcs-3400): DdkAddComposite failed: %d", __func__, status);
+    zxlogf(ERROR, "%s(tcs-3400): DdkAddCompositeNodeSpec failed: %d", __func__, status);
     return status;
   }
 
