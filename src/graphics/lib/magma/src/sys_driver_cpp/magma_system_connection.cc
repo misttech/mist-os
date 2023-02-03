@@ -110,8 +110,7 @@ magma::Status MagmaSystemConnection::ExecuteImmediateCommands(uint32_t context_i
   return context->ExecuteImmediateCommands(commands_size, commands, semaphore_count, semaphore_ids);
 }
 
-magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(
-    std::unique_ptr<magma::PlatformHandle> access_token) {
+magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(zx::handle access_token) {
   auto device = device_.lock();
   if (!device) {
     return DRET(MAGMA_STATUS_INTERNAL_ERROR);
@@ -121,7 +120,13 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(
   if (!access_token) {
     return DRET(MAGMA_STATUS_INVALID_ARGS);
   }
-  if (access_token->global_id() != perf_count_access_token_id) {
+  zx_info_handle_basic_t handle_info{};
+  zx_status_t status = access_token.get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
+                                             sizeof(handle_info), nullptr, nullptr);
+  if (status != ZX_OK) {
+    return DRET(MAGMA_STATUS_INVALID_ARGS);
+  }
+  if (handle_info.koid != perf_count_access_token_id) {
     // This is not counted as an error, since it can happen if the client uses the event from the
     // wrong driver.
     return MAGMA_STATUS_OK;
@@ -132,12 +137,12 @@ magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(
   return MAGMA_STATUS_OK;
 }
 
-magma::Status MagmaSystemConnection::ImportBuffer(uint32_t handle, uint64_t id) {
+magma::Status MagmaSystemConnection::ImportBuffer(zx::handle handle, uint64_t id) {
   auto device = device_.lock();
   if (!device) {
     return DRET(MAGMA_STATUS_INTERNAL_ERROR);
   }
-  auto buffer = magma::PlatformBuffer::Import(handle);
+  auto buffer = magma::PlatformBuffer::Import(zx::vmo(std::move(handle)));
   if (!buffer)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import buffer");
 
@@ -269,7 +274,7 @@ async_dispatcher_t* MagmaSystemConnection::GetAsyncDispatcher() {
   return notification_handler_->GetAsyncDispatcher();
 }
 
-magma::Status MagmaSystemConnection::ImportObject(uint32_t handle,
+magma::Status MagmaSystemConnection::ImportObject(zx::handle handle,
                                                   magma::PlatformObject::Type object_type,
                                                   uint64_t client_id) {
   if (!client_id)
@@ -281,11 +286,10 @@ magma::Status MagmaSystemConnection::ImportObject(uint32_t handle,
 
   switch (object_type) {
     case magma::PlatformObject::BUFFER:
-      return ImportBuffer(handle, client_id);
+      return ImportBuffer(std::move(handle), client_id);
 
     case magma::PlatformObject::SEMAPHORE: {
-      // Always import the handle to ensure it gets closed
-      auto platform_sem = magma::PlatformSemaphore::Import(handle);
+      auto platform_sem = magma::PlatformSemaphore::Import(zx::event(std::move(handle)));
       if (!platform_sem)
         return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import platform semaphore");
 

@@ -102,21 +102,21 @@ TEST(MagmaSystemConnection, BufferManagement) {
   ASSERT_NE(buf, nullptr);
   EXPECT_GE(buf->size(), test_size);
 
-  uint32_t duplicate_handle1;
+  zx::handle duplicate_handle1;
   ASSERT_TRUE(buf->duplicate_handle(&duplicate_handle1));
 
   uint64_t id = buf->id();
-  EXPECT_TRUE(connection.ImportBuffer(duplicate_handle1, id));
+  EXPECT_TRUE(connection.ImportBuffer(std::move(duplicate_handle1), id));
 
   // should be able to get the buffer by handle
   auto get_buf = connection.LookupBuffer(id);
   EXPECT_NE(get_buf, nullptr);
   EXPECT_EQ(get_buf->id(), id);  // they are shared ptrs after all
 
-  uint32_t duplicate_handle2;
+  zx::handle duplicate_handle2;
   ASSERT_TRUE(buf->duplicate_handle(&duplicate_handle2));
 
-  EXPECT_TRUE(connection.ImportBuffer(duplicate_handle2, id));
+  EXPECT_TRUE(connection.ImportBuffer(std::move(duplicate_handle2), id));
 
   // freeing the allocated buffer should cause refcount to drop to 1
   EXPECT_TRUE(connection.ReleaseBuffer(id));
@@ -146,21 +146,22 @@ TEST(MagmaSystemConnection, Semaphores) {
   // assert because if this fails the rest of this is gonna be bogus anyway
   ASSERT_NE(semaphore, nullptr);
 
-  uint32_t duplicate_handle1;
+  zx::handle duplicate_handle1;
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle1));
 
-  EXPECT_TRUE(connection.ImportObject(duplicate_handle1, magma::PlatformObject::SEMAPHORE,
-                                      semaphore->id()));
+  EXPECT_TRUE(connection.ImportObject(std::move(duplicate_handle1),
+                                      magma::PlatformObject::SEMAPHORE, semaphore->id()));
 
   auto system_semaphore = connection.LookupSemaphore(semaphore->id());
   EXPECT_NE(system_semaphore, nullptr);
-  EXPECT_EQ(system_semaphore->platform_semaphore()->id(), semaphore->id());
+  EXPECT_EQ(static_cast<MsdMockSemaphore*>(system_semaphore->msd_semaphore())->GetKoid(),
+            semaphore->id());
 
-  uint32_t duplicate_handle2;
+  zx::handle duplicate_handle2;
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle2));
 
-  EXPECT_TRUE(connection.ImportObject(duplicate_handle2, magma::PlatformObject::SEMAPHORE,
-                                      semaphore->id()));
+  EXPECT_TRUE(connection.ImportObject(std::move(duplicate_handle2),
+                                      magma::PlatformObject::SEMAPHORE, semaphore->id()));
 
   // freeing the allocated semaphore should decrease refcount to 1
   EXPECT_TRUE(connection.ReleaseObject(semaphore->id(), magma::PlatformObject::SEMAPHORE));
@@ -186,16 +187,17 @@ TEST(MagmaSystemConnection, BadSemaphoreImport) {
   MagmaSystemConnection connection(dev, std::move(msd_connection));
 
   constexpr uint32_t kBogusHandle = 0xabcd1234;
-  EXPECT_FALSE(connection.ImportObject(kBogusHandle, magma::PlatformObject::SEMAPHORE, 0));
+  EXPECT_FALSE(
+      connection.ImportObject(zx::handle(kBogusHandle), magma::PlatformObject::SEMAPHORE, 0));
 
   auto buffer = magma::PlatformBuffer::Create(4096, "test");
   ASSERT_TRUE(buffer);
 
-  uint32_t buffer_handle;
+  zx::handle buffer_handle;
   ASSERT_TRUE(buffer->duplicate_handle(&buffer_handle));
 
-  EXPECT_FALSE(
-      connection.ImportObject(buffer_handle, magma::PlatformObject::SEMAPHORE, buffer->id()));
+  EXPECT_FALSE(connection.ImportObject(std::move(buffer_handle), magma::PlatformObject::SEMAPHORE,
+                                       buffer->id()));
 }
 
 TEST(MagmaSystemConnection, BufferSharing) {
@@ -215,17 +217,17 @@ TEST(MagmaSystemConnection, BufferSharing) {
   uint64_t buf_id_0 = 1;
 
   {
-    uint32_t duplicate_handle;
+    zx::handle duplicate_handle;
     ASSERT_TRUE(platform_buf->duplicate_handle(&duplicate_handle));
-    EXPECT_TRUE(connection_0.ImportBuffer(duplicate_handle, buf_id_0));
+    EXPECT_TRUE(connection_0.ImportBuffer(std::move(duplicate_handle), buf_id_0));
   }
 
   uint64_t buf_id_1 = 2;
 
   {
-    uint32_t duplicate_handle;
+    zx::handle duplicate_handle;
     ASSERT_TRUE(platform_buf->duplicate_handle(&duplicate_handle));
-    EXPECT_TRUE(connection_1.ImportBuffer(duplicate_handle, buf_id_1));
+    EXPECT_TRUE(connection_1.ImportBuffer(std::move(duplicate_handle), buf_id_1));
   }
 
   auto buf_0 = connection_0.LookupBuffer(buf_id_0);
@@ -255,19 +257,19 @@ TEST(MagmaSystemConnection, BadBufferImport) {
 
   constexpr uint32_t kBogusHandle = 0xabcd1234;
   uint64_t id = 1;
-  EXPECT_FALSE(connection.ImportBuffer(kBogusHandle, id));
+  EXPECT_FALSE(connection.ImportBuffer(zx::handle(kBogusHandle), id));
 
   auto semaphore = magma::PlatformSemaphore::Create();
   ASSERT_TRUE(semaphore);
 
-  uint32_t semaphore_handle;
+  zx::handle semaphore_handle;
   ASSERT_TRUE(semaphore->duplicate_handle(&semaphore_handle));
 
-  EXPECT_FALSE(connection.ImportBuffer(semaphore_handle, id));
+  EXPECT_FALSE(connection.ImportBuffer(std::move(semaphore_handle), id));
 
   zx::vmo vmo;
   ASSERT_EQ(ZX_OK, zx::vmo::create(4096, ZX_VMO_RESIZABLE, &vmo));
-  EXPECT_FALSE(connection.ImportBuffer(vmo.release(), id));
+  EXPECT_FALSE(connection.ImportBuffer(std::move(vmo), id));
 }
 
 TEST(MagmaSystemConnection, MapBufferGpu) {
@@ -291,10 +293,10 @@ TEST(MagmaSystemConnection, MapBufferGpu) {
   EXPECT_FALSE(
       connection.MapBuffer(kBogusId, kGpuVa, /*offset=*/0, kPageCount * page_size(), kFlags));
 
-  uint32_t buffer_handle;
+  zx::handle buffer_handle;
   ASSERT_TRUE(buffer->duplicate_handle(&buffer_handle));
 
-  EXPECT_TRUE(connection.ImportBuffer(buffer_handle, buffer->id()));
+  EXPECT_TRUE(connection.ImportBuffer(std::move(buffer_handle), buffer->id()));
 
   // Bad page offset
   EXPECT_FALSE(connection.MapBuffer(buffer->id(), kGpuVa, /*offset=*/kPageCount * page_size(),
@@ -346,11 +348,11 @@ TEST(MagmaSystemConnection, PerformanceCounters) {
   ASSERT_NE(buf, nullptr);
   EXPECT_GE(buf->size(), kTestSize);
 
-  uint32_t duplicate_handle1;
+  zx::handle duplicate_handle1;
   ASSERT_TRUE(buf->duplicate_handle(&duplicate_handle1));
 
   uint64_t id = buf->id();
-  EXPECT_TRUE(connection.ImportBuffer(duplicate_handle1, id));
+  EXPECT_TRUE(connection.ImportBuffer(std::move(duplicate_handle1), id));
 
   EXPECT_EQ(
       MAGMA_STATUS_INVALID_ARGS,

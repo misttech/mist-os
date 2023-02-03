@@ -7,6 +7,7 @@
 #include <chrono>
 #include <mutex>
 #include <thread>
+#include <utility>
 
 #include <gtest/gtest.h>
 
@@ -110,7 +111,7 @@ struct SharedData {
       .wait_semaphore_count = 2,
       .signal_semaphore_count = 3,
   };
-  std::unique_ptr<magma::PlatformHandle> test_access_token;
+  zx::handle test_access_token;
   bool can_access_performance_counters;
   uint64_t pool_id = UINT64_MAX;
   std::function<void(msd::NotificationHandler*)> notification_handler;
@@ -416,7 +417,10 @@ class TestPlatformConnection {
     EXPECT_EQ(client_connection_->GetError(), 0);
     {
       std::unique_lock<std::mutex> lock(shared_data_->mutex);
-      EXPECT_EQ(shared_data_->test_access_token->global_id(), semaphore->id());
+      zx_info_handle_basic_t handle_info{};
+      shared_data_->test_access_token.get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
+                                               sizeof(handle_info), nullptr, nullptr);
+      EXPECT_EQ(handle_info.koid, semaphore->id());
     }
   }
 
@@ -486,18 +490,18 @@ class TestDelegate : public magma::ZirconConnection::Delegate {
  public:
   TestDelegate(std::shared_ptr<SharedData> shared_data) : shared_data_(shared_data) {}
 
-  magma::Status ImportObject(uint32_t handle, magma::PlatformObject::Type object_type,
+  magma::Status ImportObject(zx::handle handle, magma::PlatformObject::Type object_type,
                              uint64_t object_id) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     switch (object_type) {
       case magma::PlatformObject::SEMAPHORE: {
-        auto semaphore = magma::PlatformSemaphore::Import(handle);
+        auto semaphore = magma::PlatformSemaphore::Import(zx::event(std::move(handle)));
         if (!semaphore)
           return MAGMA_STATUS_INVALID_ARGS;
         EXPECT_EQ(object_id, shared_data_->test_semaphore_id);
       } break;
       case magma::PlatformObject::BUFFER: {
-        auto buffer = magma::PlatformBuffer::Import(handle);
+        auto buffer = magma::PlatformBuffer::Import(zx::vmo(std::move(handle)));
         if (!buffer)
           return MAGMA_STATUS_INVALID_ARGS;
         EXPECT_EQ(object_id, shared_data_->test_buffer_id);
@@ -614,8 +618,7 @@ class TestDelegate : public magma::ZirconConnection::Delegate {
     return MAGMA_STATUS_OK;
   }
 
-  magma::Status EnablePerformanceCounterAccess(
-      std::unique_ptr<magma::PlatformHandle> event) override {
+  magma::Status EnablePerformanceCounterAccess(zx::handle event) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     shared_data_->test_access_token = std::move(event);
     shared_data_->test_complete = true;
@@ -713,20 +716,18 @@ std::unique_ptr<TestPlatformConnection> TestPlatformConnection::Create(
   if (!endpoints.is_ok())
     return DRETP(nullptr, "Failed to create primary endpoints");
 
-  zx::channel client_notification_endpoint, server_notification_endpoint;
-  zx_status_t status =
-      zx::channel::create(0, &server_notification_endpoint, &client_notification_endpoint);
-  if (status != ZX_OK)
-    return DRETP(nullptr, "zx::channel::create failed");
+  auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
+  if (!notification_endpoints.is_ok())
+    return DRETP(nullptr, "Failed to create notification endpoints");
 
-  auto connection = magma::ZirconConnection::Create(
-      std::move(delegate), 1u, magma::PlatformHandle::Create(endpoints->server.channel().release()),
-      magma::PlatformHandle::Create(server_notification_endpoint.release()));
+  auto connection =
+      magma::ZirconConnection::Create(std::move(delegate), 1u, std::move(endpoints->server),
+                                      std::move(notification_endpoints->server));
   if (!connection)
     return DRETP(nullptr, "failed to create PlatformConnection");
 
   client_connection = magma::PlatformConnectionClient::Create(
-      endpoints->client.channel().release(), client_notification_endpoint.release(),
+      endpoints->client.channel().release(), notification_endpoints->client.TakeChannel().release(),
       shared_data->max_inflight_messages, shared_data->max_inflight_bytes);
 
   if (!client_connection)

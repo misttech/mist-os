@@ -140,10 +140,9 @@ class MagmaDeviceImpl : public ddk::Messageable<DeviceType>::Mixin<D>,
     if (!CheckSystemDevice(_completer))
       return;
 
-    auto connection = MagmaSystemDevice::Open(
-        magma_system_device_, request->client_id,
-        magma::PlatformHandle::Create(request->primary_channel.channel().release()),
-        magma::PlatformHandle::Create(request->notification_channel.channel().release()));
+    auto connection = MagmaSystemDevice::Open(magma_system_device_, request->client_id,
+                                              std::move(request->primary_channel),
+                                              std::move(request->notification_channel));
 
     if (!connection) {
       DLOG("MagmaSystemDevice::Open failed");

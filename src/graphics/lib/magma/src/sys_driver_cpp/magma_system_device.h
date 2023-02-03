@@ -14,9 +14,6 @@
 
 #include "magma_system_connection.h"
 #include "msd_cc.h"
-#include "platform_event.h"
-#include "platform_handle.h"
-#include "platform_thread.h"
 #include "zircon_connection.h"
 
 class MagmaSystemBuffer;
@@ -39,8 +36,8 @@ class MagmaSystemDevice {
   // to be passed to the client.
   static std::shared_ptr<magma::ZirconConnection> Open(
       std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
-      std::unique_ptr<magma::PlatformHandle> server_endpoint,
-      std::unique_ptr<magma::PlatformHandle> server_notification_endpoint);
+      fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
+      fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
 
   msd::Device* msd_dev() { return msd_dev_.get(); }
   msd::Driver* driver() { return driver_; }

@@ -4,11 +4,10 @@
 
 #include "magma_system_device.h"
 
+#include <zircon/types.h>
+
 #include "magma_system_connection.h"
 #include "magma_util/macros.h"
-#include "platform_handle.h"
-#include "platform_object.h"
-#include "zircon_connection.h"
 
 uint32_t MagmaSystemDevice::GetDeviceId() {
   uint64_t result;
@@ -22,15 +21,15 @@ uint32_t MagmaSystemDevice::GetDeviceId() {
 
 std::shared_ptr<magma::ZirconConnection> MagmaSystemDevice::Open(
     std::shared_ptr<MagmaSystemDevice> device, msd_client_id_t client_id,
-    std::unique_ptr<magma::PlatformHandle> server_endpoint,
-    std::unique_ptr<magma::PlatformHandle> server_notification_endpoint) {
+    fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
+    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
   std::unique_ptr<msd::Connection> msd_connection = device->msd_dev()->Open(client_id);
   if (!msd_connection)
     return DRETP(nullptr, "msd_device_open failed");
 
   return magma::ZirconConnection::Create(
       std::make_unique<MagmaSystemConnection>(std::move(device), std::move(msd_connection)),
-      client_id, std::move(server_endpoint), std::move(server_notification_endpoint));
+      client_id, std::move(primary), std::move(notification));
 }
 
 void MagmaSystemDevice::StartConnectionThread(

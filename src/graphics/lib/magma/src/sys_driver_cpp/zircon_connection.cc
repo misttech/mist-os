@@ -89,7 +89,7 @@ void ZirconConnection::SetError(fidl::CompleterBase* completer, magma_status_t e
   }
 }
 
-bool ZirconConnection::Bind(zx::channel server_endpoint) {
+bool ZirconConnection::Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary) {
   fidl::OnUnboundFn<ZirconConnection> unbind_callback =
       [](ZirconConnection* self, fidl::UnbindInfo unbind_info,
          fidl::ServerEnd<fuchsia_gpu_magma::Primary> server_channel) {
@@ -104,10 +104,8 @@ bool ZirconConnection::Bind(zx::channel server_endpoint) {
       };
 
   // Note: the async loop should not be started until we assign |server_binding_|.
-  server_binding_ =
-      fidl::BindServer(async_loop()->dispatcher(),
-                       fidl::ServerEnd<fuchsia_gpu_magma::Primary>(std::move(server_endpoint)),
-                       this, std::move(unbind_callback));
+  server_binding_ = fidl::BindServer(async_loop()->dispatcher(), std::move(primary), this,
+                                     std::move(unbind_callback));
   return true;
 }
 
@@ -277,7 +275,7 @@ void ZirconConnection::ImportObject2(ImportObject2RequestView request,
   }
   FlowControl(size);
 
-  if (!delegate_->ImportObject(request->object.release(), *object_type, request->object_id))
+  if (!delegate_->ImportObject(std::move(request->object), *object_type, request->object_id))
     SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
 }
 
@@ -443,8 +441,8 @@ void ZirconConnection::EnablePerformanceCounterAccess(
   DLOG("ZirconConnection:::EnablePerformanceCounterAccess");
   FlowControl();
 
-  magma::Status status = delegate_->EnablePerformanceCounterAccess(
-      magma::PlatformHandle::Create(request->access_token.release()));
+  magma::Status status =
+      delegate_->EnablePerformanceCounterAccess(std::move(request->access_token));
   if (!status) {
     SetError(&completer, status.get());
   }
@@ -536,8 +534,8 @@ void ZirconConnection::ClearPerformanceCounters(
 // static
 std::shared_ptr<ZirconConnection> ZirconConnection::Create(
     std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
-    std::unique_ptr<magma::PlatformHandle> server_endpoint,
-    std::unique_ptr<magma::PlatformHandle> server_notification_endpoint) {
+    fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
+    fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification) {
   if (!delegate)
     return DRETP(nullptr, "attempting to create PlatformConnection with null delegate");
 
@@ -546,10 +544,10 @@ std::shared_ptr<ZirconConnection> ZirconConnection::Create(
     return DRETP(nullptr, "Failed to create shutdown event");
 
   auto connection = std::make_shared<ZirconConnection>(
-      std::move(delegate), client_id, zx::channel(server_notification_endpoint->release()),
+      std::move(delegate), client_id, std::move(notification),
       std::shared_ptr<magma::PlatformEvent>(std::move(shutdown_event)));
 
-  if (!connection->Bind(zx::channel(server_endpoint->release())))
+  if (!connection->Bind(std::move(primary)))
     return DRETP(nullptr, "Bind failed");
 
   if (!connection->BeginShutdownWait())

@@ -9,6 +9,7 @@
 
 #include "msd/msd_cc.h"
 #include "platform_pci_device.h"
+#include "platform_semaphore.h"
 #include "sys_driver_cpp/magma_driver.h"
 #include "sys_driver_cpp/magma_system_connection.h"
 #include "sys_driver_cpp/magma_system_context.h"
@@ -177,11 +178,11 @@ class CommandBufferHelper final : public msd::NotificationHandler {
       auto buffer = MagmaSystemBuffer::Create(
           dev_->driver(), magma::PlatformBuffer::Create(kBufferSize, "command-buffer-batch"));
       DASSERT(buffer);
-      uint32_t duplicate_handle;
+      zx::handle duplicate_handle;
       success = buffer->platform_buffer()->duplicate_handle(&duplicate_handle);
       DASSERT(success);
       uint64_t id = buffer->platform_buffer()->id();
-      success = connection_->ImportBuffer(duplicate_handle, id).ok();
+      success = connection_->ImportBuffer(std::move(duplicate_handle), id).ok();
       DASSERT(success);
       resources_.push_back(connection_->LookupBuffer(id).get());
       success = buffer->platform_buffer()->duplicate_handle(&duplicate_handle);
@@ -197,11 +198,11 @@ class CommandBufferHelper final : public msd::NotificationHandler {
       auto buffer = MagmaSystemBuffer::Create(
           dev_->driver(), magma::PlatformBuffer::Create(kBufferSize, "resource"));
       DASSERT(buffer);
-      uint32_t duplicate_handle;
+      zx::handle duplicate_handle;
       success = buffer->platform_buffer()->duplicate_handle(&duplicate_handle);
       DASSERT(success);
       uint64_t id = buffer->platform_buffer()->id();
-      success = connection_->ImportBuffer(duplicate_handle, id).ok();
+      success = connection_->ImportBuffer(std::move(duplicate_handle), id).ok();
       DASSERT(success);
       resources_.push_back(connection_->LookupBuffer(id).get());
       success = buffer->platform_buffer()->duplicate_handle(&duplicate_handle);
@@ -219,14 +220,14 @@ class CommandBufferHelper final : public msd::NotificationHandler {
       auto semaphore =
           std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
       DASSERT(semaphore);
-      uint32_t duplicate_handle;
+      zx::handle duplicate_handle;
       success = semaphore->duplicate_handle(&duplicate_handle);
       DASSERT(success);
       wait_semaphores_.push_back(semaphore);
-      success =
-          connection_
-              ->ImportObject(duplicate_handle, magma::PlatformObject::SEMAPHORE, semaphore->id())
-              .ok();
+      success = connection_
+                    ->ImportObject(zx::event(std::move(duplicate_handle)),
+                                   magma::PlatformObject::SEMAPHORE, semaphore->id())
+                    .ok();
       DASSERT(success);
       abi_wait_semaphore_ids()[i] = semaphore->id();
       msd_wait_semaphores_.push_back(
@@ -238,14 +239,14 @@ class CommandBufferHelper final : public msd::NotificationHandler {
       auto semaphore =
           std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
       DASSERT(semaphore);
-      uint32_t duplicate_handle;
+      zx::handle duplicate_handle;
       success = semaphore->duplicate_handle(&duplicate_handle);
       DASSERT(success);
       signal_semaphores_.push_back(semaphore);
-      success =
-          connection_
-              ->ImportObject(duplicate_handle, magma::PlatformObject::SEMAPHORE, semaphore->id())
-              .ok();
+      success = connection_
+                    ->ImportObject(zx::event(std::move(duplicate_handle)),
+                                   magma::PlatformObject::SEMAPHORE, semaphore->id())
+                    .ok();
       DASSERT(success);
       abi_signal_semaphore_ids()[i] = semaphore->id();
       msd_signal_semaphores_.push_back(

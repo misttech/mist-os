@@ -27,7 +27,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
 
   ~MagmaSystemConnection() override;
 
-  magma::Status ImportObject(uint32_t handle, magma::PlatformObject::Type object_type,
+  magma::Status ImportObject(zx::handle handle, magma::PlatformObject::Type object_type,
                              uint64_t client_id) override;
   magma::Status ReleaseObject(uint64_t object_id, magma::PlatformObject::Type object_type) override;
   magma::Status CreateContext(uint32_t context_id) override;
@@ -45,8 +45,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
                                          uint64_t* semaphore_ids) override;
   MagmaSystemContext* LookupContext(uint32_t context_id);
   void SetNotificationCallback(msd::NotificationHandler*) override;
-  magma::Status EnablePerformanceCounterAccess(
-      std::unique_ptr<magma::PlatformHandle> access_token) override;
+  magma::Status EnablePerformanceCounterAccess(zx::handle access_token) override;
   bool IsPerformanceCounterAccessAllowed() override { return can_access_performance_counters_; }
   magma::Status EnablePerformanceCounters(const uint64_t* counters,
                                           uint64_t counter_count) override;
@@ -73,7 +72,7 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
 
   // Create a buffer from the handle and add it to the map,
   // on success |id_out| contains the id to be used to query the map
-  magma::Status ImportBuffer(uint32_t handle, uint64_t id);
+  magma::Status ImportBuffer(zx::handle handle, uint64_t id);
   // This removes the reference to the shared_ptr in the map
   // other instances remain valid until deleted
   // Returns false if no buffer with the given |id| exists in the map

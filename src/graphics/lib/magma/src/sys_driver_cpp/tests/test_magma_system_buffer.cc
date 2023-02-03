@@ -53,10 +53,10 @@ TEST(MagmaSystemBuffer, Create) {
   {
     auto buf = magma::PlatformBuffer::Create(256, "test");
 
-    uint32_t duplicate_handle;
+    zx::handle duplicate_handle;
     ASSERT_TRUE(buf->duplicate_handle(&duplicate_handle));
 
-    EXPECT_TRUE(connection->ImportBuffer(duplicate_handle, buf->id()));
+    EXPECT_TRUE(connection->ImportBuffer(std::move(duplicate_handle), buf->id()));
     EXPECT_TRUE(bufmgr->has_created_buffer());
     EXPECT_FALSE(bufmgr->has_destroyed_buffer());
 

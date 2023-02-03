@@ -6,6 +6,7 @@
 
 #include "helper/platform_device_helper.h"
 #include "src/graphics/drivers/msd-arm-mali/include/magma_arm_mali_types.h"
+#include "src/graphics/lib/magma/src/magma_util/platform/platform_semaphore.h"
 #include "sys_driver_cpp/magma_driver.h"
 #include "sys_driver_cpp/magma_system_connection.h"
 #include "sys_driver_cpp/magma_system_context.h"
@@ -197,9 +198,10 @@ class Test {
     auto ctx = InitializeContext();
     ASSERT_TRUE(ctx);
     auto platform_semaphore = magma::PlatformSemaphore::Create();
-    uint32_t handle;
+    zx::handle handle;
     platform_semaphore->duplicate_handle(&handle);
-    connection_->ImportObject(handle, magma::PlatformObject::SEMAPHORE, platform_semaphore->id());
+    connection_->ImportObject(std::move(handle), magma::PlatformObject::SEMAPHORE,
+                              platform_semaphore->id());
 
     magma_arm_mali_atom atom;
     atom.size = sizeof(atom);

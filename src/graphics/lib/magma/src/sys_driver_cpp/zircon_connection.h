@@ -18,7 +18,6 @@
 #include "magma_util/dlog.h"
 #include "msd/msd_defs.h"
 #include "msd_cc.h"
-#include "platform_handle.h"
 #include "platform_object.h"
 #include "platform_thread.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_event.h"
@@ -44,7 +43,7 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   class Delegate {
    public:
     virtual ~Delegate() {}
-    virtual magma::Status ImportObject(uint32_t handle, PlatformObject::Type object_type,
+    virtual magma::Status ImportObject(zx::handle handle, PlatformObject::Type object_type,
                                        uint64_t client_id) = 0;
     virtual magma::Status ReleaseObject(uint64_t object_id, PlatformObject::Type object_type) = 0;
 
@@ -64,8 +63,7 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
     virtual magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
                                                    void* commands, uint64_t semaphore_count,
                                                    uint64_t* semaphore_ids) = 0;
-    virtual magma::Status EnablePerformanceCounterAccess(
-        std::unique_ptr<magma::PlatformHandle> access_token) = 0;
+    virtual magma::Status EnablePerformanceCounterAccess(zx::handle access_token) = 0;
     virtual bool IsPerformanceCounterAccessAllowed() = 0;
     virtual magma::Status EnablePerformanceCounters(const uint64_t* counters,
                                                     uint64_t counter_count) = 0;
@@ -96,16 +94,16 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
 
   static std::shared_ptr<ZirconConnection> Create(
       std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
-      std::unique_ptr<magma::PlatformHandle> server_endpoint,
-      std::unique_ptr<magma::PlatformHandle> server_notification_endpoint);
+      fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary,
+      fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification);
 
   ZirconConnection(std::unique_ptr<Delegate> delegate, msd_client_id_t client_id,
-                   zx::channel server_notification_endpoint,
+                   fidl::ServerEnd<fuchsia_gpu_magma::Notification> notification,
                    std::shared_ptr<magma::PlatformEvent> shutdown_event)
       : client_id_(client_id),
         shutdown_event_(shutdown_event),
         delegate_(std::move(delegate)),
-        server_notification_endpoint_(std::move(server_notification_endpoint)),
+        server_notification_endpoint_(notification.TakeChannel()),
         async_loop_(&kAsyncLoopConfigNeverAttachToThread),
         async_wait_shutdown_(
             this, static_cast<magma::ZirconPlatformEvent*>(shutdown_event.get())->zx_handle(),
@@ -115,7 +113,7 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
 
   ~ZirconConnection() override { delegate_->SetNotificationCallback(nullptr); }
 
-  bool Bind(zx::channel server_endpoint);
+  bool Bind(fidl::ServerEnd<fuchsia_gpu_magma::Primary> primary);
 
   bool HandleRequest();
 

@@ -133,6 +133,7 @@ class MsdMockSemaphore : public msd::Semaphore {
   explicit MsdMockSemaphore(std::unique_ptr<magma::PlatformSemaphore> semaphore)
       : semaphore_(std::move(semaphore)) {}
   ~MsdMockSemaphore() override = default;
+  zx_koid_t GetKoid() { return semaphore_->id(); }
 
  private:
   std::unique_ptr<magma::PlatformSemaphore> semaphore_;

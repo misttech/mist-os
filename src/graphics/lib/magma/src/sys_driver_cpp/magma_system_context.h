@@ -11,7 +11,6 @@
 #include "magma_system_buffer.h"
 #include "magma_system_semaphore.h"
 #include "magma_util/status.h"
-#include "msd.h"
 
 class MagmaSystemCommandBuffer;
 

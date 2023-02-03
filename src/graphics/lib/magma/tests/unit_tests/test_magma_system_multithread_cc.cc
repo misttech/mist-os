@@ -66,11 +66,11 @@ class TestMultithread {
     for (uint32_t i = 0; i < num_iterations; i++) {
       auto batch_buffer = magma::PlatformBuffer::Create(page_size(), "test");
 
-      uint32_t handle;
+      zx::handle handle;
       EXPECT_TRUE(batch_buffer->duplicate_handle(&handle));
 
       uint64_t id = batch_buffer->id();
-      EXPECT_TRUE(connection->ImportBuffer(handle, id));
+      EXPECT_TRUE(connection->ImportBuffer(std::move(handle), id));
 
       InitBatchBufferIntel(batch_buffer.get());
 

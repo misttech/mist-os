@@ -66,13 +66,12 @@ TEST(MagmaNotification, NotAfterShutdown) {
   auto dev = std::shared_ptr<MagmaSystemDevice>(
       MagmaSystemDevice::Create(msd_driver.get(), std::move(msd_dev)));
 
-  zx::channel server_fidl, client_fidl;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_fidl, &client_fidl));
-  zx::channel server_notification, client_notification;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_notification, &client_notification));
-  auto zircon_connection =
-      MagmaSystemDevice::Open(dev, 0, magma::PlatformHandle::Create(std::move(server_fidl)),
-                              magma::PlatformHandle::Create(std::move(server_notification)));
+  auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Primary>();
+  ASSERT_TRUE(endpoints.is_ok());
+  auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
+  ASSERT_TRUE(notification_endpoints.is_ok());
+  auto zircon_connection = MagmaSystemDevice::Open(dev, 0, std::move(endpoints->server),
+                                                   std::move(notification_endpoints->server));
 
   dev->StartConnectionThread(std::move(zircon_connection), nullptr);
   auto completion = connection_ptr->completion();
@@ -92,20 +91,19 @@ TEST(MagmaNotification, NotAfterConnectionTeardown) {
   auto dev = std::shared_ptr<MagmaSystemDevice>(
       MagmaSystemDevice::Create(msd_driver.get(), std::move(msd_dev)));
 
-  zx::channel server_fidl, client_fidl;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_fidl, &client_fidl));
-  zx::channel server_notification, client_notification;
-  ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_notification, &client_notification));
-  auto zircon_connection =
-      MagmaSystemDevice::Open(dev, 0, magma::PlatformHandle::Create(std::move(server_fidl)),
-                              magma::PlatformHandle::Create(std::move(server_notification)));
+  auto endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Primary>();
+  ASSERT_TRUE(endpoints.is_ok());
+  auto notification_endpoints = fidl::CreateEndpoints<fuchsia_gpu_magma::Notification>();
+  ASSERT_TRUE(notification_endpoints.is_ok());
+  auto zircon_connection = MagmaSystemDevice::Open(dev, 0, std::move(endpoints->server),
+                                                   std::move(notification_endpoints->server));
 
   dev->StartConnectionThread(std::move(zircon_connection), nullptr);
   auto completion = connection_ptr->completion();
   connection_ptr->SendTask();
 
   // Should trigger the client connection to close.
-  client_fidl.reset();
+  endpoints->client.reset();
   completion->Wait();
 
   dev->Shutdown();
