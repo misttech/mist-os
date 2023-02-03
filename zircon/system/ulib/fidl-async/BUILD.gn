@@ -113,7 +113,6 @@ zx_library("fidl-async-cpp") {
     "//src/graphics/display/drivers/amlogic-display:*",
     "//src/graphics/display/drivers/dsi-dw:*",
     "//src/graphics/display/drivers/intel-i915:*",
-    "//src/graphics/display/drivers/intel-i915-tgl:*",
     "//src/graphics/drivers/misc/goldfish:*",
     "//src/graphics/drivers/virtio:*",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:*",
