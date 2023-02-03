@@ -545,6 +545,83 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
     }
 }
 
+/// Tests that when an interface is enabled and removed, no disable event is
+/// observed before the remove event.
+#[netstack_test]
+async fn test_remove_enabled_interface<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+
+    let interface_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+
+    let ep = sandbox
+        .create_endpoint("ep")
+        .await
+        .expect("create fixed ep")
+        .into_interface_in_realm(&realm)
+        .await
+        .expect("install in realm");
+    ep.set_link_up(true).await.expect("bring link up");
+
+    let event_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
+        .expect("get interface event stream")
+        .map(|r| r.expect("watcher error"))
+        .fuse();
+    futures::pin_mut!(event_stream);
+
+    // Consume the watcher until we see the idle event.
+    let mut existing = fidl_fuchsia_net_interfaces_ext::existing(
+        event_stream.by_ref().map(std::result::Result::<_, fidl::Error>::Ok),
+        HashMap::new(),
+    )
+    .await
+    .expect("existing");
+
+    let iface_id = ep.id();
+    let mut interface_state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Known({
+        let interface_state = existing.remove(&iface_id).unwrap();
+        assert!(!interface_state.online);
+        interface_state
+    });
+
+    // Now enable the interface, then wait to see that it is enabled
+    assert!(ep.control().enable().await.expect("send enable").expect("enable"));
+    fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+        event_stream.by_ref().map(std::result::Result::<_, fidl::Error>::Ok),
+        &mut interface_state,
+        |s| s.online.then_some(()),
+    )
+    .await
+    .expect("is enabled");
+    let mut interface_state = match interface_state {
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::Known(k) => k,
+        fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(_) => {
+            unreachable!("interface is still known")
+        }
+    };
+
+    #[derive(Debug)]
+    struct InterfaceWasDisabled;
+
+    // Disable the interface and wait for it to disappear (but not be disabled).
+    drop(ep);
+    assert_matches::assert_matches!(
+        fidl_fuchsia_net_interfaces_ext::wait_interface(
+            event_stream.by_ref().map(std::result::Result::<_, fidl::Error>::Ok),
+            &mut interface_state,
+            // Check that the interface does not go offline. Anything else can be
+            // ignored.
+            |s| (!s.online).then_some(InterfaceWasDisabled)
+        )
+        .await,
+        Err(fidl_fuchsia_net_interfaces_ext::WatcherOperationError::Update(
+            fidl_fuchsia_net_interfaces_ext::UpdateError::Removed
+        ))
+    )
+}
+
 /// Tests that toggling interface enabled repeatedly results in every change
 /// in the boolean value being observable.
 #[netstack_test]
