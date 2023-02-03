@@ -72,9 +72,7 @@ test("rndis-function-test") {
   sources = [ "rndis_function_test.cc" ]
   deps = [
     ":rndis-function-lib",
-
-    # TODO(fxb/115046): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -82,6 +80,13 @@ test("rndis-function-test") {
 fuchsia_unittest_package("rndis-function-test-package") {
   package_name = "rndis-function-test"
   deps = [ ":rndis-function-test" ]
+
+  # There's expected error logs that happen in some test cases.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {

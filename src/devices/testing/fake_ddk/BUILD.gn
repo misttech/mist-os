@@ -87,7 +87,6 @@ zx_library("fake_ddk") {
     "//build/*",
     "//build/cpp/*",
     "//src/camera/drivers/controller/test/*",
-    "//src/connectivity/ethernet/drivers/rndis-function/*",
     "//src/connectivity/ethernet/drivers/virtio/*",
     "//src/devices/clock/drivers/as370-clk/*",
     "//src/devices/cpu/drivers/aml-cpu-legacy/*",
