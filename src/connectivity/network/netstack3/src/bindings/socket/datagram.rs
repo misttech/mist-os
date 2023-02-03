@@ -1862,7 +1862,7 @@ where
                 value: _,
                 responder,
             } => {
-                error!("TODO(https://fxbug.dev/107644): implement IPV6_MULTICAST_IF socket option");
+                warn!("TODO(https://fxbug.dev/107644): implement IPV6_MULTICAST_IF socket option");
                 responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::SynchronousDatagramSocketRequest::GetIpv6MulticastInterface {
