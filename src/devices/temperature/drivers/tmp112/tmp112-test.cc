@@ -6,10 +6,11 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/mock-i2c/mock-i2c.h>
 
 #include <zxtest/zxtest.h>
+
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
 
@@ -27,27 +28,21 @@ class Tmp112DeviceTest : public zxtest::Test {
 
   void SetUp() override {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
+    ASSERT_TRUE(endpoints.is_ok());
 
     fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &mock_i2c_);
 
-    dev_ = std::make_unique<Tmp112Device>(fake_ddk::kFakeParent,
-                                          ddk::I2cChannel(std::move(endpoints->client)));
-
-    const auto message_op = [](void* ctx, fidl_incoming_msg_t* msg,
-                               fidl_txn_t* txn) -> zx_status_t {
-      return static_cast<Tmp112Device*>(ctx)->ddk_device_proto_.message(ctx, msg, txn);
-    };
-    ASSERT_OK(messenger_.SetMessageOp(dev_.get(), message_op));
-
-    EXPECT_OK(loop_.StartThread());
+    ASSERT_OK(loop_.StartThread());
+    root_ = MockDevice::FakeRootParent();
+    dev_ =
+        std::make_unique<Tmp112Device>(root_.get(), ddk::I2cChannel(std::move(endpoints->client)));
   }
 
  protected:
+  async::Loop loop_;
   mock_i2c::MockI2c mock_i2c_;
   std::unique_ptr<Tmp112Device> dev_;
-  fake_ddk::FidlMessenger messenger_;
-  async::Loop loop_;
+  std::shared_ptr<MockDevice> root_;
 };
 
 TEST_F(Tmp112DeviceTest, Init) {
@@ -61,8 +56,15 @@ TEST_F(Tmp112DeviceTest, Init) {
 
 TEST_F(Tmp112DeviceTest, GetTemperatureCelsius) {
   mock_i2c_.ExpectWrite({kTemperatureReg}).ExpectReadStop({0x34, 0x12});
+  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_temperature::Device>();
+  ASSERT_OK(endpoints.status_value());
 
-  TemperatureClient client(std::move(messenger_.local()));
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), dev_.get());
+  ASSERT_OK(loop.StartThread());
+
+  TemperatureClient client;
+  client.Bind(std::move(endpoints->client));
   auto result = client->GetTemperatureCelsius();
   EXPECT_OK(result->status);
   EXPECT_TRUE(FloatNear(result->temp, dev_->RegToTemperatureCelsius(0x1234)));
