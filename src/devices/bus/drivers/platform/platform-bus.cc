@@ -652,9 +652,11 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   auto instance_id = request->node.has_instance_id() ? request->node.instance_id() : 0;
 
   const ddk::BindRule kPDevBindRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID, vid),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID, pid),
       ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID, did),
+      ddk::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_INSTANCE_ID, instance_id),
   };
 
   const device_bind_prop_t kPDevProperties[] = {
