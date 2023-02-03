@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/sdk_source_set.gni")
 import("//build/zircon/zx_library.gni")
 
 zx_library("sync") {
@@ -25,8 +26,13 @@ zx_library("sync") {
   ]
 }
 
-source_set("sync-cpp") {
-  public = [ "include/lib/sync/cpp/completion.h" ]
+sdk_source_set("sync-cpp") {
+  category = "internal"
+  sdk_name = "sync_cpp"
+  public = [
+    "include/lib/sync/cpp/completion.h",
+    "include/lib/sync/cpp/mutex.h",
+  ]
   include_dirs = [ "include" ]
   sources = []
   public_deps = [
