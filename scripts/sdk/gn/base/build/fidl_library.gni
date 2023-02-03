@@ -263,43 +263,7 @@ template("fidl_cpp_codegen") {
   }
 }
 
-# Defines a C++ library target (source_set) generated from a FIDL library.
-#
-# FIDL library dependencies under `public_deps` will manifest as corresponding
-# library target dependencies.
-#
-# Parameters
-#
-#  fidl_target_name (required)
-#    The name of the fidl_libary() target
-#
-#  bindings_flavor (required)
-#    Identifies which kind of bindings (hlcpp, cpp, ...).
-#    This should be the same suffix as the one used when instantiating
-#    the fidl_cpp_codegen template.
-#
-#  bindings_layer (optional)
-#    A particular binding may be decomposed into multiple layers. In that case,
-#    this identifies the particular layer that makes up this library (e.g.
-#    domain objects layer, messaging layer, ...). When adding dependencies,
-#    a particular layer for a FIDL library depends on the corresponding
-#    layers of the dependencies of that FIDL library.
-#
-#    Some examples of valid layers are:
-#      * cpp_wire: Wire messaging over channel transport
-#      * cpp_wire_types: Wire domain objects
-#
-#    If missing, defaults to bindings_flavor.
-#
-#  generated_sources (optional)
-#    A list of source files that will be generated for this binding, relative
-#    to the target-specific generation directory.
-#
-#  generated_headers (optional)
-#    A list of header files that will be generated for this binding, relative
-#    to the target-specific generation directory.
-#
-template("fidl_cpp_library") {
+template("_fidl_cpp_library_impl") {
   root = "${invoker.fidl_gen_dir}/${invoker.bindings_flavor}"
   generation_target_name = "${target_name}_gen"
   if (defined(invoker.generation_target_prefix)) {
@@ -375,7 +339,7 @@ template("fidl_cpp_library") {
           label = get_label_info(dep, "label_no_toolchain")
           if (get_label_info(label, "name") == "zx") {
             # For the zx library, only link in the coding tables.
-            public_deps += [ "${label}" ]
+            public_deps += [ "${label}_tables" ]
             not_needed([ "bindings_layer" ])
           } else {
             public_deps += [ "${label}_${bindings_layer}" ]
@@ -385,6 +349,87 @@ template("fidl_cpp_library") {
     }
 
     public_deps += invoker.additional_public_deps
+  }
+}
+
+# Defines a C++ library target (source_set) generated from a FIDL library.
+#
+# FIDL library dependencies under `public_deps` will manifest as corresponding
+# library target dependencies.
+#
+# Parameters
+#
+#  fidl_target_name (required)
+#    The name of the fidl_libary() target
+#
+#  fidl_gen_dir (required)
+#    The directory where generated files will be placed.
+#
+#  json_representation (required)
+#    The file containing the json representation.
+#
+#  fidl_ir_target (required)
+#    The target for the base fidl library.
+#
+#  bindings_flavor (required)
+#    Identifies which kind of bindings (hlcpp, cpp, ...).
+#    This should be the same suffix as the one used when instantiating
+#    the fidl_cpp_codegen template.
+#
+#  bindings_layer (optional)
+#    A particular binding may be decomposed into multiple layers. In that case,
+#    this identifies the particular layer that makes up this library (e.g.
+#    domain objects layer, messaging layer, ...). When adding dependencies,
+#    a particular layer for a FIDL library depends on the corresponding
+#    layers of the dependencies of that FIDL library.
+#
+#    Some examples of valid layers are:
+#      * cpp_wire: Wire messaging over channel transport
+#      * cpp_wire_types: Wire domain objects
+#
+#    If missing, defaults to bindings_flavor.
+#
+#  generated_sources (optional)
+#    A list of source files that will be generated for this binding, relative
+#    to the target-specific generation directory.
+#
+#  generated_headers (optional)
+#    A list of header files that will be generated for this binding, relative
+#    to the target-specific generation directory.
+#
+#  generation_target_prefix (optional)
+#    Overrides the prefix for the generation target so that it becomes
+#    `${generation_target_prefix}_gen`.
+#
+#  additional_public_deps (optional)
+#    A list of targets to be added to public_deps.
+#
+template("fidl_cpp_library") {
+  if (invoker.fidl_target_name == "zx") {
+    # The zx FIDL library isn't generated with C++ fidlgens.
+    not_needed(invoker, "*")
+    group(target_name) {
+    }
+  } else {
+    _fidl_cpp_library_impl(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "deps",
+                               "public_deps",
+                               "testonly",
+                               "visibility",
+                               "fidl_target_name",
+                               "fidl_gen_dir",
+                               "fidl_ir_target",
+                               "json_representation",
+                               "bindings_flavor",
+                               "bindings_layer",
+                               "generated_sources",
+                               "generated_headers",
+                               "generation_target_prefix",
+                               "additional_public_deps",
+                             ])
+    }
   }
 }
 
