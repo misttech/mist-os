@@ -20,7 +20,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
@@ -912,7 +911,7 @@ func TestExecute(t *testing.T) {
 				return fuchsiaTester, nil
 			}
 			ffx := &ffxutil.MockFFXInstance{}
-			ffxInstance = func(_ context.Context, _ string, _ int, _ string, _ []string, _, _, _ string) (FFXInstance, error) {
+			ffxInstance = func(_ context.Context, _ *ffxutil.FFXInstance, _ int) (FFXInstance, error) {
 				if c.useFFX {
 					return ffx, nil
 				}
@@ -926,13 +925,12 @@ func TestExecute(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer o.Close()
+			testrunnerOpts := Options{SnapshotFile: "snapshot.zip"}
 			if c.useFFX {
-				oldValue := os.Getenv(constants.FFXExperimentLevelEnvKey)
-				os.Setenv(constants.FFXExperimentLevelEnvKey, "2")
-				defer os.Setenv(constants.FFXExperimentLevelEnvKey, oldValue)
+				// No need to set the FFX option since we will use the mock instance instead.
+				testrunnerOpts.FFXExperimentLevel = 2
 			}
-			err = execute(context.Background(), tests, o, net.IPAddr{}, c.sshKeyFile, c.serialSocketPath, t.TempDir(),
-				TestrunnerFlags{SnapshotFile: "snapshot.zip"})
+			err = execute(context.Background(), tests, o, net.IPAddr{}, c.sshKeyFile, c.serialSocketPath, t.TempDir(), testrunnerOpts)
 			if c.wantErr {
 				if err == nil {
 					t.Errorf("got nil error, want an error for failing to initialize a tester")

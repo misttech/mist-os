@@ -38,10 +38,7 @@ import (
 
 const testTimeoutGracePeriod = 30 * time.Second
 
-type TestrunnerFlags struct {
-	// Whether to show Usage and exit.
-	Help bool
-
+type Options struct {
 	// The path where a directory containing test results should be created.
 	OutDir string
 
@@ -57,18 +54,23 @@ type TestrunnerFlags struct {
 	// The output filename for the snapshot. This will be created in the outDir.
 	SnapshotFile string
 
-	// Logger level.
-	LogLevel logger.LogLevel
-
 	// Whether to prefetch test packages. This is only useful when fetching
 	// packages ephemerally.
 	PrefetchPackages bool
 
 	// Whether to use serial to run tests on the target.
 	UseSerial bool
+
+	// The ffx instance to use.
+	FFX *ffxutil.FFXInstance
+
+	// The level of experimental ffx features to enable.
+	//
+	// See //tools/botanist/cmd/run.go for the mapping of features to levels.
+	FFXExperimentLevel int
 }
 
-func SetupAndExecute(ctx context.Context, flags TestrunnerFlags, testsPath string) error {
+func SetupAndExecute(ctx context.Context, opts Options, testsPath string) error {
 	// Our mDNS library doesn't use the logger library.
 	const logFlags = log.Ltime | log.Lmicroseconds | log.Lshortfile
 	log.SetFlags(logFlags)
@@ -80,7 +82,7 @@ func SetupAndExecute(ctx context.Context, flags TestrunnerFlags, testsPath strin
 
 	// Configure a test outputs object, responsible for producing TAP output,
 	// recording data sinks, and archiving other test outputs.
-	testOutDir := filepath.Join(os.Getenv(constants.TestOutDirEnvKey), flags.OutDir)
+	testOutDir := filepath.Join(os.Getenv(constants.TestOutDirEnvKey), opts.OutDir)
 	if testOutDir == "" {
 		var err error
 		testOutDir, err = os.MkdirTemp("", "testrunner")
@@ -124,7 +126,7 @@ func SetupAndExecute(ctx context.Context, flags TestrunnerFlags, testsPath strin
 		return fmt.Errorf("failed to create test outputs: %w", err)
 	}
 
-	execErr := execute(ctx, tests, outputs, addr, sshKeyFile, serialSocketPath, testOutDir, flags)
+	execErr := execute(ctx, tests, outputs, addr, sshKeyFile, serialSocketPath, testOutDir, opts)
 	if err := outputs.Close(); err != nil {
 		if execErr == nil {
 			return err
@@ -140,48 +142,38 @@ var (
 	serialTester = NewFuchsiaSerialTester
 )
 
+// ffxInstance takes a *ffxutil.FFXInstance and returns it as a FFXInstance
+// interface. This is used for testability so that we can return a mock
+// instance instead.
 var ffxInstance = func(
 	ctx context.Context,
-	ffxPath string,
+	ffxInstance *ffxutil.FFXInstance,
 	ffxExperimentalLevel int,
-	dir string,
-	env []string,
-	target, sshKey, outputDir string,
 ) (FFXInstance, error) {
 	ffx, err := func() (FFXInstance, error) {
-		var ffx *ffxutil.FFXInstance
-		var err error
-		if isolateDir, ok := os.LookupEnv(ffxutil.FFXIsolateDirEnvKey); ok {
-			ffx, err = ffxutil.NewFFXInstance(ctx, ffxPath, dir, env, target, sshKey, isolateDir)
-		} else {
-			ffx, err = ffxutil.NewFFXInstance(ctx, ffxPath, dir, env, target, sshKey, outputDir)
-		}
-		if ffx == nil {
-			// Return nil instead of ffx so that the returned FFXTester
+		if ffxInstance == nil {
+			// Return nil instead of ffx so that the returned FFXInstance
 			// will be the nil interface instead of an interface holding
 			// a nil value. In the latter case, checking ffx == nil will
 			// return false.
-			return nil, err
-		}
-		if err != nil {
-			return ffx, err
+			return nil, nil
 		}
 		if ffxExperimentalLevel == 3 {
-			if err := ffx.ConfigSet(ctx, "test.enable_experimental_parallel_execution", "true"); err != nil {
-				return ffx, err
+			if err := ffxInstance.ConfigSet(ctx, "test.enable_experimental_parallel_execution", "true"); err != nil {
+				return ffxInstance, err
 			}
 		}
 		// Print the list of available targets for debugging purposes.
 		// TODO(ihuh): Remove when not needed.
-		if err := ffx.List(ctx); err != nil {
-			return ffx, err
+		if err := ffxInstance.List(ctx); err != nil {
+			return ffxInstance, err
 		}
 		// Print the config for debugging purposes.
 		// TODO(ihuh): Remove when not needed.
-		if err := ffx.GetConfig(ctx); err != nil {
-			return ffx, err
+		if err := ffxInstance.GetConfig(ctx); err != nil {
+			return ffxInstance, err
 		}
-		return ffx, nil
+		return ffxInstance, nil
 	}()
 	if err != nil && ffx != nil {
 		ffx.Stop()
@@ -197,7 +189,7 @@ func execute(
 	sshKeyFile,
 	serialSocketPath,
 	outDir string,
-	flags TestrunnerFlags,
+	opts Options,
 ) error {
 	var fuchsiaSinks, localSinks []runtests.DataSinkReference
 	var fuchsiaTester, localTester Tester
@@ -207,8 +199,8 @@ func execute(
 		"RUST_BACKTRACE=1",
 	)
 
-	if !flags.UseSerial && sshKeyFile != "" {
-		if flags.PrefetchPackages {
+	if !opts.UseSerial && sshKeyFile != "" {
+		if opts.PrefetchPackages {
 			// TODO(rudymathu): Remove this prefetching of packages once package
 			// delivery is fast enough.
 			resolveCtx, cancel := context.WithCancel(ctx)
@@ -227,14 +219,7 @@ func execute(
 			defer cancel()
 		}
 
-		ffxPath := os.Getenv(botanistconstants.FFXPathEnvKey)
-		ffxExperimentLevel, err := strconv.Atoi(os.Getenv(botanistconstants.FFXExperimentLevelEnvKey))
-		if err != nil {
-			ffxExperimentLevel = 0
-		}
-		ffx, err := ffxInstance(
-			ctx, ffxPath, ffxExperimentLevel, flags.LocalWD, localEnv, os.Getenv(botanistconstants.NodenameEnvKey),
-			sshKeyFile, outputs.OutDir)
+		ffx, err := ffxInstance(ctx, opts.FFX, opts.FFXExperimentLevel)
 		if err != nil {
 			return err
 		}
@@ -245,13 +230,13 @@ func execute(
 			if err != nil {
 				return fmt.Errorf("failed to initialize fuchsia tester: %w", err)
 			}
-			ffxTester := NewFFXTester(ffx, t, outputs.OutDir, ffxExperimentLevel)
+			ffxTester := NewFFXTester(ffx, t, outputs.OutDir, opts.FFXExperimentLevel)
 			defer func() {
 				// outputs.Record() moves output files to paths within the output directory
 				// specified by test name.
 				// Remove the ffx test out dirs which would now only contain empty directories
 				// and summary.jsons that don't point to real paths anymore.
-				if ffxExperimentLevel >= 2 {
+				if opts.FFXExperimentLevel >= 2 {
 					// Leave the summary.jsons for debugging.
 					err = ffxTester.RemoveAllEmptyOutputDirs()
 				} else {
@@ -273,7 +258,7 @@ func execute(
 		case "fuchsia":
 			if fuchsiaTester == nil {
 				var err error
-				if !flags.UseSerial && sshKeyFile != "" {
+				if !opts.UseSerial && sshKeyFile != "" {
 					fuchsiaTester, err = sshTester(
 						ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
 				} else {
@@ -296,7 +281,7 @@ func execute(
 			}
 			// Initialize the fuchsia SSH tester to run the snapshot at the end in case
 			// we ran any host-target interaction tests.
-			if !flags.UseSerial && fuchsiaTester == nil && sshKeyFile != "" {
+			if !opts.UseSerial && fuchsiaTester == nil && sshKeyFile != "" {
 				var err error
 				fuchsiaTester, err = sshTester(
 					ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
@@ -306,7 +291,7 @@ func execute(
 			}
 			if localTester == nil {
 				var err error
-				localTester, err = NewSubprocessTester(flags.LocalWD, localEnv, outputs.OutDir, flags.NsjailPath, flags.NsjailRoot)
+				localTester, err = NewSubprocessTester(opts.LocalWD, localEnv, outputs.OutDir, opts.NsjailPath, opts.NsjailRoot)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -340,7 +325,7 @@ func execute(
 				snapshotCtx, cancel = context.WithTimeout(context.Background(), 7*time.Second)
 				defer cancel()
 			}
-			if err := t.RunSnapshot(snapshotCtx, flags.SnapshotFile); err != nil {
+			if err := t.RunSnapshot(snapshotCtx, opts.SnapshotFile); err != nil {
 				// This error usually has a different root cause that gets masked when we
 				// return this error. Log it so we can keep track of it, but don't fail.
 				logger.Errorf(snapshotCtx, err.Error())

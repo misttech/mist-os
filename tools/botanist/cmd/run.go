@@ -97,7 +97,7 @@ type RunCommand struct {
 	skipSetup bool
 
 	// Args passed to testrunner
-	testrunnerFlags testrunner.TestrunnerFlags
+	testrunnerOptions testrunner.Options
 }
 
 type imageOverridesFlagValue build.ImageOverrides
@@ -172,14 +172,14 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
 	f.Var(&r.imageOverrides, "image-overrides", "A json struct following the ImageOverrides schema at //tools/build/tests.go with the names of the images to use from images.json.")
 
-	// Parsing of testrunner flags.
-	f.StringVar(&r.testrunnerFlags.OutDir, "out-dir", "", "Optional path where a directory containing test results should be created.")
-	f.StringVar(&r.testrunnerFlags.NsjailPath, "nsjail", "", "Optional path to an NsJail binary to use for linux host test sandboxing.")
-	f.StringVar(&r.testrunnerFlags.NsjailRoot, "nsjail-root", "", "Path to the directory to use as the NsJail root directory")
-	f.StringVar(&r.testrunnerFlags.LocalWD, "C", "", "Working directory of local testing subprocesses; if unset the current working directory will be used.")
-	f.StringVar(&r.testrunnerFlags.SnapshotFile, "snapshot-output", "", "The output filename for the snapshot. This will be created in the output directory.")
-	f.BoolVar(&r.testrunnerFlags.PrefetchPackages, "prefetch-packages", false, "Prefetch any test packages in the background.")
-	f.BoolVar(&r.testrunnerFlags.UseSerial, "use-serial", false, "Use serial to run tests on the target.")
+	// Parsing of testrunner options.
+	f.StringVar(&r.testrunnerOptions.OutDir, "out-dir", "", "Optional path where a directory containing test results should be created.")
+	f.StringVar(&r.testrunnerOptions.NsjailPath, "nsjail", "", "Optional path to an NsJail binary to use for linux host test sandboxing.")
+	f.StringVar(&r.testrunnerOptions.NsjailRoot, "nsjail-root", "", "Path to the directory to use as the NsJail root directory")
+	f.StringVar(&r.testrunnerOptions.LocalWD, "C", "", "Working directory of local testing subprocesses; if unset the current working directory will be used.")
+	f.StringVar(&r.testrunnerOptions.SnapshotFile, "snapshot-output", "", "The output filename for the snapshot. This will be created in the output directory.")
+	f.BoolVar(&r.testrunnerOptions.PrefetchPackages, "prefetch-packages", false, "Prefetch any test packages in the background.")
+	f.BoolVar(&r.testrunnerOptions.UseSerial, "use-serial", false, "Use serial to run tests on the target.")
 }
 
 func (r *RunCommand) execute(ctx context.Context, args []string) error {
@@ -200,8 +200,8 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	defer cancel()
 
 	if r.skipSetup {
-		if err := testrunner.SetupAndExecute(ctx, r.testrunnerFlags, testsPath); err != nil {
-			return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerFlags, r.timeout, err)
+		if err := testrunner.SetupAndExecute(ctx, r.testrunnerOptions, testsPath); err != nil {
+			return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerOptions, r.timeout, err)
 		}
 		return nil
 	}
@@ -529,13 +529,6 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.Target, tes
 		constants.ECCableEnvKey:       os.Getenv(constants.ECCableEnvKey),
 		constants.TestbedConfigEnvKey: testbedConfig,
 	}
-	// TODO(fxbug.dev/113992): testrunner's use of ffx involves calls to a `ssh` host binary
-	// which may not be available on the host. Put behind an experiment level until
-	// the bug is fixed.
-	if t.UseFFXExperimental(2) {
-		testrunnerEnv[constants.FFXPathEnvKey] = r.ffxPath
-		testrunnerEnv[constants.FFXExperimentLevelEnvKey] = strconv.Itoa(r.ffxExperimentLevel)
-	}
 
 	// If |netboot| is true, then we assume that fuchsia is not provisioned
 	// with a netstack; in this case, do not try to establish a connection.
@@ -592,10 +585,17 @@ func (r *RunCommand) runAgainstTarget(ctx context.Context, t targets.Target, tes
 	}
 	if t.UseFFX() {
 		setEnviron(t.FFXEnv())
+		// TODO(fxbug.dev/113992): testrunner's use of ffx involves calls to a `ssh` host binary
+		// which may not be available on the host. Put behind an experiment level until
+		// the bug is fixed.
+		if t.UseFFXExperimental(2) {
+			r.testrunnerOptions.FFX = t.GetFFX().FFXInstance
+			r.testrunnerOptions.FFXExperimentLevel = r.ffxExperimentLevel
+		}
 	}
 
-	if err := testrunner.SetupAndExecute(ctx, r.testrunnerFlags, testsPath); err != nil {
-		return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerFlags, r.timeout, err)
+	if err := testrunner.SetupAndExecute(ctx, r.testrunnerOptions, testsPath); err != nil {
+		return fmt.Errorf("testrunner with flags: %v, with timeout: %s, failed: %w", r.testrunnerOptions, r.timeout, err)
 	}
 	return nil
 }
