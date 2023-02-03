@@ -15,7 +15,7 @@
       "enabled": true
     },
     "diagnostics": {
-      "archivist": "default-service"
+      "archivist": "default"
     },
     "identity": {
       "password_pinweaver": "required"
