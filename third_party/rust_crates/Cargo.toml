@@ -196,7 +196,7 @@ serde_repr = "0.1.7"
 sha2 = "0.9"
 signature =  "1.4.0"
 siphasher = "0.3.10"
-slab = "0.4"
+slab = "0.4.7"
 smallvec = {version= "1.8", features = ["const_generics"]}
 socket2 = { version = "0.4.4", features = ["all"] }
 splines = "2.2.0"
@@ -620,6 +620,9 @@ rustflags = []
 rustflags = []
 
 [gn.package.signal-hook."0.3.8"]
+rustflags = []
+
+[gn.package.slab."0.4.7"]
 rustflags = []
 
 # Not actually used in the gn build at all, just for the rules_rust bazel rules.

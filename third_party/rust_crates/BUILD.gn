@@ -883,7 +883,7 @@ group("siphasher") {
 }
 
 group("slab") {
-  public_deps = [ ":slab-v0_4_2" ]
+  public_deps = [ ":slab-v0_4_7" ]
 }
 
 group("smallvec") {
@@ -1589,7 +1589,7 @@ rust_library("async-executor-v1_4_1") {
   deps += [ ":fastrand-v1_4_0" ]
   deps += [ ":futures-lite-v1_11_3" ]
   deps += [ ":once_cell-v1_5_2" ]
-  deps += [ ":slab-v0_4_2" ]
+  deps += [ ":slab-v0_4_7" ]
 
   rustenv = []
 
@@ -1640,7 +1640,7 @@ rust_library("async-io-v1_4_1") {
   deps += [ ":once_cell-v1_5_2" ]
   deps += [ ":parking-v2_0_0" ]
   deps += [ ":polling-v2_0_2" ]
-  deps += [ ":slab-v0_4_2" ]
+  deps += [ ":slab-v0_4_7" ]
   deps += [ ":socket2-v0_4_4" ]
   deps += [ ":waker-fn-v1_1_0" ]
   if (true) {
@@ -3354,7 +3354,7 @@ rust_library("deepsize-v0_2_0") {
   deps = []
   deps += [ ":chrono-v0_4_19" ]
   deps += [ ":deepsize_derive-v0_1_1($host_toolchain)" ]
-  deps += [ ":slab-v0_4_2" ]
+  deps += [ ":slab-v0_4_7" ]
   deps += [ ":smallvec-v1_8_0" ]
 
   rustenv = []
@@ -4596,7 +4596,7 @@ rust_library("futures-util-v0_3_19") {
   deps += [ ":memchr-v2_4_0" ]
   deps += [ ":pin-project-lite-v0_2_4" ]
   deps += [ ":pin-utils-v0_1_0" ]
-  deps += [ ":slab-v0_4_2" ]
+  deps += [ ":slab-v0_4_7" ]
 
   rustenv = [ "CARGO_PKG_NAME=futures-util" ]
 
@@ -10348,10 +10348,10 @@ rust_library("siphasher-v0_3_10") {
   visibility = [ ":*" ]
 }
 
-rust_library("slab-v0_4_2") {
+rust_library("slab-v0_4_7") {
   crate_name = "slab"
-  crate_root = "//third_party/rust_crates/vendor/slab-0.4.2/src/lib.rs"
-  output_name = "slab-8335b1c9e90ee478"
+  crate_root = "//third_party/rust_crates/vendor/slab-0.4.7/src/lib.rs"
+  output_name = "slab-bf82e5c05d7edc0d"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -10360,9 +10360,11 @@ rust_library("slab-v0_4_2") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2015",
-    "-Cmetadata=8335b1c9e90ee478",
-    "-Cextra-filename=-8335b1c9e90ee478",
+    "--edition=2018",
+    "-Cmetadata=bf82e5c05d7edc0d",
+    "-Cextra-filename=-bf82e5c05d7edc0d",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
