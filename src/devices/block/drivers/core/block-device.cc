@@ -246,7 +246,11 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
 }
 
 void BlockDevice::RebindDevice(RebindDeviceCompleter::Sync& completer) {
-  completer.Reply(device_rebind(zxdev()));
+  zx_status_t status = device_rebind(zxdev());
+  if (status == ZX_ERR_NOT_FOUND) {
+    status = ZX_OK;
+  }
+  completer.Reply(status);
 }
 
 void BlockDevice::ReadBlocks(ReadBlocksRequestView request, ReadBlocksCompleter::Sync& completer) {

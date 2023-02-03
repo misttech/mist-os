@@ -267,7 +267,7 @@ struct zx_device
   fit::callback<void(zx_status_t)> take_bind_conn();
 
   void set_rebind_conn(fit::callback<void(zx_status_t)>);
-  fit::callback<void(zx_status_t)> take_rebind_conn();
+  void call_rebind_conn_if_exists(zx_status_t status);
   void set_rebind_drv_name(std::string drv_name);
   const std::string& get_rebind_drv_name() { return rebind_drv_name_; }
 

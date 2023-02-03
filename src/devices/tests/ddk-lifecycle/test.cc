@@ -259,3 +259,21 @@ TEST_F(LifecycleTest, RebindNoChildren) {
   ASSERT_OK(result.status());
   ASSERT_TRUE(result.value().is_ok(), "%s", zx_status_get_string(result.value().error_value()));
 }
+
+TEST_F(LifecycleTest, RebindChildren) {
+  {
+    fidl::WireResult result = fidl::WireCall<TestDevice>(chan_)->AddChild(true /* complete_init */,
+                                                                          ZX_OK /* init_status */);
+    ASSERT_OK(result.status());
+    ASSERT_TRUE(result.value().is_ok(), "%s", zx_status_get_string(result.value().error_value()));
+  }
+
+  zx::result channel =
+      device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), kLifecycleTopoPath);
+  ASSERT_OK(channel);
+  fidl::WireSyncClient controller{
+      fidl::ClientEnd<fuchsia_device::Controller>(std::move(channel.value()))};
+  fidl::WireResult result = controller->Rebind({});
+  ASSERT_OK(result.status());
+  ASSERT_TRUE(result.value().is_ok(), "%s", zx_status_get_string(result.value().error_value()));
+}

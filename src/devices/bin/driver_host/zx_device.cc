@@ -60,11 +60,21 @@ void zx_device::set_rebind_conn(fit::callback<void(zx_status_t)> conn) {
   rebind_conn_ = std::move(conn);
 }
 
-fit::callback<void(zx_status_t)> zx_device::take_rebind_conn() {
-  fbl::AutoLock<fbl::Mutex> lock(&rebind_conn_lock_);
-  auto conn = std::move(rebind_conn_);
-  rebind_conn_ = nullptr;
-  return conn;
+void zx_device::call_rebind_conn_if_exists(zx_status_t status) {
+  auto conn = [this]() {
+    fbl::AutoLock<fbl::Mutex> lock(&rebind_conn_lock_);
+    return std::exchange(rebind_conn_, nullptr);
+  }();
+  if (!conn) {
+    return;
+  }
+
+  // DriverManager will return ZX_ERR_NOT_FOUND if it didn't find any drivers to bind.
+  // We don't want to surface this error to the end user.
+  if (status == ZX_ERR_NOT_FOUND) {
+    status = ZX_OK;
+  }
+  conn(status);
 }
 
 void zx_device::set_unbind_children_conn(fit::callback<void(zx_status_t)> conn) {

@@ -214,9 +214,7 @@ void DriverHostContext::FinalizeDyingDevices() {
         parent.unset_flag(DEV_FLAG_WANTS_REBIND);
         zx_status_t status = DeviceBind(dev->parent(), parent.get_rebind_drv_name().c_str());
         if (status != ZX_OK) {
-          if (auto rebind = parent.take_rebind_conn(); rebind) {
-            rebind(status);
-          }
+          parent.call_rebind_conn_if_exists(status);
         }
       }
 
@@ -474,9 +472,7 @@ void DriverHostContext::DeviceInitReply(const fbl::RefPtr<zx_device_t>& dev, zx_
     if (auto bind_conn = dev->parent()->take_bind_conn(); bind_conn) {
       bind_conn(status);
     }
-    if (auto rebind_conn = dev->parent()->take_rebind_conn(); rebind_conn) {
-      rebind_conn(status);
-    }
+    dev->parent()->call_rebind_conn_if_exists(status);
   }
 }
 
@@ -492,9 +488,7 @@ zx_status_t DriverHostContext::DeviceRemove(const fbl::RefPtr<zx_device_t>& dev,
     if (auto bind_conn = dev->parent()->take_bind_conn(); bind_conn) {
       bind_conn(ZX_ERR_IO);
     }
-    if (auto rebind_conn = dev->parent()->take_rebind_conn(); rebind_conn) {
-      rebind_conn(ZX_ERR_IO);
-    }
+    dev->parent()->call_rebind_conn_if_exists(ZX_ERR_IO);
   }
   VLOGD(1, *dev, "Device %p is being scheduled for removal", dev.get());
   // Ask the devcoordinator to schedule the removal of this device and its children.
@@ -585,15 +579,8 @@ zx_status_t DriverHostContext::DeviceRebind(const fbl::RefPtr<zx_device_t>& dev)
   } else {
     zx_status_t status = DeviceBind(dev, dev->get_rebind_drv_name().c_str());
     if (status != ZX_OK) {
-      // DriverManager will return ZX_ERR_NOT_FOUND if it didn't find any drivers to bind.
-      // We don't want to surface this error to the end user.
-      if (status == ZX_ERR_NOT_FOUND) {
-        status = ZX_OK;
-      }
       // Since device binding didn't work, we should reply to an outstanding rebind if it exists;
-      if (auto rebind_conn = dev->take_rebind_conn(); rebind_conn) {
-        rebind_conn(status);
-      }
+      dev->call_rebind_conn_if_exists(status);
     }
     return status;
   }
