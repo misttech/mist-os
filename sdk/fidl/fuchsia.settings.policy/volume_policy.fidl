@@ -13,6 +13,7 @@ alias PolicyId = uint32;
 /// Policies are automatically persisted across reboots and take effect again on
 /// boot.
 @discoverable
+@available(deprecated=11, removed=12, legacy=true)
 protocol VolumePolicyController {
     /// Gets a list of volume policy properties, including possible transforms
     /// and active policies for the property.
