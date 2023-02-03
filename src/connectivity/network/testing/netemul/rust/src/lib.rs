@@ -31,6 +31,7 @@ use futures::{
     future::{FutureExt as _, TryFutureExt as _},
     SinkExt as _, StreamExt as _, TryStreamExt as _,
 };
+use net_declare::fidl_subnet;
 
 type Result<T = ()> = std::result::Result<T, anyhow::Error>;
 
@@ -934,19 +935,9 @@ impl<'a> TestInterface<'a> {
     /// Add a direct route from the interface to the given subnet.
     pub async fn add_subnet_route(&self, subnet: fnet::Subnet) -> Result<()> {
         let subnet = fnet_ext::apply_subnet_mask(subnet);
-        let mut entry =
+        let entry =
             fnet_stack::ForwardingEntry { subnet, device_id: self.id, next_hop: None, metric: 0 };
-        self.connect_stack()
-            .context("connect stack")?
-            .add_forwarding_entry(&mut entry)
-            .await
-            .squash_result()
-            .with_context(|| {
-                format!(
-                    "stack.add_forwarding_entry({:?}) for endpoint {} failed",
-                    entry, self.endpoint.name
-                )
-            })
+        self.add_route(entry).await
     }
 
     /// Delete a direct route from the interface to the given subnet.
@@ -962,6 +953,39 @@ impl<'a> TestInterface<'a> {
             .with_context(|| {
                 format!(
                     "stack.del_forwarding_entry({:?}) for endpoint {} failed",
+                    entry, self.endpoint.name
+                )
+            })
+    }
+
+    /// Add a default route through the given address.
+    pub async fn add_default_route(&self, next_hop: fnet::IpAddress) -> Result<()> {
+        let default_route_target = match next_hop {
+            fnet::IpAddress::Ipv4(fnet::Ipv4Address { addr: _ }) => {
+                fidl_subnet!("0.0.0.0/0")
+            }
+            fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr: _ }) => {
+                fidl_subnet!("::/0")
+            }
+        };
+        let entry = fnet_stack::ForwardingEntry {
+            subnet: default_route_target,
+            device_id: self.id,
+            next_hop: Some(Box::new(next_hop)),
+            metric: 0,
+        };
+        self.add_route(entry).await
+    }
+
+    async fn add_route(&self, mut entry: fnet_stack::ForwardingEntry) -> Result<()> {
+        self.connect_stack()
+            .context("connect stack")?
+            .add_forwarding_entry(&mut entry)
+            .await
+            .squash_result()
+            .with_context(|| {
+                format!(
+                    "stack.add_forwarding_entry({:?}) for endpoint {} failed",
                     entry, self.endpoint.name
                 )
             })
@@ -1127,6 +1151,93 @@ impl<'a> TestInterface<'a> {
                 })
             },
         )
+    }
+
+    /// Set configuration on this interface.
+    ///
+    /// Returns an error if the operation is unsupported or a no-op.
+    ///
+    /// Note that this function should not be made public and should only be
+    /// used to implement helpers for setting specific pieces of configuration,
+    /// as it cannot be guaranteed that this function is kept up-to-date with
+    /// the underlying FIDL types and thus may not always be able to uphold the
+    /// error return contract.
+    async fn set_configuration(&self, config: fnet_interfaces_admin::Configuration) -> Result<()> {
+        let fnet_interfaces_admin::Configuration {
+            ipv4: previous_ipv4, ipv6: previous_ipv6, ..
+        } = self
+            .control()
+            .set_configuration(config.clone())
+            .await
+            .context("FIDL error")?
+            .map_err(|e| anyhow!("set configuration error: {:?}", e))?;
+
+        fn verify_config_changed<T: Eq>(previous: Option<T>, current: Option<T>) -> Result<()> {
+            if let Some(current) = current {
+                let previous = previous.ok_or_else(|| anyhow!("configuration not supported"))?;
+                if previous == current {
+                    return Err(anyhow!("configuration change is a no-op"));
+                }
+            }
+            Ok(())
+        }
+
+        let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = config;
+        if let Some(fnet_interfaces_admin::Ipv4Configuration {
+            forwarding,
+            multicast_forwarding,
+            ..
+        }) = ipv4
+        {
+            let fnet_interfaces_admin::Ipv4Configuration {
+                forwarding: previous_forwarding,
+                multicast_forwarding: previous_multicast_forwarding,
+                ..
+            } = previous_ipv4.ok_or_else(|| anyhow!("IPv4 configuration not supported"))?;
+            verify_config_changed(previous_forwarding, forwarding).context("IPv4 forwarding")?;
+            verify_config_changed(previous_multicast_forwarding, multicast_forwarding)
+                .context("IPv4 multicast forwarding")?;
+        }
+        if let Some(fnet_interfaces_admin::Ipv6Configuration {
+            forwarding,
+            multicast_forwarding,
+            ..
+        }) = ipv6
+        {
+            let fnet_interfaces_admin::Ipv6Configuration {
+                forwarding: previous_forwarding,
+                multicast_forwarding: previous_multicast_forwarding,
+                ..
+            } = previous_ipv6.ok_or_else(|| anyhow!("IPv6 configuration not supported"))?;
+            verify_config_changed(previous_forwarding, forwarding).context("IPv6 forwarding")?;
+            verify_config_changed(previous_multicast_forwarding, multicast_forwarding)
+                .context("IPv6 multicast forwarding")?;
+        }
+        Ok(())
+    }
+
+    /// Enable/disable IPv6 forwarding on this interface.
+    pub async fn set_ipv6_forwarding_enabled(&self, enabled: bool) -> Result<()> {
+        self.set_configuration(fnet_interfaces_admin::Configuration {
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                forwarding: Some(enabled),
+                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+            }),
+            ..fnet_interfaces_admin::Configuration::EMPTY
+        })
+        .await
+    }
+
+    /// Enable/disable IPv4 forwarding on this interface.
+    pub async fn set_ipv4_forwarding_enabled(&self, enabled: bool) -> Result<()> {
+        self.set_configuration(fnet_interfaces_admin::Configuration {
+            ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                forwarding: Some(enabled),
+                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+            }),
+            ..fnet_interfaces_admin::Configuration::EMPTY
+        })
+        .await
     }
 
     /// Consumes this [`TestInterface`] and removes the associated interface

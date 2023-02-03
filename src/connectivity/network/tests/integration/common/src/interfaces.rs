@@ -237,3 +237,28 @@ where
     .await
     .context("wait for address")
 }
+
+/// Wait until the interface's online property matches `want_online`.
+pub async fn wait_for_online(
+    interfaces_state: &fidl_fuchsia_net_interfaces::StateProxy,
+    id: u64,
+    want_online: bool,
+) -> Result<()> {
+    let mut state = fidl_fuchsia_net_interfaces_ext::InterfaceState::Unknown(u64::from(id));
+    fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interfaces_state)
+            .context("get interface event stream")?,
+        &mut state,
+        |fidl_fuchsia_net_interfaces_ext::Properties {
+             online,
+             id: _,
+             name: _,
+             device_class: _,
+             addresses: _,
+             has_default_ipv4_route: _,
+             has_default_ipv6_route: _,
+         }| { (*online == want_online).then_some(()) },
+    )
+    .await
+    .with_context(|| format!("wait for online {}", want_online))
+}

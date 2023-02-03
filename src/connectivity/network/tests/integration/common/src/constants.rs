@@ -22,6 +22,9 @@ pub mod ipv6 {
     pub const GLOBAL_PREFIX: net_types_ip::Subnet<net_types_ip::Ipv6Addr> =
         net_subnet_v6!("2001:f1f0:4060:1::/64");
 
+    /// An IPv6 address in `GLOBAL_PREFIX`.
+    pub const GLOBAL_ADDR: net_types_ip::Ipv6Addr = net_ip_v6!("2001:f1f0:4060:1::1");
+
     /// A link-local IPv6 address.
     ///
     /// fe80::1

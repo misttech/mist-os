@@ -269,7 +269,7 @@ async fn discovered_dns<M: Manager>(name: &str) {
     let addresses = [NDP_DNS_SERVER.addr.into()];
     let rdnss = RecursiveDnsServer::new(9999, &addresses);
     let options = [NdpOptionBuilder::RecursiveDnsServer(rdnss)];
-    send_ra_with_router_lifetime(&fake_ep, 0, &options)
+    send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
         .await
         .expect("failed to send router advertisement");
 

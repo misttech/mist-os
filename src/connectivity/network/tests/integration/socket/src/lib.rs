@@ -587,7 +587,7 @@ async fn udp_send_msg_preflight_autogen_addr_invalidation(name: &str) {
         0,                                    /* preferred_lifetime */
         ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
-    ndp::send_ra_with_router_lifetime(&fake_ep, 0, &options)
+    ndp::send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
         .await
         .expect("send router advertisement");
 

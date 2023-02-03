@@ -30,6 +30,7 @@ tests = [
   "ipv4",
   "ipv6",
   "management",
+  "product-flow",
   "reachability",
   "socket",
   "sys",

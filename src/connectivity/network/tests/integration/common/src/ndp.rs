@@ -64,6 +64,7 @@ pub async fn send_ra_with_router_lifetime<'a>(
     fake_ep: &netemul::TestFakeEndpoint<'a>,
     lifetime: u16,
     options: &[NdpOptionBuilder<'_>],
+    src_ip: net_types::ip::Ipv6Addr,
 ) -> crate::Result {
     let ra = RouterAdvertisement::new(
         0,        /* current_hop_limit */
@@ -78,7 +79,7 @@ pub async fn send_ra_with_router_lifetime<'a>(
         net_types::ethernet::Mac::from(
             &net_types::ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS,
         ),
-        constants::ipv6::LINK_LOCAL_ADDR,
+        src_ip,
         net_types::ip::Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
         ra,
         options,

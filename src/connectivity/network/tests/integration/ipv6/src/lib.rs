@@ -352,7 +352,7 @@ async fn slaac_with_privacy_extensions(test_name: &str, sub_test_name: &str, for
         99999,                                /* preferred_lifetime */
         ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
-    send_ra_with_router_lifetime(&fake_ep, 0, &options)
+    send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
         .await
         .expect("failed to send router advertisement");
 
@@ -669,7 +669,7 @@ async fn on_and_off_link_route_discovery(test_name: &str, sub_test_name: &str, f
             RoutePreference::default(),
         )),
     ];
-    let () = send_ra_with_router_lifetime(&fake_ep, 1234, &options)
+    let () = send_ra_with_router_lifetime(&fake_ep, 1234, &options, ipv6_consts::LINK_LOCAL_ADDR)
         .await
         .expect("failed to send router advertisement");
 
@@ -778,7 +778,7 @@ async fn slaac_regeneration_after_dad_failure(name: &str) {
         99999,                                /* preferred_lifetime */
         ipv6_consts::GLOBAL_PREFIX.network(), /* prefix */
     ))];
-    send_ra_with_router_lifetime(&fake_ep, 0, &options)
+    send_ra_with_router_lifetime(&fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
         .await
         .expect("failed to send router advertisement");
 
