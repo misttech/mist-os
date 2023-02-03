@@ -131,8 +131,7 @@ zx_status_t ProcessArgs(int argc, char** argv, CommandFunction* func,
 int main(int argc, char** argv) {
   CommandFunction func = nullptr;
   factoryfs::MountOptions options;
-  zx_status_t status = ProcessArgs(argc, argv, &func, &options);
-  if (status != ZX_OK) {
+  if (zx_status_t status = ProcessArgs(argc, argv, &func, &options); status != ZX_OK) {
     return EXIT_FAILURE;
   }
 
@@ -148,15 +147,13 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  status = RemoteBlockDevice::Create(
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block_connection)), &device);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not initialize block device";
+  zx::result device = RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(std::move(block_connection)));
+  if (device.is_error()) {
+    FX_PLOGS(ERROR, device.status_value()) << "Could not initialize block device";
     return EXIT_FAILURE;
   }
-  status = func(std::move(device), &options);
-  if (status != ZX_OK) {
+  if (zx_status_t status = func(std::move(device.value()), &options); status != ZX_OK) {
     return EXIT_FAILURE;
   }
   return 0;

@@ -58,11 +58,10 @@ zx_status_t Mount(const Options& options) {
     return ZX_ERR_INTERNAL;
   }
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  zx_status_t status = RemoteBlockDevice::Create(
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block_connection)), &device);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not initialize block device";
+  zx::result device = RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(std::move(block_connection)));
+  if (device.is_error()) {
+    FX_PLOGS(ERROR, device.status_value()) << "Could not initialize block device";
     return ZX_ERR_INTERNAL;
   }
 
@@ -74,7 +73,7 @@ zx_status_t Mount(const Options& options) {
     FX_LOGS(WARNING) << "VMEX resource unavailable, executable blobs are unsupported";
   }
 
-  return blobfs::Mount(std::move(device), options.mount_options,
+  return blobfs::Mount(std::move(device.value()), options.mount_options,
                        fidl::ServerEnd<fuchsia_io::Directory>(
                            zx::channel(zx_take_startup_handle(PA_DIRECTORY_REQUEST))),
                        std::move(vmex));
@@ -87,15 +86,14 @@ zx_status_t Mkfs(const Options& options) {
     return ZX_ERR_INTERNAL;
   }
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  zx_status_t status = RemoteBlockDevice::Create(
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block_connection)), &device);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not initialize block device";
+  zx::result device = RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(std::move(block_connection)));
+  if (device.is_error()) {
+    FX_PLOGS(ERROR, device.status_value()) << "Could not initialize block device";
     return ZX_ERR_INTERNAL;
   }
 
-  return blobfs::FormatFilesystem(device.get(), options.mkfs_options);
+  return blobfs::FormatFilesystem(device.value().get(), options.mkfs_options);
 }
 
 zx_status_t Fsck(const Options& options) {
@@ -105,15 +103,14 @@ zx_status_t Fsck(const Options& options) {
     return ZX_ERR_INTERNAL;
   }
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  zx_status_t status = RemoteBlockDevice::Create(
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(block_connection)), &device);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not initialize block device";
+  zx::result device = RemoteBlockDevice::Create(
+      fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>(std::move(block_connection)));
+  if (device.is_error()) {
+    FX_PLOGS(ERROR, device.status_value()) << "Could not initialize block device";
     return ZX_ERR_INTERNAL;
   }
 
-  return blobfs::Fsck(std::move(device), options.mount_options);
+  return blobfs::Fsck(std::move(device.value()), options.mount_options);
 }
 
 zx_status_t StartComponent(const Options& _options) {

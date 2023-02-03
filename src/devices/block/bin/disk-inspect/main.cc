@@ -104,10 +104,9 @@ fpromise::result<uint32_t, std::string> GetBlockSize(const std::string& name) {
 }
 
 std::unique_ptr<disk_inspector::CommandHandler> GetHandler(const char* path, const char* fs_name) {
-  zx::result channel = component::Connect<fuchsia_hardware_block::Block>(path);
+  zx::result channel = component::Connect<fuchsia_hardware_block_volume::Volume>(path);
   if (channel.is_error()) {
     std::cerr << "Cannot acquire handle with error: " << channel.status_string() << std::endl;
-    ;
     return nullptr;
   }
 
@@ -118,18 +117,16 @@ std::unique_ptr<disk_inspector::CommandHandler> GetHandler(const char* path, con
     return nullptr;
   }
 
-  std::unique_ptr<block_client::RemoteBlockDevice> device;
-  if (zx_status_t status =
-          block_client::RemoteBlockDevice::Create(std::move(channel.value()), &device);
-      status != ZX_OK) {
-    std::cerr << "Cannot create remote device: " << zx_status_get_string(status) << std::endl;
+  zx::result device = block_client::RemoteBlockDevice::Create(std::move(channel.value()));
+  if (device.is_error()) {
+    std::cerr << "Cannot create remote device: " << device.status_string() << std::endl;
     return nullptr;
   }
 
   uint32_t block_size = size_result.take_value();
   std::unique_ptr<disk_inspector::InspectorTransactionHandler> inspector_handler;
   if (zx_status_t status = disk_inspector::InspectorTransactionHandler::Create(
-          std::move(device), block_size, &inspector_handler);
+          std::move(device.value()), block_size, &inspector_handler);
       status != ZX_OK) {
     std::cerr << "Cannot create TransactionHandler.\n";
     return nullptr;

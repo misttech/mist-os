@@ -11,6 +11,7 @@
 
 #include <fbl/unique_fd.h>
 
+#include "fidl/fuchsia.hardware.block.volume/cpp/markers.h"
 #include "src/lib/digest/digest.h"
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/storage/tools/blobfs-corrupt/corrupt_blob.h"
@@ -35,9 +36,8 @@ zx_status_t Usage() {
   return ZX_ERR_INVALID_ARGS;
 }
 
-zx_status_t ProcessArgs(int argc, char** argv,
-                        fidl::ClientEnd<fuchsia_hardware_block::Block>* block_channel,
-                        BlobCorruptOptions* options) {
+zx::result<std::tuple<fidl::ClientEnd<fuchsia_hardware_block_volume::Volume>, BlobCorruptOptions>>
+ProcessArgs(int argc, char** argv) {
   char* arg_block_path = nullptr;
   char* arg_merkle = nullptr;
 
@@ -62,55 +62,52 @@ zx_status_t ProcessArgs(int argc, char** argv,
         arg_merkle = optarg;
         break;
       default:
-        return Usage();
+        return zx::error(Usage());
     }
   }
 
   if (arg_block_path == nullptr) {
     FX_LOGS(ERROR) << "'-d <device_path>' is required";
-    return Usage();
+    return zx::error(Usage());
   }
 
   if (arg_merkle == nullptr) {
     FX_LOGS(ERROR) << "'-m <merkle>' is required";
-    return Usage();
+    return zx::error(Usage());
   }
 
-  if (zx_status_t status = options->merkle.Parse(arg_merkle); status != ZX_OK) {
+  BlobCorruptOptions options;
+  if (zx_status_t status = options.merkle.Parse(arg_merkle); status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "invalid merkle root: '" << arg_merkle << "'";
-    return Usage();
+    return zx::error(Usage());
   }
 
-  zx::result result = component::Connect<fuchsia_hardware_block::Block>(arg_block_path);
+  zx::result result = component::Connect<fuchsia_hardware_block_volume::Volume>(arg_block_path);
   if (result.is_error()) {
     FX_PLOGS(ERROR, result.status_value())
         << "unable to open block device: '" << arg_block_path << "'";
-    return Usage();
+    return zx::error(Usage());
   }
-  *block_channel = std::move(result.value());
-  return ZX_OK;
+  return zx::ok(std::make_tuple(std::move(result.value()), options));
 }
 
 }  // namespace
 
 int main(int argc, char** argv) {
-  BlobCorruptOptions options;
-  fidl::ClientEnd<fuchsia_hardware_block::Block> block_connection;
-  zx_status_t status = ProcessArgs(argc, argv, &block_connection, &options);
-  if (status != ZX_OK) {
+  zx::result result = ProcessArgs(argc, argv);
+  if (result.is_error()) {
+    return -1;
+  }
+  auto& [client_end, options] = result.value();
+
+  zx::result device = RemoteBlockDevice::Create(std::move(std::move(client_end)));
+  if (device.is_error()) {
+    FX_PLOGS(ERROR, device.status_value()) << "Could not initialize block device";
     return -1;
   }
 
-  std::unique_ptr<RemoteBlockDevice> device;
-  status = RemoteBlockDevice::Create(std::move(block_connection), &device);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not initialize block device";
-    return -1;
-  }
-
-  status = CorruptBlob(std::move(device), &options);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not corrupt the requested blob. Failed with error " << status;
+  if (zx_status_t status = CorruptBlob(std::move(device.value()), &options); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Could not corrupt the requested blob";
     return -1;
   }
   return 0;
