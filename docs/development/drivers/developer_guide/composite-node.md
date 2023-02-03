@@ -3,7 +3,7 @@
 ## Overview
 
 This guide explains how to add composite nodes to the Driver Framework using
-node groups. It assumes familiarity with the following:
+composite node specifications. It assumes familiarity with the following:
 
 *   [Driver binding](/docs/development/drivers/concepts/device_driver_model/driver-binding.md)
 *   [Composite nodes](/docs/concepts/drivers/drivers_and_nodes.md#composite-nodes)
@@ -14,45 +14,47 @@ node groups. It assumes familiarity with the following:
 are [nodes](/docs/glossary/README.md#node) with multiple parents. To create a
 composite node, you need to:
 
-*   Define a node group in a driver
-*   Create a composite driver with bind rules that match the node group
+*   Define a composite node specification in a driver
+*   Create a composite driver with bind rules that match the specification
 
-When a [driver](/docs/glossary/README.md#driver) defines a node group, the
+When a [driver](/docs/glossary/README.md#driver) defines a specification, the
 process is as follows:
 
 1.  The [driver manager](/docs/glossary/README.md#driver-manager) asks the
-    driver index to find a composite driver that matches the node group
-2.  Once a matching composite driver is found, for each node representation, the
-    driver manager finds a node in the topology that matches it. Each matching
-    node becomes a parent of the composite node.
-3.  After all node representations have a match, the driver manager creates a
+    driver index to find a composite driver that matches the specification
+2.  Once a matching composite driver is found, the driver manager finds a node
+    in the topology that matches each parent specification. Each matching node
+    becomes a parent of the composite node.
+3.  After all parent specifications have a match, the driver manager creates a
     composite node with the nodes as parents, and binds the composite driver to
     it. The primary node and node names are provided by the composite driver.
 
-![composite-node-spec-bind-diagram](/docs/contribute/governance/rfcs/resources/0197_node_groups/node_group_diagram.png)
+![composite-node-spec-bind-diagram](/docs/development/drivers/developer_guide/images/composite-node-spec.png)
 
-## Defining a node group
+## Defining a composite node specification
 
-A node group is a set of node representations. Each node representation contains
+A composite node specification is a set of parent specifications that define the
+nodes that will parent the composite node. Each parent specification contains
 the following:
 
 *   **Bind rules** - The [bind rules](/docs/glossary/README.md#bind-rules) for
-    matching the node representation to a node.
-*   **Properties** - The properties in the node representation for matching
+    matching the parent specification to a node.
+*   **Properties** - The properties in the parent specification for matching
     against a composite driver's bind rules. They follow the same format as node
     properties.
 
 ### Bind rules
 
-The bind rules are used to find and match nodes to the node representation. The
+The bind rules are used to find and match nodes to the parent specification. The
 node properties are evaluated against the bind rules and if they match, the node
 becomes a parent of the composite.
 
-The bind rules for node groups consist of a list of accepted and rejected
-property values. To match to the bind rules, the node properties must contain
-all the accepted node property values and not any of the rejected ones.
+The bind rules for parent specifications consist of a list of accepted
+and rejected property values. To match to the bind rules, the node properties
+must contain all the accepted node property values and not any of the rejected
+ones.
 
-For instance, if a node group node contains the bind rules:
+For instance, if a parent specification contains the bind rules:
 
 *   Accept `fuchsia.BIND_PROTOCOL` values 15 and 17
 *   Reject `fuchsia.BIND_PLATFORM_DEV_VID` values "Intel"
@@ -141,9 +143,11 @@ accept BIND_I2C_ADDRESS { fuchsia.i2c.BIND_I2C_ADDRESS.FOCALTECH_TOUCH }
 
 #### Writing in Driver Framework v1 (DFv1)
 
-In DFv1, node groups are written using the DDK. The functions to write the bind
-rules are in [`composite-node-spec.h`](/src/lib/ddktl/include/ddktl/composite-node-spec.h). With
-the DDK library and bind libraries codegen values, we can write the following:
+In DFv1, composite node specifications are written using the DDK. The functions
+to write the bind rules are in
+[`composite-node-spec.h`](/src/lib/ddktl/include/ddktl/composite-node-spec.h).
+With the DDK library and bind libraries codegen values, we can write the
+following:
 
 ```
 const ddk::BindRule kI2cBindRules[] = {
@@ -158,11 +162,12 @@ const ddk::BindRule kI2cBindRules[] = {
 
 #### Writing in Driver Framework v2 (DFv2)
 
-In DFv2, node groups are written for
-[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl) in the
-`fuchsia.driver.framework` FIDL library. The
-[`composite_node_spec.h`](/sdk/lib/driver/component/cpp/composite_node_spec.h) library in
-`sdk/lib/driver/component/cpp` can be used to simplify defining the bind rules.
+In DFv2, composite node specifications are written for
+[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl)
+in the `fuchsia.driver.framework` FIDL library. The
+[`composite_node_spec.h`](/sdk/lib/driver/component/cpp/composite_node_spec.h)
+library in `sdk/lib/driver/component/cpp` can be used to simplify defining the
+bind rules.
 
 Using that library and bind libraries codegen values, we can write the
 following:
@@ -181,16 +186,18 @@ auto i2c_bind_rules = std::vector {
 ### Properties
 
 The properties are key-value pairs that are used to match the
-[node representation to the composite driver’s bind rules](#matching-process).
+[parent specification to the composite driver’s bind rules](#matching-process).
 They are the same thing as node properties, so they follow the same format. The
 property key can be integer-based or string-based while the property value can
 be an integer, boolean, string or enum type.
 
 #### Writing in Driver Framework v1 (DFv1)
 
-In DFv1, node groups are written using DDK and the functions to write the bind
-rules are in [`composite-node-spec.h`](/src/lib/ddktl/include/ddktl/composite-node-spec.h). With
-the DDK library and bind libraries codegen values, we can write the following:
+In DFv1, composite node specifications are written using DDK and the functions
+to write the bind rules are in
+[`composite-node-spec.h`](/src/lib/ddktl/include/ddktl/composite-node-spec.h).
+With the DDK library and bind libraries codegen values, we can write the
+following:
 
 ```
 const device_bind_prop_t kI2cProperties[] = {
@@ -203,9 +210,9 @@ const device_bind_prop_t kI2cProperties[] = {
 
 #### Writing in Driver Framework v2 (DFv2)
 
-In DFv2, node groups are written for
-[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl) in the
-fuchsia.driver.framework FIDL library. The
+In DFv2, composite node specifications are written for
+[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl)
+in the fuchsia.driver.framework FIDL library. The
 [`node_add_args.h`](/sdk/lib/driver/component/cpp/node_add_args.h) library in
 `//sdk/lib/driver/component/cpp` can be used to simplify defining the bind
 rules.
@@ -217,36 +224,36 @@ auto i2c_properties[] = std::vector {
 };
 ```
 
-## Adding a node group
+## Adding a composite node specification
 
-Creating a node group involves defining and adding a set of node representations
-to the driver manager.
+Creating a composite node specification involves defining and adding a set of
+parent specifications to the driver manager.
 
 ### Platform bus composite
 
 If the composite node needs a parent from a node on the
 [platform bus](/docs/glossary/README.md#platform-bus) then the
-[board driver](/docs/glossary/README.md#board-driver) can add the node group
-through the
+[board driver](/docs/glossary/README.md#board-driver) can add the composite node
+specification through the
 [`platform_bus.fidl`](/sdk/fidl/fuchsia.hardware.platform.bus/platform-bus.fidl)
 API. This applies to both DFv1 and DFv2.
 
 ```
-/// Adds a node group to the bus. This will add a platform device specified
-/// by |node| and insert a node into the node group that matches the device.
-AddNodeGroup(struct {
+/// Adds a composite node specification to the bus. This will add a platform device specified
+/// by |node| and insert a node into the composite node specification that matches the device.
+AddCompositeNodeSpec(struct {
     node Node;
-    group fuchsia.driver.framework.CompositeNodeSpec;
+    spec fuchsia.driver.framework.CompositeNodeSpec;
 }) -> () error zx.status;
 ```
 
-See [Defining a node group](#defining-a-composite-node-spec) for instructions.
+The platform bus API uses the same `CompositeNodeSpec` struct defined in
+[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl).
+See
+[Defining composite node specifications with FIDL](#defining-composite-node-specifications-with-FIDL)
+for instructions.
 
-The platform bus API uses the same `NodeGroup` struct defined in
-[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl). See
-[Defining a Node group](#defining-a-composite-node-spec) for instructions.
-
-For example, say we defined the following node group:
+For example, say we defined the following composite node specification:
 
 ```
 auto bind_rules = std::vector{
@@ -263,22 +270,22 @@ auto properties = std::vector{
         bind_fuchsia_i2c::BIND_I2C_ADDRESS_BACKLIGHT),
 };
 
-auto node_group = std::vector{
-    fuchsia_driver_framework::DeviceGroupNode{
+auto spec = std::vector{
+    fuchsia_driver_framework::ParentSpecification{
         .bind_rules = bind_rules,
         .properties = properties,
     },
 };
 ```
 
-Once the node group is defined, the board driver can connect to the platform bus
-through the `PlatformBus` FIDL protocol and use the client end to call
-`AddNodeGroup()`.
+Once the composite node specification is defined, the board driver can connect
+to the platform bus through the `PlatformBus` FIDL protocol and use the client
+end to call `AddCompositeNodeSpec()`.
 
-The `AddNodeGroup()` call inserts a node representation for a platform device
-created from the data in the node field into the given node group and then adds
-the modified node group into the Driver Framework. It then creates and adds the
-platform device.
+The `AddCompositeNodeSpec()` call inserts a parent specification for a platform
+device created from the data in the node field into the given composite node
+specification and then adds the modified composite node specification into the
+Driver Framework. It then creates and adds the platform device.
 
 ```
 fpbus::Node dev;
@@ -297,17 +304,17 @@ fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus =
     endpoints->client;
 auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
 fidl::ToWire(fidl_arena, dev),
-fidl::ToWire(fidl_arena, node_group), false);
+fidl::ToWire(fidl_arena, spec), false);
 
 if (!result.ok()) {
-    zxlogf(ERROR, "AddNodeGroup request failed: %s",
+    zxlogf(ERROR, "AddCompositeNodeSpec request failed: %s",
                result.FormatDescription().data());
     return result.status();
 }
 ```
 
-After `AddNodeGroup()` is called, the following node group is added to the
-Driver Framework:
+After `AddCompositeNodeSpec()` is called, the following composite node
+specification is added to the Driver Framework:
 
 ```
 Name      : backlight
@@ -332,19 +339,19 @@ Node 1    : None
 }
 ```
 
-The first node representation is inserted by `AddNodeGroup()` and matches the
-platform device, which contains bind rules and properties from the VID, PID, and
-DID provided in `fpbus::Node dev`. The remaining node representations are from
-the passed in node group.
+The first parent specification is inserted by `AddCompositeSpec()` and matches
+the platform device, which contains bind rules and properties from the VID, PID,
+and DID provided in `fpbus::Node dev`. The remaining parent specifications are
+from the passed in composite node specification.
 
 ### Driver Framework v1 (DFv1)
 
-In DFv1, a driver can add node groups through the DDK library through the
-`DdkAddCompositeNodeSpec()` function.
+In DFv1, a driver can add composite node specifications through the DDK library
+through the `DdkAddCompositeNodeSpec()` function.
 
-The driver must first define a `CompositeNodeSpec` in the node_group.h library.
-Using the above bind rules and properties, we can define a `CompositeNodeSpec` with
-an I2C node representation:
+The driver must first define a `CompositeNodeSpec` in the spec.h library. Using
+the above bind rules and properties, we can define a `CompositeNodeSpec` with an
+I2C parent specification:
 
 ```
 const ddk::BindRule kI2cBindRules[] = {
@@ -366,9 +373,9 @@ const device_bind_prop_t kI2cProperties[] = {
 auto spec = ddk::CompositeNodeSpec(kI2cBindRules, kI2cProperties);
 ```
 
-Any additional nodes can be added with the `AddParentSpec()`. For
-instance, if we want to add a node representation for a GPIO interpret pin, we
-can write the following:
+Any additional nodes can be added with the `AddParentSpec()`. For instance, if
+we want to add a parent specification for a GPIO interpret pin, we can write the
+following:
 
 ```
 const ddk::BindRule kGpioInterruptRules[] = {
@@ -387,10 +394,11 @@ const device_bind_prop_t kGpioInterruptProperties[] = {
 desc.AddParentSpec(kGpioInterruptRules, kGpioInterruptProperties);
 ```
 
-Metadata can be passed to the node group’s composite through the
-`set_metadata()` function.
+Metadata can be passed to the composite node specification’s composite through
+the `set_metadata()` function.
 
-Once the `CompositeNodeSpec` is ready, you can add it with `DdkAddCompositeNodeSpec()`:
+Once the `CompositeNodeSpec` is ready, you can add it with
+`DdkAddCompositeNodeSpec()`:
 
 ```
 auto status = DdkAddCompositeNodeSpec("ft3x27_touch", spec);
@@ -408,8 +416,8 @@ auto status =
 
 ### Driver Framework v2 (DFv2)
 
-In DFv2, we use the `CompositeNodeManager` from the `fuchsia.driver.framework` FIDL
-API to add a node group.
+In DFv2, we use the `CompositeNodeManager` from the `fuchsia.driver.framework`
+FIDL API to add a composite node specification.
 
 ```
 @discoverable
@@ -419,17 +427,17 @@ protocol CompositeNodeManager {
 };
 ```
 
-#### Defining node groups with FIDL
+#### Defining composite node specifications with FIDL
 
 The `CompositeNodeSpec` struct is defined in
-[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl). You can
-use the [`node_group.h`](/sdk/lib/driver/component/cpp/composite_node_spec.h) and
-[`node_add_args.h`](/sdk/lib/driver/component/cpp/node_add_args.h) functions in
-the `sdk/lib/driver/component/cpp` library to define the bind rules and
-properties for the node representations.
+[`composite_node_spec.fidl`](/sdk/fidl/fuchsia.driver.framework/composite_node_spec.fidl).
+You can use the [`spec.h`](/sdk/lib/driver/component/cpp/composite_node_spec.h)
+and [`node_add_args.h`](/sdk/lib/driver/component/cpp/node_add_args.h) functions
+in the `sdk/lib/driver/component/cpp` library to define the bind rules and
+properties for the parent specifications.
 
-Using the library, we can define a node group with node representations for an
-I2C node and gpio-interrupt node:
+Using the library, we can define a composite node specification with parent
+specifications for an I2C node and gpio-interrupt node:
 
 ```
 auto i2c_bind_rules = std::vector {
@@ -470,13 +478,13 @@ auto nodes = std::vector{
       },
   };
 
-auto node_group = fdf::CompositeNodeSpec {.name = "fo", .nodes = nodes};
+auto spec = fdf::CompositeNodeSpec {.name = "fo", .nodes = nodes};
 ```
 
-#### Adding the node group
+#### Adding the composite node specification
 
-To add the node group to the `CompositeNodeManager`, you need to connect to the
-service:
+To add the composite node specification to the `CompositeNodeManager`, you need
+to connect to the service:
 
 ```
 auto client = context().incoming()->Connect<fdf::CompositeNodeManager>();
@@ -494,7 +502,7 @@ composite_node_manager.Bind(std::move(client.value()), dispatcher());
 Then call the API:
 
 ```
-composite_node_manager->AddSpec(std::move(node_group))
+composite_node_manager->AddSpec(std::move(spec))
     .Then([this](
         fidl::Result<fdf::CompositeNodeManager::AddSpec>& create_result) {
             if (create_result.is_error()) {
@@ -516,42 +524,42 @@ for more information.
 ### Matching process
 
 The matching process is done by applying a composite driver's bind rules to the
-node representations' properties. A match is successful if the following is
-fulfilled:
+parent specifications' properties. A match is successful if the following
+is fulfilled:
 
-*   All node representations must match with a node in the composite bind rules
+*   All parent specifications must match with a node in the composite bind rules
 *   All non-optional composite bind rules node must match with a node
     representation
 
 Matching cannot be ambiguous:
 
-*   Each node representation must correspond with only one composite bind rules
+*   Each parent specification must correspond with only one composite bind rules
     node
 *   Node representations cannot match with the same node in the composite bind
     rules
 *   Nodes do not need to be matched in order
 *   If an ambiguous case occurs, a warning message will be printed out.
 
-![composite-node-spec-bind-diagram](/docs/contribute/governance/rfcs/resources/0197_node_groups/composite_bind_diagram.png)
+![composite-node-spec-bind-diagram](/docs/development/drivers/developer_guide/images/composite-node-spec-bind.png)
 
 ### Writing the bind rules
 
-Given the above examples, say we want to bind to a node group with the following
-properties in its node representations:
+Given the above examples, say we want to bind to a composite node specification
+with the following properties in its parent specifications:
 
 ```
-i2c node representation properties {
+i2c parent specification properties {
      fuchsia.BIND_FIDL_PROTOCOL: fuchsia.i2c.BIND_FIDL_PROTOCOL_DEVICE,
      fuchsia.BIND_I2C_ADDRESS: fuchsia.i2c.BIND_I2C_ADDRESS_FOCALTECH_TOUCH,
 }
 
-gpio-interrupt node representation properties {
+gpio-interrupt parent specification properties {
      fuchsia.BIND_PROTOCOL: fuchsia.gpio.BIND_PROTOCOL_DEVICE,
      fuchsia.gpio.FUNCTION: fuchsia.gpio.FUNCTION.TOUCH_INTERRUPT,
 }
 ```
 
-We can write the composite bind rules so it’ll match the node representation:
+We can write the composite bind rules so it’ll match the parent specification:
 
 ```
 composite focaltech_touch;
@@ -572,16 +580,16 @@ node "gpio-int" {
 
 ## Debugging
 
-To verify that the composite node is successfully created and is attempting
-to bind the composite driver, you can look into the logs for the statement
-similar to:
+To verify that the composite node is successfully created and is attempting to
+bind the composite driver, you can look into the logs for the statement similar
+to:
 
 ```
 Binding driver fuchsia-boot:///#meta/focaltech.cm
 ```
 
-To verify that the node group is added successfully and matched to a composite
-driver, run the command:
+To verify that the composite node specification is added successfully and
+matched to a composite driver, run the command:
 
 ```
 ffx driver list-composite-node-specs -v
@@ -610,7 +618,8 @@ Node 1    : "gpio-int"
   [ 2/ 2] : Key "fuchsia.gpio.FUNCTION"        Value "fuchsia.gpio.FUNCTION.TOUCH_INTERRUPT"
 ```
 
-If there is no matching composite driver for the node group, the output will look more like:
+If there is no matching composite driver for the composite node specification, the output will
+look more like:
 
 ```
 Name      : focaltech_touch
