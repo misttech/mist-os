@@ -185,7 +185,7 @@ mod tests {
             wheel_v_range: None,
             wheel_h_range: None,
             buttons: None,
-            counts_per_mm: COUNTS_PER_MM as i64,
+            counts_per_mm: COUNTS_PER_MM as u32,
         });
 
     std::thread_local! {static NEXT_EVENT_TIME: Cell<i64> = Cell::new(0)}

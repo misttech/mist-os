@@ -335,7 +335,10 @@ class FlutterInputTest : public MouseInputBase {
 TEST_F(FlutterInputTest, FlutterMouseMove) {
   LaunchClient();
 
-  SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 1, /* movement_y = */ 2);
+  // TODO(fxbug.dev/121244): we may want to move the reverse scaling logic to
+  // fidl backend.
+  SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ int(1 * 2.54),
+                     /* movement_y = */ int(2 * 2.54));
   RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
   ASSERT_EQ(mouse_state_->SizeOfEvents(), 1u);
@@ -563,8 +566,10 @@ TEST_F(FlutterInputTest, FlutterMouseWheel) {
   double initial_y = static_cast<double>(display_height()) / 2.f + 2;
 
   // TODO(fxbug.dev/103098): Send a mouse move as the first event to workaround.
+  // TODO(fxbug.dev/121244): we may want to move the reverse scaling logic to
+  // fidl backend.
   SimulateMouseEvent(/* pressed_buttons = */ {},
-                     /* movement_x = */ 1, /* movement_y = */ 2);
+                     /* movement_x = */ int(1 * 2.54), /* movement_y = */ int(2 * 2.54));
   RunLoopUntil([this] { return mouse_state_->SizeOfEvents() == 1; });
 
   auto event_add = mouse_state_->PopEvent();

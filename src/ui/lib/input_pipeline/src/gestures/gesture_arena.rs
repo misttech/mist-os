@@ -524,6 +524,8 @@ fn filter_palm_contact(touchpad_event: TouchpadEvent) -> TouchpadEvent {
     TouchpadEvent { contacts, filtered_palm_contacts, ..touchpad_event }
 }
 
+const COUNTS_PER_MM: u32 = 12;
+
 impl std::convert::From<MouseEvent> for input_device::InputEvent {
     fn from(mouse_event: MouseEvent) -> input_device::InputEvent {
         input_device::InputEvent {
@@ -562,7 +564,9 @@ impl std::convert::From<MouseEvent> for input_device::InputEvent {
                     }),
                     wheel_h_range: None,
                     buttons: Some(vec![PRIMARY_BUTTON, SECONDARY_BUTTON]),
-                    counts_per_mm: mouse_binding::DEFAULT_COUNTS_PER_MM,
+                    // Downstream stages ignore `counts_per_mm`, so any value is fine.
+                    // TODO(fxbug.dev/121127): remove `counts_per_mm` from descriptor.
+                    counts_per_mm: COUNTS_PER_MM,
                 },
             ),
             event_time: mouse_event.timestamp,
@@ -1265,7 +1269,7 @@ mod tests {
             super::super::{
                 args, Contender, ContenderFactory, ExamineEventResult, MatchedContender,
                 ProcessBufferedEventsResult, ProcessNewEventResult, TouchpadEvent,
-                VerifyEventResult, Winner, PRIMARY_BUTTON,
+                VerifyEventResult, Winner, COUNTS_PER_MM, PRIMARY_BUTTON,
             },
             crate::{
                 input_device, keyboard_binding, mouse_binding, touch_binding, utils::Size, Position,
@@ -1364,7 +1368,7 @@ mod tests {
                 wheel_v_range: None,
                 wheel_h_range: None,
                 buttons: Some(vec![PRIMARY_BUTTON]),
-                counts_per_mm: mouse_binding::DEFAULT_COUNTS_PER_MM,
+                counts_per_mm: COUNTS_PER_MM,
             })
         }
 

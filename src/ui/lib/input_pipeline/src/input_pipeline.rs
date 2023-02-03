@@ -622,6 +622,7 @@ mod tests {
         crate::fake_input_device_binding,
         crate::input_device::{self, InputDeviceBinding},
         crate::mouse_binding,
+        crate::mouse_model_database,
         crate::observe_fake_events_input_handler,
         crate::utils::Position,
         assert_matches::assert_matches,
@@ -642,6 +643,8 @@ mod tests {
         },
     };
 
+    const COUNTS_PER_MM: u32 = 12;
+
     /// Returns the InputEvent sent over `sender`.
     ///
     /// # Parameters
@@ -653,8 +656,8 @@ mod tests {
             device_event: input_device::InputDeviceEvent::Mouse(mouse_binding::MouseEvent::new(
                 mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                     millimeters: Position {
-                        x: offset.x / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
-                        y: offset.y / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
+                        x: offset.x / COUNTS_PER_MM as f32,
+                        y: offset.y / COUNTS_PER_MM as f32,
                     },
                 }),
                 None, /* wheel_delta_v */
@@ -672,7 +675,7 @@ mod tests {
                     wheel_v_range: None,
                     wheel_h_range: None,
                     buttons: None,
-                    counts_per_mm: mouse_binding::DEFAULT_COUNTS_PER_MM,
+                    counts_per_mm: COUNTS_PER_MM,
                 },
             ),
             event_time: zx::Time::get_monotonic(),
@@ -917,7 +920,7 @@ mod tests {
                 wheel_v_range: None,
                 wheel_h_range: None,
                 buttons: Some(vec![0]),
-                counts_per_mm: mouse_binding::DEFAULT_COUNTS_PER_MM,
+                counts_per_mm: mouse_model_database::db::DEFAULT_COUNTS_PER_MM,
             })
         );
     }

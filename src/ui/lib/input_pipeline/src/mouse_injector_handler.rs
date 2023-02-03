@@ -699,6 +699,7 @@ mod tests {
 
     const DISPLAY_WIDTH_IN_PHYSICAL_PX: f32 = 100.0;
     const DISPLAY_HEIGHT_IN_PHYSICAL_PX: f32 = 100.0;
+    const COUNTS_PER_MM: u32 = 12;
 
     /// Returns an |input_device::InputDeviceDescriptor::MouseDescriptor|.
     const DESCRIPTOR: input_device::InputDeviceDescriptor =
@@ -721,7 +722,7 @@ mod tests {
                 },
             }),
             buttons: None,
-            counts_per_mm: mouse_binding::DEFAULT_COUNTS_PER_MM,
+            counts_per_mm: COUNTS_PER_MM,
         });
 
     /// Returns an TouchDescriptor.
@@ -1272,7 +1273,7 @@ mod tests {
                 wheel_v_range: None,
                 wheel_h_range: None,
                 buttons: None,
-                counts_per_mm: mouse_binding::DEFAULT_COUNTS_PER_MM,
+                counts_per_mm: COUNTS_PER_MM,
             });
         let input_event = create_mouse_event(
             cursor_location,
@@ -2052,8 +2053,8 @@ mod tests {
         let cursor_location =
             mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                 millimeters: Position {
-                    x: cursor_relative_position.x / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
-                    y: cursor_relative_position.y / mouse_binding::DEFAULT_COUNTS_PER_MM as f32,
+                    x: cursor_relative_position.x / COUNTS_PER_MM as f32,
+                    y: cursor_relative_position.y / COUNTS_PER_MM as f32,
                 },
             });
         let event_time = zx::Time::get_monotonic();

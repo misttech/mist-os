@@ -4,6 +4,7 @@
 
 use {
     crate::input_device::{self, Handled, InputDeviceBinding},
+    crate::mouse_model_database,
     crate::utils::Position,
     anyhow::{format_err, Error},
     async_trait::async_trait,
@@ -182,14 +183,9 @@ pub struct MouseDeviceDescriptor {
     pub buttons: Option<Vec<MouseButton>>,
 
     /// This is the conversion factor between counts and millimeters for the
-    /// connected mouse input device. Default to DEFAULT_COUNTS_PER_MM.
-    pub counts_per_mm: i64,
+    /// connected mouse input device.
+    pub counts_per_mm: u32,
 }
-
-/// By default, we use 12 counts per millimeter instead of the more common
-/// value of 39 counts per millimeter (1000 counts per inch), since that will
-/// throw off the PointerMotionSensorScaleHandler which is tuned for touchpads.
-pub const DEFAULT_COUNTS_PER_MM: i64 = 12;
 
 #[async_trait]
 impl input_device::InputDeviceBinding for MouseBinding {
@@ -265,6 +261,8 @@ impl MouseBinding {
             .input
             .ok_or_else(|| format_err!("MouseDescriptor does not have a MouseInputDescriptor"))?;
 
+        let model = mouse_model_database::db::get_mouse_model(device_descriptor.device_info);
+
         let device_descriptor: MouseDeviceDescriptor = MouseDeviceDescriptor {
             device_id,
             absolute_x_range: mouse_input_descriptor.position_x.map(|axis| axis.range),
@@ -272,7 +270,7 @@ impl MouseBinding {
             wheel_v_range: mouse_input_descriptor.scroll_v,
             wheel_h_range: mouse_input_descriptor.scroll_h,
             buttons: mouse_input_descriptor.buttons,
-            counts_per_mm: DEFAULT_COUNTS_PER_MM,
+            counts_per_mm: model.counts_per_mm,
         };
 
         Ok(MouseBinding { event_sender: input_event_sender, device_descriptor })
@@ -331,6 +329,14 @@ impl MouseBinding {
             input_event_sender,
         );
 
+        let counts_per_mm = match device_descriptor {
+            input_device::InputDeviceDescriptor::Mouse(ds) => ds.counts_per_mm,
+            _ => {
+                fx_log_err!("mouse_binding::process_reports got device_descriptor not mouse");
+                mouse_model_database::db::DEFAULT_COUNTS_PER_MM
+            }
+        };
+
         // Create a location for the move event. Use the absolute position if available.
         let location = if let (Some(position_x), Some(position_y)) =
             (mouse_report.position_x, mouse_report.position_y)
@@ -341,8 +347,8 @@ impl MouseBinding {
             let movement_y = mouse_report.movement_y.unwrap_or_default() as f32;
             MouseLocation::Relative(RelativeLocation {
                 millimeters: Position {
-                    x: movement_x / DEFAULT_COUNTS_PER_MM as f32,
-                    y: movement_y / DEFAULT_COUNTS_PER_MM as f32,
+                    x: movement_x / counts_per_mm as f32,
+                    y: movement_y / counts_per_mm as f32,
                 },
             })
         };
@@ -531,6 +537,7 @@ mod tests {
     };
 
     const DEVICE_ID: u32 = 1;
+    const COUNTS_PER_MM: u32 = 12;
 
     fn mouse_device_descriptor(device_id: u32) -> input_device::InputDeviceDescriptor {
         input_device::InputDeviceDescriptor::Mouse(MouseDeviceDescriptor {
@@ -552,7 +559,7 @@ mod tests {
                 },
             }),
             buttons: None,
-            counts_per_mm: DEFAULT_COUNTS_PER_MM,
+            counts_per_mm: COUNTS_PER_MM,
         })
     }
 
@@ -615,8 +622,8 @@ mod tests {
         let expected_events = vec![testing_utilities::create_mouse_event(
             MouseLocation::Relative(RelativeLocation {
                 millimeters: Position {
-                    x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
-                    y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
+                    x: 10.0 / COUNTS_PER_MM as f32,
+                    y: 16.0 / COUNTS_PER_MM as f32,
                 },
             }),
             None, /* wheel_delta_v */
@@ -703,8 +710,8 @@ mod tests {
             testing_utilities::create_mouse_event(
                 MouseLocation::Relative(RelativeLocation {
                     millimeters: Position {
-                        x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
-                        y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
+                        x: 10.0 / COUNTS_PER_MM as f32,
+                        y: 16.0 / COUNTS_PER_MM as f32,
                     },
                 }),
                 None, /* wheel_delta_v */
@@ -819,8 +826,8 @@ mod tests {
             testing_utilities::create_mouse_event(
                 MouseLocation::Relative(RelativeLocation {
                     millimeters: Position {
-                        x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
-                        y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
+                        x: 10.0 / COUNTS_PER_MM as f32,
+                        y: 16.0 / COUNTS_PER_MM as f32,
                     },
                 }),
                 None, /* wheel_delta_v */
@@ -900,8 +907,8 @@ mod tests {
             testing_utilities::create_mouse_event(
                 MouseLocation::Relative(RelativeLocation {
                     millimeters: Position {
-                        x: 10.0 / DEFAULT_COUNTS_PER_MM as f32,
-                        y: 16.0 / DEFAULT_COUNTS_PER_MM as f32,
+                        x: 10.0 / COUNTS_PER_MM as f32,
+                        y: 16.0 / COUNTS_PER_MM as f32,
                     },
                 }),
                 None, /* wheel_delta_v */
