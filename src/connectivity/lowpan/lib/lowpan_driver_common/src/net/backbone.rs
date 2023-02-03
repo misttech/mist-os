@@ -3,12 +3,8 @@
 // found in the LICENSE file.
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_net_interfaces::*;
-use fuchsia_async::net::DatagramSocket;
 use fuchsia_component::client::connect_to_protocol;
-use socket2::{Domain, Protocol};
 use std::collections::HashSet;
-use std::num::NonZeroU64;
-use tracing::{debug, info};
 use {crate::prelude_internal::*, anyhow::Error, futures::stream::BoxStream};
 
 #[derive(thiserror::Error, Debug, Eq, PartialEq)]
@@ -22,28 +18,19 @@ impl std::fmt::Display for BackboneNetworkChanged {
 
 #[derive(Debug)]
 pub struct BackboneNetworkInterface {
-    mcast_socket: DatagramSocket,
     id: u64,
 }
 
 #[async_trait::async_trait]
 pub trait BackboneInterface: Send + Sync {
-    fn get_nicid(&self) -> Option<NonZeroU64>;
+    fn get_nicid(&self) -> u64;
     fn event_stream(&self) -> BoxStream<'_, Result<bool, Error>>;
     async fn is_backbone_if_running(&self) -> bool;
-
-    /// Makes the interface join the given multicast group.
-    fn join_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error>;
-
-    /// Makes the interface leave the given multicast group.
-    fn leave_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error>;
 }
 
 impl BackboneNetworkInterface {
     pub fn new(nicid: u64) -> BackboneNetworkInterface {
-        let mcast_socket =
-            DatagramSocket::new(Domain::IPV6, Some(Protocol::UDP)).expect("DatagramSocket::new()");
-        BackboneNetworkInterface { id: nicid, mcast_socket }
+        BackboneNetworkInterface { id: nicid }
     }
 
     fn watch_for_new_backbone_if_boxed_stream(&self) -> BoxStream<'_, Result<bool, Error>> {
@@ -77,7 +64,7 @@ impl BackboneNetworkInterface {
                             }) => {
                                 // Note: if multiple wlan interfaces are available, select the first one come online,
                                 // regardless whether it has an internet connection.
-                                info!("Looking for backbone if: id {:?} online {:?} device_class {:?}", id, online, device_class);
+                                fx_log_info!("Looking for backbone if: id {:?} online {:?} device_class {:?}", id, online, device_class);
                                 if let (
                                     Some(fidl_fuchsia_net_interfaces::DeviceClass::Device(
                                         fidl_fuchsia_hardware_network::DeviceClass::Wlan,
@@ -90,7 +77,9 @@ impl BackboneNetworkInterface {
 
                                 if let (Some(id), Some(true)) = (id, online) {
                                     if wlan_nicid_set.contains(&id) {
-                                        info!("Looking for backbone if: wlan client is online");
+                                        fx_log_info!(
+                                            "Looking for backbone if: wlan client is online"
+                                        );
                                         return Err(anyhow::Error::from(BackboneNetworkChanged));
                                     }
                                 }
@@ -104,10 +93,12 @@ impl BackboneNetworkInterface {
                             }) => {
                                 // Note: if multiple wlan interfaces are available, select the first one come online,
                                 // regardless whether it has an internet connection.
-                                info!("Looking for backbone if: id {:?} online {:?} device_class {:?}", id, online, device_class);
+                                fx_log_info!("Looking for backbone if: id {:?} online {:?} device_class {:?}", id, online, device_class);
                                 if let (Some(id), Some(true)) = (id, online) {
                                     if wlan_nicid_set.contains(&id) {
-                                        info!("Looking for backbone if: wlan client is online");
+                                        fx_log_info!(
+                                            "Looking for backbone if: wlan client is online"
+                                        );
                                         return Err(anyhow::Error::from(BackboneNetworkChanged));
                                     }
                                 }
@@ -202,8 +193,8 @@ impl BackboneNetworkInterface {
 
 #[async_trait::async_trait]
 impl BackboneInterface for BackboneNetworkInterface {
-    fn get_nicid(&self) -> Option<NonZeroU64> {
-        NonZeroU64::new(self.id)
+    fn get_nicid(&self) -> u64 {
+        self.id
     }
 
     fn event_stream(&self) -> BoxStream<'_, Result<bool, Error>> {
@@ -235,20 +226,6 @@ impl BackboneInterface for BackboneNetworkInterface {
         }
         false
     }
-
-    /// Makes the interface join the given multicast group.
-    fn join_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        debug!("BackboneInterface: Joining multicast group: {:?}", addr);
-        self.mcast_socket.as_ref().join_multicast_v6(addr, self.id.try_into().unwrap())?;
-        Ok(())
-    }
-
-    /// Makes the interface leave the given multicast group.
-    fn leave_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        debug!("BackboneInterface: Leaving multicast group: {:?}", addr);
-        self.mcast_socket.as_ref().leave_multicast_v6(addr, self.id.try_into().unwrap())?;
-        Ok(())
-    }
 }
 
 #[derive(Debug)]
@@ -264,8 +241,8 @@ impl Default for DummyBackboneInterface {
 
 #[async_trait::async_trait]
 impl BackboneInterface for DummyBackboneInterface {
-    fn get_nicid(&self) -> Option<NonZeroU64> {
-        NonZeroU64::new(self.id)
+    fn get_nicid(&self) -> u64 {
+        self.id
     }
 
     fn event_stream(&self) -> BoxStream<'_, Result<bool, Error>> {
@@ -274,15 +251,5 @@ impl BackboneInterface for DummyBackboneInterface {
 
     async fn is_backbone_if_running(&self) -> bool {
         true
-    }
-
-    fn join_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        info!("Joining multicast group: {:?}", addr);
-        Ok(())
-    }
-
-    fn leave_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
-        info!("Leaving multicast group: {:?}", addr);
-        Ok(())
     }
 }

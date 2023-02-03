@@ -48,10 +48,8 @@ rustc_library("lowpan_driver_common") {
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:slab",
-    "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
   sources = [

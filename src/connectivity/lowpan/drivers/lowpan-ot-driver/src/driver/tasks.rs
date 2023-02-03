@@ -107,18 +107,12 @@ where
         let backbone_if_event_stream =
             self.backbone_if.event_stream().map(move |event| match event {
                 Ok(is_running) => {
-                    let backbone_nic_id: u64 = match self.backbone_if.get_nicid() {
-                        None => 0,
-                        Some(val) => val.into(),
-                    };
                     self.driver_state
                         .lock()
                         .ot_instance
                         .as_ref()
                         .platform_infra_if_on_state_changed(
-                            backbone_nic_id
-                                .try_into()
-                                .expect("NIC ID should be able to fit in u32"),
+                            self.backbone_if.get_nicid().try_into().unwrap(),
                             is_running,
                         );
                     Result::<_, Error>::Ok(())
@@ -230,13 +224,6 @@ where
             // NOTE: DRIVER STATE IS LOCKED WHEN THIS IS CALLED!
             self.on_ot_ip6_receive(msg);
         }));
-
-        driver_state.ot_instance.set_multicast_listener_callback(Some(
-            move |event: ot::BackboneRouterMulticastListenerEvent, address: &ot::Ip6Address| {
-                // NOTE: DRIVER STATE IS LOCKED WHEN THIS IS CALLED!
-                self.on_ot_bbr_multicast_listener_event(event, address);
-            },
-        ));
 
         if let Err(err) = driver_state.set_discovery_proxy_enabled(true) {
             warn!("Unable to start SRP discovery proxy: {:?}", err);

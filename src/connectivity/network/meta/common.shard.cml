@@ -185,7 +185,6 @@
             protocol: [
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
-                "fuchsia.net.multicast.admin.Ipv6RoutingTableController",
                 "fuchsia.net.routes.State",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.netstack.Netstack",

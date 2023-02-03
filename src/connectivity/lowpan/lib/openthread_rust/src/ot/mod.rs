@@ -153,7 +153,6 @@ pub trait InstanceInterface:
     + State
     + Tasklets
     + Thread
-    + BackboneRouter
     + BorderRouter
     + SrpServer
     + MessageBuffer

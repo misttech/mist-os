@@ -20,13 +20,12 @@ use fidl_fuchsia_net_interfaces_ext as fnetifext;
 use fidl_fuchsia_net_stack as fnetstack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_net_tun as ftun;
-use fuchsia_async::net::DatagramSocket;
 use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol};
 use fuchsia_zircon as zx;
 use futures::stream::BoxStream;
 use parking_lot::Mutex;
-use socket2::{Domain, Protocol};
 use std::convert::TryInto;
+use std::net::{Ipv6Addr, UdpSocket};
 
 const IPV6_MIN_MTU: u32 = 1280;
 const TUN_PORT_ID: u8 = 0;
@@ -40,7 +39,7 @@ pub struct TunNetworkInterface {
     control_sync: Mutex<fnetifadmin::ControlSynchronousProxy>,
     stack_sync: Mutex<fnetstack::StackSynchronousProxy>,
     routes: Mutex<HashMap<fnet::Subnet, HashSet<std::net::Ipv6Addr>>>,
-    mcast_socket: DatagramSocket,
+    mcast_socket: UdpSocket,
     id: u64,
 }
 
@@ -144,8 +143,7 @@ impl TunNetworkInterface {
         let (client, server) = zx::Channel::create();
         connect_channel_to_protocol::<fnetstack::StackMarker>(server)?;
         let stack_sync = Mutex::new(fnetstack::StackSynchronousProxy::new(client));
-        let mcast_socket =
-            DatagramSocket::new(Domain::IPV6, Some(Protocol::UDP)).expect("DatagramSocket::new()");
+        let mcast_socket = UdpSocket::bind((Ipv6Addr::LOCALHOST, 0)).context("UdpSocket::bind")?;
 
         Ok(TunNetworkInterface {
             tun_dev,
@@ -345,14 +343,14 @@ impl NetworkInterface for TunNetworkInterface {
     /// Has the interface join the given multicast group.
     fn join_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
         fx_log_info!("TunNetworkInterface: Joining multicast group: {:?}", addr);
-        self.mcast_socket.as_ref().join_multicast_v6(addr, self.id.try_into().unwrap())?;
+        self.mcast_socket.join_multicast_v6(addr, self.id.try_into().unwrap())?;
         Ok(())
     }
 
     /// Has the interface leave the given multicast group.
     fn leave_mcast_group(&self, addr: &std::net::Ipv6Addr) -> Result<(), Error> {
         fx_log_info!("TunNetworkInterface: Leaving multicast group: {:?}", addr);
-        self.mcast_socket.as_ref().leave_multicast_v6(addr, self.id.try_into().unwrap())?;
+        self.mcast_socket.leave_multicast_v6(addr, self.id.try_into().unwrap())?;
         Ok(())
     }
 
@@ -469,7 +467,6 @@ impl NetworkInterface for TunNetworkInterface {
                 fnetifadmin::Configuration {
                     ipv6: Some(fnetifadmin::Ipv6Configuration {
                         forwarding: Some(enabled),
-                        multicast_forwarding: Some(enabled),
                         ..fnetifadmin::Ipv6Configuration::EMPTY
                     }),
                     ..fnetifadmin::Configuration::EMPTY

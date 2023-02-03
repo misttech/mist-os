@@ -25,7 +25,6 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.mdns:fuchsia.net.mdns_rust",
-    "//sdk/fidl/fuchsia.net.multicast.admin:fuchsia.net.multicast.admin_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//src/connectivity/lib/fidl_fuchsia_net_stack_ext",
     "//src/connectivity/lib/net-declare",
@@ -56,13 +55,9 @@ rustc_binary("bin") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",
-    "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [
-    "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:lazy_static",
-  ]
+  test_deps = [ "//third_party/rust_crates:lazy_static" ]
 
   sources = [
     "src/bootstrap.rs",
@@ -77,7 +72,6 @@ rustc_binary("bin") {
     "src/driver/host_to_thread.rs",
     "src/driver/joiner.rs",
     "src/driver/mod.rs",
-    "src/driver/multicast_routing_manager.rs",
     "src/driver/ot_ctl.rs",
     "src/driver/srp_proxy/advertising_proxy.rs",
     "src/driver/srp_proxy/discovery_proxy.rs",

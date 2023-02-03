@@ -242,8 +242,6 @@ impl Config {
                 .context("Unable to initialize OpenThread border routing")?;
 
             ot_instance.border_routing_set_enabled(true).context("border_routing_set_enabled")?;
-
-            ot_instance.set_backbone_router_enabled(true);
         } else {
             warn!("Backbone interface not set, border routing not supported");
         }
@@ -278,10 +276,7 @@ where
     BI: BackboneInterface,
 {
     let name = name.as_ref();
-    let mut driver = OtDriver::new(ot_instance, net_if, backbone_if);
-
-    driver.start_multicast_routing_manager();
-
+    let driver = OtDriver::new(ot_instance, net_if, backbone_if);
     let driver_ref = &driver;
 
     let lowpan_device_task = register_and_serve_driver(name, registry, driver_ref);
@@ -340,6 +335,7 @@ async fn main() -> Result<(), Error> {
     }
 
     let mut attempt_count = 0;
+
     loop {
         fx_log_info!("Starting LoWPAN OT Driver");
 
