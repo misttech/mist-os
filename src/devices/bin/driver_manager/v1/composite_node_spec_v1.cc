@@ -66,11 +66,13 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV1::BindParentImpl(
   }
 
   if (owned_device->name() == "sysmem-fidl" || owned_device->name() == "sysmem-banjo") {
-    LOGF(DEBUG, "Node '%s' matched node representation '%d' of composite node spec '%s'",
-         owned_device->name().c_str(), info.node_index(), std::string(info.name().get()).c_str());
+    LOGF(DEBUG, "Node '%s' matched composite node spec '%s' with parent spec '%s'",
+         owned_device->name().c_str(), std::string(info.name().get()).c_str(),
+         parent_names_[info.node_index()].c_str());
   } else {
-    LOGF(INFO, "Node '%s' matched node representation '%d' of composite node spec '%s'",
-         owned_device->name().c_str(), info.node_index(), std::string(info.name().get()).c_str());
+    LOGF(INFO, "Node '%s' matched composite node spec '%s' with parent spec '%s'",
+         owned_device->name().c_str(), std::string(info.name().get()).c_str(),
+         parent_names_[info.node_index()].c_str());
   }
 
   return zx::ok(std::nullopt);
@@ -88,6 +90,7 @@ void CompositeNodeSpecV1::SetCompositeDevice(
   for (size_t i = 0; i < info.node_names().count(); i++) {
     parent_names[i] = std::string(info.node_names()[i].get());
   }
+  parent_names_ = parent_names;
 
   auto fidl_driver_info = info.composite().driver_info();
   MatchedDriverInfo matched_driver_info = {

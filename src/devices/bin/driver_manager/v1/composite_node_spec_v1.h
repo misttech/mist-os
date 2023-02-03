@@ -41,6 +41,9 @@ class CompositeNodeSpecV1 : public CompositeNodeSpec {
   // Used to create |composite_device_|. Set to empty once |composite_device_| is created.
   fbl::Array<std::unique_ptr<Metadata>> metadata_;
 
+  // Set once |composite_device_| is created. Used for debugging.
+  std::vector<std::string> parent_names_;
+
   // Set by SetCompositeDevice() after the first BindParentImpl() call.
   std::unique_ptr<CompositeDevice> composite_device_;
 
