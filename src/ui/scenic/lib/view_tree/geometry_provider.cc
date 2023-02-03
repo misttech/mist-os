@@ -123,13 +123,25 @@ fuog_ViewTreeSnapshotPtr GeometryProvider::ExtractObservationSnapshot(
       stack.push(child);
     }
 
+    static const BoundingBox zero_bounding_box{};
+
     // Add |ViewDescriptor|s for nodes created by flatland instances in |views|. For GFX instances,
     // add the |ViewDescriptor|s for nodes that have generated the |is_rendering| signal.
     const bool is_flatland_view = !view.gfx_is_rendering.has_value();
     const bool gfx_rendered_view =
         view.gfx_is_rendering.has_value() && view.gfx_is_rendering.value();
-    if (is_flatland_view || gfx_rendered_view) {
-      views.push_back(ExtractViewDescriptor(view_node, context_view, snapshot));
+
+    // Closed views may have 0x0 size temporarily; do not report them as part
+    // of the view tree.
+    const bool is_sized_view = view.bounding_box != zero_bounding_box;
+    if (is_sized_view) {
+      if (is_flatland_view || gfx_rendered_view) {
+        views.push_back(ExtractViewDescriptor(view_node, context_view, snapshot));
+      }
+    } else {
+      // TODO(fxbug.dev/121166): Not obvious what the correct action is for 0x0 views.
+      // For now, we skip them, fingers crossed.
+      FX_DLOGS(WARNING) << "found a 0x0 view in the view tree, skipping: " << view_node;
     }
 
     // Do not set a view vector in the |ViewTreeSnapshot| as the size of |views| will exceed

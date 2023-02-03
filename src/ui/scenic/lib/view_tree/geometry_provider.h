@@ -123,6 +123,7 @@ class GeometryProvider {
 
   // Generates a fuchsia.ui.observation.geometry.ViewDescriptor from the |snapshot|'s view node by
   // extracting information about the |view_ref_koid| from the view node.
+  // The view nodes corresponding to views with 0x0 size are *not* reported.
   static fuchsia::ui::observation::geometry::ViewDescriptor ExtractViewDescriptor(
       zx_koid_t view_ref_koid, zx_koid_t context_view,
       std::shared_ptr<const view_tree::Snapshot> snapshot);

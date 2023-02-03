@@ -734,5 +734,38 @@ TEST_F(GeometryProviderTest, ScopedRegistryTest) {
   EXPECT_EQ(client_result->updates()[0].views().size(), 1UL);
 }
 
+TEST_F(GeometryProviderTest, ZeroSizedWindows_AreOmitted) {
+  const zx_koid_t node_a_koid = 1, node_b_koid = 2;
+
+  fuog_ProviderPtr client;
+  std::optional<fuog_WatchResponse> client_result;
+  geometry_provider_.Register(client.NewRequest(), node_b_koid);
+
+  // Generate a snapshot with |node_a| as the root and |node_b| as the child of |node_a|.
+  // This time, however, the views are zero-sized.
+  {
+    auto snapshot = std::make_shared<view_tree::Snapshot>();
+    auto node_a =
+        ViewNode{.children = {node_b_koid}, .bounding_box = {.min = {0, 0}, .max = {0, 0}}};
+    auto node_b = ViewNode{.parent = node_a_koid, .bounding_box = {.min = {0, 0}, .max = {0, 0}}};
+    snapshot->root = node_a_koid;
+    snapshot->view_tree.try_emplace(node_a_koid, std::move(node_a));
+    snapshot->view_tree.try_emplace(node_b_koid, std::move(node_b));
+    geometry_provider_.OnNewViewTreeSnapshot(snapshot);
+  }
+
+  client->Watch([&client_result](auto response) { client_result = std::move(response); });
+  RunLoopUntilIdle();
+
+  EXPECT_TRUE(client.is_bound());
+
+  ASSERT_TRUE(client_result.has_value());
+
+  // Client receives updates about its |context_view|.
+  // However, the zero-sized views are not listed.
+  ASSERT_EQ(client_result->updates().size(), 1UL);
+  EXPECT_EQ(client_result->updates()[0].views().size(), 0UL);
+}
+
 }  // namespace geometry_provider::test
 }  // namespace view_tree
