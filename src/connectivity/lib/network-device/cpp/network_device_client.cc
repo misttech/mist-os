@@ -77,22 +77,23 @@ zx::result<DeviceInfo> DeviceInfo::Create(const netdev::wire::DeviceInfo& fidl) 
 zx::result<PortInfoAndMac> PortInfoAndMac::Create(
     const netdev::wire::PortInfo& fidl,
     const std::optional<fuchsia_net::wire::MacAddress>& unicast_address) {
-  if (!(fidl.has_id() && fidl.has_class())) {
+  if (!(fidl.has_id() && fidl.has_base_info() && fidl.base_info().has_port_class())) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
+  const netdev::wire::PortBaseInfo& fidl_base_info = fidl.base_info();
   PortInfoAndMac info = {
       .id = fidl.id(),
-      .port_class = fidl.class_(),
+      .port_class = fidl_base_info.port_class(),
       .unicast_address = unicast_address,
   };
 
-  if (fidl.has_rx_types()) {
-    auto& rx_types = fidl.rx_types();
+  if (fidl_base_info.has_rx_types()) {
+    auto& rx_types = fidl_base_info.rx_types();
     std::copy(rx_types.begin(), rx_types.end(), std::back_inserter(info.rx_types));
   }
-  if (fidl.has_tx_types()) {
-    auto& tx_types = fidl.tx_types();
+  if (fidl_base_info.has_tx_types()) {
+    auto& tx_types = fidl_base_info.tx_types();
     std::copy(tx_types.begin(), tx_types.end(), std::back_inserter(info.tx_types));
   }
 

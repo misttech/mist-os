@@ -217,10 +217,17 @@ void DevicePort::GetInfo(GetInfoCompleter::Sync& completer) {
       supported_tx_.data(), supported_tx_count_);
   auto rx_support = fidl::VectorView<netdev::wire::FrameType>::FromExternal(supported_rx_.data(),
                                                                             supported_rx_count_);
-  port_info.set_id(id_)
-      .set_class_(port_class_)
+  fidl::WireTableFrame<netdev::wire::PortBaseInfo> base_info_frame;
+  netdev::wire::PortBaseInfo port_base_info(
+      fidl::ObjectView<fidl::WireTableFrame<netdev::wire::PortBaseInfo>>::FromExternal(
+          &base_info_frame));
+
+  port_base_info.set_port_class(port_class_)
       .set_tx_types(fidl::ObjectView<decltype(tx_support)>::FromExternal(&tx_support))
       .set_rx_types(fidl::ObjectView<decltype(rx_support)>::FromExternal(&rx_support));
+
+  port_info.set_id(id_).set_base_info(
+      fidl::ObjectView<netdev::wire::PortBaseInfo>::FromExternal(&port_base_info));
 
   completer.Reply(port_info);
 }

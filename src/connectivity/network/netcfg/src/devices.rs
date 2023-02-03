@@ -206,14 +206,17 @@ impl NetworkDeviceInstance {
 
     pub async fn get_device_info(&self) -> Result<DeviceInfo, errors::Error> {
         let NetworkDeviceInstance { port, port_id: _, device_control: _, topological_path } = self;
-        let fhwnet::PortInfo { id: _, class: device_class, rx_types: _, tx_types: _, .. } = port
+        let fhwnet::PortInfo { id: _, base_info, .. } = port
             .get_info()
             .await
             .context("error getting port info")
             .map_err(errors::Error::NonFatal)?;
-        let device_class = device_class.ok_or_else(|| {
-            errors::Error::Fatal(anyhow::anyhow!("missing device class in port info"))
-        })?;
+        let device_class = base_info
+            .ok_or_else(|| errors::Error::Fatal(anyhow::anyhow!("missing base info in port info")))?
+            .port_class
+            .ok_or_else(|| {
+                errors::Error::Fatal(anyhow::anyhow!("missing port class in port base info"))
+            })?;
 
         let (mac_addressing, mac_addressing_server_end) =
             fidl::endpoints::create_proxy::<fhwnet::MacAddressingMarker>()

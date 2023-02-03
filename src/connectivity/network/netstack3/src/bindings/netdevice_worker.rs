@@ -150,13 +150,16 @@ impl DeviceHandler {
 
         let DeviceHandler { inner: Inner { state, device, session: _ } } = self;
         let port_proxy = device.connect_port(port)?;
-        let netdevice_client::client::PortInfo { id: _, class: device_class, rx_types, tx_types } =
-            port_proxy
-                .get_info()
-                .await
-                .map_err(Error::CantConnectToPort)?
-                .try_into()
-                .map_err(Error::InvalidPortInfo)?;
+        let netdevice_client::client::PortInfo {
+            id: _,
+            base_info:
+                netdevice_client::client::PortBaseInfo { port_class: device_class, rx_types, tx_types },
+        } = port_proxy
+            .get_info()
+            .await
+            .map_err(Error::CantConnectToPort)?
+            .try_into()
+            .map_err(Error::InvalidPortInfo)?;
 
         let mut status_stream =
             netdevice_client::client::new_port_status_stream(&port_proxy, None)?;

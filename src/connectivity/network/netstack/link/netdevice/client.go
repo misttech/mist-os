@@ -552,7 +552,7 @@ func (p *Port) SetPromiscuousMode(enabled bool) error {
 }
 
 func (p *Port) DeviceClass() network.DeviceClass {
-	return p.portInfo.Class
+	return p.portInfo.BaseInfo.PortClass
 }
 
 func (p *Port) ConnectPort(port network.PortWithCtxInterfaceRequest) {
@@ -664,11 +664,11 @@ func (c *Client) NewPort(ctx context.Context, portId network.PortId) (*Port, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to get port info: %w", err)
 	}
-	if !(portInfo.HasId() && portInfo.HasClass() && portInfo.HasRxTypes() && portInfo.HasTxTypes()) {
+	if !(portInfo.HasId() && portInfo.HasBaseInfo() && portInfo.BaseInfo.HasPortClass() && portInfo.BaseInfo.HasRxTypes() && portInfo.BaseInfo.HasTxTypes()) {
 		return nil, fmt.Errorf("incomplete PortInfo: %#v", portInfo)
 	}
 
-	portMode, err := selectPortOperatingMode(portInfo.GetRxTypes())
+	portMode, err := selectPortOperatingMode(portInfo.BaseInfo.GetRxTypes())
 	if err != nil {
 		return nil, err
 	}
@@ -933,7 +933,7 @@ func (p *Port) TxStats() *fifo.TxStats {
 }
 
 func (p *Port) Class() network.DeviceClass {
-	return p.portInfo.Class
+	return p.portInfo.BaseInfo.PortClass
 }
 
 type InvalidPortOperatingModeError struct {

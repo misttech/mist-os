@@ -142,12 +142,12 @@ struct Netdevice {
               return;
             }
             const fuchsia_hardware_network::wire::PortInfo& port_info = result.value().info;
-            if (!port_info.has_class()) {
-              printf("netifc: missing port class in  netdevice port info (%d:%d): %s\n",
+            if (!(port_info.has_base_info() && port_info.base_info().has_port_class())) {
+              printf("netifc: missing port class in netdevice port info (%d:%d): %s\n",
                      port_id.base, port_id.salt, result.FormatDescription().c_str());
               return;
             }
-            switch (port_info.class_()) {
+            switch (port_info.base_info().port_class()) {
               case fuchsia_hardware_network::DeviceClass::kEthernet:
               case fuchsia_hardware_network::DeviceClass::kVirtual:
                 // NB: Historically this only netifc only accepts Ethernet
@@ -159,7 +159,7 @@ struct Netdevice {
               case fuchsia_hardware_network::DeviceClass::kPpp:
               case fuchsia_hardware_network::DeviceClass::kWlanAp:
                 printf("netifc: ignoring netdevice port (%d:%d) with class %hu\n", port_id.base,
-                       port_id.salt, port_info.class_());
+                       port_id.salt, port_info.base_info().port_class());
                 return;
             }
           }

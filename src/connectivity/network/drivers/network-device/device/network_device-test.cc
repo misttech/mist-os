@@ -1971,22 +1971,24 @@ TEST_F(NetworkDeviceTest, PortGetInfo) {
   const netdev::wire::PortId& port_id = port_info.id();
   EXPECT_EQ(port_id.base, kPort13);
   EXPECT_EQ(port_id.salt, GetSaltedPortId(kPort13).salt);
-  ASSERT_TRUE(port_info.has_class());
-  EXPECT_EQ(port_info.class_(),
+  ASSERT_TRUE(port_info.has_base_info());
+  const netdev::wire::PortBaseInfo& base_info = port_info.base_info();
+  ASSERT_TRUE(base_info.has_port_class());
+  EXPECT_EQ(base_info.port_class(),
             static_cast<netdev::wire::DeviceClass>(port13_.port_info().port_class));
-  ASSERT_TRUE(port_info.has_rx_types());
-  EXPECT_EQ(port_info.rx_types().count(), impl_info.rx_types_count);
-  for (size_t i = 0; i < port_info.rx_types().count(); i++) {
-    EXPECT_EQ(port_info.rx_types()[i],
+  ASSERT_TRUE(base_info.has_rx_types());
+  EXPECT_EQ(base_info.rx_types().count(), impl_info.rx_types_count);
+  for (size_t i = 0; i < base_info.rx_types().count(); i++) {
+    EXPECT_EQ(base_info.rx_types()[i],
               static_cast<netdev::wire::FrameType>(impl_info.rx_types_list[i]));
   }
-  ASSERT_TRUE(port_info.has_tx_types());
-  EXPECT_EQ(port_info.tx_types().count(), impl_info.tx_types_count);
-  for (size_t i = 0; i < port_info.tx_types().count(); i++) {
-    EXPECT_EQ(port_info.tx_types()[i].type,
+  ASSERT_TRUE(base_info.has_tx_types());
+  EXPECT_EQ(base_info.tx_types().count(), impl_info.tx_types_count);
+  for (size_t i = 0; i < base_info.tx_types().count(); i++) {
+    EXPECT_EQ(base_info.tx_types()[i].type,
               static_cast<netdev::wire::FrameType>(impl_info.tx_types_list[i].type));
-    EXPECT_EQ(port_info.tx_types()[i].features, impl_info.tx_types_list[i].features);
-    EXPECT_EQ(port_info.tx_types()[i].supported_flags,
+    EXPECT_EQ(base_info.tx_types()[i].features, impl_info.tx_types_list[i].features);
+    EXPECT_EQ(base_info.tx_types()[i].supported_flags,
               static_cast<netdev::wire::TxFlags>(impl_info.tx_types_list[i].supported_flags));
   }
 }

@@ -72,18 +72,35 @@ async fn watch_and_update_ports(
             device.get_port(&mut port_id, port_server_end).unwrap();
 
             match port.get_info().await {
-                Ok(fhwnet::PortInfo { id: _, class: port_class, .. }) => {
-                    // Add port if a new port was a Wlan/WlanAp port.
-                    if let Some(class) = port_class {
-                        if class == fhwnet::DeviceClass::WlanAp
-                            || class == fhwnet::DeviceClass::Wlan
-                        {
-                            if ports.borrow_mut().insert(port_id.base, port).is_none() {
-                                info!(port_id.base, port_id.salt, "Added a new/existing port");
+                Ok(fhwnet::PortInfo { id: _, base_info, .. }) => {
+                    match base_info.map_or_else(
+                        || {
+                            error!("Port with port id: {:?} is missing port metadata", port_id);
+                            None
+                        },
+                        |base_info| {
+                            base_info.port_class.map_or_else(
+                                || {
+                                    error!(
+                                        "Port with port id {:?} is missing device type",
+                                        port_id
+                                    );
+                                    None
+                                },
+                                |device_class| Some(device_class),
+                            )
+                        },
+                    ) {
+                        Some(class) => {
+                            if class == fhwnet::DeviceClass::WlanAp
+                                || class == fhwnet::DeviceClass::Wlan
+                            {
+                                if ports.borrow_mut().insert(port_id.base, port).is_none() {
+                                    info!(port_id.base, port_id.salt, "Added a new/existing port");
+                                }
                             }
                         }
-                    } else {
-                        error!("Port with port id {:?} is missing device type", port_id);
+                        None => {}
                     }
                 }
                 Err(err) => {

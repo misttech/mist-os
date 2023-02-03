@@ -94,18 +94,16 @@ protocol StatusWatcher {
     });
 };
 
-/// Logical port information.
+/// Port base info.
 @available(added=HEAD)
-type PortInfo = table {
-    /// Port's identifier. Required.
-    1: id PortId;
+type PortBaseInfo = table {
     /// Port's class. Required.
-    2: class PortClass;
+    1: port_class PortClass;
     /// Supported rx frame types on this port. Required.
     ///
     /// Clients may open sessions subscribing to a subset of `rx_types` frame
     /// types on this port.
-    3: rx_types vector<FrameType>:MAX_FRAME_TYPES;
+    2: rx_types vector<FrameType>:MAX_FRAME_TYPES;
     /// Supported tx frame types on this port. Required.
     ///
     /// Frames destined to this port whose frame type is not in `tx_types` are
@@ -117,7 +115,16 @@ type PortInfo = table {
     /// For example, a device that supports Ethernet frames but needs to convert
     /// the Ethernet header may only support standard Ethernet II frames, and
     /// not any "raw" Ethernet frame.
-    4: tx_types vector<FrameTypeSupport>:MAX_FRAME_TYPES;
+    3: tx_types vector<FrameTypeSupport>:MAX_FRAME_TYPES;
+};
+
+/// Logical port information.
+@available(added=HEAD)
+type PortInfo = table {
+    /// Port's identifier. Required.
+    1: id PortId;
+    // Port base info. Required.
+    2: base_info PortBaseInfo;
 };
 
 /// A logical port belonging to a [`Device`].

@@ -125,18 +125,26 @@ impl Client {
     }
 }
 
+/// Network device base info with all required fields.
+#[derive(Debug, Clone, ValidFidlTable)]
+#[fidl_table_src(netdev::PortBaseInfo)]
+pub struct PortBaseInfo {
+    /// Port's class.
+    pub port_class: netdev::DeviceClass,
+    /// Supported rx frame types on this port.
+    pub rx_types: Vec<netdev::FrameType>,
+    /// Supported tx frame types on this port.
+    pub tx_types: Vec<netdev::FrameTypeSupport>,
+}
+
 /// Network device information with all required fields.
 #[derive(Debug, Clone, ValidFidlTable)]
 #[fidl_table_src(netdev::PortInfo)]
 pub struct PortInfo {
     /// Port's identifier.
     pub id: Port,
-    /// Port's class.
-    pub class: netdev::DeviceClass,
-    /// Supported rx frame types on this port.
-    pub rx_types: Vec<netdev::FrameType>,
-    /// Supported tx frame types on this port.
-    pub tx_types: Vec<netdev::FrameTypeSupport>,
+    /// Port's base info.
+    pub base_info: PortBaseInfo,
 }
 
 /// Dynamic port information with all required fields.
