@@ -71,7 +71,7 @@ clap = "2.34"
 crc = "1.8.1"
 criterion = { version = "0.2", default-features = false }
 crossbeam = "0.8.0"
-crossbeam-utils = "0.8.0"
+crossbeam-utils = "0.8.14"
 crypto-mac = { version = "0.11.1", features = ["std"] }
 cfg-if = "1.0.0"
 chacha20 = "0.8.1"
@@ -356,11 +356,6 @@ wepoll-sys = { path = "empty/wepoll-sys" }
 winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
 windows-sys = { path = "empty/windows-sys" }
-windows_aarch64_msvc = { path = "empty/windows_aarch64_msvc" }
-windows_i686_gnu = { path = "empty/windows_i686_gnu" }
-windows_i686_msvc = { path = "empty/windows_i686_msvc" }
-windows_x86_64_gnu = { path = "empty/windows_x86_64_gnu" }
-windows_x86_64_msvc = { path = "empty/windows_x86_64_msvc" }
 
 ### Forks: vendored crates whose code doesn't match the upstream version
 fatfs = { path = "forks/fatfs" }
@@ -451,16 +446,8 @@ env_vars = ["OUT_DIR=../../../compat/crc"]
 [gn.package.crc32fast."1.2.0"]
 rustflags = ["--cfg=crc32fast_stdarchx86"]
 
-[gn.package.crossbeam-utils."0.8.4"]
-rustflags = [
-  "--cfg=has_min_const_fn",
-  "--cfg=has_atomic_u8",
-  "--cfg=has_atomic_u16",
-  "--cfg=has_atomic_u32",
-  "--cfg=has_atomic_u64",
-  # TODO(https://github.com/rust-lang/rust/issues/32976): AtomicU128 is unstable.
-  # "--cfg=has_atomic_u128",
-]
+[gn.package.crossbeam-utils."0.8.14"]
+rustflags = []
 
 [gn.package.fancy-regex."0.8.0"]
 # TODO(fxbug.dev/112722): We're importing this explicitly for now, but eventually
@@ -572,7 +559,7 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 [gn.package.num-iter."0.1.42"]
 rustflags = ["--cfg=has_i128"]
 
-[gn.package.parking_lot_core."0.9.2"]
+[gn.package.parking_lot_core."0.9.6"]
 rustflags = []
 
 [gn.package.proc-macro2."0.4.27"]

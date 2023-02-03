@@ -671,7 +671,7 @@ dependencies = [
  "crossbeam-deque 0.8.1",
  "crossbeam-epoch 0.9.4",
  "crossbeam-queue 0.3.1",
- "crossbeam-utils 0.8.4",
+ "crossbeam-utils 0.8.14",
 ]
 
 [[package]]
@@ -681,7 +681,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06ed27e177f16d65f0f0c22a213e17c696ace5dd64b14258b52f9417ccb52db4"
 dependencies = [
  "cfg-if 1.0.0",
- "crossbeam-utils 0.8.4",
+ "crossbeam-utils 0.8.14",
 ]
 
 [[package]]
@@ -703,7 +703,7 @@ checksum = "6455c0ca19f0d2fbf751b908d5c55c1f5cbc65e03c4225427254b46890bdde1e"
 dependencies = [
  "cfg-if 1.0.0",
  "crossbeam-epoch 0.9.4",
- "crossbeam-utils 0.8.4",
+ "crossbeam-utils 0.8.14",
 ]
 
 [[package]]
@@ -728,7 +728,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52fb27eab85b17fbb9f6fd667089e07d6a2eb8743d02639ee7f6a7a7729c9c94"
 dependencies = [
  "cfg-if 1.0.0",
- "crossbeam-utils 0.8.4",
+ "crossbeam-utils 0.8.14",
  "lazy_static",
  "memoffset 0.6.3",
  "scopeguard",
@@ -751,7 +751,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0f6cb3c7f5b8e51bc3ebb73a2327ad4abdbd119dc13223f14f961d2f38486756"
 dependencies = [
  "cfg-if 1.0.0",
- "crossbeam-utils 0.8.4",
+ "crossbeam-utils 0.8.14",
 ]
 
 [[package]]
@@ -767,13 +767,11 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-utils"
-version = "0.8.4"
+version = "0.8.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4feb231f0d4d6af81aed15928e58ecf5816aa62a2393e2c82f46973e92a9a278"
+checksum = "4fb766fa798726286dbbb842f174001dab8abc7b627a1dd86e0b7222a95d929f"
 dependencies = [
- "autocfg 1.1.0",
  "cfg-if 1.0.0",
- "lazy_static",
 ]
 
 [[package]]
@@ -1315,7 +1313,7 @@ dependencies = [
  "crc",
  "criterion",
  "crossbeam",
- "crossbeam-utils 0.8.4",
+ "crossbeam-utils 0.8.14",
  "crossterm",
  "crypto-mac",
  "csv",
@@ -2572,7 +2570,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87f5ec2493a61ac0506c0f4199f99070cbe83857b0337006a30f3e6719b8ef58"
 dependencies = [
  "lock_api 0.4.7",
- "parking_lot_core 0.9.2",
+ "parking_lot_core 0.9.6",
 ]
 
 [[package]]
@@ -2606,9 +2604,9 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.9.2"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "995f667a6c822200b0433ac218e05582f0e2efa1b922a3fd2fbaadc5f87bab37"
+checksum = "ba1ef8814b5c993410bb3adfad7a5ed269563e4a2f90c41f5d85be7fb47133bf"
 dependencies = [
  "cfg-if 1.0.0",
  "libc",
@@ -4916,7 +4914,7 @@ version = "0.1.5"
 
 [[package]]
 name = "windows-sys"
-version = "0.34.0"
+version = "0.42.0"
 
 [[package]]
 name = "xattr"
@@ -5008,23 +5006,3 @@ dependencies = [
 [[patch.unused]]
 name = "nix"
 version = "0.26.1"
-
-[[patch.unused]]
-name = "windows_aarch64_msvc"
-version = "0.34.0"
-
-[[patch.unused]]
-name = "windows_i686_gnu"
-version = "0.34.0"
-
-[[patch.unused]]
-name = "windows_i686_msvc"
-version = "0.34.0"
-
-[[patch.unused]]
-name = "windows_x86_64_gnu"
-version = "0.34.0"
-
-[[patch.unused]]
-name = "windows_x86_64_msvc"
-version = "0.34.0"

@@ -4,11 +4,12 @@
 
 [package]
 name = "windows-sys"
-version = "0.34.0"
+version = "0.42.0"
 authors = ["The Fuchsia Authors <rust-fuchsia@fuchsia.com>"]
 
 [features]
 Win32_Foundation = []
+Win32_Networking_WinSock = []
 Win32_System_LibraryLoader = []
 Win32_System_SystemServices = []
 Win32_System_WindowsProgramming = []
