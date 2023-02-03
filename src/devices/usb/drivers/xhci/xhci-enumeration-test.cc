@@ -20,7 +20,6 @@
 
 #include "src/devices/usb/drivers/xhci/xhci-enumeration.h"
 
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 #include <lib/mmio-ptr/fake.h>

@@ -4,13 +4,13 @@
 
 #include "src/devices/usb/drivers/xhci/xhci-transfer-ring.h"
 
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
 #include <atomic>
+#include <memory>
 #include <thread>
 
 #include <fake-dma-buffer/fake-dma-buffer.h>
@@ -18,6 +18,7 @@
 #include <fbl/algorithm.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
 
@@ -28,8 +29,7 @@ const zx::bti kFakeBti(42);
 class TransferRingHarness : public zxtest::Test {
  public:
   TransferRingHarness()
-      : trb_context_allocator_(-1, true),
-        hci_(reinterpret_cast<zx_device_t*>(this), ddk_fake::CreateBufferFactory()) {}
+      : trb_context_allocator_(-1, true), hci_(root_.get(), ddk_fake::CreateBufferFactory()) {}
   void SetUp() override {
     constexpr auto kOffset = 6;
     constexpr auto kErdp = 2062;
@@ -80,6 +80,7 @@ class TransferRingHarness : public zxtest::Test {
   using AllocatorType = fbl::SlabAllocator<AllocatorTraits>;
   AllocatorType trb_context_allocator_;
 
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   std::optional<Request> pending_req_;
   fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> pending_contexts_;
   std::optional<fdf::MmioBuffer> buffer_;

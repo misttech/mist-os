@@ -98,12 +98,11 @@ source_set("test-libs") {
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/testing/fake-dma-buffer",
     "//src/devices/testing/fake-mmio-reg",
-
-    # TODO(fxb/115081): Migrate from fake_ddk to mock-ddk.
-    "//src/devices/testing/fake_ddk",
+    "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
     "//src/lib/ddk",
     "//src/lib/ddktl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/inspect",
@@ -220,6 +219,9 @@ fuchsia_unittest_package("xhci-transfer-ring-unittest") {
   deps = [ ":xhci-transfer-ring-unittest-bin" ]
   test_specs = {
     environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 

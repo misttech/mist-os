@@ -5,7 +5,6 @@
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 
 #include <lib/device-protocol/pdev.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmar.h>
@@ -18,6 +17,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace usb_xhci {
 
@@ -245,15 +245,19 @@ struct FakeUsbDevice {
   bool fake_root_hub;
 };
 
-class Ddk : public fake_ddk::Bind, public ddk::UsbBusInterfaceProtocol<Ddk> {
+class FakeUsbBus : public ddk::UsbBusInterfaceProtocol<FakeUsbBus> {
  public:
-  Ddk() {}
-  bool added() { return add_called_; }
-  const device_add_args_t& args() { return add_args_.value(); }
+  FakeUsbBus() = default;
 
   void reset() { sync_completion_reset(&completion_); }
 
   void wait() { sync_completion_wait(&completion_, ZX_TIME_INFINITE); }
+
+  usb_bus_interface_protocol_t* proto() {
+    proto_.ctx = this;
+    proto_.ops = &usb_bus_interface_protocol_ops_;
+    return &proto_;
+  }
 
   zx_status_t UsbBusInterfaceAddDevice(uint32_t device_id, uint32_t hub_id, usb_speed_t speed) {
     FakeUsbDevice fake_device;
@@ -279,32 +283,9 @@ class Ddk : public fake_ddk::Bind, public ddk::UsbBusInterfaceProtocol<Ddk> {
   const std::map<uint32_t, FakeUsbDevice>& devices() { return devices_; }
 
  private:
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    // Set add_args_ before calling DeviceAdd so it's ready before we call DdkInit and subsequently
-    // get a call to DeviceInitReply.
-    add_args_ = *args;
-    zx_status_t status = fake_ddk::Bind::DeviceAdd(drv, parent, args, out);
-    if (status != ZX_OK) {
-      return status;
-    }
-    return ZX_OK;
-  }
-
-  void DeviceInitReply(zx_device_t* device, zx_status_t status,
-                       const device_init_reply_args_t* args) override {
-    usb_bus_interface_protocol_t proto;
-    proto.ctx = this;
-    proto.ops = &usb_bus_interface_protocol_ops_;
-    ASSERT_OK(status);
-    ASSERT_TRUE(add_args_.has_value());
-    static_cast<UsbXhci*>(add_args_->ctx)->UsbHciSetBusInterface(&proto);
-
-    fake_ddk::Bind::DeviceInitReply(device, status, args);
-  }
   std::map<uint32_t, FakeUsbDevice> devices_;
   sync_completion_t completion_;
-  std::optional<device_add_args_t> add_args_;
+  usb_bus_interface_protocol_t proto_;
 };
 
 using TestRequest = usb::CallbackRequest<sizeof(max_align_t)>;
@@ -327,15 +308,15 @@ class XhciHarness : public zxtest::Test {
     return it->get();
   }
 
-  size_t GetMaxDeviceCount() { return device_->UsbHciGetMaxDeviceCount(); }
+  size_t GetMaxDeviceCount() { return xhci_->UsbHciGetMaxDeviceCount(); }
 
-  void RequestQueue(TestRequest request) { request.Queue(*device_); }
+  void RequestQueue(TestRequest request) { request.Queue(*xhci_); }
 
   template <typename Callback>
   zx_status_t AllocateRequest(std::optional<TestRequest>* request, uint32_t device_id,
                               uint64_t data_size, uint8_t endpoint, Callback callback) {
     zx_status_t result = TestRequest::Alloc(request, data_size, endpoint,
-                                            device_->UsbHciGetRequestSize(), std::move(callback));
+                                            xhci_->UsbHciGetRequestSize(), std::move(callback));
     if (result != ZX_OK) {
       return result;
     }
@@ -370,35 +351,35 @@ class XhciHarness : public zxtest::Test {
   FakeUsbDevice ConnectDevice(uint8_t port, usb_speed_t speed) {
     std::optional<HubInfo> hub;
     uint8_t slot = AllocateSlot();
-    device_->GetPortState()[port - 1].is_connected = true;
-    device_->GetPortState()[port - 1].link_active = true;
-    device_->GetPortState()[port - 1].slot_id = slot;
-    device_->SetDeviceInformation(slot, slot, hub);
-    device_->AddressDeviceCommand(slot, port, hub, true);
-    ddk_.reset();
-    device_->DeviceOnline(slot, port, speed);
-    ddk_.wait();
-    return ddk_.devices().find(slot - 1)->second;
+    xhci_->GetPortState()[port - 1].is_connected = true;
+    xhci_->GetPortState()[port - 1].link_active = true;
+    xhci_->GetPortState()[port - 1].slot_id = slot;
+    xhci_->SetDeviceInformation(slot, slot, hub);
+    xhci_->AddressDeviceCommand(slot, port, hub, true);
+    bus_.reset();
+    xhci_->DeviceOnline(slot, port, speed);
+    bus_.wait();
+    return bus_.devices().find(slot - 1)->second;
   }
 
   void EnableEndpoint(uint32_t device_id, uint8_t ep_num, bool is_in_endpoint) {
     usb_endpoint_descriptor_t ep_desc = {};
     ep_desc.bm_attributes = USB_ENDPOINT_BULK;
     ep_desc.b_endpoint_address = ep_num | (is_in_endpoint ? 0x80 : 0);
-    device_->UsbHciEnableEndpoint(device_id, &ep_desc, nullptr);
+    xhci_->UsbHciEnableEndpoint(device_id, &ep_desc, nullptr);
   }
 
   zx_status_t ResetEndpointCommand(uint32_t device_id, uint8_t ep_address) {
-    return device_->UsbHciResetEndpoint(device_id, ep_address);
+    return xhci_->UsbHciResetEndpoint(device_id, ep_address);
   }
 
   zx_status_t CancelAllCommand(uint32_t device_id, uint8_t ep_address) {
-    return device_->UsbHciCancelAll(device_id, ep_address);
+    return xhci_->UsbHciCancelAll(device_id, ep_address);
   }
 
   zx_status_t CompleteCommand(TRB* trb, CommandCompletionEvent* event) {
     std::unique_ptr<TRBContext> context;
-    zx_status_t status = device_->GetCommandRing()->CompleteTRB(trb, &context);
+    zx_status_t status = xhci_->GetCommandRing()->CompleteTRB(trb, &context);
     if (status != ZX_OK) {
       return status;
     }
@@ -415,8 +396,10 @@ class XhciHarness : public zxtest::Test {
   virtual ~XhciHarness() {}
 
  protected:
-  std::unique_ptr<UsbXhci> device_;
-  Ddk ddk_;
+  UsbXhci* xhci_ = nullptr;
+  FakeUsbBus bus_;
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
+  MockDevice* mock_ddk_xhci_ = nullptr;
   FakeDevice fake_device_;
   fake_pdev::FakePDev pdev_;
 
@@ -433,24 +416,23 @@ class XhciMmioHarness : public XhciHarness {
     fake_device_.set_irq_signaller(pdev_.CreateVirtualInterrupt(0));
     pdev_.UseFakeBti();
 
-    ddk_.SetProtocol(ZX_PROTOCOL_PDEV, pdev_.proto());
+    root_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx);
 
-    auto dev = std::make_unique<UsbXhci>(fake_ddk::kFakeParent, ddk_fake::CreateBufferFactory());
+    auto dev = std::make_unique<UsbXhci>(root_.get(), ddk_fake::CreateBufferFactory());
     dev->SetTestHarness(this);
-    dev->DdkAdd("xhci");  // This will also call DdkInit.
-    ASSERT_TRUE(ddk_.added());
-    ASSERT_OK(ddk_.WaitUntilInitComplete());
-    ASSERT_TRUE(ddk_.init_reply().has_value());
-    ASSERT_OK(ddk_.init_reply().value());
-    dev.release();
-    device_.reset(static_cast<UsbXhci*>(ddk_.args().ctx));
+    dev->DdkAdd("xhci");
+    ASSERT_EQ(1, root_->child_count());
+    mock_ddk_xhci_ = root_->GetLatestChild();
+    mock_ddk_xhci_->InitOp();
+    ASSERT_OK(mock_ddk_xhci_->WaitUntilInitReplyCalled());
+    ASSERT_OK(mock_ddk_xhci_->InitReplyCallStatus());
+    dev->UsbHciSetBusInterface(bus_.proto());
+    xhci_ = dev.release();
   }
 
   void TearDown() override {
-    auto device = device_.release();
-    ddk::UnbindTxn txn(device->zxdev());
-    device->DdkUnbind(std::move(txn));
-    ASSERT_OK(ddk_.WaitUntilRemove());
+    mock_ddk_xhci_->UnbindOp();
+    ASSERT_OK(mock_ddk_xhci_->WaitUntilUnbindReplyCalled());
   }
 };
 
@@ -858,7 +840,7 @@ TEST_F(XhciMmioHarness, CancelAllOnDisabledEndpoint) {
   ConnectDevice(1, USB_SPEED_HIGH);
   uint64_t paddr;
   {
-    auto& state = device_->GetDeviceState()[0];
+    auto& state = xhci_->GetDeviceState()[0];
     ASSERT_NOT_NULL(state);
     fbl::AutoLock _(&state->transaction_lock());
     state->GetTransferRing(0).set_stall(true);
@@ -897,7 +879,7 @@ TEST_F(XhciMmioHarness, ResetEndpointTestSuccessCase) {
   EnableEndpoint(0, 1, true);
   uint64_t paddr;
   {
-    auto& state = device_->GetDeviceState()[0];
+    auto& state = xhci_->GetDeviceState()[0];
     ASSERT_NOT_NULL(state);
     fbl::AutoLock l(&state->transaction_lock());
     state->GetTransferRing(0).set_stall(true);
@@ -950,7 +932,7 @@ TEST_F(XhciMmioHarness, ResetEndpointFailsIfNotStalled) {
   ConnectDevice(1, USB_SPEED_HIGH);
   EnableEndpoint(0, 1, true);
   {
-    auto& state = device_->GetDeviceState()[0];
+    auto& state = xhci_->GetDeviceState()[0];
     ASSERT_NOT_NULL(state);
     fbl::AutoLock l(&state->transaction_lock());
     state->GetTransferRing(0).set_stall(false);

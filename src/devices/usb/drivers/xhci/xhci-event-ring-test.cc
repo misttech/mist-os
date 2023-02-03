@@ -4,7 +4,6 @@
 
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
 
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/fpromise/bridge.h>
 #include <lib/fpromise/promise.h>
 #include <zircon/errors.h>
@@ -20,6 +19,7 @@
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/xhci/registers.h"
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
@@ -53,8 +53,7 @@ struct Command : public fbl::DoublyLinkedListable<std::unique_ptr<Command>> {
 class EventRingHarness : public zxtest::Test {
  public:
   EventRingHarness()
-      : trb_context_allocator_(-1, true),
-        hci_(reinterpret_cast<zx_device_t*>(this), ddk_fake::CreateBufferFactory()) {}
+      : trb_context_allocator_(-1, true), hci_(root_.get(), ddk_fake::CreateBufferFactory()) {}
   void SetUp() override {
     // Globals
     constexpr auto kRuntimeRegisterOffset = 6;
@@ -223,6 +222,7 @@ class EventRingHarness : public zxtest::Test {
   }
 
  private:
+  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
   std::optional<Request> pending_req_;
   std::optional<fit::function<void(usb_xhci::TRB*, size_t, usb_xhci::TRB**)>> short_packet_handler_;
   using AllocatorTraits = fbl::InstancedSlabAllocatorTraits<std::unique_ptr<TRBContext>, 4096U>;
