@@ -27,6 +27,8 @@
 // search (ctrl-f) in the browser and the hit will probably will a link that you can press into
 // the corresponding definition (eg. search for "dbgwcr" and then click on the link).
 //
+// See zircon/system/public/hw/debug/arm64.h for more detailed information.
+//
 // Hardware Breakpoints
 // -------------------------------------------------------------------------------------------------
 //
@@ -35,14 +37,12 @@
 // read-only or not.
 // ARMv8 assures at least 2 hardware breakpoints.
 //
-// See zircon/system/public/hw/debug/arm64.h for more detailed information.
-//
-// DBGBVR<n>: Watchpoint Value Register.
+// DBGBVR<n>: HW Breakpoint Value Register.
 //
 // This register defines the value of the hw breakpoint <n> within the system. How that value is
 // interpreted depends on the correspondent value of DBGBCR<n>.
-
-// DBGBCR<n>: Debug Control Register for HW Breakpoint #n.
+//
+// DBGBCR<n>: HW Breakpoint Control Register.
 //
 // Control register for HW breakpoints. There is one for each HW breakpoint present within the
 // system. They go numbering by DBGBCR0, DBGBCR1, ... until the value defined in ID_AADFR0_EL1.
@@ -50,9 +50,8 @@
 // For each control register, there is an equivalent DBGBVR<n> that holds the address the thread
 // will compare against.
 //
-// The only register that needs to be set by the user is E (Bit 1). The other configuration is
-// opaque and is handled by the kernel.
-// See zircon/system/public/hw/debug/arm64.h for more detailed information.
+// The only register bit that needs to be set by the user is E (Bit 1). The other bits are opaque
+// and should be handled by the kernel.
 //
 // Watchpoints
 // -------------------------------------------------------------------------------------------------
@@ -60,8 +59,6 @@
 // Watchpoints permits to stop a thread when it read/writes to a particular address in memory.
 // This will work even if the address is read-only memory (for a read, of course).
 // ARMv8 assures at least 2 watchpoints.
-//
-// See zircon/system/public/hw/debug/arm64.h for more detailed information.
 //
 // DBGWVR<n>: Watchpoint Value Register.
 //
