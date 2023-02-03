@@ -83,6 +83,7 @@ VulkanDeviceQueues::Params GetDefaultVulkanDeviceQueuesParams(bool enable_protec
       {{VK_KHR_MAINTENANCE1_EXTENSION_NAME, VK_KHR_BIND_MEMORY_2_EXTENSION_NAME,
         VK_KHR_EXTERNAL_MEMORY_EXTENSION_NAME},
        {
+           VK_KHR_GLOBAL_PRIORITY_EXTENSION_NAME,
            VK_KHR_SAMPLER_YCBCR_CONVERSION_EXTENSION_NAME,
        },
        vk::SurfaceKHR()});

@@ -25,6 +25,10 @@ using VulkanDeviceQueuesPtr = fxl::RefPtr<VulkanDeviceQueues>;
 class VulkanDeviceQueues : public fxl::RefCountedThreadSafe<VulkanDeviceQueues> {
  public:
   // Parameters used to construct a new Vulkan Device and Queues.
+  //
+  // Magic behavior:
+  // - if the extension `VK_KHR_global_priority` is requested/found, then the main queue will use
+  //   the highest priority available for that queue family.
   struct Params {
     std::set<std::string> required_extension_names;
     std::set<std::string> desired_extension_names;
@@ -47,9 +51,9 @@ class VulkanDeviceQueues : public fxl::RefCountedThreadSafe<VulkanDeviceQueues> 
     std::set<vk::Format> depth_stencil_formats;
     std::set<size_t> msaa_sample_counts;
     std::set<std::string> extensions;
-    uint32_t device_api_version;
-    bool allow_protected_memory;
-    bool allow_ycbcr;
+    uint32_t device_api_version = 0;
+    bool allow_protected_memory = false;
+    bool allow_ycbcr = false;
 
     vk::PhysicalDeviceFeatures enabled_features;
 
@@ -91,14 +95,6 @@ class VulkanDeviceQueues : public fxl::RefCountedThreadSafe<VulkanDeviceQueues> 
   static fxl::RefPtr<VulkanDeviceQueues> New(VulkanInstancePtr instance, Params params);
 
   ~VulkanDeviceQueues();
-
-  // Enumerate the available extensions for the specified physical device.
-  // Return true if all required extensions are present, and false otherwise.
-  // NOTE: if an extension isn't found at first, we look in all required layers
-  // to see if it is implemented there.
-  static bool ValidateExtensions(vk::PhysicalDevice device,
-                                 const std::set<std::string>& required_extension_names,
-                                 const std::set<std::string>& required_layer_names);
 
   vk::Device vk_device() const { return device_; }
   vk::PhysicalDevice vk_physical_device() const { return physical_device_; }
@@ -145,6 +141,6 @@ class VulkanDeviceQueues : public fxl::RefCountedThreadSafe<VulkanDeviceQueues> 
 
 ESCHER_DEBUG_PRINTABLE(VulkanDeviceQueues::Caps);
 
-} // namespace escher
+}  // namespace escher
 
 #endif  // SRC_UI_LIB_ESCHER_VK_VULKAN_DEVICE_QUEUES_H_
