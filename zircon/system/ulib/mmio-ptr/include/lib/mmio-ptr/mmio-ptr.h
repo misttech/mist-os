@@ -214,4 +214,45 @@ static inline void MmioReadBuffer(void* dest, MMIO_PTR const volatile void* mmio
   }
 }
 
+#ifdef __cplusplus
+
+// In C++ overloads allow using one name for all types.  C++ would usually use
+// references rather than pointers to indicate non-nullability, but `noderef`
+// pointers don't allow creating references since that's the same as
+// dereferencing the pointer.
+
+__NONNULL((2)) inline void MmioWrite(uint8_t data, MMIO_PTR volatile uint8_t* buffer) {
+  MmioWrite8(data, buffer);
+}
+
+__NONNULL((2)) inline void MmioWrite(uint16_t data, MMIO_PTR volatile uint16_t* buffer) {
+  MmioWrite16(data, buffer);
+}
+
+__NONNULL((2)) inline void MmioWrite(uint32_t data, MMIO_PTR volatile uint32_t* buffer) {
+  MmioWrite32(data, buffer);
+}
+
+__NONNULL((2)) inline void MmioWrite(uint64_t data, MMIO_PTR volatile uint64_t* buffer) {
+  MmioWrite64(data, buffer);
+}
+
+__NONNULL((1)) inline uint8_t MmioRead(MMIO_PTR const volatile uint8_t* buffer) {
+  return MmioRead8(buffer);
+}
+
+__NONNULL((1)) inline uint16_t MmioRead(MMIO_PTR const volatile uint16_t* buffer) {
+  return MmioRead16(buffer);
+}
+
+__NONNULL((1)) inline uint32_t MmioRead(MMIO_PTR const volatile uint32_t* buffer) {
+  return MmioRead32(buffer);
+}
+
+__NONNULL((1)) inline uint64_t MmioRead(MMIO_PTR const volatile uint64_t* buffer) {
+  return MmioRead64(buffer);
+}
+
+#endif  // __cplusplus
+
 #endif  // LIB_MMIO_PTR_MMIO_PTR_H_

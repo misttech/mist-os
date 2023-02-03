@@ -47,7 +47,7 @@ group("tests") {
     "ldmsg:tests",
     "lockdep:tests",
     "mipi-dsi:tests",
-    "mmio-ptr/test:tests",
+    "mmio-ptr:tests",
     "mock-function:tests",
     "nand-redundant-storage:tests",
     "perftest:tests",

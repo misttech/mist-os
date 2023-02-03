@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-group("tests") {
+group("test") {
   testonly = true
   deps = [ ":mmio-ptr-unittest" ]
 }

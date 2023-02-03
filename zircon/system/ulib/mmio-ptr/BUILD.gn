@@ -20,3 +20,8 @@ zx_library("mmio-ptr-fake") {
   sdk = "source"
   sdk_headers = [ "lib/mmio-ptr/fake.h" ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [ "test" ]
+}
