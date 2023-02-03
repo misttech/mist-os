@@ -2,10 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components/fuchsia_test_package.gni")
 import("//build/components/fuchsia_unittest_component.gni")
 import("//build/dist/renamed_binary.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/storage/fshost/fshost.gni")
 
 rustc_binary("bin") {
   output_name = "fshost_rust"
@@ -94,6 +96,27 @@ fuchsia_unittest_component("fshost_rust_tests_component") {
 
 fuchsia_test_package("fshost_rust_tests") {
   test_components = [ ":fshost_rust_tests_component" ]
+}
+
+fshost_component_and_config("fshost_rust_fxfs_component") {
+  # THIS CANNOT BE MARKED TESTONLY, EVEN IF THE ASSEMBLY IS.  This template
+  # changes behavior to create a non-bootable fshost if testly is set to true.
+  testonly = false
+
+  # Correct the component name since the target_name is per-image.
+  component_name = "fshost"
+
+  options = {
+    # Use the defaults from the build args set in generated_fshost_config.gni
+    data_filesystem_format = "fxfs"
+
+    # Use the rust implementation of fshost based on the global GN arg.
+    use_rust_port = true
+  }
+}
+
+bootfs_files_for_assembly("fshost_rust_fxfs_bootfs") {
+  deps = [ ":fshost_rust_fxfs_component" ]
 }
 
 group("tests") {

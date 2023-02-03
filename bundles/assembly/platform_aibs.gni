@@ -37,6 +37,9 @@ platform_aib_names = [
   "wlan_fullmac_support",
   "wlan_softmac_support",
 
+  # Storage
+  "fshost_fxfs",
+
   "starnix_support",
   "virtualization_support",
   "empty_live_usb",
