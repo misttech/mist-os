@@ -77,4 +77,7 @@ default_args = {
 
   # Configures Pigweed to use Fuchsia's boringssl target.
   pw_third_party_boringssl_ALIAS = "//third_party/boringssl"
+
+  # Configures Pigweed to use Fuchsia's Emboss checkout.
+  dir_pw_third_party_emboss = "//third_party/github.com/google/emboss/src"
 }

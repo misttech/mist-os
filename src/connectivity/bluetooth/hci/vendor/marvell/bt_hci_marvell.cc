@@ -15,10 +15,11 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
 
-#include "src/connectivity/bluetooth/core/bt-host/hci-spec/hci-protocol.emb.h"
 #include "src/connectivity/bluetooth/hci/vendor/marvell/bt_hci_marvell_bind.h"
 #include "src/connectivity/bluetooth/hci/vendor/marvell/marvell_frame.emb.h"
 #include "src/connectivity/bluetooth/hci/vendor/marvell/marvell_hci.h"
+
+#include <pw_bluetooth/hci.emb.h>
 
 namespace bt_hci_marvell {
 
