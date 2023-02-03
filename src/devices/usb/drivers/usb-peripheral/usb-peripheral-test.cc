@@ -11,7 +11,6 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
-#include <lib/fake_ddk/fake_ddk.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/interrupt.h>
 #include <zircon/errors.h>
@@ -27,19 +26,8 @@
 #include <usb/usb.h>
 #include <zxtest/zxtest.h>
 
+#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
-
-struct zx_device : std::enable_shared_from_this<zx_device> {
-  std::list<std::shared_ptr<zx_device>> devices;
-  std::weak_ptr<zx_device> parent;
-  std::vector<zx_device_prop_t> props;
-  const void* proto_ops;
-  uint32_t proto_id;
-  void* ctx;
-  zx_protocol_device_t dev_ops;
-  std::map<uint32_t, std::vector<uint8_t>> metadata;
-  virtual ~zx_device() = default;
-};
 
 class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol> {
  public:
@@ -73,80 +61,37 @@ class FakeDevice : public ddk::UsbDciProtocol<FakeDevice, ddk::base_protocol> {
   usb_dci_protocol_t proto_;
 };
 
-static void DestroyDevices(zx_device_t* node) {
-  for (auto& dev : node->devices) {
-    DestroyDevices(dev.get());
-    if (dev->dev_ops.unbind) {
-      dev->dev_ops.unbind(dev->ctx);
-    }
-    dev->dev_ops.release(dev->ctx);
-  }
-}
-
-class Ddk : public fake_ddk::Bind {
- public:
-  Ddk() = default;
-
-  zx_status_t DeviceGetProtocol(const zx_device_t* device, uint32_t proto_id,
-                                void* protocol) override {
-    if (device->proto_id != proto_id) {
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-    memcpy(protocol, device->proto_ops, 16);
-    return ZX_OK;
-  }
-  zx_status_t DeviceAdd(zx_driver_t* drv, zx_device_t* parent, device_add_args_t* args,
-                        zx_device_t** out) override {
-    auto dev = std::make_shared<zx_device>();
-    dev->ctx = args->ctx;
-    dev->proto_ops = args->proto_ops;
-    if (args->props) {
-      dev->props.resize(args->prop_count);
-      memcpy(dev->props.data(), args->props, args->prop_count * sizeof(zx_device_prop_t));
-    }
-    dev->dev_ops = *args->ops;
-    dev->parent = parent->weak_from_this();
-    dev->proto_id = args->proto_id;
-    parent->devices.push_back(dev);
-    *out = dev.get();
-    return ZX_OK;
-  }
-
-  zx_status_t DeviceRemove(zx_device_t* device) override {
-    DestroyDevices(device);
-    return ZX_OK;
-  }
-};
-
 class UsbPeripheralHarness : public zxtest::Test {
  public:
   void SetUp() override {
+    root_device_ = MockDevice::FakeRootParent();
     static const UsbConfig kConfig = []() {
       UsbConfig config = {};
       memcpy(config.serial, kSerialNumber, sizeof(kSerialNumber));
       return config;
     }();
-    ddk_.SetMetadata(DEVICE_METADATA_USB_CONFIG, &kConfig, sizeof(kConfig));
-    ddk_.SetMetadata(DEVICE_METADATA_SERIAL_NUMBER, &kSerialNumber, sizeof(kSerialNumber));
-
     dci_ = std::make_unique<FakeDevice>();
-    root_device_ = std::make_shared<zx_device_t>();
-    root_device_->proto_ops = dci_->proto();
-    root_device_->ctx = dci_.get();
-    root_device_->proto_id = ZX_PROTOCOL_USB_DCI;
+    root_device_->SetMetadata(DEVICE_METADATA_USB_CONFIG, &kConfig, sizeof(kConfig));
+    root_device_->SetMetadata(DEVICE_METADATA_SERIAL_NUMBER, &kSerialNumber, sizeof(kSerialNumber));
+    root_device_->AddProtocol(ZX_PROTOCOL_USB_DCI, dci_->proto()->ops, dci_->proto()->ctx);
+
     zx::interrupt irq;
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq));
     ASSERT_OK(usb_peripheral::UsbPeripheral::Create(nullptr, root_device_.get()));
-    auto dev = root_device_->devices.front();
+    ASSERT_EQ(1, root_device_->child_count());
+    mock_dev_ = root_device_->GetLatestChild();
     client_ = ddk::UsbDciInterfaceProtocolClient(dci_->interface());
   }
 
-  void TearDown() override {}
+  void TearDown() override {
+    mock_dev_->UnbindOp();
+    mock_dev_->WaitUntilUnbindReplyCalled();
+  }
 
  protected:
   std::unique_ptr<FakeDevice> dci_;
-  std::shared_ptr<zx_device_t> root_device_;
-  Ddk ddk_;
+  std::shared_ptr<MockDevice> root_device_;
+  MockDevice* mock_dev_;
   ddk::UsbDciInterfaceProtocolClient client_;
 
   static constexpr char kSerialNumber[] = "Test serial number";
@@ -167,7 +112,6 @@ TEST_F(UsbPeripheralHarness, AddsCorrectSerialNumberMetadata) {
   for (size_t i = 0; i < sizeof(kSerialNumber) - 1; i++) {
     ASSERT_EQ(serial[2 + (i * 2)], kSerialNumber[i]);
   }
-  DestroyDevices(root_device_.get());
 }
 
 TEST_F(UsbPeripheralHarness, WorksWithVendorSpecificCommandWhenConfigurationIsZero) {
@@ -181,5 +125,4 @@ TEST_F(UsbPeripheralHarness, WorksWithVendorSpecificCommandWhenConfigurationIsZe
   ASSERT_EQ(client_.Control(&setup, nullptr, 0, reinterpret_cast<uint8_t*>(&serial), sizeof(serial),
                             &actual),
             ZX_ERR_BAD_STATE);
-  DestroyDevices(root_device_.get());
 }

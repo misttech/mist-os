@@ -104,7 +104,6 @@ zx_library("fake_ddk") {
     "//src/devices/thermal/drivers/aml-thermistor/test/*",
     "//src/devices/thermal/drivers/as370-thermal/*",
     "//src/devices/usb/drivers/aml-usb-crg-phy-v2/*",
-    "//src/devices/usb/drivers/usb-peripheral/*",
     "//src/devices/usb/drivers/xhci/*",
     "//src/graphics/lib/magma/tests/unit_tests/*",
     "//src/media/audio/drivers/intel-hda/controller/*",
