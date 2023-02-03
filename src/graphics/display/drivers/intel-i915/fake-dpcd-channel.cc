@@ -4,7 +4,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/fake-dpcd-channel.h"
 
-namespace i915_tgl {
+namespace i915 {
 namespace testing {
 
 void FakeDpcdChannel::SetDefaults() {
@@ -43,4 +43,4 @@ bool FakeDpcdChannel::DpcdWrite(uint32_t addr, const uint8_t* buf, size_t size) 
 }
 
 }  // namespace testing
-}  // namespace i915_tgl
+}  // namespace i915

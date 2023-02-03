@@ -16,7 +16,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 CoreDisplayClockSkylake::CoreDisplayClockSkylake(fdf::MmioBuffer* mmio_space)
     : mmio_space_(mmio_space) {
@@ -25,32 +25,31 @@ CoreDisplayClockSkylake::CoreDisplayClockSkylake(fdf::MmioBuffer* mmio_space)
 }
 
 bool CoreDisplayClockSkylake::LoadState() {
-  auto dpll_enable =
-      tgl_registers::PllEnable::GetForSkylakeDpll(PllId::DPLL_0).ReadFrom(mmio_space_);
+  auto dpll_enable = registers::PllEnable::GetForSkylakeDpll(PllId::DPLL_0).ReadFrom(mmio_space_);
   if (!dpll_enable.pll_enabled()) {
     zxlogf(ERROR, "Skylake CDCLK LoadState: DPLL0 is disabled");
     return false;
   }
 
-  auto dpll_control1 = tgl_registers::DisplayPllControl1::Get().ReadFrom(mmio_space_);
+  auto dpll_control1 = registers::DisplayPllControl1::Get().ReadFrom(mmio_space_);
   const int16_t dpll0_frequency_mhz =
       dpll_control1.pll_display_port_ddi_frequency_mhz(PllId::DPLL_0);
   const bool dpll0_uses_vco_8640 = (dpll0_frequency_mhz == 1080) || (dpll0_frequency_mhz == 2160);
 
-  auto cdclk_ctl = tgl_registers::CdClockCtl::Get().ReadFrom(mmio_space_);
+  auto cdclk_ctl = registers::CdClockCtl::Get().ReadFrom(mmio_space_);
   auto skl_cd_freq_select = cdclk_ctl.skl_cd_freq_select();
 
   switch (skl_cd_freq_select) {
-    case tgl_registers::CdClockCtl::kFreqSelect3XX:
+    case registers::CdClockCtl::kFreqSelect3XX:
       set_current_freq_khz(dpll0_uses_vco_8640 ? 308'570 : 337'500);
       break;
-    case tgl_registers::CdClockCtl::kFreqSelect4XX:
+    case registers::CdClockCtl::kFreqSelect4XX:
       set_current_freq_khz(dpll0_uses_vco_8640 ? 432'000 : 450'000);
       break;
-    case tgl_registers::CdClockCtl::kFreqSelect540:
+    case registers::CdClockCtl::kFreqSelect540:
       set_current_freq_khz(540'000);
       break;
-    case tgl_registers::CdClockCtl::kFreqSelect6XX:
+    case registers::CdClockCtl::kFreqSelect6XX:
       set_current_freq_khz(dpll0_uses_vco_8640 ? 617'140 : 675'000);
       break;
     default:
@@ -101,14 +100,13 @@ bool CoreDisplayClockSkylake::PostChangeFreq(uint32_t freq_khz) {
 }
 
 bool CoreDisplayClockSkylake::CheckFrequency(uint32_t freq_khz) {
-  auto dpll_enable =
-      tgl_registers::PllEnable::GetForSkylakeDpll(PllId::DPLL_0).ReadFrom(mmio_space_);
+  auto dpll_enable = registers::PllEnable::GetForSkylakeDpll(PllId::DPLL_0).ReadFrom(mmio_space_);
   if (!dpll_enable.pll_enabled()) {
     zxlogf(ERROR, "Skylake CDCLK CheckFrequency: DPLL0 is disabled");
     return false;
   }
 
-  auto dpll_control1 = tgl_registers::DisplayPllControl1::Get().ReadFrom(mmio_space_);
+  auto dpll_control1 = registers::DisplayPllControl1::Get().ReadFrom(mmio_space_);
   const int16_t dpll0_frequency_mhz =
       dpll_control1.pll_display_port_ddi_frequency_mhz(PllId::DPLL_0);
   const bool dpll0_uses_vco_8640 = (dpll0_frequency_mhz == 1080) || (dpll0_frequency_mhz == 2160);
@@ -123,29 +121,29 @@ bool CoreDisplayClockSkylake::CheckFrequency(uint32_t freq_khz) {
 
 bool CoreDisplayClockSkylake::ChangeFreq(uint32_t freq_khz) {
   // Set the cd_clk frequency to |freq_khz|.
-  auto cd_clk = tgl_registers::CdClockCtl::Get().ReadFrom(mmio_space_);
+  auto cd_clk = registers::CdClockCtl::Get().ReadFrom(mmio_space_);
   switch (freq_khz) {
     case 308'570:
     case 337'500:
-      cd_clk.set_skl_cd_freq_select(tgl_registers::CdClockCtl::kFreqSelect3XX);
+      cd_clk.set_skl_cd_freq_select(registers::CdClockCtl::kFreqSelect3XX);
       break;
     case 432'000:
     case 450'000:
-      cd_clk.set_skl_cd_freq_select(tgl_registers::CdClockCtl::kFreqSelect4XX);
+      cd_clk.set_skl_cd_freq_select(registers::CdClockCtl::kFreqSelect4XX);
       break;
     case 540'000:
-      cd_clk.set_skl_cd_freq_select(tgl_registers::CdClockCtl::kFreqSelect540);
+      cd_clk.set_skl_cd_freq_select(registers::CdClockCtl::kFreqSelect540);
       break;
     case 617'140:
     case 675'000:
-      cd_clk.set_skl_cd_freq_select(tgl_registers::CdClockCtl::kFreqSelect6XX);
+      cd_clk.set_skl_cd_freq_select(registers::CdClockCtl::kFreqSelect6XX);
       break;
     default:
       // Unreachable
       ZX_DEBUG_ASSERT(false);
       return false;
   }
-  cd_clk.set_cd_freq_decimal(tgl_registers::CdClockCtl::FreqDecimal(freq_khz));
+  cd_clk.set_cd_freq_decimal(registers::CdClockCtl::FreqDecimal(freq_khz));
   cd_clk.WriteTo(mmio_space_);
   return true;
 }
@@ -200,7 +198,7 @@ CoreDisplayClockTigerLake::CoreDisplayClockTigerLake(fdf::MmioBuffer* mmio_space
 }
 
 bool CoreDisplayClockTigerLake::LoadState() {
-  auto display_straps = tgl_registers::DisplayStraps::Get().ReadFrom(mmio_space_);
+  auto display_straps = registers::DisplayStraps::Get().ReadFrom(mmio_space_);
   ref_clock_khz_ = display_straps.reference_frequency_khz_tiger_lake();
   if (ref_clock_khz_ == 0) {
     zxlogf(ERROR, "Invalid reference clock frequency select! Display straps register: %x",
@@ -209,7 +207,7 @@ bool CoreDisplayClockTigerLake::LoadState() {
   }
   zxlogf(TRACE, "Display reference clock frequency: %d kHz", ref_clock_khz_);
 
-  auto cdclk_pll_enable = tgl_registers::IclCdClkPllEnable::Get().ReadFrom(mmio_space_);
+  auto cdclk_pll_enable = registers::IclCdClkPllEnable::Get().ReadFrom(mmio_space_);
   if (!cdclk_pll_enable.pll_lock()) {
     // CDCLK is disabled. No need to load |state_|.
     enabled_ = false;
@@ -219,13 +217,13 @@ bool CoreDisplayClockTigerLake::LoadState() {
   enabled_ = true;
   state_.pll_ratio = cdclk_pll_enable.pll_ratio();
 
-  auto cdclk_ctl = tgl_registers::CdClockCtl::Get().ReadFrom(mmio_space_);
+  auto cdclk_ctl = registers::CdClockCtl::Get().ReadFrom(mmio_space_);
   auto divider = cdclk_ctl.icl_cd2x_divider_select();
   switch (divider) {
-    case tgl_registers::CdClockCtl::kCd2xDivider1:
+    case registers::CdClockCtl::kCd2xDivider1:
       state_.cd2x_divider = 1;
       break;
-    case tgl_registers::CdClockCtl::kCd2xDivider2:
+    case registers::CdClockCtl::kCd2xDivider2:
       state_.cd2x_divider = 2;
       break;
     default:
@@ -233,7 +231,7 @@ bool CoreDisplayClockTigerLake::LoadState() {
   }
 
   uint32_t freq_khz = ref_clock_khz_ * state_.pll_ratio / state_.cd2x_divider / 2;
-  if (cdclk_ctl.cd_freq_decimal() != tgl_registers::CdClockCtl::FreqDecimal(freq_khz)) {
+  if (cdclk_ctl.cd_freq_decimal() != registers::CdClockCtl::FreqDecimal(freq_khz)) {
     zxlogf(ERROR,
            "The CD frequency value (0x%x) doesn't match loaded hardware "
            "state (ref_clock %u KHz, pll ratio %u, cd2x divider %u)",
@@ -373,7 +371,7 @@ bool CoreDisplayClockTigerLake::Enable(uint32_t freq_khz, State state) {
   }
 
   // Write CDCLK_PLL_ENABLE with the PLL ratio, but not yet enabling it.
-  auto cdclk_pll_enable = tgl_registers::IclCdClkPllEnable::Get().ReadFrom(mmio_space_);
+  auto cdclk_pll_enable = registers::IclCdClkPllEnable::Get().ReadFrom(mmio_space_);
   cdclk_pll_enable.set_pll_ratio(state.pll_ratio);
   cdclk_pll_enable.WriteTo(mmio_space_);
 
@@ -391,20 +389,20 @@ bool CoreDisplayClockTigerLake::Enable(uint32_t freq_khz, State state) {
 
   // Write CDCLK_CTL with the CD2X Divider selection and CD Frequency Decimal
   // value to match the desired CD clock frequency.
-  auto cdclk_ctl = tgl_registers::CdClockCtl::Get().ReadFrom(mmio_space_);
+  auto cdclk_ctl = registers::CdClockCtl::Get().ReadFrom(mmio_space_);
   switch (state.cd2x_divider) {
     case 1:
-      cdclk_ctl.set_icl_cd2x_divider_select(tgl_registers::CdClockCtl::kCd2xDivider1);
+      cdclk_ctl.set_icl_cd2x_divider_select(registers::CdClockCtl::kCd2xDivider1);
       break;
     case 2:
-      cdclk_ctl.set_icl_cd2x_divider_select(tgl_registers::CdClockCtl::kCd2xDivider2);
+      cdclk_ctl.set_icl_cd2x_divider_select(registers::CdClockCtl::kCd2xDivider2);
       break;
     default:
       ZX_DEBUG_ASSERT(false);
       return false;
   }
 
-  cdclk_ctl.set_cd_freq_decimal(tgl_registers::CdClockCtl::FreqDecimal(freq_khz));
+  cdclk_ctl.set_cd_freq_decimal(registers::CdClockCtl::FreqDecimal(freq_khz));
   cdclk_ctl.WriteTo(mmio_space_);
 
   state_ = state;
@@ -419,7 +417,7 @@ bool CoreDisplayClockTigerLake::Disable() {
   }
 
   // Clear CDCLK_PLL_ENABLE PLL Enable
-  auto cdclk_pll_enable = tgl_registers::IclCdClkPllEnable::Get().ReadFrom(mmio_space_);
+  auto cdclk_pll_enable = registers::IclCdClkPllEnable::Get().ReadFrom(mmio_space_);
   cdclk_pll_enable.set_pll_enable(0);
   cdclk_pll_enable.WriteTo(mmio_space_);
 
@@ -451,19 +449,19 @@ bool CoreDisplayClockTigerLake::ChangeFreq(uint32_t freq_khz) {
       // Changing only the CD2X divider:
       // Write CDCLK_CTL with the CD2X Divider selection, and CD Frequency
       // Decimal value to match the desired CD clock frequency.
-      auto cdclk_ctl = tgl_registers::CdClockCtl::Get().ReadFrom(mmio_space_);
+      auto cdclk_ctl = registers::CdClockCtl::Get().ReadFrom(mmio_space_);
       switch (new_state.cd2x_divider) {
         case 1:
-          cdclk_ctl.set_icl_cd2x_divider_select(tgl_registers::CdClockCtl::kCd2xDivider1);
+          cdclk_ctl.set_icl_cd2x_divider_select(registers::CdClockCtl::kCd2xDivider1);
           break;
         case 2:
-          cdclk_ctl.set_icl_cd2x_divider_select(tgl_registers::CdClockCtl::kCd2xDivider2);
+          cdclk_ctl.set_icl_cd2x_divider_select(registers::CdClockCtl::kCd2xDivider2);
           break;
         default:
           ZX_DEBUG_ASSERT(false);
           return false;
       }
-      cdclk_ctl.set_cd_freq_decimal(tgl_registers::CdClockCtl::FreqDecimal(freq_khz));
+      cdclk_ctl.set_cd_freq_decimal(registers::CdClockCtl::FreqDecimal(freq_khz));
       cdclk_ctl.WriteTo(mmio_space_);
     }
     // Otherwise the state doesn't change; it's a no-op.
@@ -508,4 +506,4 @@ int CoreDisplayClockTigerLake::VoltageLevelForFrequency(uint32_t frequency_khz) 
   return 0x0;
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

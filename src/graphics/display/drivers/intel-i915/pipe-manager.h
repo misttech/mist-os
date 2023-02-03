@@ -16,7 +16,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class Controller;
 
@@ -172,6 +172,6 @@ class PipeManagerTigerLake : public PipeManager {
   fdf::MmioBuffer* mmio_space_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PIPE_MANAGER_H_

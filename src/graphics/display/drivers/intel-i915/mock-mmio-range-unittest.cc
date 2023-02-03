@@ -11,7 +11,7 @@
 #include <gtest/gtest-spi.h>
 #include <gtest/gtest.h>
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -378,4 +378,4 @@ TEST_F(MockMmioRangeTest, CheckAllAccessesReplayedIncomplete) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

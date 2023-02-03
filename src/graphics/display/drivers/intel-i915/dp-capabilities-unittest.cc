@@ -12,7 +12,7 @@
 #include "src/graphics/display/drivers/intel-i915/dp-display.h"
 #include "src/graphics/display/drivers/intel-i915/fake-dpcd-channel.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -305,4 +305,4 @@ TEST(TglDpCapabilitiesTest, Inspect) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

@@ -21,7 +21,7 @@
 #include "src/graphics/display/drivers/intel-i915/ddi.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -99,4 +99,4 @@ TEST_F(InterruptTest, SetInterruptCallback) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

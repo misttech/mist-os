@@ -10,22 +10,22 @@
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 cpp20::span<const DdiId> GetDdiIds(uint16_t device_id) {
   if (is_skl(device_id)) {
-    return DdiIds<tgl_registers::Platform::kSkylake>();
+    return DdiIds<registers::Platform::kSkylake>();
   }
   if (is_kbl(device_id)) {
-    return DdiIds<tgl_registers::Platform::kKabyLake>();
+    return DdiIds<registers::Platform::kKabyLake>();
   }
   if (is_tgl(device_id)) {
-    return DdiIds<tgl_registers::Platform::kTigerLake>();
+    return DdiIds<registers::Platform::kTigerLake>();
   }
   if (is_test_device(device_id)) {
-    return DdiIds<tgl_registers::Platform::kTestDevice>();
+    return DdiIds<registers::Platform::kTestDevice>();
   }
   ZX_ASSERT_MSG(false, "Device id (%04x) not supported", device_id);
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

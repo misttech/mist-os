@@ -15,7 +15,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace tgl_registers {
+namespace registers {
 
 // ===========================================================================
 //                             Type-C FIA Registers
@@ -114,9 +114,9 @@ class DynamicFlexIoDisplayPortMainLinkLaneEnabled
   // based on `ddi_id`.
   //
   // Callers must make sure they read from the correct FIA register.
-  uint32_t enabled_display_port_main_link_lane_bits(i915_tgl::DdiId ddi_id) const {
+  uint32_t enabled_display_port_main_link_lane_bits(i915::DdiId ddi_id) const {
     ZX_ASSERT(IsDdiCoveredByThisRegister(ddi_id));
-    const uint32_t bit_index = ((ddi_id - i915_tgl::DdiId::DDI_TC_1) & 0x1) * 4;
+    const uint32_t bit_index = ((ddi_id - i915::DdiId::DDI_TC_1) & 0x1) * 4;
     return hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index + 3, bit_index).get();
   }
 
@@ -125,10 +125,10 @@ class DynamicFlexIoDisplayPortMainLinkLaneEnabled
   // based on `ddi_id`.
   //
   // Callers must make sure they write to the correct FIA register.
-  SelfType& set_enabled_display_port_main_link_lane_bits(i915_tgl::DdiId ddi_id, uint32_t bits) {
+  SelfType& set_enabled_display_port_main_link_lane_bits(i915::DdiId ddi_id, uint32_t bits) {
     ZX_ASSERT(IsDdiCoveredByThisRegister(ddi_id));
     if (IsSupportedDisplayPortLaneConfig(bits)) {
-      const uint32_t lane0_enabled_bit_index = ((ddi_id - i915_tgl::DdiId::DDI_TC_1) & 0x1) * 4;
+      const uint32_t lane0_enabled_bit_index = ((ddi_id - i915::DdiId::DDI_TC_1) & 0x1) * 4;
       hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), lane0_enabled_bit_index + 3,
                                    lane0_enabled_bit_index)
           .set(bits);
@@ -137,10 +137,10 @@ class DynamicFlexIoDisplayPortMainLinkLaneEnabled
     ZX_ASSERT_MSG(false, "invalid enabled_main_links_mask: 0x%x", bits);
   }
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_TC_1);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_TC_6);
-    const uint32_t fia_index = (ddi_id - i915_tgl::DdiId::DDI_TC_1) >> 1;
+  static auto GetForDdi(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+    const uint32_t fia_index = (ddi_id - i915::DdiId::DDI_TC_1) >> 1;
     return hwreg::RegisterAddr<SelfType>(kFiaOffsets[fia_index]);
   }
 
@@ -157,14 +157,14 @@ class DynamicFlexIoDisplayPortMainLinkLaneEnabled
     }
   }
 
-  bool IsDdiCoveredByThisRegister(i915_tgl::DdiId ddi_id) const {
+  bool IsDdiCoveredByThisRegister(i915::DdiId ddi_id) const {
     switch (reg_addr()) {
       case kFiaOffsets[0]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_1 || ddi_id == i915_tgl::DdiId::DDI_TC_2;
+        return ddi_id == i915::DdiId::DDI_TC_1 || ddi_id == i915::DdiId::DDI_TC_2;
       case kFiaOffsets[1]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_3 || ddi_id == i915_tgl::DdiId::DDI_TC_4;
+        return ddi_id == i915::DdiId::DDI_TC_3 || ddi_id == i915::DdiId::DDI_TC_4;
       case kFiaOffsets[2]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_5 || ddi_id == i915_tgl::DdiId::DDI_TC_6;
+        return ddi_id == i915::DdiId::DDI_TC_5 || ddi_id == i915::DdiId::DDI_TC_6;
       default:
         ZX_ASSERT_MSG(false, "Invalid register address 0x%x", reg_addr());
         return false;
@@ -262,11 +262,11 @@ class DynamicFlexIoScratchPad : public hwreg::RegisterBase<DynamicFlexIoScratchP
   // `type_c_live_state_connector_1` field based on `ddi_id`.
   //
   // Callers must make sure they read from the correct FIA register.
-  TypeCLiveState type_c_live_state(i915_tgl::DdiId ddi_id) const {
+  TypeCLiveState type_c_live_state(i915::DdiId ddi_id) const {
     ZX_ASSERT(IsDdiCoveredByThisRegister(ddi_id));
     // TODO(fxbug.dev/110198): Move the logic to calculate register bit index
     // from given `ddi_id` to a separate method.
-    const uint32_t bit_index = ((ddi_id - i915_tgl::DdiId::DDI_TC_1) & 0x1) * 8 + 5;
+    const uint32_t bit_index = ((ddi_id - i915::DdiId::DDI_TC_1) & 0x1) * 8 + 5;
     auto val = hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index + 2, bit_index).get();
     if (IsSupportedTypeCLiveState(val)) {
       return static_cast<TypeCLiveState>(val);
@@ -281,9 +281,9 @@ class DynamicFlexIoScratchPad : public hwreg::RegisterBase<DynamicFlexIoScratchP
   // `display_port_tx_lane_assignment_bits_connector_1` field based on `ddi_id`.
   //
   // Callers must make sure they read from the correct FIA register.
-  uint32_t display_port_tx_lane_assignment(i915_tgl::DdiId ddi_id) const {
+  uint32_t display_port_tx_lane_assignment(i915::DdiId ddi_id) const {
     ZX_ASSERT(IsDdiCoveredByThisRegister(ddi_id));
-    const uint32_t bit_index = ((ddi_id - i915_tgl::DdiId::DDI_TC_1) & 0x1) * 8;
+    const uint32_t bit_index = ((ddi_id - i915::DdiId::DDI_TC_1) & 0x1) * 8;
     return hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index + 3, bit_index).get();
   }
 
@@ -294,17 +294,17 @@ class DynamicFlexIoScratchPad : public hwreg::RegisterBase<DynamicFlexIoScratchP
   // and counts number of ones in the bitmap.
   //
   // Callers must make sure they read from the correct FIA register.
-  size_t display_port_assigned_tx_lane_count(i915_tgl::DdiId ddi_id) const {
+  size_t display_port_assigned_tx_lane_count(i915::DdiId ddi_id) const {
     auto assignment = display_port_tx_lane_assignment(ddi_id);
     return cpp20::popcount(assignment);
   }
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_TC_1);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_TC_6);
+  static auto GetForDdi(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
     // TODO(fxbug.dev/110198): Move the logic to calculate FIA field index
     // from given `ddi_id` to a separate method.
-    const uint32_t fia_index = (ddi_id - i915_tgl::DdiId::DDI_TC_1) >> 1;
+    const uint32_t fia_index = (ddi_id - i915::DdiId::DDI_TC_1) >> 1;
     return hwreg::RegisterAddr<SelfType>(kFiaOffsets[fia_index]);
   }
 
@@ -321,14 +321,14 @@ class DynamicFlexIoScratchPad : public hwreg::RegisterBase<DynamicFlexIoScratchP
     }
   }
 
-  bool IsDdiCoveredByThisRegister(i915_tgl::DdiId ddi_id) const {
+  bool IsDdiCoveredByThisRegister(i915::DdiId ddi_id) const {
     switch (reg_addr()) {
       case kFiaOffsets[0]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_1 || ddi_id == i915_tgl::DdiId::DDI_TC_2;
+        return ddi_id == i915::DdiId::DDI_TC_1 || ddi_id == i915::DdiId::DDI_TC_2;
       case kFiaOffsets[1]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_3 || ddi_id == i915_tgl::DdiId::DDI_TC_4;
+        return ddi_id == i915::DdiId::DDI_TC_3 || ddi_id == i915::DdiId::DDI_TC_4;
       case kFiaOffsets[2]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_5 || ddi_id == i915_tgl::DdiId::DDI_TC_6;
+        return ddi_id == i915::DdiId::DDI_TC_5 || ddi_id == i915::DdiId::DDI_TC_6;
       default:
         ZX_ASSERT_MSG(false, "Invalid register address 0x%x", reg_addr());
         return false;
@@ -421,9 +421,9 @@ class DynamicFlexIoDisplayPortPinAssignment
   // and `display_port_pin_assignment_connector_1`.
   //
   // Callers must make sure they read from the correct FIA register.
-  std::optional<PinAssignment> pin_assignment_for_ddi(i915_tgl::DdiId ddi_id) const {
+  std::optional<PinAssignment> pin_assignment_for_ddi(i915::DdiId ddi_id) const {
     ZX_ASSERT(IsDdiCoveredByThisRegister(ddi_id));
-    const uint32_t bit_index = ((ddi_id - i915_tgl::DdiId::DDI_TC_1) & 0x1) * 4;
+    const uint32_t bit_index = ((ddi_id - i915::DdiId::DDI_TC_1) & 0x1) * 4;
     auto raw_pin_assignment =
         hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index + 3, bit_index).get();
     if (IsValidPinAssignment(raw_pin_assignment)) {
@@ -434,10 +434,10 @@ class DynamicFlexIoDisplayPortPinAssignment
     return std::nullopt;
   }
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_TC_1);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_TC_6);
-    const uint32_t fia_index = (ddi_id - i915_tgl::DdiId::DDI_TC_1) >> 1;
+  static auto GetForDdi(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+    const uint32_t fia_index = (ddi_id - i915::DdiId::DDI_TC_1) >> 1;
     return hwreg::RegisterAddr<SelfType>(kFiaOffsets[fia_index]);
   }
 
@@ -457,14 +457,14 @@ class DynamicFlexIoDisplayPortPinAssignment
     }
   }
 
-  bool IsDdiCoveredByThisRegister(i915_tgl::DdiId ddi_id) const {
+  bool IsDdiCoveredByThisRegister(i915::DdiId ddi_id) const {
     switch (reg_addr()) {
       case kFiaOffsets[0]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_1 || ddi_id == i915_tgl::DdiId::DDI_TC_2;
+        return ddi_id == i915::DdiId::DDI_TC_1 || ddi_id == i915::DdiId::DDI_TC_2;
       case kFiaOffsets[1]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_3 || ddi_id == i915_tgl::DdiId::DDI_TC_4;
+        return ddi_id == i915::DdiId::DDI_TC_3 || ddi_id == i915::DdiId::DDI_TC_4;
       case kFiaOffsets[2]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_5 || ddi_id == i915_tgl::DdiId::DDI_TC_6;
+        return ddi_id == i915::DdiId::DDI_TC_5 || ddi_id == i915::DdiId::DDI_TC_6;
       default:
         ZX_ASSERT_MSG(false, "Invalid register address 0x%x", reg_addr());
         return false;
@@ -517,29 +517,29 @@ class DynamicFlexIoDisplayPortControllerSafeStateSettings
   // `display_port_safe_mode_disabled_connector_1` based on `ddi_id` argument.
   //
   // Callers must make sure they write to the correct FIA register.
-  SelfType& set_safe_mode_disabled_for_ddi(i915_tgl::DdiId ddi_id, bool disabled) {
+  SelfType& set_safe_mode_disabled_for_ddi(i915::DdiId ddi_id, bool disabled) {
     ZX_ASSERT(IsDdiCoveredByThisRegister(ddi_id));
-    const uint32_t bit_index = (ddi_id - i915_tgl::DdiId::DDI_TC_1) & 0x1;
+    const uint32_t bit_index = (ddi_id - i915::DdiId::DDI_TC_1) & 0x1;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index, bit_index).set(disabled);
     return *this;
   }
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_TC_1);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_TC_6);
-    const uint32_t fia_index = (ddi_id - i915_tgl::DdiId::DDI_TC_1) >> 1;
+  static auto GetForDdi(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+    const uint32_t fia_index = (ddi_id - i915::DdiId::DDI_TC_1) >> 1;
     return hwreg::RegisterAddr<SelfType>(kFiaOffsets[fia_index]);
   }
 
  private:
-  bool IsDdiCoveredByThisRegister(i915_tgl::DdiId ddi_id) const {
+  bool IsDdiCoveredByThisRegister(i915::DdiId ddi_id) const {
     switch (reg_addr()) {
       case kFiaOffsets[0]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_1 || ddi_id == i915_tgl::DdiId::DDI_TC_2;
+        return ddi_id == i915::DdiId::DDI_TC_1 || ddi_id == i915::DdiId::DDI_TC_2;
       case kFiaOffsets[1]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_3 || ddi_id == i915_tgl::DdiId::DDI_TC_4;
+        return ddi_id == i915::DdiId::DDI_TC_3 || ddi_id == i915::DdiId::DDI_TC_4;
       case kFiaOffsets[2]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_5 || ddi_id == i915_tgl::DdiId::DDI_TC_6;
+        return ddi_id == i915::DdiId::DDI_TC_5 || ddi_id == i915::DdiId::DDI_TC_6;
       default:
         ZX_ASSERT_MSG(false, "Invalid register address 0x%x", reg_addr());
         return false;
@@ -587,28 +587,28 @@ class DynamicFlexIoDisplayPortPhyModeStatus
   // `display_port_phy_is_ready_connector_1` bit based on given `ddi_id`.
   //
   // Callers must make sure they read from the correct FIA register.
-  bool phy_is_ready_for_ddi(i915_tgl::DdiId ddi_id) {
+  bool phy_is_ready_for_ddi(i915::DdiId ddi_id) {
     ZX_ASSERT(IsDdiCoveredByThisRegister(ddi_id));
-    const uint32_t bit_index = (ddi_id - i915_tgl::DdiId::DDI_TC_1) & 0x1;
+    const uint32_t bit_index = (ddi_id - i915::DdiId::DDI_TC_1) & 0x1;
     return hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index, bit_index).get();
   }
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
-    ZX_DEBUG_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_TC_1);
-    ZX_DEBUG_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_TC_6);
-    const uint32_t fia_index = (ddi_id - i915_tgl::DdiId::DDI_TC_1) >> 1;
+  static auto GetForDdi(i915::DdiId ddi_id) {
+    ZX_DEBUG_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
+    ZX_DEBUG_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+    const uint32_t fia_index = (ddi_id - i915::DdiId::DDI_TC_1) >> 1;
     return hwreg::RegisterAddr<SelfType>(kFiaOffsets[fia_index]);
   }
 
  private:
-  bool IsDdiCoveredByThisRegister(i915_tgl::DdiId ddi_id) const {
+  bool IsDdiCoveredByThisRegister(i915::DdiId ddi_id) const {
     switch (reg_addr()) {
       case kFiaOffsets[0]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_1 || ddi_id == i915_tgl::DdiId::DDI_TC_2;
+        return ddi_id == i915::DdiId::DDI_TC_1 || ddi_id == i915::DdiId::DDI_TC_2;
       case kFiaOffsets[1]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_3 || ddi_id == i915_tgl::DdiId::DDI_TC_4;
+        return ddi_id == i915::DdiId::DDI_TC_3 || ddi_id == i915::DdiId::DDI_TC_4;
       case kFiaOffsets[2]:
-        return ddi_id == i915_tgl::DdiId::DDI_TC_5 || ddi_id == i915_tgl::DdiId::DDI_TC_6;
+        return ddi_id == i915::DdiId::DDI_TC_5 || ddi_id == i915::DdiId::DDI_TC_6;
       default:
         ZX_ASSERT_MSG(false, "Invalid register address 0x%x", reg_addr());
         return false;
@@ -675,13 +675,13 @@ class HipIndexReg0 : public hwreg::RegisterBase<HipIndexReg0, uint32_t> {
   // This writes to corresponding field `hip_index_type_c_1`,
   // `hip_index_type_c_2`, `hip_index_type_c_3` or `hip_index_type_c_4` based on
   // given `ddi_id`.
-  SelfType& set_hip_index_for_ddi(i915_tgl::DdiId ddi_id, uint32_t hip_index) {
+  SelfType& set_hip_index_for_ddi(i915::DdiId ddi_id, uint32_t hip_index) {
     ZX_ASSERT_MSG((hip_index & (~0b1111)) == 0,
                   "hip_index (0x%x) invalid: it has more than 4 bits.", hip_index);
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_TC_1);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_TC_4);
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_TC_4);
 
-    const uint32_t bit_low = (ddi_id - i915_tgl::DdiId::DDI_TC_1) * 8;
+    const uint32_t bit_low = (ddi_id - i915::DdiId::DDI_TC_1) * 8;
     const uint32_t bit_high = bit_low + 3;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_high, bit_low).set(hip_index);
 
@@ -714,13 +714,13 @@ class HipIndexReg1 : public hwreg::RegisterBase<HipIndexReg1, uint32_t> {
   //
   // This writes to corresponding field `hip_index_type_c_5` or
   // `hip_index_type_c_6` based on given `ddi_id`.
-  SelfType& set_hip_index_for_ddi(i915_tgl::DdiId ddi_id, uint32_t hip_index) {
+  SelfType& set_hip_index_for_ddi(i915::DdiId ddi_id, uint32_t hip_index) {
     ZX_ASSERT_MSG((hip_index & (~0b1111)) == 0,
                   "hip_index (0x%x) invalid: it has more than 4 bits.", hip_index);
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_TC_5);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_TC_6);
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_TC_5);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
 
-    const uint32_t bit_low = (ddi_id - i915_tgl::DdiId::DDI_TC_5) * 8;
+    const uint32_t bit_low = (ddi_id - i915::DdiId::DDI_TC_5) * 8;
     const uint32_t bit_high = bit_low + 3;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_high, bit_low).set(hip_index);
 
@@ -731,18 +731,18 @@ class HipIndexReg1 : public hwreg::RegisterBase<HipIndexReg1, uint32_t> {
 };
 
 template <typename T>
-void WriteHipIndex(T* reg_io, i915_tgl::DdiId ddi_id, uint32_t hip_index) {
+void WriteHipIndex(T* reg_io, i915::DdiId ddi_id, uint32_t hip_index) {
   switch (ddi_id) {
-    case i915_tgl::DdiId::DDI_TC_1:
-    case i915_tgl::DdiId::DDI_TC_2:
-    case i915_tgl::DdiId::DDI_TC_3:
-    case i915_tgl::DdiId::DDI_TC_4: {
+    case i915::DdiId::DDI_TC_1:
+    case i915::DdiId::DDI_TC_2:
+    case i915::DdiId::DDI_TC_3:
+    case i915::DdiId::DDI_TC_4: {
       auto hip_index_reg0 = HipIndexReg0::Get().ReadFrom(reg_io);
       hip_index_reg0.set_hip_index_for_ddi(ddi_id, hip_index).WriteTo(reg_io);
       break;
     }
-    case i915_tgl::DdiId::DDI_TC_5:
-    case i915_tgl::DdiId::DDI_TC_6: {
+    case i915::DdiId::DDI_TC_5:
+    case i915::DdiId::DDI_TC_6: {
       auto hip_index_reg1 = HipIndexReg1::Get().ReadFrom(reg_io);
       hip_index_reg1.set_hip_index_for_ddi(ddi_id, hip_index).WriteTo(reg_io);
       break;
@@ -783,7 +783,7 @@ class DekelRegisterBase : public ::hwreg::RegisterBase<DerivedType, IntType, Pri
     return *static_cast<SelfType*>(this);
   }
 
-  SelfType& set_ddi(i915_tgl::DdiId ddi_id) {
+  SelfType& set_ddi(i915::DdiId ddi_id) {
     ddi_id_ = ddi_id;
     return *static_cast<SelfType*>(this);
   }
@@ -802,24 +802,24 @@ class DekelRegisterBase : public ::hwreg::RegisterBase<DerivedType, IntType, Pri
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev2.0 "Dekel PHY Register Access",
   //             pages 414-416
   // Lakefield: IHD-OS-LKF-Vol 12-4.21 "Dekel PHY Programming" pages 319-321
-  static uint32_t PhyBaseAddress(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_TC_1);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_TC_6);
-    return 0x168000 + (ddi_id - i915_tgl::DdiId::DDI_TC_1) * 0x1000;
+  static uint32_t PhyBaseAddress(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_TC_1);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_TC_6);
+    return 0x168000 + (ddi_id - i915::DdiId::DDI_TC_1) * 0x1000;
   }
 
  private:
   using ParentType::reg_addr;
   using ParentType::set_reg_addr;
 
-  i915_tgl::DdiId ddi_id_;
+  i915::DdiId ddi_id_;
   uint32_t phy_internal_address_;
 };
 
 template <class RegType>
 class DekelRegisterAddr {
  public:
-  DekelRegisterAddr(i915_tgl::DdiId ddi_id, uint32_t phy_internal_address)
+  DekelRegisterAddr(i915::DdiId ddi_id, uint32_t phy_internal_address)
       : ddi_id_(ddi_id), phy_internal_address_(phy_internal_address) {}
 
   static_assert(
@@ -848,7 +848,7 @@ class DekelRegisterAddr {
   }
 
  private:
-  const i915_tgl::DdiId ddi_id_;
+  const i915::DdiId ddi_id_;
   const uint32_t phy_internal_address_;
 };
 
@@ -865,7 +865,7 @@ class DekelOpaqueRegister
  public:
   using SelfType = DekelOpaqueRegister<PhyInternalAddr>;
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return DekelRegisterAddr<SelfType>(ddi_id, PhyInternalAddr);
   }
 };
@@ -886,7 +886,7 @@ class DekelPllDivisor0 : public DekelRegisterBase<DekelPllDivisor0, uint32_t> {
   DEF_FIELD(7, 0, feedback_divider_integer_part);
 
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "PHY Registers" pages 415-416
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return DekelRegisterAddr<DekelPllDivisor0>(ddi_id, 0x2200);
   }
 };
@@ -934,7 +934,7 @@ class DekelPllBias : public DekelRegisterBase<DekelPllBias, uint32_t> {
   DEF_FIELD(29, 8, feedback_divider_fractional_part_22_bits);
 
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "PHY Registers" pages 415-416
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return DekelRegisterAddr<DekelPllBias>(ddi_id, 0x2214);
   }
 };
@@ -1035,7 +1035,7 @@ class DekelPllClktop2HighSpeedClockControl
     return programmable_divider_ratio_selection();
   }
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "PHY Registers" pages 415-416
     return DekelRegisterAddr<DekelPllClktop2HighSpeedClockControl>(ddi_id, 0x20D4);
   }
@@ -1059,7 +1059,7 @@ class DekelCommonConfigMicroControllerDword27
   // Indicates whether the PHY uC firmware is ready in uC mode.
   DEF_BIT(15, microcontroller_firmware_is_ready);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return DekelRegisterAddr<DekelCommonConfigMicroControllerDword27>(ddi_id, 0x236C);
   }
 };
@@ -1088,7 +1088,7 @@ class DekelDisplayPortMode : public DekelRegisterBase<DekelDisplayPortMode, uint
   // See above `x2_mode` field documentation for how to decode the field.
   DEF_BIT(6, x1_mode);
 
-  static auto GetForLaneDdi(uint32_t lane, i915_tgl::DdiId ddi_id) {
+  static auto GetForLaneDdi(uint32_t lane, i915::DdiId ddi_id) {
     ZX_ASSERT(lane == 0 || lane == 1);
     // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "PHY Registers" pages 415-416
     const uint32_t phy_internal_address = lane == 0 ? 0x00A0 : 0x10A0;
@@ -1119,7 +1119,7 @@ class DekelTransmitterDisplayPortControl0
   // mappings.
   DEF_FIELD(2, 0, voltage_swing_control_level_transmitter_1);
 
-  static auto GetForLaneDdi(uint32_t lane, i915_tgl::DdiId ddi_id) {
+  static auto GetForLaneDdi(uint32_t lane, i915::DdiId ddi_id) {
     ZX_ASSERT(lane == 0 || lane == 1);
     // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "PHY Registers" pages 415-416
     const uint32_t phy_internal_address = lane == 0 ? 0x02C0 : 0x12C0;
@@ -1150,7 +1150,7 @@ class DekelTransmitterDisplayPortControl1
   // mappings.
   DEF_FIELD(2, 0, voltage_swing_control_level_transmitter_2);
 
-  static auto GetForLaneDdi(uint32_t lane, i915_tgl::DdiId ddi_id) {
+  static auto GetForLaneDdi(uint32_t lane, i915::DdiId ddi_id) {
     ZX_ASSERT(lane == 0 || lane == 1);
     // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "PHY Registers" pages 415-416
     const uint32_t phy_internal_address = lane == 0 ? 0x02C4 : 0x12C4;
@@ -1170,7 +1170,7 @@ class DekelTransmitterDisplayPortControl2
   // This needs to be set to 1 if Pipe width doesn't reflect the 20 bit mode.
   DEF_BIT(2, display_port_20bit_mode_supported);
 
-  static auto GetForLaneDdi(uint32_t lane, i915_tgl::DdiId ddi_id) {
+  static auto GetForLaneDdi(uint32_t lane, i915::DdiId ddi_id) {
     ZX_ASSERT(lane == 0 || lane == 1);
     // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "PHY Registers" pages 415-416
     const uint32_t phy_internal_address = lane == 0 ? 0x02C8 : 0x12C8;
@@ -1188,7 +1188,7 @@ class DekelTransmitterDisplayPortControl2
 // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev 2.0 Part 1, Pages 482-483
 class DekelTransmitterPmdLaneSus : public DekelRegisterBase<DekelTransmitterPmdLaneSus, uint32_t> {
  public:
-  static auto GetForLaneDdi(uint32_t lane, i915_tgl::DdiId ddi_id) {
+  static auto GetForLaneDdi(uint32_t lane, i915::DdiId ddi_id) {
     ZX_ASSERT(lane == 0 || lane == 1);
     // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "PHY Registers" pages 415-416
     const uint32_t phy_internal_address = lane == 0 ? 0x0D00 : 0x1D00;
@@ -1196,6 +1196,6 @@ class DekelTransmitterPmdLaneSus : public DekelRegisterBase<DekelTransmitterPmdL
   }
 };
 
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_TYPEC_H_

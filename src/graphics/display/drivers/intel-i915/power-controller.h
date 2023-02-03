@@ -12,7 +12,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/scoped-value-change.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // Command sent to the PCU (power controller)'s firmware.
 struct PowerControllerCommand {
@@ -261,6 +261,6 @@ class PowerController {
   fdf::MmioBuffer* mmio_buffer_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_POWER_CONTROLLER_H_

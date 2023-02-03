@@ -41,7 +41,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 typedef struct buffer_allocation {
   uint16_t start;
@@ -209,19 +209,19 @@ class Controller : public DeviceType,
   // plane 0 of the failing displays will be set to UINT16_MAX.
   bool CalculateMinimumAllocations(
       cpp20::span<const display_config_t*> display_configs,
-      uint16_t min_allocs[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                         [tgl_registers::kImagePlaneCount]) __TA_REQUIRES(display_lock_);
+      uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
+                         [registers::kImagePlaneCount]) __TA_REQUIRES(display_lock_);
   // Updates plane_buffers_ based pipe_buffers_ and the given parameters
   void UpdateAllocations(
-      const uint16_t min_allocs[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                               [tgl_registers::kImagePlaneCount],
-      const uint64_t display_rate[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                                 [tgl_registers::kImagePlaneCount]) __TA_REQUIRES(display_lock_);
+      const uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
+                               [registers::kImagePlaneCount],
+      const uint64_t display_rate[PipeIds<registers::Platform::kKabyLake>().size()]
+                                 [registers::kImagePlaneCount]) __TA_REQUIRES(display_lock_);
   // Reallocates the pipe buffers when a pipe comes online/goes offline. This is a
   // long-running operation, as shifting allocations between pipes requires waiting
   // for vsync.
   void DoPipeBufferReallocation(
-      buffer_allocation_t active_allocation[PipeIds<tgl_registers::Platform::kKabyLake>().size()])
+      buffer_allocation_t active_allocation[PipeIds<registers::Platform::kKabyLake>().size()])
       __TA_REQUIRES(display_lock_);
   // Reallocates plane buffers based on the given layer config.
   void ReallocatePlaneBuffers(cpp20::span<const display_config_t*> display_configs,
@@ -233,7 +233,7 @@ class Controller : public DeviceType,
                           uint32_t** layer_cfg_results) __TA_REQUIRES(display_lock_);
 
   bool CalculatePipeAllocation(cpp20::span<const display_config_t*> display_configs,
-                               uint64_t alloc[PipeIds<tgl_registers::Platform::kKabyLake>().size()])
+                               uint64_t alloc[PipeIds<registers::Platform::kKabyLake>().size()])
       __TA_REQUIRES(display_lock_);
 
   // The number of DBUF (Data Buffer) blocks that can be allocated to planes.
@@ -293,15 +293,15 @@ class Controller : public DeviceType,
   fbl::Vector<GMBusI2c> gmbus_i2cs_;
   fbl::Vector<DpAux> dp_auxs_;
 
-  // Plane buffer allocation. If no alloc, start == end == tgl_registers::PlaneBufCfg::kBufferCount.
-  buffer_allocation_t plane_buffers_[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                                    [tgl_registers::kImagePlaneCount] __TA_GUARDED(
+  // Plane buffer allocation. If no alloc, start == end == registers::PlaneBufCfg::kBufferCount.
+  buffer_allocation_t plane_buffers_[PipeIds<registers::Platform::kKabyLake>().size()]
+                                    [registers::kImagePlaneCount] __TA_GUARDED(
                                         plane_buffers_lock_) = {};
   mtx_t plane_buffers_lock_;
 
   // Buffer allocations for pipes
-  buffer_allocation_t pipe_buffers_[PipeIds<tgl_registers::Platform::kKabyLake>()
-                                        .size()] __TA_GUARDED(display_lock_) = {};
+  buffer_allocation_t pipe_buffers_[PipeIds<registers::Platform::kKabyLake>().size()] __TA_GUARDED(
+      display_lock_) = {};
   bool initial_alloc_ = true;
 
   uint16_t device_id_;
@@ -317,6 +317,6 @@ class Controller : public DeviceType,
   inspect::Node root_node_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_INTEL_I915_H_

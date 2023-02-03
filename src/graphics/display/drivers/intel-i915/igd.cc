@@ -16,7 +16,7 @@
 #include "src/graphics/display/drivers/intel-i915/firmware-bridge.h"
 #include "src/graphics/display/drivers/intel-i915/intel-i915.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -478,4 +478,4 @@ zx_status_t IgdOpRegion::Init(ddk::Pci& pci) {
   return ZX_OK;
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

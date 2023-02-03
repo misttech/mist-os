@@ -198,7 +198,7 @@ class EdpDisplayCtrl : public hwreg::RegisterBase<EdpDisplayCtrl, uint8_t> {
   DEF_BIT(7, vblank_backlight_update_enable);
 };
 
-// DPCD tgl_registers:: SET_POWER
+// DPCD registers:: SET_POWER
 class SetPower : public hwreg::RegisterBase<SetPower, uint8_t> {
  public:
   DEF_FIELD(2, 0, set_power_state);
@@ -211,7 +211,7 @@ class SetPower : public hwreg::RegisterBase<SetPower, uint8_t> {
   DEF_BIT(7, set_dn_device_dp_pwr_18v);
 };
 
-// DPCD tgl_registers:: LINK_RATE_SET
+// DPCD registers:: LINK_RATE_SET
 class LinkRateSet : public hwreg::RegisterBase<LinkRateSet, uint8_t> {
  public:
   DEF_FIELD(2, 0, link_rate_idx);
@@ -220,7 +220,7 @@ class LinkRateSet : public hwreg::RegisterBase<LinkRateSet, uint8_t> {
   DEF_RSVDZ_FIELD(7, 5);
 };
 
-// DPCD tgl_registers:: DOWN_STREAM_PORT_PRESENT
+// DPCD registers:: DOWN_STREAM_PORT_PRESENT
 class DownStreamPortPresent : public hwreg::RegisterBase<DownStreamPortPresent, uint8_t> {
  public:
   DEF_BIT(0, is_branch);
@@ -233,7 +233,7 @@ class DownStreamPortPresent : public hwreg::RegisterBase<DownStreamPortPresent, 
   DEF_BIT(4, detailed_cap_info_available);
 };
 
-// DPCD tgl_registers:: DOWN_STREAM_PORT_COUNT
+// DPCD registers:: DOWN_STREAM_PORT_COUNT
 class DownStreamPortCount : public hwreg::RegisterBase<DownStreamPortCount, uint8_t> {
  public:
   DEF_FIELD(3, 0, count);
@@ -241,7 +241,7 @@ class DownStreamPortCount : public hwreg::RegisterBase<DownStreamPortCount, uint
   DEF_BIT(7, oui_supported);
 };
 
-// DPCD tgl_registers:: SINK_COUNT
+// DPCD registers:: SINK_COUNT
 class SinkCount : public hwreg::RegisterBase<SinkCount, uint8_t> {
  public:
   DEF_FIELD(5, 0, count_lo);
@@ -251,7 +251,7 @@ class SinkCount : public hwreg::RegisterBase<SinkCount, uint8_t> {
   uint8_t count() const { return static_cast<uint8_t>(count_lo() | (count_hi() << 6)); }
 };
 
-// DPCD tgl_registers:: LANE_ALIGN_STATUS_UPDATED
+// DPCD registers:: LANE_ALIGN_STATUS_UPDATED
 class LaneAlignStatusUpdate : public hwreg::RegisterBase<LaneAlignStatusUpdate, uint8_t> {
  public:
   DEF_BIT(0, interlane_align_done);
@@ -260,7 +260,7 @@ class LaneAlignStatusUpdate : public hwreg::RegisterBase<LaneAlignStatusUpdate, 
   DEF_BIT(7, link_status_updated);
 };
 
-// DPCD tgl_registers:: TRAINING_AUX_RD_INTERVAL
+// DPCD registers:: TRAINING_AUX_RD_INTERVAL
 class TrainingAuxRdInterval
     : public hwreg::RegisterBase<TrainingAuxRdInterval, uint8_t, hwreg::EnablePrinter> {
  public:

@@ -23,7 +23,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-ddi-phy-tiger-lake.h"
 #include "src/graphics/display/drivers/intel-i915/registers-typec.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -145,12 +145,11 @@ struct TigerLakeProcessCompensationConfig {
 
 TigerLakeProcessCompensationConfig ReadTigerLakeProcessCompensationConfig(
     DdiId ddi_id, fdf::MmioBuffer* mmio_space) {
-  auto compensation1 = tgl_registers::PortCompensation1::GetForDdi(ddi_id).ReadFrom(mmio_space);
+  auto compensation1 = registers::PortCompensation1::GetForDdi(ddi_id).ReadFrom(mmio_space);
   auto compensation_nominal =
-      tgl_registers::PortCompensationNominalVoltageReferences::GetForDdi(ddi_id).ReadFrom(
-          mmio_space);
+      registers::PortCompensationNominalVoltageReferences::GetForDdi(ddi_id).ReadFrom(mmio_space);
   auto compensation_low =
-      tgl_registers::PortCompensationLowVoltageReferences::GetForDdi(ddi_id).ReadFrom(mmio_space);
+      registers::PortCompensationLowVoltageReferences::GetForDdi(ddi_id).ReadFrom(mmio_space);
 
   zxlogf(TRACE, "DDI %d PORT_COMP_DW1: %08x PORT_COMP_DW_9: %08x PORT_COMP_DW10: %08x", ddi_id,
          compensation1.reg_value(), compensation_nominal.reg_value(), compensation_low.reg_value());
@@ -209,7 +208,7 @@ TigerLakeProcessCompensationConfig ReadTigerLakeProcessCompensationConfig(
 
 void WriteTigerLakeProcessCompensationConfig(const TigerLakeProcessCompensationConfig& config,
                                              DdiId ddi_id, fdf::MmioBuffer* mmio_space) {
-  auto compensation1 = tgl_registers::PortCompensation1::GetForDdi(ddi_id).ReadFrom(mmio_space);
+  auto compensation1 = registers::PortCompensation1::GetForDdi(ddi_id).ReadFrom(mmio_space);
   compensation1.set_negative_low_voltage_reference_low_value_bits98(config.low.negative.low >> 8)
       .set_negative_low_voltage_reference_high_value_bits98(config.low.negative.high >> 8)
       .set_positive_low_voltage_reference_low_value_bits98(config.low.positive.low >> 8)
@@ -221,7 +220,7 @@ void WriteTigerLakeProcessCompensationConfig(const TigerLakeProcessCompensationC
       .WriteTo(mmio_space);
 
   auto compensation_nominal =
-      tgl_registers::PortCompensationNominalVoltageReferences::GetForDdi(ddi_id).FromValue(0);
+      registers::PortCompensationNominalVoltageReferences::GetForDdi(ddi_id).FromValue(0);
   compensation_nominal
       .set_negative_nominal_voltage_reference_low_value_bits70(config.nominal.negative.low & 0xff)
       .set_negative_nominal_voltage_reference_high_value_bits70(config.nominal.negative.high & 0xff)
@@ -230,7 +229,7 @@ void WriteTigerLakeProcessCompensationConfig(const TigerLakeProcessCompensationC
       .WriteTo(mmio_space);
 
   auto compensation_low =
-      tgl_registers::PortCompensationLowVoltageReferences::GetForDdi(ddi_id).FromValue(0);
+      registers::PortCompensationLowVoltageReferences::GetForDdi(ddi_id).FromValue(0);
   compensation_low
       .set_negative_low_voltage_reference_low_value_bits70(config.low.negative.low & 0xff)
       .set_negative_low_voltage_reference_high_value_bits70(config.low.negative.high & 0xff)
@@ -241,55 +240,55 @@ void WriteTigerLakeProcessCompensationConfig(const TigerLakeProcessCompensationC
 
 // Returns an empty configuration for unsupported process monitor values.
 TigerLakeProcessCompensationConfig ProcessCompensationConfigFor(
-    tgl_registers::PortCompensationStatus::ProcessSelect process,
-    tgl_registers::PortCompensationStatus::VoltageSelect voltage) {
+    registers::PortCompensationStatus::ProcessSelect process,
+    registers::PortCompensationStatus::VoltageSelect voltage) {
   switch (voltage) {
-    case tgl_registers::PortCompensationStatus::VoltageSelect::k850mv:
+    case registers::PortCompensationStatus::VoltageSelect::k850mv:
       switch (process) {
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot0:
+        case registers::PortCompensationStatus::ProcessSelect::kDot0:
           return TigerLakeProcessCompensationConfig{
               .nominal = {.negative = {.low = 0x62, .high = 0xab},
                           .positive = {.low = 0x67, .high = 0xbb}},
               .low = {.negative = {.low = 0x51, .high = 0x91},
                       .positive = {.low = 0x4f, .high = 0x96}}};
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot1:
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot4:
+        case registers::PortCompensationStatus::ProcessSelect::kDot1:
+        case registers::PortCompensationStatus::ProcessSelect::kDot4:
           break;
       };
       break;
-    case tgl_registers::PortCompensationStatus::VoltageSelect::k950mv:
+    case registers::PortCompensationStatus::VoltageSelect::k950mv:
       switch (process) {
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot0:
+        case registers::PortCompensationStatus::ProcessSelect::kDot0:
           return TigerLakeProcessCompensationConfig{
               .nominal = {.negative = {.low = 0x86, .high = 0xe1},
                           .positive = {.low = 0x72, .high = 0xc7}},
               .low = {.negative = {.low = 0x77, .high = 0xca},
                       .positive = {.low = 0x5e, .high = 0xab}}};
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot1:
+        case registers::PortCompensationStatus::ProcessSelect::kDot1:
           return TigerLakeProcessCompensationConfig{
               .nominal = {.negative = {.low = 0x93, .high = 0xf8},
                           .positive = {.low = 0x7e, .high = 0xf1}},
               .low = {.negative = {.low = 0x8a, .high = 0xe8},
                       .positive = {.low = 0x71, .high = 0xc5}}};
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot4:
+        case registers::PortCompensationStatus::ProcessSelect::kDot4:
           break;
       };
       break;
-    case tgl_registers::PortCompensationStatus::VoltageSelect::k1050mv:
+    case registers::PortCompensationStatus::VoltageSelect::k1050mv:
       switch (process) {
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot0:
+        case registers::PortCompensationStatus::ProcessSelect::kDot0:
           return TigerLakeProcessCompensationConfig{
               .nominal = {.negative = {.low = 0x98, .high = 0xfa},
                           .positive = {.low = 0x82, .high = 0xdd}},
               .low = {.negative = {.low = 0x89, .high = 0xe4},
                       .positive = {.low = 0x6d, .high = 0xc1}}};
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot1:
+        case registers::PortCompensationStatus::ProcessSelect::kDot1:
           return TigerLakeProcessCompensationConfig{
               .nominal = {.negative = {.low = 0x9a, .high = 0x100},
                           .positive = {.low = 0xab, .high = 0x125}},
               .low = {.negative = {.low = 0x8a, .high = 0xe3},
                       .positive = {.low = 0x8f, .high = 0xf1}}};
-        case tgl_registers::PortCompensationStatus::ProcessSelect::kDot4:
+        case registers::PortCompensationStatus::ProcessSelect::kDot4:
           break;
       };
   };
@@ -311,17 +310,17 @@ bool ComboDdiTigerLake::Initialize() {
   // between DDI A and DDIs B-C.
 
   auto procmon_status =
-      tgl_registers::PortCompensationStatus::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
+      registers::PortCompensationStatus::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
   {
     const char* process_name;
     switch (procmon_status.process_select()) {
-      case tgl_registers::PortCompensationStatus::ProcessSelect::kDot0:
+      case registers::PortCompensationStatus::ProcessSelect::kDot0:
         process_name = "dot-0";
         break;
-      case tgl_registers::PortCompensationStatus::ProcessSelect::kDot1:
+      case registers::PortCompensationStatus::ProcessSelect::kDot1:
         process_name = "dot-1";
         break;
-      case tgl_registers::PortCompensationStatus::ProcessSelect::kDot4:
+      case registers::PortCompensationStatus::ProcessSelect::kDot4:
         process_name = "dot-4";
         break;
       default:
@@ -332,13 +331,13 @@ bool ComboDdiTigerLake::Initialize() {
 
     const char* voltage_name;
     switch (procmon_status.voltage_select()) {
-      case tgl_registers::PortCompensationStatus::VoltageSelect::k850mv:
+      case registers::PortCompensationStatus::VoltageSelect::k850mv:
         voltage_name = "0.85v";
         break;
-      case tgl_registers::PortCompensationStatus::VoltageSelect::k950mv:
+      case registers::PortCompensationStatus::VoltageSelect::k950mv:
         voltage_name = "0.95v";
         break;
-      case tgl_registers::PortCompensationStatus::VoltageSelect::k1050mv:
+      case registers::PortCompensationStatus::VoltageSelect::k1050mv:
         voltage_name = "1.05v";
         break;
       default:
@@ -375,7 +374,7 @@ bool ComboDdiTigerLake::Initialize() {
            process_compensation.low.positive.low, process_compensation.low.positive.high);
   }
 
-  auto common_lane5 = tgl_registers::PortCommonLane5::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
+  auto common_lane5 = registers::PortCommonLane5::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
   zxlogf(TRACE,
          "DDI %d PORT_CL_DW5: %08x, common lane power down %s, suspend clock config %d, "
          "downlink broadcast %s, force %02x, CRI clock: count max %d select %d, "
@@ -396,13 +395,13 @@ bool ComboDdiTigerLake::Initialize() {
          common_lane5.fuse_valid_reset() ? "valid reset" : "-",
          common_lane5.fuse_repull() ? "repull" : "-");
 
-  static constexpr tgl_registers::PortLane kAllLanes[] = {
-      tgl_registers::PortLane::kAux, tgl_registers::PortLane::kMainLinkLane0,
-      tgl_registers::PortLane::kMainLinkLane1, tgl_registers::PortLane::kMainLinkLane2,
-      tgl_registers::PortLane::kMainLinkLane3};
-  for (tgl_registers::PortLane lane : kAllLanes) {
+  static constexpr registers::PortLane kAllLanes[] = {
+      registers::PortLane::kAux, registers::PortLane::kMainLinkLane0,
+      registers::PortLane::kMainLinkLane1, registers::PortLane::kMainLinkLane2,
+      registers::PortLane::kMainLinkLane3};
+  for (registers::PortLane lane : kAllLanes) {
     auto transmitter_dcc =
-        tgl_registers::PortTransmitterDutyCycleCorrection::GetForDdiLane(ddi_id(), lane)
+        registers::PortTransmitterDutyCycleCorrection::GetForDdiLane(ddi_id(), lane)
             .ReadFrom(mmio_space_);
     zxlogf(TRACE,
            "DDI %d Lane %d PORT_TX_DW8: %08x, output DCC clock: select %d divider select %d, "
@@ -421,7 +420,7 @@ bool ComboDdiTigerLake::Initialize() {
                transmitter_dcc.input_duty_cycle_correction_thermal_bits20());
 
     auto physical_coding1 =
-        tgl_registers::PortPhysicalCoding1::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space_);
+        registers::PortPhysicalCoding1::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space_);
     zxlogf(TRACE,
            "DDI %d Lane %d PORT_PCS_DW1: %08x, power-gated %s, DCC schedule %d, "
            "DCC calibration: force %s bypass %s on wake %s, clock request %d, "
@@ -447,13 +446,13 @@ bool ComboDdiTigerLake::Initialize() {
            physical_coding1.use_transmitter_buffer_clock_as_symbol_clock() ? "yes" : "no");
   }
 
-  auto phy_misc = tgl_registers::PhyMisc::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
+  auto phy_misc = registers::PhyMisc::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
   zxlogf(TRACE, "DDI %d PHY_MISC %08x, DE to IO: %x, IO to DE: %x, Comp power down: %s", ddi_id(),
          phy_misc.reg_value(), phy_misc.display_engine_to_io(), phy_misc.io_to_display_engine(),
          phy_misc.compensation_resistors_powered_down() ? "enabled" : "disabled");
 
   auto compensation_source =
-      tgl_registers::PortCompensationSource::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
+      registers::PortCompensationSource::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
   zxlogf(TRACE,
          "DDI %d PORT_COMP_DW8 %08x, internal reference generation %s, periodic compensation %s",
          ddi_id(), compensation_source.reg_value(),
@@ -461,7 +460,7 @@ bool ComboDdiTigerLake::Initialize() {
          compensation_source.periodic_current_compensation_disabled() ? "disabled" : "enabled");
 
   auto compensation_initialized =
-      tgl_registers::PortCompensation0::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
+      registers::PortCompensation0::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
   zxlogf(TRACE, "DDI %d PORT_COMP_DW0: %08x PORT_COMP_DW3: %08x ", ddi_id(),
          compensation_initialized.reg_value(), procmon_status.reg_value());
   if (compensation_initialized.initialized()) {
@@ -473,20 +472,20 @@ bool ComboDdiTigerLake::Initialize() {
     return true;
   }
 
-  for (tgl_registers::PortLane lane : kAllLanes) {
+  for (registers::PortLane lane : kAllLanes) {
     auto transmitter_dcc =
-        tgl_registers::PortTransmitterDutyCycleCorrection::GetForDdiLane(ddi_id(), lane)
+        registers::PortTransmitterDutyCycleCorrection::GetForDdiLane(ddi_id(), lane)
             .ReadFrom(mmio_space_);
     transmitter_dcc.set_output_duty_cycle_correction_clock_select(1)
         .set_output_duty_cycle_correction_clock_divider_select(
-            tgl_registers::PortTransmitterDutyCycleCorrection::ClockDividerSelect::k2)
+            registers::PortTransmitterDutyCycleCorrection::ClockDividerSelect::k2)
         .WriteTo(mmio_space_);
 
     auto physical_coding1 =
-        tgl_registers::PortPhysicalCoding1::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space_);
+        registers::PortPhysicalCoding1::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space_);
     physical_coding1
         .set_duty_cycle_correction_schedule_select(
-            tgl_registers::PortPhysicalCoding1::DutyCycleCorrectionScheduleSelect::kContinuously)
+            registers::PortPhysicalCoding1::DutyCycleCorrectionScheduleSelect::kContinuously)
         .WriteTo(mmio_space_);
   }
 
@@ -518,11 +517,10 @@ bool ComboDdiTigerLake::Deinitialize() {
   // TODO(fxbug.dev/113870): Implement the compensation source dependency
   // between DDI A and DDIs B-C.
 
-  auto phy_misc = tgl_registers::PhyMisc::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
+  auto phy_misc = registers::PhyMisc::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
   phy_misc.set_compensation_resistors_powered_down(true).WriteTo(mmio_space_);
 
-  auto port_compensation0 =
-      tgl_registers::PortCompensation0::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
+  auto port_compensation0 = registers::PortCompensation0::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
   port_compensation0.set_initialized(false).WriteTo(mmio_space_);
 
   return true;
@@ -572,10 +570,10 @@ DdiPhysicalLayer::PhysicalLayerInfo TypeCDdiTigerLake::ReadPhysicalLayerInfo() c
       .ddi_type = DdiType::kTypeC,
   };
 
-  auto dp_sp = tgl_registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
+  auto dp_sp = registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id()).ReadFrom(mmio_space_);
   auto type_c_live_state = dp_sp.type_c_live_state(ddi_id());
   switch (type_c_live_state) {
-    using TypeCLiveState = tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState;
+    using TypeCLiveState = registers::DynamicFlexIoScratchPad::TypeCLiveState;
     case TypeCLiveState::kNoHotplugDisplay:
       if (is_static_port_) {
         physical_layer_info.connection_type = ConnectionType::kBuiltIn;
@@ -722,7 +720,7 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
       //             Microcontroller health"
       if (!PollUntil(
               [&] {
-                return tgl_registers::DekelCommonConfigMicroControllerDword27::GetForDdi(ddi_id())
+                return registers::DekelCommonConfigMicroControllerDword27::GetForDdi(ddi_id())
                     .ReadFrom(mmio_space_)
                     .microcontroller_firmware_is_ready();
               },
@@ -732,8 +730,7 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
       }
     }
 
-    auto ddi_aux_ctl =
-        tgl_registers::DdiAuxControl::GetForTigerLakeDdi(ddi_id()).ReadFrom(mmio_space_);
+    auto ddi_aux_ctl = registers::DdiAuxControl::GetForTigerLakeDdi(ddi_id()).ReadFrom(mmio_space_);
     ddi_aux_ctl.set_use_thunderbolt(is_thunderbolt);
     ddi_aux_ctl.WriteTo(mmio_space_);
 
@@ -748,7 +745,7 @@ bool TypeCDdiTigerLake::SetAuxIoPower(bool target_enabled) const {
 }
 
 bool TypeCDdiTigerLake::SetPhySafeModeDisabled(bool target_disabled) const {
-  if (target_disabled && !tgl_registers::DynamicFlexIoDisplayPortPhyModeStatus::GetForDdi(ddi_id())
+  if (target_disabled && !registers::DynamicFlexIoDisplayPortPhyModeStatus::GetForDdi(ddi_id())
                               .ReadFrom(mmio_space_)
                               .phy_is_ready_for_ddi(ddi_id())) {
     zxlogf(ERROR, "DDI %d: lane not in DP mode", ddi_id());
@@ -756,8 +753,8 @@ bool TypeCDdiTigerLake::SetPhySafeModeDisabled(bool target_disabled) const {
   }
 
   auto dp_csss =
-      tgl_registers::DynamicFlexIoDisplayPortControllerSafeStateSettings::GetForDdi(ddi_id())
-          .ReadFrom(mmio_space_);
+      registers::DynamicFlexIoDisplayPortControllerSafeStateSettings::GetForDdi(ddi_id()).ReadFrom(
+          mmio_space_);
   dp_csss.set_safe_mode_disabled_for_ddi(ddi_id(), /*disabled=*/target_disabled);
   dp_csss.WriteTo(mmio_space_);
   dp_csss.ReadFrom(mmio_space_);
@@ -809,4 +806,4 @@ bool TypeCDdiTigerLake::UnblockTypeCColdPowerState() {
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

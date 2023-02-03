@@ -13,7 +13,7 @@
 #include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 #include "src/graphics/display/drivers/intel-i915/scoped-value-change.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -120,4 +120,4 @@ TEST_F(DisplayPllTigerLakeTest, EnableDisplayPort) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

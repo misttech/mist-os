@@ -8,12 +8,12 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
 TEST(GMBusDataTest, DataGetter) {
-  auto gmbus_data = tgl_registers::GMBusData::Get().FromValue(0);
+  auto gmbus_data = registers::GMBusData::Get().FromValue(0);
   gmbus_data.set_data_byte_0(0x50);
   gmbus_data.set_data_byte_1(0x51);
   gmbus_data.set_data_byte_2(0x52);
@@ -28,7 +28,7 @@ TEST(GMBusDataTest, DataGetter) {
 }
 
 TEST(GMBusDataTest, DataSetter) {
-  auto gmbus_data = tgl_registers::GMBusData::Get().FromValue(0);
+  auto gmbus_data = registers::GMBusData::Get().FromValue(0);
 
   // Test writing all 4 bytes.
   {
@@ -63,4 +63,4 @@ TEST(GMBusDataTest, DataSetter) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

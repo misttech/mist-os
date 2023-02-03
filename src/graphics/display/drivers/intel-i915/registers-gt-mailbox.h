@@ -9,7 +9,7 @@
 
 #include <hwreg/bitfields.h>
 
-namespace tgl_registers {
+namespace registers {
 
 // GTDRIVER_MAILBOX_INTERFACE (GT Driver Mailbox Interface).
 //
@@ -119,6 +119,6 @@ class PowerMailboxData1 : public hwreg::RegisterBase<PowerMailboxData1, uint32_t
   static auto Get() { return hwreg::RegisterAddr<PowerMailboxData0>(0x13812c); }
 };
 
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_GT_MAILBOX_H_

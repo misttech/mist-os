@@ -14,7 +14,7 @@
 #include "src/graphics/display/drivers/intel-i915/igd.h"
 #include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -386,4 +386,4 @@ TEST(DdiManagerTigerLake, ParseVbtTable_NUC11PAHi5) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

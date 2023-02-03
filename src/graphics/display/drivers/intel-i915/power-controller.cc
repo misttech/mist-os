@@ -20,7 +20,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-gt-mailbox.h"
 #include "src/graphics/display/drivers/intel-i915/scoped-value-change.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -79,7 +79,7 @@ PowerController::PowerController(fdf::MmioBuffer* mmio_buffer) : mmio_buffer_(mm
 }
 
 zx::result<uint64_t> PowerController::Transact(PowerControllerCommand command) {
-  auto mailbox_interface = tgl_registers::PowerMailboxInterface::Get().FromValue(0);
+  auto mailbox_interface = registers::PowerMailboxInterface::Get().FromValue(0);
 
   if (!PollUntil([&] { return !mailbox_interface.ReadFrom(mmio_buffer_).has_active_transaction(); },
                  zx::usec(1), g_previous_command_timeout_us)) {
@@ -87,9 +87,9 @@ zx::result<uint64_t> PowerController::Transact(PowerControllerCommand command) {
     return zx::error_result(ZX_ERR_IO_MISSED_DEADLINE);
   }
 
-  auto mailbox_data0 = tgl_registers::PowerMailboxData0::Get().FromValue(0);
+  auto mailbox_data0 = registers::PowerMailboxData0::Get().FromValue(0);
   mailbox_data0.set_reg_value(static_cast<uint32_t>(command.data)).WriteTo(mmio_buffer_);
-  auto mailbox_data1 = tgl_registers::PowerMailboxData1::Get().FromValue(0);
+  auto mailbox_data1 = registers::PowerMailboxData1::Get().FromValue(0);
   mailbox_data1.set_reg_value(static_cast<uint32_t>(command.data >> 32)).WriteTo(mmio_buffer_);
   mailbox_interface.set_command_code(command.command)
       .set_param1(command.param1)
@@ -245,7 +245,7 @@ zx::result<uint32_t> PowerController::GetSystemAgentBlockTimeUsTigerLake() {
 
   // This PCU command returns an error code in the Command/Error Code field
   // of the Mailbox Interface register.
-  auto mailbox_interface = tgl_registers::PowerMailboxInterface::Get().ReadFrom(mmio_buffer_);
+  auto mailbox_interface = registers::PowerMailboxInterface::Get().ReadFrom(mmio_buffer_);
   if (mailbox_interface.command_code() != 0) {
     return zx::error_result(ZX_ERR_IO_REFUSED);
   }
@@ -288,7 +288,7 @@ zx::result<std::array<uint8_t, 8>> PowerController::GetRawMemoryLatencyDataUs() 
 
     // This PCU command returns an error code in the Command/Error Code field
     // of the Mailbox Interface register.
-    auto mailbox_interface = tgl_registers::PowerMailboxInterface::Get().ReadFrom(mmio_buffer_);
+    auto mailbox_interface = registers::PowerMailboxInterface::Get().ReadFrom(mmio_buffer_);
     if (mailbox_interface.command_code() != 0) {
       return zx::error_result(ZX_ERR_IO_REFUSED);
     }
@@ -415,7 +415,7 @@ zx::result<MemorySubsystemInfo> PowerController::GetMemorySubsystemInfoTigerLake
 
     // This PCU command returns an error code in the Command/Error Code field
     // of the Mailbox Interface register.
-    auto mailbox_interface = tgl_registers::PowerMailboxInterface::Get().ReadFrom(mmio_buffer_);
+    auto mailbox_interface = registers::PowerMailboxInterface::Get().ReadFrom(mmio_buffer_);
     if (mailbox_interface.command_code() != 0) {
       return zx::error_result(ZX_ERR_IO_REFUSED);
     }
@@ -482,4 +482,4 @@ ScopedValueChange<int> PowerController::OverrideGetMemoryLatencyReplyTimeoutUsFo
   return ScopedValueChange(g_get_memory_latency_reply_timeout_us, timeout_us);
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

@@ -62,7 +62,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -231,7 +231,7 @@ void Controller::HandlePipeVsync(PipeId pipe_id, zx_time_t timestamp) {
   if (pipe && pipe->in_use()) {
     id = pipe->attached_display_id();
 
-    tgl_registers::PipeRegs regs(pipe_id);
+    registers::PipeRegs regs(pipe_id);
     std::vector<uint64_t> handles;
     for (int i = 0; i < 3; i++) {
       auto live_surface = regs.PlaneSurfaceLive(i).ReadFrom(mmio_space());
@@ -294,7 +294,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
 
   // Wait for Power Well 0 distribution
   if (!PollUntil(
-          [&] { return tgl_registers::FuseStatus::Get().ReadFrom(mmio_space()).pg0_dist_status(); },
+          [&] { return registers::FuseStatus::Get().ReadFrom(mmio_space()).pg0_dist_status(); },
           zx::usec(1), 20)) {
     zxlogf(ERROR, "Power Well 0 distribution failed");
     return false;
@@ -312,16 +312,13 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   }
 
   if (is_tgl(device_id_)) {
-    auto pwr_well_ctrl = tgl_registers::PowerWellControl::Get().ReadFrom(mmio_space());
+    auto pwr_well_ctrl = registers::PowerWellControl::Get().ReadFrom(mmio_space());
     pwr_well_ctrl.power_request(1).set(1);
     pwr_well_ctrl.WriteTo(mmio_space());
 
     if (!PollUntil(
             [&] {
-              return tgl_registers::PowerWellControl::Get()
-                  .ReadFrom(mmio_space())
-                  .power_state(0)
-                  .get();
+              return registers::PowerWellControl::Get().ReadFrom(mmio_space()).power_state(0).get();
             },
             zx::usec(1), 30)) {
       zxlogf(ERROR, "Power Well 1 state failed");
@@ -329,9 +326,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     }
 
     if (!PollUntil(
-            [&] {
-              return tgl_registers::FuseStatus::Get().ReadFrom(mmio_space()).pg1_dist_status();
-            },
+            [&] { return registers::FuseStatus::Get().ReadFrom(mmio_space()).pg1_dist_status(); },
             zx::usec(1), 20)) {
       zxlogf(ERROR, "Power Well 1 distribution failed");
       return false;
@@ -348,11 +343,11 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     // Enable CDCLK PLL to 337.5mhz if the BIOS didn't already enable it. If it needs to be
     // something special (i.e. for eDP), assume that the BIOS already enabled it.
     auto lcpll1_control =
-        tgl_registers::PllEnable::GetForSkylakeDpll(PllId::DPLL_0).ReadFrom(mmio_space());
+        registers::PllEnable::GetForSkylakeDpll(PllId::DPLL_0).ReadFrom(mmio_space());
     if (!lcpll1_control.pll_enabled()) {
       // Configure DPLL0 frequency before enabling it.
       const auto dpll = PllId::DPLL_0;
-      auto dpll_control1 = tgl_registers::DisplayPllControl1::Get().ReadFrom(mmio_space());
+      auto dpll_control1 = registers::DisplayPllControl1::Get().ReadFrom(mmio_space());
       dpll_control1.set_pll_uses_hdmi_configuration_mode(dpll, false)
           .set_pll_spread_spectrum_clocking_enabled(dpll, false)
           .set_pll_display_port_ddi_frequency_mhz(dpll, 810)
@@ -393,7 +388,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
   const int display_buffer_slice_count = is_tgl(device_id_) ? 2 : 1;
   for (int slice_index = 0; slice_index < display_buffer_slice_count; ++slice_index) {
     auto display_buffer_control =
-        tgl_registers::DataBufferControl::GetForSlice(slice_index).ReadFrom(mmio_space());
+        registers::DataBufferControl::GetForSlice(slice_index).ReadFrom(mmio_space());
     display_buffer_control.set_powered_on_target(true).WriteTo(mmio_space());
 
     if (!PollUntil([&] { return display_buffer_control.ReadFrom(mmio_space()).powered_on(); },
@@ -420,7 +415,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     outp(kSequencerIdx, inp(kSequencerData) | kClockingModeScreenOff);
     zx_nanosleep(zx_deadline_after(ZX_MSEC(100)));
 
-    auto vga_ctl = tgl_registers::VgaCtl::Get().ReadFrom(mmio_space());
+    auto vga_ctl = registers::VgaCtl::Get().ReadFrom(mmio_space());
     vga_ctl.set_vga_display_disable(1);
     vga_ctl.WriteTo(mmio_space());
   }
@@ -429,18 +424,18 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     pipe->Reset();
     ResetPipePlaneBuffers(pipe->pipe_id());
 
-    tgl_registers::PipeRegs pipe_regs(pipe->pipe_id());
+    registers::PipeRegs pipe_regs(pipe->pipe_id());
 
     // Disable the scalers (double buffered on PipeScalerWindowSize), since
     // we don't know what state they are in at boot.
-    auto pipe_scaler_0_regs = tgl_registers::PipeScalerRegs(pipe->pipe_id(), 0);
+    auto pipe_scaler_0_regs = registers::PipeScalerRegs(pipe->pipe_id(), 0);
     pipe_scaler_0_regs.PipeScalerControlSkylake()
         .ReadFrom(mmio_space())
         .set_is_enabled(0)
         .WriteTo(mmio_space());
     pipe_scaler_0_regs.PipeScalerWindowSize().ReadFrom(mmio_space()).WriteTo(mmio_space());
     if (pipe->pipe_id() != PipeId::PIPE_C) {
-      auto pipe_scaler_1_regs = tgl_registers::PipeScalerRegs(pipe->pipe_id(), 1);
+      auto pipe_scaler_1_regs = registers::PipeScalerRegs(pipe->pipe_id(), 1);
       pipe_scaler_1_regs.PipeScalerControlSkylake()
           .ReadFrom(mmio_space())
           .set_is_enabled(0)
@@ -455,7 +450,7 @@ bool Controller::BringUpDisplayEngine(bool resume) {
     }
 
     // Disable the primary plane watermarks and reset their buffer allocation
-    for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+    for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
       for (int wm_num = 0; wm_num < 8; wm_num++) {
         auto wm = pipe_regs.PlaneWatermark(plane_num + 1, wm_num).FromValue(0);
         wm.WriteTo(mmio_space());
@@ -469,13 +464,13 @@ bool Controller::BringUpDisplayEngine(bool resume) {
 void Controller::ResetPipePlaneBuffers(PipeId pipe_id) {
   fbl::AutoLock lock(&plane_buffers_lock_);
   const int data_buffer_block_count = DataBufferBlockCount();
-  for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+  for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
     plane_buffers_[pipe_id][plane_num].start = data_buffer_block_count;
   }
 }
 
 bool Controller::ResetDdi(DdiId ddi_id, std::optional<TranscoderId> transcoder_id) {
-  tgl_registers::DdiRegs ddi_regs(ddi_id);
+  registers::DdiRegs ddi_regs(ddi_id);
 
   // Disable the port
   auto ddi_buffer_control = ddi_regs.BufferControl().ReadFrom(mmio_space());
@@ -485,15 +480,15 @@ bool Controller::ResetDdi(DdiId ddi_id, std::optional<TranscoderId> transcoder_i
   if (!is_tgl(device_id_)) {
     auto dp_transport_control = ddi_regs.DpTransportControl().ReadFrom(mmio_space());
     dp_transport_control.set_enabled(false)
-        .set_training_pattern(tgl_registers::DpTransportControl::kTrainingPattern1)
+        .set_training_pattern(registers::DpTransportControl::kTrainingPattern1)
         .WriteTo(mmio_space());
   } else {
     if (transcoder_id.has_value()) {
       auto dp_transport_control =
-          tgl_registers::DpTransportControl::GetForTigerLakeTranscoder(*transcoder_id)
+          registers::DpTransportControl::GetForTigerLakeTranscoder(*transcoder_id)
               .ReadFrom(mmio_space());
       dp_transport_control.set_enabled(false)
-          .set_training_pattern(tgl_registers::DpTransportControl::kTrainingPattern1)
+          .set_training_pattern(registers::DpTransportControl::kTrainingPattern1)
           .WriteTo(mmio_space());
     }
   }
@@ -571,7 +566,7 @@ std::unique_ptr<DisplayDevice> Controller::QueryDisplay(DdiId ddi_id, uint64_t d
 }
 
 bool Controller::LoadHardwareState(DdiId ddi_id, DisplayDevice* device) {
-  tgl_registers::DdiRegs regs(ddi_id);
+  registers::DdiRegs regs(ddi_id);
 
   if (!power_->GetDdiIoPowerState(ddi_id) ||
       !regs.BufferControl().ReadFrom(mmio_space()).enabled()) {
@@ -773,7 +768,7 @@ void Controller::DisableSystemAgentGeyserville() {
 void Controller::RemoveDisplay(std::unique_ptr<DisplayDevice> display) {
   // Invalidate and disable any ELD.
   if (display->id() == eld_display_id_) {
-    auto audio_pin = tgl_registers::AudioPinEldCPReadyStatus::Get().ReadFrom(mmio_space());
+    auto audio_pin = registers::AudioPinEldCPReadyStatus::Get().ReadFrom(mmio_space());
     audio_pin.set_eld_valid_a(0).set_audio_enable_a(0).WriteTo(mmio_space());
     eld_display_id_.reset();
   }
@@ -964,11 +959,11 @@ zx_status_t Controller::DisplayControllerImplImportImage(image_t* image, zx_unow
 
   uint32_t align;
   if (image->type == IMAGE_TYPE_SIMPLE) {
-    align = tgl_registers::PlaneSurface::kLinearAlignment;
+    align = registers::PlaneSurface::kLinearAlignment;
   } else if (image->type == IMAGE_TYPE_X_TILED) {
-    align = tgl_registers::PlaneSurface::kXTilingAlignment;
+    align = registers::PlaneSurface::kXTilingAlignment;
   } else {
-    align = tgl_registers::PlaneSurface::kYTilingAlignment;
+    align = registers::PlaneSurface::kYTilingAlignment;
   }
   std::unique_ptr<GttRegionImpl> gtt_region;
   zx_status_t status = gtt_.AllocRegion(length, align, &gtt_region);
@@ -1041,7 +1036,7 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
       } else if (config->layer_list[j]->type == LAYER_TYPE_CURSOR) {
         // Since the config is validated, we know the cursor is the
         // highest plane, so we don't care about the layer's z_index.
-        if (plane != tgl_registers::kCursorPlane) {
+        if (plane != registers::kCursorPlane) {
           continue;
         }
       } else if (config->layer_list[j]->type == LAYER_TYPE_COLOR) {
@@ -1058,14 +1053,14 @@ bool Controller::GetPlaneLayer(Pipe* pipe, uint32_t plane,
 }
 
 uint16_t Controller::CalculateBuffersPerPipe(size_t active_pipe_count) {
-  ZX_ASSERT(active_pipe_count < PipeIds<tgl_registers::Platform::kKabyLake>().size());
+  ZX_ASSERT(active_pipe_count < PipeIds<registers::Platform::kKabyLake>().size());
   return static_cast<uint16_t>(DataBufferBlockCount() / active_pipe_count);
 }
 
 bool Controller::CalculateMinimumAllocations(
     cpp20::span<const display_config_t*> display_configs,
-    uint16_t min_allocs[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                       [tgl_registers::kImagePlaneCount]) {
+    uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
+                       [registers::kImagePlaneCount]) {
   // This fn ignores layers after kImagePlaneCount. Displays with too many layers already
   // failed in ::CheckConfiguration, so it doesn't matter if we incorrectly say they pass here.
   bool success = true;
@@ -1073,7 +1068,7 @@ bool Controller::CalculateMinimumAllocations(
     PipeId pipe_id = pipe->pipe_id();
     uint32_t total = 0;
 
-    for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+    for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
       const layer_t* layer;
       if (!GetPlaneLayer(pipe, plane_num, display_configs, &layer)) {
         min_allocs[pipe_id][plane_num] = 0;
@@ -1123,21 +1118,20 @@ bool Controller::CalculateMinimumAllocations(
 }
 
 void Controller::UpdateAllocations(
-    const uint16_t min_allocs[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                             [tgl_registers::kImagePlaneCount],
-    const uint64_t data_rate[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                            [tgl_registers::kImagePlaneCount]) {
-  uint16_t allocs[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                 [tgl_registers::kImagePlaneCount];
+    const uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
+                             [registers::kImagePlaneCount],
+    const uint64_t data_rate[PipeIds<registers::Platform::kKabyLake>().size()]
+                            [registers::kImagePlaneCount]) {
+  uint16_t allocs[PipeIds<registers::Platform::kKabyLake>().size()][registers::kImagePlaneCount];
 
-  for (unsigned pipe_num = 0; pipe_num < PipeIds<tgl_registers::Platform::kKabyLake>().size();
+  for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
        pipe_num++) {
     uint64_t total_data_rate = 0;
-    for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+    for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
       total_data_rate += data_rate[pipe_num][plane_num];
     }
     if (total_data_rate == 0) {
-      for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+      for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
         allocs[pipe_num][plane_num] = 0;
       }
       continue;
@@ -1147,10 +1141,10 @@ void Controller::UpdateAllocations(
     // that percentage isn't enough for a plane, give that plane its minimum allocation and
     // then try again.
     double buffers_per_pipe = pipe_buffers_[pipe_num].end - pipe_buffers_[pipe_num].start;
-    bool forced_alloc[tgl_registers::kImagePlaneCount] = {};
+    bool forced_alloc[registers::kImagePlaneCount] = {};
     bool done = false;
     while (!done) {
-      for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+      for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
         if (forced_alloc[plane_num]) {
           continue;
         }
@@ -1162,7 +1156,7 @@ void Controller::UpdateAllocations(
 
       done = true;
 
-      for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+      for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
         if (allocs[pipe_num][plane_num] < min_allocs[pipe_num][plane_num]) {
           done = false;
           allocs[pipe_num][plane_num] = min_allocs[pipe_num][plane_num];
@@ -1178,10 +1172,10 @@ void Controller::UpdateAllocations(
   {
     fbl::AutoLock lock(&plane_buffers_lock_);
     const int data_buffer_block_count = DataBufferBlockCount();
-    for (unsigned pipe_num = 0; pipe_num < PipeIds<tgl_registers::Platform::kKabyLake>().size();
+    for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
          pipe_num++) {
       uint16_t start = pipe_buffers_[pipe_num].start;
-      for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+      for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
         auto cur = &plane_buffers_[pipe_num][plane_num];
 
         if (allocs[pipe_num][plane_num] == 0) {
@@ -1193,8 +1187,8 @@ void Controller::UpdateAllocations(
         }
         start = static_cast<uint16_t>(start + allocs[pipe_num][plane_num]);
 
-        PipeId pipe_id = PipeIds<tgl_registers::Platform::kKabyLake>()[pipe_num];
-        tgl_registers::PipeRegs pipe_regs(pipe_id);
+        PipeId pipe_id = PipeIds<registers::Platform::kKabyLake>()[pipe_num];
+        registers::PipeRegs pipe_regs(pipe_id);
 
         // These are latched on the surface address register, so we don't yet need to
         // worry about overlaps when updating planes during a pipe allocation.
@@ -1211,7 +1205,7 @@ void Controller::UpdateAllocations(
 
         // Give the buffers to both the cursor plane and plane 2, since
         // only one will actually be active.
-        if (plane_num == tgl_registers::kCursorPlane) {
+        if (plane_num == registers::kCursorPlane) {
           auto buf_cfg = pipe_regs.PlaneBufCfg(0).FromValue(0);
           buf_cfg.set_buffer_start(cur->start);
           buf_cfg.set_buffer_end(cur->end - 1);
@@ -1234,19 +1228,18 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> dis
     return;
   }
 
-  uint16_t min_allocs[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                     [tgl_registers::kImagePlaneCount];
+  uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
+                     [registers::kImagePlaneCount];
   if (!CalculateMinimumAllocations(display_configs, min_allocs)) {
     // The allocation should have been checked, so this shouldn't fail
     ZX_ASSERT(false);
   }
 
   // Calculate the data rates and store the minimum allocations
-  uint64_t data_rate[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                    [tgl_registers::kImagePlaneCount];
+  uint64_t data_rate[PipeIds<registers::Platform::kKabyLake>().size()][registers::kImagePlaneCount];
   for (Pipe* pipe : *pipe_manager_) {
     PipeId pipe_id = pipe->pipe_id();
-    for (unsigned plane_num = 0; plane_num < tgl_registers::kImagePlaneCount; plane_num++) {
+    for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
       const layer_t* layer;
       if (!GetPlaneLayer(pipe, plane_num, display_configs, &layer)) {
         data_rate[pipe_id][plane_num] = 0;
@@ -1274,7 +1267,7 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> dis
     reallocate_pipes = true;
   }
 
-  buffer_allocation_t active_allocation[PipeIds<tgl_registers::Platform::kKabyLake>().size()];
+  buffer_allocation_t active_allocation[PipeIds<registers::Platform::kKabyLake>().size()];
   if (reallocate_pipes) {
     // Allocate buffers to each pipe, but save the old allocation to use
     // when progressively updating the allocation.
@@ -1310,7 +1303,7 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> dis
 }
 
 void Controller::DoPipeBufferReallocation(
-    buffer_allocation_t active_allocation[PipeIds<tgl_registers::Platform::kKabyLake>().size()]) {
+    buffer_allocation_t active_allocation[PipeIds<registers::Platform::kKabyLake>().size()]) {
   // Given that the order of the allocations is fixed, an allocation X_i is contained completely
   // within its old allocation if {new len of allocations preceding X_i} >= {start of old X_i} and
   // {new len of allocations preceding X_i + new len of X_i} <= {end of old X_i}. For any i,
@@ -1323,7 +1316,7 @@ void Controller::DoPipeBufferReallocation(
   bool done = false;
   while (!done) {
     done = true;
-    for (unsigned pipe_num = 0; pipe_num < PipeIds<tgl_registers::Platform::kKabyLake>().size();
+    for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
          pipe_num++) {
       auto active_alloc = active_allocation + pipe_num;
       auto goal_alloc = pipe_buffers_ + pipe_num;
@@ -1335,8 +1328,8 @@ void Controller::DoPipeBufferReallocation(
       // Look through all the other active pipe allocations for overlap
       bool overlap = false;
       if (goal_alloc->start != goal_alloc->end) {
-        for (unsigned other_pipe = 0;
-             other_pipe < PipeIds<tgl_registers::Platform::kKabyLake>().size(); other_pipe++) {
+        for (unsigned other_pipe = 0; other_pipe < PipeIds<registers::Platform::kKabyLake>().size();
+             other_pipe++) {
           if (other_pipe == pipe_num) {
             continue;
           }
@@ -1357,8 +1350,8 @@ void Controller::DoPipeBufferReallocation(
       if (!overlap) {
         // Flush the pipe allocation, wait for it to be active, and update
         // what is current active.
-        tgl_registers::PipeRegs pipe_regs(PipeIds<tgl_registers::Platform::kKabyLake>()[pipe_num]);
-        for (unsigned j = 0; j < tgl_registers::kImagePlaneCount; j++) {
+        registers::PipeRegs pipe_regs(PipeIds<registers::Platform::kKabyLake>()[pipe_num]);
+        for (unsigned j = 0; j < registers::kImagePlaneCount; j++) {
           pipe_regs.PlaneSurface(j).ReadFrom(mmio_space()).WriteTo(mmio_space());
         }
         pipe_regs.CursorBase().ReadFrom(mmio_space()).WriteTo(mmio_space());
@@ -1398,23 +1391,23 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> display
     }
 
     uint64_t max_pipe_pixel_rate;
-    auto cd_freq = tgl_registers::CdClockCtl::Get().ReadFrom(mmio_space()).cd_freq_decimal();
+    auto cd_freq = registers::CdClockCtl::Get().ReadFrom(mmio_space()).cd_freq_decimal();
 
-    if (cd_freq == tgl_registers::CdClockCtl::FreqDecimal(307200)) {
+    if (cd_freq == registers::CdClockCtl::FreqDecimal(307200)) {
       max_pipe_pixel_rate = 307200000;
-    } else if (cd_freq == tgl_registers::CdClockCtl::FreqDecimal(308570)) {
+    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(308570)) {
       max_pipe_pixel_rate = 308570000;
-    } else if (cd_freq == tgl_registers::CdClockCtl::FreqDecimal(337500)) {
+    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(337500)) {
       max_pipe_pixel_rate = 337500000;
-    } else if (cd_freq == tgl_registers::CdClockCtl::FreqDecimal(432000)) {
+    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(432000)) {
       max_pipe_pixel_rate = 432000000;
-    } else if (cd_freq == tgl_registers::CdClockCtl::FreqDecimal(450000)) {
+    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(450000)) {
       max_pipe_pixel_rate = 450000000;
-    } else if (cd_freq == tgl_registers::CdClockCtl::FreqDecimal(540000)) {
+    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(540000)) {
       max_pipe_pixel_rate = 540000000;
-    } else if (cd_freq == tgl_registers::CdClockCtl::FreqDecimal(617140)) {
+    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(617140)) {
       max_pipe_pixel_rate = 617140000;
-    } else if (cd_freq == tgl_registers::CdClockCtl::FreqDecimal(675000)) {
+    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(675000)) {
       max_pipe_pixel_rate = 675000000;
     } else {
       ZX_ASSERT(false);
@@ -1478,7 +1471,7 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
     return CONFIG_DISPLAY_OK;
   }
 
-  uint64_t pipe_alloc[PipeIds<tgl_registers::Platform::kKabyLake>().size()];
+  uint64_t pipe_alloc[PipeIds<registers::Platform::kKabyLake>().size()];
   if (!CalculatePipeAllocation(display_configs, pipe_alloc)) {
     return CONFIG_DISPLAY_TOO_MANY;
   }
@@ -1555,14 +1548,14 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
           }
 
           if (primary->dest_frame.width != src_width || primary->dest_frame.height != src_height) {
-            float ratio = tgl_registers::PipeScalerControlSkylake::k7x5MaxRatio;
+            float ratio = registers::PipeScalerControlSkylake::k7x5MaxRatio;
             uint32_t max_width = static_cast<uint32_t>(static_cast<float>(src_width) * ratio);
             uint32_t max_height = static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
             uint32_t scalers_needed = 1;
             // The 7x5 scaler (i.e. 2 scaler resources) is required if the src width is
             // >2048 and the required vertical scaling is greater than 1.99.
             if (primary->src_frame.width > 2048) {
-              float ratio = tgl_registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
+              float ratio = registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
               uint32_t max_dynamic_height =
                   static_cast<uint32_t>(static_cast<float>(src_height) * ratio);
               if (max_dynamic_height < primary->dest_frame.height) {
@@ -1575,11 +1568,11 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
             // Verify that the required scaling ratio isn't too large
             bool using_c = pipe_alloc[PipeId::PIPE_C] == display->id();
             if ((total_scalers_needed + scalers_needed) >
-                    (using_c ? tgl_registers::PipeScalerControlSkylake::kPipeCScalersAvailable
-                             : tgl_registers::PipeScalerControlSkylake::kPipeABScalersAvailable) ||
-                src_width > tgl_registers::PipeScalerControlSkylake::kMaxSrcWidthPx ||
-                src_width < tgl_registers::PipeScalerControlSkylake::kMinSrcSizePx ||
-                src_height < tgl_registers::PipeScalerControlSkylake::kMinSrcSizePx ||
+                    (using_c ? registers::PipeScalerControlSkylake::kPipeCScalersAvailable
+                             : registers::PipeScalerControlSkylake::kPipeABScalersAvailable) ||
+                src_width > registers::PipeScalerControlSkylake::kMaxSrcWidthPx ||
+                src_width < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
+                src_height < registers::PipeScalerControlSkylake::kMinSrcSizePx ||
                 max_width < primary->dest_frame.width || max_height < primary->dest_frame.height) {
               layer_cfg_result[i][j] |= CLIENT_FRAME_SCALE;
             } else {
@@ -1632,8 +1625,7 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
 
   // CalculateMinimumAllocations ignores layers after kImagePlaneCount. That's fine, since
   // that case already fails from an earlier check.
-  uint16_t arr[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-              [tgl_registers::kImagePlaneCount];
+  uint16_t arr[PipeIds<registers::Platform::kKabyLake>().size()][registers::kImagePlaneCount];
   if (!CalculateMinimumAllocations(display_configs, arr)) {
     // Find any displays whose allocation fails and set the return code. Overwrite
     // any previous errors, since they get solved by the merge.
@@ -1662,11 +1654,11 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
 
 bool Controller::CalculatePipeAllocation(
     cpp20::span<const display_config_t*> display_configs,
-    uint64_t alloc[PipeIds<tgl_registers::Platform::kKabyLake>().size()]) {
-  if (display_configs.size() > PipeIds<tgl_registers::Platform::kKabyLake>().size()) {
+    uint64_t alloc[PipeIds<registers::Platform::kKabyLake>().size()]) {
+  if (display_configs.size() > PipeIds<registers::Platform::kKabyLake>().size()) {
     return false;
   }
-  memset(alloc, 0, sizeof(uint64_t) * PipeIds<tgl_registers::Platform::kKabyLake>().size());
+  memset(alloc, 0, sizeof(uint64_t) * PipeIds<registers::Platform::kKabyLake>().size());
   // Keep any allocated pipes on the same display
   for (const display_config_t* config : display_configs) {
     DisplayDevice* display = FindDevice(config->display_id);
@@ -1678,7 +1670,7 @@ bool Controller::CalculatePipeAllocation(
   for (const display_config_t* config : display_configs) {
     DisplayDevice* display = FindDevice(config->display_id);
     if (display != nullptr && display->pipe() == nullptr) {
-      for (unsigned pipe_num = 0; pipe_num < PipeIds<tgl_registers::Platform::kKabyLake>().size();
+      for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
            pipe_num++) {
         if (!alloc[pipe_num]) {
           alloc[pipe_num] = config->display_id;
@@ -1721,9 +1713,9 @@ void Controller::DisplayControllerImplSetEld(uint64_t display_id, const uint8_t*
 
   constexpr size_t kMaxEldLength = 48;
   size_t length = std::min<size_t>(raw_eld_count, kMaxEldLength);
-  auto edid0 = tgl_registers::AudEdidData::Get(0).ReadFrom(mmio_space());
-  auto audio_pin = tgl_registers::AudioPinEldCPReadyStatus::Get().ReadFrom(mmio_space());
-  auto ctrl = tgl_registers::AudioDipEldControlStatus::Get().ReadFrom(mmio_space());
+  auto edid0 = registers::AudEdidData::Get(0).ReadFrom(mmio_space());
+  auto audio_pin = registers::AudioPinEldCPReadyStatus::Get().ReadFrom(mmio_space());
+  auto ctrl = registers::AudioDipEldControlStatus::Get().ReadFrom(mmio_space());
   audio_pin.set_audio_enable_a(1).set_eld_valid_a(0).WriteTo(mmio_space());
 
   // TODO(andresoportus): We should "Wait for 2 vertical blanks" if we do this with the display
@@ -2147,7 +2139,7 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
     // controller's bar 2. Try to get that buffer working again across the
     // mexec by mapping gfx stolen memory to gaddr 0.
 
-    auto bdsm_reg = tgl_registers::BaseDsm::Get().FromValue(0);
+    auto bdsm_reg = registers::BaseDsm::Get().FromValue(0);
     zx_status_t status = pci_.ReadConfig32(bdsm_reg.kAddr, bdsm_reg.reg_value_ptr());
     if (status != ZX_OK) {
       zxlogf(TRACE, "Failed to read dsm base");
@@ -2179,7 +2171,7 @@ void Controller::DdkSuspend(ddk::SuspendTxn txn) {
           continue;
         }
         // TODO(fxbug.dev/31310): Reset/scale the display to ensure the buffer displays properly
-        tgl_registers::PipeRegs pipe_regs(display->pipe()->pipe_id());
+        registers::PipeRegs pipe_regs(display->pipe()->pipe_id());
 
         auto plane_stride = pipe_regs.PlaneSurfaceStride(0).ReadFrom(mmio_space());
         plane_stride.set_stride(width_in_tiles(IMAGE_TYPE_SIMPLE, fb_info.width, fb_info.format));
@@ -2207,7 +2199,7 @@ void Controller::DdkResume(ddk::ResumeTxn txn) {
     //
     // Kaby Lake: IHD-OS-KBL-Vol 2c-1.17 Part 1 page 444
     // Skylake: IHD-OS-SKL-Vol 2c-05.16 Part 1 page 440
-    tgl_registers::DdiRegs(DdiId::DDI_A)
+    registers::DdiRegs(DdiId::DDI_A)
         .BufferControl()
         .ReadFrom(mmio_space())
         .set_ddi_e_disabled_kaby_lake(ddi_e_disabled_)
@@ -2300,7 +2292,7 @@ zx_status_t Controller::Init() {
   }
 
   if (!is_tgl(device_id_)) {
-    ddi_e_disabled_ = tgl_registers::DdiRegs(DdiId::DDI_A)
+    ddi_e_disabled_ = registers::DdiRegs(DdiId::DDI_A)
                           .BufferControl()
                           .ReadFrom(mmio_space())
                           .ddi_e_disabled_kaby_lake();
@@ -2472,6 +2464,6 @@ constexpr zx_driver_ops_t kDriverOps = {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915
 
-ZIRCON_DRIVER(intel_i915, i915_tgl::kDriverOps, "zircon", "0.1");
+ZIRCON_DRIVER(intel_i915, i915::kDriverOps, "zircon", "0.1");

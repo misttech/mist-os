@@ -13,11 +13,11 @@
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/i2c/gmbus-gpio.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class GMBusI2c {
  public:
-  GMBusI2c(DdiId ddi_id, tgl_registers::Platform platform, fdf::MmioBuffer* mmio_space);
+  GMBusI2c(DdiId ddi_id, registers::Platform platform, fdf::MmioBuffer* mmio_space);
   zx_status_t I2cTransact(const i2c_impl_op_t* ops, size_t count);
 
  private:
@@ -37,6 +37,6 @@ class GMBusI2c {
   bool GMBusWrite(uint8_t addr, const uint8_t* buf, uint8_t size) __TA_REQUIRES(lock_);
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_I2C_GMBUS_I2C_H_

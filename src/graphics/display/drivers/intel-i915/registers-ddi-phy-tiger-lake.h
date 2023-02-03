@@ -31,7 +31,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace tgl_registers {
+namespace registers {
 
 // PHY_MISC (Miscellaneous Physical layer settings?)
 //
@@ -65,11 +65,11 @@ class PhyMisc : public hwreg::RegisterBase<PhyMisc, uint32_t> {
 
   DEF_RSVDZ_FIELD(19, 0);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_C);
+  static auto GetForDdi(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_C);
 
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     return hwreg::RegisterAddr<PhyMisc>(0x64c00 + 4 * ddi_index);
   }
 };
@@ -79,11 +79,11 @@ class PhyMisc : public hwreg::RegisterBase<PhyMisc, uint32_t> {
 // This definition is currently only used as a host for MmioAddressForDdi().
 class PortCommonLane0 : public hwreg::RegisterBase<PortCommonLane0, uint32_t> {
  public:
-  // Returns the base address of the PORT_CL_ configuration registers for a i915_tgl::DdiId.
-  static constexpr uint32_t MmioAddressForDdi(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_C);
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+  // Returns the base address of the PORT_CL_ configuration registers for a i915::DdiId.
+  static constexpr uint32_t MmioAddressForDdi(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_C);
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     // `kMmioAddress` can be static in C++20.
     constexpr uint32_t kMmioAddress[] = {0x162000, 0x6c000, 0x160000};
     return kMmioAddress[ddi_index];
@@ -132,7 +132,7 @@ class PortCommonLane5 : public hwreg::RegisterBase<PortCommonLane5, uint32_t> {
   DEF_BIT(2, phy_power_ack_override);
   DEF_FIELD(1, 0, suspend_clock_config);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCommonLane5>(PortCommonLane0::MmioAddressForDdi(ddi_id) + 5 * 4);
   }
 };
@@ -250,7 +250,7 @@ class PortCommonLaneMainLinkPower
         .set_power_down_lane0(active_lane_count <= 3);
   }
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCommonLaneMainLinkPower>(
         PortCommonLane0::MmioAddressForDdi(ddi_id) + 10 * 4);
   }
@@ -295,7 +295,7 @@ class PortCommonLaneMiscPower : public hwreg::RegisterBase<PortCommonLaneMiscPow
   // If true, the AUX lane will eventually be powered up.
   DEF_BIT(0, aux_lane_enabled);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCommonLaneMiscPower>(PortCommonLane0::MmioAddressForDdi(ddi_id) +
                                                         12 * 4);
   }
@@ -327,7 +327,7 @@ class PortCommonLanePowerStatus : public hwreg::RegisterBase<PortCommonLanePower
 
   DEF_RSVDZ_FIELD(16, 0);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCommonLanePowerStatus>(
         PortCommonLane0::MmioAddressForDdi(ddi_id) + 15 * 4);
   }
@@ -368,7 +368,7 @@ class PortCommonLane16 : public hwreg::RegisterBase<PortCommonLane16, uint32_t> 
   // If false, `common_register_interface_wake_override` is ignored.
   DEF_BIT(0, common_register_interface_wake_override_valid);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCommonLane16>(PortCommonLane0::MmioAddressForDdi(ddi_id) +
                                                  16 * 4);
   }
@@ -402,15 +402,15 @@ class PortCompensation0 : public hwreg::RegisterBase<PortCompensation0, uint32_t
 
   DEF_RSVDZ_FIELD(7, 0);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCompensation0>(MmioAddressForDdi(ddi_id) + 0 * 4);
   }
 
   // Returns the base address of the PORT_COMP configuration registers.
-  static constexpr uint32_t MmioAddressForDdi(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_C);
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+  static constexpr uint32_t MmioAddressForDdi(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_C);
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     // `kMmioAddress` can be static in C++20.
     constexpr uint32_t kMmioAddress[] = {0x162100, 0x6c100, 0x160100};
     return kMmioAddress[ddi_index];
@@ -453,7 +453,7 @@ class PortCompensation1 : public hwreg::RegisterBase<PortCompensation1, uint32_t
   DEF_FIELD(3, 2, negative_low_voltage_reference_high_value_bits98);
   DEF_FIELD(1, 0, negative_low_voltage_reference_low_value_bits98);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCompensation1>(PortCompensation0::MmioAddressForDdi(ddi_id) +
                                                   1 * 4);
   }
@@ -515,7 +515,7 @@ class PortCompensationStatus : public hwreg::RegisterBase<PortCompensationStatus
   // LPDn (negative Data pin in Low-Power mode) compensation value.
   DEF_FIELD(5, 0, mipi_low_power_data_negative_code);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCompensationStatus>(
         PortCompensation0::MmioAddressForDdi(ddi_id) + 3 * 4);
   }
@@ -545,7 +545,7 @@ class PortCompensationSource : public hwreg::RegisterBase<PortCompensationSource
 
   DEF_RSVDZ_FIELD(13, 0);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCompensationSource>(
         PortCompensation0::MmioAddressForDdi(ddi_id) + 8 * 4);
   }
@@ -575,7 +575,7 @@ class PortCompensationNominalVoltageReferences
   DEF_FIELD(15, 8, positive_nominal_voltage_reference_low_value_bits70);
   DEF_FIELD(7, 0, positive_nominal_voltage_reference_high_value_bits70);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCompensationNominalVoltageReferences>(
         PortCompensation0::MmioAddressForDdi(ddi_id) + 9 * 4);
   }
@@ -605,7 +605,7 @@ class PortCompensationLowVoltageReferences
   DEF_FIELD(15, 8, positive_low_voltage_reference_low_value_bits70);
   DEF_FIELD(7, 0, positive_low_voltage_reference_high_value_bits70);
 
-  static auto GetForDdi(i915_tgl::DdiId ddi_id) {
+  static auto GetForDdi(i915::DdiId ddi_id) {
     return hwreg::RegisterAddr<PortCompensationLowVoltageReferences>(
         PortCompensation0::MmioAddressForDdi(ddi_id) + 10 * 4);
   }
@@ -715,15 +715,15 @@ class PortPhysicalCoding1 : public hwreg::RegisterBase<PortPhysicalCoding1, uint
   // This field is only used if `soft_lane_reset_valid` is true.
   DEF_BIT(0, soft_lane_reset);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortPhysicalCoding1>(MmioAddressForDdiLane(ddi_id, lane) + 1 * 4);
   }
 
   // Returns the base address of lane's PORT_PCS_ configuration registers.
-  static constexpr uint32_t MmioAddressForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_C);
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+  static constexpr uint32_t MmioAddressForDdiLane(i915::DdiId ddi_id, PortLane lane) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_C);
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     // `kMmioAddress` can be static in C++20.
     constexpr uint32_t kMmioAddress[] = {0x162000, 0x6c000, 0x160000};
     return kMmioAddress[ddi_index] | (static_cast<uint32_t>(lane) << 8);
@@ -755,7 +755,7 @@ class PortPhysicalCoding9 : public hwreg::RegisterBase<PortPhysicalCoding9, uint
   DEF_BIT(5, stagger_override_valid);
   DEF_FIELD(4, 0, stagger_override);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortPhysicalCoding9>(
         PortPhysicalCoding1::MmioAddressForDdiLane(ddi_id, lane) + 9 * 4);
   }
@@ -807,16 +807,16 @@ class PortTransmitterMipiEqualization
   // The PRM advises against changing this field. The default value is 0x34.
   DEF_FIELD(5, 0, cursor_coefficient);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortTransmitterMipiEqualization>(
         MmioAddressForDdiLane(ddi_id, lane) + 0 * 4);
   }
 
   // Returns the base address of lane's PORT_TX_ configuration registers.
-  static constexpr uint32_t MmioAddressForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_C);
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+  static constexpr uint32_t MmioAddressForDdiLane(i915::DdiId ddi_id, PortLane lane) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_C);
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     // `kMmioAddress` can be static in C++20.
     constexpr uint32_t kMmioAddress[] = {0x162080, 0x6c080, 0x160080};
     return kMmioAddress[ddi_index] | (static_cast<uint32_t>(lane) << 8);
@@ -860,7 +860,7 @@ class PortTransmitter1 : public hwreg::RegisterBase<PortTransmitter1, uint32_t> 
   // Enables the LDO feedback path for nominal reference voltage.
   DEF_BIT(0, nominal_reference_voltage_low_dropout_regulator_feedback_enabled);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortTransmitter1>(
         PortTransmitter0::MmioAddressForDdiLane(ddi_id, lane) + 1 * 4);
   }
@@ -918,7 +918,7 @@ class PortTransmitterVoltageSwing
         .set_voltage_swing_select_bit3(static_cast<uint32_t>((voltage_swing_select >> 3) & 1));
   }
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortTransmitterVoltageSwing>(
         PortTransmitter0::MmioAddressForDdiLane(ddi_id, lane) + 2 * 4);
   }
@@ -952,7 +952,7 @@ class PortTransmitterEqualization
   // Equalization tap C (cursor) coefficient.
   DEF_FIELD(5, 0, cursor_coefficient);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortTransmitterEqualization>(
         PortTransmitter0::MmioAddressForDdiLane(ddi_id, lane) + 4 * 4);
   }
@@ -990,7 +990,7 @@ class PortTransmitterVoltage : public hwreg::RegisterBase<PortTransmitterVoltage
 
   DEF_FIELD(5, 3, terminating_resistor_select);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortTransmitterVoltage>(
         PortTransmitter0::MmioAddressForDdiLane(ddi_id, lane) + 5 * 4);
   }
@@ -1019,7 +1019,7 @@ class PortTransmitterLowDropoutRegulator
   // This field should be replicated from CRI (Common Register Interface).
   DEF_BIT(0, low_dropout_bypass);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortTransmitterLowDropoutRegulator>(
         PortTransmitter0::MmioAddressForDdiLane(ddi_id, lane) + 6 * 4);
   }
@@ -1039,7 +1039,7 @@ class PortTransmitterNScalar : public hwreg::RegisterBase<PortTransmitterNScalar
  public:
   DEF_FIELD(30, 24, n_scalar);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortTransmitterNScalar>(
         PortTransmitter0::MmioAddressForDdiLane(ddi_id, lane) + 7 * 4);
   }
@@ -1082,12 +1082,12 @@ class PortTransmitterDutyCycleCorrection
 
   DEF_FIELD(4, 0, output_duty_cycle_correction_upper_limit);
 
-  static auto GetForDdiLane(i915_tgl::DdiId ddi_id, PortLane lane) {
+  static auto GetForDdiLane(i915::DdiId ddi_id, PortLane lane) {
     return hwreg::RegisterAddr<PortTransmitterDutyCycleCorrection>(
         PortTransmitter0::MmioAddressForDdiLane(ddi_id, lane) + 8 * 4);
   }
 };
 
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DDI_PHY_TIGER_LAKE_H_

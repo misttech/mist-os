@@ -9,7 +9,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/dp-display.h"
 
-namespace i915_tgl {
+namespace i915 {
 namespace testing {
 
 constexpr uint8_t kDefaultLaneCount = 2;
@@ -67,6 +67,6 @@ class FakeDpcdChannel : public DpcdChannel {
 };
 
 }  // namespace testing
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_FAKE_DPCD_CHANNEL_H_

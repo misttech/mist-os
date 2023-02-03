@@ -15,7 +15,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/i2c/gmbus-gpio.h"
 
-namespace tgl_registers {
+namespace registers {
 
 // GMBUS Configuration Registers
 //
@@ -135,7 +135,7 @@ class GMBusClockPortSelect : public hwreg::RegisterBase<GMBusClockPortSelect, ui
   DEF_FIELD(4, 0, pin_pair_select);
 
   // Helper to select typed `pin_pair` for GMBUS communication.
-  GMBusClockPortSelect& SetPinPair(const i915_tgl::GMBusPinPair& pin_pair) {
+  GMBusClockPortSelect& SetPinPair(const i915::GMBusPinPair& pin_pair) {
     return set_pin_pair_select(pin_pair.number());
   }
 
@@ -625,12 +625,12 @@ class GpioPinPairControl : public hwreg::RegisterBase<GpioPinPairControl, uint32
   DEF_BIT(0, write_clock_direction_is_output);
 
   // Get the DDC GPIO pin control register for port `gpio_port`.
-  static auto GetForPort(const i915_tgl::GpioPort& gpio_port) {
+  static auto GetForPort(const i915::GpioPort& gpio_port) {
     int gpio_port_id = gpio_port.number();
     return hwreg::RegisterAddr<GpioPinPairControl>(0xc5010 + 4 * gpio_port_id);
   }
 };
 
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_GMBUS_H_

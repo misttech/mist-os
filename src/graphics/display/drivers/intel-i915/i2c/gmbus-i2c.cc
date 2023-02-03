@@ -12,7 +12,7 @@
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/registers-gmbus.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -21,12 +21,12 @@ void WriteGMBusData(fdf::MmioBuffer* mmio_space, const uint8_t* buf, uint32_t si
     return;
   }
   cpp20::span<const uint8_t> data(buf + idx, std::min(4u, size - idx));
-  tgl_registers::GMBusData::Get().FromValue(0).set_data(data).WriteTo(mmio_space);
+  registers::GMBusData::Get().FromValue(0).set_data(data).WriteTo(mmio_space);
 }
 
 void ReadGMBusData(fdf::MmioBuffer* mmio_space, uint8_t* buf, uint32_t size, uint32_t idx) {
   int cur_byte = 0;
-  auto bytes = tgl_registers::GMBusData::Get().ReadFrom(mmio_space).data();
+  auto bytes = registers::GMBusData::Get().ReadFrom(mmio_space).data();
   while (idx < size && cur_byte < 4) {
     buf[idx++] = bytes[cur_byte++];
   }
@@ -38,8 +38,7 @@ static constexpr uint8_t kI2cClockUs = 10;  // 100 kHz
 
 // For bit banging i2c over the gpio pins
 bool i2c_scl(fdf::MmioBuffer* mmio_space, const GpioPort& gpio_port, bool hi) {
-  auto gpio_pin_pair_control =
-      tgl_registers::GpioPinPairControl::GetForPort(gpio_port).FromValue(0);
+  auto gpio_pin_pair_control = registers::GpioPinPairControl::GetForPort(gpio_port).FromValue(0);
 
   if (!hi) {
     gpio_pin_pair_control.set_clock_direction_is_output(true);
@@ -70,8 +69,7 @@ bool i2c_scl(fdf::MmioBuffer* mmio_space, const GpioPort& gpio_port, bool hi) {
 
 // For bit banging i2c over the gpio pins
 void i2c_sda(fdf::MmioBuffer* mmio_space, const GpioPort& gpio_port, bool hi) {
-  auto gpio_pin_pair_control =
-      tgl_registers::GpioPinPairControl::GetForPort(gpio_port).FromValue(0);
+  auto gpio_pin_pair_control = registers::GpioPinPairControl::GetForPort(gpio_port).FromValue(0);
 
   if (!hi) {
     gpio_pin_pair_control.set_data_direction_is_output(true);
@@ -104,7 +102,7 @@ bool i2c_send_byte(fdf::MmioBuffer* mmio_space, const GpioPort& gpio_port, uint8
   i2c_scl(mmio_space, gpio_port, 1);
 
   bool ack =
-      !tgl_registers::GpioPinPairControl::GetForPort(gpio_port).ReadFrom(mmio_space).data_input();
+      !registers::GpioPinPairControl::GetForPort(gpio_port).ReadFrom(mmio_space).data_input();
 
   // Sleep for the rest of the cycle
   zx_nanosleep(zx_deadline_after(ZX_USEC(kI2cClockUs / 2)));
@@ -162,14 +160,14 @@ zx_status_t GMBusI2c::I2cTransact(const i2c_impl_op_t* ops, size_t size) {
   for (unsigned i = 0; i < size; i++) {
     const i2c_impl_op_t* op = ops + i;
     if (op->address == kDdcSegmentAddress && !op->is_read && op->data_size == 1) {
-      tgl_registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space_);
+      registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space_);
       gmbus_set = false;
       if (!SetDdcSegment(*static_cast<uint8_t*>(op->data_buffer))) {
         goto fail;
       }
     } else if (op->address == kDdcDataAddress) {
       if (!gmbus_set) {
-        auto gmbus_clock_port_select = tgl_registers::GMBusClockPortSelect::Get().FromValue(0);
+        auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
         gmbus_clock_port_select.SetPinPair(*gmbus_pin_pair_).WriteTo(mmio_space_);
 
         gmbus_set = true;
@@ -187,9 +185,7 @@ zx_status_t GMBusI2c::I2cTransact(const i2c_impl_op_t* ops, size_t size) {
 
         if (!PollUntil(
                 [&]() {
-                  return tgl_registers::GMBusControllerStatus::Get()
-                      .ReadFrom(&mmio_space)
-                      .is_waiting();
+                  return registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_waiting();
                 },
                 zx::msec(1), 10)) {
           zxlogf(TRACE, "Transition to wait phase timed out");
@@ -224,7 +220,7 @@ bool GMBusI2c::GMBusWrite(uint8_t addr, const uint8_t* buf, uint8_t size) {
   WriteGMBusData(mmio_space_, buf, size, idx);
   idx += 4;
 
-  auto gmbus_command = tgl_registers::GMBusCommand::Get().FromValue(0);
+  auto gmbus_command = registers::GMBusCommand::Get().FromValue(0);
   gmbus_command.set_software_ready(true);
   gmbus_command.set_wait_state_enabled(true);
   gmbus_command.set_total_byte_count(size);
@@ -244,7 +240,7 @@ bool GMBusI2c::GMBusWrite(uint8_t addr, const uint8_t* buf, uint8_t size) {
 }
 
 bool GMBusI2c::GMBusRead(uint8_t addr, uint8_t* buf, uint8_t size) {
-  auto gmbus_command = tgl_registers::GMBusCommand::Get().FromValue(0);
+  auto gmbus_command = registers::GMBusCommand::Get().FromValue(0);
   gmbus_command.set_software_ready(true);
   gmbus_command.set_wait_state_enabled(true);
   gmbus_command.set_total_byte_count(size);
@@ -266,7 +262,7 @@ bool GMBusI2c::GMBusRead(uint8_t addr, uint8_t* buf, uint8_t size) {
 }
 
 bool GMBusI2c::I2cFinish() {
-  auto gmbus_command = tgl_registers::GMBusCommand::Get().FromValue(0);
+  auto gmbus_command = registers::GMBusCommand::Get().FromValue(0);
   gmbus_command.set_stop_generated(true);
   gmbus_command.set_software_ready(true);
   gmbus_command.WriteTo(mmio_space_);
@@ -277,12 +273,10 @@ bool GMBusI2c::I2cFinish() {
   // scope, and the method is guaranteed to hold the lock.
   fdf::MmioBuffer& mmio_space = *mmio_space_;
   bool idle = PollUntil(
-      [&] {
-        return !tgl_registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_active();
-      },
+      [&] { return !registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_active(); },
       zx::msec(1), 100);
 
-  auto gmbus_clock_port_select = tgl_registers::GMBusClockPortSelect::Get().FromValue(0);
+  auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
   gmbus_clock_port_select.set_pin_pair_select(0);
   gmbus_clock_port_select.WriteTo(mmio_space_);
 
@@ -293,7 +287,7 @@ bool GMBusI2c::I2cFinish() {
 }
 
 bool GMBusI2c::I2cWaitForHwReady() {
-  auto gmbus_controller_status = tgl_registers::GMBusControllerStatus::Get().FromValue(0);
+  auto gmbus_controller_status = registers::GMBusControllerStatus::Get().FromValue(0);
 
   // Alias `mmio_space_` to aid Clang's thread safety analyzer, which can't
   // reason about closure scopes. The type system still helps ensure
@@ -328,7 +322,7 @@ bool GMBusI2c::I2cClearNack() {
 
   if (!PollUntil(
           [&] {
-            return !tgl_registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_active();
+            return !registers::GMBusControllerStatus::Get().ReadFrom(&mmio_space).is_active();
           },
           zx::msec(1), 10)) {
     zxlogf(TRACE, "hdmi: GMBus i2c failed to clear active nack");
@@ -336,24 +330,24 @@ bool GMBusI2c::I2cClearNack() {
   }
 
   // Set/clear sw clear int to reset the bus
-  auto gmbus_command = tgl_registers::GMBusCommand::Get().FromValue(0);
+  auto gmbus_command = registers::GMBusCommand::Get().FromValue(0);
   gmbus_command.set_software_clear_interrupt(true);
   gmbus_command.WriteTo(mmio_space_);
   gmbus_command.set_software_clear_interrupt(false);
   gmbus_command.WriteTo(mmio_space_);
 
   // Reset GMBus0
-  auto gmbus_clock_port_select = tgl_registers::GMBusClockPortSelect::Get().FromValue(0);
+  auto gmbus_clock_port_select = registers::GMBusClockPortSelect::Get().FromValue(0);
   gmbus_clock_port_select.WriteTo(mmio_space_);
 
   return true;
 }
 
-GMBusI2c::GMBusI2c(DdiId ddi_id, tgl_registers::Platform platform, fdf::MmioBuffer* mmio_space)
+GMBusI2c::GMBusI2c(DdiId ddi_id, registers::Platform platform, fdf::MmioBuffer* mmio_space)
     : gmbus_pin_pair_(GMBusPinPair::GetForDdi(ddi_id, platform)),
       gpio_port_(GpioPort::GetForDdi(ddi_id, platform)),
       mmio_space_(mmio_space) {
   ZX_ASSERT(mtx_init(&lock_, mtx_plain) == thrd_success);
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

@@ -16,7 +16,7 @@
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe-scaler.h"
 
-namespace tgl_registers {
+namespace registers {
 
 static constexpr uint32_t kImagePlaneCount = 3;
 static constexpr uint32_t kCursorPlane = 2;
@@ -851,98 +851,94 @@ class PipeRegs {
     kEnable = 0x4440c,
   };
 
-  explicit PipeRegs(i915_tgl::PipeId pipe_id) : pipe_id_(pipe_id) {}
+  explicit PipeRegs(i915::PipeId pipe_id) : pipe_id_(pipe_id) {}
 
-  hwreg::RegisterAddr<tgl_registers::PipeSourceSize> PipeSourceSize() {
-    return GetReg<tgl_registers::PipeSourceSize>();
+  hwreg::RegisterAddr<registers::PipeSourceSize> PipeSourceSize() {
+    return GetReg<registers::PipeSourceSize>();
   }
-  hwreg::RegisterAddr<tgl_registers::PipeBottomColor> PipeBottomColor() {
-    return GetReg<tgl_registers::PipeBottomColor>();
+  hwreg::RegisterAddr<registers::PipeBottomColor> PipeBottomColor() {
+    return GetReg<registers::PipeBottomColor>();
   }
 
-  hwreg::RegisterAddr<tgl_registers::PlaneSurface> PlaneSurface(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneSurface>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneSurface> PlaneSurface(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneSurface>(plane_num);
   }
-  hwreg::RegisterAddr<tgl_registers::PlaneSurfaceLive> PlaneSurfaceLive(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneSurfaceLive>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneSurfaceLive> PlaneSurfaceLive(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneSurfaceLive>(plane_num);
   }
-  hwreg::RegisterAddr<tgl_registers::PlaneSurfaceStride> PlaneSurfaceStride(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneSurfaceStride>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneSurfaceStride> PlaneSurfaceStride(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneSurfaceStride>(plane_num);
   }
-  hwreg::RegisterAddr<tgl_registers::PlaneSurfaceSize> PlaneSurfaceSize(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneSurfaceSize>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneSurfaceSize> PlaneSurfaceSize(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneSurfaceSize>(plane_num);
   }
-  hwreg::RegisterAddr<tgl_registers::PlaneColorControl> PlaneColorControlTigerLake(
-      int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneColorControl>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneColorControl> PlaneColorControlTigerLake(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneColorControl>(plane_num);
   }
-  hwreg::RegisterAddr<tgl_registers::PlaneControl> PlaneControl(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneControl>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneControl> PlaneControl(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneControl>(plane_num);
   }
-  hwreg::RegisterAddr<tgl_registers::PlaneOffset> PlaneOffset(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneOffset>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneOffset> PlaneOffset(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneOffset>(plane_num);
   }
-  hwreg::RegisterAddr<tgl_registers::PlanePosition> PlanePosition(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlanePosition>(plane_num);
+  hwreg::RegisterAddr<registers::PlanePosition> PlanePosition(int32_t plane_num) {
+    return GetPlaneReg<registers::PlanePosition>(plane_num);
   }
   // 0 == cursor, 1-3 are regular planes
-  hwreg::RegisterAddr<tgl_registers::PlaneBufferConfig> PlaneBufCfg(int plane) {
-    return hwreg::RegisterAddr<tgl_registers::PlaneBufferConfig>(PlaneBufferConfig::kBaseAddr +
-                                                                 0x1000 * pipe_id_ + 0x100 * plane);
+  hwreg::RegisterAddr<registers::PlaneBufferConfig> PlaneBufCfg(int plane) {
+    return hwreg::RegisterAddr<registers::PlaneBufferConfig>(PlaneBufferConfig::kBaseAddr +
+                                                             0x1000 * pipe_id_ + 0x100 * plane);
   }
 
-  hwreg::RegisterAddr<tgl_registers::PlaneWm> PlaneWatermark(int plane, int wm_num) {
+  hwreg::RegisterAddr<registers::PlaneWm> PlaneWatermark(int plane, int wm_num) {
     return hwreg::RegisterAddr<PlaneWm>(PlaneWm::kBaseAddr + 0x1000 * pipe_id_ + 0x100 * plane +
                                         4 * wm_num);
   }
 
-  hwreg::RegisterAddr<tgl_registers::PlaneKeyMask> PlaneKeyMask(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneKeyMask>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneKeyMask> PlaneKeyMask(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneKeyMask>(plane_num);
   }
-  hwreg::RegisterAddr<tgl_registers::PlaneKeyMax> PlaneKeyMax(int32_t plane_num) {
-    return GetPlaneReg<tgl_registers::PlaneKeyMax>(plane_num);
+  hwreg::RegisterAddr<registers::PlaneKeyMax> PlaneKeyMax(int32_t plane_num) {
+    return GetPlaneReg<registers::PlaneKeyMax>(plane_num);
   }
 
-  hwreg::RegisterAddr<tgl_registers::PipeInterrupt> PipeInterrupt(InterruptRegister register_type) {
-    return hwreg::RegisterAddr<tgl_registers::PipeInterrupt>(static_cast<uint32_t>(register_type) +
-                                                             0x10 * pipe_id_);
+  hwreg::RegisterAddr<registers::PipeInterrupt> PipeInterrupt(InterruptRegister register_type) {
+    return hwreg::RegisterAddr<registers::PipeInterrupt>(static_cast<uint32_t>(register_type) +
+                                                         0x10 * pipe_id_);
   }
 
   PipeScalerRegs PipeScalerRegs(int scaler_index) {
-    return tgl_registers::PipeScalerRegs(pipe_id_, scaler_index);
+    return registers::PipeScalerRegs(pipe_id_, scaler_index);
   }
 
-  hwreg::RegisterAddr<tgl_registers::CursorBase> CursorBase() {
-    return GetReg<tgl_registers::CursorBase>();
+  hwreg::RegisterAddr<registers::CursorBase> CursorBase() {
+    return GetReg<registers::CursorBase>();
   }
 
-  hwreg::RegisterAddr<tgl_registers::CursorCtrl> CursorCtrl() {
-    return GetReg<tgl_registers::CursorCtrl>();
+  hwreg::RegisterAddr<registers::CursorCtrl> CursorCtrl() {
+    return GetReg<registers::CursorCtrl>();
   }
 
-  hwreg::RegisterAddr<tgl_registers::CursorPos> CursorPos() {
-    return GetReg<tgl_registers::CursorPos>();
+  hwreg::RegisterAddr<registers::CursorPos> CursorPos() { return GetReg<registers::CursorPos>(); }
+
+  hwreg::RegisterAddr<registers::CursorSurfaceLive> CursorSurfaceLive() {
+    return GetReg<registers::CursorSurfaceLive>();
   }
 
-  hwreg::RegisterAddr<tgl_registers::CursorSurfaceLive> CursorSurfaceLive() {
-    return GetReg<tgl_registers::CursorSurfaceLive>();
-  }
-
-  hwreg::RegisterAddr<tgl_registers::CscCoeff> CscCoeff(uint32_t i, uint32_t j) {
+  hwreg::RegisterAddr<registers::CscCoeff> CscCoeff(uint32_t i, uint32_t j) {
     ZX_DEBUG_ASSERT(i < 3 && j < 3);
-    uint32_t base = tgl_registers::CscCoeff::kBaseAddr + 4 * ((i * 2) + (j == 2 ? 1 : 0));
-    return GetCscReg<tgl_registers::CscCoeff>(base);
+    uint32_t base = registers::CscCoeff::kBaseAddr + 4 * ((i * 2) + (j == 2 ? 1 : 0));
+    return GetCscReg<registers::CscCoeff>(base);
   }
 
-  hwreg::RegisterAddr<tgl_registers::CscMode> CscMode() {
-    return GetCscReg<tgl_registers::CscMode>(tgl_registers::CscMode::kBaseAddr);
+  hwreg::RegisterAddr<registers::CscMode> CscMode() {
+    return GetCscReg<registers::CscMode>(registers::CscMode::kBaseAddr);
   }
 
-  hwreg::RegisterAddr<tgl_registers::CscOffset> CscOffset(bool preoffset, uint32_t component_idx) {
-    uint32_t base =
-        (4 * component_idx) + (preoffset ? tgl_registers::CscOffset::kPreOffsetBaseAddr
-                                         : tgl_registers::CscOffset::kPostOffsetBaseAddr);
-    return GetCscReg<tgl_registers::CscOffset>(base);
+  hwreg::RegisterAddr<registers::CscOffset> CscOffset(bool preoffset, uint32_t component_idx) {
+    uint32_t base = (4 * component_idx) + (preoffset ? registers::CscOffset::kPreOffsetBaseAddr
+                                                     : registers::CscOffset::kPostOffsetBaseAddr);
+    return GetCscReg<registers::CscOffset>(base);
   }
 
  private:
@@ -961,7 +957,7 @@ class PipeRegs {
     return hwreg::RegisterAddr<RegType>(base + 0x100 * pipe_id_);
   }
 
-  i915_tgl::PipeId pipe_id_;
+  i915::PipeId pipe_id_;
 };
 
 // Struct of registers which arm double buffered registers
@@ -974,6 +970,6 @@ typedef struct pipe_arming_regs {
   uint32_t ps_win_sz[2];
 } pipe_arming_regs_t;
 
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_PIPE_H_

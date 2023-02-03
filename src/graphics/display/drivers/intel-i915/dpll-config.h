@@ -10,7 +10,7 @@
 #include <cstdint>
 #include <optional>
 
-namespace i915_tgl {
+namespace i915 {
 
 // Returns to the list of documented DCO frequency dividers in Display PLLs.
 //
@@ -71,6 +71,6 @@ DpllOscillatorConfig CreateDpllOscillatorConfigForDisplayPortTigerLake(int32_t a
 DpllFrequencyDividerConfig CreateDpllFrequencyDividerConfigKabyLake(int8_t dco_divider);
 DpllFrequencyDividerConfig CreateDpllFrequencyDividerConfigTigerLake(int8_t dco_divider);
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DPLL_CONFIG_H_

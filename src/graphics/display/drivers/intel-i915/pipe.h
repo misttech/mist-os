@@ -25,14 +25,14 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class Controller;
 class DisplayDevice;
 
 class Pipe {
  public:
-  Pipe(fdf::MmioBuffer* mmio_space, tgl_registers::Platform platform, PipeId pipe_id,
+  Pipe(fdf::MmioBuffer* mmio_space, registers::Platform platform, PipeId pipe_id,
        PowerWellRef pipe_power);
   virtual ~Pipe() = default;
 
@@ -58,7 +58,7 @@ class Pipe {
   void ResetPlanes();
 
   // Resets the transcoder identified by `transcoder_id`.
-  static void ResetTranscoder(TranscoderId transcoder_id, tgl_registers::Platform platform,
+  static void ResetTranscoder(TranscoderId transcoder_id, registers::Platform platform,
                               fdf::MmioBuffer* mmio_space);
 
   void LoadActiveMode(display_mode_t* mode);
@@ -99,14 +99,14 @@ class Pipe {
 
  protected:
   bool attached_edp() const { return attached_edp_; }
-  tgl_registers::Platform platform() const { return platform_; }
+  registers::Platform platform() const { return platform_; }
 
  private:
   void ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary, bool enable_csc,
-                             bool* scaler_1_claimed, tgl_registers::pipe_arming_regs* regs,
+                             bool* scaler_1_claimed, registers::pipe_arming_regs* regs,
                              uint64_t config_stamp_seqno, const SetupGttImageFunc& setup_gtt_image);
   void ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
-                            tgl_registers::pipe_arming_regs* regs, uint64_t config_stamp_seqno);
+                            registers::pipe_arming_regs* regs, uint64_t config_stamp_seqno);
   void SetColorConversionOffsets(bool preoffsets, const float vals[3]);
   void ResetActiveTranscoder();
   void ResetScaler();
@@ -117,14 +117,14 @@ class Pipe {
   uint64_t attached_display_ = INVALID_DISPLAY_ID;
   bool attached_edp_ = false;
 
-  tgl_registers::Platform platform_;
+  registers::Platform platform_;
   PipeId pipe_id_;
 
   PowerWellRef pipe_power_;
 
   // For any scaled planes, this contains the (1-based) index of the active scaler
-  uint32_t scaled_planes_[PipeIds<tgl_registers::Platform::kKabyLake>().size()]
-                         [tgl_registers::kImagePlaneCount] = {};
+  uint32_t scaled_planes_[PipeIds<registers::Platform::kKabyLake>().size()]
+                         [registers::kImagePlaneCount] = {};
 
   // On each Vsync, the driver should return the stamp of the *oldest*
   // configuration that has been fully applied to the device. We use the
@@ -163,7 +163,7 @@ class Pipe {
 class PipeSkylake : public Pipe {
  public:
   PipeSkylake(fdf::MmioBuffer* mmio_space, PipeId pipe_id, PowerWellRef pipe_power)
-      : Pipe(mmio_space, tgl_registers::Platform::kSkylake, pipe_id, std::move(pipe_power)) {}
+      : Pipe(mmio_space, registers::Platform::kSkylake, pipe_id, std::move(pipe_power)) {}
   ~PipeSkylake() override = default;
 
   TranscoderId connected_transcoder_id() const override {
@@ -174,12 +174,12 @@ class PipeSkylake : public Pipe {
 class PipeTigerLake : public Pipe {
  public:
   PipeTigerLake(fdf::MmioBuffer* mmio_space, PipeId pipe_id, PowerWellRef pipe_power)
-      : Pipe(mmio_space, tgl_registers::Platform::kTigerLake, pipe_id, std::move(pipe_power)) {}
+      : Pipe(mmio_space, registers::Platform::kTigerLake, pipe_id, std::move(pipe_power)) {}
   ~PipeTigerLake() override = default;
 
   TranscoderId connected_transcoder_id() const override { return tied_transcoder_id(); }
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PIPE_H_

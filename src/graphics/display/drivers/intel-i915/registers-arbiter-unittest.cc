@@ -9,12 +9,12 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
 TEST(ArbitrationControlTest, HighPriorityQueueWatermark) {
-  auto arb_ctl = tgl_registers::ArbitrationControl::GetForArbiter(0).FromValue(0);
+  auto arb_ctl = registers::ArbitrationControl::GetForArbiter(0).FromValue(0);
 
   // Example from the the reference manuals.
   //
@@ -44,7 +44,7 @@ TEST(ArbitrationControlTest, HighPriorityQueueWatermark) {
 }
 
 TEST(ArbitrationControlTest, LowPriorityBackToBackRequestLimit) {
-  auto arb_ctl = tgl_registers::ArbitrationControl::GetForArbiter(0).FromValue(0);
+  auto arb_ctl = registers::ArbitrationControl::GetForArbiter(0).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -74,18 +74,18 @@ TEST(ArbitrationControlTest, GetForArbiter) {
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 1 page 51
   // DG1: IHD-OS-DG1-Vol 2c-2.21 Part 1 page 13
 
-  auto arb_ctl = tgl_registers::ArbitrationControl::GetForArbiter(0).FromValue(0);
+  auto arb_ctl = registers::ArbitrationControl::GetForArbiter(0).FromValue(0);
   EXPECT_EQ(0x45000u, arb_ctl.reg_addr());
 
-  auto arb_ctl_abox1 = tgl_registers::ArbitrationControl::GetForArbiter(1).FromValue(0);
+  auto arb_ctl_abox1 = registers::ArbitrationControl::GetForArbiter(1).FromValue(0);
   EXPECT_EQ(0x45800u, arb_ctl_abox1.reg_addr());
 
-  auto arb_ctl_abox2 = tgl_registers::ArbitrationControl::GetForArbiter(2).FromValue(0);
+  auto arb_ctl_abox2 = registers::ArbitrationControl::GetForArbiter(2).FromValue(0);
   EXPECT_EQ(0x45808u, arb_ctl_abox2.reg_addr());
 }
 
 TEST(ArbitrationControl2Test, DisplayCaptureWriteRequestLimit) {
-  auto arb_ctl2 = tgl_registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
+  auto arb_ctl2 = registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -110,7 +110,7 @@ TEST(ArbitrationControl2Test, DisplayCaptureWriteRequestLimit) {
 }
 
 TEST(ArbitrationControl2Test, DisplayStateBufferWriteRequestLimitTigerLake) {
-  auto arb_ctl2 = tgl_registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
+  auto arb_ctl2 = registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -135,7 +135,7 @@ TEST(ArbitrationControl2Test, DisplayStateBufferWriteRequestLimitTigerLake) {
 }
 
 TEST(ArbitrationControl2Test, Par5RequestLimitTigerLake) {
-  auto arb_ctl2 = tgl_registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
+  auto arb_ctl2 = registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -160,7 +160,7 @@ TEST(ArbitrationControl2Test, Par5RequestLimitTigerLake) {
 }
 
 TEST(ArbitrationControl2Test, FrameBufferCompressionRequestLimitTigerLake) {
-  auto arb_ctl2 = tgl_registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
+  auto arb_ctl2 = registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -185,7 +185,7 @@ TEST(ArbitrationControl2Test, FrameBufferCompressionRequestLimitTigerLake) {
 }
 
 TEST(ArbitrationControl2Test, MaxInflightLowPriorityReadRequestsTigerLake) {
-  auto arb_ctl2 = tgl_registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
+  auto arb_ctl2 = registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -210,7 +210,7 @@ TEST(ArbitrationControl2Test, MaxInflightLowPriorityReadRequestsTigerLake) {
 }
 
 TEST(ArbitrationControl2Test, MaxInflightHighPriorityReadRequestsTigerLake) {
-  auto arb_ctl2 = tgl_registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
+  auto arb_ctl2 = registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -235,7 +235,7 @@ TEST(ArbitrationControl2Test, MaxInflightHighPriorityReadRequestsTigerLake) {
 }
 
 TEST(ArbitrationControl2Test, RequestTransactionIdQueueWatermarkTigerLake) {
-  auto arb_ctl2 = tgl_registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
+  auto arb_ctl2 = registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -261,13 +261,13 @@ TEST(ArbitrationControl2Test, GetForArbiter) {
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 1 page 54
   // DG1: IHD-OS-DG1-Vol 2c-2.21 Part 1 page 16
 
-  auto arb_ctl2 = tgl_registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
+  auto arb_ctl2 = registers::ArbitrationControl2::GetForArbiter(0).FromValue(0);
   EXPECT_EQ(0x45004u, arb_ctl2.reg_addr());
 
-  auto arb_ctl2_abox1 = tgl_registers::ArbitrationControl2::GetForArbiter(1).FromValue(0);
+  auto arb_ctl2_abox1 = registers::ArbitrationControl2::GetForArbiter(1).FromValue(0);
   EXPECT_EQ(0x45804u, arb_ctl2_abox1.reg_addr());
 
-  auto arb_ctl2_abox2 = tgl_registers::ArbitrationControl2::GetForArbiter(2).FromValue(0);
+  auto arb_ctl2_abox2 = registers::ArbitrationControl2::GetForArbiter(2).FromValue(0);
   EXPECT_EQ(0x4580cu, arb_ctl2_abox2.reg_addr());
 }
 
@@ -278,13 +278,13 @@ TEST(BandwidthBuddyControl, GetForArbiter) {
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 1 page 171
   // DG1: IHD-OS-DG1-Vol 2c-2.21 Part 1 page 136
 
-  auto bw_buddy0_ctl = tgl_registers::BandwidthBuddyControl::GetForArbiter(0).FromValue(0);
+  auto bw_buddy0_ctl = registers::BandwidthBuddyControl::GetForArbiter(0).FromValue(0);
   EXPECT_EQ(0x45130u, bw_buddy0_ctl.reg_addr());
 
-  auto bw_buddy1_ctl = tgl_registers::BandwidthBuddyControl::GetForArbiter(1).FromValue(0);
+  auto bw_buddy1_ctl = registers::BandwidthBuddyControl::GetForArbiter(1).FromValue(0);
   EXPECT_EQ(0x45140u, bw_buddy1_ctl.reg_addr());
 
-  auto bw_buddy2_ctl = tgl_registers::BandwidthBuddyControl::GetForArbiter(2).FromValue(0);
+  auto bw_buddy2_ctl = registers::BandwidthBuddyControl::GetForArbiter(2).FromValue(0);
   EXPECT_EQ(0x45150u, bw_buddy2_ctl.reg_addr());
 }
 
@@ -295,13 +295,13 @@ TEST(BandwidthBuddyPageMask, GetForArbiter) {
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 1 page 173
   // DG1: IHD-OS-DG1-Vol 2c-2.21 Part 1 page 138
 
-  auto bw_buddy0_page_mask = tgl_registers::BandwidthBuddyPageMask::GetForArbiter(0).FromValue(0);
+  auto bw_buddy0_page_mask = registers::BandwidthBuddyPageMask::GetForArbiter(0).FromValue(0);
   EXPECT_EQ(0x45134u, bw_buddy0_page_mask.reg_addr());
 
-  auto bw_buddy1_page_mask = tgl_registers::BandwidthBuddyPageMask::GetForArbiter(1).FromValue(0);
+  auto bw_buddy1_page_mask = registers::BandwidthBuddyPageMask::GetForArbiter(1).FromValue(0);
   EXPECT_EQ(0x45144u, bw_buddy1_page_mask.reg_addr());
 
-  auto bw_buddy2_page_mask = tgl_registers::BandwidthBuddyPageMask::GetForArbiter(2).FromValue(0);
+  auto bw_buddy2_page_mask = registers::BandwidthBuddyPageMask::GetForArbiter(2).FromValue(0);
   EXPECT_EQ(0x45154u, bw_buddy2_page_mask.reg_addr());
 }
 
@@ -311,13 +311,13 @@ TEST(MbusArbiterBoxControlTest, GetForArbiter) {
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 2 page 8
   // DG1: IHD-OS-DG1-Vol 2c-2.21 Part 2 page 8
 
-  auto mbus_abox_ctl = tgl_registers::MbusArbiterBoxControl::GetForArbiter(0).FromValue(0);
+  auto mbus_abox_ctl = registers::MbusArbiterBoxControl::GetForArbiter(0).FromValue(0);
   EXPECT_EQ(0x45038u, mbus_abox_ctl.reg_addr());
 
-  auto mbus_abox1_ctl = tgl_registers::MbusArbiterBoxControl::GetForArbiter(1).FromValue(0);
+  auto mbus_abox1_ctl = registers::MbusArbiterBoxControl::GetForArbiter(1).FromValue(0);
   EXPECT_EQ(0x45048u, mbus_abox1_ctl.reg_addr());
 
-  auto mbus_abox2_ctl = tgl_registers::MbusArbiterBoxControl::GetForArbiter(2).FromValue(0);
+  auto mbus_abox2_ctl = registers::MbusArbiterBoxControl::GetForArbiter(2).FromValue(0);
   EXPECT_EQ(0x4504cu, mbus_abox2_ctl.reg_addr());
 }
 
@@ -327,10 +327,10 @@ TEST(MbusDisplayBufferBoxControlTest, GetForSlice) {
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 2 page 10
   // DG1: IHD-OS-DG1-Vol 2c-2.21 Part 2 page 10
 
-  auto mbus_bbox_ctl_s1 = tgl_registers::MbusDisplayBufferBoxControl::GetForSlice(0).FromValue(0);
+  auto mbus_bbox_ctl_s1 = registers::MbusDisplayBufferBoxControl::GetForSlice(0).FromValue(0);
   EXPECT_EQ(0x45040u, mbus_bbox_ctl_s1.reg_addr());
 
-  auto mbus_bbox_ctl_s2 = tgl_registers::MbusDisplayBufferBoxControl::GetForSlice(1).FromValue(0);
+  auto mbus_bbox_ctl_s2 = registers::MbusDisplayBufferBoxControl::GetForSlice(1).FromValue(0);
   EXPECT_EQ(0x45044u, mbus_bbox_ctl_s2.reg_addr());
 }
 
@@ -341,15 +341,15 @@ TEST(MbusPipeDataBoxControlTest, GetForPipe) {
   // DG1: IHD-OS-DG1-Vol 2c-2.21 Part 2 page 12
 
   auto pipe_mbus_dbox_ctl_a =
-      tgl_registers::MbusPipeDataBoxControl::GetForPipe(PipeId::PIPE_A).FromValue(0);
+      registers::MbusPipeDataBoxControl::GetForPipe(PipeId::PIPE_A).FromValue(0);
   EXPECT_EQ(0x7003cu, pipe_mbus_dbox_ctl_a.reg_addr());
 
   auto pipe_mbus_dbox_ctl_b =
-      tgl_registers::MbusPipeDataBoxControl::GetForPipe(PipeId::PIPE_B).FromValue(0);
+      registers::MbusPipeDataBoxControl::GetForPipe(PipeId::PIPE_B).FromValue(0);
   EXPECT_EQ(0x7103cu, pipe_mbus_dbox_ctl_b.reg_addr());
 
   auto pipe_mbus_dbox_ctl_c =
-      tgl_registers::MbusPipeDataBoxControl::GetForPipe(PipeId::PIPE_C).FromValue(0);
+      registers::MbusPipeDataBoxControl::GetForPipe(PipeId::PIPE_C).FromValue(0);
   EXPECT_EQ(0x7203cu, pipe_mbus_dbox_ctl_c.reg_addr());
 
   // TODO(fxbug.dev/109278): Add a test for pipe D, when we support it.
@@ -357,7 +357,7 @@ TEST(MbusPipeDataBoxControlTest, GetForPipe) {
 }
 
 TEST(PipeArbiterControlTest, DisplayStreamBufferArbitrationInterval) {
-  auto pipe_arb_ctl_a = tgl_registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_A).FromValue(0);
+  auto pipe_arb_ctl_a = registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_A).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -382,7 +382,7 @@ TEST(PipeArbiterControlTest, DisplayStreamBufferArbitrationInterval) {
 }
 
 TEST(PipeArbiterControlTest, DisplayBufferRequestsPerStreamerRequest) {
-  auto pipe_arb_ctl_a = tgl_registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_A).FromValue(0);
+  auto pipe_arb_ctl_a = registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_A).FromValue(0);
 
   // The valid values and encodings are listed in the reference manuals.
   //
@@ -412,13 +412,13 @@ TEST(PipeArbiterControlTest, GetForPipe) {
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 2 page 669
   // DG1: IHD-OS-DG1-Vol 2c-2.21 Part 2 page 669
 
-  auto pipe_arb_ctl_a = tgl_registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_A).FromValue(0);
+  auto pipe_arb_ctl_a = registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_A).FromValue(0);
   EXPECT_EQ(0x70028u, pipe_arb_ctl_a.reg_addr());
 
-  auto pipe_arb_ctl_b = tgl_registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_B).FromValue(0);
+  auto pipe_arb_ctl_b = registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_B).FromValue(0);
   EXPECT_EQ(0x71028u, pipe_arb_ctl_b.reg_addr());
 
-  auto pipe_arb_ctl_c = tgl_registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_C).FromValue(0);
+  auto pipe_arb_ctl_c = registers::PipeArbiterControl::GetForPipe(PipeId::PIPE_C).FromValue(0);
   EXPECT_EQ(0x72028u, pipe_arb_ctl_c.reg_addr());
 
   // TODO(fxbug.dev/109278): Add a test for pipe D, when we support it.
@@ -427,4 +427,4 @@ TEST(PipeArbiterControlTest, GetForPipe) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

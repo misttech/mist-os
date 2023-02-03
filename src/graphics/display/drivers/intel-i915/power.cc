@@ -15,7 +15,7 @@
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -29,7 +29,7 @@ bool SetPowerWellImpl(const PowerWellInfo& power_well_info, bool enable,
   // Sequences from IHD-OS-TGL-Vol 12-12.21 "Sequences for Power Wells".
   // "Enable sequence" on page 220, "Disable sequence" on page 221.
 
-  auto power_well_reg = tgl_registers::PowerWellControl::Get().ReadFrom(mmio_space);
+  auto power_well_reg = registers::PowerWellControl::Get().ReadFrom(mmio_space);
 
   power_well_reg.power_request(power_well_info.request_bit_index).set(enable);
   power_well_reg.WriteTo(mmio_space);
@@ -39,7 +39,7 @@ bool SetPowerWellImpl(const PowerWellInfo& power_well_info, bool enable,
 
     if (!PollUntil(
             [&] {
-              return tgl_registers::PowerWellControl::Get()
+              return registers::PowerWellControl::Get()
                   .ReadFrom(mmio_space)
                   .power_state(power_well_info.state_bit_index)
                   .get();
@@ -51,7 +51,7 @@ bool SetPowerWellImpl(const PowerWellInfo& power_well_info, bool enable,
 
     if (!PollUntil(
             [&] {
-              return tgl_registers::FuseStatus::Get()
+              return registers::FuseStatus::Get()
                   .ReadFrom(mmio_space)
                   .dist_status(power_well_info.fuse_dist_bit_index);
             },
@@ -157,12 +157,12 @@ class PowerSkylake : public Power {
   }
 
   bool GetDdiIoPowerState(DdiId ddi_id) override {
-    auto power_well = tgl_registers::PowerWellControl::Get().ReadFrom(mmio_space());
+    auto power_well = registers::PowerWellControl::Get().ReadFrom(mmio_space());
     return power_well.ddi_io_power_state_skylake(ddi_id).get();
   }
 
   void SetDdiIoPowerState(DdiId ddi_id, bool enable) override {
-    auto power_well = tgl_registers::PowerWellControl::Get().ReadFrom(mmio_space());
+    auto power_well = registers::PowerWellControl::Get().ReadFrom(mmio_space());
     power_well.ddi_io_power_request_skylake(ddi_id).set(1);
     power_well.WriteTo(mmio_space());
   }
@@ -302,23 +302,23 @@ class PowerTigerLake : public Power {
   }
 
   bool GetDdiIoPowerState(DdiId ddi_id) override {
-    auto power_well = tgl_registers::PowerWellControlDdi2::Get().ReadFrom(mmio_space());
+    auto power_well = registers::PowerWellControlDdi2::Get().ReadFrom(mmio_space());
     return power_well.ddi_io_power_state_tiger_lake(ddi_id).get();
   }
 
   void SetDdiIoPowerState(DdiId ddi_id, bool enable) override {
-    auto power_well = tgl_registers::PowerWellControlDdi2::Get().ReadFrom(mmio_space());
+    auto power_well = registers::PowerWellControlDdi2::Get().ReadFrom(mmio_space());
     power_well.ddi_io_power_request_tiger_lake(ddi_id).set(enable);
     power_well.WriteTo(mmio_space());
   }
 
   bool GetAuxIoPowerState(DdiId ddi_id) override {
-    auto power_well = tgl_registers::PowerWellControlAux::Get().ReadFrom(mmio_space());
+    auto power_well = registers::PowerWellControlAux::Get().ReadFrom(mmio_space());
     return power_well.powered_on_combo_or_usb_c(ddi_id);
   }
 
   void SetAuxIoPowerState(DdiId ddi_id, bool enable) override {
-    auto power_well = tgl_registers::PowerWellControlAux::Get().ReadFrom(mmio_space());
+    auto power_well = registers::PowerWellControlAux::Get().ReadFrom(mmio_space());
     power_well.set_power_on_request_combo_or_usb_c(ddi_id, enable);
     power_well.WriteTo(mmio_space());
   }
@@ -424,4 +424,4 @@ std::unique_ptr<Power> Power::New(fdf::MmioBuffer* mmio_space, uint16_t device_i
   return nullptr;
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

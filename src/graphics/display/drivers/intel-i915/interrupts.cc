@@ -18,7 +18,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -32,11 +32,11 @@ HotplugDetectionResult DetectHotplugSkylake(fdf::MmioBuffer* mmio_space) {
   HotplugDetectionResult result;
 
   auto sde_int_identity =
-      tgl_registers::SdeInterruptBase::Get(tgl_registers ::SdeInterruptBase::kSdeIntIdentity)
+      registers::SdeInterruptBase::Get(registers ::SdeInterruptBase::kSdeIntIdentity)
           .ReadFrom(mmio_space);
-  auto hp_ctrl1 = tgl_registers::SouthHotplugCtrl ::Get(DdiId::DDI_A).ReadFrom(mmio_space);
-  auto hp_ctrl2 = tgl_registers::SouthHotplugCtrl ::Get(DdiId::DDI_E).ReadFrom(mmio_space);
-  for (auto ddi : DdiIds<tgl_registers::Platform::kKabyLake>()) {
+  auto hp_ctrl1 = registers::SouthHotplugCtrl ::Get(DdiId::DDI_A).ReadFrom(mmio_space);
+  auto hp_ctrl2 = registers::SouthHotplugCtrl ::Get(DdiId::DDI_E).ReadFrom(mmio_space);
+  for (auto ddi : DdiIds<registers::Platform::kKabyLake>()) {
     auto hp_ctrl = ddi < DdiId::DDI_E ? hp_ctrl1 : hp_ctrl2;
     result.detected[ddi] =
         sde_int_identity.skl_ddi_bit(ddi).get() &
@@ -55,19 +55,19 @@ HotplugDetectionResult DetectHotplugTigerLake(fdf::MmioBuffer* mmio_space) {
   HotplugDetectionResult result;
 
   auto sde_int_identity =
-      tgl_registers::SdeInterruptBase::Get(tgl_registers ::SdeInterruptBase::kSdeIntIdentity)
+      registers::SdeInterruptBase::Get(registers ::SdeInterruptBase::kSdeIntIdentity)
           .ReadFrom(mmio_space);
   auto hpd_int_identity =
-      tgl_registers::HpdInterruptBase::Get(tgl_registers::HpdInterruptBase::kHpdIntIdentity)
+      registers::HpdInterruptBase::Get(registers::HpdInterruptBase::kHpdIntIdentity)
           .ReadFrom(mmio_space);
 
-  auto pch_ddi_ctrl = tgl_registers::IclSouthHotplugCtrl::Get(DdiId::DDI_A).ReadFrom(mmio_space);
-  auto pch_tc_ctrl = tgl_registers::IclSouthHotplugCtrl::Get(DdiId::DDI_TC_1).ReadFrom(mmio_space);
+  auto pch_ddi_ctrl = registers::IclSouthHotplugCtrl::Get(DdiId::DDI_A).ReadFrom(mmio_space);
+  auto pch_tc_ctrl = registers::IclSouthHotplugCtrl::Get(DdiId::DDI_TC_1).ReadFrom(mmio_space);
 
-  auto tbt_ctrl = tgl_registers::TbtHotplugCtrl::Get().ReadFrom(mmio_space);
-  auto tc_ctrl = tgl_registers::TcHotplugCtrl::Get().ReadFrom(mmio_space);
+  auto tbt_ctrl = registers::TbtHotplugCtrl::Get().ReadFrom(mmio_space);
+  auto tc_ctrl = registers::TcHotplugCtrl::Get().ReadFrom(mmio_space);
 
-  for (auto ddi : DdiIds<tgl_registers::Platform::kTigerLake>()) {
+  for (auto ddi : DdiIds<registers::Platform::kTigerLake>()) {
     switch (ddi) {
       case DdiId::DDI_A:
       case DdiId::DDI_B:
@@ -106,9 +106,9 @@ HotplugDetectionResult DetectHotplugTigerLake(fdf::MmioBuffer* mmio_space) {
 }
 
 void EnableHotplugInterruptsSkylake(fdf::MmioBuffer* mmio_space) {
-  auto pch_fuses = tgl_registers::PchDisplayFuses::Get().ReadFrom(mmio_space);
+  auto pch_fuses = registers::PchDisplayFuses::Get().ReadFrom(mmio_space);
 
-  for (const auto ddi : DdiIds<tgl_registers::Platform::kKabyLake>()) {
+  for (const auto ddi : DdiIds<registers::Platform::kKabyLake>()) {
     bool enabled = false;
     switch (ddi) {
       case DdiId::DDI_A:
@@ -132,18 +132,17 @@ void EnableHotplugInterruptsSkylake(fdf::MmioBuffer* mmio_space) {
         break;
     }
 
-    auto hp_ctrl = tgl_registers::SouthHotplugCtrl::Get(ddi).ReadFrom(mmio_space);
+    auto hp_ctrl = registers::SouthHotplugCtrl::Get(ddi).ReadFrom(mmio_space);
     hp_ctrl.hpd_enable(ddi).set(enabled);
     hp_ctrl.WriteTo(mmio_space);
 
-    auto mask = tgl_registers::SdeInterruptBase::Get(tgl_registers::SdeInterruptBase::kSdeIntMask)
+    auto mask = registers::SdeInterruptBase::Get(registers::SdeInterruptBase::kSdeIntMask)
                     .ReadFrom(mmio_space);
     mask.skl_ddi_bit(ddi).set(!enabled);
     mask.WriteTo(mmio_space);
 
-    auto enable =
-        tgl_registers::SdeInterruptBase::Get(tgl_registers::SdeInterruptBase::kSdeIntEnable)
-            .ReadFrom(mmio_space);
+    auto enable = registers::SdeInterruptBase::Get(registers::SdeInterruptBase::kSdeIntEnable)
+                      .ReadFrom(mmio_space);
     enable.skl_ddi_bit(ddi).set(enabled);
     enable.WriteTo(mmio_space);
   }
@@ -154,7 +153,7 @@ void EnableHotplugInterruptsTigerLake(fdf::MmioBuffer* mmio_space) {
   constexpr uint32_t kSHPD_FILTER_CNT_500_ADJ = 0x001d9;
   mmio_space->Write32(kSHPD_FILTER_CNT_500_ADJ, kSHPD_FILTER_CNT);
 
-  for (const auto ddi : DdiIds<tgl_registers::Platform::kTigerLake>()) {
+  for (const auto ddi : DdiIds<registers::Platform::kTigerLake>()) {
     switch (ddi) {
       case DdiId::DDI_TC_1:
       case DdiId::DDI_TC_2:
@@ -162,19 +161,17 @@ void EnableHotplugInterruptsTigerLake(fdf::MmioBuffer* mmio_space) {
       case DdiId::DDI_TC_4:
       case DdiId::DDI_TC_5:
       case DdiId::DDI_TC_6: {
-        auto hp_ctrl = tgl_registers::TcHotplugCtrl::Get().ReadFrom(mmio_space);
+        auto hp_ctrl = registers::TcHotplugCtrl::Get().ReadFrom(mmio_space);
         hp_ctrl.hpd_enable(ddi).set(1);
         hp_ctrl.WriteTo(mmio_space);
 
-        auto mask =
-            tgl_registers::HpdInterruptBase::Get(tgl_registers::HpdInterruptBase::kHpdIntMask)
-                .ReadFrom(mmio_space);
+        auto mask = registers::HpdInterruptBase::Get(registers::HpdInterruptBase::kHpdIntMask)
+                        .ReadFrom(mmio_space);
         mask.set_reg_value(0);
         mask.WriteTo(mmio_space);
 
-        auto enable =
-            tgl_registers::HpdInterruptBase::Get(tgl_registers::HpdInterruptBase::kHpdIntEnable)
-                .ReadFrom(mmio_space);
+        auto enable = registers::HpdInterruptBase::Get(registers::HpdInterruptBase::kHpdIntEnable)
+                          .ReadFrom(mmio_space);
         enable.tc_hotplug(ddi).set(1);
         enable.tbt_hotplug(ddi).set(1);
         enable.WriteTo(mmio_space);
@@ -183,20 +180,18 @@ void EnableHotplugInterruptsTigerLake(fdf::MmioBuffer* mmio_space) {
       case DdiId::DDI_A:
       case DdiId::DDI_B:
       case DdiId::DDI_C: {
-        auto hp_ctrl = tgl_registers::IclSouthHotplugCtrl::Get(ddi).ReadFrom(mmio_space);
+        auto hp_ctrl = registers::IclSouthHotplugCtrl::Get(ddi).ReadFrom(mmio_space);
         hp_ctrl.hpd_enable(ddi).set(1);
         hp_ctrl.WriteTo(mmio_space);
 
-        auto mask =
-            tgl_registers::SdeInterruptBase::Get(tgl_registers::SdeInterruptBase::kSdeIntMask)
-                .ReadFrom(mmio_space);
+        auto mask = registers::SdeInterruptBase::Get(registers::SdeInterruptBase::kSdeIntMask)
+                        .ReadFrom(mmio_space);
         mask.set_reg_value(0);
         mask.WriteTo(mmio_space);
         mask.ReadFrom(mmio_space);
 
-        auto enable =
-            tgl_registers::SdeInterruptBase::Get(tgl_registers::SdeInterruptBase::kSdeIntEnable)
-                .ReadFrom(mmio_space);
+        auto enable = registers::SdeInterruptBase::Get(registers::SdeInterruptBase::kSdeIntEnable)
+                          .ReadFrom(mmio_space);
         enable.icl_ddi_bit(ddi).set(1);
         enable.WriteTo(mmio_space);
       } break;
@@ -233,14 +228,14 @@ int Interrupts::IrqLoop() {
       return -1;
     }
 
-    auto graphics_primary_interrupts = tgl_registers::GraphicsPrimaryInterrupt::Get().FromValue(0);
+    auto graphics_primary_interrupts = registers::GraphicsPrimaryInterrupt::Get().FromValue(0);
     if (is_tgl(device_id_)) {
       graphics_primary_interrupts.ReadFrom(mmio_space_)
           .set_interrupts_enabled(false)
           .WriteTo(mmio_space_);
     }
 
-    auto display_interrupts = tgl_registers::DisplayInterruptControl::Get().ReadFrom(mmio_space_);
+    auto display_interrupts = registers::DisplayInterruptControl::Get().ReadFrom(mmio_space_);
     display_interrupts.set_interrupts_enabled(false);
     display_interrupts.WriteTo(mmio_space_);
 
@@ -300,10 +295,9 @@ int Interrupts::IrqLoop() {
 }
 
 void Interrupts::HandlePipeInterrupt(PipeId pipe_id, zx_time_t timestamp) {
-  tgl_registers::PipeRegs regs(pipe_id);
+  registers::PipeRegs regs(pipe_id);
   auto interrupt_identity =
-      regs.PipeInterrupt(tgl_registers::PipeRegs::InterruptRegister::kIdentity)
-          .ReadFrom(mmio_space_);
+      regs.PipeInterrupt(registers::PipeRegs::InterruptRegister::kIdentity).ReadFrom(mmio_space_);
 
   // Interrupt Identity Registers (IIR) are R/WC (Read/Write Clear), meaning
   // that indicator bits are cleared by writing 1s to them. Writing the value we
@@ -319,13 +313,13 @@ void Interrupts::HandlePipeInterrupt(PipeId pipe_id, zx_time_t timestamp) {
 }
 
 void Interrupts::EnablePipeInterrupts(PipeId pipe_id, bool enable) {
-  tgl_registers::PipeRegs regs(pipe_id);
+  registers::PipeRegs regs(pipe_id);
   auto interrupt_mask =
-      regs.PipeInterrupt(tgl_registers::PipeRegs::InterruptRegister::kMask).FromValue(0);
+      regs.PipeInterrupt(registers::PipeRegs::InterruptRegister::kMask).FromValue(0);
   interrupt_mask.set_underrun(!enable).set_vsync(!enable).WriteTo(mmio_space_);
 
   auto interrupt_enable =
-      regs.PipeInterrupt(tgl_registers::PipeRegs::InterruptRegister::kEnable).FromValue(0);
+      regs.PipeInterrupt(registers::PipeRegs::InterruptRegister::kEnable).FromValue(0);
   interrupt_enable.set_underrun(enable).set_vsync(enable).WriteTo(mmio_space_);
 }
 
@@ -364,11 +358,11 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
 
   if (is_tgl(device_id_)) {
     auto graphics_primary_interrupts =
-        tgl_registers::GraphicsPrimaryInterrupt::Get().ReadFrom(mmio_space);
+        registers::GraphicsPrimaryInterrupt::Get().ReadFrom(mmio_space);
     graphics_primary_interrupts.set_interrupts_enabled(false).WriteTo(mmio_space_);
   }
 
-  auto interrupt_ctrl = tgl_registers::DisplayInterruptControl::Get().ReadFrom(mmio_space);
+  auto interrupt_ctrl = registers::DisplayInterruptControl::Get().ReadFrom(mmio_space);
   interrupt_ctrl.set_interrupts_enabled(false).WriteTo(mmio_space);
 
   // Assume that PCI will enable bus mastering as required for MSI interrupts.
@@ -421,12 +415,12 @@ zx_status_t Interrupts::Init(PipeVsyncCallback pipe_vsync_callback,
 void Interrupts::FinishInit() {
   zxlogf(TRACE, "Interrupts re-enabled");
 
-  auto display_interrupts = tgl_registers::DisplayInterruptControl::Get().ReadFrom(mmio_space_);
+  auto display_interrupts = registers::DisplayInterruptControl::Get().ReadFrom(mmio_space_);
   display_interrupts.set_interrupts_enabled(true).WriteTo(mmio_space_);
 
   if (is_tgl(device_id_)) {
     auto graphics_primary_interrupts =
-        tgl_registers::GraphicsPrimaryInterrupt::Get().ReadFrom(mmio_space_);
+        registers::GraphicsPrimaryInterrupt::Get().ReadFrom(mmio_space_);
     graphics_primary_interrupts.set_interrupts_enabled(true).WriteTo(mmio_space_);
 
     graphics_primary_interrupts.ReadFrom(mmio_space_);  // posting read
@@ -441,4 +435,4 @@ void Interrupts::Resume() {
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

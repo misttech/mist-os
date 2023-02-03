@@ -16,7 +16,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace tgl_registers {
+namespace registers {
 
 // PS_CTRL (Pipe Scaler Control) for Skylake / Kaby Lake
 //
@@ -1135,79 +1135,79 @@ class PipeScalerWindowSize : public hwreg::RegisterBase<PipeScalerWindowSize, ui
 // scaler.
 class PipeScalerRegs {
  public:
-  explicit PipeScalerRegs(i915_tgl::PipeId pipe_id, int scaler_index)
+  explicit PipeScalerRegs(i915::PipeId pipe_id, int scaler_index)
       : pipe_id_(pipe_id), scaler_index_(scaler_index) {}
 
   hwreg::RegisterAddr<PipeScalerControlSkylake> PipeScalerControlSkylake() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerControlSkylake>(
+    return hwreg::RegisterAddr<registers::PipeScalerControlSkylake>(
         PipeScalerControlSkylake::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerControlTigerLake> PipeScalerControlTigerLake() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerControlTigerLake>(
+    return hwreg::RegisterAddr<registers::PipeScalerControlTigerLake>(
         PipeScalerControlTigerLake::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerAdaptiveFilterThresholds> PipeScalerAdaptiveFilterThresholds() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerAdaptiveFilterThresholds>(
+    return hwreg::RegisterAddr<registers::PipeScalerAdaptiveFilterThresholds>(
         PipeScalerAdaptiveFilterThresholds::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerCoefficientData> PipeScalerCoefficientData() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerCoefficientData>(
+    return hwreg::RegisterAddr<registers::PipeScalerCoefficientData>(
         PipeScalerCoefficientData::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerCoefficientIndex> PipeScalerCoefficientIndex() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerCoefficientIndex>(
+    return hwreg::RegisterAddr<registers::PipeScalerCoefficientIndex>(
         PipeScalerCoefficientIndex::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   PipeScalerCoefficients PipeScalerCoefficients() {
-    return tgl_registers::PipeScalerCoefficients(PipeScalerCoefficientIndex(),
-                                                 PipeScalerCoefficientData());
+    return registers::PipeScalerCoefficients(PipeScalerCoefficientIndex(),
+                                             PipeScalerCoefficientData());
   }
 
   hwreg::RegisterAddr<PipeScalerHorizontalInitialPhase> PipeScalerHorizontalInitialPhase() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerHorizontalInitialPhase>(
+    return hwreg::RegisterAddr<registers::PipeScalerHorizontalInitialPhase>(
         PipeScalerHorizontalInitialPhase::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerVerticalInitialPhase> PipeScalerVerticalInitialPhase() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerVerticalInitialPhase>(
+    return hwreg::RegisterAddr<registers::PipeScalerVerticalInitialPhase>(
         PipeScalerVerticalInitialPhase::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerPowerGateControl> PipeScalerPowerGateControl() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerPowerGateControl>(
+    return hwreg::RegisterAddr<registers::PipeScalerPowerGateControl>(
         PipeScalerPowerGateControl::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerScalingFactor> PipeScalerHorizontalScalingFactor() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerScalingFactor>(
+    return hwreg::RegisterAddr<registers::PipeScalerScalingFactor>(
         PipeScalerScalingFactor::kHorizontalBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerScalingFactor> PipeScalerVerticalScalingFactor() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerScalingFactor>(
+    return hwreg::RegisterAddr<registers::PipeScalerScalingFactor>(
         PipeScalerScalingFactor::kVerticalBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerWindowPosition> PipeScalerWindowPosition() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerWindowPosition>(
+    return hwreg::RegisterAddr<registers::PipeScalerWindowPosition>(
         PipeScalerWindowPosition::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
   hwreg::RegisterAddr<PipeScalerWindowSize> PipeScalerWindowSize() {
-    return hwreg::RegisterAddr<tgl_registers::PipeScalerWindowSize>(
+    return hwreg::RegisterAddr<registers::PipeScalerWindowSize>(
         PipeScalerWindowSize::kBaseAddr + 0x800 * pipe_id_ + scaler_index_ * 0x100);
   }
 
  private:
-  i915_tgl::PipeId pipe_id_;
+  i915::PipeId pipe_id_;
   int scaler_index_;
 };
 
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_PIPE_SCALER_H_

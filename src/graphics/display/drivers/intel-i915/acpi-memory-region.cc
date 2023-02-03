@@ -20,7 +20,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/acpi-memory-region-util.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // static
 zx::result<AcpiMemoryRegion> AcpiMemoryRegion::Create(zx_paddr_t region_base, size_t region_size) {
@@ -89,4 +89,4 @@ AcpiMemoryRegion::~AcpiMemoryRegion() {
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

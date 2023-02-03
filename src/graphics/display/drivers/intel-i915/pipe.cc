@@ -31,7 +31,7 @@ uint32_t float_to_i915_csc_offset(float f) {
 }
 
 uint32_t float_to_i915_csc_coefficient(float f) {
-  tgl_registers::CscCoeffFormat res;
+  registers::CscCoeffFormat res;
   if (f < 0) {
     f *= -1;
     res.set_sign(1);
@@ -73,9 +73,9 @@ uint32_t encode_pipe_color_component(uint8_t component) {
 
 }  // namespace
 
-namespace i915_tgl {
+namespace i915 {
 
-Pipe::Pipe(fdf::MmioBuffer* mmio_space, tgl_registers::Platform platform, PipeId pipe_id,
+Pipe::Pipe(fdf::MmioBuffer* mmio_space, registers::Platform platform, PipeId pipe_id,
            PowerWellRef pipe_power)
     : mmio_space_(mmio_space),
       platform_(platform),
@@ -83,9 +83,9 @@ Pipe::Pipe(fdf::MmioBuffer* mmio_space, tgl_registers::Platform platform, PipeId
       pipe_power_(std::move(pipe_power)) {}
 
 // static
-void Pipe::ResetTranscoder(TranscoderId transcoder_id, tgl_registers::Platform platform,
+void Pipe::ResetTranscoder(TranscoderId transcoder_id, registers::Platform platform,
                            fdf::MmioBuffer* mmio_space) {
-  tgl_registers::TranscoderRegs transcoder_regs(transcoder_id);
+  registers::TranscoderRegs transcoder_regs(transcoder_id);
 
   // Disable transcoder and wait for it to stop. These are the "Disable
   // Transcoder" steps from:
@@ -121,7 +121,7 @@ void Pipe::ResetTranscoder(TranscoderId transcoder_id, tgl_registers::Platform p
            transcoder_config.reg_value());
   }
 
-  if (platform == tgl_registers::Platform::kTigerLake) {
+  if (platform == registers::Platform::kTigerLake) {
     auto transcoder_chicken = transcoder_regs.Chicken().ReadFrom(mmio_space);
     zxlogf(TRACE, "ResetTranscoder() - Transcoder %d chicken register: %x", transcoder_id,
            transcoder_chicken.reg_value());
@@ -149,7 +149,7 @@ void Pipe::ResetTranscoder(TranscoderId transcoder_id, tgl_registers::Platform p
     return;
   }
 
-  if (platform == tgl_registers::Platform::kTigerLake) {
+  if (platform == registers::Platform::kTigerLake) {
     auto transcoder_variable_rate_refresh_control =
         transcoder_regs.VariableRateRefreshControl().ReadFrom(mmio_space);
     zxlogf(TRACE, "ResetTranscoder() - Transcoder %d VRR register: %x", transcoder_id,
@@ -229,16 +229,16 @@ void Pipe::Reset() {
 }
 
 void Pipe::ResetPlanes() {
-  tgl_registers::PipeRegs pipe_regs(pipe_id());
+  registers::PipeRegs pipe_regs(pipe_id());
 
   // Disable planes, bottom color, and cursor
-  const size_t plane_count = platform_ == tgl_registers::Platform::kTigerLake ? 7 : 3;
+  const size_t plane_count = platform_ == registers::Platform::kTigerLake ? 7 : 3;
   for (size_t i = 0; i < plane_count; i++) {
     pipe_regs.PlaneControl(i).FromValue(0).WriteTo(mmio_space_);
     pipe_regs.PlaneSurface(i).FromValue(0).WriteTo(mmio_space_);
   }
   auto cursor_ctrl = pipe_regs.CursorCtrl().ReadFrom(mmio_space_);
-  cursor_ctrl.set_mode_select(tgl_registers::CursorCtrl::kDisabled);
+  cursor_ctrl.set_mode_select(registers::CursorCtrl::kDisabled);
   cursor_ctrl.WriteTo(mmio_space_);
   pipe_regs.CursorBase().FromValue(0).WriteTo(mmio_space_);
   pipe_regs.PipeBottomColor().FromValue(0).WriteTo(mmio_space_);
@@ -252,7 +252,7 @@ void Pipe::ResetActiveTranscoder() {
 }
 
 void Pipe::ResetScaler() {
-  tgl_registers::PipeRegs pipe_regs(pipe_id());
+  registers::PipeRegs pipe_regs(pipe_id());
 
   // This works for Skylake / Kaby Lake and Tiger Lake.
   // Note that Skylake / Kaby Lake doesn't have PS_CTRL_2_C documented in the
@@ -283,7 +283,7 @@ void Pipe::AttachToDisplay(uint64_t id, bool is_edp) {
 }
 
 void Pipe::ApplyModeConfig(const display_mode_t& mode) {
-  tgl_registers::TranscoderRegs trans_regs(connected_transcoder_id());
+  registers::TranscoderRegs trans_regs(connected_transcoder_id());
 
   // Configure the rest of the transcoder
   uint32_t h_active = mode.h_addressable - 1;
@@ -324,7 +324,7 @@ void Pipe::ApplyModeConfig(const display_mode_t& mode) {
   trans_regs.HBlank().FromValue(h_total_reg.reg_value()).WriteTo(mmio_space_);
   trans_regs.VBlank().FromValue(v_total_reg.reg_value()).WriteTo(mmio_space_);
 
-  tgl_registers::PipeRegs pipe_regs(pipe_id());
+  registers::PipeRegs pipe_regs(pipe_id());
   auto pipe_size = pipe_regs.PipeSourceSize().FromValue(0);
   pipe_size.set_horizontal_source_size_minus_one(mode.h_addressable - 1);
   pipe_size.set_vertical_source_size_minus_one(mode.v_addressable - 1);
@@ -332,7 +332,7 @@ void Pipe::ApplyModeConfig(const display_mode_t& mode) {
 }
 
 void Pipe::LoadActiveMode(display_mode_t* mode) {
-  tgl_registers::TranscoderRegs trans_regs(connected_transcoder_id());
+  registers::TranscoderRegs trans_regs(connected_transcoder_id());
 
   auto h_total_reg = trans_regs.HTotal().ReadFrom(mmio_space_);
   uint32_t h_total = h_total_reg.count_total();
@@ -372,7 +372,7 @@ void Pipe::LoadActiveMode(display_mode_t* mode) {
 
   // If we're reusing hardware state, make sure the pipe source size matches
   // the display mode size, since we never scale pipes.
-  tgl_registers::PipeRegs pipe_regs(pipe_id_);
+  registers::PipeRegs pipe_regs(pipe_id_);
   auto pipe_size = pipe_regs.PipeSourceSize().FromValue(0);
   pipe_size.set_horizontal_source_size_minus_one(mode->h_addressable - 1);
   pipe_size.set_vertical_source_size_minus_one(mode->v_addressable - 1);
@@ -393,8 +393,8 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
 
   auto current_config_stamp_seqno = *config_stamps_front_seqno_ + config_stamps_.size() - 1;
 
-  tgl_registers::pipe_arming_regs_t regs;
-  tgl_registers::PipeRegs pipe_regs(pipe_id_);
+  registers::pipe_arming_regs_t regs;
+  registers::PipeRegs pipe_regs(pipe_id_);
 
   if (config->cc_flags) {
     float zero_offset[3] = {};
@@ -469,13 +469,13 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
   }
   ConfigureCursorPlane(cursor, !!config->cc_flags, &regs, current_config_stamp_seqno);
 
-  if (platform_ != tgl_registers::Platform::kTigerLake) {
+  if (platform_ != registers::Platform::kTigerLake) {
     pipe_regs.CscMode().FromValue(regs.csc_mode).WriteTo(mmio_space_);
   }
   pipe_regs.PipeBottomColor().FromValue(regs.pipe_bottom_color).WriteTo(mmio_space_);
   pipe_regs.CursorBase().FromValue(regs.cur_base).WriteTo(mmio_space_);
   pipe_regs.CursorPos().FromValue(regs.cur_pos).WriteTo(mmio_space_);
-  for (unsigned i = 0; i < tgl_registers::kImagePlaneCount; i++) {
+  for (unsigned i = 0; i < registers::kImagePlaneCount; i++) {
     pipe_regs.PlaneSurface(i).FromValue(regs.plane_surf[i]).WriteTo(mmio_space_);
   }
   pipe_regs.PipeScalerRegs(/* num= */ 0)
@@ -492,10 +492,9 @@ void Pipe::ApplyConfiguration(const display_config_t* config, const config_stamp
 
 void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* primary,
                                  bool enable_csc, bool* scaler_1_claimed,
-                                 tgl_registers::pipe_arming_regs_t* regs,
-                                 uint64_t config_stamp_seqno,
+                                 registers::pipe_arming_regs_t* regs, uint64_t config_stamp_seqno,
                                  const SetupGttImageFunc& setup_gtt_image) {
-  tgl_registers::PipeRegs pipe_regs(pipe_id());
+  registers::PipeRegs pipe_regs(pipe_id());
 
   auto plane_ctrl = pipe_regs.PlaneControl(plane_num).ReadFrom(mmio_space_);
   if (primary == nullptr) {
@@ -544,7 +543,7 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     // in case there's nothing else that will claim it this frame.
     if (scaled_planes_[pipe_id()][plane_num]) {
       int scaler_num = scaled_planes_[pipe_id()][plane_num] - 1;
-      tgl_registers::PipeScalerRegs pipe_scaler_regs(pipe_id_, scaler_num);
+      registers::PipeScalerRegs pipe_scaler_regs(pipe_id_, scaler_num);
       pipe_scaler_regs.PipeScalerControlSkylake()
           .ReadFrom(mmio_space_)
           .set_is_enabled(false)
@@ -556,19 +555,19 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
     pipe_regs.PlanePosition(plane_num).FromValue(0).WriteTo(mmio_space_);
 
     int scaler_num = *scaler_1_claimed ? 1 : 0;
-    tgl_registers::PipeScalerRegs pipe_scaler_regs(pipe_id_, scaler_num);
+    registers::PipeScalerRegs pipe_scaler_regs(pipe_id_, scaler_num);
 
     auto ps_ctrl = pipe_scaler_regs.PipeScalerControlSkylake().ReadFrom(mmio_space_);
-    ps_ctrl.set_mode(tgl_registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
-    if (platform_ != tgl_registers::Platform::kTigerLake) {
+    ps_ctrl.set_mode(registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
+    if (platform_ != registers::Platform::kTigerLake) {
       // The mode bits are different in Tiger Lake.
       if (primary->src_frame.width > 2048) {
         float max_dynamic_height =
             static_cast<float>(plane_height) *
-            tgl_registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
+            registers::PipeScalerControlSkylake::kDynamicMaxVerticalRatio2049;
         if (static_cast<uint32_t>(max_dynamic_height) < primary->dest_frame.height) {
           // TODO(stevensd): This misses some cases where 7x5 can be used.
-          ps_ctrl.set_mode(tgl_registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
+          ps_ctrl.set_mode(registers::PipeScalerControlSkylake::ScalerMode::kDynamic);
         }
       }
     }
@@ -605,19 +604,19 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   stride_reg.set_stride(stride);
   stride_reg.WriteTo(mmio_space_);
 
-  tgl_registers::PlaneControlAlphaMode alpha_mode;
+  registers::PlaneControlAlphaMode alpha_mode;
   if (primary->alpha_mode == ALPHA_DISABLE ||
       primary->image.pixel_format == ZX_PIXEL_FORMAT_RGB_x888 ||
       primary->image.pixel_format == ZX_PIXEL_FORMAT_BGR_888x) {
-    alpha_mode = tgl_registers::PlaneControlAlphaMode::kAlphaIgnored;
+    alpha_mode = registers::PlaneControlAlphaMode::kAlphaIgnored;
   } else if (primary->alpha_mode == ALPHA_PREMULTIPLIED) {
-    alpha_mode = tgl_registers::PlaneControlAlphaMode::kAlphaPreMultiplied;
+    alpha_mode = registers::PlaneControlAlphaMode::kAlphaPreMultiplied;
   } else {
     ZX_ASSERT(primary->alpha_mode == ALPHA_HW_MULTIPLY);
-    alpha_mode = tgl_registers::PlaneControlAlphaMode::kAlphaHardwareMultiply;
+    alpha_mode = registers::PlaneControlAlphaMode::kAlphaHardwareMultiply;
   }
 
-  if (platform_ == tgl_registers::Platform::kTigerLake) {
+  if (platform_ == registers::Platform::kTigerLake) {
     auto plane_color_ctl = pipe_regs.PlaneColorControlTigerLake(plane_num).ReadFrom(mmio_space_);
     plane_color_ctl.set_pipe_gamma_enabled_deprecated(false)
         .set_pipe_csc_enabled_deprecated(enable_csc)
@@ -641,45 +640,45 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
   plane_key_mask.WriteTo(mmio_space_);
 
   plane_ctrl.set_plane_enabled(true);
-  if (platform_ != tgl_registers::Platform::kTigerLake) {
+  if (platform_ != registers::Platform::kTigerLake) {
     plane_ctrl.set_pipe_csc_enabled_kaby_lake(enable_csc).set_alpha_mode_kaby_lake(alpha_mode);
   }
-  if (platform_ == tgl_registers::Platform::kTigerLake) {
+  if (platform_ == registers::Platform::kTigerLake) {
     plane_ctrl.set_source_pixel_format_tiger_lake(
-        tgl_registers::PlaneControl::ColorFormatTigerLake::kRgb8888);
+        registers::PlaneControl::ColorFormatTigerLake::kRgb8888);
   } else {
     plane_ctrl.set_source_pixel_format_kaby_lake(
-        tgl_registers::PlaneControl::ColorFormatKabyLake::kRgb8888);
+        registers::PlaneControl::ColorFormatKabyLake::kRgb8888);
   }
   if (primary->image.pixel_format == ZX_PIXEL_FORMAT_ABGR_8888 ||
       primary->image.pixel_format == ZX_PIXEL_FORMAT_BGR_888x) {
-    plane_ctrl.set_rgb_color_order(tgl_registers::PlaneControl::RgbColorOrder::kRgbx);
+    plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kRgbx);
   } else {
-    plane_ctrl.set_rgb_color_order(tgl_registers::PlaneControl::RgbColorOrder::kBgrx);
+    plane_ctrl.set_rgb_color_order(registers::PlaneControl::RgbColorOrder::kBgrx);
   }
   if (primary->image.type == IMAGE_TYPE_SIMPLE) {
-    plane_ctrl.set_surface_tiling(tgl_registers::PlaneControl::SurfaceTiling::kLinear);
+    plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kLinear);
   } else if (primary->image.type == IMAGE_TYPE_X_TILED) {
-    plane_ctrl.set_surface_tiling(tgl_registers::PlaneControl::SurfaceTiling::kTilingX);
+    plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingX);
   } else if (primary->image.type == IMAGE_TYPE_Y_LEGACY_TILED) {
-    plane_ctrl.set_surface_tiling(tgl_registers::PlaneControl::SurfaceTiling::kTilingYLegacy);
+    plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingYLegacy);
   } else {
     ZX_ASSERT(primary->image.type == IMAGE_TYPE_YF_TILED);
-    if (platform_ == tgl_registers::Platform::kTigerLake) {
+    if (platform_ == registers::Platform::kTigerLake) {
       // TODO(fxbug.dev/111347): Remove this warning or turn it into an error.
       zxlogf(ERROR, "The Tiger Lake display engine may not support YF tiling.");
     }
-    plane_ctrl.set_surface_tiling(tgl_registers::PlaneControl::SurfaceTiling::kTilingYFKabyLake);
+    plane_ctrl.set_surface_tiling(registers::PlaneControl::SurfaceTiling::kTilingYFKabyLake);
   }
   if (primary->transform_mode == FRAME_TRANSFORM_IDENTITY) {
-    plane_ctrl.set_rotation(tgl_registers::PlaneControl::Rotation::kIdentity);
+    plane_ctrl.set_rotation(registers::PlaneControl::Rotation::kIdentity);
   } else if (primary->transform_mode == FRAME_TRANSFORM_ROT_90) {
-    plane_ctrl.set_rotation(tgl_registers::PlaneControl::Rotation::k90degrees);
+    plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k90degrees);
   } else if (primary->transform_mode == FRAME_TRANSFORM_ROT_180) {
-    plane_ctrl.set_rotation(tgl_registers::PlaneControl::Rotation::k180degrees);
+    plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k180degrees);
   } else {
     ZX_ASSERT(primary->transform_mode == FRAME_TRANSFORM_ROT_270);
-    plane_ctrl.set_rotation(tgl_registers::PlaneControl::Rotation::k270degrees);
+    plane_ctrl.set_rotation(registers::PlaneControl::Rotation::k270degrees);
   }
   plane_ctrl.WriteTo(mmio_space_);
 
@@ -691,9 +690,8 @@ void Pipe::ConfigurePrimaryPlane(uint32_t plane_num, const primary_layer_t* prim
 }
 
 void Pipe::ConfigureCursorPlane(const cursor_layer_t* cursor, bool enable_csc,
-                                tgl_registers::pipe_arming_regs_t* regs,
-                                uint64_t config_stamp_seqno) {
-  tgl_registers::PipeRegs pipe_regs(pipe_id());
+                                registers::pipe_arming_regs_t* regs, uint64_t config_stamp_seqno) {
+  registers::PipeRegs pipe_regs(pipe_id());
 
   auto cursor_ctrl = pipe_regs.CursorCtrl().ReadFrom(mmio_space_);
   // The hardware requires that the cursor has at least one pixel on the display,
@@ -785,7 +783,7 @@ std::optional<config_stamp_t> Pipe::GetVsyncConfigStamp(
 }
 
 void Pipe::SetColorConversionOffsets(bool preoffsets, const float vals[3]) {
-  tgl_registers::PipeRegs pipe_regs(pipe_id());
+  registers::PipeRegs pipe_regs(pipe_id());
 
   for (uint32_t i = 0; i < 3; i++) {
     float offset = vals[i];
@@ -799,4 +797,4 @@ void Pipe::SetColorConversionOffsets(bool preoffsets, const float vals[3]) {
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

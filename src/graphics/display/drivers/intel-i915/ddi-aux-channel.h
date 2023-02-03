@@ -14,7 +14,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // Low-level channel configuration.
 struct DdiAuxChannelConfig {
@@ -182,7 +182,7 @@ class DdiAuxChannel {
   // caller is responsible for issuing a WriteTo() call to the register.
   void FixConfig();
 
-  tgl_registers::DdiAuxControl aux_control_;
+  registers::DdiAuxControl aux_control_;
 
   fdf::MmioBuffer* mmio_buffer_;  // Non-null.
 
@@ -206,6 +206,6 @@ class DdiAuxChannel {
 #endif  // ZX_DEBUG_ASSERT_IMPLEMENTED
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DDI_AUX_CHANNEL_H_

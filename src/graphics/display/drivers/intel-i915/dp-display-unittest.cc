@@ -28,7 +28,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -225,8 +225,7 @@ TEST_F(DpDisplayTest, MultipleSinksNotSupported) {
 
 // Tests that the maximum supported lane count is 2 when DDI E is enabled.
 TEST_F(DpDisplayTest, ReducedMaxLaneCountWhenDdiEIsEnabled) {
-  auto buffer_control =
-      tgl_registers::DdiRegs(DdiId::DDI_A).BufferControl().ReadFrom(mmio_buffer());
+  auto buffer_control = registers::DdiRegs(DdiId::DDI_A).BufferControl().ReadFrom(mmio_buffer());
   buffer_control.set_ddi_e_disabled_kaby_lake(false).WriteTo(mmio_buffer());
 
   fake_dpcd()->SetMaxLaneCount(4);
@@ -238,8 +237,7 @@ TEST_F(DpDisplayTest, ReducedMaxLaneCountWhenDdiEIsEnabled) {
 
 // Tests that the maximum supported lane count is selected when DDI E is not enabled.
 TEST_F(DpDisplayTest, MaxLaneCount) {
-  auto buffer_control =
-      tgl_registers::DdiRegs(DdiId::DDI_A).BufferControl().ReadFrom(mmio_buffer());
+  auto buffer_control = registers::DdiRegs(DdiId::DDI_A).BufferControl().ReadFrom(mmio_buffer());
   buffer_control.set_ddi_e_disabled_kaby_lake(true).WriteTo(mmio_buffer());
   fake_dpcd()->SetMaxLaneCount(4);
 
@@ -259,11 +257,11 @@ TEST_F(DpDisplayTest, LinkRateSelectionViaInit) {
   // DpDisplay. Can DpDisplay be told that it is eDP during construction time instead of querying
   // Controller for it every time?
   controller()->igd_opregion_for_testing()->SetIsEdpForTesting(DdiId::DDI_A, true);
-  auto dpll_status = tgl_registers::DisplayPllStatus::Get().ReadFrom(mmio_buffer());
+  auto dpll_status = registers::DisplayPllStatus::Get().ReadFrom(mmio_buffer());
   dpll_status.set_pll0_locked(true).WriteTo(mmio_buffer());
 
   // Mock the "Panel ready" status.
-  auto panel_status = tgl_registers::PchPanelPowerStatus::Get().ReadFrom(mmio_buffer());
+  auto panel_status = registers::PchPanelPowerStatus::Get().ReadFrom(mmio_buffer());
   panel_status.set_panel_on(1);
   panel_status.WriteTo(mmio_buffer());
 
@@ -340,4 +338,4 @@ TEST_F(DpDisplayTest, GetBacklightBrightnessUsesDpcd) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

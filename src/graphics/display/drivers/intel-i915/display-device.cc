@@ -22,7 +22,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 #include "src/graphics/display/drivers/intel-i915/tiling.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -294,4 +294,4 @@ void DisplayDevice::GetNormalizedBrightnessScale(
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

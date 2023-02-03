@@ -21,7 +21,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class PipeManagerTest : public ::testing::Test {
  public:
@@ -126,8 +126,8 @@ TEST_F(PipeManagerTest, SkylakeReclaimUsedPipe) {
   controller_.SetPipeManagerForTesting(std::make_unique<PipeManagerSkylake>(controller()));
   PipeManager* pm = controller_.pipe_manager();
 
-  for (size_t display_id = 1u;
-       display_id <= PipeIds<tgl_registers::Platform::kKabyLake>().size() * 10; display_id++) {
+  for (size_t display_id = 1u; display_id <= PipeIds<registers::Platform::kKabyLake>().size() * 10;
+       display_id++) {
     std::unique_ptr<DisplayDevice> display = std::make_unique<FakeDisplay>(
         controller(), display_id, DdiId::DDI_B, DisplayDevice::Type::kDp);
     Pipe* pipe = pm->RequestPipe(*display);
@@ -140,4 +140,4 @@ TEST_F(PipeManagerTest, SkylakeReclaimUsedPipe) {
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

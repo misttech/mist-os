@@ -9,7 +9,7 @@
 #include "gtest/gtest.h"
 #include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -2316,4 +2316,4 @@ TEST_F(PchEnginePanelPowerStateTest, WaitForPanelPowerStateTimeoutRounding) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

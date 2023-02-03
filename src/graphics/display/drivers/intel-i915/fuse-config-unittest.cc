@@ -13,7 +13,7 @@
 #include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -116,4 +116,4 @@ TEST_F(FuseConfigTest, KabyLakeAllFusesBlown) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

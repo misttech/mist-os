@@ -16,7 +16,7 @@
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -26,7 +26,7 @@ constexpr size_t kPageSize = PAGE_SIZE;
 // graphics control register set to 0x01.
 constexpr size_t kTableSize = (1 << 21);
 void Configure2MbGtt(ddk::Pci& pci) {
-  zx_status_t status = pci.WriteConfig16(tgl_registers::GmchGfxControl::kAddr, 0x40);
+  zx_status_t status = pci.WriteConfig16(registers::GmchGfxControl::kAddr, 0x40);
   EXPECT_EQ(ZX_OK, status);
 }
 
@@ -153,4 +153,4 @@ TEST_F(GttTest, SetupForMexec) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

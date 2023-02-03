@@ -60,7 +60,7 @@ zx_status_t zx_framebuffer_get_info(zx_handle_t resource, uint32_t* format, uint
   return g_framebuffer.status;
 }
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -126,7 +126,7 @@ class TglIntegrationTest : public ::testing::Test {
     // This configures the "GMCH Graphics Control" register to report 2MB for the available GTT
     // Graphics Memory. All other bits of this register are set to zero and should get populated as
     // required for the tests below.
-    pci_.PciWriteConfig16(tgl_registers::GmchGfxControl::kAddr, 0x40);
+    pci_.PciWriteConfig16(registers::GmchGfxControl::kAddr, 0x40);
 
     constexpr uint16_t kIntelVendorId = 0x8086;
     pci_.SetDeviceInfo({
@@ -394,4 +394,4 @@ TEST_F(TglIntegrationTest, SysmemRotated) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

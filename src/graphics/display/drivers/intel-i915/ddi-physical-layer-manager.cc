@@ -11,7 +11,7 @@
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/intel-i915.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 DdiReference::DdiReference() = default;
 
@@ -62,7 +62,7 @@ DdiReference DdiManager::GetDdiReference(DdiId ddi_id) {
 }
 
 DdiManagerSkylake::DdiManagerSkylake() {
-  for (const DdiId ddi_id : DdiIds<tgl_registers::Platform::kSkylake>()) {
+  for (const DdiId ddi_id : DdiIds<registers::Platform::kSkylake>()) {
     ddi_map()[ddi_id] = std::make_unique<DdiSkylake>(ddi_id);
   }
 }
@@ -73,7 +73,7 @@ DdiManagerTigerLake::DdiManagerTigerLake(Controller* controller)
 
 DdiManagerTigerLake::DdiManagerTigerLake(Power* power, fdf::MmioBuffer* mmio_space,
                                          const IgdOpRegion& igd_opregion) {
-  for (const DdiId ddi_id : DdiIds<tgl_registers::Platform::kTigerLake>()) {
+  for (const DdiId ddi_id : DdiIds<registers::Platform::kTigerLake>()) {
     if (!igd_opregion.HasDdi(ddi_id)) {
       zxlogf(TRACE, "DDI %d not initialized because it's omitted in VBT.", ddi_id);
       continue;
@@ -103,4 +103,4 @@ DdiManagerTigerLake::DdiManagerTigerLake(Power* power, fdf::MmioBuffer* mmio_spa
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

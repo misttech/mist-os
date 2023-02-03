@@ -11,7 +11,7 @@
 
 #include <hwreg/bitfields.h>
 
-namespace tgl_registers {
+namespace registers {
 
 // NDE_RSTWRN_OPT (North Display Reset Warn Options)
 //
@@ -402,6 +402,6 @@ class PchPanelPowerStatus : public hwreg::RegisterBase<PchPanelPowerStatus, uint
   // Tiger Lake has another instance for a 2nd panel at 0xc7300.
 };
 
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_PCH_H_

@@ -17,7 +17,7 @@
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class PowerTest : public ::testing::Test {
  public:
@@ -41,8 +41,8 @@ class PowerTest : public ::testing::Test {
 
 // Verify setting Power Well 2 status on Skylake platform.
 TEST_F(PowerTest, Skylake_PowerWell2) {
-  auto kPwrWellCtlIndex = tgl_registers::PowerWellControl::Get().addr() / sizeof(uint32_t);
-  auto kFuseStatusIndex = tgl_registers::FuseStatus::Get().addr() / sizeof(uint32_t);
+  auto kPwrWellCtlIndex = registers::PowerWellControl::Get().addr() / sizeof(uint32_t);
+  auto kFuseStatusIndex = registers::FuseStatus::Get().addr() / sizeof(uint32_t);
 
   bool pg2_status = false;
 
@@ -110,9 +110,9 @@ TEST_F(PowerTest, Skylake_AuxIo) {
 
 TEST_F(PowerTest, TigerLake_DdiIo) {
   const auto kPowerWellControlDdi2Index =
-      tgl_registers::PowerWellControlDdi2::Get().addr() / sizeof(uint32_t);
+      registers::PowerWellControlDdi2::Get().addr() / sizeof(uint32_t);
 
-  auto power_well_control_ddi_reg = tgl_registers::PowerWellControlDdi2::Get().FromValue(0);
+  auto power_well_control_ddi_reg = registers::PowerWellControlDdi2::Get().FromValue(0);
 
   // Fake PowerWellControlDdi2 register, which flips the state bit once the
   // corresponding request bit is flipped.
@@ -174,8 +174,8 @@ TEST_F(PowerTest, TigerLake_DdiIo) {
 
 // Verify setting Power Well status on Tiger lake platform.
 TEST_F(PowerTest, TigerLake_PowerWell) {
-  auto kPwrWellCtlIndex = tgl_registers::PowerWellControl::Get().addr() / sizeof(uint32_t);
-  auto kFuseStatusIndex = tgl_registers::FuseStatus::Get().addr() / sizeof(uint32_t);
+  auto kPwrWellCtlIndex = registers::PowerWellControl::Get().addr() / sizeof(uint32_t);
+  auto kFuseStatusIndex = registers::FuseStatus::Get().addr() / sizeof(uint32_t);
 
   std::unordered_map<PowerWellId, bool> pg_status = {
       {PowerWellId::PG1, true},  {PowerWellId::PG2, false}, {PowerWellId::PG3, false},
@@ -271,4 +271,4 @@ TEST_F(PowerTest, TigerLake_PowerWell) {
   EXPECT_FALSE(pg_status[PowerWellId::PG5]);
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

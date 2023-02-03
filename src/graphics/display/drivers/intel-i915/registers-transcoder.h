@@ -14,7 +14,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace tgl_registers {
+namespace registers {
 
 // TRANS_HTOTAL, TRANS_HBLANK,
 // TRANS_VTOTAL, TRANS_VBLANK
@@ -75,7 +75,7 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   //
   // The underlying field is ignored by the EDP transcoder, which is attached to
   // DDI A.
-  std::optional<i915_tgl::DdiId> ddi_kaby_lake() const {
+  std::optional<i915::DdiId> ddi_kaby_lake() const {
     // The cast is lossless because `ddi_select_subtle()` is a 4-bit field.
     const int8_t ddi_select_raw_value = static_cast<int8_t>(ddi_select_subtle());
     if (ddi_select_raw_value == 0) {
@@ -84,7 +84,7 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
 
     // Convert from the Tiger Lake field representation.
     const int ddi_index = (ddi_select_raw_value >> 1);
-    return static_cast<i915_tgl::DdiId>(ddi_index);
+    return static_cast<i915::DdiId>(ddi_index);
   }
 
   // The DDI that the transcoder will connect to.
@@ -96,36 +96,36 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   //
   // The underlying field is ignored by the DSI transcoders. Each DSI transcoder
   // is attached to a DDI.
-  std::optional<i915_tgl::DdiId> ddi_tiger_lake() const {
+  std::optional<i915::DdiId> ddi_tiger_lake() const {
     // The cast is lossless because `ddi_select_subtle()` is a 4-bit field.
     const int8_t ddi_select_raw_value = static_cast<int8_t>(ddi_select_subtle());
     if (ddi_select_raw_value == 0) {
       return std::nullopt;
     }
     const int ddi_index = ddi_select_raw_value - 1;
-    return static_cast<i915_tgl::DdiId>(ddi_index);
+    return static_cast<i915::DdiId>(ddi_index);
   }
 
   // See `ddi_kaby_lake()` for details.
-  TranscoderDdiControl& set_ddi_kaby_lake(std::optional<i915_tgl::DdiId> ddi_id) {
+  TranscoderDdiControl& set_ddi_kaby_lake(std::optional<i915::DdiId> ddi_id) {
     if (!ddi_id.has_value()) {
       return set_ddi_select_subtle(0);
     }
 
-    ZX_DEBUG_ASSERT_MSG(*ddi_id != i915_tgl::DdiId::DDI_A,
+    ZX_DEBUG_ASSERT_MSG(*ddi_id != i915::DdiId::DDI_A,
                         "DDI A cannot be explicitly connected to a transcoder");
-    const int ddi_index = *ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = *ddi_id - i915::DdiId::DDI_A;
 
     // Convert to the Tiger Lake field representation.
     return set_ddi_select_subtle(ddi_index << 1);
   }
 
   // See `ddi_tiger_lake()` for details.
-  TranscoderDdiControl& set_ddi_tiger_lake(std::optional<i915_tgl::DdiId> ddi_id) {
+  TranscoderDdiControl& set_ddi_tiger_lake(std::optional<i915::DdiId> ddi_id) {
     if (!ddi_id.has_value()) {
       return set_ddi_select_subtle(0);
     }
-    const int ddi_index = *ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = *ddi_id - i915::DdiId::DDI_A;
     return set_ddi_select_subtle(ddi_index + 1);
   }
 
@@ -191,32 +191,32 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   //
   // This field's bits are reserved MBZ (must be zero) on Tiger Lake. The field
   // was moved to the TRANS_DDI_FUNC_CTL2 register and widened.
-  i915_tgl::TranscoderId port_sync_primary_transcoder_kaby_lake() const {
+  i915::TranscoderId port_sync_primary_transcoder_kaby_lake() const {
     // The cast is lossless because `port_sync_primary_select_kaby_lake()` is a
     // 2-bit field.
     const int8_t raw_port_sync_primary_select =
         static_cast<int8_t>(port_sync_primary_transcoder_select_kaby_lake());
     if (raw_port_sync_primary_select == 0) {
-      return i915_tgl::TranscoderId::TRANSCODER_EDP;
+      return i915::TranscoderId::TRANSCODER_EDP;
     }
 
     // The subtraction result is non-negative, because we checked for zero
     // above. The addition will not overflow because
     // `port_sync_primary_select_kaby_lake()` is a 2-bit field.
-    return static_cast<i915_tgl::TranscoderId>(i915_tgl::TranscoderId::TRANSCODER_A +
-                                               (raw_port_sync_primary_select - 1));
+    return static_cast<i915::TranscoderId>(i915::TranscoderId::TRANSCODER_A +
+                                           (raw_port_sync_primary_select - 1));
   }
 
   // See `port_sync_primary_kaby_lake()`.
-  TranscoderDdiControl& set_port_sync_primary_kaby_lake(i915_tgl::TranscoderId transcoder_id) {
-    if (transcoder_id == i915_tgl::TranscoderId::TRANSCODER_EDP) {
+  TranscoderDdiControl& set_port_sync_primary_kaby_lake(i915::TranscoderId transcoder_id) {
+    if (transcoder_id == i915::TranscoderId::TRANSCODER_EDP) {
       return set_port_sync_primary_transcoder_select_kaby_lake(0);
     }
 
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
     return set_port_sync_primary_transcoder_select_kaby_lake(
-        (transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A) + 1);
+        (transcoder_id - i915::TranscoderId::TRANSCODER_A) + 1);
   }
 
   // If true, VSync is active high. If false, VSync is active low.
@@ -265,34 +265,34 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   // "Display Connections" pages 103, section "Pipe to Transcoder to DDI
   // Mappings" page 107) mention that the EDP transcoder can connect to pipes
   // A-C. So, the field likely works the same way as on Kaby Lake.
-  i915_tgl::PipeId input_pipe_id() const {
+  i915::PipeId input_pipe_id() const {
     switch (input_pipe_select()) {
       case kInputSelectPipeA:
-        return i915_tgl::PipeId::PIPE_A;
+        return i915::PipeId::PIPE_A;
       case kInputSelectPipeB:
-        return i915_tgl::PipeId::PIPE_B;
+        return i915::PipeId::PIPE_B;
       case kInputSelectPipeC:
-        return i915_tgl::PipeId::PIPE_C;
+        return i915::PipeId::PIPE_C;
 
         // TODO(fxbug.dev/109278): Add pipe D, once we support it.
     };
 
-    return i915_tgl::PipeId::PIPE_INVALID;
+    return i915::PipeId::PIPE_INVALID;
   }
 
   // See `input_pipe()` for details.
-  TranscoderDdiControl& set_input_pipe_id(i915_tgl::PipeId input_pipe_id) {
+  TranscoderDdiControl& set_input_pipe_id(i915::PipeId input_pipe_id) {
     switch (input_pipe_id) {
-      case i915_tgl::PipeId::PIPE_A:
+      case i915::PipeId::PIPE_A:
         return set_input_pipe_select(kInputSelectPipeA);
-      case i915_tgl::PipeId::PIPE_B:
+      case i915::PipeId::PIPE_B:
         return set_input_pipe_select(kInputSelectPipeB);
-      case i915_tgl::PipeId::PIPE_C:
+      case i915::PipeId::PIPE_C:
         return set_input_pipe_select(kInputSelectPipeC);
 
         // TODO(fxbug.dev/109278): Add pipe D, once we support it.
 
-      case i915_tgl::PipeId::PIPE_INVALID:
+      case i915::PipeId::PIPE_INVALID:
           // The code handling the explicit invalid pipe value is outside the
           // switch() so it also applies to values that aren't Pipe enum members,
           // which are also invalid.
@@ -398,24 +398,24 @@ class TranscoderDdiControl : public hwreg::RegisterBase<TranscoderDdiControl, ui
   // zero means that no HDMI scrambler is enabled.
   DEF_BIT(0, hdmi_scrambler_enabled_tiger_lake);
 
-  static auto GetForKabyLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    if (transcoder_id == i915_tgl::TranscoderId::TRANSCODER_EDP) {
+  static auto GetForKabyLakeTranscoder(i915::TranscoderId transcoder_id) {
+    if (transcoder_id == i915::TranscoderId::TRANSCODER_EDP) {
       return hwreg::RegisterAddr<TranscoderDdiControl>(0x6f400);
     }
 
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderDdiControl>(0x60400 + 0x1000 * transcoder_index);
   }
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderDdiControl>(0x60400 + 0x1000 * transcoder_index);
   }
 
@@ -474,24 +474,24 @@ class TranscoderConfig : public hwreg::RegisterBase<TranscoderConfig, uint32_t> 
   // This field does not exist (must be zero) on Kaby Lake or Skylake.
   DEF_FIELD(6, 0, display_port_audio_symbol_watermark_tiger_lake);
 
-  static auto GetForKabyLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    if (transcoder_id == i915_tgl::TranscoderId::TRANSCODER_EDP) {
+  static auto GetForKabyLakeTranscoder(i915::TranscoderId transcoder_id) {
+    if (transcoder_id == i915::TranscoderId::TRANSCODER_EDP) {
       return hwreg::RegisterAddr<TranscoderConfig>(0x7f008);
     }
 
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderConfig>(0x70008 + 0x1000 * transcoder_index);
   }
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderConfig>(0x70008 + 0x1000 * transcoder_index);
   }
 };
@@ -528,7 +528,7 @@ class TranscoderClockSelect : public hwreg::RegisterBase<TranscoderClockSelect, 
   // This helper works for Kaby Lake and Skylake.
   //
   // This field must not be changed while the transcoder is enabled.
-  std::optional<i915_tgl::DdiId> ddi_clock_kaby_lake() const {
+  std::optional<i915::DdiId> ddi_clock_kaby_lake() const {
     // Shifting converts from the Tiger Lake field width. The cast is lossless
     // because `ddi_clock_select_subtle()` is a 4-bit field.
     const int8_t ddi_clock_select_raw_value = static_cast<int8_t>(ddi_clock_select_subtle() >> 1);
@@ -536,7 +536,7 @@ class TranscoderClockSelect : public hwreg::RegisterBase<TranscoderClockSelect, 
       return std::nullopt;
     }
     const int ddi_index = ddi_clock_select_raw_value - 1;
-    return static_cast<i915_tgl::DdiId>(ddi_index);
+    return static_cast<i915::DdiId>(ddi_index);
   }
 
   // The DDI whose port clock is used by the transcoder.
@@ -544,19 +544,19 @@ class TranscoderClockSelect : public hwreg::RegisterBase<TranscoderClockSelect, 
   // This helper works for Tiger Lake.
   //
   // This field must not be changed while the transcoder is enabled.
-  std::optional<i915_tgl::DdiId> ddi_clock_tiger_lake() const {
+  std::optional<i915::DdiId> ddi_clock_tiger_lake() const {
     // The cast is lossless because `ddi_clock_select_subtle()` is a 4-bit field.
     const int8_t ddi_select_raw_value = static_cast<int8_t>(ddi_clock_select_subtle());
     if (ddi_select_raw_value == 0) {
       return std::nullopt;
     }
     const int ddi_index = ddi_select_raw_value - 1;
-    return static_cast<i915_tgl::DdiId>(ddi_index);
+    return static_cast<i915::DdiId>(ddi_index);
   }
 
   // See `ddi_clock_kaby_lake()` for details.
-  TranscoderClockSelect& set_ddi_clock_kaby_lake(std::optional<i915_tgl::DdiId> ddi_id) {
-    ZX_DEBUG_ASSERT_MSG(!ddi_id.has_value() || ddi_id != i915_tgl::DdiId::DDI_A,
+  TranscoderClockSelect& set_ddi_clock_kaby_lake(std::optional<i915::DdiId> ddi_id) {
+    ZX_DEBUG_ASSERT_MSG(!ddi_id.has_value() || ddi_id != i915::DdiId::DDI_A,
                         "DDI A cannot be explicitly connected to a transcoder");
 
     const int8_t ddi_select_raw = RawDdiClockSelect(ddi_id);
@@ -567,27 +567,27 @@ class TranscoderClockSelect : public hwreg::RegisterBase<TranscoderClockSelect, 
   }
 
   // See `ddi_clock_tiger_lake()` for details.
-  TranscoderClockSelect& set_ddi_clock_tiger_lake(std::optional<i915_tgl::DdiId> ddi_id) {
+  TranscoderClockSelect& set_ddi_clock_tiger_lake(std::optional<i915::DdiId> ddi_id) {
     return set_ddi_clock_select_subtle(RawDdiClockSelect(ddi_id));
   }
 
-  static auto GetForTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderClockSelect>(0x46140 + 4 * transcoder_index);
   }
 
  private:
-  static int8_t RawDdiClockSelect(std::optional<i915_tgl::DdiId> ddi) {
+  static int8_t RawDdiClockSelect(std::optional<i915::DdiId> ddi) {
     if (!ddi.has_value()) {
       return 0;
     }
     // The cast is lossless because DDI indices fit in 4 bits.
-    const int8_t ddi_index = static_cast<int8_t>(*ddi - i915_tgl::DdiId::DDI_A);
+    const int8_t ddi_index = static_cast<int8_t>(*ddi - i915::DdiId::DDI_A);
     // The addition doesn't overflow and the cast is lossless because DDI
     // indices fit in 4 bits.
     return static_cast<int8_t>(ddi_index + 1);
@@ -642,24 +642,24 @@ class TranscoderDataM : public hwreg::RegisterBase<TranscoderDataM, uint32_t> {
   // The M value in the data M/N ratio, which is used by the transcoder.
   DEF_FIELD(23, 0, m);
 
-  static auto GetForKabyLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    if (transcoder_id == i915_tgl::TranscoderId::TRANSCODER_EDP) {
+  static auto GetForKabyLakeTranscoder(i915::TranscoderId transcoder_id) {
+    if (transcoder_id == i915::TranscoderId::TRANSCODER_EDP) {
       return hwreg::RegisterAddr<TranscoderDataM>(0x6f030);
     }
 
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderDataM>(0x60030 + 0x1000 * transcoder_index);
   }
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderDataM>(0x60030 + 0x1000 * transcoder_index);
   }
 };
@@ -682,24 +682,24 @@ class TranscoderDataN : public hwreg::RegisterBase<TranscoderDataN, uint32_t> {
   // The N value in the data M/N ratio, which is used by the transcoder.
   DEF_FIELD(23, 0, n);
 
-  static auto GetForKabyLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    if (transcoder_id == i915_tgl::TranscoderId::TRANSCODER_EDP) {
+  static auto GetForKabyLakeTranscoder(i915::TranscoderId transcoder_id) {
+    if (transcoder_id == i915::TranscoderId::TRANSCODER_EDP) {
       return hwreg::RegisterAddr<TranscoderDataN>(0x6f034);
     }
 
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderDataN>(0x60034 + 0x1000 * transcoder_index);
   }
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderDataN>(0x60034 + 0x1000 * transcoder_index);
   }
 };
@@ -722,24 +722,24 @@ class TranscoderLinkM : public hwreg::RegisterBase<TranscoderLinkM, uint32_t> {
   // The M value in the link M/N ratio transmitted in the MSA packet.
   DEF_FIELD(23, 0, m);
 
-  static auto GetForKabyLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    if (transcoder_id == i915_tgl::TranscoderId::TRANSCODER_EDP) {
+  static auto GetForKabyLakeTranscoder(i915::TranscoderId transcoder_id) {
+    if (transcoder_id == i915::TranscoderId::TRANSCODER_EDP) {
       return hwreg::RegisterAddr<TranscoderLinkM>(0x6f040);
     }
 
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderLinkM>(0x60040 + 0x1000 * transcoder_index);
   }
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderLinkM>(0x60040 + 0x1000 * transcoder_index);
   }
 };
@@ -763,24 +763,24 @@ class TranscoderLinkN : public hwreg::RegisterBase<TranscoderLinkN, uint32_t> {
   // also transmitted in the VB-ID (Vertical Blanking ID).
   DEF_FIELD(23, 0, n);
 
-  static auto GetForKabyLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    if (transcoder_id == i915_tgl::TranscoderId::TRANSCODER_EDP) {
+  static auto GetForKabyLakeTranscoder(i915::TranscoderId transcoder_id) {
+    if (transcoder_id == i915::TranscoderId::TRANSCODER_EDP) {
       return hwreg::RegisterAddr<TranscoderLinkN>(0x6f044);
     }
 
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderLinkN>(0x60044 + 0x1000 * transcoder_index);
   }
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderLinkN>(0x60044 + 0x1000 * transcoder_index);
   }
 };
@@ -906,25 +906,25 @@ class TranscoderMainStreamAttributeMisc
   // Before DisplayPort is enabled, this field must be set to true.
   DEF_BIT(0, video_stream_clock_sync_with_link_clock);
 
-  static auto GetForKabyLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    if (transcoder_id == i915_tgl::TranscoderId::TRANSCODER_EDP) {
+  static auto GetForKabyLakeTranscoder(i915::TranscoderId transcoder_id) {
+    if (transcoder_id == i915::TranscoderId::TRANSCODER_EDP) {
       return hwreg::RegisterAddr<TranscoderMainStreamAttributeMisc>(0x6f410);
     }
 
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderMainStreamAttributeMisc>(0x60410 +
                                                                   0x1000 * transcoder_index);
   }
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderClockSelect>(0x60410 + 0x1000 * transcoder_index);
   }
 };
@@ -983,13 +983,13 @@ class TranscoderVariableRateRefreshControl
   // programmed correctly.
   DEF_BIT(0, use_pipeline_full_line_count_delay);
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderVariableRateRefreshControl>(0x60420 +
                                                                      0x1000 * transcoder_index);
   }
@@ -1051,50 +1051,49 @@ class TranscoderChicken : public hwreg::RegisterBase<TranscoderChicken, uint32_t
   // On Kaby Lake, the transcoder chicken registers are also used for DDI-scoped
   // chicken bits. The mapping of DDIs to registers is not straightforward. This
   // method returns the correct register for accessing a DDI's chicken bits.
-  static auto GetForKabyLakeDdi(i915_tgl::DdiId ddi_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_D);
+  static auto GetForKabyLakeDdi(i915::DdiId ddi_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_D);
 
     // The DDI-to-MMIO address mapping is specified implicitly in
     // IHD-OS-KBL-Vol 16-1.17 BSpec (workaround) ID 1143, page 30.
     static constexpr uint32_t kMmioAddress[] = {0x420cc, 0x420c0, 0x420c4, 0x420c8};
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     return hwreg::RegisterAddr<TranscoderChicken>(kMmioAddress[ddi_index]);
   }
 
-  static auto GetForKabyLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+  static auto GetForKabyLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     // The transcoder-to-MMIO address mapping is specified implicitly in
     // IHD-OS-KBL-Vol 16-1.17 BSpec (workaround) ID 1144, page 31.
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderChicken>(0x420c0 + transcoder_index * 4);
   }
 
-  static auto GetForTigerLakeTranscoder(i915_tgl::TranscoderId transcoder_id) {
-    ZX_ASSERT(transcoder_id >= i915_tgl::TranscoderId::TRANSCODER_A);
+  static auto GetForTigerLakeTranscoder(i915::TranscoderId transcoder_id) {
+    ZX_ASSERT(transcoder_id >= i915::TranscoderId::TRANSCODER_A);
 
     // TODO(fxbug.dev/109278): Allow transcoder D, once we support it.
-    ZX_ASSERT(transcoder_id <= i915_tgl::TranscoderId::TRANSCODER_C);
+    ZX_ASSERT(transcoder_id <= i915::TranscoderId::TRANSCODER_C);
 
     // The transcoder-to-MMIO address mapping is presented in section "Variable
     // Refresh Rate" in the display engine PRMs.
     // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev2.0 page 240
     // DG1: IHD-OS-DG1-Vol 12-2.21 page 192
     static constexpr uint32_t kMmioAddress[] = {0x420c0, 0x420c4, 0x420c8, 0x420d8};
-    const int transcoder_index = transcoder_id - i915_tgl::TranscoderId::TRANSCODER_A;
+    const int transcoder_index = transcoder_id - i915::TranscoderId::TRANSCODER_A;
     return hwreg::RegisterAddr<TranscoderChicken>(kMmioAddress[transcoder_index]);
   }
 };
 
 class TranscoderRegs {
  public:
-  explicit TranscoderRegs(i915_tgl::TranscoderId transcoder_id)
+  explicit TranscoderRegs(i915::TranscoderId transcoder_id)
       : transcoder_id_(transcoder_id),
-        offset_(transcoder_id_ == i915_tgl::TranscoderId::TRANSCODER_EDP
-                    ? 0xf000
-                    : (transcoder_id_ * 0x1000)) {}
+        offset_(transcoder_id_ == i915::TranscoderId::TRANSCODER_EDP ? 0xf000
+                                                                     : (transcoder_id_ * 0x1000)) {}
 
   hwreg::RegisterAddr<TransHVTotal> HTotal() { return GetReg<TransHVTotal>(0x60000); }
   hwreg::RegisterAddr<TransHVTotal> HBlank() { return GetReg<TransHVTotal>(0x60004); }
@@ -1175,9 +1174,9 @@ class TranscoderRegs {
     return hwreg::RegisterAddr<RegType>(base_addr + offset_);
   }
 
-  i915_tgl::TranscoderId transcoder_id_;
+  i915::TranscoderId transcoder_id_;
   uint32_t offset_;
 };
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_TRANSCODER_H_

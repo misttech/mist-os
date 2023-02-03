@@ -18,7 +18,7 @@
 #include "src/graphics/display/drivers/intel-i915/dpll.h"
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class HdmiDisplay : public DisplayDevice {
  public:
@@ -48,6 +48,6 @@ class HdmiDisplay : public DisplayDevice {
   uint32_t i2c_bus_id() const final { return 2 * ddi_id() + 1; }
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_HDMI_DISPLAY_H_

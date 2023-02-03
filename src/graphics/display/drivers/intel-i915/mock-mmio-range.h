@@ -19,7 +19,7 @@
 #include <fbl/vector.h>
 #include <gtest/gtest.h>
 
-namespace i915_tgl {
+namespace i915 {
 
 // TODO(fxbug.dev/105644): Move this file to a directory where it can be reused
 //                         by all drivers, or deprecate in favor of a library in
@@ -222,6 +222,6 @@ class MockMmioRange {
   const Size default_access_size_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_MOCK_MMIO_RANGE_H_

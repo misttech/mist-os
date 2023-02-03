@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace i915_tgl {
+namespace i915 {
 
 // Sets a variable to a value. Restores the old value when going out of scope.
 //
@@ -149,6 +149,6 @@ inline void ScopedValueChange<T>::RemovedChangeTo(T* variable) {
   ScopedValueChange<void>::RemovedChangeTo(static_cast<void*>(variable));
 }
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_SCOPED_VALUE_CHANGE_H_

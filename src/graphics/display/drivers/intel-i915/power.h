@@ -14,7 +14,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class Power;
 class PowerTest;
@@ -110,6 +110,6 @@ class Power {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Power);
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_POWER_H_

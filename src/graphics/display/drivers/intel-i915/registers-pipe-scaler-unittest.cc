@@ -15,54 +15,54 @@
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
 TEST(PipeScalerControlTigerLake, SetYPlaneBinding) {
   // Valid values
   EXPECT_NO_FATAL_FAILURE({
-    tgl_registers::PipeScalerControlTigerLake pipe_scaler_control;
+    registers::PipeScalerControlTigerLake pipe_scaler_control;
     pipe_scaler_control.set_y_plane_binding(6);
   });
   EXPECT_NO_FATAL_FAILURE({
-    tgl_registers::PipeScalerControlTigerLake pipe_scaler_control;
+    registers::PipeScalerControlTigerLake pipe_scaler_control;
     pipe_scaler_control.set_y_plane_binding(7);
   });
   // Invalid values
   EXPECT_DEATH_IF_SUPPORTED(
       {
-        tgl_registers::PipeScalerControlTigerLake pipe_scaler_control;
+        registers::PipeScalerControlTigerLake pipe_scaler_control;
         pipe_scaler_control.set_y_plane_binding(0);
       },
       "non-Y plane");
   EXPECT_DEATH_IF_SUPPORTED(
       {
-        tgl_registers::PipeScalerControlTigerLake pipe_scaler_control;
+        registers::PipeScalerControlTigerLake pipe_scaler_control;
         pipe_scaler_control.set_y_plane_binding(1);
       },
       "non-Y plane");
   EXPECT_DEATH_IF_SUPPORTED(
       {
-        tgl_registers::PipeScalerControlTigerLake pipe_scaler_control;
+        registers::PipeScalerControlTigerLake pipe_scaler_control;
         pipe_scaler_control.set_y_plane_binding(2);
       },
       "non-Y plane");
   EXPECT_DEATH_IF_SUPPORTED(
       {
-        tgl_registers::PipeScalerControlTigerLake pipe_scaler_control;
+        registers::PipeScalerControlTigerLake pipe_scaler_control;
         pipe_scaler_control.set_y_plane_binding(3);
       },
       "non-Y plane");
   EXPECT_DEATH_IF_SUPPORTED(
       {
-        tgl_registers::PipeScalerControlTigerLake pipe_scaler_control;
+        registers::PipeScalerControlTigerLake pipe_scaler_control;
         pipe_scaler_control.set_y_plane_binding(4);
       },
       "non-Y plane");
   EXPECT_DEATH_IF_SUPPORTED(
       {
-        tgl_registers::PipeScalerControlTigerLake pipe_scaler_control;
+        registers::PipeScalerControlTigerLake pipe_scaler_control;
         pipe_scaler_control.set_y_plane_binding(5);
       },
       "non-Y plane");
@@ -74,44 +74,44 @@ TEST(PipeScalerScalingFactor, ToFloat) {
 
   // Integer part
   {
-    tgl_registers::PipeScalerScalingFactor zero;
+    registers::PipeScalerScalingFactor zero;
     zero.set_integer_part(0).set_fraction_part(0);
     EXPECT_EQ(zero.ToFloat(), 0.0f);
   }
 
   {
-    tgl_registers::PipeScalerScalingFactor five;
+    registers::PipeScalerScalingFactor five;
     five.set_integer_part(5).set_fraction_part(0);
     EXPECT_EQ(five.ToFloat(), 5.0f);
   }
 
   {
-    tgl_registers::PipeScalerScalingFactor seven;
+    registers::PipeScalerScalingFactor seven;
     seven.set_integer_part(7).set_fraction_part(0);
     EXPECT_EQ(seven.ToFloat(), 7.0f);
   }
 
   // Fraction part
   {
-    tgl_registers::PipeScalerScalingFactor decimal_0_25;
+    registers::PipeScalerScalingFactor decimal_0_25;
     decimal_0_25.set_integer_part(0).set_fraction_part(0b010'000'000'000'000);
     EXPECT_EQ(decimal_0_25.ToFloat(), 0.25f);
   }
 
   {
-    tgl_registers::PipeScalerScalingFactor min_positive_decimal;
+    registers::PipeScalerScalingFactor min_positive_decimal;
     min_positive_decimal.set_integer_part(0).set_fraction_part(0b000'000'000'000'001);
     EXPECT_EQ(min_positive_decimal.ToFloat(), 1.0f / 32768.0f);
   }
 
   {
-    tgl_registers::PipeScalerScalingFactor max_decimal_less_than_1;
+    registers::PipeScalerScalingFactor max_decimal_less_than_1;
     max_decimal_less_than_1.set_integer_part(0).set_fraction_part(0b111'111'111'111'111);
     EXPECT_EQ(max_decimal_less_than_1.ToFloat(), 32767.0f / 32768.0f);
   }
 
   {
-    tgl_registers::PipeScalerScalingFactor max_decimal;
+    registers::PipeScalerScalingFactor max_decimal;
     max_decimal.set_integer_part(0b111).set_fraction_part(0b111'111'111'111'111);
     EXPECT_EQ(max_decimal.ToFloat(), 7.0f + 32767.0f / 32768.0f);
   }
@@ -120,61 +120,61 @@ TEST(PipeScalerScalingFactor, ToFloat) {
 TEST(PipeScalerInitialPhase, HorizontalPhaseUvValidity) {
   // Valid values should be between -0.5 and 1.5 (inclusive on both ends).
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(0.25f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(-0.5f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(0.0f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(0.5f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(1.0f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(1.5f));
   }
 
   // Values out of range, NaN and infinite values are invalid.
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetUvInitialPhase(std::numeric_limits<float>::quiet_NaN()), "");
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetUvInitialPhase(std::numeric_limits<float>::infinity()), "");
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetUvInitialPhase(-std::numeric_limits<float>::infinity()), "");
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(invalid_phase.SetUvInitialPhase(-0.6f), "");
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(invalid_phase.SetUvInitialPhase(1.6f), "");
   }
 }
@@ -182,61 +182,61 @@ TEST(PipeScalerInitialPhase, HorizontalPhaseUvValidity) {
 TEST(PipeScalerInitialPhase, HorizontalPhaseYValidity) {
   // Valid values should be between -0.5 and 1.5 (inclusive on both ends).
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(0.25f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(-0.5f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(0.0f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(0.5f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(1.0f));
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase valid_phase;
+    registers::PipeScalerHorizontalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(1.5f));
   }
 
   // Values out of range, NaN and infinite values are invalid.
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetYInitialPhase(std::numeric_limits<float>::quiet_NaN()), "");
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetYInitialPhase(std::numeric_limits<float>::infinity()), "");
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetYInitialPhase(-std::numeric_limits<float>::infinity()), "");
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(invalid_phase.SetYInitialPhase(-0.6f), "");
   }
 
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase invalid_phase;
+    registers::PipeScalerHorizontalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(invalid_phase.SetYInitialPhase(1.6f), "");
   }
 }
@@ -245,7 +245,7 @@ TEST(PipeScalerInitialPhase, HorizontalPhaseValue) {
   // YUV 420 Chroma Siting = Top Left
   // Horizontal Phase = 0.25
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase phase_top_left;
+    registers::PipeScalerHorizontalInitialPhase phase_top_left;
     phase_top_left.SetUvInitialPhase(0.25f);
     EXPECT_EQ(phase_top_left.uv_initial_phase_fraction(), 1u << 11);
     EXPECT_EQ(phase_top_left.uv_initial_phase_int(), 0u);
@@ -260,7 +260,7 @@ TEST(PipeScalerInitialPhase, HorizontalPhaseValue) {
   // YUV 420 Chroma Siting = Bottom Right
   // Horizontal Phase = -0.25
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase phase_bottom_right;
+    registers::PipeScalerHorizontalInitialPhase phase_bottom_right;
     phase_bottom_right.SetUvInitialPhase(-0.25f);
     EXPECT_EQ(phase_bottom_right.uv_initial_phase_fraction(), 3u << 11);
     EXPECT_EQ(phase_bottom_right.uv_initial_phase_int(), 0u);
@@ -275,7 +275,7 @@ TEST(PipeScalerInitialPhase, HorizontalPhaseValue) {
   // YUV 420 Chroma Siting = Bottom Center
   // Horizontal Phase = 0
   {
-    tgl_registers::PipeScalerHorizontalInitialPhase phase_bottom_center;
+    registers::PipeScalerHorizontalInitialPhase phase_bottom_center;
     phase_bottom_center.SetUvInitialPhase(0.0f);
     EXPECT_EQ(phase_bottom_center.uv_initial_phase_fraction(), 0u);
     EXPECT_EQ(phase_bottom_center.uv_initial_phase_int(), 0u);
@@ -291,61 +291,61 @@ TEST(PipeScalerInitialPhase, HorizontalPhaseValue) {
 TEST(PipeScalerInitialPhase, VerticalPhaseUvValidity) {
   // Valid values should be between -0.5 and 1.5 (inclusive on both ends).
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(0.25f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(-0.5f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(0.0f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(0.5f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(1.0f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetUvInitialPhase(1.5f));
   }
 
   // Values out of range, NaN and infinite values are invalid.
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetUvInitialPhase(std::numeric_limits<float>::quiet_NaN()), "");
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetUvInitialPhase(std::numeric_limits<float>::infinity()), "");
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetUvInitialPhase(-std::numeric_limits<float>::infinity()), "");
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(invalid_phase.SetUvInitialPhase(-0.6f), "");
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(invalid_phase.SetUvInitialPhase(1.6f), "");
   }
 }
@@ -353,61 +353,61 @@ TEST(PipeScalerInitialPhase, VerticalPhaseUvValidity) {
 TEST(PipeScalerInitialPhase, VerticalPhaseYValidity) {
   // Valid values should be between -0.5 and 1.5 (inclusive on both ends).
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(0.25f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(-0.5f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(0.0f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(0.5f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(1.0f));
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase valid_phase;
+    registers::PipeScalerVerticalInitialPhase valid_phase;
     EXPECT_NO_FATAL_FAILURE(valid_phase.SetYInitialPhase(1.5f));
   }
 
   // Values out of range, NaN and infinite values are invalid.
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetYInitialPhase(std::numeric_limits<float>::quiet_NaN()), "");
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetYInitialPhase(std::numeric_limits<float>::infinity()), "");
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(
         invalid_phase.SetYInitialPhase(-std::numeric_limits<float>::infinity()), "");
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(invalid_phase.SetYInitialPhase(-0.6f), "");
   }
 
   {
-    tgl_registers::PipeScalerVerticalInitialPhase invalid_phase;
+    registers::PipeScalerVerticalInitialPhase invalid_phase;
     EXPECT_DEATH_IF_SUPPORTED(invalid_phase.SetYInitialPhase(1.6f), "");
   }
 }
@@ -416,7 +416,7 @@ TEST(PipeScalerInitialPhase, VerticalPhaseValue) {
   // YUV 420 Chroma Siting = Top Left
   // Vertical Phase = 0.25
   {
-    tgl_registers::PipeScalerVerticalInitialPhase phase_top_left;
+    registers::PipeScalerVerticalInitialPhase phase_top_left;
     phase_top_left.SetUvInitialPhase(0.25f);
     EXPECT_EQ(phase_top_left.uv_initial_phase_fraction(), 1u << 11);
     EXPECT_EQ(phase_top_left.uv_initial_phase_int(), 0u);
@@ -431,7 +431,7 @@ TEST(PipeScalerInitialPhase, VerticalPhaseValue) {
   // YUV 420 Chroma Siting = Bottom Right / Bottom Center
   // Vertical Phase = -0.25
   {
-    tgl_registers::PipeScalerVerticalInitialPhase phase_bottom_right;
+    registers::PipeScalerVerticalInitialPhase phase_bottom_right;
     phase_bottom_right.SetUvInitialPhase(-0.25f);
     EXPECT_EQ(phase_bottom_right.uv_initial_phase_fraction(), 3u << 11);
     EXPECT_EQ(phase_bottom_right.uv_initial_phase_int(), 0u);
@@ -446,39 +446,39 @@ TEST(PipeScalerInitialPhase, VerticalPhaseValue) {
 
 TEST(PipeScalerCoefficientDataFormat, ToCanonical) {
   {
-    tgl_registers::PipeScalerCoefficientFormat zero;
+    registers::PipeScalerCoefficientFormat zero;
     zero.set_is_negative(false).set_exponent(1).set_mantissa(0);
     EXPECT_EQ(zero.x2048(), 0);
   }
 
   {
-    tgl_registers::PipeScalerCoefficientFormat one;
+    registers::PipeScalerCoefficientFormat one;
     one.set_is_negative(false).set_exponent(0).set_mantissa(0b100'000'000);
     EXPECT_EQ(one.x2048(), 2048);
   }
 
   {
-    tgl_registers::PipeScalerCoefficientFormat minus_one;
+    registers::PipeScalerCoefficientFormat minus_one;
     minus_one.set_is_negative(true).set_exponent(0).set_mantissa(0b100'000'000);
     EXPECT_EQ(minus_one.x2048(), -2048);
   }
 
   {
-    tgl_registers::PipeScalerCoefficientFormat half;
+    registers::PipeScalerCoefficientFormat half;
     half.set_is_negative(false).set_exponent(1).set_mantissa(0b100'000'000);
     EXPECT_EQ(half.x2048(), 1024);
   }
 
   {
     // Minimum positive: (0.00000000001) = 1 / 2048
-    tgl_registers::PipeScalerCoefficientFormat minimum_positive;
+    registers::PipeScalerCoefficientFormat minimum_positive;
     minimum_positive.set_is_negative(false).set_exponent(3).set_mantissa(1);
     EXPECT_EQ(minimum_positive.x2048(), 1);
   }
 
   {
     // Maximum positive: (1.11111111)b = 511 / 256 = 4088 / 2048
-    tgl_registers::PipeScalerCoefficientFormat minimum_positive;
+    registers::PipeScalerCoefficientFormat minimum_positive;
     minimum_positive.set_is_negative(false).set_exponent(0).set_mantissa(0b111'111'111);
     EXPECT_EQ(minimum_positive.x2048(), 4088);
   }
@@ -486,7 +486,7 @@ TEST(PipeScalerCoefficientDataFormat, ToCanonical) {
 
 TEST(PipeScalerCoefficients, Write) {
   constexpr size_t kNumCoefficients = size_t{17} * 7;
-  std::vector<tgl_registers::PipeScalerCoefficientFormat> coefficients(kNumCoefficients);
+  std::vector<registers::PipeScalerCoefficientFormat> coefficients(kNumCoefficients);
   for (size_t i = 0; i < kNumCoefficients; i++) {
     coefficients[i].set_is_negative(0).set_mantissa(i).set_exponent(0);
   }
@@ -508,7 +508,7 @@ TEST(PipeScalerCoefficients, Write) {
   mmio_range.Expect(expected_access_list);
   fdf::MmioBuffer mmio_buffer(mmio_range.GetMmioBuffer());
 
-  tgl_registers::PipeScalerRegs pipe_scaler_regs(PipeId::PIPE_A, /* scaler_index= */ 0);
+  registers::PipeScalerRegs pipe_scaler_regs(PipeId::PIPE_A, /* scaler_index= */ 0);
   auto pipe_scaler_coefficients = pipe_scaler_regs.PipeScalerCoefficients();
 
   pipe_scaler_coefficients.WriteToRegister(coefficients, &mmio_buffer);
@@ -516,7 +516,7 @@ TEST(PipeScalerCoefficients, Write) {
 
 TEST(PipeScalerCoefficients, Read) {
   constexpr size_t kNumCoefficients = size_t{17} * 7;
-  std::vector<tgl_registers::PipeScalerCoefficientFormat> expected_coefficients(kNumCoefficients);
+  std::vector<registers::PipeScalerCoefficientFormat> expected_coefficients(kNumCoefficients);
   for (size_t i = 0; i < kNumCoefficients; i++) {
     expected_coefficients[i].set_is_negative(0).set_mantissa(i).set_exponent(0);
   }
@@ -538,7 +538,7 @@ TEST(PipeScalerCoefficients, Read) {
   mmio_range.Expect(expected_access_list);
   fdf::MmioBuffer mmio_buffer(mmio_range.GetMmioBuffer());
 
-  tgl_registers::PipeScalerRegs pipe_scaler_regs(PipeId::PIPE_A, /* scaler_index= */ 0);
+  registers::PipeScalerRegs pipe_scaler_regs(PipeId::PIPE_A, /* scaler_index= */ 0);
   auto pipe_scaler_coefficients = pipe_scaler_regs.PipeScalerCoefficients();
 
   auto coefficients_read = pipe_scaler_coefficients.ReadFromRegister(&mmio_buffer);
@@ -550,4 +550,4 @@ TEST(PipeScalerCoefficients, Read) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

@@ -21,7 +21,7 @@
 
 #include "src/devices/pci/testing/pci_protocol_fake.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -154,4 +154,4 @@ TEST_F(PciConfigOpRegionTest, TriggerSystemControlInterruptPciError) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

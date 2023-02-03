@@ -11,12 +11,12 @@
 #include "src/graphics/display/drivers/intel-i915/pci-ids.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
 FuseConfig ReadFuseConfigTigerLake(fdf::MmioBuffer& mmio_space) {
-  auto dfsm_register = tgl_registers::DisplayFuses::Get().ReadFrom(&mmio_space);
+  auto dfsm_register = registers::DisplayFuses::Get().ReadFrom(&mmio_space);
   return FuseConfig{
       .core_clock_limit_khz = 652'800,  // No CDCLK limit fuses.
       .graphics_enabled = true,         // No global disable fuse.
@@ -35,22 +35,22 @@ FuseConfig ReadFuseConfigTigerLake(fdf::MmioBuffer& mmio_space) {
   };
 }
 
-int CoreClockLimitKhzSkylake(tgl_registers::DisplayFuses::CoreClockLimit clock_limit) {
-  static_assert(tgl_registers::DisplayFuses::CoreClockLimit::k675Mhz <
-                tgl_registers::DisplayFuses::CoreClockLimit::k337_5Mhz);
-  ZX_DEBUG_ASSERT_MSG(clock_limit >= tgl_registers::DisplayFuses::CoreClockLimit::k675Mhz,
+int CoreClockLimitKhzSkylake(registers::DisplayFuses::CoreClockLimit clock_limit) {
+  static_assert(registers::DisplayFuses::CoreClockLimit::k675Mhz <
+                registers::DisplayFuses::CoreClockLimit::k337_5Mhz);
+  ZX_DEBUG_ASSERT_MSG(clock_limit >= registers::DisplayFuses::CoreClockLimit::k675Mhz,
                       "clock_limit should be a 2-bit field, but is %d", clock_limit);
-  ZX_DEBUG_ASSERT_MSG(clock_limit <= tgl_registers::DisplayFuses::CoreClockLimit::k337_5Mhz,
+  ZX_DEBUG_ASSERT_MSG(clock_limit <= registers::DisplayFuses::CoreClockLimit::k337_5Mhz,
                       "clock_limit should be a 2-bit field, but is %d", clock_limit);
 
   switch (clock_limit) {
-    case tgl_registers::DisplayFuses::CoreClockLimit::k675Mhz:
+    case registers::DisplayFuses::CoreClockLimit::k675Mhz:
       return 675'000;
-    case tgl_registers::DisplayFuses::CoreClockLimit::k540Mhz:
+    case registers::DisplayFuses::CoreClockLimit::k540Mhz:
       return 540'000;
-    case tgl_registers::DisplayFuses::CoreClockLimit::k450Mhz:
+    case registers::DisplayFuses::CoreClockLimit::k450Mhz:
       return 450'000;
-    case tgl_registers::DisplayFuses::CoreClockLimit::k337_5Mhz:
+    case registers::DisplayFuses::CoreClockLimit::k337_5Mhz:
       return 337'500;
   };
 
@@ -61,7 +61,7 @@ int CoreClockLimitKhzSkylake(tgl_registers::DisplayFuses::CoreClockLimit clock_l
 }
 
 FuseConfig ReadFuseConfigSkylake(fdf::MmioBuffer& mmio_space) {
-  auto dfsm_register = tgl_registers::DisplayFuses::Get().ReadFrom(&mmio_space);
+  auto dfsm_register = registers::DisplayFuses::Get().ReadFrom(&mmio_space);
   return FuseConfig{
       .core_clock_limit_khz = CoreClockLimitKhzSkylake(dfsm_register.GetCoreClockLimit()),
       .graphics_enabled = !dfsm_register.graphics_disabled(),
@@ -116,4 +116,4 @@ void FuseConfig::Log() {
   zxlogf(TRACE, "Maximum clock: %d kHz", core_clock_limit_khz);
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

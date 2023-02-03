@@ -13,7 +13,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace tgl_registers {
+namespace registers {
 
 // DPLL_CTRL1 (Display PLL Control 1?)
 //
@@ -72,31 +72,31 @@ class DisplayPllControl1 : public hwreg::RegisterBase<DisplayPllControl1, uint32
   //
   // This helper always returns false on DPLL0. The underlying field does not
   // exist for Display PLL0, because PLL0 does not support HDMI operation.
-  bool pll_uses_hdmi_configuration_mode(i915_tgl::PllId pll_id) const {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  bool pll_uses_hdmi_configuration_mode(i915::PllId pll_id) const {
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    if (pll_id == i915_tgl::PllId::DPLL_0) {
+    if (pll_id == i915::PllId::DPLL_0) {
       return false;  // DPLL 0 does not support HDMI operation.
     }
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     const int bit_index = dpll_index * 6 + 5;
     return static_cast<bool>(
         hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index, bit_index).get());
   }
 
   // See `pll_uses_hdmi_configuration_mode()` for details.
-  DisplayPllControl1& set_pll_uses_hdmi_configuration_mode(i915_tgl::PllId pll_id, bool hdmi_mode) {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  DisplayPllControl1& set_pll_uses_hdmi_configuration_mode(i915::PllId pll_id, bool hdmi_mode) {
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    if (pll_id == i915_tgl::PllId::DPLL_0) {
+    if (pll_id == i915::PllId::DPLL_0) {
       ZX_DEBUG_ASSERT(!hdmi_mode);
       return *this;
     }
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     const int bit_index = dpll_index * 6 + 5;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index, bit_index).set(hdmi_mode ? 1 : 0);
     return *this;
@@ -107,32 +107,32 @@ class DisplayPllControl1 : public hwreg::RegisterBase<DisplayPllControl1, uint32
   // This helper always return false for DPLL (Display PLL) 0. The underlying
   // field does not exist for DPLL0. DPLL0 does not support SSC, because it must
   // deliver a constant frequency to the core display clock.
-  bool pll_spread_spectrum_clocking_enabled(i915_tgl::PllId pll_id) const {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  bool pll_spread_spectrum_clocking_enabled(i915::PllId pll_id) const {
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    if (pll_id == i915_tgl::PllId::DPLL_0) {
+    if (pll_id == i915::PllId::DPLL_0) {
       return false;  // DPLL 0 does not support SSC (Spread Spectrum Clocking).
     }
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     const int bit_index = dpll_index * 6 + 4;
     return static_cast<bool>(
         hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index, bit_index).get());
   }
 
   // See `pll_spread_spectrum_clocking_enabled()` for details.
-  DisplayPllControl1& set_pll_spread_spectrum_clocking_enabled(i915_tgl::PllId pll_id,
+  DisplayPllControl1& set_pll_spread_spectrum_clocking_enabled(i915::PllId pll_id,
                                                                bool ssc_enabled) {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    if (pll_id == i915_tgl::PllId::DPLL_0) {
+    if (pll_id == i915::PllId::DPLL_0) {
       ZX_DEBUG_ASSERT(!ssc_enabled);
       return *this;
     }
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     const int bit_index = dpll_index * 6 + 4;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index, bit_index).set(ssc_enabled ? 1 : 0);
     return *this;
@@ -159,11 +159,11 @@ class DisplayPllControl1 : public hwreg::RegisterBase<DisplayPllControl1, uint32
   // DisplayPort frequency must evenly divide the VCO frequency.
   //
   // This helper returns 0 if the field is set to an undocumented value.
-  int16_t pll_display_port_ddi_frequency_mhz(i915_tgl::PllId pll_id) const {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  int16_t pll_display_port_ddi_frequency_mhz(i915::PllId pll_id) const {
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     const int bit_index = dpll_index * 6 + 1;
     const int raw_frequency_select = static_cast<int>(
         hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index + 2, bit_index).get());
@@ -187,7 +187,7 @@ class DisplayPllControl1 : public hwreg::RegisterBase<DisplayPllControl1, uint32
   }
 
   // See `pll_display_port_ddi_frequency_mhz()` for details.
-  DisplayPllControl1& set_pll_display_port_ddi_frequency_mhz(i915_tgl::PllId pll_id,
+  DisplayPllControl1& set_pll_display_port_ddi_frequency_mhz(i915::PllId pll_id,
                                                              int16_t ddi_frequency_mhz) {
     DisplayPortDdiFrequencySelect frequency_select;
     switch (ddi_frequency_mhz) {
@@ -214,10 +214,10 @@ class DisplayPllControl1 : public hwreg::RegisterBase<DisplayPllControl1, uint32
         frequency_select = DisplayPortDdiFrequencySelect::k2700Mhz;
     }
 
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     const int bit_index = dpll_index * 6 + 1;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index + 2, bit_index)
         .set(static_cast<uint32_t>(frequency_select));
@@ -225,23 +225,22 @@ class DisplayPllControl1 : public hwreg::RegisterBase<DisplayPllControl1, uint32
   }
 
   // If true, the Display PLL uses the configuration in this register.
-  bool pll_programming_enabled(i915_tgl::PllId pll_id) const {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  bool pll_programming_enabled(i915::PllId pll_id) const {
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     const int bit_index = dpll_index * 6;
     return static_cast<bool>(
         hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index, bit_index).get());
   }
 
   // See `pll_programming_enabled()` for details.
-  DisplayPllControl1& set_pll_programming_enabled(i915_tgl::PllId pll_id,
-                                                  bool programming_enabled) {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  DisplayPllControl1& set_pll_programming_enabled(i915::PllId pll_id, bool programming_enabled) {
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     const int bit_index = dpll_index * 6;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index, bit_index)
         .set(programming_enabled ? 1 : 0);
@@ -290,73 +289,72 @@ class DisplayPllDdiMapKabyLake : public hwreg::RegisterBase<DisplayPllDdiMapKaby
   DEF_BIT(0, ddi_a_clock_programming_enabled);
 
   // If true, the DDI's clock is disabled. This is accomplished by gating.
-  bool ddi_clock_disabled(i915_tgl::DdiId ddi_id) const {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_E);
+  bool ddi_clock_disabled(i915::DdiId ddi_id) const {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_E);
 
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     const int bit_index = 15 + ddi_index;
     return static_cast<bool>(
         hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index, bit_index).get());
   }
 
   // See `ddi_clock_disabled()` for details.
-  DisplayPllDdiMapKabyLake& set_ddi_clock_disabled(i915_tgl::DdiId ddi_id, bool clock_disabled) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_E);
+  DisplayPllDdiMapKabyLake& set_ddi_clock_disabled(i915::DdiId ddi_id, bool clock_disabled) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_E);
 
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     const int bit_index = 15 + ddi_index;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index, bit_index).set(clock_disabled ? 1 : 0);
     return *this;
   }
 
   // The DPLL (Display PLL) used as a clock source for a DDI.
-  i915_tgl::PllId ddi_clock_display_pll(i915_tgl::DdiId ddi_id) const {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_E);
+  i915::PllId ddi_clock_display_pll(i915::DdiId ddi_id) const {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_E);
 
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     const int bit_index = ddi_index * 3 + 1;
     const uint32_t dpll_index = static_cast<int>(
         hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index + 1, bit_index).get());
     // The cast result is DPLL0-3 because `dpll_index` comes from a 2-bit field.
-    return static_cast<i915_tgl::PllId>(dpll_index);
+    return static_cast<i915::PllId>(dpll_index);
   }
 
   // See `ddi_clock_display_pll()` for details.
-  DisplayPllDdiMapKabyLake& set_ddi_clock_display_pll(i915_tgl::DdiId ddi_id,
-                                                      i915_tgl::PllId pll_id) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_E);
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_0);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  DisplayPllDdiMapKabyLake& set_ddi_clock_display_pll(i915::DdiId ddi_id, i915::PllId pll_id) {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_E);
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_0);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     const int bit_index = ddi_index * 3 + 1;
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index + 1, bit_index).set(dpll_index);
     return *this;
   }
 
   // If true, the DDI uses the clock configuration in this register.
-  bool ddi_clock_programming_enabled(i915_tgl::DdiId ddi_id) const {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_E);
+  bool ddi_clock_programming_enabled(i915::DdiId ddi_id) const {
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_E);
 
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     const int bit_index = ddi_index * 3;
     return static_cast<bool>(
         hwreg::BitfieldRef<const uint32_t>(reg_value_ptr(), bit_index, bit_index).get());
   }
 
   // See `ddi_clock_programming_enabled()` for details.
-  DisplayPllDdiMapKabyLake& set_ddi_clock_programming_enabled(i915_tgl::DdiId ddi_id,
+  DisplayPllDdiMapKabyLake& set_ddi_clock_programming_enabled(i915::DdiId ddi_id,
                                                               bool programming_enabled) {
-    ZX_ASSERT(ddi_id >= i915_tgl::DdiId::DDI_A);
-    ZX_ASSERT(ddi_id <= i915_tgl::DdiId::DDI_E);
+    ZX_ASSERT(ddi_id >= i915::DdiId::DDI_A);
+    ZX_ASSERT(ddi_id <= i915::DdiId::DDI_E);
 
-    const int ddi_index = ddi_id - i915_tgl::DdiId::DDI_A;
+    const int ddi_index = ddi_id - i915::DdiId::DDI_A;
     const int bit_index = ddi_index * 3;
     hwreg::BitfieldRef<uint32_t>(reg_value_ptr(), bit_index, bit_index)
         .set(programming_enabled ? 1 : 0);
@@ -449,11 +447,11 @@ class DisplayPllDcoFrequencyKabyLake
         (int64_t{frequency_khz} << kMultiplierPrecisionBits) / kReferenceFrequencyKhz));
   }
 
-  static auto GetForDpll(i915_tgl::PllId pll_id) {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_1);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  static auto GetForDpll(i915::PllId pll_id) {
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_1);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     return hwreg::RegisterAddr<DisplayPllDcoFrequencyKabyLake>(0x6c040 + (dpll_index - 1) * 8);
   }
 };
@@ -667,11 +665,11 @@ class DisplayPllDcoDividersKabyLake
     return set_center_frequency_select(center_frequency_select);
   }
 
-  static auto GetForDpll(i915_tgl::PllId pll_id) {
-    ZX_ASSERT(pll_id >= i915_tgl::PllId::DPLL_1);
-    ZX_ASSERT(pll_id <= i915_tgl::PllId::DPLL_3);
+  static auto GetForDpll(i915::PllId pll_id) {
+    ZX_ASSERT(pll_id >= i915::PllId::DPLL_1);
+    ZX_ASSERT(pll_id <= i915::PllId::DPLL_3);
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     return hwreg::RegisterAddr<DisplayPllDcoDividersKabyLake>(0x6c044 + (dpll_index - 1) * 8);
   }
 };
@@ -794,14 +792,14 @@ class DisplayPllDcoFrequencyTigerLake
     return set_dco_frequency_multiplier(frequency_multiplier, tiger_lake_38mhz_workaround);
   }
 
-  static auto GetForDpll(i915_tgl::PllId pll_id) {
-    ZX_ASSERT_MSG(pll_id >= i915_tgl::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
+  static auto GetForDpll(i915::PllId pll_id) {
+    ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
     // TODO(fxbug.dev/110351): Allow DPLL 4, once we support it.
-    ZX_ASSERT_MSG(pll_id <= i915_tgl::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
+    ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
 
     // The MMIO addresses vary across Tiger Lake, DG1, and Ice Lake.
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     static constexpr uint32_t kMmioAddresses[] = {0x164284, 0x16428c, 0x16429c, 0, 0x164294};
     return hwreg::RegisterAddr<DisplayPllDcoFrequencyTigerLake>(kMmioAddresses[dpll_index]);
   }
@@ -990,14 +988,14 @@ class DisplayPllDcoDividersTigerLake
   // display controller sets this for genlocked transcoders.
   DEF_ENUM_FIELD(ReferenceClockSelect, 1, 0, reference_clock_select);
 
-  static auto GetForDpll(i915_tgl::PllId pll_id) {
-    ZX_ASSERT_MSG(pll_id >= i915_tgl::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
+  static auto GetForDpll(i915::PllId pll_id) {
+    ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
     // TODO(fxbug.dev/110351): Allow DPLL 4, once we support it.
-    ZX_ASSERT_MSG(pll_id <= i915_tgl::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
+    ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
 
     // The MMIO addresses vary across Tiger Lake, DG1, and Ice Lake.
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     static constexpr uint32_t kMmioAddresses[] = {0x164288, 0x164290, 0x1642a0, 0, 0x164298};
     return hwreg::RegisterAddr<DisplayPllDcoDividersTigerLake>(kMmioAddresses[dpll_index]);
   }
@@ -1091,13 +1089,13 @@ class DisplayPllDivider : public hwreg::RegisterBase<DisplayPllDivider, uint32_t
     return set_automatic_frequency_calibration_start_point_select(point_select);
   }
 
-  static auto GetForDpll(i915_tgl::PllId pll_id) {
-    ZX_ASSERT_MSG(pll_id >= i915_tgl::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
+  static auto GetForDpll(i915::PllId pll_id) {
+    ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
     // TODO(fxbug.dev/110351): Allow DPLL 4, once we support it.
-    ZX_ASSERT_MSG(pll_id <= i915_tgl::PllId::DPLL_1, "Unsupported DPLL %d", pll_id);
+    ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_1, "Unsupported DPLL %d", pll_id);
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     static constexpr uint32_t kMmioAddresses[] = {0x164b00, 0x164c00, 0, 0, 0x16e00};
     return hwreg::RegisterAddr<DisplayPllDivider>(kMmioAddresses[dpll_index]);
   }
@@ -1146,14 +1144,14 @@ class DisplayPllSpreadSpectrumClocking
   // Initial DCO (Digitally-Controlled Oscillator) amplification value.
   DEF_FIELD(5, 0, dco_amplification_initial_value);
 
-  static auto GetForDpll(i915_tgl::PllId pll_id) {
-    ZX_ASSERT_MSG(pll_id >= i915_tgl::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
+  static auto GetForDpll(i915::PllId pll_id) {
+    ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
     // TODO(fxbug.dev/110351): Allow DPLL 4, once we support it.
-    ZX_ASSERT_MSG(pll_id <= i915_tgl::PllId::DPLL_1, "Unsupported DPLL %d", pll_id);
+    ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_1, "Unsupported DPLL %d", pll_id);
 
     // The MMIO addresses vary across Tiger Lake and DG1.
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     static constexpr uint32_t kMmioAddresses[] = {0x164b10, 0x164c10, 0, 0, 0x16e10};
     return hwreg::RegisterAddr<DisplayPllSpreadSpectrumClocking>(kMmioAddresses[dpll_index]);
   }
@@ -1236,10 +1234,10 @@ class PllEnable : public hwreg::RegisterBase<PllEnable, uint32_t> {
   // reserved on Kaby Lake and Skylake.
   DEF_BIT(26, powered_on_tiger_lake);
 
-  static auto GetForSkylakeDpll(i915_tgl::PllId pll_id) {
-    ZX_ASSERT_MSG(pll_id >= i915_tgl::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
-    ZX_ASSERT_MSG(pll_id <= i915_tgl::PllId::DPLL_3, "Unsupported DPLL %d", pll_id);
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+  static auto GetForSkylakeDpll(i915::PllId pll_id) {
+    ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
+    ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_3, "Unsupported DPLL %d", pll_id);
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
 
     static constexpr uint32_t kAddresses[] = {0x46010, 0x46014, 0x46040, 0x46060};
     return hwreg::RegisterAddr<PllEnable>(kAddresses[dpll_index]);
@@ -1249,19 +1247,19 @@ class PllEnable : public hwreg::RegisterBase<PllEnable, uint32_t> {
   // that the MG register instances are used for Type-C in general, so they
   // can control Dekel PLLs as well (for example, MGPLL1_ENABLE controls
   // Dekel PLL Type-C Port 1).
-  static auto GetForTigerLakeDpll(i915_tgl::PllId pll_id) {
-    if (pll_id >= i915_tgl::PllId::DPLL_TC_1 && pll_id <= i915_tgl::PllId::DPLL_TC_6) {
+  static auto GetForTigerLakeDpll(i915::PllId pll_id) {
+    if (pll_id >= i915::PllId::DPLL_TC_1 && pll_id <= i915::PllId::DPLL_TC_6) {
       // MGPLL1_ENABLE - MGPLL6_ENABLE
-      const int mgpll_index = pll_id - i915_tgl::PllId::DPLL_TC_1;
+      const int mgpll_index = pll_id - i915::PllId::DPLL_TC_1;
       return hwreg::RegisterAddr<PllEnable>(0x46030 + 4 * mgpll_index);
     }
 
-    ZX_ASSERT_MSG(pll_id >= i915_tgl::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
+    ZX_ASSERT_MSG(pll_id >= i915::PllId::DPLL_0, "Unsupported DPLL %d", pll_id);
 
     // TODO(fxbug.dev/110351): Allow DPLL 4, once we support it.
-    ZX_ASSERT_MSG(pll_id <= i915_tgl::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
+    ZX_ASSERT_MSG(pll_id <= i915::PllId::DPLL_2, "Unsupported DPLL %d", pll_id);
 
-    const int dpll_index = pll_id - i915_tgl::PllId::DPLL_0;
+    const int dpll_index = pll_id - i915::PllId::DPLL_0;
     static constexpr uint32_t kPllEnableAddresses[] = {0x46010, 0x46014, 0x46020, 0, 0x46018};
     return hwreg::RegisterAddr<PllEnable>(kPllEnableAddresses[dpll_index]);
   }
@@ -1288,13 +1286,11 @@ class DisplayPllStatus : public hwreg::RegisterBase<DisplayPllStatus, uint32_t> 
   // The meaning of "SEM Done" is not documented.
   //
   // Including access to these fields for logging purposes.
-  bool pll_sem_done(i915_tgl::PllId display_pll) const {
-    ZX_ASSERT_MSG(display_pll >= i915_tgl::PllId::DPLL_0, "Unsupported Display PLL %d",
-                  display_pll);
-    ZX_ASSERT_MSG(display_pll <= i915_tgl::PllId::DPLL_3, "Unsupported Display PLL %d",
-                  display_pll);
+  bool pll_sem_done(i915::PllId display_pll) const {
+    ZX_ASSERT_MSG(display_pll >= i915::PllId::DPLL_0, "Unsupported Display PLL %d", display_pll);
+    ZX_ASSERT_MSG(display_pll <= i915::PllId::DPLL_3, "Unsupported Display PLL %d", display_pll);
 
-    const int display_pll_index = display_pll - i915_tgl::PllId::DPLL_0;
+    const int display_pll_index = display_pll - i915::PllId::DPLL_0;
     const int locked_bit_index = display_pll_index * 8 + 4;
 
     // The cast is lossless because the BitfieldRef references a 1-bit field.
@@ -1308,13 +1304,11 @@ class DisplayPllStatus : public hwreg::RegisterBase<DisplayPllStatus, uint32_t> 
   // Soon after a PLL is enabled, it will lock onto its target frequency. Soon
   // after a PLL is disabled, it will no longer be locked -- the frequency lock
   // will be lost.
-  bool pll_locked(i915_tgl::PllId display_pll) const {
-    ZX_ASSERT_MSG(display_pll >= i915_tgl::PllId::DPLL_0, "Unsupported Display PLL %d",
-                  display_pll);
-    ZX_ASSERT_MSG(display_pll <= i915_tgl::PllId::DPLL_3, "Unsupported Display PLL %d",
-                  display_pll);
+  bool pll_locked(i915::PllId display_pll) const {
+    ZX_ASSERT_MSG(display_pll >= i915::PllId::DPLL_0, "Unsupported Display PLL %d", display_pll);
+    ZX_ASSERT_MSG(display_pll <= i915::PllId::DPLL_3, "Unsupported Display PLL %d", display_pll);
 
-    const int display_pll_index = display_pll - i915_tgl::PllId::DPLL_0;
+    const int display_pll_index = display_pll - i915::PllId::DPLL_0;
     const int locked_bit_index = display_pll_index * 8;
 
     // The cast is lossless because the BitfieldRef references a 1-bit field.
@@ -1326,6 +1320,6 @@ class DisplayPllStatus : public hwreg::RegisterBase<DisplayPllStatus, uint32_t> 
   static auto Get() { return hwreg::RegisterAddr<DisplayPllStatus>(0x6c060); }
 };
 
-}  // namespace tgl_registers
+}  // namespace registers
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DPLL_H_

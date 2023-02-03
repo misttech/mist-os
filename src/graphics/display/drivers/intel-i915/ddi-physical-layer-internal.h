@@ -7,7 +7,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // This describes the state machine to Enable / Disable the DDI PHY.
 //
@@ -51,6 +51,6 @@ enum class TypeCDdiTigerLake::InitializationPhase {
   kInitialized = 4,
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DDI_PHYSICAL_LAYER_INTERNAL_H_

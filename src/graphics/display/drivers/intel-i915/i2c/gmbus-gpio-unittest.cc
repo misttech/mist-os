@@ -8,12 +8,12 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
 TEST(GMBusPinPairTest, GetForDdi_TigerLake) {
-  constexpr auto kTigerLake = tgl_registers::Platform::kTigerLake;
+  constexpr auto kTigerLake = registers::Platform::kTigerLake;
   {
     std::optional<GMBusPinPair> pin_pair = GMBusPinPair::GetForDdi(DdiId::DDI_A, kTigerLake);
     ASSERT_TRUE(pin_pair.has_value());
@@ -71,7 +71,7 @@ TEST(GMBusPinPairTest, GetForDdi_TigerLake) {
 }
 
 TEST(GMBusPinPairTest, GetForDdi_Skylake) {
-  constexpr auto kSkylake = tgl_registers::Platform::kSkylake;
+  constexpr auto kSkylake = registers::Platform::kSkylake;
   {
     std::optional<GMBusPinPair> pin_pair = GMBusPinPair::GetForDdi(DdiId::DDI_A, kSkylake);
     ASSERT_FALSE(pin_pair.has_value());
@@ -105,7 +105,7 @@ TEST(GMBusPinPairTest, GetForDdi_Skylake) {
 }
 
 TEST(GMBusPinPairTest, HasValidPinPair_TigerLake) {
-  constexpr auto kTigerLake = tgl_registers::Platform::kTigerLake;
+  constexpr auto kTigerLake = registers::Platform::kTigerLake;
   for (const DdiId ddi_with_valid_pin_pair :
        {DdiId::DDI_A, DdiId::DDI_B, DdiId::DDI_C, DdiId::DDI_TC_1, DdiId::DDI_TC_2, DdiId::DDI_TC_3,
         DdiId::DDI_TC_4, DdiId::DDI_TC_5, DdiId::DDI_TC_6}) {
@@ -114,7 +114,7 @@ TEST(GMBusPinPairTest, HasValidPinPair_TigerLake) {
 }
 
 TEST(GMBusPinPairTest, HasValidPinPair_Skylake) {
-  constexpr auto kSkylake = tgl_registers::Platform::kSkylake;
+  constexpr auto kSkylake = registers::Platform::kSkylake;
   for (const DdiId ddi_with_valid_pin_pair : {DdiId::DDI_B, DdiId::DDI_C, DdiId::DDI_D}) {
     EXPECT_TRUE(GMBusPinPair::HasValidPinPair(ddi_with_valid_pin_pair, kSkylake));
   }
@@ -126,7 +126,7 @@ TEST(GMBusPinPairTest, HasValidPinPair_Skylake) {
 }
 
 TEST(GpioPortTest, GetForDdi_TigerLake) {
-  constexpr auto kTigerLake = tgl_registers::Platform::kTigerLake;
+  constexpr auto kTigerLake = registers::Platform::kTigerLake;
   {
     std::optional<GpioPort> pin_pair = GpioPort::GetForDdi(DdiId::DDI_A, kTigerLake);
     ASSERT_TRUE(pin_pair.has_value());
@@ -184,7 +184,7 @@ TEST(GpioPortTest, GetForDdi_TigerLake) {
 }
 
 TEST(GpioPortTest, GetForDdi_Skylake) {
-  constexpr auto kSkylake = tgl_registers::Platform::kSkylake;
+  constexpr auto kSkylake = registers::Platform::kSkylake;
   {
     std::optional<GpioPort> gpio_port = GpioPort::GetForDdi(DdiId::DDI_A, kSkylake);
     ASSERT_FALSE(gpio_port.has_value());
@@ -218,7 +218,7 @@ TEST(GpioPortTest, GetForDdi_Skylake) {
 }
 
 TEST(GpioPortTest, HasValidPort_TigerLake) {
-  constexpr auto kTigerLake = tgl_registers::Platform::kTigerLake;
+  constexpr auto kTigerLake = registers::Platform::kTigerLake;
   for (const DdiId ddi_with_valid_port :
        {DdiId::DDI_A, DdiId::DDI_B, DdiId::DDI_C, DdiId::DDI_TC_1, DdiId::DDI_TC_2, DdiId::DDI_TC_3,
         DdiId::DDI_TC_4, DdiId::DDI_TC_5, DdiId::DDI_TC_6}) {
@@ -227,7 +227,7 @@ TEST(GpioPortTest, HasValidPort_TigerLake) {
 }
 
 TEST(GpioPortTest, HasValidPort_Skylake) {
-  constexpr auto kSkylake = tgl_registers::Platform::kSkylake;
+  constexpr auto kSkylake = registers::Platform::kSkylake;
   for (const DdiId ddi_with_valid_port : {DdiId::DDI_B, DdiId::DDI_C, DdiId::DDI_D}) {
     EXPECT_TRUE(GpioPort::HasValidPort(ddi_with_valid_port, kSkylake));
   }
@@ -239,4 +239,4 @@ TEST(GpioPortTest, HasValidPort_Skylake) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

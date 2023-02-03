@@ -11,7 +11,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/registers-pch.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // PCH display engine clocking.
 //
@@ -415,18 +415,18 @@ class PchEngine {
   // GPU device ID used throughout the driver. Not the PCH's device ID.
   const int device_id_;
 
-  tgl_registers::PchRawClock clock_;
-  tgl_registers::PchChicken1 misc_;
-  tgl_registers::PchBacklightFreq backlight_pwm_freq_;
-  tgl_registers::PchBacklightDuty backlight_pwm_duty_;
-  tgl_registers::PchBacklightFreqDuty backlight_freq_duty_;
-  tgl_registers::PchBacklightControl backlight_control_;
-  tgl_registers::PchPanelPowerOnDelays panel_power_on_delays_;
-  tgl_registers::PchPanelPowerOffDelays panel_power_off_delays_;
-  tgl_registers::PchPanelPowerClockDelay panel_power_clock_delay_;
-  tgl_registers::PchPanelPowerControl panel_power_control_;
+  registers::PchRawClock clock_;
+  registers::PchChicken1 misc_;
+  registers::PchBacklightFreq backlight_pwm_freq_;
+  registers::PchBacklightDuty backlight_pwm_duty_;
+  registers::PchBacklightFreqDuty backlight_freq_duty_;
+  registers::PchBacklightControl backlight_control_;
+  registers::PchPanelPowerOnDelays panel_power_on_delays_;
+  registers::PchPanelPowerOffDelays panel_power_off_delays_;
+  registers::PchPanelPowerClockDelay panel_power_clock_delay_;
+  registers::PchPanelPowerControl panel_power_control_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PCH_ENGINE_H_

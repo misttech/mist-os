@@ -21,17 +21,17 @@
 #include "src/graphics/display/drivers/intel-i915/poll-until.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 DdiAuxChannel::DdiAuxChannel(fdf::MmioBuffer* mmio_buffer, DdiId ddi_id, uint16_t device_id)
     : mmio_buffer_(mmio_buffer), large_timeout_us_(0) {
   ZX_ASSERT(mmio_buffer);
 
   if (is_skl(device_id) || is_kbl(device_id)) {
-    aux_control_ = tgl_registers::DdiAuxControl::GetForKabyLakeDdi(ddi_id).ReadFrom(mmio_buffer);
+    aux_control_ = registers::DdiAuxControl::GetForKabyLakeDdi(ddi_id).ReadFrom(mmio_buffer);
     large_timeout_us_ = 1'600;
   } else if (is_tgl(device_id)) {
-    aux_control_ = tgl_registers::DdiAuxControl::GetForTigerLakeDdi(ddi_id).ReadFrom(mmio_buffer);
+    aux_control_ = registers::DdiAuxControl::GetForTigerLakeDdi(ddi_id).ReadFrom(mmio_buffer);
     large_timeout_us_ = 4'000;
   } else if (is_test_device(device_id)) {
     // Stubbed for integration tests.
@@ -88,16 +88,16 @@ void DdiAuxChannel::SetUseThunderbolt(bool use_thunderbolt) {
 DdiAuxChannelConfig DdiAuxChannel::Config() const {
   int16_t timeout_us;
   switch (aux_control_.timeout_timer_select()) {
-    case tgl_registers::DdiAuxControl::kTimeoutUnsupported400us:
+    case registers::DdiAuxControl::kTimeoutUnsupported400us:
       timeout_us = 400;
       break;
-    case tgl_registers::DdiAuxControl::kTimeout600us:
+    case registers::DdiAuxControl::kTimeout600us:
       timeout_us = 600;
       break;
-    case tgl_registers::DdiAuxControl::kTimeout800us:
+    case registers::DdiAuxControl::kTimeout800us:
       timeout_us = 800;
       break;
-    case tgl_registers::DdiAuxControl::kTimeoutLarge:
+    case registers::DdiAuxControl::kTimeoutLarge:
       timeout_us = large_timeout_us_;
       break;
   }
@@ -177,8 +177,7 @@ void DdiAuxChannel::WriteRequestHeader(int8_t command, int32_t address, int8_t o
   const uint32_t swapped_bytes =
       (uint32_t{byte0} << 24) | (uint32_t{byte1} << 16) | (uint32_t{byte2} << 8) | uint32_t{byte3};
 
-  auto aux_data_header =
-      tgl_registers::DdiAuxData::GetData0ForAuxControl(aux_control_).FromValue(0);
+  auto aux_data_header = registers::DdiAuxData::GetData0ForAuxControl(aux_control_).FromValue(0);
   aux_data_header.set_swapped_bytes(swapped_bytes).WriteTo(mmio_buffer_);
 }
 
@@ -190,7 +189,7 @@ void DdiAuxChannel::WriteRequestData(cpp20::span<const uint8_t> data) {
 
   // Points 4 bytes below the MMIO address of the AUX DDI buffer being written to.
   zx_off_t aux_data_mmio_address =
-      tgl_registers::DdiAuxData::GetData0ForAuxControl(aux_control_).addr();
+      registers::DdiAuxData::GetData0ForAuxControl(aux_control_).addr();
 
   // The cast is lossless because data.size() is at most 16.
   int data_left = static_cast<int>(data.size());
@@ -305,7 +304,7 @@ DdiAuxChannel::ReplyInfo DdiAuxChannel::ReadReplyForTesting(cpp20::span<uint8_t>
   // The first AUX data register is a special case, because it contains the
   // headear byte.
   auto aux_data_start =
-      tgl_registers::DdiAuxData::GetData0ForAuxControl(aux_control_).ReadFrom(mmio_buffer_);
+      registers::DdiAuxData::GetData0ForAuxControl(aux_control_).ReadFrom(mmio_buffer_);
 
   // Points at the next byte to be written in the data buffer.
   uint8_t* data_pointer = data_buffer.data();
@@ -365,23 +364,22 @@ void DdiAuxChannel::FixConfig() {
   // TODO(fxbug.dev/31313): Support interrupts
   aux_control_.set_interrupt_on_done(true);
 
-  if (aux_control_.timeout_timer_select() != tgl_registers::DdiAuxControl::kTimeoutLarge) {
+  if (aux_control_.timeout_timer_select() != registers::DdiAuxControl::kTimeoutLarge) {
     zxlogf(TRACE, "DDI AUX channel transaction timeout select was %u. Set to maximum.",
            aux_control_.timeout_timer_select());
-    aux_control_.set_timeout_timer_select(tgl_registers::DdiAuxControl::kTimeoutLarge);
+    aux_control_.set_timeout_timer_select(registers::DdiAuxControl::kTimeoutLarge);
   }
   if (aux_control_.fast_wake_sync_pulse_count() !=
-      tgl_registers::DdiAuxControl::kFastWakeSyncPulseCount) {
+      registers::DdiAuxControl::kFastWakeSyncPulseCount) {
     zxlogf(WARNING, "DDI AUX channel fast wake pulse count was incorrectly set to %u. Fixed.",
            aux_control_.fast_wake_sync_pulse_count());
-    aux_control_.set_fast_wake_sync_pulse_count(
-        tgl_registers::DdiAuxControl::kFastWakeSyncPulseCount);
+    aux_control_.set_fast_wake_sync_pulse_count(registers::DdiAuxControl::kFastWakeSyncPulseCount);
   }
-  if (aux_control_.sync_pulse_count() < tgl_registers::DdiAuxControl::kMinSyncPulseCount) {
+  if (aux_control_.sync_pulse_count() < registers::DdiAuxControl::kMinSyncPulseCount) {
     zxlogf(WARNING, "DDI AUX channel wake pulse count was incorrectly set to %u. Fixed.",
            aux_control_.sync_pulse_count());
-    aux_control_.set_sync_pulse_count(tgl_registers::DdiAuxControl::kMinSyncPulseCount);
+    aux_control_.set_sync_pulse_count(registers::DdiAuxControl::kMinSyncPulseCount);
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

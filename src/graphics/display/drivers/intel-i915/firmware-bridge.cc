@@ -33,7 +33,7 @@
 // should only be used to supplement the information in the other documents, and
 // it should never be the only reference for any aspect of our implementation.
 
-namespace i915_tgl {
+namespace i915 {
 
 PciConfigOpRegion::PciConfigOpRegion(ddk::Pci& pci) : pci_(pci) {}
 
@@ -178,4 +178,4 @@ zx::result<> PciConfigOpRegion::TriggerSystemControlInterrupt() {
   return zx::make_result(write_status);
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

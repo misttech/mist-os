@@ -20,7 +20,7 @@
 #include "src/graphics/display/drivers/intel-i915/acpi-memory-region.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 
-namespace i915_tgl {
+namespace i915 {
 // Various definitions from IGD OpRegion/Software SCI documentation.
 
 // Length of the igd opregion
@@ -318,6 +318,6 @@ class IgdOpRegion {
   double min_backlight_brightness_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_IGD_H_

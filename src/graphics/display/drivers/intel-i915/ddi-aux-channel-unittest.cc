@@ -17,7 +17,7 @@
 #include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -845,4 +845,4 @@ TEST_F(DdiAuxChannelTest, DoTransactWrite7BytesNack) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

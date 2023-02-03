@@ -16,7 +16,7 @@
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/scoped-value-change.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // High-level configuration of a PLL that serves as a DDI clock source.
 //
@@ -339,6 +339,6 @@ class DpllManagerTigerLake : public DisplayPllManager {
   fdf::MmioBuffer* mmio_space_ = nullptr;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DPLL_H_

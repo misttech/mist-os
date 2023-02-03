@@ -22,7 +22,7 @@
 // * Whiskey Lake: IHD-OS-WHL-Vol 1-1.20 page 7
 // * Comet Lake: IHD-OS-CML-Vol 1-4.20 pages 9-10
 
-namespace i915_tgl {
+namespace i915 {
 
 constexpr bool is_skl(uint16_t device_id) { return (device_id & 0xff00) == 0x1900; }
 
@@ -53,22 +53,22 @@ constexpr bool is_tgl_u(uint16_t device_id) {
 constexpr uint16_t kTestDeviceDid = 0xffff;
 constexpr bool is_test_device(uint16_t device_id) { return device_id == kTestDeviceDid; }
 
-constexpr tgl_registers::Platform GetPlatform(uint16_t device_id) {
+constexpr registers::Platform GetPlatform(uint16_t device_id) {
   if (is_skl(device_id)) {
-    return tgl_registers::Platform::kSkylake;
+    return registers::Platform::kSkylake;
   }
   if (is_kbl(device_id)) {
-    return tgl_registers::Platform::kKabyLake;
+    return registers::Platform::kKabyLake;
   }
   if (is_tgl(device_id)) {
-    return tgl_registers::Platform::kTigerLake;
+    return registers::Platform::kTigerLake;
   }
   if (is_test_device(device_id)) {
-    return tgl_registers::Platform::kTestDevice;
+    return registers::Platform::kTestDevice;
   }
   ZX_ASSERT_MSG(false, "device id %u not supported", device_id);
 }
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PCI_IDS_H_

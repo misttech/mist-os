@@ -14,7 +14,7 @@
 #include "src/graphics/display/drivers/intel-i915/mock-mmio-range.h"
 #include "src/graphics/display/drivers/intel-i915/registers-typec.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -742,7 +742,7 @@ TEST_F(TypeCDdiTigerLakeTest, Enable_FailureOnBailout) {
 
   // DynamicFlexIoDisplayPortPhyModeStatus: Type-C PHY is not ready on DDI_TC_2.
   const size_t phy_mode_status_reg_index =
-      tgl_registers::DynamicFlexIoDisplayPortPhyModeStatus::GetForDdi(kTargetDdiId).addr() /
+      registers::DynamicFlexIoDisplayPortPhyModeStatus::GetForDdi(kTargetDdiId).addr() /
       sizeof(uint32_t);
   fake_mmio_regs[phy_mode_status_reg_index].SetReadCallback([] { return 0x0000'0000; });
 
@@ -831,7 +831,7 @@ TEST_F(TypeCDdiTigerLakeTest, Disable_Failure_TcColdCannotUnblock) {
 
   // Re-enable safe mode.
   const size_t safe_state_reg_index =
-      tgl_registers::DynamicFlexIoDisplayPortControllerSafeStateSettings::GetForDdi(kTargetDdiId)
+      registers::DynamicFlexIoDisplayPortControllerSafeStateSettings::GetForDdi(kTargetDdiId)
           .addr() /
       sizeof(uint32_t);
   bool safe_mode_enabled = false;
@@ -877,15 +877,15 @@ TEST_F(TypeCDdiTigerLakeTest, ReadPhysicalLayerInfo_StaticPort) {
            DdiId::DDI_TC_5,
            DdiId::DDI_TC_6,
        }) {
-    auto scratch_pad = tgl_registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id).FromValue(0);
+    auto scratch_pad = registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id).FromValue(0);
     scratch_pad.set_is_modular_flexi_io_adapter(true).set_firmware_supports_mfd(true);
 
     if ((ddi_id - DdiId::DDI_TC_1) % 2 == 0) {
       scratch_pad.set_type_c_live_state_connector_0(static_cast<uint32_t>(
-          tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
+          registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
     } else {
       scratch_pad.set_type_c_live_state_connector_1(static_cast<uint32_t>(
-          tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
+          registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
     }
 
     mmio_range_.Expect(MockMmioRange::AccessList({
@@ -910,15 +910,15 @@ TEST_F(TypeCDdiTigerLakeTest, ReadPhysicalLayerInfo_NoTypeC) {
            DdiId::DDI_TC_5,
            DdiId::DDI_TC_6,
        }) {
-    auto scratch_pad = tgl_registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id).FromValue(0);
+    auto scratch_pad = registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id).FromValue(0);
     scratch_pad.set_is_modular_flexi_io_adapter(true).set_firmware_supports_mfd(true);
 
     if ((ddi_id - DdiId::DDI_TC_1) % 2 == 0) {
       scratch_pad.set_type_c_live_state_connector_0(static_cast<uint32_t>(
-          tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
+          registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
     } else {
       scratch_pad.set_type_c_live_state_connector_1(static_cast<uint32_t>(
-          tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
+          registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay));
     }
 
     mmio_range_.Expect(MockMmioRange::AccessList({
@@ -943,16 +943,16 @@ TEST_F(TypeCDdiTigerLakeTest, ReadPhysicalLayerInfo_TypeCDisplayPortAlt) {
            DdiId::DDI_TC_5,
            DdiId::DDI_TC_6,
        }) {
-    auto scratch_pad = tgl_registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id).FromValue(0);
+    auto scratch_pad = registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id).FromValue(0);
     scratch_pad.set_is_modular_flexi_io_adapter(true).set_firmware_supports_mfd(true);
 
     if ((ddi_id - DdiId::DDI_TC_1) % 2 == 0) {
       scratch_pad.set_type_c_live_state_connector_0(static_cast<uint32_t>(
-          tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kTypeCHotplugDisplay));
+          registers::DynamicFlexIoScratchPad::TypeCLiveState::kTypeCHotplugDisplay));
       scratch_pad.set_display_port_tx_lane_assignment_bits_connector_0(0b0011);
     } else {
       scratch_pad.set_type_c_live_state_connector_1(static_cast<uint32_t>(
-          tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kTypeCHotplugDisplay));
+          registers::DynamicFlexIoScratchPad::TypeCLiveState::kTypeCHotplugDisplay));
       scratch_pad.set_display_port_tx_lane_assignment_bits_connector_1(0b0011);
     }
 
@@ -979,15 +979,15 @@ TEST_F(TypeCDdiTigerLakeTest, ReadPhysicalLayerInfo_Thunderbolt) {
            DdiId::DDI_TC_5,
            DdiId::DDI_TC_6,
        }) {
-    auto scratch_pad = tgl_registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id).FromValue(0);
+    auto scratch_pad = registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id).FromValue(0);
     scratch_pad.set_is_modular_flexi_io_adapter(true).set_firmware_supports_mfd(true);
 
     if ((ddi_id - DdiId::DDI_TC_1) % 2 == 0) {
       scratch_pad.set_type_c_live_state_connector_0(static_cast<uint32_t>(
-          tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kThunderboltHotplugDisplay));
+          registers::DynamicFlexIoScratchPad::TypeCLiveState::kThunderboltHotplugDisplay));
     } else {
       scratch_pad.set_type_c_live_state_connector_1(static_cast<uint32_t>(
-          tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kThunderboltHotplugDisplay));
+          registers::DynamicFlexIoScratchPad::TypeCLiveState::kThunderboltHotplugDisplay));
     }
 
     mmio_range_.Expect(MockMmioRange::AccessList({
@@ -1136,4 +1136,4 @@ TEST_F(ComboDdiTigerLakeTest, InitializeDdiBNuc11) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

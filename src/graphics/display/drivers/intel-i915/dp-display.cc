@@ -42,7 +42,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-typec.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 namespace {
 
 constexpr uint32_t kBitsPerPixel = 24;  // kPixelFormat
@@ -735,7 +735,7 @@ bool DpDisplay::DpcdHandleAdjustRequest(dpcd::TrainingLaneSet* training,
 }
 
 void DpDisplay::ConfigureVoltageSwingKabyLake(size_t phy_config_index) {
-  tgl_registers::DdiRegs ddi_regs(ddi_id());
+  registers::DdiRegs ddi_regs(ddi_id());
   auto buffer_control = ddi_regs.BufferControl().ReadFrom(mmio_space());
   buffer_control.set_display_port_phy_config_kaby_lake(phy_config_index);
   buffer_control.WriteTo(mmio_space());
@@ -789,14 +789,14 @@ void DpDisplay::ConfigureVoltageSwingTypeCTigerLake(size_t phy_config_index) {
 
   for (auto tx_lane : {0, 1}) {
     // Flush PMD_LANE_SUS register if display owns this PHY lane.
-    tgl_registers::DekelTransmitterPmdLaneSus::GetForLaneDdi(tx_lane, ddi_id())
+    registers::DekelTransmitterPmdLaneSus::GetForLaneDdi(tx_lane, ddi_id())
         .FromValue(0)
         .WriteTo(mmio_space());
 
     // Update DisplayPort control registers with appropriate voltage swing and
     // de-emphasis levels from the table.
     auto display_port_control_0 =
-        tgl_registers::DekelTransmitterDisplayPortControl0::GetForLaneDdi(tx_lane, ddi_id())
+        registers::DekelTransmitterDisplayPortControl0::GetForLaneDdi(tx_lane, ddi_id())
             .ReadFrom(mmio_space());
     display_port_control_0
         .set_voltage_swing_control_level_transmitter_1(
@@ -808,7 +808,7 @@ void DpDisplay::ConfigureVoltageSwingTypeCTigerLake(size_t phy_config_index) {
         .WriteTo(mmio_space());
 
     auto display_port_control_1 =
-        tgl_registers::DekelTransmitterDisplayPortControl1::GetForLaneDdi(tx_lane, ddi_id())
+        registers::DekelTransmitterDisplayPortControl1::GetForLaneDdi(tx_lane, ddi_id())
             .ReadFrom(mmio_space());
     display_port_control_1
         .set_voltage_swing_control_level_transmitter_2(
@@ -820,7 +820,7 @@ void DpDisplay::ConfigureVoltageSwingTypeCTigerLake(size_t phy_config_index) {
         .WriteTo(mmio_space());
 
     auto display_port_control_2 =
-        tgl_registers::DekelTransmitterDisplayPortControl2::GetForLaneDdi(tx_lane, ddi_id())
+        registers::DekelTransmitterDisplayPortControl2::GetForLaneDdi(tx_lane, ddi_id())
             .ReadFrom(mmio_space());
     display_port_control_2.set_display_port_20bit_mode_supported(0).WriteTo(mmio_space());
   }
@@ -838,14 +838,14 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
          dp_link_rate_mhz_, static_cast<int>(phy_config_index));
   zxlogf(TRACE, "Logging pre-configuration register state for debugging");
 
-  static constexpr tgl_registers::PortLane kMainLinkLanes[] = {
-      tgl_registers::PortLane::kMainLinkLane0, tgl_registers::PortLane::kMainLinkLane1,
-      tgl_registers::PortLane::kMainLinkLane2, tgl_registers::PortLane::kMainLinkLane3};
-  for (tgl_registers::PortLane lane : kMainLinkLanes) {
+  static constexpr registers::PortLane kMainLinkLanes[] = {
+      registers::PortLane::kMainLinkLane0, registers::PortLane::kMainLinkLane1,
+      registers::PortLane::kMainLinkLane2, registers::PortLane::kMainLinkLane3};
+  for (registers::PortLane lane : kMainLinkLanes) {
     auto physical_coding1 =
-        tgl_registers::PortPhysicalCoding1::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
+        registers::PortPhysicalCoding1::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
     const int lane_index =
-        static_cast<int>(lane) - static_cast<int>(tgl_registers::PortLane::kMainLinkLane0);
+        static_cast<int>(lane) - static_cast<int>(registers::PortLane::kMainLinkLane0);
     zxlogf(TRACE, "DDI %d Lane %d PORT_PCS_DW1: %08x, common mode keeper: %s", ddi_id(), lane_index,
            physical_coding1.reg_value(),
            physical_coding1.common_mode_keeper_enabled() ? "enabled" : "disabled");
@@ -863,12 +863,11 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
     static constexpr bool kPartialLinkLoadGeneration[] = {false, true, true, false};
     load_generation = kPartialLinkLoadGeneration;
   }
-  for (tgl_registers::PortLane lane : kMainLinkLanes) {
-    auto lane_equalization =
-        tgl_registers::PortTransmitterEqualization::GetForDdiLane(ddi_id(), lane)
-            .ReadFrom(mmio_space());
+  for (registers::PortLane lane : kMainLinkLanes) {
+    auto lane_equalization = registers::PortTransmitterEqualization::GetForDdiLane(ddi_id(), lane)
+                                 .ReadFrom(mmio_space());
     const int lane_index =
-        static_cast<int>(lane) - static_cast<int>(tgl_registers::PortLane::kMainLinkLane0);
+        static_cast<int>(lane) - static_cast<int>(registers::PortLane::kMainLinkLane0);
     zxlogf(TRACE,
            "DDI %d Lane %d PORT_TX_DW4: %08x, load generation select: %d, equalization "
            "C0: %02x C1: %02x C2: %02x",
@@ -879,18 +878,18 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
     lane_equalization.set_load_generation_select(load_generation[lane_index]).WriteTo(mmio_space());
   }
 
-  auto common_lane5 = tgl_registers::PortCommonLane5::GetForDdi(ddi_id()).ReadFrom(mmio_space());
+  auto common_lane5 = registers::PortCommonLane5::GetForDdi(ddi_id()).ReadFrom(mmio_space());
   zxlogf(TRACE, "DDI %d PORT_CL_DW5 %08x, suspend clock config %d", ddi_id(),
          common_lane5.reg_value(), common_lane5.suspend_clock_config());
   common_lane5.set_suspend_clock_config(0b11).WriteTo(mmio_space());
 
   // Lane training must be disabled while we configure new voltage settings into
   // the AFE (Analog Front-End) registers.
-  for (tgl_registers::PortLane lane : kMainLinkLanes) {
+  for (registers::PortLane lane : kMainLinkLanes) {
     auto lane_voltage =
-        tgl_registers::PortTransmitterVoltage::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
+        registers::PortTransmitterVoltage::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
     const int lane_index =
-        static_cast<int>(lane) - static_cast<int>(tgl_registers::PortLane::kMainLinkLane0);
+        static_cast<int>(lane) - static_cast<int>(registers::PortLane::kMainLinkLane0);
     zxlogf(TRACE,
            "DDI %d Lane %d PORT_TX_DW5: %08x, scaling mode select: %d, "
            "terminating resistor select: %d, equalization 3-tap: %s 2-tap: %s, "
@@ -1065,13 +1064,12 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
   }
 
   const ComboSwingConfig& swing_config = swing_configs[phy_config_index];
-  for (tgl_registers::PortLane lane : kMainLinkLanes) {
+  for (registers::PortLane lane : kMainLinkLanes) {
     const int lane_index =
-        static_cast<int>(lane) - static_cast<int>(tgl_registers::PortLane::kMainLinkLane0);
+        static_cast<int>(lane) - static_cast<int>(registers::PortLane::kMainLinkLane0);
 
-    auto lane_voltage_swing =
-        tgl_registers::PortTransmitterVoltageSwing::GetForDdiLane(ddi_id(), lane)
-            .ReadFrom(mmio_space());
+    auto lane_voltage_swing = registers::PortTransmitterVoltageSwing::GetForDdiLane(ddi_id(), lane)
+                                  .ReadFrom(mmio_space());
     zxlogf(TRACE, "DDI %d Lane %d PORT_TX_DW2: %08x, Rcomp scalar: %02x, Swing select: %d",
            ddi_id(), lane_index, lane_voltage_swing.reg_value(),
            lane_voltage_swing.resistance_compensation_code_scalar(),
@@ -1080,16 +1078,15 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
         .set_voltage_swing_select(swing_config.swing_select)
         .WriteTo(mmio_space());
 
-    auto lane_equalization =
-        tgl_registers::PortTransmitterEqualization::GetForDdiLane(ddi_id(), lane)
-            .ReadFrom(mmio_space());
+    auto lane_equalization = registers::PortTransmitterEqualization::GetForDdiLane(ddi_id(), lane)
+                                 .ReadFrom(mmio_space());
     lane_equalization.set_cursor_coefficient(swing_config.cursor)
         .set_post_cursor_coefficient1(0x3f - swing_config.cursor)
         .set_post_cursor_coefficient2(0)
         .WriteTo(mmio_space());
 
     auto lane_voltage =
-        tgl_registers::PortTransmitterVoltage::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
+        registers::PortTransmitterVoltage::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
     lane_voltage.set_scaling_mode_select(2)
         .set_terminating_resistor_select(6)
         .set_three_tap_equalization_disabled(true)
@@ -1099,23 +1096,23 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
         .WriteTo(mmio_space());
 
     auto lane_n_scalar =
-        tgl_registers::PortTransmitterNScalar::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
+        registers::PortTransmitterNScalar::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
     zxlogf(TRACE, "DDI %d Lane %d PORT_TX_DW7: %08x, N Scalar: %02x", ddi_id(), lane_index,
            lane_n_scalar.reg_value(), lane_n_scalar.n_scalar());
   }
 
   // Re-enabling training causes the AFE (Analog Front-End) to pick up the new
   // voltage configuration.
-  for (tgl_registers::PortLane lane : kMainLinkLanes) {
+  for (registers::PortLane lane : kMainLinkLanes) {
     auto lane_voltage =
-        tgl_registers::PortTransmitterVoltage::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
+        registers::PortTransmitterVoltage::GetForDdiLane(ddi_id(), lane).ReadFrom(mmio_space());
     lane_voltage.set_training_enabled(true);
   }
 
   // This step follows voltage swing configuration in the "Sequences for
   // DisplayPort" > "Enable Sequence" section in the display engine PRMs.
   auto common_lane_main_link_power =
-      tgl_registers::PortCommonLaneMainLinkPower::GetForDdi(ddi_id()).ReadFrom(mmio_space());
+      registers::PortCommonLaneMainLinkPower::GetForDdi(ddi_id()).ReadFrom(mmio_space());
   zxlogf(TRACE,
          "DDI %d PORT_CL_DW10 %08x, lanes: 0 %s 1 %s 2 %s 3 %s, eDP power-optimized %s %s, "
          "terminating resistor %s %d Ohm",
@@ -1128,7 +1125,7 @@ void DpDisplay::ConfigureVoltageSwingComboTigerLake(size_t phy_config_index) {
          common_lane_main_link_power.edp_power_optimized_mode_enabled() ? "enabled" : "disabled",
          common_lane_main_link_power.terminating_resistor_override_valid() ? "valid" : "invalid",
          (common_lane_main_link_power.terminating_resistor_override() ==
-          tgl_registers::PortCommonLaneMainLinkPower::TerminatingResistorOverride::k100Ohms)
+          registers::PortCommonLaneMainLinkPower::TerminatingResistorOverride::k100Ohms)
              ? 100
              : 150);
   if (phy_config_index == 10) {
@@ -1149,7 +1146,7 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0, Page 144
 
   // Transcoder must be disabled while doing link training.
-  tgl_registers::TranscoderRegs transcoder_regs(pipe()->connected_transcoder_id());
+  registers::TranscoderRegs transcoder_regs(pipe()->connected_transcoder_id());
 
   // Our experiments on NUC 11 indicate that the display engine may crash the
   // whole system if the driver sets `enabled_target` to false and writes the
@@ -1171,18 +1168,18 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
   auto ddi_control = transcoder_regs.DdiControl().ReadFrom(mmio_space());
   ddi_control.set_ddi_tiger_lake(ddi_id());
   // TODO(fxbug.dev/110411): Support MST (Multi-Stream).
-  ddi_control.set_ddi_mode(tgl_registers::TranscoderDdiControl::kModeDisplayPortSingleStream);
+  ddi_control.set_ddi_mode(registers::TranscoderDdiControl::kModeDisplayPortSingleStream);
   ddi_control.WriteTo(mmio_space());
 
   // Configure and enable "DP Transport Control" register with link training
   // pattern 1 selected
-  auto dp_transport_control = tgl_registers::DpTransportControl::GetForTigerLakeTranscoder(
-                                  pipe()->connected_transcoder_id())
-                                  .ReadFrom(mmio_space());
+  auto dp_transport_control =
+      registers::DpTransportControl::GetForTigerLakeTranscoder(pipe()->connected_transcoder_id())
+          .ReadFrom(mmio_space());
   dp_transport_control.set_enabled(true)
       .set_is_multi_stream(false)
       .set_sst_enhanced_framing(capabilities_->enhanced_frame_capability())
-      .set_training_pattern(tgl_registers::DpTransportControl::kTrainingPattern1)
+      .set_training_pattern(registers::DpTransportControl::kTrainingPattern1)
       .WriteTo(mmio_space());
 
   // Start link training at the minimum Voltage Swing level.
@@ -1194,7 +1191,7 @@ bool DpDisplay::LinkTrainingSetupTigerLake() {
 
   // Configure and enable DDI Buffer.
   auto buffer_control =
-      tgl_registers::DdiBufferControl::GetForTigerLakeDdi(ddi_id()).ReadFrom(mmio_space());
+      registers::DdiBufferControl::GetForTigerLakeDdi(ddi_id()).ReadFrom(mmio_space());
   buffer_control.set_enabled(true)
       .set_display_port_lane_count(dp_lane_count_)
       .WriteTo(mmio_space());
@@ -1262,14 +1259,14 @@ bool DpDisplay::LinkTrainingSetupKabyLake() {
   ZX_ASSERT(capabilities_);
   ZX_DEBUG_ASSERT(!is_tgl(controller()->device_id()));
 
-  tgl_registers::DdiRegs ddi_regs(ddi_id());
+  registers::DdiRegs ddi_regs(ddi_id());
 
   // Tell the source device to emit the training pattern.
   auto dp_transport_control = ddi_regs.DpTransportControl().ReadFrom(mmio_space());
   dp_transport_control.set_enabled(true)
       .set_is_multi_stream(false)
       .set_sst_enhanced_framing(capabilities_->enhanced_frame_capability())
-      .set_training_pattern(tgl_registers::DpTransportControl::kTrainingPattern1)
+      .set_training_pattern(registers::DpTransportControl::kTrainingPattern1)
       .WriteTo(mmio_space());
 
   // Configure DDI PHY parameters (voltage swing and pre-emphasis).
@@ -1286,7 +1283,7 @@ bool DpDisplay::LinkTrainingSetupKabyLake() {
 
   for (int entry_index = 0; entry_index < static_cast<int>(entries.size()); ++entry_index) {
     auto phy_config_entry1 =
-        tgl_registers::DdiPhyConfigEntry1::GetDdiInstance(ddi_id(), entry_index).FromValue(0);
+        registers::DdiPhyConfigEntry1::GetDdiInstance(ddi_id(), entry_index).FromValue(0);
     phy_config_entry1.set_reg_value(entries[entry_index].entry1);
     if (i_boost_override) {
       phy_config_entry1.set_balance_leg_enable(1);
@@ -1294,12 +1291,12 @@ bool DpDisplay::LinkTrainingSetupKabyLake() {
     phy_config_entry1.WriteTo(mmio_space());
 
     auto phy_config_entry2 =
-        tgl_registers::DdiPhyConfigEntry2::GetDdiInstance(ddi_id(), entry_index).FromValue(0);
+        registers::DdiPhyConfigEntry2::GetDdiInstance(ddi_id(), entry_index).FromValue(0);
     phy_config_entry2.set_reg_value(entries[entry_index].entry2).WriteTo(mmio_space());
   }
 
   const uint8_t i_boost_val = i_boost_override ? i_boost_override : i_boost;
-  auto balance_control = tgl_registers::DdiPhyBalanceControl::Get().ReadFrom(mmio_space());
+  auto balance_control = registers::DdiPhyBalanceControl::Get().ReadFrom(mmio_space());
   balance_control.set_disable_balance_leg(!i_boost && !i_boost_override);
   balance_control.balance_leg_select_for_ddi(ddi_id()).set(i_boost_val);
   if (ddi_id() == DdiId::DDI_A && dp_lane_count_ == 4) {
@@ -1422,15 +1419,15 @@ bool DpDisplay::LinkTrainingStage2(dpcd::TrainingPatternSet* tp_set, dpcd::Train
   dpcd::LaneStatus lane_status[dp_lane_count_];
 
   if (is_tgl(controller()->device_id())) {
-    auto dp_transport_control = tgl_registers::DpTransportControl::GetForTigerLakeTranscoder(
-                                    pipe()->connected_transcoder_id())
-                                    .ReadFrom(mmio_space());
-    dp_transport_control.set_training_pattern(tgl_registers::DpTransportControl::kTrainingPattern2);
+    auto dp_transport_control =
+        registers::DpTransportControl::GetForTigerLakeTranscoder(pipe()->connected_transcoder_id())
+            .ReadFrom(mmio_space());
+    dp_transport_control.set_training_pattern(registers::DpTransportControl::kTrainingPattern2);
     dp_transport_control.WriteTo(mmio_space());
   } else {
-    tgl_registers::DdiRegs ddi_regs(ddi_id());
+    registers::DdiRegs ddi_regs(ddi_id());
     auto dp_transport_control = ddi_regs.DpTransportControl().ReadFrom(mmio_space());
-    dp_transport_control.set_training_pattern(tgl_registers::DpTransportControl::kTrainingPattern2);
+    dp_transport_control.set_training_pattern(registers::DpTransportControl::kTrainingPattern2);
     dp_transport_control.WriteTo(mmio_space());
   }
 
@@ -1490,15 +1487,15 @@ bool DpDisplay::LinkTrainingStage2(dpcd::TrainingPatternSet* tp_set, dpcd::Train
   }
 
   if (is_tgl(controller()->device_id())) {
-    auto dp_transport_control = tgl_registers::DpTransportControl::GetForTigerLakeTranscoder(
-                                    pipe()->connected_transcoder_id())
-                                    .ReadFrom(mmio_space());
-    dp_transport_control.set_training_pattern(tgl_registers::DpTransportControl::kSendPixelData);
+    auto dp_transport_control =
+        registers::DpTransportControl::GetForTigerLakeTranscoder(pipe()->connected_transcoder_id())
+            .ReadFrom(mmio_space());
+    dp_transport_control.set_training_pattern(registers::DpTransportControl::kSendPixelData);
     dp_transport_control.WriteTo(mmio_space());
   } else {
-    tgl_registers::DdiRegs ddi_regs(ddi_id());
+    registers::DdiRegs ddi_regs(ddi_id());
     auto dp_transport_control = ddi_regs.DpTransportControl().ReadFrom(mmio_space());
-    dp_transport_control.set_training_pattern(tgl_registers::DpTransportControl::kSendPixelData)
+    dp_transport_control.set_training_pattern(registers::DpTransportControl::kSendPixelData)
         .WriteTo(mmio_space());
     dp_transport_control.WriteTo(mmio_space());
   }
@@ -1511,11 +1508,11 @@ bool DpDisplay::ProgramDpModeTigerLake() {
   ZX_ASSERT(ddi_id() <= DdiId::DDI_TC_6);
 
   auto dp_mode_0 =
-      tgl_registers::DekelDisplayPortMode::GetForLaneDdi(0, ddi_id()).ReadFrom(mmio_space());
+      registers::DekelDisplayPortMode::GetForLaneDdi(0, ddi_id()).ReadFrom(mmio_space());
   auto dp_mode_1 =
-      tgl_registers::DekelDisplayPortMode::GetForLaneDdi(1, ddi_id()).ReadFrom(mmio_space());
+      registers::DekelDisplayPortMode::GetForLaneDdi(1, ddi_id()).ReadFrom(mmio_space());
 
-  auto pin_assignment = tgl_registers::DynamicFlexIoDisplayPortPinAssignment::GetForDdi(ddi_id())
+  auto pin_assignment = registers::DynamicFlexIoDisplayPortPinAssignment::GetForDdi(ddi_id())
                             .ReadFrom(mmio_space())
                             .pin_assignment_for_ddi(ddi_id());
   if (!pin_assignment.has_value()) {
@@ -1528,7 +1525,7 @@ bool DpDisplay::ProgramDpModeTigerLake() {
   dp_mode_1.set_x1_mode(0).set_x2_mode(0);
 
   switch (*pin_assignment) {
-    using PinAssignment = tgl_registers::DynamicFlexIoDisplayPortPinAssignment::PinAssignment;
+    using PinAssignment = registers::DynamicFlexIoDisplayPortPinAssignment::PinAssignment;
     case PinAssignment::kNone:  // Fixed/Static
       if (dp_lane_count_ == 1) {
         dp_mode_1.set_x1_mode(1);
@@ -1699,7 +1696,7 @@ bool DpDisplay::Query() {
     // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 "Display Connections" > "DDIs" page 107
     // Skylake: IHD-OS-SKL-Vol 12-05.16 "Display Connections" > "DDIs" page 105
     if (ddi_id() == DdiId::DDI_A || ddi_id() == DdiId::DDI_E) {
-      const bool ddi_e_enabled = !tgl_registers::DdiRegs(DdiId::DDI_A)
+      const bool ddi_e_enabled = !registers::DdiRegs(DdiId::DDI_A)
                                       .BufferControl()
                                       .ReadFrom(mmio_space())
                                       .ddi_e_disabled_kaby_lake();
@@ -1763,7 +1760,7 @@ bool DpDisplay::InitDdi() {
   if (is_tgl(controller()->device_id()) && ddi_id() >= DdiId::DDI_TC_1 &&
       ddi_id() <= DdiId::DDI_TC_6) {
     auto main_link_lane_enabled =
-        tgl_registers::DynamicFlexIoDisplayPortMainLinkLaneEnabled::GetForDdi(ddi_id()).ReadFrom(
+        registers::DynamicFlexIoDisplayPortMainLinkLaneEnabled::GetForDdi(ddi_id()).ReadFrom(
             mmio_space());
     switch (dp_lane_count_) {
       case 1:
@@ -1888,7 +1885,7 @@ bool DpDisplay::DdiModeset(const display_mode_t& mode) { return true; }
 
 bool DpDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
                                    TranscoderId transcoder_id) {
-  tgl_registers::TranscoderRegs transcoder_regs(transcoder_id);
+  registers::TranscoderRegs transcoder_regs(transcoder_id);
 
   // Transcoder should be disabled first before reconfiguring the transcoder
   // clock. Will be re-enabled at `PipeConfigEpilogue()`.
@@ -1976,7 +1973,7 @@ bool DpDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
 
 bool DpDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
                                    TranscoderId transcoder_id) {
-  tgl_registers::TranscoderRegs transcoder_regs(transcoder_id);
+  registers::TranscoderRegs transcoder_regs(transcoder_id);
   auto main_stream_attribute_misc = transcoder_regs.MainStreamAttributeMisc().FromValue(0);
   main_stream_attribute_misc.set_video_stream_clock_sync_with_link_clock(true)
       .set_colorimetry_in_vsc_sdp(false)
@@ -1985,8 +1982,8 @@ bool DpDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
   // TODO(fxbug.dev/85601): Decide the color model / pixel format based on pipe
   //                        configuration and display capabilities.
   main_stream_attribute_misc
-      .set_bits_per_component_select(tgl_registers::DisplayPortMsaBitsPerComponent::k8Bpc)
-      .set_colorimetry_select(tgl_registers::DisplayPortMsaColorimetry::kRgbUnspecifiedLegacy)
+      .set_bits_per_component_select(registers::DisplayPortMsaBitsPerComponent::k8Bpc)
+      .set_colorimetry_select(registers::DisplayPortMsaColorimetry::kRgbUnspecifiedLegacy)
       .WriteTo(mmio_space());
 
   auto transcoder_ddi_control = transcoder_regs.DdiControl().ReadFrom(mmio_space());
@@ -2010,9 +2007,8 @@ bool DpDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
 
   // TODO(fxbug.dev/85601): Decide the color model / pixel format based on pipe
   //                        configuration and display capabilities.
-  transcoder_ddi_control
-      .set_ddi_mode(tgl_registers::TranscoderDdiControl::kModeDisplayPortSingleStream)
-      .set_bits_per_color(tgl_registers::TranscoderDdiControl::k8bpc)
+  transcoder_ddi_control.set_ddi_mode(registers::TranscoderDdiControl::kModeDisplayPortSingleStream)
+      .set_bits_per_color(registers::TranscoderDdiControl::k8bpc)
       .set_vsync_polarity_not_inverted((mode.flags & MODE_FLAG_VSYNC_POSITIVE) != 0)
       .set_hsync_polarity_not_inverted((mode.flags & MODE_FLAG_HSYNC_POSITIVE) != 0);
 
@@ -2192,14 +2188,14 @@ bool DpDisplay::HandleHotplug(bool long_pulse) {
   //             Sequence"
   if (is_tgl(controller()->device_id()) && ddi_id() >= DdiId::DDI_TC_1 &&
       ddi_id() <= DdiId::DDI_TC_6) {
-    auto dp_sp = tgl_registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id()).ReadFrom(mmio_space());
+    auto dp_sp = registers::DynamicFlexIoScratchPad::GetForDdi(ddi_id()).ReadFrom(mmio_space());
     auto type_c_live_state = dp_sp.type_c_live_state(ddi_id());
 
     // The device has been already connected when `HandleHotplug` is called.
     // If live state is non-zero, keep the existing connection; otherwise
     // return false to disconnect the display.
     return type_c_live_state !=
-           tgl_registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay;
+           registers::DynamicFlexIoScratchPad::TypeCLiveState::kNoHotplugDisplay;
   }
 
   // On other platforms, a long pulse indicates that the hotplug status is
@@ -2243,7 +2239,7 @@ bool DpDisplay::CheckPixelRate(uint64_t pixel_rate) {
 }
 
 uint32_t DpDisplay::LoadClockRateForTranscoder(TranscoderId transcoder_id) {
-  tgl_registers::TranscoderRegs transcoder_regs(transcoder_id);
+  registers::TranscoderRegs transcoder_regs(transcoder_id);
   const uint32_t data_m = transcoder_regs.DataM().ReadFrom(mmio_space()).m();
   const uint32_t data_n = transcoder_regs.DataN().ReadFrom(mmio_space()).n();
 
@@ -2252,4 +2248,4 @@ uint32_t DpDisplay::LoadClockRateForTranscoder(TranscoderId transcoder_id) {
   return static_cast<uint32_t>(round(res));
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

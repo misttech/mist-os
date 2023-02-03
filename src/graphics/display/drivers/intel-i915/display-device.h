@@ -20,7 +20,7 @@
 #include "src/graphics/display/drivers/intel-i915/pipe.h"
 #include "src/graphics/display/drivers/intel-i915/power.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class Controller;
 class DisplayDevice;
@@ -175,6 +175,6 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
   display_ref_t* display_ref_ = nullptr;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DISPLAY_DEVICE_H_

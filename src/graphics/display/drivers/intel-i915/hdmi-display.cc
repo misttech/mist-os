@@ -35,7 +35,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-i915/registers.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // I2c functions
 
@@ -95,14 +95,14 @@ HdmiDisplay::~HdmiDisplay() = default;
 
 bool HdmiDisplay::Query() {
   // HDMI isn't supported on these DDIs
-  const tgl_registers::Platform platform = GetPlatform(controller()->device_id());
+  const registers::Platform platform = GetPlatform(controller()->device_id());
   if (!GMBusPinPair::HasValidPinPair(ddi_id(), platform)) {
     return false;
   }
 
   // Reset the GMBus registers and disable GMBus interrupts
-  tgl_registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
-  tgl_registers::GMBusControllerInterruptMask::Get().FromValue(0).WriteTo(mmio_space());
+  registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
+  registers::GMBusControllerInterruptMask::Get().FromValue(0).WriteTo(mmio_space());
 
   // The I2C address for writing the DDC data offset/reading DDC data.
   //
@@ -124,7 +124,7 @@ bool HdmiDisplay::Query() {
         .is_read = true,
         .stop = 1,
     };
-    tgl_registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
+    registers::GMBusClockPortSelect::Get().FromValue(0).WriteTo(mmio_space());
     // TODO(fxbug.dev/99979): We should read using GMBusI2c directly instead.
     if (controller()->Transact(i2c_bus_id(), &op, 1) == ZX_OK) {
       zxlogf(TRACE, "Found a hdmi/dvi monitor");
@@ -182,7 +182,7 @@ bool HdmiDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
   ZX_DEBUG_ASSERT_MSG(transcoder_id != TranscoderId::TRANSCODER_EDP,
                       "The EDP transcoder doesn't do HDMI");
 
-  tgl_registers::TranscoderRegs transcoder_regs(transcoder_id);
+  registers::TranscoderRegs transcoder_regs(transcoder_id);
 
   // Configure Transcoder Clock Select
   auto transcoder_clock_select = transcoder_regs.ClockSelect().ReadFrom(mmio_space());
@@ -202,7 +202,7 @@ bool HdmiDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
   ZX_DEBUG_ASSERT_MSG(transcoder_id != TranscoderId::TRANSCODER_EDP,
                       "The EDP transcoder doesn't do HDMI");
 
-  tgl_registers::TranscoderRegs transcoder_regs(transcoder_id);
+  registers::TranscoderRegs transcoder_regs(transcoder_id);
 
   auto transcoder_ddi_control = transcoder_regs.DdiControl().ReadFrom(mmio_space());
   transcoder_ddi_control.set_enabled(true);
@@ -212,9 +212,9 @@ bool HdmiDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
     transcoder_ddi_control.set_ddi_kaby_lake(ddi_id());
   }
   transcoder_ddi_control.set_ddi_mode(type() == DisplayDevice::Type::kHdmi
-                                          ? tgl_registers::TranscoderDdiControl::kModeHdmi
-                                          : tgl_registers::TranscoderDdiControl::kModeDvi);
-  transcoder_ddi_control.set_bits_per_color(tgl_registers::TranscoderDdiControl::k8bpc)
+                                          ? registers::TranscoderDdiControl::kModeHdmi
+                                          : registers::TranscoderDdiControl::kModeDvi);
+  transcoder_ddi_control.set_bits_per_color(registers::TranscoderDdiControl::k8bpc)
       .set_vsync_polarity_not_inverted((mode.flags & MODE_FLAG_VSYNC_POSITIVE) != 0)
       .set_hsync_polarity_not_inverted((mode.flags & MODE_FLAG_HSYNC_POSITIVE) != 0)
       .set_is_port_sync_secondary_kaby_lake(false)
@@ -242,7 +242,7 @@ bool HdmiDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
     idx = 8;  // Default index
   }
 
-  tgl_registers::DdiRegs ddi_regs(ddi_id());
+  registers::DdiRegs ddi_regs(ddi_id());
   auto phy_config_entry1 = ddi_regs.PhyConfigEntry1(9).FromValue(0);
   phy_config_entry1.set_reg_value(entries[idx].entry1);
   if (i_boost_override) {
@@ -253,7 +253,7 @@ bool HdmiDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
   auto phy_config_entry2 = ddi_regs.PhyConfigEntry2(9).FromValue(0);
   phy_config_entry2.set_reg_value(entries[idx].entry2).WriteTo(mmio_space());
 
-  auto phy_balance_control = tgl_registers::DdiPhyBalanceControl::Get().ReadFrom(mmio_space());
+  auto phy_balance_control = registers::DdiPhyBalanceControl::Get().ReadFrom(mmio_space());
   phy_balance_control.set_disable_balance_leg(0);
   phy_balance_control.balance_leg_select_for_ddi(ddi_id()).set(i_boost_override ? i_boost_override
                                                                                 : default_iboost);
@@ -294,4 +294,4 @@ bool HdmiDisplay::CheckPixelRate(uint64_t pixel_rate_hz) {
   return dco_config.frequency_khz != 0;
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

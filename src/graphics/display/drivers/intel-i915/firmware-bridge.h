@@ -16,7 +16,7 @@
 
 #include <cstddef>
 
-namespace i915_tgl {
+namespace i915 {
 
 // The GMCH (Graphics Memory Controller Hub) PCI configuration space OpRegion.
 //
@@ -83,6 +83,6 @@ class PciConfigOpRegion {
   ddk::Pci& pci_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_FIRMWARE_BRIDGE_H_

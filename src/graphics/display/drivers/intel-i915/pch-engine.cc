@@ -21,7 +21,7 @@
 #include "src/graphics/display/drivers/intel-i915/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pch.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -104,28 +104,28 @@ PchEngine::PchEngine(fdf::MmioBuffer* mmio_buffer, int device_id)
   // requirements, and this ordering might have a slight performance advantage,
   // if the range is prefetchable.
 
-  misc_ = tgl_registers::PchChicken1::Get().ReadFrom(mmio_buffer);
-  clock_ = tgl_registers::PchRawClock::Get().ReadFrom(mmio_buffer);
+  misc_ = registers::PchChicken1::Get().ReadFrom(mmio_buffer);
+  clock_ = registers::PchRawClock::Get().ReadFrom(mmio_buffer);
 
-  panel_power_control_ = tgl_registers::PchPanelPowerControl::Get().ReadFrom(mmio_buffer);
-  panel_power_on_delays_ = tgl_registers::PchPanelPowerOnDelays::Get().ReadFrom(mmio_buffer);
-  panel_power_off_delays_ = tgl_registers::PchPanelPowerOffDelays::Get().ReadFrom(mmio_buffer);
+  panel_power_control_ = registers::PchPanelPowerControl::Get().ReadFrom(mmio_buffer);
+  panel_power_on_delays_ = registers::PchPanelPowerOnDelays::Get().ReadFrom(mmio_buffer);
+  panel_power_off_delays_ = registers::PchPanelPowerOffDelays::Get().ReadFrom(mmio_buffer);
   if (is_skl(device_id) || is_kbl(device_id)) {
-    panel_power_clock_delay_ = tgl_registers::PchPanelPowerClockDelay::Get().ReadFrom(mmio_buffer);
+    panel_power_clock_delay_ = registers::PchPanelPowerClockDelay::Get().ReadFrom(mmio_buffer);
   }
 
-  backlight_control_ = tgl_registers::PchBacklightControl::Get().ReadFrom(mmio_buffer);
+  backlight_control_ = registers::PchBacklightControl::Get().ReadFrom(mmio_buffer);
   if (is_skl(device_id) || is_kbl(device_id)) {
-    backlight_freq_duty_ = tgl_registers::PchBacklightFreqDuty::Get().ReadFrom(mmio_buffer);
+    backlight_freq_duty_ = registers::PchBacklightFreqDuty::Get().ReadFrom(mmio_buffer);
   }
   if (is_tgl(device_id)) {
-    backlight_pwm_freq_ = tgl_registers::PchBacklightFreq::Get().ReadFrom(mmio_buffer);
-    backlight_pwm_duty_ = tgl_registers::PchBacklightDuty::Get().ReadFrom(mmio_buffer);
+    backlight_pwm_freq_ = registers::PchBacklightFreq::Get().ReadFrom(mmio_buffer);
+    backlight_pwm_duty_ = registers::PchBacklightDuty::Get().ReadFrom(mmio_buffer);
   }
 }
 
 void PchEngine::SetPchResetHandshake(bool enabled) {
-  auto display_reset_options = tgl_registers::DisplayResetOptions::Get().ReadFrom(mmio_buffer_);
+  auto display_reset_options = registers::DisplayResetOptions::Get().ReadFrom(mmio_buffer_);
   if (display_reset_options.pch_reset_handshake() == enabled)
     return;
   display_reset_options.set_pch_reset_handshake(enabled).WriteTo(mmio_buffer_);
@@ -196,15 +196,15 @@ void PchEngine::RestoreNonClockParameters() {
 }
 
 PchPanelPowerState PchEngine::PanelPowerState() {
-  auto status = tgl_registers::PchPanelPowerStatus::Get().ReadFrom(mmio_buffer_);
+  auto status = registers::PchPanelPowerStatus::Get().ReadFrom(mmio_buffer_);
 
   auto power_transition = status.PowerTransition();
-  if (power_transition == tgl_registers::PchPanelPowerStatus::Transition::kPoweringDown) {
+  if (power_transition == registers::PchPanelPowerStatus::Transition::kPoweringDown) {
     // According to Intel's PRM, status.panel_on() should be 1.
     return PchPanelPowerState::kPoweringDown;
   }
 
-  if (power_transition == tgl_registers::PchPanelPowerStatus::Transition::kPoweringUp) {
+  if (power_transition == registers::PchPanelPowerStatus::Transition::kPoweringUp) {
     // According to Intel's PRM, status.panel_on() should be 0.
 
     // The power up sequence includes waiting for a T12 (power cycle) delay.
@@ -275,7 +275,7 @@ void PchEngine::FixClockParameters(PchClockParameters& parameters) const {
   if (is_tgl(device_id_)) {
     // IHD-OS-TGL-Vol 2c-1.22-Rev2.0 Part 2 page 1185 and pages 1083-1084
 
-    auto pch_fuses = tgl_registers::PchDisplayFuses::Get().ReadFrom(mmio_buffer_);
+    auto pch_fuses = registers::PchDisplayFuses::Get().ReadFrom(mmio_buffer_);
     parameters.raw_clock_hz = pch_fuses.rawclk_is_24mhz() ? 24'000'000 : 19'200'000;
     return;
   }
@@ -990,7 +990,7 @@ void PchEngine::Log() {
          panel_parameters.backlight_pwm_inverted ? "inverted" : "not inverted");
 
   zxlogf(TRACE, "NDE_RSTWRN_OPT: %" PRIx32,
-         tgl_registers::DisplayResetOptions::Get().ReadFrom(mmio_buffer_).reg_value());
+         registers::DisplayResetOptions::Get().ReadFrom(mmio_buffer_).reg_value());
   zxlogf(TRACE, "SCHICKEN_1: %" PRIx32, misc_.reg_value());
   zxlogf(TRACE, "RAWCLK_FREQ: %" PRIx32, clock_.reg_value());
 
@@ -998,7 +998,7 @@ void PchEngine::Log() {
   zxlogf(TRACE, "PP_ON_DELAYS: %" PRIx32, panel_power_on_delays_.reg_value());
   zxlogf(TRACE, "PP_OFF_DELAYS: %" PRIx32, panel_power_off_delays_.reg_value());
   zxlogf(TRACE, "PP_STATUS: %" PRIx32,
-         tgl_registers::PchPanelPowerStatus::Get().ReadFrom(mmio_buffer_).reg_value());
+         registers::PchPanelPowerStatus::Get().ReadFrom(mmio_buffer_).reg_value());
   if (is_skl(device_id_) || is_kbl(device_id_)) {
     zxlogf(TRACE, "PP_DIVISOR: %" PRIx32, panel_power_clock_delay_.reg_value());
   }
@@ -1013,4 +1013,4 @@ void PchEngine::Log() {
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

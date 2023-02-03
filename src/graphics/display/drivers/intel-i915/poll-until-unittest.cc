@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -65,4 +65,4 @@ TEST(PollUntilTest, Timeout) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915

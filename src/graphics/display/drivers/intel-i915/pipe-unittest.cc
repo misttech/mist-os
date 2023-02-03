@@ -17,7 +17,7 @@
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 #include "src/graphics/display/drivers/intel-i915/registers-pipe.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 class PipeTest : public ::testing::Test {
  public:
@@ -172,4 +172,4 @@ TEST_F(PipeTest, GetVsyncConfigStamp) {
   EXPECT_FALSE(vsync_config_stamp_4.has_value());
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

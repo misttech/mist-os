@@ -20,7 +20,7 @@
 #include "src/graphics/display/drivers/intel-i915/dpcd.h"
 #include "src/graphics/display/drivers/intel-i915/pch-engine.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // Abstraction over the DPCD register transactions that are performed over the DisplayPort Auxiliary
 // channel.
@@ -306,6 +306,6 @@ class DpDisplay : public DisplayDevice {
   inspect::UintProperty dp_link_rate_mhz_inspect_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DP_DISPLAY_H_

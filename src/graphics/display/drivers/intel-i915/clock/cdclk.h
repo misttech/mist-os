@@ -9,7 +9,7 @@
 #include <lib/mmio/mmio.h>
 #include <zircon/assert.h>
 
-namespace i915_tgl {
+namespace i915 {
 
 class CoreDisplayClock {
  public:
@@ -98,6 +98,6 @@ class CoreDisplayClockTigerLake final : public CoreDisplayClock {
   bool enabled_ = false;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_CLOCK_CDCLK_H_

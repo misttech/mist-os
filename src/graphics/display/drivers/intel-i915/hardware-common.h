@@ -9,7 +9,7 @@
 
 #include <array>
 
-namespace tgl_registers {
+namespace registers {
 
 enum class Platform {
   kSkylake,
@@ -18,9 +18,9 @@ enum class Platform {
   kTestDevice,
 };
 
-}  // namespace tgl_registers
+}  // namespace registers
 
-namespace i915_tgl {
+namespace i915 {
 
 enum DdiId {
   DDI_A = 0,
@@ -49,14 +49,14 @@ constexpr std::array kDdisTigerLake = {
 
 }  // namespace internal
 
-template <tgl_registers::Platform P>
+template <registers::Platform P>
 constexpr cpp20::span<const DdiId> DdiIds() {
   switch (P) {
-    case tgl_registers::Platform::kKabyLake:
-    case tgl_registers::Platform::kSkylake:
-    case tgl_registers::Platform::kTestDevice:
+    case registers::Platform::kKabyLake:
+    case registers::Platform::kSkylake:
+    case registers::Platform::kTestDevice:
       return internal::kDdisKabyLake;
-    case tgl_registers::Platform::kTigerLake:
+    case registers::Platform::kTigerLake:
       return internal::kDdisTigerLake;
   }
 }
@@ -86,14 +86,14 @@ constexpr std::array kTranscodersTigerLake = {
 
 }  // namespace internal
 
-template <tgl_registers::Platform P>
+template <registers::Platform P>
 constexpr cpp20::span<const TranscoderId> TranscoderIds() {
   switch (P) {
-    case tgl_registers::Platform::kKabyLake:
-    case tgl_registers::Platform::kSkylake:
-    case tgl_registers::Platform::kTestDevice:
+    case registers::Platform::kKabyLake:
+    case registers::Platform::kSkylake:
+    case registers::Platform::kTestDevice:
       return internal::kTranscodersKabyLake;
-    case tgl_registers::Platform::kTigerLake:
+    case registers::Platform::kTigerLake:
       return internal::kTranscodersTigerLake;
   }
 }
@@ -122,14 +122,14 @@ constexpr std::array kPipeIdsTigerLake = {
 
 }  // namespace internal
 
-template <tgl_registers::Platform P>
+template <registers::Platform P>
 constexpr cpp20::span<const PipeId> PipeIds() {
   switch (P) {
-    case tgl_registers::Platform::kKabyLake:
-    case tgl_registers::Platform::kSkylake:
-    case tgl_registers::Platform::kTestDevice:
+    case registers::Platform::kKabyLake:
+    case registers::Platform::kSkylake:
+    case registers::Platform::kTestDevice:
       return internal::kPipeIdsKabyLake;
-    case tgl_registers::Platform::kTigerLake:
+    case registers::Platform::kTigerLake:
       return internal::kPipeIdsTigerLake;
   }
 }
@@ -165,18 +165,18 @@ constexpr std::array kPllIdsTigerLake = {
 
 }  // namespace internal
 
-template <tgl_registers::Platform P>
+template <registers::Platform P>
 constexpr cpp20::span<const PllId> PllIds() {
   switch (P) {
-    case tgl_registers::Platform::kSkylake:
-    case tgl_registers::Platform::kKabyLake:
-    case tgl_registers::Platform::kTestDevice:
+    case registers::Platform::kSkylake:
+    case registers::Platform::kKabyLake:
+    case registers::Platform::kTestDevice:
       return internal::kPllIdsKabyLake;
-    case tgl_registers::Platform::kTigerLake:
+    case registers::Platform::kTigerLake:
       return internal::kPllIdsTigerLake;
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_HARDWARE_COMMON_H_

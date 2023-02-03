@@ -36,7 +36,7 @@ inline uint32_t get_pte_offset(uint32_t idx) {
 
 }  // namespace
 
-namespace i915_tgl {
+namespace i915 {
 
 Gtt::Gtt()
     : region_allocator_(RegionAllocator::RegionPool::Create(std::numeric_limits<size_t>::max())) {}
@@ -66,7 +66,7 @@ zx_status_t Gtt::Init(const ddk::Pci& pci, fdf::MmioBuffer buffer, uint32_t fb_o
   min_contiguity_ = info.minimum_contiguity;
 
   // Calculate the size of the gtt.
-  auto gmch_gfx_ctrl = tgl_registers::GmchGfxControl::Get().FromValue(0);
+  auto gmch_gfx_ctrl = registers::GmchGfxControl::Get().FromValue(0);
   status = pci.ReadConfig16(gmch_gfx_ctrl.kAddr, gmch_gfx_ctrl.reg_value_ptr());
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to read GfxControl");
@@ -281,4 +281,4 @@ void GttRegionImpl::SetRotation(uint32_t rotation, const image_t& image) {
   }
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

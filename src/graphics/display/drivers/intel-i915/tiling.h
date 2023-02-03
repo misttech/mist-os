@@ -13,7 +13,7 @@
 
 #include <fbl/algorithm.h>
 
-namespace i915_tgl {
+namespace i915 {
 
 static inline uint32_t get_tile_byte_width(uint32_t tiling, zx_pixel_format_t format) {
   switch (tiling) {
@@ -49,6 +49,6 @@ static inline uint32_t height_in_tiles(uint32_t tiling, uint32_t height, zx_pixe
   return (height + tile_height - 1) / tile_height;
 }
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TILING_H_

@@ -12,7 +12,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -47,4 +47,4 @@ void ScopedValueChange<void>::RemovedChangeTo(void* variable) {
   ZX_ASSERT_MSG(erase_count == 1, "Bug in ScopedValueChange lifecycle / reference counting");
 }
 
-}  // namespace i915_tgl
+}  // namespace i915

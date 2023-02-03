@@ -11,7 +11,7 @@
 
 #include "src/graphics/display/drivers/intel-i915/hardware-common.h"
 
-namespace i915_tgl {
+namespace i915 {
 
 // The GMBUS controller has multiple GPIO pin pairs used as I2C clock and
 // data lines connected to DDIs for I2C-based data transfer protocol like
@@ -29,11 +29,11 @@ class GMBusPinPair {
   // Returns the ID of the DDI this pin pair connects in the Display Engine.
   DdiId ddi_id() const {
     switch (platform_) {
-      case tgl_registers::Platform::kSkylake:
-      case tgl_registers::Platform::kKabyLake:
-      case tgl_registers::Platform::kTestDevice:
+      case registers::Platform::kSkylake:
+      case registers::Platform::kKabyLake:
+      case registers::Platform::kTestDevice:
         return ToDdiIdSkylake();
-      case tgl_registers::Platform::kTigerLake:
+      case registers::Platform::kTigerLake:
         return ToDdiIdTigerLake();
     }
   }
@@ -41,32 +41,31 @@ class GMBusPinPair {
   // Get the GMBUS pin pair for a given DDI ID on `platform`.
   //
   // The `ddi_id` must be a valid DDI available in `platform`.
-  static std::optional<GMBusPinPair> GetForDdi(DdiId ddi_id, tgl_registers::Platform platform) {
+  static std::optional<GMBusPinPair> GetForDdi(DdiId ddi_id, registers::Platform platform) {
     switch (platform) {
-      case tgl_registers::Platform::kSkylake:
-      case tgl_registers::Platform::kKabyLake:
-      case tgl_registers::Platform::kTestDevice:
+      case registers::Platform::kSkylake:
+      case registers::Platform::kKabyLake:
+      case registers::Platform::kTestDevice:
         return GetForDdiSkylake(ddi_id, platform);
-      case tgl_registers::Platform::kTigerLake:
+      case registers::Platform::kTigerLake:
         return GetForDdiTigerLake(ddi_id, platform);
     }
   }
 
   // Returns whether a DDI has a valid pin pair on `platform`.
-  static bool HasValidPinPair(DdiId ddi_id, tgl_registers::Platform platform) {
+  static bool HasValidPinPair(DdiId ddi_id, registers::Platform platform) {
     switch (platform) {
-      case tgl_registers::Platform::kSkylake:
-      case tgl_registers::Platform::kKabyLake:
-      case tgl_registers::Platform::kTestDevice:
+      case registers::Platform::kSkylake:
+      case registers::Platform::kKabyLake:
+      case registers::Platform::kTestDevice:
         return HasValidPinPairSkylake(ddi_id);
-      case tgl_registers::Platform::kTigerLake:
+      case registers::Platform::kTigerLake:
         return HasValidPinPairTigerLake(ddi_id);
     }
   }
 
  private:
-  GMBusPinPair(int number, tgl_registers::Platform platform)
-      : number_(number), platform_(platform) {}
+  GMBusPinPair(int number, registers::Platform platform) : number_(number), platform_(platform) {}
 
   // Helper method to convert given pin pair to its corresponding DDI ID
   // for Tiger Lake.
@@ -74,7 +73,7 @@ class GMBusPinPair {
   // The DDI <-> pin pair mapping is available at:
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev 2.0 Part 1, Page 1020
   DdiId ToDdiIdTigerLake() const {
-    ZX_DEBUG_ASSERT(platform_ == tgl_registers::Platform::kTigerLake);
+    ZX_DEBUG_ASSERT(platform_ == registers::Platform::kTigerLake);
     switch (number_) {
       case 1:
       case 2:
@@ -99,9 +98,9 @@ class GMBusPinPair {
   // Kaby Lake: IHD-OS-KBL-Vol 2c-1.17 Part 1, Page 728
   // Skylake: IHD-OS-SKL-Vol 2c-05.16 Part 1, Page 723
   DdiId ToDdiIdSkylake() const {
-    ZX_DEBUG_ASSERT(platform_ == tgl_registers::Platform::kSkylake ||
-                    platform_ == tgl_registers::Platform::kKabyLake ||
-                    platform_ == tgl_registers::Platform::kTestDevice);
+    ZX_DEBUG_ASSERT(platform_ == registers::Platform::kSkylake ||
+                    platform_ == registers::Platform::kKabyLake ||
+                    platform_ == registers::Platform::kTestDevice);
     switch (number_) {
       case 0b100:
         return DdiId::DDI_C;
@@ -120,8 +119,8 @@ class GMBusPinPair {
   // The DDI <-> pin pair mapping is available at:
   // Tiger Lake: IHD-OS-TGL-Vol 2c-1.22-Rev 2.0 Part 1, Page 1020
   static std::optional<GMBusPinPair> GetForDdiTigerLake(DdiId ddi_id,
-                                                        tgl_registers::Platform platform) {
-    ZX_DEBUG_ASSERT(platform == tgl_registers::Platform::kTigerLake);
+                                                        registers::Platform platform) {
+    ZX_DEBUG_ASSERT(platform == registers::Platform::kTigerLake);
     switch (ddi_id) {
       case DdiId::DDI_A:
       case DdiId::DDI_B:
@@ -147,11 +146,10 @@ class GMBusPinPair {
   // The DDI <-> pin pair mapping is available at:
   // Kaby Lake: IHD-OS-KBL-Vol 2c-1.17 Part 1, Page 728
   // Skylake: IHD-OS-SKL-Vol 2c-05.16 Part 1, Page 723
-  static std::optional<GMBusPinPair> GetForDdiSkylake(DdiId ddi_id,
-                                                      tgl_registers::Platform platform) {
-    ZX_DEBUG_ASSERT(platform == tgl_registers::Platform::kSkylake ||
-                    platform == tgl_registers::Platform::kKabyLake ||
-                    platform == tgl_registers::Platform::kTestDevice);
+  static std::optional<GMBusPinPair> GetForDdiSkylake(DdiId ddi_id, registers::Platform platform) {
+    ZX_DEBUG_ASSERT(platform == registers::Platform::kSkylake ||
+                    platform == registers::Platform::kKabyLake ||
+                    platform == registers::Platform::kTestDevice);
     switch (ddi_id) {
       case DdiId::DDI_B:
         return GMBusPinPair{0b101, platform};
@@ -199,7 +197,7 @@ class GMBusPinPair {
   }
 
   int number_;
-  tgl_registers::Platform platform_;
+  registers::Platform platform_;
 };
 
 // The Intel Display Engine has multiple GPIO pin pairs (ports) which may
@@ -217,41 +215,41 @@ class GpioPort {
   // Returns the ID of the DDI this GPIO port connects in the Display Engine.
   DdiId ddi_id() const {
     switch (platform_) {
-      case tgl_registers::Platform::kSkylake:
-      case tgl_registers::Platform::kKabyLake:
-      case tgl_registers::Platform::kTestDevice:
+      case registers::Platform::kSkylake:
+      case registers::Platform::kKabyLake:
+      case registers::Platform::kTestDevice:
         return ToDdiIdSkylake();
-      case tgl_registers::Platform::kTigerLake:
+      case registers::Platform::kTigerLake:
         return ToDdiIdTigerLake();
     }
   }
 
   // Get the GPIO port for a given DDI ID on `platform`.
-  static std::optional<GpioPort> GetForDdi(DdiId ddi_id, tgl_registers::Platform platform) {
+  static std::optional<GpioPort> GetForDdi(DdiId ddi_id, registers::Platform platform) {
     switch (platform) {
-      case tgl_registers::Platform::kSkylake:
-      case tgl_registers::Platform::kKabyLake:
-      case tgl_registers::Platform::kTestDevice:
+      case registers::Platform::kSkylake:
+      case registers::Platform::kKabyLake:
+      case registers::Platform::kTestDevice:
         return GetForDdiSkylake(ddi_id, platform);
-      case tgl_registers::Platform::kTigerLake:
+      case registers::Platform::kTigerLake:
         return GetForDdiTigerLake(ddi_id, platform);
     }
   }
 
   // Returns whether a DDI has a valid GPIO port on `platform`.
-  static bool HasValidPort(DdiId ddi_id, tgl_registers::Platform platform) {
+  static bool HasValidPort(DdiId ddi_id, registers::Platform platform) {
     switch (platform) {
-      case tgl_registers::Platform::kSkylake:
-      case tgl_registers::Platform::kKabyLake:
-      case tgl_registers::Platform::kTestDevice:
+      case registers::Platform::kSkylake:
+      case registers::Platform::kKabyLake:
+      case registers::Platform::kTestDevice:
         return HasValidPortSkylake(ddi_id);
-      case tgl_registers::Platform::kTigerLake:
+      case registers::Platform::kTigerLake:
         return HasValidPortTigerLake(ddi_id);
     }
   }
 
  private:
-  GpioPort(int number, tgl_registers::Platform platform) : number_(number), platform_(platform) {}
+  GpioPort(int number, registers::Platform platform) : number_(number), platform_(platform) {}
 
   // Helper method to convert given GPIO port to its corresponding DDI ID
   // for Tiger Lake.
@@ -259,7 +257,7 @@ class GpioPort {
   // The DDI <-> GPIO port mapping is available at:
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "Pin Usage", Page 423
   DdiId ToDdiIdTigerLake() const {
-    ZX_DEBUG_ASSERT(platform_ == tgl_registers::Platform::kTigerLake);
+    ZX_DEBUG_ASSERT(platform_ == registers::Platform::kTigerLake);
     switch (number_) {
       case 1:
       case 2:
@@ -284,9 +282,9 @@ class GpioPort {
   // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 "Pin Usage", Page 198
   // Skylake: IHD-OS-SKL-Vol 12-05.16 "Pin Usage", Page 190
   DdiId ToDdiIdSkylake() const {
-    ZX_DEBUG_ASSERT(platform_ == tgl_registers::Platform::kSkylake ||
-                    platform_ == tgl_registers::Platform::kKabyLake ||
-                    platform_ == tgl_registers::Platform::kTestDevice);
+    ZX_DEBUG_ASSERT(platform_ == registers::Platform::kSkylake ||
+                    platform_ == registers::Platform::kKabyLake ||
+                    platform_ == registers::Platform::kTestDevice);
     switch (number_) {
       case 3:
         return DdiId::DDI_C;
@@ -304,9 +302,8 @@ class GpioPort {
   //
   // The DDI <-> GPIO port mapping is available at:
   // Tiger Lake: IHD-OS-TGL-Vol 12-1.22-Rev 2.0 "Pin Usage", Page 423
-  static std::optional<GpioPort> GetForDdiTigerLake(DdiId ddi_id,
-                                                    tgl_registers::Platform platform) {
-    ZX_DEBUG_ASSERT(platform == tgl_registers::Platform::kTigerLake);
+  static std::optional<GpioPort> GetForDdiTigerLake(DdiId ddi_id, registers::Platform platform) {
+    ZX_DEBUG_ASSERT(platform == registers::Platform::kTigerLake);
     switch (ddi_id) {
       case DdiId::DDI_A:
       case DdiId::DDI_B:
@@ -331,10 +328,10 @@ class GpioPort {
   // The DDI <-> GPIO port mapping is available at:
   // Kaby Lake: IHD-OS-KBL-Vol 12-1.17 "Pin Usage", Page 198
   // Skylake: IHD-OS-SKL-Vol 12-05.16 "Pin Usage", Page 190
-  static std::optional<GpioPort> GetForDdiSkylake(DdiId ddi_id, tgl_registers::Platform platform) {
-    ZX_DEBUG_ASSERT(platform == tgl_registers::Platform::kSkylake ||
-                    platform == tgl_registers::Platform::kKabyLake ||
-                    platform == tgl_registers::Platform::kTestDevice);
+  static std::optional<GpioPort> GetForDdiSkylake(DdiId ddi_id, registers::Platform platform) {
+    ZX_DEBUG_ASSERT(platform == registers::Platform::kSkylake ||
+                    platform == registers::Platform::kKabyLake ||
+                    platform == registers::Platform::kTestDevice);
     switch (ddi_id) {
       case DdiId::DDI_B:
         return GpioPort{4, platform};
@@ -382,9 +379,9 @@ class GpioPort {
   }
 
   int number_;
-  tgl_registers::Platform platform_;
+  registers::Platform platform_;
 };
 
-}  // namespace i915_tgl
+}  // namespace i915
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_I2C_GMBUS_GPIO_H_

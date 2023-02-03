@@ -6,7 +6,7 @@
 
 #include <gtest/gtest.h>
 
-namespace i915_tgl {
+namespace i915 {
 
 namespace {
 
@@ -176,4 +176,4 @@ TEST(ScopedValueChange, MoveAssignmentDoesRestoreResetDestination) {
 
 }  // namespace
 
-}  // namespace i915_tgl
+}  // namespace i915
