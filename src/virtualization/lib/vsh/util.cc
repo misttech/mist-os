@@ -51,14 +51,16 @@ bool SendMessage(const zx::socket& socket, const MessageLite& message) {
   return SendAllBytes(socket, buf, static_cast<uint32_t>(msg_size));
 }
 
-uint32_t RecvSockBlocking(const zx::socket& socket, uint8_t* buf, uint32_t buf_size) {
-  size_t bytes_left;
-  size_t actual;
-  zx_status_t status;
+int32_t RecvSockBlocking(const zx::socket& socket, uint8_t* buf, int32_t buf_size) {
+  if (buf_size < 0) {
+    FX_LOGS(ERROR) << "Buffer size must be greater than 0";
+    return -1;
+  }
 
-  bytes_left = {buf_size};  // prevent narrowing conversion
+  size_t bytes_left = buf_size;
+
   while (bytes_left > 0) {
-    status =
+    zx_status_t status =
         socket.wait_one(ZX_SOCKET_READABLE | ZX_SOCKET_PEER_CLOSED, zx::time::infinite(), nullptr);
     if (status != ZX_OK) {
       FX_LOGS(ERROR) << "Something happened to the socket while waiting: "
@@ -66,6 +68,7 @@ uint32_t RecvSockBlocking(const zx::socket& socket, uint8_t* buf, uint32_t buf_s
       return -1;
     }
 
+    size_t actual;
     status = socket.read(0, buf, bytes_left, &actual);
     if (status != ZX_OK) {
       // Only non-failure cases are ZX_OK and ZX_ERR_SHOULD_WAIT.
@@ -82,8 +85,8 @@ uint32_t RecvSockBlocking(const zx::socket& socket, uint8_t* buf, uint32_t buf_s
   return buf_size;
 }
 
-uint32_t RecvAllBytes(const zx::socket& socket, uint8_t* buf, uint32_t buf_size) {
-  uint32_t msg_size;
+int32_t RecvAllBytes(const zx::socket& socket, uint8_t* buf, int32_t buf_size) {
+  int32_t msg_size;
 
   // Receive the message's size
   if (RecvSockBlocking(socket, reinterpret_cast<uint8_t*>(&msg_size), sizeof(msg_size)) < 0) {
@@ -93,7 +96,7 @@ uint32_t RecvAllBytes(const zx::socket& socket, uint8_t* buf, uint32_t buf_size)
   // Revert msg_size from wire representation to host representation
   msg_size = le32toh(msg_size);
 
-  if (buf_size < msg_size) {
+  if (buf_size < msg_size || msg_size < 0) {
     FX_LOGS(ERROR) << "Message size of " << msg_size << " exceeds buffer size of " << buf_size;
     return -1;
   }
@@ -104,7 +107,7 @@ uint32_t RecvAllBytes(const zx::socket& socket, uint8_t* buf, uint32_t buf_size)
 
 bool RecvMessage(const zx::socket& socket, MessageLite* message) {
   uint8_t buf[kMaxMessageSize];
-  uint32_t count = RecvAllBytes(socket, buf, sizeof(buf));
+  int32_t count = RecvAllBytes(socket, buf, sizeof(buf));
   if (count < 0) {
     return false;
   }
