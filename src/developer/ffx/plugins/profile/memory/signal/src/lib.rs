@@ -10,10 +10,7 @@ use {
 };
 
 /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
-#[ffx_plugin(
-    "ffx_memory_signal",
-    DebuggerProxy = "core/memory_monitor:expose:fuchsia.memory.Debugger"
-)]
+#[ffx_plugin(DebuggerProxy = "core/memory_monitor:expose:fuchsia.memory.Debugger")]
 pub async fn signal(debugger_proxy: DebuggerProxy, cmd: SignalCommand) -> Result<()> {
     Ok(debugger_proxy.signal_memory_pressure(cmd.level)?)
 }
