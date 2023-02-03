@@ -58,7 +58,7 @@ results dataset in a different directory, `perf_results_after`:
 git checkout AFTER_VERSION
 fx build
 fx update
-python src/testing/perfcompare/perfcompare.py run_local \
+python3 src/testing/perfcompare/perfcompare.py run_local \
   --boots=5 \
   --iter_cmd='fx test --e2e rust_inspect_benchmarks_test' \
   --iter_file='out/test_out/*/*.fuchsiaperf.json' \
@@ -72,5 +72,5 @@ which prints a table showing the "before" and "after" results side by
 side:
 
 ```sh
-python src/testing/perfcompare/perfcompare.py compare_perf perf_results_before perf_results_after
+python3 src/testing/perfcompare/perfcompare.py compare_perf perf_results_before perf_results_after
 ```
