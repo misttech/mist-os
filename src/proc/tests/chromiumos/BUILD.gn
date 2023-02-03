@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/testing/environments.gni")
-import("//src/proc/tests/starnix_test_package.gni")
 import("build/starnix_host_test_component.gni")
 import("build/starnix_linux_test_component.gni")
 
@@ -23,6 +22,27 @@ group("tests") {
   }
 }
 
+resource("system_image") {
+  sources = [ "//prebuilt/starnix/chromiumos-image-amd64/system.img" ]
+  outputs = [ "data/system.img" ]
+}
+
+# This target creates a placeholder in data/tmp, allowing the tests to mount things there.
+resource("data_tmp_target") {
+  sources = [ "//src/proc/bin/galaxies/placeholder" ]
+  outputs = [ "data/tmp/.placeholder" ]
+}
+
+group("galaxy_resources") {
+  if (target_cpu == "x64") {
+    deps = [
+      ":data_tmp_target",
+      ":system_image",
+      "//src/proc/bin/starnix_manager:init",
+    ]
+  }
+}
+
 fuchsia_component("sh_test") {
   testonly = true
   check_references = false
@@ -35,7 +55,7 @@ if (host_os == "linux" && host_cpu == "x64") {
   }
 }
 
-starmium_test_package("test_chromiumos_distro") {
+fuchsia_test_package("test_chromiumos_distro") {
   test_components = [ ":sh_test" ]
 
   # TODO(https://fxbug.dev/116773): Remove !is_asan check when Starnix can run binaries built for
@@ -43,6 +63,11 @@ starmium_test_package("test_chromiumos_distro") {
   if (host_os == "linux" && host_cpu == "x64" && !is_asan) {
     test_components += [ ":fdio-test" ]
   }
+
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+  }
+  deps = [ ":galaxy_resources" ]
 }
 
 if (target_cpu == "x64") {
@@ -56,12 +81,17 @@ if (target_cpu == "x64") {
         "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_image_tests"
   }
 
-  starmium_test_package("test_starnix_magma") {
+  fuchsia_test_package("test_starnix_magma") {
     test_components = [
       ":virtmagma_conformance_tests",
       # TODO(fxbug.dev/104611) - enable this when all tests passing
       #":virtmagma_image_tests",
     ]
+
+    deps = [ ":galaxy_resources" ]
+
+    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+
     test_specs = {
       log_settings = {
         max_severity = "ERROR"

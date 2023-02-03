@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/proc/tests/android/benchmarks/meta/benchmark.shard.cml" ],
+    include: [
+        "//src/proc/tests/android/benchmarks/meta/benchmark.shard.cml",
+        "//src/proc/tests/android/gvisor/meta/gvisor_galaxy.shard.cml",
+    ],
     program: {
         binary: "data/tests/benchmarks",
     },

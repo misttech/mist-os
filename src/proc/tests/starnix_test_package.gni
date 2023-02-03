@@ -22,7 +22,7 @@ template("starnix_test_package") {
     if (target_cpu == "x64") {
       renameable_subpackages = [
         {
-          name = "galaxy"
+          name = "starnix_kernel"
           package = galaxy
         },
       ]
@@ -51,7 +51,7 @@ template("starnix_test_package_with_expectations") {
     if (target_cpu == "x64") {
       renameable_subpackages = [
         {
-          name = "galaxy"
+          name = "starnix_kernel"
           package = galaxy
         },
       ]

@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/proc/tests/starnix_test_with_expectations.shard.cml" ],
+    include: [
+        "//src/proc/tests/android/meta/bionic_galaxy.shard.cml",
+        "//src/proc/tests/starnix_test_with_expectations.shard.cml",
+    ],
     program: {
         binary: "/vendor/data/nativetest64/adbd_test/adbd_test",
         user: "root:x:0:0",

@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/python/python_host_test.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
-import("//src/proc/tests/starnix_test_package.gni")
 
 group("tests") {
   testonly = true
@@ -73,7 +72,36 @@ fuchsia_component("boringssl_self_test64") {
   manifest = "meta/boringssl_self_test64.cml"
 }
 
-starbionic_test_package("android") {
+resource("system_image") {
+  sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
+  outputs = [ "data/system.img" ]
+}
+
+# This target creates a placeholder in data/tmp, allowing the tests to mount things there.
+resource("data_tmp_target") {
+  sources = [ "//src/proc/bin/galaxies/placeholder" ]
+  outputs = [ "data/tmp/.placeholder" ]
+}
+
+# The filesystem image containing tests built in the Android tree but not included in the system
+# image.
+resource("testcases_image") {
+  sources = [ "//prebuilt/starnix/android-image-amd64/starnix_testcases.img" ]
+  outputs = [ "data/testcases.img" ]
+}
+
+group("galaxy_resources") {
+  if (target_cpu == "x64") {
+    deps = [
+      ":data_tmp_target",
+      ":system_image",
+      ":testcases_image",
+      "//src/proc/bin/starnix_manager:init",
+    ]
+  }
+}
+
+fuchsia_test_package("android") {
   test_components = [
     ":adbd_test",
     ":boringssl_self_test64",
@@ -81,15 +109,31 @@ starbionic_test_package("android") {
     ":binder_smoke_test",
     ":libutils_test",
   ]
-  deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
+
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+  }
+
+  deps = [
+    ":galaxy_resources",
+    "//src/lib/testing/expectation:expectation_comparer",
+  ]
 }
 
-starnix_test_package("android_with_init") {
+fuchsia_test_package("android_with_init") {
   test_components = [ ":init_test" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
     }
   }
-  galaxy = "//src/proc/bin/galaxies/starbionic"
+
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+  }
+
+  deps = [
+    ":galaxy_resources",
+    "//src/lib/testing/expectation:expectation_comparer",
+  ]
 }

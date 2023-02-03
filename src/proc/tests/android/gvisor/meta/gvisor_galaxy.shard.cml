@@ -1,28 +1,30 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/proc/tests/starnix_test.shard.cml" ],
     program: {
-        environ: [
-            "XDG_RUNTIME_DIR=/data/tmp",
-            "VIRTWL_DEVICE=/data/tmp/wayland-1",
-        ],
-
-        // Kernel config.
         apex_hack: [ "com.android.runtime" ],
-        features: [ "binder" ],
+        features: [
+            "binder",
+            "test_data",
+        ],
         init: [],
         init_user: "root:x:0:0",
         kernel_cmdline: "androidboot.hardware=starnix",
         mounts: [
             "/:ext4:data/system.img",
+            "/vendor:ext4:data/testcases.img",
             "/data:remotefs:data",
-            "/data/tmp:tmpfs",
             "/dev:devtmpfs",
+            "/dev/shm:tmpfs",
+            "/data/tmp:tmpfs",
+            "/dev/shm:tmpfs",
+            "/dev/pts:devpts",
             "/proc:proc",
+            "/sys:sysfs",
+            "/sys/fs/selinux:selinuxfs",
         ],
-        name: "wayland_test",
+        name: "gvisor_test",
         startup_file_path: "",
     },
 }

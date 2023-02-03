@@ -3,20 +3,17 @@
 // found in the LICENSE file.
 
 use {
+    crate::helpers::clone_start_info,
     crate::test_suite::handle_suite_requests,
     anyhow::{anyhow, Error},
-    fidl::endpoints::ServerEnd,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_zircon as zx,
-    futures::{StreamExt, TryStreamExt},
+    fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd},
+    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_test as ftest,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+    futures::TryStreamExt,
+    parking_lot::Mutex,
     std::sync::Arc,
+    vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable},
 };
-
-/// The services exposed in the outgoing directory for the test component.
-enum TestComponentExposedServices {
-    Suite(ftest::SuiteRequestStream),
-}
 
 /// Handles a `fcrunner::ComponentRunnerRequestStream`.
 ///
@@ -25,15 +22,13 @@ enum TestComponentExposedServices {
 ///
 /// See `test_suite` for more on how the test suite requests are handled.
 pub async fn handle_runner_requests(
-    kernels_dir: Arc<vfs::directory::immutable::Simple>,
     mut request_stream: fcrunner::ComponentRunnerRequestStream,
 ) -> Result<(), Error> {
     while let Some(event) = request_stream.try_next().await? {
         match event {
             fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } => {
-                let kernels_dir = kernels_dir.clone();
                 fasync::Task::local(async move {
-                    match serve_test_suite(&kernels_dir, start_info, controller).await {
+                    match serve_test_suite(start_info, controller).await {
                         Ok(_) => tracing::info!("Finished serving test suite for component."),
                         Err(e) => tracing::error!("Error serving test suite: {:?}", e),
                     }
@@ -59,30 +54,57 @@ pub async fn handle_runner_requests(
 ///                   the starnix_kernel.
 ///   - `controller`: The server end of the component controller for the test component.
 async fn serve_test_suite(
-    kernels_dir: &vfs::directory::immutable::Simple,
     mut start_info: fcrunner::ComponentStartInfo,
     controller: ServerEnd<fcrunner::ComponentControllerMarker>,
 ) -> Result<(), Error> {
-    // Serve the test suite in the outgoing directory of the test component.
-    let mut outgoing_dir = ServiceFs::new_local();
-    outgoing_dir.dir("svc").add_fidl_service(TestComponentExposedServices::Suite);
-    let outgoing_dir_channel =
-        start_info.outgoing_dir.take().ok_or(anyhow!("Missing outgoing directory"))?.into();
-    outgoing_dir.serve_connection(outgoing_dir_channel)?;
+    // The name of the directory capability that is offered to the starnix_kernel instances.
+    const KERNELS_DIRECTORY: &str = "kernels";
+    const SVC_DIRECTORY: &str = "svc";
 
-    if let Some(service_request) = outgoing_dir.next().await {
-        match service_request {
-            TestComponentExposedServices::Suite(stream) => {
-                match handle_suite_requests(kernels_dir, start_info, stream).await {
+    let outgoing_dir = vfs::directory::immutable::simple();
+    let kernels_dir = vfs::directory::immutable::simple();
+    // Add the directory that is offered to starnix_kernel instances, to read their configuration
+    // from.
+    outgoing_dir.add_entry(KERNELS_DIRECTORY, kernels_dir.clone())?;
+
+    let outgoing_dir_server_end =
+        start_info.outgoing_dir.take().ok_or(anyhow!("Missing outgoing directory"))?;
+
+    // Wrap controller in an option, since closing it will consume the server end.
+    let controller = Arc::new(Mutex::new(Some(controller)));
+    let start_info = Arc::new(Mutex::new(start_info));
+
+    let svc_dir = vfs::directory::immutable::simple();
+    svc_dir.add_entry(
+        ftest::SuiteMarker::PROTOCOL_NAME,
+        vfs::service::host(move |requests| {
+            let kernels_dir = kernels_dir.clone();
+            let controller = controller.clone();
+            let start_info = start_info.clone();
+            async move {
+                let start_info =
+                    clone_start_info(&mut start_info.lock()).expect("Failed to clone start info");
+                match handle_suite_requests(&kernels_dir, start_info, requests).await {
                     Ok(_) => tracing::info!("Finished serving test suite requests."),
                     Err(e) => {
                         tracing::error!("Error serving test suite requests: {:?}", e)
                     }
                 }
-                let _ = controller.close_with_epitaph(zx::Status::OK);
+                let _ = controller.lock().take().map(|c| c.close_with_epitaph(zx::Status::OK));
             }
-        }
-    }
+        }),
+    )?;
+    // Serve the test suite in the outgoing directory of the test component.
+    outgoing_dir.add_entry(SVC_DIRECTORY, svc_dir.clone())?;
+
+    let execution_scope = vfs::execution_scope::ExecutionScope::new();
+    outgoing_dir.open(
+        execution_scope.clone(),
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        vfs::path::Path::dot(),
+        outgoing_dir_server_end.into_channel().into(),
+    );
+    execution_scope.wait().await;
 
     Ok(())
 }

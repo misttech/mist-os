@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/testing/host_test.gni")
 import("//src/proc/tests/chromiumos/build/starnix_host_test_component.gni")
-import("//src/proc/tests/starnix_test_package.gni")
 import("//zircon/vdso/vdso.gni")
 
 # This can be built as a Fuchsia executable or as a host executable.
@@ -259,22 +258,52 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     deps = [ ":no_op_executable_in_test_dir($host_toolchain)" ]
   }
 
-  starmium_test_package("starnix_microbenchmarks_unittestmode") {
+  resource("system_image") {
+    sources = [ "//prebuilt/starnix/chromiumos-image-amd64/system.img" ]
+    outputs = [ "data/system.img" ]
+  }
+
+  # This target creates a placeholder in data/tmp, allowing the tests to mount things there.
+  resource("data_tmp_target") {
+    sources = [ "//src/proc/bin/galaxies/placeholder" ]
+    outputs = [ "data/tmp/.placeholder" ]
+  }
+
+  group("galaxy_resources") {
+    if (target_cpu == "x64") {
+      deps = [
+        ":data_tmp_target",
+        ":system_image",
+        "//src/proc/bin/starnix_manager:init",
+      ]
+    }
+  }
+
+  fuchsia_test_package("starnix_microbenchmarks_unittestmode") {
     test_components = [ ":starnix_microbenchmarks_component" ]
+
+    if (target_cpu == "x64") {
+      subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+    }
+
+    deps = [
+      ":galaxy_resources",
+      "//src/lib/testing/expectation:expectation_comparer",
+      "//src/proc/tests/chromiumos/syscalls:galaxy_resources",
+    ]
   }
 
   fuchsia_shell_package("starnix_microbenchmarks_perftestmode") {
     testonly = true
 
-    galaxy = "//src/proc/bin/galaxies/starmium_test"
-    renameable_subpackages = [
-      {
-        name = "galaxy"
-        package = galaxy
-      },
-    ]
+    if (target_cpu == "x64") {
+      subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+    }
 
-    deps = [ ":starnix_microbenchmarks_component" ]
+    deps = [
+      ":galaxy_resources",
+      ":starnix_microbenchmarks_component",
+    ]
 
     # This package intentionally contains many non-Fuchia ELF binaries that
     # are not under /data/, and some of them are even unstripped, so disable

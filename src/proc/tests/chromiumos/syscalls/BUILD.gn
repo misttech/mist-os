@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/test.gni")
 import("//src/proc/bin/starnix/starnix.gni")
 import("//src/proc/tests/chromiumos/build/starnix_linux_test_component.gni")
-import("//src/proc/tests/starnix_test_package.gni")
 
 group("tests") {
   testonly = true
@@ -100,10 +99,39 @@ starnix_linux_test_component("crash_test") {
   test_binary = "crash"
 }
 
-starmium_test_package("test_chromiumos_syscalls") {
+resource("system_image") {
+  sources = [ "//prebuilt/starnix/chromiumos-image-amd64/system.img" ]
+  outputs = [ "data/system.img" ]
+}
+
+# This target creates a placeholder in data/tmp, allowing the tests to mount things there.
+resource("data_tmp_target") {
+  sources = [ "//src/proc/bin/galaxies/placeholder" ]
+  outputs = [ "data/tmp/.placeholder" ]
+}
+
+group("galaxy_resources") {
+  if (target_cpu == "x64") {
+    deps = [
+      ":data_tmp_target",
+      ":system_image",
+      "//src/proc/bin/starnix_manager:init",
+    ]
+  }
+}
+
+fuchsia_test_package("test_chromiumos_syscalls") {
   test_components = [
     ":syscalls_test",
     ":crash_test",
   ]
-  deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
+
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+  }
+
+  deps = [
+    ":galaxy_resources",
+    "//src/lib/testing/expectation:expectation_comparer",
+  ]
 }

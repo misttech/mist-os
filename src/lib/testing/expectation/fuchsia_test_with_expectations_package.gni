@@ -177,6 +177,7 @@ template("fuchsia_test_with_expectations_package") {
                              "package_name",
                              "data_deps",
                              "renameable_subpackages",
+                             "subpackages",
                              "visibility",
                            ])
     deps = _include_check_targets + [

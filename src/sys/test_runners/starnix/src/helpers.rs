@@ -72,7 +72,7 @@ pub async fn instantiate_kernel_in_realm(
 ) -> Result<(frunner::ComponentRunnerProxy, fcomponent::RealmProxy, String), Error> {
     const KERNELS_DIR_NAME: &str = "kernels";
 
-    let runner_url = "galaxy#meta/starnix_kernel.cm";
+    let runner_url = "starnix_kernel#meta/starnix_kernel.cm";
 
     // Grab the realm from the component's namespace.
     let realm =

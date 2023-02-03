@@ -2,10 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/proc/tests/starnix_test.shard.cml" ],
+    include: [
+        "//src/proc/tests/chromiumos/meta/chromiumos_galaxy.shard.cml",
+        "//src/proc/tests/starnix_test.shard.cml",
+    ],
     program: {
         binary: "data/tests/virtmagma_conformance_tests",
         user: "root:x:0:0",
-        features: [ "wayland" ]
+        component_features: [ "wayland" ],
     },
 }

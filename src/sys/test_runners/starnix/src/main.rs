@@ -16,8 +16,6 @@ use vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable};
 
 #[fuchsia::main(logging_tags=["starnix_test_runner"])]
 async fn main() -> Result<(), Error> {
-    // The name of the directory capability that is offered to the starnix_kernel instances.
-    const KERNELS_DIRECTORY: &str = "kernels";
     const SVC_DIRECTORY: &str = "svc";
 
     let outgoing_dir_handle =
@@ -27,21 +25,12 @@ async fn main() -> Result<(), Error> {
         fidl::endpoints::ServerEnd::new(zx::Channel::from(outgoing_dir_handle));
 
     let outgoing_dir = vfs::directory::immutable::simple();
-    let kernels_dir = vfs::directory::immutable::simple();
-    // Add the directory that is offered to starnix_kernel instances, to read their configuration
-    // from.
-    outgoing_dir.add_entry(KERNELS_DIRECTORY, kernels_dir.clone())?;
 
     let svc_dir = vfs::directory::immutable::simple();
     svc_dir.add_entry(
         frunner::ComponentRunnerMarker::PROTOCOL_NAME,
-        vfs::service::host(move |requests| {
-            let kernels_dir = kernels_dir.clone();
-            async move {
-                runner::handle_runner_requests(kernels_dir.clone(), requests)
-                    .await
-                    .expect("Error serving runner requests.")
-            }
+        vfs::service::host(move |requests| async move {
+            runner::handle_runner_requests(requests).await.expect("Error serving runner requests.")
         }),
     )?;
     outgoing_dir.add_entry(SVC_DIRECTORY, svc_dir.clone())?;

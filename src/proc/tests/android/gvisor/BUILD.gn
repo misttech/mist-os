@@ -3,8 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/dist/zip_resource.gni")
-import("//src/proc/tests/android/build/starnix_test_component.gni")
-import("//src/proc/tests/starnix_test_package.gni")
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 group("gvisor") {
   testonly = true
@@ -15,40 +15,6 @@ group("gvisor") {
   ]
 }
 
-# Gvisor tests should depend on this.
-expect_includes("gvisor_test") {
-  includes = [ "meta/gvisor.shard.cml" ]
-
-  # Uses starbionic_test_runner
-  deps = [ "//src/proc/tests:starnix_test" ]
-}
-
-expect_includes("gvisor_test_with_expectations") {
-  includes = [ "meta/gvisor_with_expectations.shard.cml" ]
-
-  # Uses starbionic_test_runner
-  deps = [ "//src/proc/tests:starnix_test_with_expectations" ]
-}
-
-template("gvisor_test_component") {
-  meta_dir = "//src/proc/tests/android/gvisor/meta"
-  starnix_test_component(target_name) {
-    forward_variables_from(invoker, "*")
-
-    use_expectations = false
-    if (defined(invoker.use_expectations)) {
-      use_expectations = invoker.use_expectations
-    }
-
-    if (use_expectations) {
-      deps = [ ":gvisor_test_with_expectations" ]
-    } else {
-      deps = [ ":gvisor_test" ]
-    }
-  }
-}
-
-# Commented out tests exist as binaries in the tree but are not run (yet!).
 gvisor_tests = [
   "32bit_test",
   "accept_bind_stream_test",
@@ -297,6 +263,87 @@ gvisor_benchmarks = [
   "write_benchmark",
 ]
 
+expect_includes("gvisor_test") {
+  includes = [
+    "meta/gvisor.shard.cml",
+    "meta/gvisor_galaxy.shard.cml",
+  ]
+}
+
+expect_includes("gvisor_test_with_expectations") {
+  includes = [
+    "meta/gvisor_with_expectations.shard.cml",
+    "meta/gvisor_galaxy.shard.cml",
+  ]
+}
+
+zip_resource("gvisor_runfiles") {
+  file = "//prebuilt/starnix/tests/syscalls/linux-amd64/gvisor_runfiles"
+  dest_prefix = "data/tests"
+}
+
+resource("system_image") {
+  sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
+  outputs = [ "data/system.img" ]
+}
+
+# This target creates a placeholder in data/tmp, allowing the tests to mount things there.
+resource("data_tmp_target") {
+  sources = [ "//src/proc/bin/galaxies/placeholder" ]
+  outputs = [ "data/tmp/.placeholder" ]
+}
+
+# The filesystem image containing tests built in the Android tree but not included in the system
+# image.
+resource("testcases_image") {
+  sources = [ "//prebuilt/starnix/android-image-amd64/starnix_testcases.img" ]
+  outputs = [ "data/testcases.img" ]
+}
+
+group("galaxy_resources") {
+  deps = [
+    ":data_tmp_target",
+    ":gvisor_runfiles",
+    ":system_image",
+    ":testcases_image",
+    "//src/connectivity/network/netstack:component",
+    "//src/proc/bin/starnix_manager:init",
+  ]
+}
+
+template("gvisor_test_component") {
+  test_name = target_name
+
+  resource("${test_name}_bin") {
+    sources = [
+      "//prebuilt/starnix/tests/syscalls/linux-amd64/stripped/${test_name}",
+    ]
+    outputs = [ "data/tests/${test_name}" ]
+  }
+
+  fuchsia_test_component(target_name) {
+    forward_variables_from(invoker, "*")
+
+    testonly = true
+    check_references = false
+
+    manifest = "meta/" + target_name + ".cml"
+
+    use_expectations = false
+    if (defined(invoker.use_expectations)) {
+      use_expectations = invoker.use_expectations
+    }
+
+    if (use_expectations) {
+      deps = [ ":gvisor_test_with_expectations" ]
+    } else {
+      deps = [ ":gvisor_test" ]
+    }
+
+    deps += [ ":${test_name}_bin" ]
+  }
+}
+
 foreach(test_name, gvisor_tests) {
   gvisor_test_component(test_name) {
     use_expectations = true
@@ -308,16 +355,12 @@ foreach(benchmark_name, gvisor_benchmarks) {
   }
 }
 
-zip_resource("gvisor_runfiles") {
-  file = "${gvisor_prebuilt_test_root}/gvisor_runfiles"
-  dest_prefix = "data/tests"
-}
+fuchsia_test_with_expectations_package("starnix_gvisor_tests") {
+  deps = [ ":galaxy_resources" ]
 
-starbionic_test_package_with_expectations("starnix_gvisor_tests") {
-  deps = [
-    ":gvisor_runfiles",
-    "//src/connectivity/network/netstack:component",
-  ]
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+  }
 
   test_components = []
 
@@ -344,10 +387,16 @@ starbionic_test_package_with_expectations("starnix_gvisor_tests") {
   }
 }
 
-starbionic_test_package("starnix_gvisor_benchmarks") {
+fuchsia_test_package("starnix_gvisor_benchmarks") {
+  deps = [ ":galaxy_resources" ]
+
   test_components = []
 
   foreach(benchmark_name, gvisor_benchmarks) {
     test_components += [ ":${benchmark_name}" ]
+  }
+
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
   }
 }

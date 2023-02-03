@@ -2,22 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/proc/tests/android/build/starnix_test_component.gni")
-import("//src/proc/tests/starnix_test_package.gni")
+import("//build/components/fuchsia_test_package.gni")
 
 group("wayland") {
   testonly = true
   deps = [ ":starnix_wayland_tests" ]
-}
-
-template("wayland_test_component") {
-  # Without this gn gives an error: `You set the variable "invoker" here and it was unused before it
-  # went out of scope.`
-  not_needed([ "invoker" ])
-
-  meta_dir = "//src/proc/tests/android/wayland/meta"
-  starnix_test_component(target_name) {
-  }
 }
 
 wayland_tests = [
@@ -65,15 +54,57 @@ wayland_tests = [
   # "socket-test",
 ]
 
+template("wayland_test_component") {
+  test_name = target_name
+  resource("${test_name}_bin") {
+    sources = [
+      "//prebuilt/starnix/tests/syscalls/linux-amd64/stripped/${test_name}",
+    ]
+    outputs = [ "data/tests/${test_name}" ]
+  }
+
+  fuchsia_test_component(target_name) {
+    forward_variables_from(invoker, "*")
+
+    manifest = "meta/" + target_name + ".cml"
+
+    deps = [ ":${test_name}_bin" ]
+  }
+}
+
 foreach(test_name, wayland_tests) {
   wayland_test_component(test_name) {
   }
 }
 
-starbionic_test_package("starnix_wayland_tests") {
+resource("system_image") {
+  sources = [ "//prebuilt/starnix/android-image-amd64/system.img" ]
+  outputs = [ "data/system.img" ]
+}
+
+resource("data_tmp_target") {
+  sources = [ "//src/proc/bin/galaxies/placeholder" ]
+  outputs = [ "data/tmp/.placeholder" ]
+}
+
+group("galaxy_resources") {
+  deps = [
+    ":data_tmp_target",
+    ":system_image",
+    "//src/proc/bin/starnix_manager:init",
+  ]
+}
+
+fuchsia_test_package("starnix_wayland_tests") {
   test_components = []
 
   foreach(test_name, wayland_tests) {
     test_components += [ ":${test_name}" ]
   }
+
+  if (target_cpu == "x64") {
+    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+  }
+
+  deps = [ ":galaxy_resources" ]
 }
