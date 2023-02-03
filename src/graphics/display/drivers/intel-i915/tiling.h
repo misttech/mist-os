@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_TILING_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_TILING_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TILING_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TILING_H_
 
 #include <assert.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -51,4 +51,4 @@ static inline uint32_t height_in_tiles(uint32_t tiling, uint32_t height, zx_pixe
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_TILING_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TILING_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_PCI_IDS_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_PCI_IDS_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PCI_IDS_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PCI_IDS_H_
 
 #include <stdint.h>
 #include <zircon/assert.h>
@@ -71,4 +71,4 @@ constexpr tgl_registers::Platform GetPlatform(uint16_t device_id) {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_PCI_IDS_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PCI_IDS_H_

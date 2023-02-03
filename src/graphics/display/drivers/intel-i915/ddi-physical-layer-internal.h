@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DDI_PHYSICAL_LAYER_INTERNAL_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DDI_PHYSICAL_LAYER_INTERNAL_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DDI_PHYSICAL_LAYER_INTERNAL_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DDI_PHYSICAL_LAYER_INTERNAL_H_
 
 #include "src/graphics/display/drivers/intel-i915/ddi-physical-layer.h"
 
@@ -53,4 +53,4 @@ enum class TypeCDdiTigerLake::InitializationPhase {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DDI_PHYSICAL_LAYER_INTERNAL_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DDI_PHYSICAL_LAYER_INTERNAL_H_

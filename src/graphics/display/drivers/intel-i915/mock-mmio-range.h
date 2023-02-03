@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_MOCK_MMIO_RANGE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_MOCK_MMIO_RANGE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_MOCK_MMIO_RANGE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_MOCK_MMIO_RANGE_H_
 
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio.h>
@@ -224,4 +224,4 @@ class MockMmioRange {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_MOCK_MMIO_RANGE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_MOCK_MMIO_RANGE_H_

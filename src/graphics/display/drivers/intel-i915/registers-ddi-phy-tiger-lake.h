@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_DDI_PHY_TIGER_LAKE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_DDI_PHY_TIGER_LAKE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DDI_PHY_TIGER_LAKE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DDI_PHY_TIGER_LAKE_H_
 
 // Most fields in the PHY (Physical Layer) configuration registers are not
 // sufficiently documented to be configured by driver authors. Plausible
@@ -1090,4 +1090,4 @@ class PortTransmitterDutyCycleCorrection
 
 }  // namespace tgl_registers
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_DDI_PHY_TIGER_LAKE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DDI_PHY_TIGER_LAKE_H_

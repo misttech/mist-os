@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_FIRMWARE_BRIDGE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_FIRMWARE_BRIDGE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_FIRMWARE_BRIDGE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_FIRMWARE_BRIDGE_H_
 
 // This file implements Intel's ACPI (Advanced Configuration and
 // Power Interface) IGD (Integrated Graphics Device) OpRegion Specification.
@@ -85,4 +85,4 @@ class PciConfigOpRegion {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_FIRMWARE_BRIDGE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_FIRMWARE_BRIDGE_H_

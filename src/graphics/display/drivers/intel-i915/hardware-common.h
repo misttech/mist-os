@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_HARDWARE_COMMON_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_HARDWARE_COMMON_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_HARDWARE_COMMON_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_HARDWARE_COMMON_H_
 
 #include <lib/stdcompat/span.h>
 
@@ -179,4 +179,4 @@ constexpr cpp20::span<const PllId> PllIds() {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_HARDWARE_COMMON_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_HARDWARE_COMMON_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_DPLL_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_DPLL_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DPLL_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DPLL_H_
 
 #include <zircon/assert.h>
 
@@ -1328,4 +1328,4 @@ class DisplayPllStatus : public hwreg::RegisterBase<DisplayPllStatus, uint32_t> 
 
 }  // namespace tgl_registers
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_DPLL_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_DPLL_H_

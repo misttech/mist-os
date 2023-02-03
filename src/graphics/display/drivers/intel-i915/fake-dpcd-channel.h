@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_FAKE_DPCD_CHANNEL_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_FAKE_DPCD_CHANNEL_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_FAKE_DPCD_CHANNEL_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_FAKE_DPCD_CHANNEL_H_
 
 #include <cstdint>
 
@@ -69,4 +69,4 @@ class FakeDpcdChannel : public DpcdChannel {
 }  // namespace testing
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_FAKE_DPCD_CHANNEL_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_FAKE_DPCD_CHANNEL_H_

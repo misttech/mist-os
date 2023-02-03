@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DPCD_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DPCD_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DPCD_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DPCD_H_
 
 #include <hwreg/bitfields.h>
 
@@ -293,4 +293,4 @@ class TrainingAuxRdInterval
 
 }  // namespace dpcd
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DPCD_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DPCD_H_

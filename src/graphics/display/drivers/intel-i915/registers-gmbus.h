@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_GMBUS_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_GMBUS_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_GMBUS_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_GMBUS_H_
 
 #include <lib/ddk/debug.h>
 #include <lib/stdcompat/span.h>
@@ -633,4 +633,4 @@ class GpioPinPairControl : public hwreg::RegisterBase<GpioPinPairControl, uint32
 
 }  // namespace tgl_registers
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_REGISTERS_GMBUS_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_REGISTERS_GMBUS_H_

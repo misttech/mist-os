@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DDI_PHYSICAL_LAYER_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DDI_PHYSICAL_LAYER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DDI_PHYSICAL_LAYER_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DDI_PHYSICAL_LAYER_H_
 
 #include <zircon/assert.h>
 
@@ -367,4 +367,4 @@ class TypeCDdiTigerLake : public DdiPhysicalLayer {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DDI_PHYSICAL_LAYER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DDI_PHYSICAL_LAYER_H_

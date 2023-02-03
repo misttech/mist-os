@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DISPLAY_DEVICE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DISPLAY_DEVICE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DISPLAY_DEVICE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DISPLAY_DEVICE_H_
 
 #include <fidl/fuchsia.hardware.backlight/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
@@ -177,4 +177,4 @@ class DisplayDevice : public fidl::WireServer<FidlBacklight::Device> {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DISPLAY_DEVICE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DISPLAY_DEVICE_H_

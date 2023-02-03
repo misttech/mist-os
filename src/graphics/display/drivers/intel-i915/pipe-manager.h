@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_PIPE_MANAGER_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_PIPE_MANAGER_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PIPE_MANAGER_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PIPE_MANAGER_H_
 
 #include <lib/mmio/mmio-buffer.h>
 
@@ -174,4 +174,4 @@ class PipeManagerTigerLake : public PipeManager {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_PIPE_MANAGER_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_PIPE_MANAGER_H_

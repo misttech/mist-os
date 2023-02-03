@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DP_DISPLAY_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DP_DISPLAY_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DP_DISPLAY_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DP_DISPLAY_H_
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -308,4 +308,4 @@ class DpDisplay : public DisplayDevice {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_DP_DISPLAY_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_DP_DISPLAY_H_

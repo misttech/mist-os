@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_ACPI_MEMORY_REGION_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_ACPI_MEMORY_REGION_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_ACPI_MEMORY_REGION_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_ACPI_MEMORY_REGION_H_
 
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
@@ -74,4 +74,4 @@ class AcpiMemoryRegion {
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_ACPI_MEMORY_REGION_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_ACPI_MEMORY_REGION_H_

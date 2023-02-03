@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_POLL_UNTIL_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_POLL_UNTIL_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_POLL_UNTIL_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_POLL_UNTIL_H_
 
 #include <lib/zx/time.h>
 #include <zircon/assert.h>
@@ -37,4 +37,4 @@ bool PollUntil(Lambda predicate, zx::duration poll_interval, int max_intervals) 
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_POLL_UNTIL_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_POLL_UNTIL_H_

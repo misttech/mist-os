@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_ACPI_MEMORY_REGION_UTIL_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_ACPI_MEMORY_REGION_UTIL_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_ACPI_MEMORY_REGION_UTIL_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_ACPI_MEMORY_REGION_UTIL_H_
 
 #include <lib/zircon-internal/align.h>
 #include <zircon/assert.h>
@@ -40,4 +40,4 @@ std::pair<T, size_t> RoundToPageBoundaries(T region_start_address, size_t region
 
 }  // namespace i915_tgl
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_TGL_ACPI_MEMORY_REGION_UTIL_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_I915_ACPI_MEMORY_REGION_UTIL_H_
