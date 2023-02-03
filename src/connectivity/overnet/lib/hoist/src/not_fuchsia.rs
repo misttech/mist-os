@@ -138,11 +138,12 @@ impl Hoist {
     /// On a host platform it will use the environment variable ASCENDD to find the socket, or
     /// use a default address.
     #[must_use = "Dropped tasks will not run, either hold on to the reference or detach()"]
-    pub fn start_default_link(&self) -> Result<Task<()>, Error> {
+    pub fn start_default_link(&self, enable_circuit: crate::Cso) -> Result<Task<()>, Error> {
         Ok(self.start_socket_link(
             std::env::var_os("ASCENDD")
                 .map(PathBuf::from)
                 .context("No ASCENDD socket provided in environment")?,
+            enable_circuit,
         ))
     }
 
@@ -150,13 +151,13 @@ impl Hoist {
     /// to a local ascendd socket. For a single use variant, see
     /// Hoist.run_single_ascendd_link.
     #[must_use = "Dropped tasks will not run, either hold on to the reference or detach()"]
-    pub fn start_socket_link(&self, sockpath: PathBuf) -> Task<()> {
+    pub fn start_socket_link(&self, sockpath: PathBuf, enable_circuit: crate::Cso) -> Task<()> {
         let hoist = self.clone();
         Task::spawn(async move {
             let ascendd_path = sockpath.clone();
             let hoist = hoist.clone();
             retry_with_backoff(Duration::from_millis(100), Duration::from_secs(3), || async {
-                hoist.clone().run_single_ascendd_link(ascendd_path.clone()).await
+                hoist.clone().run_single_ascendd_link(ascendd_path.clone(), enable_circuit).await
             })
             .await
         })
@@ -166,7 +167,11 @@ impl Hoist {
     /// unix socket a few times, but only running a single successful
     /// connection to completion. This function will timeout with an
     /// error after one second if no connection could be established.
-    pub async fn run_single_ascendd_link(self, sockpath: PathBuf) -> Result<(), Error> {
+    pub async fn run_single_ascendd_link(
+        self,
+        sockpath: PathBuf,
+        enable_circuit: crate::Cso,
+    ) -> Result<(), Error> {
         const MAX_SINGLE_CONNECT_TIME: u64 = 1;
         let label = connection_label(Option::<String>::None);
 
@@ -226,6 +231,7 @@ impl Hoist {
             &mut tx_b,
             Some(label),
             sockpath.to_str().context("Non-unicode in ascendd path")?.to_owned(),
+            enable_circuit,
         )
         .await
     }
@@ -253,19 +259,25 @@ async fn run_ascendd_connection<'a>(
     tx: &'a mut (dyn AsyncWrite + Unpin + Send),
     label: Option<String>,
     sockpath: String,
+    enable_circuit: crate::Cso,
 ) -> Result<(), Error> {
+    let enable_circuit = matches!(enable_circuit, crate::Cso::Enabled);
     let node = hoist.node.clone();
     let conn_fut = async move {
-        tx.write_all(&CIRCUIT_ID).await?;
-        circuit::multi_stream::multi_stream_node_connection_to_async(
-            node.circuit_node(),
-            rx,
-            tx,
-            false,
-            circuit::Quality::LOCAL_SOCKET,
-        )
-        .await
-        .map_err(Error::from)
+        if enable_circuit {
+            tx.write_all(&CIRCUIT_ID).await?;
+            circuit::multi_stream::multi_stream_node_connection_to_async(
+                node.circuit_node(),
+                rx,
+                tx,
+                false,
+                circuit::Quality::LOCAL_SOCKET,
+            )
+            .await
+            .map_err(Error::from)
+        } else {
+            Ok(())
+        }
     };
 
     let config = Box::new(move || {
@@ -286,7 +298,9 @@ async fn run_ascendd_connection<'a>(
 
     match futures::future::select(conn_fut, link_fut).await {
         Either::Left((res, link_fut)) => {
-            tracing::warn!("Circuit connection terminated: {:?}", res);
+            if enable_circuit {
+                tracing::warn!("Circuit connection terminated: {:?}", res);
+            }
             link_fut.await
         }
         Either::Right((res, _)) => res,
