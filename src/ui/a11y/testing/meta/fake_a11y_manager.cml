@@ -27,6 +27,7 @@
             protocol: [
                 "fuchsia.logger.LogSink",
                 "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.observation.scope.Registry",
                 "fuchsia.ui.scenic.Scenic",
             ],
         },
