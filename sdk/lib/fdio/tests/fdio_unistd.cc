@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <fcntl.h>
 #include <lib/fit/defer.h>
+#include <lib/fit/result.h>
 #include <limits.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -13,6 +14,7 @@
 #include <zxtest/zxtest.h>
 
 #include "src/lib/fxl/strings/concatenate.h"
+#include "src/lib/fxl/strings/string_printf.h"
 
 namespace {
 
@@ -20,10 +22,179 @@ namespace {
 constexpr int kInvalidFD = -1;
 static_assert(kInvalidFD != AT_FDCWD);
 
-static std::string TestTempDirPath() {
-  char* tmp = getenv("TEST_TMPDIR");
+std::string TestTempDirPath() {
+  const char* tmp = getenv("TEST_TMPDIR");
   return std::string(tmp == nullptr ? "/tmp" : tmp);
 }
+
+enum class Existing {
+  kNone,
+  kFile,
+  KDirectory,
+};
+
+class OpenCreate : public zxtest::TestWithParam<std::tuple<Existing, bool, bool>> {
+ public:
+  struct Param {
+    explicit Param(ParamType info)
+        : existing(std::get<0>(info)),
+          o_directory_flag(std::get<1>(info)),
+          trailing_slash(std::get<2>(info)) {}
+    const Existing existing;
+    const bool o_directory_flag;
+    const bool trailing_slash;
+  };
+};
+
+TEST_P(OpenCreate, DirectoryUndefinedBehavior) {
+  const Param param(GetParam());
+  const std::string base_filename = TestTempDirPath() + "/open-create";
+
+  // Create precondition.
+  {
+    fbl::unique_fd fd;
+    switch (param.existing) {
+      case Existing::kNone: {
+        struct stat s;
+        ASSERT_EQ(-1, stat(base_filename.c_str(), &s), "%o", s.st_mode);
+        ASSERT_EQ(ENOENT, errno, "%s", strerror(errno));
+        break;
+      }
+      case Existing::kFile:
+        ASSERT_GE(0, fd.reset(open(base_filename.c_str(), O_CREAT | O_EXCL, 0666)), "%s",
+                  strerror(errno));
+        break;
+      case Existing::KDirectory:
+        ASSERT_GE(0, fd.reset(mkdir(base_filename.c_str(), 0666)), "%s", strerror(errno));
+        break;
+    }
+  }
+  // Deferred precondition cleanup.
+  auto cleanup = fit::defer([existing = param.existing, base_filename]() {
+    switch (existing) {
+      case Existing::kNone:
+        break;
+      case Existing::kFile:
+        ASSERT_EQ(0, unlink(base_filename.c_str()), "%s", strerror(errno));
+        break;
+      case Existing::KDirectory:
+        ASSERT_EQ(0, rmdir(base_filename.c_str()), "%s", strerror(errno));
+        break;
+    }
+  });
+  std::string filename = base_filename;
+  if (param.trailing_slash) {
+    filename.append("/");
+  }
+  int flags = O_CREAT;
+  if (param.o_directory_flag) {
+    flags |= O_DIRECTORY;
+  }
+  // +-----------+-------------+---+-------------------+-------------------+
+  // | Existing  | O_DIRECTORY | / |       Linux       |      Fuchsia      |
+  // |           |             |   | Errno   | Created | Errno   | Created |
+  // +-----------+-------------+---+---------+---------+---------+---------+
+  // | None      | N           | N | SUCCESS | Y       | SUCCESS | Y       |
+  // | None      | N           | Y | EISDIR  | N       | EISDIR  | N       |
+  // | None      | Y           | N | ENOTDIR | Y       | EINVAL  | N       |
+  // | None      | Y           | Y | EISDIR  | N       | EINVAL  | N       |
+  // +-----------+-------------+---+---------+---------+---------+---------+
+  // | File      | N           | N | SUCCESS | N/A     | SUCCESS | N/A     |
+  // | File      | N           | Y | EISDIR  | N/A     | EISDIR  | N/A     |
+  // | File      | Y           | N | ENOTDIR | N/A     | EINVAL  | N/A     |
+  // | File      | Y           | Y | EISDIR  | N/A     | EINVAL  | N/A     |
+  // +-----------+-------------+---+---------+---------+---------+---------+
+  // | DIRECTORY | N           | N | EISDIR  | N/A     | EISDIR  | N/A     |
+  // | DIRECTORY | N           | Y | EISDIR  | N/A     | EISDIR  | N/A     |
+  // | DIRECTORY | Y           | N | EISDIR  | N/A     | EINVAL  | N/A     |
+  // | DIRECTORY | Y           | Y | EISDIR  | N/A     | EINVAL  | N/A     |
+  // +-----------+-------------+---+---------+---------+---------+---------+
+  const std::optional open_errno = [&]() -> std::optional<int> {
+    const int result = open(filename.c_str(), flags, 0666);
+    if (result < 0) {
+      return errno;
+    }
+    EXPECT_EQ(0, close(result), "%s", strerror(errno));
+    return {};
+  }();
+  switch (param.existing) {
+    case Existing::kNone: {
+      const std::optional unlink_errno = [&]() -> std::optional<int> {
+        const int result = unlink(filename.c_str());
+        if (result < 0) {
+          return errno;
+        }
+        return {};
+      }();
+#if defined(__linux__)
+      if (!param.trailing_slash) {
+#else
+      if (!param.o_directory_flag && !param.trailing_slash) {
+#endif
+        EXPECT_FALSE(unlink_errno.has_value(), "%s", strerror(unlink_errno.value()));
+      } else {
+        ASSERT_TRUE(unlink_errno.has_value());
+        EXPECT_EQ(ENOENT, unlink_errno.value(), "%s", strerror(unlink_errno.value()));
+      }
+      [[fallthrough]];
+    }
+    case Existing::kFile:
+#if defined(__linux__)
+      if (param.trailing_slash) {
+        ASSERT_TRUE(open_errno.has_value());
+        EXPECT_EQ(EISDIR, open_errno.value(), "%s", strerror(open_errno.value()));
+      } else if (param.o_directory_flag) {
+        ASSERT_TRUE(open_errno.has_value());
+        EXPECT_EQ(ENOTDIR, open_errno.value(), "%s", strerror(open_errno.value()));
+      } else {
+        EXPECT_FALSE(open_errno.has_value(), "%s", strerror(open_errno.value()));
+      }
+      break;
+#else
+      if (!param.o_directory_flag && !param.trailing_slash) {
+        EXPECT_FALSE(open_errno.has_value(), "%s", strerror(open_errno.value()));
+        break;
+      }
+      [[fallthrough]];
+#endif
+    case Existing::KDirectory:
+#if defined(__linux__)
+      ASSERT_TRUE(open_errno.has_value());
+      EXPECT_EQ(EISDIR, open_errno.value(), "%s", strerror(open_errno.value()));
+#else
+      if (param.o_directory_flag) {
+        ASSERT_TRUE(open_errno.has_value());
+        EXPECT_EQ(EINVAL, open_errno.value(), "%s", strerror(open_errno.value()));
+      } else {
+        ASSERT_TRUE(open_errno.has_value());
+        EXPECT_EQ(EISDIR, open_errno.value(), "%s", strerror(open_errno.value()));
+      }
+#endif
+      break;
+  }
+}
+
+INSTANTIATE_TEST_SUITE_P(UnistdTest, OpenCreate,
+                         zxtest::Combine(zxtest::Values(Existing::kNone, Existing::kFile,
+                                                        Existing::KDirectory),
+                                         zxtest::Bool(), zxtest::Bool()),
+                         [](const zxtest::TestParamInfo<OpenCreate::ParamType>& info) {
+                           const OpenCreate::Param param(info.param);
+                           return fxl::StringPrintf(
+                               "With%s/%s/%s",
+                               [existing = param.existing]() {
+                                 switch (existing) {
+                                   case Existing::kNone:
+                                     return "None";
+                                   case Existing::kFile:
+                                     return "File";
+                                   case Existing::KDirectory:
+                                     return "Directory";
+                                 }
+                               }(),
+                               param.o_directory_flag ? "O_DIRECTORY" : "{}",
+                               param.trailing_slash ? "WithSlash" : "WithoutSlash");
+                         });
 
 TEST(UnistdTest, TruncateWithNegativeLength) {
   std::string filename = TestTempDirPath() + "/truncate-with-negative-length-test";
@@ -71,8 +242,9 @@ TEST(UnistdTest, LinkAt) {
   ASSERT_EQ(0, linkat(AT_FDCWD, foo_rel, dir_fd.get(), bar_name, 0), "%s", strerror(errno));
   ASSERT_EQ(0, unlink(bar_rel), "%s", strerror(errno));
 
-  // Create link using an absolute oldpath (newpath), verifying that olddirfd (newdirfd) is ignored.
-  // We also test that an invalid file descriptor is accepted if the corresponding path is absolute.
+  // Create link using an absolute oldpath (newpath), verifying that olddirfd (newdirfd) is
+  // ignored. We also test that an invalid file descriptor is accepted if the corresponding path
+  // is absolute.
   const std::string foo_abs = fxl::Concatenate({root_abs, "/", foo_rel});
   const std::string bar_abs = fxl::Concatenate({root_abs, "/", bar_rel});
   for (int olddirfd : {dir_fd.get(), AT_FDCWD, kInvalidFD}) {
@@ -84,7 +256,8 @@ TEST(UnistdTest, LinkAt) {
     ASSERT_EQ(0, unlink(bar_rel), "%s", strerror(errno));
   }
 
-  // Test errors: an invalid file descriptor is not accepted if the corresponding path is relative.
+  // Test errors: an invalid file descriptor is not accepted if the corresponding path is
+  // relative.
   constexpr char baz_name[] = "baz";
   ASSERT_EQ(-1, linkat(kInvalidFD, foo_rel, AT_FDCWD, baz_name, 0));
   EXPECT_EQ(EBADF, errno, "%s", strerror(errno));
