@@ -44,8 +44,8 @@ class DdiReference;
 //
 // The Ref-counting Is *Not* Thread-safe. `DdiPhysicalLayer`s and references to
 // `DdiPhysicalLayer`s must be accessed only by a single thread.
-// TODO(fxbug.dev/112849): Currently the intel-i915-tgl driver doesn't fulfill
-// this requirement. The threading model of the driver needs to be fixed.
+// TODO(fxbug.dev/112849): Currently the intel-i915 driver doesn't fulfill this
+// requirement. The threading model of the driver needs to be fixed.
 //
 // References:
 //

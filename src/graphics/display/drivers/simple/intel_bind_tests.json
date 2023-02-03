@@ -37,6 +37,6 @@
             "fuchsia.BIND_COMPOSITE": "1"
         },
         "expected": "abort",
-        "name": "Abort PCI - NUC11 GPU (defer to i915-tgl)"
+        "name": "Abort PCI - NUC11 GPU (defer to i915)"
     }
 ]

@@ -39,12 +39,6 @@ fuchsia.BIND_PCI_DID != 0x5902;
 fuchsia.BIND_PCI_DID != 0x591a;
 fuchsia.BIND_PCI_DID != 0x591d;
 fuchsia.BIND_PCI_DID != 0x3ea5;
-
-// Reject all device IDs that i915-tgl binds to as well. This is necessary
-// because the simple-intel driver binds to the FIDL node published by PCI,
-// but i915-tgl binds to the banjo node.
-// TODO(fxbug.dev/89649): Remove this list and the entire
-// simple-intel-tgl-optout.bind file once i915-tgl uses FIDL as well.
 fuchsia.BIND_PCI_DID != 0x9a49;
 fuchsia.BIND_PCI_DID != 0x9a78;
 fuchsia.BIND_PCI_DID != 0x9a40;
