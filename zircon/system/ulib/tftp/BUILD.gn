@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/zircon/migrated_targets.gni")
-import("//zircon/kernel/phys/efi/toolchain.gni")
 
 zx_library("tftp") {
   sdk = "static"
@@ -18,7 +17,8 @@ zx_library("tftp") {
     # headers i.e. strings.h, arpa/inet.h. Since in the case of efi toolchain,
     # the library is only used by gigaboot, we'll use the headers provided from
     # the gigaboot.
-    if (is_efi) {
+    if (current_toolchain ==
+        "//zircon/kernel/phys/efi:kernel.efi_$target_cpu") {
       public_deps = [ "//zircon/kernel/lib/libc" ]  # c std headers
       configs += [ "//src/firmware/gigaboot/cpp/legacy_c_gigaboot:includes" ]
     }

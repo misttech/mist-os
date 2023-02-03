@@ -178,7 +178,6 @@ compiled_action("uefi-disk") {
   deps = [
     "zedboot",
     "//src/firmware/gigaboot:bootloader(//src/firmware/gigaboot:efi_$target_cpu)",
-    "//src/firmware/gigaboot/cpp:eng-esp",
     labels.images,
     mkfs_label,
   ]
