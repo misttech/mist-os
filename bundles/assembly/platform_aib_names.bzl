@@ -17,12 +17,13 @@ PLATFORM_AIB_NAMES = [
     "live_usb",
     "omaha_client",
     "starnix_support",
-    "virtualization_support",
     "wlan_base",
     "wlan_contemporary_privacy_only_support",
     "wlan_fullmac_support",
     "wlan_legacy_privacy_support",
     "wlan_softmac_support",
+    "virtcon",
+    "virtualization_support",
 ]
 
 # The names of all of the platform's Assembly Input Bundles.

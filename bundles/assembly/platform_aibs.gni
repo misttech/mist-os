@@ -23,6 +23,9 @@ platform_aib_names = [
   ###
   # Feature-level / Subsystem-level bundles
 
+  # Graphics
+  "virtcon",
+
   # SWD (Software Delivery)
   "omaha_client",
 

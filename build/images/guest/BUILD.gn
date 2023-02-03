@@ -104,7 +104,6 @@ if (labels.images == "//build/images/bringup") {
     ]
 
     bootfs_labels = [
-      "//src/bringup/bin/virtcon:bootfs",
       "//src/power/power-manager:base_config",
       "//src/connectivity/ethernet/drivers/ethernet/netdevice-migration",
       "//src/connectivity/ethernet/drivers/virtio:virtio_netdevice",

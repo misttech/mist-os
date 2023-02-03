@@ -111,6 +111,25 @@ assembly_input_bundle("common_bringup") {
   ]
 }
 
+# The virtcon AIB is included by all eng and userdebug products, and can be
+# optionally included by user products.
+assembly_input_bundle("virtcon") {
+  bootfs_files_labels = [
+    "//src/bringup/bin/virtcon:bootfs",
+
+    # TODO(120776) The boot animation is configured via a global GN arg, which
+    # needs to be migrated to a path provided by the product to assembly, which
+    # then places it in the appropriate path in bootfs.
+    #
+    # As such, this isn't something that should be added to a platform bundle,
+    # but the migration with the products that use that GN arg is sufficiently
+    # complicated that this is clearer that trying to do a removal of the
+    # default boot animation in those products that shouldn't include it (if
+    # it's included by default via `//products/common/bringup.gni`).
+    "//src/bringup/bin/virtcon:boot_animation",
+  ]
+}
+
 # All eng build type products will include this Assembly Input Bundle.
 # These kernel args should be refactored so that the AIBs have logical names.
 assembly_input_bundle("kernel_args_eng") {
