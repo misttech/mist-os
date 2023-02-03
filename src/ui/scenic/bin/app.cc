@@ -495,7 +495,7 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
   if (config_values_.i_can_haz_flatland) {
     // Warming the pipeline cache causes some non-Flatland tests to time out, so don't warm unless
     // |i_can_haz_flatland| is true.
-    flatland_renderer->WarmPipelineCache(ZX_PIXEL_FORMAT_ARGB_8888);
+    flatland_renderer->WarmPipelineCache();
     flatland_renderer->set_disable_lazy_pipeline_creation(true);
   }
 

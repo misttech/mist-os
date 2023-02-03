@@ -35,13 +35,15 @@ namespace {
 using allocation::BufferCollectionUsage;
 using fuchsia::ui::composition::ImageFlip;
 
-// TODO(fxbug.dev/78186): we don't want to "warm up" render passes and pipelines for multiple
-// framebuffer formats, so we allow only BGRA framebuffers.  This is supported by all current
-// platforms, including the emulator.
-const std::vector<vk::Format> kSupportedRenderTargetImageFormats = {vk::Format::eB8G8R8A8Srgb};
+// TODO(fxbug.dev/121328): We support two framebuffer formats and warmup for both.
+// * RGBA is the only supported format for AFBC on mali. Should be the default in production.
+// * BGRA is the only format that allows screen capture and testing on mali. It is also used as
+// default on screenshots.
+const std::vector<vk::Format> kSupportedRenderTargetImageFormats = {vk::Format::eR8G8B8A8Srgb,
+                                                                    vk::Format::eB8G8R8A8Srgb};
 
-const std::vector<vk::Format> kSupportedReadbackImageFormats = {vk::Format::eB8G8R8A8Srgb,
-                                                                vk::Format::eR8G8B8A8Srgb};
+const std::vector<vk::Format> kSupportedReadbackImageFormats = {vk::Format::eR8G8B8A8Srgb,
+                                                                vk::Format::eB8G8R8A8Srgb};
 
 const std::vector<vk::Format>& GetSupportedImageFormatsForBufferCollectionUsage(
     BufferCollectionUsage usage) {
@@ -322,7 +324,8 @@ VkRenderer::~VkRenderer() {
   readback_collections_.clear();
 }
 
-std::optional<vk::BufferCollectionFUCHSIA> VkRenderer::CreateVulkanBufferCollection(
+std::optional<vk::BufferCollectionFUCHSIA>
+VkRenderer::SetConstraintsAndCreateVulkanBufferCollection(
     fuchsia::sysmem::BufferCollectionTokenSyncPtr token, const BufferCollectionUsage usage,
     const std::optional<fuchsia::math::SizeU> size) {
   auto vk_device = escher_->vk_device();
@@ -422,7 +425,8 @@ bool VkRenderer::ImportBufferCollection(
   }
 
   vk::BufferCollectionFUCHSIA vk_collection;
-  if (const auto collection = CreateVulkanBufferCollection(std::move(vulkan_token), usage, size)) {
+  if (const auto collection =
+          SetConstraintsAndCreateVulkanBufferCollection(std::move(vulkan_token), usage, size)) {
     vk_collection = std::move(*collection);
   } else {
     return false;
@@ -982,23 +986,24 @@ bool VkRenderer::WaitIdle() {
   return escher_->vk_device().waitIdle() == vk::Result::eSuccess;
 }
 
-void VkRenderer::WarmPipelineCache(zx_pixel_format_t pixel_format) {
+void VkRenderer::WarmPipelineCache() {
   TRACE_DURATION("gfx", "VkRenderer::WarmPipelineCache");
 
-  auto output_format = ConvertToVkFormat(pixel_format);
-  auto depth_format = escher_->device()->caps().GetMatchingDepthStencilFormat().value;
+  for (auto output_format : kSupportedRenderTargetImageFormats) {
+    auto depth_format = escher_->device()->caps().GetMatchingDepthStencilFormat().value;
 
-  auto immutable_samplers = utils::ImmutableSamplersForShaderWarmup(escher_, kDefaultFilter);
+    auto immutable_samplers = utils::ImmutableSamplersForShaderWarmup(escher_, kDefaultFilter);
 
-  // Depending on the memory types provided by the Vulkan implementation, separate versions of the
-  // render-passes (and therefore pipelines) may be required for protected/non-protected memory.
-  // Or not; if not, then the second call will simply use the ones that are already cached.
-  compositor_.WarmPipelineCache(output_format, vk::ImageLayout::eColorAttachmentOptimal,
-                                depth_format, immutable_samplers,
-                                /* use_protected_memory= */ true);
-  compositor_.WarmPipelineCache(output_format, vk::ImageLayout::eColorAttachmentOptimal,
-                                depth_format, immutable_samplers,
-                                /* use_protected_memory= */ false);
+    // Depending on the memory types provided by the Vulkan implementation, separate versions of the
+    // render-passes (and therefore pipelines) may be required for protected/non-protected memory.
+    // Or not; if not, then the second call will simply use the ones that are already cached.
+    compositor_.WarmPipelineCache(output_format, vk::ImageLayout::eColorAttachmentOptimal,
+                                  depth_format, immutable_samplers,
+                                  /* use_protected_memory= */ true);
+    compositor_.WarmPipelineCache(output_format, vk::ImageLayout::eColorAttachmentOptimal,
+                                  depth_format, immutable_samplers,
+                                  /* use_protected_memory= */ false);
+  }
 }
 
 void VkRenderer::BlitRenderTarget(escher::CommandBuffer* command_buffer,

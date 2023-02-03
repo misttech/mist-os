@@ -80,7 +80,7 @@ class Renderer : public allocation::BufferCollectionImporter {
 
   // Implementations which use Vulkan or similar should implement this by generating render passes
   // and pipelines, so that there is no jank due to lazily generating them later.
-  virtual void WarmPipelineCache(zx_pixel_format_t) {}
+  virtual void WarmPipelineCache() {}
 };
 
 }  // namespace flatland

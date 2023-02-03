@@ -62,7 +62,9 @@ class RectangleCompositor {
     color_conversion_params_ = color_conversion_params;
   }
 
-  // Minimal image constraints to be set on textures passed into DrawBatch.
+  // Minimal image constraints to be set on textures and render targets passed into
+  // DrawBatch. These are meant to also be compatible with AFBC
+  // (Arm Framebuffer Compression).
   static vk::ImageCreateInfo GetDefaultImageConstraints(const vk::Format& vk_format,
                                                         vk::ImageUsageFlags usage);
 

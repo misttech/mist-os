@@ -372,18 +372,33 @@ ImagePtr RectangleCompositor::CreateOrFindTransientImage(const ImagePtr& image) 
   return result;
 }
 
+// https://developer.arm.com/documentation/101897/0300/Buffers-and-textures/AFBC-textures-for-Vulkan
+// In order to maintain ARM Framebuffer Compression (AFBC):
+// - VkSampleCountFlagBits must be VK_SAMPLE_COUNT_1_BIT.
+// - VkImageType must be VK_IMAGE_TYPE_2D.
+// - VkImageTiling must be VK_IMAGE_TILING_OPTIMAL.
+//
+// VkImageUsageFlags must not contain:
+// - VK_IMAGE_USAGE_STORAGE_BIT
+// - VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT
 vk::ImageCreateInfo RectangleCompositor::GetDefaultImageConstraints(const vk::Format& vk_format,
                                                                     vk::ImageUsageFlags usage) {
   vk::ImageCreateInfo create_info;
-  create_info.imageType = vk::ImageType::e2D;
   create_info.extent = vk::Extent3D{1, 1, 1};
   create_info.flags = {};
   create_info.format = vk_format;
   create_info.mipLevels = 1;
   create_info.arrayLayers = 1;
+
   create_info.samples = vk::SampleCountFlagBits::e1;
+  create_info.imageType = vk::ImageType::e2D;
   create_info.tiling = vk::ImageTiling::eOptimal;
+
+  // These constraints may be valid for non-AFBC use cases, so exclude these checks if needed.
+  FX_DCHECK(!(usage & vk::ImageUsageFlagBits::eStorage));
+  FX_DCHECK(!(usage & vk::ImageUsageFlagBits::eTransientAttachment));
   create_info.usage = usage;
+
   create_info.sharingMode = vk::SharingMode::eExclusive;
   create_info.initialLayout = vk::ImageLayout::eUndefined;
   return create_info;

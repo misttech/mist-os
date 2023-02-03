@@ -84,7 +84,7 @@ class VkRenderer final : public Renderer {
   bool WaitIdle();
 
   // |Renderer|.
-  void WarmPipelineCache(zx_pixel_format_t pixel_format) override;
+  void WarmPipelineCache() override;
 
   // Determines whether |CommandBuffer::DisableLazyPipelineCreation()| is invoked on the command
   // buffers created within |Render()|.
@@ -103,7 +103,7 @@ class VkRenderer final : public Renderer {
 
   // Creates a vk::BufferCollectionFUCHSIA with the proper constraints set.
   // Returns std::nullopt on failure.
-  std::optional<vk::BufferCollectionFUCHSIA> CreateVulkanBufferCollection(
+  std::optional<vk::BufferCollectionFUCHSIA> SetConstraintsAndCreateVulkanBufferCollection(
       fuchsia::sysmem::BufferCollectionTokenSyncPtr token, BufferCollectionUsage usage,
       std::optional<fuchsia::math::SizeU> size);
 

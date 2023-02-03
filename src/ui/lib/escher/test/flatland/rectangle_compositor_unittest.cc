@@ -521,4 +521,33 @@ VK_TEST_F(RectangleCompositorTest, StressTest) {
   EXPECT_EQ(histogram[kBlack], 512U * 512U - 100U);
 }
 
+// Test to make sure that the image create info returned by the RectangleCompositor is
+// AFBC compliant.
+VK_TEST_F(RectangleCompositorTest, SetsAFBCCompatibleConstraints) {
+  frame_setup();
+  auto image_usage =
+      RectangleCompositor::kRenderTargetUsageFlags | vk::ImageUsageFlagBits::eTransferSrc;
+  auto vk_format = vk::Format::eB8G8R8A8Srgb;
+  auto constraints = RectangleCompositor::GetDefaultImageConstraints(vk_format, image_usage);
+
+  EXPECT_EQ(constraints.format, vk_format);
+  EXPECT_EQ(constraints.mipLevels, 1U);
+  EXPECT_EQ(constraints.arrayLayers, 1U);
+
+  // https://developer.arm.com/documentation/101897/0300/Buffers-and-textures/AFBC-textures-for-Vulkan
+  // In order to maintain ARM Framebuffer Compression (AFBC):
+  // - VkSampleCountFlagBits must be VK_SAMPLE_COUNT_1_BIT.
+  EXPECT_EQ(constraints.samples, vk::SampleCountFlagBits::e1);
+  // - VkImageType must be VK_IMAGE_TYPE_2D.
+  EXPECT_EQ(constraints.imageType, vk::ImageType::e2D);
+  // - VkImageTiling must be VK_IMAGE_TILING_OPTIMAL.
+  EXPECT_EQ(constraints.tiling, vk::ImageTiling::eOptimal);
+
+  // VkImageUsageFlags must not contain:
+  // - VK_IMAGE_USAGE_STORAGE_BIT
+  EXPECT_FALSE(constraints.usage & vk::ImageUsageFlagBits::eStorage);
+  // - VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT
+  EXPECT_FALSE(constraints.usage & vk::ImageUsageFlagBits::eTransientAttachment);
+}
+
 }  // namespace escher

@@ -47,7 +47,7 @@ void SetClientConstraintsAndWaitForAllocated(
     image_constraints.color_spaces_count = 1;
     image_constraints.color_space[0] =
         fuchsia::sysmem::ColorSpace{.type = fuchsia::sysmem::ColorSpaceType::SRGB};
-    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::BGRA32;
+    image_constraints.pixel_format.type = fuchsia::sysmem::PixelFormatType::R8G8B8A8;
     image_constraints.pixel_format.has_format_modifier = true;
     image_constraints.pixel_format.format_modifier.value =
         i == 0 ? fuchsia::sysmem::FORMAT_MODIFIER_LINEAR : additional_format_modifiers[i - 1];

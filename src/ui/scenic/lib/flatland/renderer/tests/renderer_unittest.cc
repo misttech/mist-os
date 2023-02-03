@@ -41,7 +41,7 @@ using fuchsia::ui::composition::Orientation;
 using NullRendererTest = RendererTest;
 using VulkanRendererTest = RendererTest;
 
-// We need this function for several tests because irectly reading the vmo values for sysmem-backed
+// We need this function for several tests because directly reading the vmo values for sysmem-backed
 // images does not unmap the sRGB image values back into a linear space. So we have to do that
 // conversion here before we do any value comparisons. This conversion could be done automatically
 // if we were doing a Vulkan read on the vk::Image directly and not a sysmem read of the vmo,
@@ -127,7 +127,7 @@ allocation::GlobalBufferCollectionId SetupBufferCollection(
       sysmem_allocator, std::move(tokens.local_token),
       /*image_count*/ num_buffers,
       /*width*/ image_width,
-      /*height*/ image_height, buffer_usage, fuchsia::sysmem::PixelFormatType::BGRA32,
+      /*height*/ image_height, buffer_usage, fuchsia::sysmem::PixelFormatType::R8G8B8A8,
       std::make_optional(memory_constraints),
       std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
@@ -660,7 +660,7 @@ CreateEscherAndPrewarmedRenderer(bool use_protected_memory = false) {
     escher->set_pipeline_builder(std::move(pipeline_builder));
   }
   auto renderer = std::make_unique<VkRenderer>(escher->GetWeakPtr());
-  renderer->WarmPipelineCache(ZX_PIXEL_FORMAT_ARGB_8888);
+  renderer->WarmPipelineCache();
   renderer->set_disable_lazy_pipeline_creation(true);
 
   return {std::move(escher), std::move(renderer)};
@@ -1588,8 +1588,8 @@ VK_TEST_F(VulkanRendererTest, SolidColorTest) {
                        auto pixel = GetPixel(linear_vals, kTargetWidth, i, j);
                        // The sRGB conversion function provides slightly different results depending
                        // on the platform.
-                       EXPECT_TRUE(pixel == glm::ivec4(0, 101, 255, 255) ||
-                                   pixel == glm::ivec4(0, 102, 255, 255));
+                       EXPECT_TRUE(pixel == glm::ivec4(255, 101, 0, 255) ||
+                                   pixel == glm::ivec4(255, 102, 0, 255));
                      }
                    }
 
@@ -1651,11 +1651,11 @@ VK_TEST_F(VulkanRendererTest, ColorCorrectionTest) {
   glm::mat4 glm_matrix = glm::make_mat4(values);
   auto expected_color_float = glm_matrix * glm::vec4(1, 0, 0, 1);
 
-  // Order needs to be BGRA.
+  // Order needs to be RGBA.
   glm::ivec4 expected_color = {
-      static_cast<uint8_t>(std::max(expected_color_float.z * 255, 0.f)),
-      static_cast<uint8_t>(std::max(expected_color_float.y * 255, 0.f)),
       static_cast<uint8_t>(std::max(expected_color_float.x * 255, 0.f)),
+      static_cast<uint8_t>(std::max(expected_color_float.y * 255, 0.f)),
+      static_cast<uint8_t>(std::max(expected_color_float.z * 255, 0.f)),
       static_cast<uint8_t>(std::max(expected_color_float.w * 255, 0.f)),
   };
 
@@ -1673,7 +1673,7 @@ VK_TEST_F(VulkanRendererTest, ColorCorrectionTest) {
         sRGBtoLinear(vmo_host, linear_vals, num_bytes);
 
         // Make sure the pixels are in the right order give that we rotated
-        // the rectangle. Values are BGRA.
+        // the rectangle. Values are RGBA.
         for (uint32_t i = 6; i < 6 + kRenderableWidth; i++) {
           for (uint32_t j = 3; j < 3 + kRenderableHeight; j++) {
             auto pixel = GetPixel(linear_vals, kTargetWidth, i, j);
@@ -1756,13 +1756,13 @@ VK_TEST_F(VulkanRendererTest, MultipleSolidColorTest) {
         // the rectangle.
         for (uint32_t i = 6; i < 6 + kRenderableWidth; i++) {
           for (uint32_t j = 3; j < 3 + kRenderableHeight; j++) {
-            EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, i, j), glm::ivec4(0, 0, 255, 255));
+            EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, i, j), glm::ivec4(255, 0, 0, 255));
           }
         }
 
         for (uint32_t i = 6; i < 6 + kRenderableWidth; i++) {
           for (uint32_t j = 5; j < 5 + kRenderableHeight; j++) {
-            EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, i, j), glm::ivec4(255, 0, 0, 255));
+            EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, i, j), glm::ivec4(0, 0, 255, 255));
           }
         }
 
@@ -2122,13 +2122,13 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
         constexpr uint32_t kCompLow = 126;
         // ARM Mali value:
         constexpr uint32_t kCompHigh = 128;
-        const auto kLowValue = glm::ivec4(0, kCompLow, kCompLow, 255);
-        const auto kHighValue = glm::ivec4(0, kCompHigh, kCompHigh, 255);
+        const auto kLowValue = glm::ivec4(kCompLow, kCompLow, 0, 255);
+        const auto kHighValue = glm::ivec4(kCompHigh, kCompHigh, 0, 255);
 
         // Make sure the pixels are in the right order give that we rotated
         // the rectangle.
-        EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, 6, 3), glm::ivec4(0, 0, 255, 255));
-        EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, 6, 4), glm::ivec4(0, 0, 255, 255));
+        EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, 6, 3), glm::ivec4(255, 0, 0, 255));
+        EXPECT_EQ(GetPixel(linear_vals, kTargetWidth, 6, 4), glm::ivec4(255, 0, 0, 255));
         EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 7, 3), InRange(kLowValue, kHighValue));
         EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 7, 4), InRange(kLowValue, kHighValue));
         EXPECT_THAT(GetPixel(linear_vals, kTargetWidth, 8, 3), InRange(kLowValue, kHighValue));
@@ -2216,7 +2216,7 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
       sysmem_allocator_.get(), std::move(render_target_tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
-      /*height*/ kTargetHeight, buffer_usage, fuchsia::sysmem::PixelFormatType::BGRA32,
+      /*height*/ kTargetHeight, buffer_usage, fuchsia::sysmem::PixelFormatType::R8G8B8A8,
       std::make_optional(memory_constraints),
       std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
@@ -2246,7 +2246,7 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
 
   const uint32_t num_pixels = kTargetWidth * kTargetHeight;
   const uint8_t kFuchsiaYuvValues[] = {110U, 192U, 192U};
-  const uint8_t kFuchsiaBgraValues[] = {246U, 68U, 228U, 255U};
+  const uint8_t kFuchsiaRgbaValues[] = {228U, 68U, 246U, 255U};
   // Have the client write pixel values to the renderable Image's texture.
   MapHostPointer(
       image_collection_info, image_metadata.vmo_index,
@@ -2296,8 +2296,8 @@ VK_TEST_P(VulkanRendererParameterizedYuvTest, YuvTest) {
                    for (uint32_t y = 0; y < kTargetHeight; y++) {
                      for (uint32_t x = 0; x < kTargetWidth; x++) {
                        EXPECT_EQ(GetPixel(vmo_host, kTargetWidth, x, y),
-                                 glm::ivec4(kFuchsiaBgraValues[0], kFuchsiaBgraValues[1],
-                                            kFuchsiaBgraValues[2], kFuchsiaBgraValues[3]));
+                                 glm::ivec4(kFuchsiaRgbaValues[0], kFuchsiaRgbaValues[1],
+                                            kFuchsiaRgbaValues[2], kFuchsiaRgbaValues[3]));
                      }
                    }
                  });
@@ -2385,7 +2385,7 @@ VK_TEST_F(VulkanRendererTest, ProtectedMemoryTest) {
       sysmem_allocator_.get(), std::move(render_target_tokens.local_token),
       /*image_count*/ 1,
       /*width*/ kTargetWidth,
-      /*height*/ kTargetHeight, buffer_usage, fuchsia::sysmem::PixelFormatType::BGRA32,
+      /*height*/ kTargetHeight, buffer_usage, fuchsia::sysmem::PixelFormatType::R8G8B8A8,
       std::make_optional(memory_constraints),
       std::make_optional(fuchsia::sysmem::FORMAT_MODIFIER_LINEAR));
 
@@ -2495,10 +2495,81 @@ VK_TEST_F(VulkanRendererTest, ReadbackTest) {
         auto pixel = GetPixel(linear_vals, kTargetWidth, i, j);
         // The sRGB conversion function provides slightly different results depending
         // on the platform.
-        EXPECT_TRUE(pixel == glm::ivec4(0, 101, 255, 255) || pixel == glm::ivec4(0, 102, 255, 255));
+        EXPECT_TRUE(pixel == glm::ivec4(255, 101, 0, 255) || pixel == glm::ivec4(255, 102, 0, 255));
       }
     }
   });
 }
+
+class VulkanRendererParameterizedAFBCTest
+    : public VulkanRendererTest,
+      public ::testing::WithParamInterface<allocation::BufferCollectionUsage> {};
+
+// Test ARM Framebuffer compression. As the name implies, this only runs on specific ARM platforms.
+VK_TEST_P(VulkanRendererParameterizedAFBCTest, EnablesAFBC) {
+  auto env = escher::test::EscherEnvironment::GetGlobalTestEnvironment();
+
+  // Run test on ARM/Mali only.
+  if (env->GetVulkanDevice()->vk_physical_device().getProperties().vendorID != 0x13B5) {
+    GTEST_SKIP();
+  }
+
+  // Create renderer.
+  auto unique_escher = std::make_unique<escher::Escher>(
+      env->GetVulkanDevice(), env->GetFilesystem(), /*gpu_allocator*/ nullptr);
+  VkRenderer renderer(unique_escher->GetWeakPtr());
+
+  // Create a pair of tokens for the render target allocation.
+  auto render_target_tokens = SysmemTokens::Create(sysmem_allocator_.get());
+
+  // Register the render target tokens with the renderer.
+  auto render_target_collection_id = allocation::GenerateUniqueBufferCollectionId();
+  const uint32_t kTargetWidth = 1024;
+  const uint32_t kTargetHeight = 600;
+  const allocation::BufferCollectionUsage usage = GetParam();
+  auto result = renderer.ImportBufferCollection(
+      render_target_collection_id, sysmem_allocator_.get(),
+      std::move(render_target_tokens.dup_token), usage,
+      std::optional<fuchsia::math::SizeU>({kTargetWidth, kTargetHeight}));
+  EXPECT_TRUE(result);
+
+  // Create a client-side handle to the render target's buffer collection and set the client
+  // constraints.
+  fuchsia::sysmem::BufferCollectionSyncPtr render_target_collection;
+  zx_status_t status = sysmem_allocator_->BindSharedCollection(
+      std::move(render_target_tokens.local_token), render_target_collection.NewRequest());
+  ASSERT_EQ(status, ZX_OK);
+  status = render_target_collection->SetConstraints(false, {});
+  ASSERT_EQ(status, ZX_OK);
+
+  // Wait for buffers allocated so it can populate its information struct with the vmo data.
+  fuchsia::sysmem::BufferCollectionInfo_2 render_target_collection_info = {};
+  {
+    zx_status_t allocation_status = ZX_OK;
+    auto status = render_target_collection->WaitForBuffersAllocated(&allocation_status,
+                                                                    &render_target_collection_info);
+    EXPECT_EQ(status, ZX_OK);
+    EXPECT_EQ(allocation_status, ZX_OK);
+  }
+
+  ASSERT_TRUE(render_target_collection_info.settings.image_format_constraints.pixel_format
+                  .has_format_modifier);
+  const uint64_t format_modifier = render_target_collection_info.settings.image_format_constraints
+                                       .pixel_format.format_modifier.value;
+
+  // The format modifier should not be linear.
+  EXPECT_NE(format_modifier, fuchsia::sysmem::FORMAT_MODIFIER_ARM_LINEAR_TE);
+  EXPECT_NE(format_modifier, fuchsia::sysmem::FORMAT_MODIFIER_LINEAR);
+
+  // We also need to make sure that the format is still a type of AFBC, which is indicated by the
+  // top byte being equal to 0x08.
+  const uint64_t afbc_mask = 0x0800000000000000;
+  const bool afbc_enabled = ((format_modifier & afbc_mask) == afbc_mask);
+  EXPECT_TRUE(afbc_enabled) << "Format modifier: " << format_modifier;
+}
+
+INSTANTIATE_TEST_SUITE_P(BufferCollectionUsages, VulkanRendererParameterizedAFBCTest,
+                         ::testing::Values(allocation::BufferCollectionUsage::kRenderTarget,
+                                           allocation::BufferCollectionUsage::kClientImage));
 
 }  // namespace flatland
