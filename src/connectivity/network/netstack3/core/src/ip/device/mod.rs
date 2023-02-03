@@ -391,6 +391,10 @@ where
         device_id: &Self::DeviceId,
         multicast_addr: MulticastAddr<I::Addr>,
     );
+
+    /// Returns the ID of the loopback interface, if one exists on the system
+    /// and is initialized.
+    fn loopback_id(&self) -> Option<Self::DeviceId>;
 }
 
 /// The execution context for an IPv6 device.

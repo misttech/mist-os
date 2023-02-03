@@ -410,10 +410,6 @@ pub(crate) trait DualStackDeviceIdContext {
 pub(crate) trait IpDeviceIdContext<I: Ip> {
     /// The type of device IDs.
     type DeviceId: IpDeviceId + 'static;
-
-    /// Returns the ID of the loopback interface, if one exists on the system
-    /// and is initialized.
-    fn loopback_id(&self) -> Option<Self::DeviceId>;
 }
 
 /// The status of an IP address on an interface.
@@ -2587,20 +2583,12 @@ pub(crate) mod testutil {
         for crate::context::testutil::FakeSyncCtx<S, Meta, D>
     {
         type DeviceId = D;
-
-        fn loopback_id(&self) -> Option<Self::DeviceId> {
-            None
-        }
     }
 
     impl<I: Ip, Outer, S, Meta, D: IpDeviceId + 'static> IpDeviceIdContext<I>
         for crate::context::testutil::WrappedFakeSyncCtx<Outer, S, Meta, D>
     {
         type DeviceId = D;
-
-        fn loopback_id(&self) -> Option<Self::DeviceId> {
-            None
-        }
     }
 
     /// A fake device ID for use in testing.

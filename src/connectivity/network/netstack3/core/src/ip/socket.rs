@@ -833,10 +833,6 @@ pub(crate) mod testutil {
         for FakeIpSocketCtx<I, DeviceId>
     {
         type DeviceId = DeviceId;
-
-        fn loopback_id(&self) -> Option<Self::DeviceId> {
-            None
-        }
     }
 
     impl<

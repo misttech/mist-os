@@ -323,6 +323,13 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
     ) {
         leave_link_multicast_group(self, ctx, device_id, multicast_addr)
     }
+
+    fn loopback_id(&self) -> Option<Self::DeviceId> {
+        let devices = self.state.device.devices.read();
+        devices.loopback.as_ref().map(|state| {
+            DeviceIdInner::Loopback(LoopbackDeviceId(ReferenceCounted::downgrade(state))).into()
+        })
+    }
 }
 
 impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv4, NonSyncCtx::Instant>
@@ -500,6 +507,13 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         multicast_addr: MulticastAddr<Ipv6Addr>,
     ) {
         leave_link_multicast_group(self, ctx, device_id, multicast_addr)
+    }
+
+    fn loopback_id(&self) -> Option<Self::DeviceId> {
+        let devices = self.state.device.devices.read();
+        devices.loopback.as_ref().map(|state| {
+            DeviceIdInner::Loopback(LoopbackDeviceId(ReferenceCounted::downgrade(state))).into()
+        })
     }
 }
 
@@ -1191,13 +1205,6 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceIdContext for &'_ SyncCtx<NonSyn
 // the `context` module.
 impl<NonSyncCtx: NonSyncContext, I: Ip> IpDeviceIdContext<I> for &'_ SyncCtx<NonSyncCtx> {
     type DeviceId = DeviceId<NonSyncCtx::Instant>;
-
-    fn loopback_id(&self) -> Option<DeviceId<NonSyncCtx::Instant>> {
-        let devices = self.state.device.devices.read();
-        devices.loopback.as_ref().map(|state| {
-            DeviceIdInner::Loopback(LoopbackDeviceId(ReferenceCounted::downgrade(state))).into()
-        })
-    }
 }
 
 /// Insert a static entry into this device's ARP table.
