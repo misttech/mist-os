@@ -53,8 +53,11 @@ TEST_F(RedactorTest, Check) {
             "SSID: <REDACTED-SSID: 10> <REDACTED-SSID: 11>");
   EXPECT_EQ(Redact("HTTP: http://fuchsia.dev/"), "HTTP: <REDACTED-URL>");
   EXPECT_EQ(Redact("HTTPS: https://fuchsia.dev/"), "HTTPS: <REDACTED-URL>");
-  EXPECT_EQ(Redact("URL with colon: https://fuchsia.dev?query=a;b"),
-            "URL with colon: <REDACTED-URL>");
+  EXPECT_EQ(Redact("URL with semicolon: https://fuchsia.dev?query=a;b"),
+            "URL with semicolon: <REDACTED-URL>");
+  EXPECT_EQ(
+      Redact("URL with UUID: https://fuchsia.dev/ddd0fA34-1016-11eb-adc1-0242ac120002?query=a;b"),
+      "URL with UUID: <REDACTED-URL>");
   EXPECT_EQ(Redact("Combined: Email alice@website.tld, IPv4 8.8.8.8"),
             "Combined: Email <REDACTED-EMAIL>, IPv4 <REDACTED-IPV4: 1>");
   EXPECT_EQ(Redact("service::fidl service:fidl"), "service::fidl service:fidl");

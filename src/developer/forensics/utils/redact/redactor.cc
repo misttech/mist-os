@@ -108,9 +108,9 @@ Redactor::Redactor(const int starting_id, inspect::UintProperty cache_size,
   Add(ReplaceIPv4())
       .Add(ReplaceIPv6())
       .Add(ReplaceMac())
+      .AddTextReplacer(kUrlPattern, "<REDACTED-URL>")
       .AddTextReplacer(kEmailPattern, "<REDACTED-EMAIL>")
       .AddTextReplacer(kUuidPattern, "<REDACTED-UUID>")
-      .AddTextReplacer(kUrlPattern, "<REDACTED-URL>")
       .AddIdReplacer(kSsidPattern, "<REDACTED-SSID: %d>")
       .AddIdReplacer(kHexPattern, "<REDACTED-HEX: %d>")
       .AddIdReplacer(kGaiaPattern, "<REDACTED-OBFUSCATED-GAIA-ID: %d>");
