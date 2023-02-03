@@ -1,0 +1,41 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "NetStreamSocketsTest.PartialWriteStress",
+                "NetStreamSocketsTest.PeerClosedPOLLOUT",
+                "NetStreamSocketsTest.ResetOnFullReceiveBufferShutdown",
+                "NetStreamSocketsTest.ShutdownReset",
+                "NetStreamSocketsTest.ShutdownPendingWrite",
+                "LocalhostTest.AcceptAfterReset",
+                "LocalhostTest.RaceLocalPeerClose",
+                "LocalhostTest.GetAddrInfo",
+                "NetStreamTest.NonBlockingConnectRefused",
+                "NetStreamTest.GetTcpInfo",
+                "NetStreamTest.GetSocketAcceptConn",
+                "NetStreamTest.ConnectTwice",
+                "NetStreamTest/StopListenWhileConnect*",
+                "NetStreamTest/ConnectAcrossIpVersionTest.ConnectReturnsError/IPv*_WithPreexistingErr",
+                "NetStreamTest/HangupTest.DuringConnect/ShutdownClient",
+                "NetStreamTest/HangupTest.DuringConnect/*Server",
+            ],
+        },
+        {
+            type: "skip",
+            matchers: [
+                "NetStreamTest/ConnectingIOTest.BlockedIO/CloseListener*",
+                "NetStreamTest/BlockedIOTest.CloseWhileBlocked/close*Linger*",
+            ],
+        },
+    ],
+}

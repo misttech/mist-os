@@ -326,6 +326,10 @@ netstack3_tests = [
     label = dgramsocket_label
     with_err_logs = true
   },
+  {
+    label = streamsocket_label
+    expects = true
+  },
 ]
 
 foreach(test, netstack3_tests) {
