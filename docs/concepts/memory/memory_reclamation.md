@@ -419,26 +419,25 @@ Rebooting...
 
 ### Simulating memory pressure signals in userspace
 
-Use the `fx mem --signal` command to simulate memory pressure signals in
-userspace without actually leaking any memory. This is useful when the goal is
+Use the `ffx profile memory signal` command to simulate memory pressure signals in
+userspace without creating actual memory pressure. This is useful when the goal is
 to test the response of a particular userspace process to memory pressure
 signals without altering the memory state of the system.
 
 ```posix-terminal
-fx mem --help
-…
---signal=L Signal userspace clients with memory pressure level L
-           where L can be CRITICAL, WARNING or NORMAL. Clients can
-           use this command to test their response to memory pressure.
-           Does not affect the real memory pressure level on the system,
-           or trigger any kernel memory reclamation tasks.
+Signals userspace clients with specified memory pressure level. Clients can use this
+command to test their response to memory pressure. Does not affect the real memory
+pressure level on the system, or trigger any kernel reclamation tasks.
+
+Positional Arguments:
+  level             memory pressure level. Can be CRITICAL, WARNING or NORMAL.
 ```
 
-For example, with `fx mem --signal=WARNING`, the following shows in the `fx
+For example, with `ffx profile memory signal WARNING`, the following shows in the `ffx
 log` output:
 
 ```none {:.devsite-disable-click-to-copy}
-[00213.059579][26701][26703][memory_monitor] INFO: [pressure_notifier.cc(106)] Simulating memory pressure level WARNING
+[00213.059579][26701][26703][memory_monitor] INFO: [pressure_notifier.cc:106] Simulating memory pressure level WARNING
 ```
 
 Note that this command does not actually allocate any memory. It simply
