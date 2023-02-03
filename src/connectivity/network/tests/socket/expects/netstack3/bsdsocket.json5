@@ -1,0 +1,101 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_failure",
+            matchers: [
+                "IntSocketOptionTests/IntSocketOptionTest.Default*",
+                "IntSocketOptionTests/IntSocketOptionTest.SetValid*",
+                "IntSocketOptionTests/IntSocketOptionTest.SetChar*",
+                "DatagramIntSocketOptionTests/IntSocketOptionTest.SetValid*",
+                "DatagramIntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4*",
+
+                // IP_TTL
+                "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv*_Stream_IPPROTO_IP_IP_TTL",
+                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IP_IP_TTL",
+                "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv6_Datagram_IPPROTO_IP_IP_TTL",
+                "TtlHopLimitSocketOptionTests/TtlHopLimitSocketOptionTest.ResetToDefault/IPv6_*_IPPROTO_IP_IP_TTL",
+                "TtlHopLimitSocketOptionTests/TtlHopLimitSocketOptionTest.ResetToDefault/IPv4_Stream_IPPROTO_IP_IP_TTL",
+                "LocalhostTest/SocketOptsTest.ResetTtlToDefault/IPv6_Datagram",
+                "LocalhostTest/SocketOptsTest.ResetTtlToDefault/IPv*_Stream",
+
+                // IP_TOS + IPV6_TCLASS
+                "LocalhostTest/SocketOptsTest.InvalidLargeTOS*",
+                "LocalhostTest/SocketOptsTest.ZeroTOSOptionSize*",
+                "LocalhostTest/SocketOptsTest.SmallTOSOptionSize*",
+                "LocalhostTest/SocketOptsTest.LargeTOSOptionSize*",
+                "LocalhostTest/SocketOptsTest.NegativeTOS*",
+                "LocalhostTest/SocketOptsTest.InvalidNegativeTOS*",
+                "LocalhostTest/SocketOptsTest.SetReceiveTOSShort/IPv*_Datagram",
+                "LocalhostTest/SocketOptsTest.InvalidCheckSkipECN*",
+                "LocalhostTest/SocketOptsTest.CheckSkipECN*",
+
+                // IPV6_TCLASS
+                "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv*_Stream_IPPROTO_IPV6_IPV6_TCLASS",
+                "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv*_Datagram_IPPROTO_IPV6_IPV6_TCLASS",
+
+                // IPV6_UNICAST_HOPS
+                "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv*_Stream_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
+                "IntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv4_Datagram_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
+                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
+                "TtlHopLimitSocketOptionTests/TtlHopLimitSocketOptionTest.ResetToDefault/IPv4_*_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
+                "TtlHopLimitSocketOptionTests/TtlHopLimitSocketOptionTest.ResetToDefault/IPv6_Stream_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
+
+                // IPV6_MULTICAST_HOPS
+                "DatagramIntSocketOptionTests/IntSocketOptionTest.SetInvalid/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_HOPS",
+                "DatagramIntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IPV6_IPV6_MULTICAST_HOPS",
+
+                // IP_MULTICAST_TTL
+                "DatagramIntSocketOptionTests/IntSocketOptionTest*/IPv6_Datagram_IPPROTO_IP_IP_MULTICAST_TTL",
+
+                // SO_TIMESTAMP{NS}
+                "LocalhostTest/SocketOptsTest.UpdateAnyTimestampDisablesOtherTimestampOptions*",
+
+                // IP{V6}_MULTICAST_IF
+                "LocalhostTest/SocketOptsTest.SetUDPMulticastIfImrIfindex/IPv*_Datagram",
+                "LocalhostTest/SocketOptsTest.SetUDPMulticastIfImrAddress/IPv4_Datagram",
+
+                // AnyAddr
+                "AnyAddrSocketTest*",
+
+                // Read after shutdown.
+                "ReadAfterShutdownTests/ReadAfterShutdownTest.Success/IPv*_Datagram_Self_SHUT_RD_NonBlockingRead_NoPendingData",
+                "ReadAfterShutdownTests/ReadAfterShutdownTest.Success/IPv*_Stream_Self_SHUT_WR_*BlockingRead_NoPendingData",
+
+                // ICMP sockets.
+                "NetSocket/IcmpSocketTest.PayloadIdentIgnored/*",
+            ],
+        },
+        {
+            type: "expect_pass",
+            matchers: [
+                // Socket Options
+
+                // IP_TTL
+                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv4_Datagram_IPPROTO_IP_IP_TTL",
+                "IntSocketOptionTests/IntSocketOptionTest.SetValid/IPv4_Datagram_IPPROTO_IP_IP_TTL",
+                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv4_Datagram_IPPROTO_IP_IP_TTL",
+
+                // IPV6_UNICAST_HOPS
+                "IntSocketOptionTests/IntSocketOptionTest.Default/IPv6_Datagram_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
+                "IntSocketOptionTests/IntSocketOptionTest.SetChar/IPv6_Datagram_IPPROTO_IPV6_IPV6_UNICAST_HOPS",
+            ],
+        },
+        {
+            type: "expect_failure_with_err_logs",
+            matchers: [
+                "NoNetworkTest.NonBlockingConnect*V*",
+                "LocalhostTest/ReuseTest.AllowsAddressReuse/StreamLoopback",
+                "NetSocket/IcmpSocketTest.PayloadIdentIgnored*",
+            ],
+        },
+    ],
+}

@@ -330,6 +330,10 @@ netstack3_tests = [
     label = streamsocket_label
     expects = true
   },
+  {
+    label = bsdsocket_label
+    with_err_logs = true
+  },
 ]
 
 foreach(test, netstack3_tests) {
@@ -382,6 +386,7 @@ all_package_names = [ ":netstack-c-api-tests" ]
 
 foreach(test_component, test_components_with_err_logs) {
   no_err_logs_package_name = "${test_component.name}_no_err_logs"
+  _test_components = []
   _test_components = [ ":${test_component.name}_component" ]
   fuchsia_test_with_expectations_package(no_err_logs_package_name) {
     test_components = _test_components
