@@ -1,9 +1,10 @@
-#!/usr/bin/env python3.8
+#!/usr/bin/env python3
 # Copyright 2019 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 import json
+import re
 import textwrap
 import sys
 
@@ -33,6 +34,14 @@ def format_comment(type, comment):
 
 # Generate a string for a magma export object, including its comment block.
 def format_export(export):
+    # Verify no use of "struct" in types - these should use type_t instead.
+    for arg in export["arguments"]:
+        m = re.search(r'(.*)struct ([^\*]*)(\**)', arg["type"])
+        if (m):
+            print(
+                f'Error in {export["name"]}: Argument type \"{arg["type"]}\" appears to be a struct.'
+                f' Did you mean to use \"{m.group(1)}{m.group(2)}_t{m.group(3)}\"?')
+            sys.exit(-1)
     # Leading comment
     lines = [f'///\n{format_comment("brief", export["description"])}']
     lines.extend(

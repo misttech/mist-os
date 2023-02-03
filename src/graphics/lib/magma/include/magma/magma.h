@@ -256,7 +256,7 @@ MAGMA_EXPORT void magma_connection_unmap_buffer(
 MAGMA_EXPORT magma_status_t magma_connection_execute_command(
     magma_connection_t connection,
     uint32_t context_id,
-    struct magma_command_descriptor* descriptor);
+    magma_command_descriptor_t* descriptor);
 
 ///
 /// \brief Submits a series of commands for execution on the hardware without using a command
@@ -270,7 +270,7 @@ MAGMA_EXPORT magma_status_t magma_connection_execute_immediate_commands(
     magma_connection_t connection,
     uint32_t context_id,
     uint64_t command_count,
-    struct magma_inline_command_buffer* command_buffers);
+    magma_inline_command_buffer_t* command_buffers);
 
 ///
 /// \brief Incurs a round-trip to the system driver, used to ensure all previous messages have been
@@ -503,7 +503,7 @@ MAGMA_EXPORT magma_status_t magma_connection_release_performance_counter_buffer_
 MAGMA_EXPORT magma_status_t magma_connection_add_performance_counter_buffer_offsets_to_pool(
     magma_connection_t connection,
     magma_perf_count_pool_t pool_id,
-    const struct magma_buffer_offset* offsets,
+    const magma_buffer_offset_t* offsets,
     uint64_t offsets_count);
 
 ///

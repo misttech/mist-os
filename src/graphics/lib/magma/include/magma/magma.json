@@ -427,7 +427,7 @@
                     },
                     {
                         "name": "descriptor",
-                        "type": "struct magma_command_descriptor*",
+                        "type": "magma_command_descriptor_t*",
                         "description": "A pointer to the command descriptor."
                     }
                 ]
@@ -455,7 +455,7 @@
                     },
                     {
                         "name": "command_buffers",
-                        "type": "struct magma_inline_command_buffer*",
+                        "type": "magma_inline_command_buffer_t*",
                         "description": "An array of command_count magma_inline_command_buffer structs."
                     }
                 ]
@@ -851,7 +851,7 @@
                     },
                     {
                         "name": "offsets",
-                        "type": "const struct magma_buffer_offset*",
+                        "type": "const magma_buffer_offset_t*",
                         "description": "An array of offsets to add."
                     },
                     {
