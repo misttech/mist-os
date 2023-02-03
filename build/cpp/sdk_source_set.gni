@@ -122,7 +122,6 @@ template("sdk_source_set") {
     # //build/sdk:sdk_versioned_source_sets_allowlist for SDK consistency
     # checks (see https://fxbug.dev/118903).
     if ((!defined(invoker.testonly) || !invoker.testonly) &&
-        target_type == "source_set" &&
         (invoker.category == "partner" || invoker.category == "public")) {
       if (!defined(deps)) {
         deps = []

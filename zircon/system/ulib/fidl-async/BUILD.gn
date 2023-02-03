@@ -18,6 +18,7 @@ zx_library("fidl-async") {
   # This library only supports the C bindings.
   # Consider using the new C++ FIDL bindings instead of the C bindings.
   visibility = [
+    "//build/sdk:sdk_versioned_source_sets",
     "//sdk/lib/component/tests:*",
     "//sdk/lib/fdio/tests:*",
     "//sdk/lib/sys/component/cpp/tests:*",
