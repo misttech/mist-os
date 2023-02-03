@@ -86,7 +86,6 @@ class BlockDevice : public BlockDeviceType,
   void GetInfo(GetInfoCompleter::Sync& completer) override;
   void GetStats(GetStatsRequestView request, GetStatsCompleter::Sync& completer) override;
   void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
-  void RebindDevice(RebindDeviceCompleter::Sync& completer) override;
   void ReadBlocks(ReadBlocksRequestView request, ReadBlocksCompleter::Sync& completer) override;
   void WriteBlocks(WriteBlocksRequestView request, WriteBlocksCompleter::Sync& completer) override;
 

@@ -126,12 +126,18 @@ zx_status_t FvmOverwriteImpl(fidl::UnownedClientEnd<fuchsia_hardware_block::Bloc
   }
 
   {
-    const fidl::WireResult result = fidl::WireCall(device)->RebindDevice();
+    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+    const fidl::WireResult result =
+        fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(device.channel()))
+            ->Rebind({});
     if (!result.ok()) {
       return result.status();
     }
-    const fidl::WireResponse response = result.value();
-    return response.status;
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
+    }
+    return ZX_OK;
   }
 }
 

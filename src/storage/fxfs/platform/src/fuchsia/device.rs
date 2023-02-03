@@ -341,10 +341,6 @@ impl BlockServer {
                     .await?;
             }
             // TODO(fxbug.dev/89873)
-            VolumeAndNodeRequest::RebindDevice { responder } => {
-                responder.send(zx::sys::ZX_OK)?;
-            }
-            // TODO(fxbug.dev/89873)
             VolumeAndNodeRequest::ReadBlocks {
                 responder,
                 vmo: _,

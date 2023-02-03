@@ -127,6 +127,8 @@ class RamdiskTest {
     }
   }
 
+  zx_status_t Rebind() { return ramdisk_rebind(ramdisk_); }
+
   ~RamdiskTest() { Terminate(); }
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_interface() const {
@@ -565,11 +567,7 @@ TEST(RamdiskTests, RamdiskTestRebind) {
   std::unique_ptr<RamdiskTest> ramdisk;
   ASSERT_NO_FATAL_FAILURE(RamdiskTest::Create(zx_system_get_page_size() / 2, 512, &ramdisk));
 
-  // Rebind the ramdisk driver
-  const fidl::WireResult result = fidl::WireCall(ramdisk->block_interface())->RebindDevice();
-  ASSERT_TRUE(result.ok()) << result.FormatDescription();
-  const fidl::WireResponse response = result.value();
-  ASSERT_EQ(response.status, ZX_OK);
+  ASSERT_EQ(ramdisk->Rebind(), ZX_OK);
   ASSERT_EQ(
       device_watcher::RecursiveWaitForFile(ramdisk_get_path(ramdisk->ramdisk_client()), zx::sec(3))
           .status_value(),

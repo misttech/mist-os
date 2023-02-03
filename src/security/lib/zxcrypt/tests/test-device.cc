@@ -163,7 +163,7 @@ void TestDevice::Rebind() {
     ASSERT_OK(owned.status_value());
     ASSERT_OK(fdio_fd_create(owned.value().release(), parent_.reset_and_get_address()));
   } else {
-    ASSERT_EQ(ramdisk_rebind(ramdisk_), ZX_OK);
+    ASSERT_OK(ramdisk_rebind(ramdisk_));
 
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
     fidl::UnownedClientEnd<fuchsia_io::Node> client(ramdisk_get_block_interface(ramdisk_));

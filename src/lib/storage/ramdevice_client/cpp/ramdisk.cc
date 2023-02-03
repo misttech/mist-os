@@ -94,13 +94,17 @@ struct ramdisk_client {
   }
 
   zx_status_t Rebind() {
-    const fidl::WireResult result = fidl::WireCall(block_interface_)->RebindDevice();
+    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+    const fidl::WireResult result =
+        fidl::WireCall(
+            fidl::UnownedClientEnd<fuchsia_device::Controller>(block_interface_.borrow().channel()))
+            ->Rebind({});
     if (!result.ok()) {
       return result.status();
     }
-    const fidl::WireResponse response = result.value();
-    if (zx_status_t status = response.status; status != ZX_OK) {
-      return status;
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      return response.error_value();
     }
     ramdisk_interface_.reset();
 

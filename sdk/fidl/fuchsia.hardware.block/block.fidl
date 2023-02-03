@@ -114,14 +114,6 @@ protocol Block {
         session server_end:Session;
     });
 
-    /// Rebinds the block device (if supported).
-    ///
-    /// WARNING: This is only added for parity with block device ioctls;
-    /// this is going to move into the device FIDL API.
-    RebindDevice() -> (struct {
-        status zx.status;
-    });
-
     /// Reads from a block device.
     ///
     /// This read does not require exclusive access.

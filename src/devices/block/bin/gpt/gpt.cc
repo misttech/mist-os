@@ -4,6 +4,7 @@
 
 #include <ctype.h>
 #include <fcntl.h>
+#include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <getopt.h>
 #include <inttypes.h>
@@ -253,17 +254,20 @@ zx_status_t Commit(GptDevice* gpt, const char* dev) {
     return status;
   }
 
-  const fidl::WireResult result = fidl::WireCall(gpt->device())->RebindDevice();
+  // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+  const fidl::WireResult result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
+                                                     gpt->device().channel().borrow()))
+                                      ->Rebind({});
   if (!result.ok()) {
     fprintf(stderr, "gpt: gpt updated but device %s could not be rebound: %s. Please reboot.\n",
             dev, result.FormatDescription().c_str());
     return result.status();
   }
-  const fidl::WireResponse response = result.value();
-  if (zx_status_t status = response.status; status != ZX_OK) {
+  const fit::result response = result.value();
+  if (response.is_error()) {
     fprintf(stderr, "gpt: gpt updated but device %s could not be rebound: %s. Please reboot.\n",
-            dev, zx_status_get_string(status));
-    return status;
+            dev, zx_status_get_string(response.error_value()));
+    return response.error_value();
   }
   printf("GPT changes complete.\n");
   return ZX_OK;

@@ -57,18 +57,20 @@ zx_status_t RebindBlockDevice(DeviceRef* device) {
     return status;
   }
 
-  zx::result channel = GetChannel<fuchsia_hardware_block::Block>(device);
+  zx::result channel = GetChannel<fuchsia_device::Controller>(device);
   if (channel.is_error()) {
     return channel.status_value();
   }
-  const fidl::WireResult result = fidl::WireCall(channel.value())->RebindDevice();
+  const fidl::WireResult result = fidl::WireCall(channel.value())->Rebind({});
   if (!result.ok()) {
+    ADD_FAILURE("('%s').Rebind(): %s", device->path(), result.status_string());
     return result.status();
   }
-  const fidl::WireResponse response = result.value();
-  if (zx_status_t status = response.status; status != ZX_OK) {
-    ADD_FAILURE("('%s').Rebind(): %s", device->path(), zx_status_get_string(status));
-    return status;
+  const fit::result response = result.value();
+  if (response.is_error()) {
+    ADD_FAILURE("('%s').Rebind(): %s", device->path(),
+                zx_status_get_string(response.error_value()));
+    return response.error_value();
   }
   if (zx_status_t status = watcher->WaitForRemoval(fbl::String() /* any file */, kDeviceWaitTime);
       status != ZX_OK) {
