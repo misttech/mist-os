@@ -13,7 +13,9 @@
 #include <fidl/fuchsia.paver/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
 #include <lib/async/dispatcher.h>
+#include <lib/async_patterns/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fastboot/fastboot.h>
 #include <lib/fastboot/test/test-transport.h>
@@ -812,21 +814,110 @@ TEST_F(FastbootFlashTest, OemWipePartitionTables) {
             std::vector<paver_test::Command>{paver_test::Command::kWipePartitionTables});
 }
 
-class FastbootRebootTest
-    : public zxtest::Test,
-      public fidl::testing::WireTestBase<fuchsia_paver::Paver>,
-      public fidl::testing::WireTestBase<fuchsia_paver::BootManager>,
-      public fidl::testing::WireTestBase<fuchsia_hardware_power_statecontrol::Admin> {
+class FastbootRebootTest : public zxtest::Test {
  public:
-  FastbootRebootTest()
-      : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), outgoing_(loop_.dispatcher()) {
-    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_hardware_power_statecontrol::Admin>(
-        admin_bindings_.CreateHandler(this, loop_.dispatcher(), fidl::kIgnoreBindingClosure)));
-    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_paver::Paver>(
-        paver_bindings_.CreateHandler(this, loop_.dispatcher(), fidl::kIgnoreBindingClosure)));
+  // |TestState| is shared between |Background| and the main test object.
+  class TestState {
+   public:
+    bool reboot_triggered() const {
+      fbl::AutoLock al(&lock_);
+      return reboot_triggered_;
+    }
+
+    void set_reboot_triggered(bool v) {
+      fbl::AutoLock al(&lock_);
+      reboot_triggered_ = v;
+    }
+
+    bool one_shot_recovery() const {
+      fbl::AutoLock al(&lock_);
+      return one_shot_recovery_;
+    }
+
+    void set_one_shot_recovery(bool v) {
+      fbl::AutoLock al(&lock_);
+      one_shot_recovery_ = v;
+    }
+
+   private:
+    bool reboot_triggered_ __TA_GUARDED(lock_) = false;
+    bool one_shot_recovery_ __TA_GUARDED(lock_) = false;
+    mutable fbl::Mutex lock_;
+  };
+
+  class MockFidlServer
+      : public fidl::testing::WireTestBase<fuchsia_paver::Paver>,
+        public fidl::testing::WireTestBase<fuchsia_paver::BootManager>,
+        public fidl::testing::WireTestBase<fuchsia_hardware_power_statecontrol::Admin> {
+   public:
+    MockFidlServer(async_dispatcher_t* dispatcher, std::shared_ptr<TestState> state)
+        : dispatcher_(dispatcher), state_(std::move(state)) {}
+
+    fidl::ProtocolHandler<fuchsia_hardware_power_statecontrol::Admin> PublishAdmin() {
+      return admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure);
+    }
+
+    fidl::ProtocolHandler<fuchsia_paver::Paver> PublishPaver() {
+      return paver_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure);
+    }
+
+   private:
+    void Reboot(RebootRequestView request, RebootCompleter::Sync& completer) override {
+      state_->set_reboot_triggered(true);
+      completer.ReplySuccess();
+    }
+
+    void FindBootManager(FindBootManagerRequestView request,
+                         FindBootManagerCompleter::Sync& completer) override {
+      boot_manager_bindings_.AddBinding(dispatcher_, std::move(request->boot_manager), this,
+                                        fidl::kIgnoreBindingClosure);
+    }
+
+    void SetOneShotRecovery(SetOneShotRecoveryCompleter::Sync& completer) override {
+      state_->set_one_shot_recovery(true);
+      completer.ReplySuccess();
+    }
+
+    void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+      FAIL("Unexpected call to BuildInfo: %s", name.c_str());
+    }
+
+    async_dispatcher_t* dispatcher_;
+    std::shared_ptr<TestState> state_;
+    fidl::ServerBindingGroup<fuchsia_paver::Paver> paver_bindings_;
+    fidl::ServerBindingGroup<fuchsia_hardware_power_statecontrol::Admin> admin_bindings_;
+    fidl::ServerBindingGroup<fuchsia_paver::BootManager> boot_manager_bindings_;
+  };
+
+  // This class is managed and used from a parallel background |async::Loop|
+  // while the main thread runs blocking operations.
+  class MockComponent {
+   public:
+    MockComponent(fidl::ServerEnd<fuchsia_io::Directory> svc,
+                  const std::shared_ptr<TestState>& state)
+        : dispatcher_(async_get_default_dispatcher()),
+          outgoing_(dispatcher_),
+          server_(dispatcher_, state) {
+      ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_hardware_power_statecontrol::Admin>(
+          server_.PublishAdmin()));
+      ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_paver::Paver>(server_.PublishPaver()));
+      ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(svc)).status_value());
+    }
+
+   private:
+    async_dispatcher_t* dispatcher_;
+    component::OutgoingDirectory outgoing_;
+    MockFidlServer server_;
+  };
+
+  FastbootRebootTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+    loop_.StartThread("fastboot-reboot-test-loop");
+
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(endpoints.is_ok());
-    ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints->server)).status_value());
+
+    mock_.emplace(loop_.dispatcher(), std::move(endpoints->server), state_);
+
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
     ASSERT_OK(fidl::WireCall(endpoints->client)
@@ -835,55 +926,15 @@ class FastbootRebootTest
                          {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
-    loop_.StartThread("fastboot-reboot-test-loop");
   }
-
-  ~FastbootRebootTest() { loop_.Shutdown(); }
 
   fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
-  bool reboot_triggered() {
-    fbl::AutoLock al(&lock_);
-    return reboot_triggered_;
-  }
-
-  bool set_one_shot_recovery() {
-    fbl::AutoLock al(&lock_);
-    return set_one_shot_recovery_;
-  }
-
- private:
-  void Reboot(RebootRequestView request, RebootCompleter::Sync& completer) override {
-    fbl::AutoLock al(&lock_);
-    reboot_triggered_ = true;
-    completer.ReplySuccess();
-  }
-
-  void FindBootManager(FindBootManagerRequestView request,
-                       FindBootManagerCompleter::Sync& _completer) override {
-    fidl::BindSingleInFlightOnly<fidl::WireServer<fuchsia_paver::BootManager>>(
-        loop_.dispatcher(), std::move(request->boot_manager), this);
-  }
-
-  void SetOneShotRecovery(SetOneShotRecoveryCompleter::Sync& completer) override {
-    fbl::AutoLock al(&lock_);
-    set_one_shot_recovery_ = true;
-    completer.ReplySuccess();
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FAIL("Unexpected call to BuildInfo: %s", name.c_str());
-  }
+  const TestState& state() const { return *state_; }
 
   async::Loop loop_;
-  component::OutgoingDirectory outgoing_;
-  fidl::ServerBindingGroup<fuchsia_paver::Paver> paver_bindings_;
-  fidl::ServerBindingGroup<fuchsia_hardware_power_statecontrol::Admin> admin_bindings_;
+  std::shared_ptr<TestState> state_ = std::make_shared<TestState>();
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
-
-  bool reboot_triggered_ = false;
-  bool set_one_shot_recovery_ = false;
-
-  mutable fbl::Mutex lock_;
+  async_patterns::DispatcherBound<MockComponent> mock_;
 };
 
 TEST_F(FastbootRebootTest, Reboot) {
@@ -896,7 +947,7 @@ TEST_F(FastbootRebootTest, Reboot) {
 
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
-  ASSERT_TRUE(reboot_triggered());
+  ASSERT_TRUE(state().reboot_triggered());
 }
 
 TEST_F(FastbootRebootTest, Continue) {
@@ -910,7 +961,7 @@ TEST_F(FastbootRebootTest, Continue) {
   // One info message plus one OKAY message
   ASSERT_EQ(transport.GetOutPackets().size(), 2ULL);
   ASSERT_EQ(transport.GetOutPackets().back(), "OKAY");
-  ASSERT_TRUE(reboot_triggered());
+  ASSERT_TRUE(state().reboot_triggered());
 }
 
 TEST_F(FastbootRebootTest, RebootBootloader) {
@@ -924,8 +975,8 @@ TEST_F(FastbootRebootTest, RebootBootloader) {
   // One info message plus one OKAY message
   ASSERT_EQ(transport.GetOutPackets().size(), 2ULL);
   ASSERT_EQ(transport.GetOutPackets().back(), "OKAY");
-  ASSERT_TRUE(reboot_triggered());
-  ASSERT_TRUE(set_one_shot_recovery());
+  ASSERT_TRUE(state().reboot_triggered());
+  ASSERT_TRUE(state().one_shot_recovery());
 }
 
 TEST_F(FastbootFlashTest, UnknownOemCommand) {
@@ -940,16 +991,105 @@ TEST_F(FastbootFlashTest, UnknownOemCommand) {
   ASSERT_EQ(sent_packets[0].compare(0, 4, "FAIL"), 0);
 }
 
-class FastbootFshostTest : public FastbootDownloadTest,
-                           public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
+class FastbootFshostTest : public FastbootDownloadTest {
  public:
-  FastbootFshostTest()
-      : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), outgoing_(loop_.dispatcher()) {
-    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_fshost::Admin>(
-        admin_bindings_.CreateHandler(this, loop_.dispatcher(), fidl::kIgnoreBindingClosure)));
+  class TestState {
+   public:
+    const std::string& data_file_name() const {
+      fbl::AutoLock al(&lock_);
+      return data_file_name_;
+    }
+
+    void set_data_file_name(std::string v) {
+      fbl::AutoLock al(&lock_);
+      data_file_name_ = std::move(v);
+    }
+
+    const std::string& data_file_content() const {
+      fbl::AutoLock al(&lock_);
+      return data_file_content_;
+    }
+
+    void set_data_file_content(std::string v) {
+      fbl::AutoLock al(&lock_);
+      data_file_content_ = std::move(v);
+    }
+
+    uint64_t data_file_vmo_content_size() const {
+      fbl::AutoLock al(&lock_);
+      return data_file_vmo_content_size_;
+    }
+
+    void set_data_file_vmo_content_size(uint64_t v) {
+      fbl::AutoLock al(&lock_);
+      data_file_vmo_content_size_ = v;
+    }
+
+   private:
+    std::string data_file_name_ TA_GUARDED(lock_);
+    std::string data_file_content_ TA_GUARDED(lock_);
+    uint64_t data_file_vmo_content_size_ TA_GUARDED(lock_);
+
+    mutable fbl::Mutex lock_;
+  };
+
+  class MockFshostAdmin : public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
+   public:
+    explicit MockFshostAdmin(async_dispatcher_t* dispatcher,
+                             const std::shared_ptr<TestState>& state)
+        : dispatcher_(dispatcher), state_(state) {}
+
+    fidl::ProtocolHandler<fuchsia_fshost::Admin> Publish() {
+      return admin_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure);
+    }
+
+   private:
+    void WriteDataFile(WriteDataFileRequestView request,
+                       WriteDataFileCompleter::Sync& completer) override {
+      state_->set_data_file_name(std::string(request->filename.data(), request->filename.size()));
+      uint64_t size;
+      ASSERT_OK(request->payload.get_size(&size));
+      std::string data_file_content;
+      data_file_content.resize(size);
+      ASSERT_OK(request->payload.read(data_file_content.data(), 0, size));
+      state_->set_data_file_content(std::move(data_file_content));
+      uint64_t data_file_vmo_content_size;
+      ASSERT_OK(request->payload.get_prop_content_size(&data_file_vmo_content_size));
+      state_->set_data_file_vmo_content_size(data_file_vmo_content_size);
+      completer.ReplySuccess();
+    }
+
+    void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+      FAIL("Unexpected call to ControllerImpl: %s", name.c_str());
+    }
+
+    async_dispatcher_t* dispatcher_;
+    std::shared_ptr<TestState> state_;
+    fidl::ServerBindingGroup<fuchsia_fshost::Admin> admin_bindings_;
+  };
+
+  class MockComponent {
+   public:
+    explicit MockComponent(fidl::ServerEnd<fuchsia_io::Directory> directory,
+                           const std::shared_ptr<TestState>& state)
+        : dispatcher_(async_get_default_dispatcher()),
+          outgoing_(dispatcher_),
+          server_(dispatcher_, state) {
+      ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_fshost::Admin>(server_.Publish()));
+      ASSERT_OK(outgoing_.Serve(std::move(directory)));
+    }
+
+   private:
+    async_dispatcher_t* dispatcher_;
+    component::OutgoingDirectory outgoing_;
+    MockFshostAdmin server_;
+  };
+
+  FastbootFshostTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+    loop_.StartThread("fastboot-fshost-test-loop");
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(endpoints.is_ok());
-    ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints->server)).status_value());
+
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
     ASSERT_OK(fidl::WireCall(endpoints->client)
@@ -958,58 +1098,19 @@ class FastbootFshostTest : public FastbootDownloadTest,
                          {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
-    loop_.StartThread("fastboot-fshost-test-loop");
+
+    mock_.emplace(loop_.dispatcher(), std::move(endpoints->server), state_);
   }
 
-  ~FastbootFshostTest() { loop_.Shutdown(); }
+  fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
 
-  fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() {
-    fbl::AutoLock al(&lock_);
-    return svc_local_;
-  }
-
-  const std::string& data_file_name() {
-    fbl::AutoLock al(&lock_);
-    return data_file_name_;
-  }
-
-  const std::string& data_file_content() {
-    fbl::AutoLock al(&lock_);
-    return data_file_content_;
-  }
-
-  uint64_t data_file_vmo_content_size() {
-    fbl::AutoLock al(&lock_);
-    return data_file_vmo_content_size_;
-  }
+  const TestState& state() const { return *state_; }
 
  private:
-  void WriteDataFile(WriteDataFileRequestView request,
-                     WriteDataFileCompleter::Sync& completer) override {
-    fbl::AutoLock al(&lock_);
-    data_file_name_ = std::string(request->filename.data(), request->filename.size());
-    uint64_t size;
-    ASSERT_OK(request->payload.get_size(&size));
-    data_file_content_.resize(size);
-    ASSERT_OK(request->payload.read(data_file_content_.data(), 0, size));
-    ASSERT_OK(request->payload.get_prop_content_size(&data_file_vmo_content_size_));
-    completer.ReplySuccess();
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FAIL("Unexpected call to ControllerImpl: %s", name.c_str());
-  }
-
   async::Loop loop_;
-  component::OutgoingDirectory outgoing_;
-  fidl::ServerBindingGroup<fuchsia_fshost::Admin> admin_bindings_;
+  std::shared_ptr<TestState> state_ = std::make_shared<TestState>();
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
-
-  std::string data_file_name_ TA_GUARDED(lock_);
-  std::string data_file_content_ TA_GUARDED(lock_);
-  uint64_t data_file_vmo_content_size_ TA_GUARDED(lock_);
-
-  mutable fbl::Mutex lock_;
+  async_patterns::DispatcherBound<MockComponent> mock_;
 };
 
 TEST_F(FastbootFshostTest, OemAddStagedBootloaderFile) {
@@ -1027,9 +1128,10 @@ TEST_F(FastbootFshostTest, OemAddStagedBootloaderFile) {
   std::vector<std::string> expected_packets = {"OKAY"};
   ASSERT_NO_FATAL_FAILURE(CheckPacketsEqual(transport.GetOutPackets(), expected_packets));
 
-  ASSERT_EQ(data_file_name(), sshd_host::kAuthorizedKeyPathInData);
-  ASSERT_EQ(data_file_vmo_content_size(), download_content.size());
-  ASSERT_BYTES_EQ(data_file_content().data(), download_content.data(), download_content.size());
+  ASSERT_EQ(state().data_file_name(), sshd_host::kAuthorizedKeyPathInData);
+  ASSERT_EQ(state().data_file_vmo_content_size(), download_content.size());
+  ASSERT_BYTES_EQ(state().data_file_content().data(), download_content.data(),
+                  download_content.size());
 }
 
 TEST_F(FastbootFlashTest, OemAddStagedBootloaderFileInvalidNumberOfArguments) {
@@ -1169,16 +1271,56 @@ TEST(FastbootBase, ExtractCommandArgsMultipleBySpace) {
 
 constexpr char kTestBoardConfig[] = "test-board-config";
 
-class FastbootBuildInfoTest : public FastbootDownloadTest,
-                              public fidl::testing::WireTestBase<fuchsia_buildinfo::Provider> {
+class FastbootBuildInfoTest : public FastbootDownloadTest {
  public:
-  FastbootBuildInfoTest()
-      : loop_(&kAsyncLoopConfigNoAttachToCurrentThread), outgoing_(loop_.dispatcher()) {
-    ASSERT_OK(outgoing_.AddUnmanagedProtocol<fuchsia_buildinfo::Provider>(
-        provider_bindings_.CreateHandler(this, loop_.dispatcher(), fidl::kIgnoreBindingClosure)));
+  class MockBuildInfoProvider : public fidl::testing::WireTestBase<fuchsia_buildinfo::Provider> {
+   public:
+    explicit MockBuildInfoProvider(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+
+    fidl::ProtocolHandler<fuchsia_buildinfo::Provider> Publish() {
+      return provider_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure);
+    }
+
+   private:
+    void GetBuildInfo(GetBuildInfoCompleter::Sync& completer) override {
+      fidl::Arena arena;
+      auto res = fuchsia_buildinfo::wire::BuildInfo::Builder(arena)
+                     .board_config(fidl::StringView(kTestBoardConfig))
+                     .Build();
+      completer.Reply(res);
+    }
+
+    void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+      FAIL("Unexpected call to BuildInfo: %s", name.c_str());
+    }
+
+    async_dispatcher_t* dispatcher_;
+    fidl::ServerBindingGroup<fuchsia_buildinfo::Provider> provider_bindings_;
+  };
+
+  class MockComponent {
+   public:
+    explicit MockComponent(fidl::ServerEnd<fuchsia_io::Directory> server_end)
+        : dispatcher_(async_get_default_dispatcher()),
+          outgoing_(dispatcher_),
+          provider_server_(dispatcher_) {
+      ASSERT_OK(
+          outgoing_.AddUnmanagedProtocol<fuchsia_buildinfo::Provider>(provider_server_.Publish()));
+      ASSERT_OK(outgoing_.Serve(std::move(server_end)));
+    }
+
+   private:
+    async_dispatcher_t* dispatcher_;
+    component::OutgoingDirectory outgoing_;
+    MockBuildInfoProvider provider_server_;
+  };
+
+  FastbootBuildInfoTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+    loop_.StartThread("fastboot-build-info-test-loop");
+
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(endpoints.is_ok());
-    ASSERT_EQ(ZX_OK, outgoing_.Serve(std::move(endpoints->server)).status_value());
+
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
     ASSERT_OK(fidl::WireCall(endpoints->client)
@@ -1187,30 +1329,16 @@ class FastbootBuildInfoTest : public FastbootDownloadTest,
                          {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
-    loop_.StartThread("fastboot-buildinfo-test-loop");
-  }
 
-  ~FastbootBuildInfoTest() { loop_.Shutdown(); }
+    mock_.emplace(loop_.dispatcher(), std::move(endpoints->server));
+  }
 
   fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
 
  private:
-  void GetBuildInfo(GetBuildInfoCompleter::Sync& completer) override {
-    fidl::Arena arena;
-    auto res = fuchsia_buildinfo::wire::BuildInfo::Builder(arena)
-                   .board_config(fidl::StringView(kTestBoardConfig))
-                   .Build();
-    completer.Reply(res);
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FAIL("Unexpected call to BuildInfo: %s", name.c_str());
-  }
-
   async::Loop loop_;
-  fidl::ServerBindingGroup<fuchsia_buildinfo::Provider> provider_bindings_;
-  component::OutgoingDirectory outgoing_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_local_;
+  async_patterns::DispatcherBound<MockComponent> mock_;
 };
 
 TEST_F(FastbootBuildInfoTest, GetVarHwRevision) {
