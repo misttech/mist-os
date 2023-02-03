@@ -40,9 +40,9 @@ rustc_library("config_schema") {
     "src/platform_config/input_config.rs",
     "src/platform_config/starnix_config.rs",
     "src/platform_config/storage_config.rs",
+    "src/platform_config/swd_config.rs",
     "src/platform_config/virtualization_config.rs",
     "src/product_config.rs",
-    "src/swd_config.rs",
   ]
 }
 

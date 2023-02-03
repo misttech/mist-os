@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_schema::{
-    platform_config::BuildType,
+use assembly_config_schema::platform_config::{
     swd_config::{
         OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
     },
+    BuildType,
 };
 
 #[allow(dead_code)]

@@ -10,7 +10,6 @@ pub mod common;
 pub mod image_assembly_config;
 pub mod platform_config;
 pub mod product_config;
-pub mod swd_config;
 
 pub use assembly_config::AssemblyConfig;
 pub use board_config::BoardInformation;

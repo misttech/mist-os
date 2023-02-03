@@ -127,6 +127,20 @@ pub fn define_configuration(
     )
     .context("Configuring the 'console' subsystem")?;
 
+    development::DevelopmentConfig::define_configuration(
+        &context,
+        &config.platform.development_support,
+        &mut builder,
+    )
+    .context("Configuring the 'development' subsystem")?;
+
+    diagnostics::DiagnosticsSubsystem::define_configuration(
+        &context,
+        &config.platform.diagnostics,
+        &mut builder,
+    )
+    .context("Configuring the 'diagnostics' subsystem")?;
+
     graphics::GraphicsSubsystemConfig::define_configuration(
         &context,
         &config.platform.graphics,
@@ -148,13 +162,6 @@ pub fn define_configuration(
     )
     .context("Configuring the 'input' subsystem")?;
 
-    storage::StorageSubsystemConfig::define_configuration(
-        &context,
-        &config.platform.storage,
-        &mut builder,
-    )
-    .context("Configuring the 'storage' subsystem")?;
-
     session::SessionConfig::define_configuration(
         &context,
         &config.product.session_url,
@@ -162,26 +169,19 @@ pub fn define_configuration(
     )
     .context("Configuring the 'session' subsystem")?;
 
-    development::DevelopmentConfig::define_configuration(
-        &context,
-        &config.platform.development_support,
-        &mut builder,
-    )
-    .context("Configuring the 'development' subsystem")?;
-
-    diagnostics::DiagnosticsSubsystem::define_configuration(
-        &context,
-        &config.platform.diagnostics,
-        &mut builder,
-    )
-    .context("Configuring the 'diagnostics' subsystem")?;
-
     starnix::StarnixSubsystem::define_configuration(
         &context,
         &config.platform.starnix,
         &mut builder,
     )
     .context("Configuring the starnix subsystem")?;
+
+    storage::StorageSubsystemConfig::define_configuration(
+        &context,
+        &config.platform.storage,
+        &mut builder,
+    )
+    .context("Configuring the 'storage' subsystem")?;
 
     virtualization::VirtualizationSubsystem::define_configuration(
         &context,

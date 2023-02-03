@@ -13,6 +13,7 @@ pub mod identity_config;
 pub mod input_config;
 pub mod starnix_config;
 pub mod storage_config;
+pub mod swd_config;
 pub mod virtualization_config;
 
 /// Platform configuration options.  These are the options that pertain to the
@@ -44,6 +45,18 @@ pub struct PlatformConfig {
     #[serde(default)]
     pub additional_serial_log_tags: Vec<String>,
 
+    /// Platform configuration options for the connectivity area.
+    #[serde(default)]
+    pub connectivity: connectivity_config::PlatformConnectivityConfig,
+
+    /// Platform configuration options for enabling developer support.
+    #[serde(default)]
+    pub development_support: Option<development_support_config::DevelopmentSupportConfig>,
+
+    /// Platform configuration options for the diagnostics area.
+    #[serde(default)]
+    pub diagnostics: diagnostics_config::DiagnosticsConfig,
+
     /// Platform configuration options for graphics
     #[serde(default)]
     pub graphics: graphics_config::GraphicsConfig,
@@ -56,34 +69,24 @@ pub struct PlatformConfig {
     #[serde(default)]
     pub input: input_config::PlatformInputConfig,
 
-    /// Platform configuration options for storage support.
-    #[serde(default)]
-    pub storage: storage_config::StorageConfig,
-
     /// Platform configuration options for the SWD subsystem.
-    pub software_delivery: Option<crate::swd_config::SwdConfig>,
-
-    /// Platform configuration options for enabling developer support.
-    #[serde(default)]
-    pub development_support: Option<development_support_config::DevelopmentSupportConfig>,
-
-    /// Platform configuration options for the diagnostics area.
-    #[serde(default)]
-    pub diagnostics: diagnostics_config::DiagnosticsConfig,
-
-    /// Platform configuration options for the connectivity area.
-    #[serde(default)]
-    pub connectivity: connectivity_config::PlatformConnectivityConfig,
+    pub software_delivery: Option<swd_config::SwdConfig>,
 
     /// Platform configuration options for the starnix area.
     #[serde(default)]
     pub starnix: starnix_config::PlatformStarnixConfig,
+
+    /// Platform configuration options for storage support.
+    #[serde(default)]
+    pub storage: storage_config::StorageConfig,
 
     /// Platform configuration options for the virtualization area.
     #[serde(default)]
     pub virtualization: virtualization_config::PlatformVirtualizationConfig,
 
     /// Assembly option triggering the inclusion of test AIBs
+    ///
+    /// NOTE: This is not for use by products! It's for testing assembly itself.
     #[serde(default)]
     pub example_config: example_config::ExampleConfig,
 }
