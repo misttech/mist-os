@@ -9,50 +9,50 @@ use {
         node_property_key_to_string, node_property_value_to_string, write_node_properties,
     },
     anyhow::{Context, Result},
-    args::ListNodeGroupsCommand,
+    args::ListCompositeNodeSpecsCommand,
     fidl_fuchsia_driver_development as fdd, fuchsia_driver_dev,
     std::io::Write,
 };
 
-pub async fn list_node_groups(
-    cmd: ListNodeGroupsCommand,
+pub async fn list_composite_node_specs(
+    cmd: ListCompositeNodeSpecsCommand,
     writer: &mut impl Write,
     driver_development_proxy: fdd::DriverDevelopmentProxy,
 ) -> Result<()> {
-    let node_groups = fuchsia_driver_dev::get_node_groups(&driver_development_proxy, cmd.name)
+    let specs = fuchsia_driver_dev::get_composite_node_specs(&driver_development_proxy, cmd.name)
         .await
-        .context("Failed to get node groups")?;
+        .context("Failed to get composite node specs")?;
 
     if !cmd.verbose {
-        for node_group in node_groups {
-            let name = node_group.name.unwrap_or("N/A".to_string());
-            let driver = node_group.driver.unwrap_or("None".to_string());
+        for spec in specs {
+            let name = spec.name.unwrap_or("N/A".to_string());
+            let driver = spec.driver.unwrap_or("None".to_string());
             writeln!(writer, "{:<20}: {}", name, driver)?;
         }
         return Ok(());
     }
 
-    for node_group in node_groups {
-        if let Some(name) = node_group.name {
+    for spec in specs {
+        if let Some(name) = spec.name {
             writeln!(writer, "{0: <10}: {1}", "Name", name)?;
         }
 
-        if let Some(driver) = node_group.driver {
+        if let Some(driver) = spec.driver {
             writeln!(writer, "{0: <10}: {1}", "Driver", driver)?;
         } else {
             writeln!(writer, "{0: <10}: {1}", "Driver", "None")?;
         }
 
-        if let Some(nodes) = node_group.nodes {
+        if let Some(nodes) = spec.parents {
             writeln!(writer, "{0: <10}: {1}", "Nodes", nodes.len())?;
 
             for (i, node) in nodes.into_iter().enumerate() {
-                let name = match &node_group.node_names {
+                let name = match &spec.parent_names {
                     Some(names) => format!("\"{}\"", names.get(i).unwrap()),
                     None => "None".to_string(),
                 };
 
-                if &node_group.primary_index == &Some(i as u32) {
+                if &spec.primary_index == &Some(i as u32) {
                     writeln!(writer, "{0: <10}: {1} (Primary)", format!("Node {}", i), name)?;
                 } else {
                     writeln!(writer, "{0: <10}: {1}", format!("Node {}", i), name)?;
@@ -102,12 +102,12 @@ mod tests {
         },
     };
 
-    /// Invokes `list_node_groups` with `cmd` and runs a mock driver development server that
+    /// Invokes `list_composite_node_specs` with `cmd` and runs a mock driver development server that
     /// invokes `on_driver_development_request` whenever it receives a request.
-    /// The output of `list_node_groups` that is normally written to its `writer` parameter
+    /// The output of `list_composite_node_specs` that is normally written to its `writer` parameter
     /// is returned.
-    async fn test_list_node_groups<F, Fut>(
-        cmd: ListNodeGroupsCommand,
+    async fn test_list_composite_node_specs<F, Fut>(
+        cmd: ListCompositeNodeSpecsCommand,
         on_driver_development_request: F,
     ) -> Result<String>
     where
@@ -132,30 +132,31 @@ mod tests {
                 res?;
                 anyhow::bail!("Request handler task unexpectedly finished");
             }
-            res = list_node_groups(cmd, &mut writer, driver_development_proxy).fuse() => res.context("List node groups command failed")?,
+            res = list_composite_node_specs(cmd, &mut writer, driver_development_proxy).fuse() => res.context("List composite node specs command failed")?,
         }
 
-        String::from_utf8(writer).context("Failed to convert list node groups output to a string")
+        String::from_utf8(writer)
+            .context("Failed to convert list composite node specs output to a string")
     }
 
-    async fn run_node_groups_iterator_server(
-        mut node_groups: Vec<fdd::NodeGroupInfo>,
-        iterator: ServerEnd<fdd::NodeGroupsIteratorMarker>,
+    async fn run_specs_iterator_server(
+        mut specs: Vec<fdd::CompositeNodeSpecInfo>,
+        iterator: ServerEnd<fdd::CompositeNodeSpecIteratorMarker>,
     ) -> Result<()> {
         let mut iterator =
             iterator.into_stream().context("Failed to convert iterator into a stream")?;
         while let Some(res) = iterator.next().await {
             let request = res.context("Failed to get request")?;
             match request {
-                fdd::NodeGroupsIteratorRequest::GetNext { responder } => {
+                fdd::CompositeNodeSpecIteratorRequest::GetNext { responder } => {
                     responder
                         .send(
-                            &mut node_groups
+                            &mut specs
                                 .drain(..)
-                                .collect::<Vec<fdd::NodeGroupInfo>>()
+                                .collect::<Vec<fdd::CompositeNodeSpecInfo>>()
                                 .into_iter(),
                         )
-                        .context("Failed to send node groups to responder")?;
+                        .context("Failed to send composite node specs to responder")?;
                 }
             }
         }
@@ -164,20 +165,25 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_verbose() {
-        let cmd = ListNodeGroupsCommand::from_args(&["list-node-groups"], &["--verbose"]).unwrap();
+        let cmd = ListCompositeNodeSpecsCommand::from_args(
+            &["list-composite-node-specs"],
+            &["--verbose"],
+        )
+        .unwrap();
 
-        let output =
-            test_list_node_groups(cmd, |request: fdd::DriverDevelopmentRequest| async move {
+        let output = test_list_composite_node_specs(
+            cmd,
+            |request: fdd::DriverDevelopmentRequest| async move {
                 match request {
-                    fdd::DriverDevelopmentRequest::GetNodeGroups {
+                    fdd::DriverDevelopmentRequest::GetCompositeNodeSpecs {
                         name_filter: _,
                         iterator,
                         control_handle: _,
-                    } => run_node_groups_iterator_server(
+                    } => run_specs_iterator_server(
                         vec![
-                            fdd::NodeGroupInfo {
-                                name: Some("test_group".to_string()),
-                                nodes: Some(vec![fdf::ParentSpec {
+                            fdd::CompositeNodeSpecInfo {
+                                name: Some("test_spec".to_string()),
+                                parents: Some(vec![fdf::ParentSpec {
                                     bind_rules: vec![fdf::BindRule {
                                         key: fdf::NodePropertyKey::StringValue(
                                             "rule_key".to_string(),
@@ -196,17 +202,17 @@ mod tests {
                                         ),
                                     }],
                                 }]),
-                                ..fdd::NodeGroupInfo::EMPTY
+                                ..fdd::CompositeNodeSpecInfo::EMPTY
                             },
-                            fdd::NodeGroupInfo {
-                                name: Some("test_group_with_driver".to_string()),
+                            fdd::CompositeNodeSpecInfo {
+                                name: Some("test_spec_with_driver".to_string()),
                                 driver: Some("driver_url".to_string()),
                                 primary_index: Some(1),
-                                node_names: Some(vec![
+                                parent_names: Some(vec![
                                     "name_one".to_string(),
                                     "name_two".to_string(),
                                 ]),
-                                nodes: Some(vec![
+                                parents: Some(vec![
                                     fdf::ParentSpec {
                                         bind_rules: vec![fdf::BindRule {
                                             key: fdf::NodePropertyKey::StringValue(
@@ -274,7 +280,7 @@ mod tests {
                                         ],
                                     },
                                 ]),
-                                ..fdd::NodeGroupInfo::EMPTY
+                                ..fdd::CompositeNodeSpecInfo::EMPTY
                             },
                         ],
                         iterator,
@@ -284,13 +290,14 @@ mod tests {
                     _ => {}
                 }
                 Ok(())
-            })
-            .await
-            .unwrap();
+            },
+        )
+        .await
+        .unwrap();
 
         assert_eq!(
             output,
-            r#"Name      : test_group
+            r#"Name      : test_spec
 Driver    : None
 Nodes     : 1
 Node 0    : None
@@ -299,7 +306,7 @@ Node 0    : None
   1 Properties
   [ 1/ 1] : Key "prop_key"                     Value "prop_val"
 
-Name      : test_group_with_driver
+Name      : test_spec_with_driver
 Driver    : driver_url
 Nodes     : 2
 Node 0    : "name_one"

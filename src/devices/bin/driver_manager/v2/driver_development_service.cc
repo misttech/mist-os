@@ -212,8 +212,8 @@ void DriverDevelopmentService::GetDriverInfo(GetDriverInfoRequestView request,
   }
 }
 
-void DriverDevelopmentService::GetNodeGroups(GetNodeGroupsRequestView request,
-                                             GetNodeGroupsCompleter::Sync& completer) {
+void DriverDevelopmentService::GetCompositeNodeSpecs(
+    GetCompositeNodeSpecsRequestView request, GetCompositeNodeSpecsCompleter::Sync& completer) {
   auto driver_index_client = component::Connect<fdd::DriverIndex>();
   if (driver_index_client.is_error()) {
     LOGF(ERROR, "Failed to connect to service '%s': %s",
@@ -224,9 +224,9 @@ void DriverDevelopmentService::GetNodeGroups(GetNodeGroupsRequestView request,
 
   fidl::WireSyncClient driver_index{std::move(*driver_index_client)};
   auto info_result =
-      driver_index->GetNodeGroups(request->name_filter, std::move(request->iterator));
+      driver_index->GetCompositeNodeSpecs(request->name_filter, std::move(request->iterator));
   if (!info_result.ok()) {
-    LOGF(ERROR, "Failed to call DriverIndex::GetNodeGroups: %s\n",
+    LOGF(ERROR, "Failed to call DriverIndex::GetCompositeNodeSpecs: %s\n",
          info_result.error().FormatDescription().data());
   }
 }

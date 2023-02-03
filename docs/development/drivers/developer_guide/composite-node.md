@@ -584,7 +584,7 @@ To verify that the node group is added successfully and matched to a composite
 driver, run the command:
 
 ```
-ffx driver list-node-groups -v
+ffx driver list-composite-node-specs -v
 ```
 
 This will output something similar to this:

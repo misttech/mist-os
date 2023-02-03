@@ -107,19 +107,19 @@ pub async fn driver(cmd: DriverCommand, driver_connector: impl DriverConnector) 
                 .await
                 .context("List-hosts subcommand failed")?;
         }
-        DriverSubCommand::ListNodeGroups(subcmd) => {
+        DriverSubCommand::ListCompositeNodeSpecs(subcmd) => {
             let mut writer = io::stdout();
             let driver_development_proxy = driver_connector
                 .get_driver_development_proxy(subcmd.select)
                 .await
                 .context("Failed to get driver development proxy")?;
-            subcommands::list_node_groups::list_node_groups(
+            subcommands::list_composite_node_specs::list_composite_node_specs(
                 subcmd,
                 &mut writer,
                 driver_development_proxy,
             )
             .await
-            .context("List-node-groups subcommand failed")?;
+            .context("list-composite-node-specs subcommand failed")?;
         }
         #[cfg(not(target_os = "fuchsia"))]
         DriverSubCommand::Lsblk(subcmd) => {

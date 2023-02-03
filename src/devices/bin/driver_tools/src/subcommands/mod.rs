@@ -8,10 +8,10 @@ pub mod dump;
 #[cfg(any(not(target_os = "fuchsia"), test))]
 pub mod i2c;
 pub mod list;
+pub mod list_composite_node_specs;
 pub mod list_composites;
 pub mod list_devices;
 pub mod list_hosts;
-pub mod list_node_groups;
 #[cfg(not(target_os = "fuchsia"))]
 pub mod lsblk;
 #[cfg(not(target_os = "fuchsia"))]

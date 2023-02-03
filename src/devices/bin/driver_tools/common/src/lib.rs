@@ -150,15 +150,15 @@ pub async fn get_driver_info(
 }
 
 /// Combines pagination results into a single vector.
-pub async fn get_node_groups(
+pub async fn get_composite_node_specs(
     service: &fdd::DriverDevelopmentProxy,
     name_filter: Option<String>,
-) -> Result<Vec<fdd::NodeGroupInfo>> {
+) -> Result<Vec<fdd::CompositeNodeSpecInfo>> {
     let (iterator, iterator_server) =
-        fidl::endpoints::create_proxy::<fdd::NodeGroupsIteratorMarker>()?;
+        fidl::endpoints::create_proxy::<fdd::CompositeNodeSpecIteratorMarker>()?;
 
     service
-        .get_node_groups(name_filter.as_deref(), iterator_server)
+        .get_composite_node_specs(name_filter.as_deref(), iterator_server)
         .context("FIDL call to get node groups failed")?;
 
     let mut info_result = Vec::new();

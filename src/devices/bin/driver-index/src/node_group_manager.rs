@@ -181,7 +181,7 @@ impl NodeGroupManager {
         }
     }
 
-    pub fn get_node_groups(&self, name_filter: Option<String>) -> Vec<fdd::NodeGroupInfo> {
+    pub fn get_node_groups(&self, name_filter: Option<String>) -> Vec<fdd::CompositeNodeSpecInfo> {
         if let Some(name) = name_filter {
             match self.node_group_list.get(&name) {
                 Some(item) => return vec![to_node_group_info(&name, item)],
@@ -220,26 +220,26 @@ impl NodeGroupManager {
     }
 }
 
-fn to_node_group_info(name: &str, node_group_info: &NodeGroupInfo) -> fdd::NodeGroupInfo {
+fn to_node_group_info(name: &str, node_group_info: &NodeGroupInfo) -> fdd::CompositeNodeSpecInfo {
     match &node_group_info.matched {
         Some(matched_driver) => {
             let driver = match &matched_driver.info.driver_info {
                 Some(driver_info) => driver_info.url.clone().or(driver_info.driver_url.clone()),
                 None => None,
             };
-            fdd::NodeGroupInfo {
+            fdd::CompositeNodeSpecInfo {
                 name: Some(name.to_string()),
                 driver,
                 primary_index: Some(matched_driver.primary_index),
-                node_names: Some(matched_driver.names.clone()),
-                nodes: Some(node_group_info.nodes.clone()),
-                ..fdd::NodeGroupInfo::EMPTY
+                parent_names: Some(matched_driver.names.clone()),
+                parents: Some(node_group_info.nodes.clone()),
+                ..fdd::CompositeNodeSpecInfo::EMPTY
             }
         }
-        None => fdd::NodeGroupInfo {
+        None => fdd::CompositeNodeSpecInfo {
             name: Some(name.to_string()),
-            nodes: Some(node_group_info.nodes.clone()),
-            ..fdd::NodeGroupInfo::EMPTY
+            parents: Some(node_group_info.nodes.clone()),
+            ..fdd::CompositeNodeSpecInfo::EMPTY
         },
     }
 }
@@ -655,10 +655,10 @@ mod tests {
         let node_groups = node_group_manager.get_node_groups(Some("test_group".to_string()));
         assert_eq!(1, node_groups.len());
         let node_group = &node_groups[0];
-        let expected_node_group = fdd::NodeGroupInfo {
+        let expected_node_group = fdd::CompositeNodeSpecInfo {
             name: Some("test_group".to_string()),
-            nodes,
-            ..fdd::NodeGroupInfo::EMPTY
+            parents: nodes,
+            ..fdd::CompositeNodeSpecInfo::EMPTY
         };
 
         assert_eq!(&expected_node_group, node_group);
@@ -1567,17 +1567,17 @@ mod tests {
         let node_groups = node_group_manager.get_node_groups(Some("test_group".to_string()));
         assert_eq!(1, node_groups.len());
         let node_group = &node_groups[0];
-        let expected_node_group = fdd::NodeGroupInfo {
+        let expected_node_group = fdd::CompositeNodeSpecInfo {
             name: Some("test_group".to_string()),
             driver: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
             primary_index: Some(0),
-            node_names: Some(vec![
+            parent_names: Some(vec![
                 TEST_PRIMARY_NAME.to_string(),
                 TEST_ADDITIONAL_B_NAME.to_string(),
                 TEST_ADDITIONAL_A_NAME.to_string(),
             ]),
-            nodes,
-            ..fdd::NodeGroupInfo::EMPTY
+            parents: nodes,
+            ..fdd::CompositeNodeSpecInfo::EMPTY
         };
 
         assert_eq!(&expected_node_group, node_group);
@@ -1742,17 +1742,17 @@ mod tests {
         let node_groups = node_group_manager.get_node_groups(Some("test_group".to_string()));
         assert_eq!(1, node_groups.len());
         let node_group = &node_groups[0];
-        let expected_node_group = fdd::NodeGroupInfo {
+        let expected_node_group = fdd::CompositeNodeSpecInfo {
             name: Some("test_group".to_string()),
             driver: Some("fuchsia-pkg://fuchsia.com/package#driver/my-driver.cm".to_string()),
             primary_index: Some(2),
-            node_names: Some(vec![
+            parent_names: Some(vec![
                 TEST_ADDITIONAL_B_NAME.to_string(),
                 TEST_ADDITIONAL_A_NAME.to_string(),
                 TEST_PRIMARY_NAME.to_string(),
             ]),
-            nodes,
-            ..fdd::NodeGroupInfo::EMPTY
+            parents: nodes,
+            ..fdd::CompositeNodeSpecInfo::EMPTY
         };
 
         assert_eq!(&expected_node_group, node_group);

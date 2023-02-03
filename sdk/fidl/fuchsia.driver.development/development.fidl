@@ -201,7 +201,7 @@ protocol CompositeInfoIterator {
     });
 };
 
-type NodeGroupInfo = table {
+type CompositeNodeSpecInfo = table {
     /// The name of the node group.
     1: name string:MAX;
 
@@ -213,18 +213,18 @@ type NodeGroupInfo = table {
     /// to this node group.
     3: primary_index uint32;
 
-    /// A list of all the node names for this node group. Empty if no driver has matched to this
-    /// node group. These are ordered according to index.
-    4: node_names vector<string:MAX>:MAX;
+    /// A list of all the parents names for the composite node. Empty if no driver has matched to
+    /// this composite node spec. These are ordered according to index.
+    4: parent_names vector<string:MAX>:MAX;
 
     /// The nodes in the node group.
-    5: nodes vector<fuchsia.driver.framework.ParentSpec>:MAX;
+    5: parents vector<fuchsia.driver.framework.ParentSpec>:MAX;
 };
 
-protocol NodeGroupsIterator {
+protocol CompositeNodeSpecIterator {
     /// Return empty when no more node groups are left.
     GetNext() -> (struct {
-        node_groups vector<NodeGroupInfo>:MAX;
+        specs vector<CompositeNodeSpecInfo>:MAX;
     });
 };
 
@@ -246,16 +246,16 @@ protocol DriverIndex {
         iterator server_end:DriverInfoIterator;
     });
 
-    /// Returns a list of all node groups that are known to the system.
-    /// If a |name_filter| is provided, the returned list will only include 1 node group,
+    /// Returns a list of all composite node specs that are known to the system.
+    /// If a |name_filter| is provided, the returned list will only include 1 spec,
     /// the one with that exact name.
     ///
     /// |iterator| is closed with following epitaphs on error:
-    /// ZX_ERR_NOT_FOUND indicates that there are no node groups or if a |name_filter| is provided,
-    /// that there are no node groups with that name.
-    GetNodeGroups(resource struct {
+    /// ZX_ERR_NOT_FOUND indicates that there are no specs or if a |name_filter| is provided,
+    /// that there are no specs with that name.
+    GetCompositeNodeSpecs(resource struct {
         name_filter string:<MAX, optional>;
-        iterator server_end:NodeGroupsIterator;
+        iterator server_end:CompositeNodeSpecIterator;
     });
 };
 

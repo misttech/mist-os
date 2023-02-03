@@ -421,16 +421,16 @@ async fn run_driver_info_iterator_server(
     Ok(())
 }
 
-async fn run_node_groups_iterator_server(
-    node_groups: Arc<Mutex<Vec<fdd::NodeGroupInfo>>>,
-    stream: fdd::NodeGroupsIteratorRequestStream,
+async fn run_composite_node_specs_iterator_server(
+    node_groups: Arc<Mutex<Vec<fdd::CompositeNodeSpecInfo>>>,
+    stream: fdd::CompositeNodeSpecIteratorRequestStream,
 ) -> Result<(), anyhow::Error> {
     stream
         .map(|result| result.context("failed request"))
         .try_for_each(|request| async {
             let node_groups_clone = node_groups.clone();
             match request {
-                fdd::NodeGroupsIteratorRequest::GetNext { responder } => {
+                fdd::CompositeNodeSpecIteratorRequest::GetNext { responder } => {
                     let result = {
                         let mut node_groups = node_groups_clone.lock().unwrap();
                         let len = node_groups.len();
@@ -473,7 +473,9 @@ async fn run_driver_development_server(
                     })
                     .detach();
                 }
-                fdd::DriverIndexRequest::GetNodeGroups { name_filter, iterator, .. } => {
+                fdd::DriverIndexRequest::GetCompositeNodeSpecs {
+                    name_filter, iterator, ..
+                } => {
                     let node_group_manager = indexer.node_group_manager.borrow();
                     let node_groups = node_group_manager.get_node_groups(name_filter);
                     if node_groups.is_empty() {
@@ -483,7 +485,7 @@ async fn run_driver_development_server(
                     let node_groups = Arc::new(Mutex::new(node_groups));
                     let iterator = iterator.into_stream()?;
                     fasync::Task::spawn(async move {
-                        run_node_groups_iterator_server(node_groups, iterator)
+                        run_composite_node_specs_iterator_server(node_groups, iterator)
                             .await
                             .expect("Failed to run node groups iterator");
                     })

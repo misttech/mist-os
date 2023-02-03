@@ -7,23 +7,23 @@ use argh::FromArgs;
 #[derive(FromArgs, Debug, PartialEq)]
 #[argh(
     subcommand,
-    name = "list-node-groups",
-    description = "List Node Groups.",
-    example = "To list all Node Groups with properties:
+    name = "list-composite-node-specs",
+    description = "List composite node specs.",
+    example = "To list all composite node specs with properties:
 
-    $ driver list-node-groups -v
+    $ driver list-composite-node-specs -v
 
-To show a specific Node Group, specify a `--name` or `-n` for short:
+To show a specific composite nod spec, specify a `--name` or `-n` for short:
 
-    $ driver list-node-groups -n example_group",
+    $ driver list-composite-node-specs -n example_group",
     error_code(1, "Failed to connect to the driver development service")
 )]
-pub struct ListNodeGroupsCommand {
+pub struct ListCompositeNodeSpecsCommand {
     /// list all driver properties.
     #[argh(switch, short = 'v', long = "verbose")]
     pub verbose: bool,
 
-    /// only show the Node Group with this name.
+    /// only show the spec with this name.
     #[argh(option, short = 'n', long = "name")]
     pub name: Option<String>,
 
