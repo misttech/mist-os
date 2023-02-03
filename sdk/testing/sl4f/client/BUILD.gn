@@ -23,6 +23,7 @@ dart_library("client") {
     "src/exceptions.dart",
     "src/factory_store.dart",
     "src/feedback_data_provider.dart",
+    "src/flatland_example.dart",
     "src/input.dart",
     "src/inspect.dart",
     "src/modular.dart",

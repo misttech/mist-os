@@ -5,19 +5,17 @@
 use {
     anyhow::{Context as _, Error},
     async_utils::hanging_get::client::HangingGetStream,
-    fidl::endpoints::{create_proxy, ClientEnd},
+    fidl::endpoints::create_proxy,
     fidl_fuchsia_developer_tiles::{
-        ControllerAddTileFromUrlResponder, ControllerAddTileFromViewProviderResponder,
-        ControllerControlHandle, ControllerListTilesResponder, ControllerRequest,
-        ControllerRequestStream,
+        ControllerAddTileFromViewProviderResponder, ControllerControlHandle,
+        ControllerListTilesResponder, ControllerRequest, ControllerRequestStream,
     },
-    fidl_fuchsia_math as fmath,
-    fidl_fuchsia_sys::{LauncherMarker, LauncherProxy},
-    fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_composition as ui_comp,
+    fidl_fuchsia_math as fmath, fidl_fuchsia_ui_app as ui_app,
+    fidl_fuchsia_ui_composition as ui_comp,
     fidl_fuchsia_ui_gfx::Vec3,
     fidl_fuchsia_ui_views::{self as ui_views, ViewRef},
     fuchsia_async as fasync, fuchsia_component as component,
-    fuchsia_component::client::{connect_to_protocol, launch, App},
+    fuchsia_component::client::connect_to_protocol,
     fuchsia_scenic::{self as scenic, flatland},
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
@@ -35,15 +33,12 @@ const BG_CONTENT_ID: flatland::ContentId = flatland::ContentId { value: u64::MAX
 struct Tile {
     url: String,
     focusable: bool,
-    app: App,
-    status_watcher: fasync::Task<()>,
 }
 
 struct Service {
     next_id: u32,
     tiles: BTreeMap<u32, Tile>,
     session: flatland::FlatlandProxy,
-    launcher: LauncherProxy,
     focuser: ui_views::FocuserProxy,
     num_presents_allowed: u32,
     pending_present: bool,
@@ -56,7 +51,6 @@ enum MessageInternal {
     FlatlandEvent(flatland::FlatlandEvent),
     ParentViewportWatcherGetLayout(flatland::LayoutInfo),
     ReceivedChildViewRef(ViewRef),
-    TileExited(u32),
 }
 
 const GRID_MARGIN_DIVIDER: Option<u32> = Some(100);
@@ -130,7 +124,6 @@ impl Service {
     fn new(
         display: &flatland::FlatlandDisplayProxy,
         session: flatland::FlatlandProxy,
-        launcher: LauncherProxy,
         internal_sender: UnboundedSender<MessageInternal>,
     ) -> Service {
         session.set_debug_name("Tiles Service").expect("fidl error");
@@ -214,7 +207,6 @@ impl Service {
             next_id: 1,
             tiles: BTreeMap::new(),
             session,
-            launcher,
             focuser,
             num_presents_allowed: 1,
             pending_present: false,
@@ -223,19 +215,15 @@ impl Service {
         }
     }
 
-    fn add_tile_from_url(
+    fn add_tile_from_view_provider(
         &mut self,
         url: String,
-        allow_focus: bool,
-        args: Option<Vec<String>>,
+        view_provider: ui_app::ViewProviderProxy,
         sender: UnboundedSender<MessageInternal>,
-        responder: ControllerAddTileFromUrlResponder,
+        responder: ControllerAddTileFromViewProviderResponder,
     ) -> Result<(), Error> {
         let id = self.next_id;
 
-        let mut app = launch(&self.launcher, url.clone(), args)?;
-
-        let view_provider = app.connect_to_protocol::<ui_app::ViewProviderMarker>()?;
         let mut view_creation_tokens = flatland::ViewCreationTokenPair::new()?;
         view_provider
             .create_view2(ui_app::CreateView2Args {
@@ -271,25 +259,13 @@ impl Service {
             .expect("fidl error");
         self.session.set_content(&mut transform_id, &mut link_id).expect("fidl error");
 
-        let this_tile_id = self.next_id;
-
         self.session
             .add_child(&mut ROOT_TRANSFORM_ID.clone(), &mut transform_id)
             .expect("fidl error");
 
-        let app_status = app.wait();
-        let exit_sender = sender.clone();
-        let status_watcher = fasync::Task::local(async move {
-            let _exit_status = app_status.await;
-            exit_sender.unbounded_send(MessageInternal::TileExited(this_tile_id)).ok();
-        });
-
         self.next_id = self.next_id + 1;
-        self.tiles.insert(
-            id,
-            Tile { url: url, focusable: allow_focus, app: app, status_watcher: status_watcher },
-        );
-        responder.send(id).context("AddTileFromUrl: failed to send ID to client")?;
+        self.tiles.insert(id, Tile { url: url, focusable: true });
+        responder.send(id).context("AddTileFromViewProvider: failed to send ID to client")?;
 
         self.relayout();
 
@@ -311,17 +287,8 @@ impl Service {
         Ok(())
     }
 
-    fn add_tile_from_view_provider(
-        &mut self,
-        _url: String,
-        _provider: ClientEnd<ui_app::ViewProviderMarker>,
-        _responder: ControllerAddTileFromViewProviderResponder,
-    ) {
-        error!("AddTileFromViewProvider is not implemented (and probably will not be).");
-    }
-
     fn remove_tile(&mut self, key: u32) {
-        if let Some((_, mut tile)) = self.tiles.remove_entry(&key) {
+        if self.tiles.remove_entry(&key).is_some() {
             let mut transform_id = flatland::TransformId { value: key.into() };
             let mut link_id = flatland::ContentId { value: key.into() };
 
@@ -332,16 +299,6 @@ impl Service {
 
             // When removing a tile, we don't intend to reparent it, so we drop the returned future.
             let _ = self.session.release_viewport(&mut link_id);
-
-            // Cause the app to stop, should it still be running.
-            tile.app.kill().ok();
-
-            // Stop watching for exit status
-            fasync::Task::local(async move {
-                let _ = &tile;
-                tile.status_watcher.cancel().await;
-            })
-            .detach();
 
             self.relayout();
         } else {
@@ -483,28 +440,23 @@ async fn main() -> Result<(), Error> {
     setup_fidl_services(internal_sender.clone());
     setup_handle_flatland_events(flatland_session.take_event_stream(), internal_sender.clone());
 
-    let launcher =
-        connect_to_protocol::<LauncherMarker>().expect("error connecting to Launcher service");
-
-    let mut service =
-        Service::new(&flatland_display, flatland_session, launcher, internal_sender.clone());
+    let mut service = Service::new(&flatland_display, flatland_session, internal_sender.clone());
 
     while let Some(message) = internal_receiver.next().await {
         match message {
             MessageInternal::ControllerRequest(request) => match request {
-                ControllerRequest::AddTileFromUrl { url, allow_focus, args, responder } => {
-                    if let Err(e) = service.add_tile_from_url(
+                ControllerRequest::AddTileFromUrl { .. } => {
+                    error!("launching CFv1 tiles is no longer supported");
+                }
+                ControllerRequest::AddTileFromViewProvider { url, provider, responder } => {
+                    if let Err(e) = service.add_tile_from_view_provider(
                         url,
-                        allow_focus,
-                        args,
+                        provider.into_proxy().context("converting ClientEnd to Proxy")?,
                         internal_sender.clone(),
                         responder,
                     ) {
-                        info!("error in add_tile_from_url(): {:?}", e);
+                        info!("error in add_tile_from_view_provider(): {:?}", e);
                     }
-                }
-                ControllerRequest::AddTileFromViewProvider { url, provider, responder } => {
-                    service.add_tile_from_view_provider(url, provider, responder);
                 }
                 ControllerRequest::RemoveTile { key, .. } => {
                     service.remove_tile(key);
@@ -548,9 +500,6 @@ async fn main() -> Result<(), Error> {
                     }
                 })
                 .detach();
-            }
-            MessageInternal::TileExited(key) => {
-                service.remove_tile(key);
             }
         }
     }

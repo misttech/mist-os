@@ -66,6 +66,8 @@ use crate::feedback_data_provider::facade::FeedbackDataProviderFacade;
 // File related includes
 use crate::file::facade::FileFacade;
 
+use crate::flatland_example::facade::FlatlandExampleFacade;
+
 // Device Manager related includes
 use crate::hardware_power_statecontrol::facade::HardwarePowerStatecontrolFacade;
 
@@ -191,6 +193,7 @@ impl Sl4f {
                 "factory_store_facade" => FactoryStoreFacade::new(),
                 "feedback_data_provider_facade" => FeedbackDataProviderFacade::new(),
                 "file_facade" => FileFacade::new(),
+                "flatland_example_facade" => FlatlandExampleFacade::new(),
                 "gatt_client_facade" => GattClientFacade::new(),
                 "gatt_server_facade" => GattServerFacade::new(),
                 "hardware_power_statecontrol_facade" => HardwarePowerStatecontrolFacade::new(),

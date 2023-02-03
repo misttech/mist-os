@@ -18,6 +18,7 @@ pub mod factory_store;
 pub mod feedback_data_provider;
 pub mod fidl;
 pub mod file;
+pub mod flatland_example;
 pub mod hardware_power_statecontrol;
 pub mod hwinfo;
 pub mod input;

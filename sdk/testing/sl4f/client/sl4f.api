@@ -2349,6 +2349,50 @@
       "name": "feedback_data_provider.dart",
       "type": "file"
     },
+    "flatland_example.dart": {
+      "ClassDeclarationImpl": {
+        "FlatlandExample": {
+          "ConstructorDeclarationImpl": {
+            "FlatlandExample": {
+              "FieldFormalParameterImpl": {
+                "this._sl4f": {
+                  "name": "this._sl4f",
+                  "type": "FieldFormalParameterImpl"
+                }
+              },
+              "name": "FlatlandExample",
+              "type": "ConstructorDeclarationImpl"
+            }
+          },
+          "MethodDeclarationImpl": {
+            "start": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "start",
+              "returnType": "Future<void>",
+              "type": "MethodDeclarationImpl"
+            },
+            "stop": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "stop",
+              "returnType": "Future<void>",
+              "type": "MethodDeclarationImpl"
+            }
+          },
+          "name": "FlatlandExample",
+          "type": "ClassDeclarationImpl"
+        }
+      },
+      "name": "flatland_example.dart",
+      "type": "file"
+    },
     "flatland_latency.dart": {
       "FunctionDeclarationImpl": {
         "flatlandLatencyMetricsProcessor": {
@@ -5714,6 +5758,10 @@
         },
         "src/feedback_data_provider.dart": {
           "name": "src/feedback_data_provider.dart",
+          "type": "ExportDirectiveImpl"
+        },
+        "src/flatland_example.dart": {
+          "name": "src/flatland_example.dart",
           "type": "ExportDirectiveImpl"
         },
         "src/input.dart": {

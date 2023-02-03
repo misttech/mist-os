@@ -4,7 +4,21 @@
 
 // Adds sl4f to core for terminal and workstation
 {
-    include: [ "//src/testing/sl4f/meta/sl4f.core_shard.cml" ],
+    include: [ "//src/testing/sl4f/meta/sl4f_base.core_shard.cml" ],
+
+    // TODO(https://fxbug.dev/107905) Delete once example can be launched in tiles-session.
+    children: [
+        {
+            name: "flatland_view_provider_example",
+            url: "fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider.cm",
+            environment: "#core-env",
+        },
+        {
+            name: "tiles_flatland",
+            url: "fuchsia-pkg://fuchsia.com/tiles#meta/tiles-flatland.cm",
+            environment: "#core-env",
+        },
+    ],
     capabilities: [
         {
             // WARNING: Capabilities here are not guaranteed to be availble in terminal or workstation.
@@ -40,6 +54,56 @@
             from: "self",
             to: "#sl4f",
             dependency: "weak_for_migration",
+        },
+
+        // TODO(https://fxbug.dev/107905) Delete once example can be launched in tiles-session.
+        {
+            protocol: "fuchsia.ui.app.ViewProvider",
+            from: "#flatland_view_provider_example",
+            to: "#sl4f",
+        },
+        {
+            protocol: [ "fuchsia.developer.tiles.Controller" ],
+            from: "#tiles_flatland",
+            as: "fuchsia.developer.tiles.Controller.flatland",
+            to: "#sl4f",
+        },
+        {
+            protocol: [ "fuchsia.sysmem.Allocator" ],
+            from: "parent",
+            to: "#flatland_view_provider_example",
+        },
+        {
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            from: "#trace_manager",
+            to: [
+                "#flatland_view_provider_example",
+                "#tiles_flatland",
+            ],
+        },
+        {
+            protocol: [ "fuchsia.logger.LogSink" ],
+            from: "parent",
+            to: [
+                "#flatland_view_provider_example",
+                "#tiles_flatland",
+            ],
+        },
+        {
+            protocol: [
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+            ],
+            from: "#ui",
+            to: "#flatland_view_provider_example",
+        },
+        {
+            protocol: [
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.composition.FlatlandDisplay",
+            ],
+            from: "#ui",
+            to: "#tiles_flatland",
         },
     ],
 }

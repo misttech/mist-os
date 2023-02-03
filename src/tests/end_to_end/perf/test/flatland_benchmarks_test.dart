@@ -38,10 +38,8 @@ void _addTest(String testName, String appUrl) {
     await helper.sl4fDriver.ssh.run(
         'log flatland_benchmarks_test "Finished killing processes for flatland_benchmarks_test, before test"');
 
-    final tiles = Tiles(helper.sl4fDriver);
-    await tiles.startFlatland();
-
-    final tileKey = await tiles.addFromUrl(appUrl);
+    final flatlandExample = FlatlandExample(helper.sl4fDriver);
+    await flatlandExample.start();
 
     // Wait for the application to start.
     await Future.delayed(Duration(seconds: 3));
@@ -63,8 +61,7 @@ void _addTest(String testName, String appUrl) {
 
     await traceSession.stop();
 
-    await tiles.remove(tileKey);
-    await tiles.stop();
+    await flatlandExample.stop();
 
     final fxtTraceFile = await traceSession.terminateAndDownload(testName);
     final jsonTraceFile = await helper.performance

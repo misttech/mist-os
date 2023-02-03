@@ -72,12 +72,6 @@ fuchsia_component("flatland-view-provider-vulkan") {
   deps = [ ":bin" ]
 }
 
-fuchsia_component("flatland-view-provider-v1") {
-  component_name = "flatland-view-provider-example"
-  manifest = "meta/flatland-view-provider-example.cmx"
-  deps = [ ":bin" ]
-}
-
 fuchsia_unittest_package("flatland-view-provider-tests") {
   manifest = "meta/flatland-view-provider-tests.cml"
   deps = [ ":bin_test" ]

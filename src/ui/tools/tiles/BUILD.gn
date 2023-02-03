@@ -63,9 +63,16 @@ fuchsia_component("tiles-flatland") {
   deps = [ "flatland:bin" ]
 }
 
+fuchsia_component("tiles-flatland-v2") {
+  component_name = "tiles-flatland"
+  manifest = "flatland/meta/tiles-flatland.cml"
+  deps = [ "flatland:bin" ]
+}
+
 fuchsia_package("tiles") {
   deps = [
     ":tiles-flatland",
+    ":tiles-flatland-v2",
     ":tiles-gfx",
     ":tiles-gfx-v2",
   ]
