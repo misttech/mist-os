@@ -23,7 +23,7 @@ use crate::{
         queue::{
             BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequeueState, ReceiveQueue,
             ReceiveQueueContext, ReceiveQueueFullError, ReceiveQueueNonSyncContext,
-            ReceiveQueueState,
+            ReceiveQueueState, ReceiveQueueTypes,
         },
         state::IpLinkDeviceState,
         with_loopback_state, Device, DeviceIdContext, DeviceLayerEventDispatcher, FrameDestination,
@@ -147,10 +147,12 @@ impl<C: NonSyncContext> ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDevic
     }
 }
 
-impl<C: NonSyncContext> ReceiveQueueContext<LoopbackDevice, C> for &'_ SyncCtx<C> {
+impl<C: NonSyncContext> ReceiveQueueTypes<LoopbackDevice, C> for &'_ SyncCtx<C> {
     type Meta = IpVersion;
     type Buffer = Buf<Vec<u8>>;
+}
 
+impl<C: NonSyncContext> ReceiveQueueContext<LoopbackDevice, C> for &'_ SyncCtx<C> {
     fn with_receive_queue_mut<
         O,
         F: FnOnce(&mut ReceiveQueueState<Self::Meta, Self::Buffer>) -> O,

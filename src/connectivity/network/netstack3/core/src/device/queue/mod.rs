@@ -72,8 +72,7 @@ pub(crate) struct ReceiveQueue<Meta, Buffer> {
     pub(crate) queue: Mutex<ReceiveQueueState<Meta, Buffer>>,
 }
 
-/// The execution context for a receive queue.
-pub(crate) trait ReceiveQueueContext<D: Device, C>: DeviceIdContext<D> {
+pub(crate) trait ReceiveQueueTypes<D: Device, C>: DeviceIdContext<D> {
     /// Metadata associated with an RX packet.
     ///
     /// E.g. loopback may hold the packet's IP version in the metadata (since
@@ -82,7 +81,10 @@ pub(crate) trait ReceiveQueueContext<D: Device, C>: DeviceIdContext<D> {
 
     /// The type of buffer holding an RX packet.
     type Buffer: ParseBuffer;
+}
 
+/// The execution context for a receive queue.
+pub(crate) trait ReceiveQueueContext<D: Device, C>: ReceiveQueueTypes<D, C> {
     /// Calls the function with the RX queue state.
     fn with_receive_queue_mut<O, F: FnOnce(&mut ReceiveQueueState<Self::Meta, Self::Buffer>) -> O>(
         &mut self,
@@ -100,7 +102,7 @@ pub(crate) trait ReceiveQueueContext<D: Device, C>: DeviceIdContext<D> {
     );
 }
 
-pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueContext<D, C> {
+pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
     type ReceiveQueueCtx: ReceiveQueueContext<
         D,
         C,
@@ -137,8 +139,11 @@ pub(crate) trait ReceiveQueueHandler<D: Device, C>: DeviceIdContext<D> {
 
 /// An implementation of a receive queue, with a buffer.
 pub(crate) trait BufferReceiveQueueHandler<D: Device, B: ParseBuffer, C>:
-    ReceiveQueueHandler<D, C>
+    DeviceIdContext<D>
 {
+    /// Metadata associated with an RX packet.
+    type Meta;
+
     /// Queues a packet for reception.
     ///
     /// # Errors
@@ -194,9 +199,11 @@ impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDeque
     }
 }
 
-impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDequeContext<D, C>>
+impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveQueueContext<D, C>>
     BufferReceiveQueueHandler<D, SC::Buffer, C> for SC
 {
+    type Meta = SC::Meta;
+
     fn queue_rx_packet(
         &mut self,
         ctx: &mut C,
@@ -251,10 +258,12 @@ mod tests {
         }
     }
 
-    impl ReceiveQueueContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+    impl ReceiveQueueTypes<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
         type Meta = ();
         type Buffer = Buf<Vec<u8>>;
+    }
 
+    impl ReceiveQueueContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
         fn with_receive_queue_mut<O, F: FnOnce(&mut ReceiveQueueState<(), Buf<Vec<u8>>>) -> O>(
             &mut self,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
