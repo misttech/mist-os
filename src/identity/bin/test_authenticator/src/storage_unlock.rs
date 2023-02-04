@@ -71,11 +71,19 @@ impl StorageUnlockMechanism {
         match request {
             StorageUnlockMechanismRequest::Authenticate { interaction, enrollments, responder } => {
                 let mut response = self.authenticate(interaction, enrollments).await;
-                responder.send(&mut response)
+                match responder.send(&mut response) {
+                    // TODO(fxbug.dev/113160): Remove this since it will never occur.
+                    Err(e) if e.is_closed() => Ok(()),
+                    result => result,
+                }
             }
             StorageUnlockMechanismRequest::Enroll { interaction, responder } => {
                 let mut response = self.enroll(interaction).await;
-                responder.send(&mut response)
+                match responder.send(&mut response) {
+                    // TODO(fxbug.dev/113160): Remove this since it will never occur.
+                    Err(e) if e.is_closed() => Ok(()),
+                    result => result,
+                }
             }
         }
     }
@@ -168,9 +176,8 @@ mod test {
     }
 
     /// Starts the StorageUnlockMechanism server. Then it runs the `test_fn` and
-    /// checks its result. If `ok_server_result` is true, we verify that the
-    /// server should return an `Ok` value. Otherwise it should return an error.
-    async fn run_proxy_test<Fn, Fut>(ok_server_result: bool, test_fn: Fn)
+    /// checks its result. Also asserts that the server returns an `Ok` value.
+    async fn run_proxy_test<Fn, Fut>(test_fn: Fn)
     where
         Fn: FnOnce(StorageUnlockMechanismProxy) -> Fut,
         Fut: Future<Output = Result<(), fidl::Error>>,
@@ -182,16 +189,12 @@ mod test {
 
         let (test_result, server_result) = join(test_fut, server_fut).await;
         assert!(test_result.is_ok());
-        if ok_server_result {
-            assert!(server_result.is_ok());
-        } else {
-            assert!(server_result.is_err());
-        }
+        assert!(server_result.is_ok());
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn no_set_success_authentication_enroll_and_authenticate() {
-        run_proxy_test(true, |proxy| async move {
+        run_proxy_test(|proxy| async move {
             let (enrollment_data, enrollment_prekey) =
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
@@ -217,7 +220,7 @@ mod test {
         // Since we don't call SetSuccess on the TestInteraction channel, the
         // TestInteraction server handler, and hence the StorageUnlockMechanism
         // server handler will keep waiting and will not return.
-        run_proxy_test(false, |proxy| async move {
+        run_proxy_test(|proxy| async move {
             let (enrollment_data, enrollment_prekey) =
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
@@ -245,7 +248,7 @@ mod test {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn interection_enroll_and_successfully_authenticate_produce_same_prekey() {
-        run_proxy_test(true, |proxy| async move {
+        run_proxy_test(|proxy| async move {
             let (enrollment_data, enrollment_prekey) =
                 proxy.enroll(&mut create_test_interaction_protocol()).await?.unwrap();
 
@@ -269,7 +272,7 @@ mod test {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn set_success_and_authenticate_multiple_enrollments() {
-        run_proxy_test(true, |proxy| async move {
+        run_proxy_test(|proxy| async move {
             let enrollment = Enrollment { id: TEST_ENROLLMENT_ID, data: vec![3] };
             let enrollment_2 = Enrollment { id: TEST_ENROLLMENT_ID_2, data: vec![12] };
             let (test_proxy, mut test_ipse) = create_test_interaction_proxy_and_server_end();
@@ -291,7 +294,7 @@ mod test {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn password_ipse_fail_enrollment_and_authentication() {
-        run_proxy_test(true, |proxy| async move {
+        run_proxy_test(|proxy| async move {
             // Fail Enrollment since it only supports Test IPSE.
             assert_eq!(
                 proxy.enroll(&mut create_password_interaction_protocol()).await?,
