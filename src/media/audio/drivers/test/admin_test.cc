@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 
 #include <algorithm>
 #include <cstring>
@@ -68,7 +69,7 @@ void AdminTest::RequestRingBufferChannel() {
 
 // Request that driver set format to the lowest bit-rate/channelization of the ranges reported.
 // This method assumes that the driver has already successfully responded to a GetFormats request.
-void AdminTest::RequestMinFormat() {
+void AdminTest::RequestRingBufferChannelWithMinFormat() {
   ASSERT_GT(pcm_formats().size(), 0u);
 
   pcm_format_ = min_format();
@@ -77,7 +78,7 @@ void AdminTest::RequestMinFormat() {
 
 // Request that driver set the highest bit-rate/channelization of the ranges reported.
 // This method assumes that the driver has already successfully responded to a GetFormats request.
-void AdminTest::RequestMaxFormat() {
+void AdminTest::RequestRingBufferChannelWithMaxFormat() {
   ASSERT_GT(pcm_formats().size(), 0u);
 
   pcm_format_ = max_format();
@@ -141,29 +142,40 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
             ZX_OK);
 }
 
-void AdminTest::ActivateChannels(uint64_t active_channels_bitmask) {
-  bool active_channels_were_set = false;
+void AdminTest::ActivateChannelsAndExpectSuccess(uint64_t active_channels_bitmask) {
+  ActivateChannels(active_channels_bitmask, true);
+}
 
+void AdminTest::ActivateChannelsAndExpectFailure(uint64_t active_channels_bitmask) {
+  ActivateChannels(active_channels_bitmask, false);
+}
+
+void AdminTest::ActivateChannels(uint64_t active_channels_bitmask, bool expect_success) {
+  zx_status_t status = ZX_OK;
   auto send_time = zx::clock::get_monotonic();
   auto set_time = zx::time(0);
   ring_buffer_->SetActiveChannels(
       active_channels_bitmask,
       AddCallback("SetActiveChannels",
-                  [active_channels_bitmask, &active_channels_were_set, &set_time](
+                  [&status, &set_time](
                       fuchsia::hardware::audio::RingBuffer_SetActiveChannels_Result result) {
                     if (!result.is_err()) {
-                      active_channels_were_set = true;
                       set_time = zx::time(result.response().set_time);
-                    } else if (result.err() == ZX_ERR_NOT_SUPPORTED) {
-                      GTEST_SKIP() << "This driver does not support SetActiveChannels()";
                     } else {
-                      ADD_FAILURE() << "ring_buffer_fidl->SetActiveChannels(0x" << std::hex
-                                    << active_channels_bitmask << ") received error " << std::dec
-                                    << result.err();
+                      status = result.err();
                     }
                   }));
   ExpectCallbacks();
-  if (!HasFailure() && !IsSkipped()) {
+
+  if (status == ZX_ERR_NOT_SUPPORTED) {
+    GTEST_SKIP() << "This driver does not support SetActiveChannels()";
+    __UNREACHABLE;
+  }
+
+  SCOPED_TRACE(testing::Message() << "...during ring_buffer_fidl->SetActiveChannels(0x" << std::hex
+                                  << active_channels_bitmask << ")");
+  ASSERT_EQ(status, expect_success ? ZX_OK : ZX_ERR_INVALID_ARGS);
+  if (expect_success) {
     EXPECT_GT(set_time, send_time);
   }
 }
@@ -338,7 +350,7 @@ void AdminTest::ExpectExternalDelayMatchesRingBufferProperties() {
 // Verify valid responses: ring buffer properties
 DEFINE_ADMIN_TEST_CLASS(GetRingBufferProperties, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
   RequestRingBufferProperties();
   WaitForError();
@@ -347,7 +359,7 @@ DEFINE_ADMIN_TEST_CLASS(GetRingBufferProperties, {
 // Verify valid responses: get ring buffer VMO.
 DEFINE_ADMIN_TEST_CLASS(GetBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
 
   RequestBuffer(100);
   WaitForError();
@@ -356,21 +368,30 @@ DEFINE_ADMIN_TEST_CLASS(GetBuffer, {
 // Verify valid responses: set active channels
 DEFINE_ADMIN_TEST_CLASS(SetActiveChannels, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
-  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannels(0));
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannelsAndExpectSuccess(0));
 
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
-  auto all_channels = (1 << pcm_format().number_of_channels) - 1;
-  ActivateChannels(all_channels);
+  uint64_t all_channels = (1 << pcm_format().number_of_channels) - 1;
+  ActivateChannelsAndExpectSuccess(all_channels);
   WaitForError();
+});
+
+// Verify an invalid input (out of range) for SetActiveChannels.
+DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsTooHigh, {
+  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
+
+  auto channel_mask_too_high = (1 << pcm_format().number_of_channels);
+  ActivateChannelsAndExpectFailure(channel_mask_too_high);
 });
 
 // Verify that valid start responses are received.
 DEFINE_ADMIN_TEST_CLASS(Start, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(32000));
 
   RequestStart();
@@ -380,7 +401,7 @@ DEFINE_ADMIN_TEST_CLASS(Start, {
 // ring-buffer FIDL channel should disconnect, with ZX_ERR_BAD_STATE
 DEFINE_ADMIN_TEST_CLASS(StartBeforeGetVmoShouldDisconnect, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
 
   RequestStartAndExpectDisconnect(ZX_ERR_BAD_STATE);
 });
@@ -388,7 +409,7 @@ DEFINE_ADMIN_TEST_CLASS(StartBeforeGetVmoShouldDisconnect, {
 // ring-buffer FIDL channel should disconnect, with ZX_ERR_BAD_STATE
 DEFINE_ADMIN_TEST_CLASS(StartWhileStartedShouldDisconnect, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
@@ -398,7 +419,7 @@ DEFINE_ADMIN_TEST_CLASS(StartWhileStartedShouldDisconnect, {
 // Verify that valid stop responses are received.
 DEFINE_ADMIN_TEST_CLASS(Stop, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
@@ -409,14 +430,14 @@ DEFINE_ADMIN_TEST_CLASS(Stop, {
 // ring-buffer FIDL channel should disconnect, with ZX_ERR_BAD_STATE
 DEFINE_ADMIN_TEST_CLASS(StopBeforeGetVmoShouldDisconnect, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
 
   RequestStopAndExpectDisconnect(ZX_ERR_BAD_STATE);
 });
 
 DEFINE_ADMIN_TEST_CLASS(StopWhileStoppedIsPermitted, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStop());
 
@@ -427,7 +448,7 @@ DEFINE_ADMIN_TEST_CLASS(StopWhileStoppedIsPermitted, {
 // Verify valid WatchDelayInfo internal_delay responses.
 DEFINE_ADMIN_TEST_CLASS(InternalDelayIsValid, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
   WatchDelayAndExpectUpdate();
   ValidateInternalDelay();
@@ -437,7 +458,7 @@ DEFINE_ADMIN_TEST_CLASS(InternalDelayIsValid, {
 // Verify valid WatchDelayInfo external_delay response.
 DEFINE_ADMIN_TEST_CLASS(ExternalDelayIsValid, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
   WatchDelayAndExpectUpdate();
   ValidateExternalDelay();
@@ -447,7 +468,7 @@ DEFINE_ADMIN_TEST_CLASS(ExternalDelayIsValid, {
 // Verify valid responses: WatchDelayInfo does NOT respond a second time.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoSecondTimeNoResponse, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
 
   WatchDelayAndExpectUpdate();
   WatchDelayAndExpectNoUpdate();
@@ -462,7 +483,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoSecondTimeNoResponse, {
 // Verify that valid WatchDelayInfo responses are received, even after Start().
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
@@ -474,7 +495,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
 // TODO(fxbug.dev/116898): eliminate this case once fifo_depth is entirely removed.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoInternalDelayMatchesFifoDepth, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
 
   WatchDelayAndExpectUpdate();
@@ -488,7 +509,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoInternalDelayMatchesFifoDepth, {
 // TODO(fxbug.dev/116898): eliminate this case once RingBufferProperties.external_delay is removed.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoExternalDelayMatchesRingBufferProps, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
 
   WatchDelayAndExpectUpdate();
@@ -498,7 +519,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoExternalDelayMatchesRingBufferProps, {
 // Create RingBuffer, fully exercise it, drop it, recreate it, then validate GetDelayInfo.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(WatchDelayAndExpectUpdate());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
@@ -508,7 +529,7 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
 
   // Dropped first ring buffer, creating second one, reverifying WatchDelayInfo.
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(WatchDelayAndExpectUpdate());
@@ -520,20 +541,22 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
 // Create RingBuffer, fully exercise it, drop it, recreate it, then validate SetActiveChannels.
 DEFINE_ADMIN_TEST_CLASS(SetActiveChannelsAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
-  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannels((1 << pcm_format().number_of_channels) - 1));
+  ASSERT_NO_FAILURE_OR_SKIP(
+      ActivateChannelsAndExpectSuccess((1 << pcm_format().number_of_channels) - 1));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStop());
   ASSERT_NO_FAILURE_OR_SKIP(DropRingBuffer());
 
   // Dropped first ring buffer, creating second one, reverifying SetActiveChannels.
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(100));
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
-  ASSERT_NO_FAILURE_OR_SKIP(ActivateChannels((1 << pcm_format().number_of_channels) - 1));
+  ASSERT_NO_FAILURE_OR_SKIP(
+      ActivateChannelsAndExpectSuccess((1 << pcm_format().number_of_channels) - 1));
 
   RequestStop();
   WaitForError();
@@ -564,6 +587,7 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(ExternalDelayIsValid, device_entry);
 
     REGISTER_ADMIN_TEST(SetActiveChannels, device_entry);
+    REGISTER_ADMIN_TEST(SetActiveChannelsTooHigh, device_entry);
     REGISTER_ADMIN_TEST(GetDelayInfoSecondTimeNoResponse, device_entry);
 
     REGISTER_ADMIN_TEST(Start, device_entry);

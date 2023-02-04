@@ -138,7 +138,7 @@ void PositionTest::ValidatePositionInfo() {
 DEFINE_POSITION_TEST_CLASS(PositionNotifyFast, {
   // Request a 0.5-second ring-buffer
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(pcm_format().frame_rate / 2, 32));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
@@ -156,7 +156,7 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
   // Request a 2-second ring-buffer
   constexpr auto kNotifsPerRingBuffer = 2u;
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMinFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(pcm_format().frame_rate * 2, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
@@ -175,7 +175,7 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
 // Verify no position notifications arrive after stop.
 DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000, 32));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
@@ -188,7 +188,7 @@ DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
 // Verify no position notifications arrive if notifications_per_ring is 0.
 DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestMaxFormat());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000, 0));
   ASSERT_NO_FAILURE_OR_SKIP(DisallowPositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());

@@ -25,15 +25,15 @@ class AdminTest : public TestBase {
   void TearDown() override;
   void DropRingBuffer();
 
-  void RequestMinFormat();
-  void RequestMaxFormat();
+  void RequestRingBufferChannelWithMinFormat();
+  void RequestRingBufferChannelWithMaxFormat();
 
   void CalculateFrameSize();
 
-  void RequestRingBufferChannel();
   void RequestRingBufferProperties();
   void RequestBuffer(uint32_t min_ring_buffer_frames, uint32_t notifications_per_ring);
-  void ActivateChannels(uint64_t active_channels_bitmask);
+  void ActivateChannelsAndExpectSuccess(uint64_t active_channels_bitmask);
+  void ActivateChannelsAndExpectFailure(uint64_t active_channels_bitmask);
 
   void RequestStart();
   void RequestStartAndExpectDisconnect(zx_status_t expected_error);
@@ -64,6 +64,9 @@ class AdminTest : public TestBase {
   uint16_t frame_size() const { return frame_size_; }
 
  private:
+  void RequestRingBufferChannel();
+  void ActivateChannels(uint64_t active_channels_bitmask, bool expect_success);
+
   fidl::InterfacePtr<fuchsia::hardware::audio::RingBuffer> ring_buffer_;
   std::optional<fuchsia::hardware::audio::RingBufferProperties> ring_buffer_props_;
   std::optional<fuchsia::hardware::audio::DelayInfo> delay_info_;
