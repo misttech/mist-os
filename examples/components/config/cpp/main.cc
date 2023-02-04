@@ -26,7 +26,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   std::this_thread::sleep_for(std::chrono::milliseconds(c.delay_ms()));
 
   // Print greeting to the log
-  FX_LOGS(INFO) << "Hello, " << c.greeting() << "!";
+  FX_LOGS(INFO) << "Hello, " << c.greeting() << "! (from C++)";
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 

@@ -20,7 +20,7 @@ async fn main() {
     std::thread::sleep(std::time::Duration::from_millis(config.delay_ms));
 
     // Print greeting to the log
-    info!("Hello, {}!", config.greeting);
+    info!("Hello, {}! (from Rust)", config.greeting);
 
     // [START inspect]
     // Record configuration to inspect
