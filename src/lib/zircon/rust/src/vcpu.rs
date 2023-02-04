@@ -65,6 +65,19 @@ impl Vcpu {
         };
         ok(status)
     }
+
+    /// Write the result of an IO trap to a VCPU.
+    pub fn write_io(&self, state: &sys::zx_vcpu_io_t) -> Result<(), Status> {
+        let status = unsafe {
+            sys::zx_vcpu_write_state(
+                self.raw_handle(),
+                sys::ZX_VCPU_IO,
+                state as *const _ as *const u8,
+                std::mem::size_of_val(state),
+            )
+        };
+        ok(status)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

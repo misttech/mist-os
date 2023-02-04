@@ -1215,6 +1215,14 @@ pub struct zx_vcpu_state_t {
     pub _padding1: [PadByte; 4],
 }
 
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct zx_vcpu_io_t {
+    pub access_size: u8,
+    pub _padding1: [PadByte; 3],
+    pub data: [u8; 4],
+}
+
 #[cfg(target_arch = "aarch64")]
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
