@@ -21,7 +21,7 @@ class NodePage : public Page, public fbl::Recyclable<NodePage> {
   NodePage &operator=(const NodePage &&) = delete;
   void fbl_recycle() { RecyclePage(); }
 
-  void FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs, bool reset);
+  void FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs);
   void CopyNodeFooterFrom(NodePage &src);
   void FillNodeFooterBlkaddr(block_t blkaddr);
   nid_t InoOfNode();

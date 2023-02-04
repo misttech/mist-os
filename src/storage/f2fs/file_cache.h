@@ -152,7 +152,7 @@ class Page : public PageRefCounted<Page>,
   // its block address in a dnode or nat entry first.
   void Invalidate();
 
-  static constexpr uint32_t BlockSize() { return kPageSize; }
+  static constexpr uint32_t Size() { return kPageSize; }
   block_t GetBlockAddr() const { return block_addr_; }
   zx::result<> SetBlockAddr(block_t addr);
 
@@ -264,8 +264,8 @@ class LockedPage final {
   // Call Page::SetDirty().
   // If |add_to_list| is true, it is inserted into F2fs::dirty_data_page_list_.
   bool SetDirty(bool add_to_list = true);
-  void Zero(size_t start = 0, size_t end = kPageSize) const {
-    if (start < end && end <= Page::BlockSize()) {
+  void Zero(size_t start = 0, size_t end = Page::Size()) const {
+    if (start < end && end <= Page::Size()) {
       std::memset(page_->GetAddress<uint8_t>() + start, 0, end - start);
     }
   }

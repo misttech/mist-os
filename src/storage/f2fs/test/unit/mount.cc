@@ -111,8 +111,8 @@ void TestSegmentType(F2fs *fs, Dir *root_dir, std::string_view name, bool is_dir
     LockedPage page;
     fs->GetNodeVnode().GrabCachePage(vn->Ino(), &page);
     NodePage *node_page = &page.GetPage<NodePage>();
-    node_page->FillNodeFooter(static_cast<nid_t>(node_page->GetIndex()), vn->Ino(), inode_ofs,
-                              true);
+    page.Zero();
+    node_page->FillNodeFooter(static_cast<nid_t>(node_page->GetIndex()), vn->Ino(), inode_ofs);
     node_page->SetColdNode(*vn);
     type = fs->GetSegmentManager().GetSegmentType(*node_page, PageType::kNode);
     out.push_back(type);
@@ -123,8 +123,9 @@ void TestSegmentType(F2fs *fs, Dir *root_dir, std::string_view name, bool is_dir
     LockedPage page;
     fs->GetNodeVnode().GrabCachePage(nid, &page);
     NodePage *node_page = &page.GetPage<NodePage>();
+    page.Zero();
     node_page->FillNodeFooter(static_cast<nid_t>(node_page->GetIndex()), vn->Ino(),
-                              indirect_node_ofs, true);
+                              indirect_node_ofs);
     node_page->SetColdNode(*vn);
     type = fs->GetSegmentManager().GetSegmentType(*node_page, PageType::kNode);
     out.push_back(type);

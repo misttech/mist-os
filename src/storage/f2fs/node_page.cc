@@ -5,10 +5,8 @@
 #include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {
-void NodePage::FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs, bool reset) {
+void NodePage::FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs) {
   Node &rn = GetRawNode();
-  if (reset)
-    memset(&rn, 0, sizeof(rn));
   rn.footer.nid = CpuToLe(nid);
   rn.footer.ino = CpuToLe(ino);
   rn.footer.flag = CpuToLe(ofs << static_cast<int>(BitShift::kOffsetBitShift));

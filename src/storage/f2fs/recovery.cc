@@ -253,7 +253,7 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
   }
 
   dnode_page.GetPage<NodePage>().CopyNodeFooterFrom(page);
-  dnode_page.GetPage<NodePage>().FillNodeFooter(ni.nid, ni.ino, page.OfsOfNode(), false);
+  dnode_page.GetPage<NodePage>().FillNodeFooter(ni.nid, ni.ino, page.OfsOfNode());
   dnode_page.SetDirty();
 }
 
