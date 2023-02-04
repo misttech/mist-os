@@ -52,6 +52,7 @@ where
 impl<R: From<Response> + Send + Sync + 'static, T: Responder<R> + Send + Sync + 'static>
     Work<R, T>
 {
+    #[allow(dead_code)]
     pub(crate) fn new(policy_type: PolicyType, request: Request, responder: T) -> Self {
         Self { policy_type, request, responder, _data: PhantomData }
     }

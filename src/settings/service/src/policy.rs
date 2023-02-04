@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::audio::policy::{self as audio, State};
 use crate::base::SettingType;
 use crate::generate_inspect_with_info;
 use crate::payload_convert;
@@ -14,6 +13,7 @@ use async_trait::async_trait;
 use futures::future::BoxFuture;
 use serde::{Deserialize, Serialize};
 use settings_storage::device_storage::DeviceStorage;
+use settings_storage::device_storage::DeviceStorageCompatible;
 use settings_storage::storage_factory::StorageFactory;
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -35,9 +35,7 @@ pub mod policy_handler_factory_impl;
 #[derive(PartialEq, Debug, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
 pub enum PolicyType {
     /// This type is reserved for testing purposes.
-    #[cfg(test)]
     Unknown,
-    Audio,
 }
 
 pub(crate) trait HasPolicyType {
@@ -46,11 +44,12 @@ pub(crate) trait HasPolicyType {
 
 impl PolicyType {
     /// Returns the corresponding setting type that this policy controls.
-    pub(crate) fn setting_type(&self) -> SettingType {
+    pub(crate) fn setting_type(&self) -> Option<SettingType> {
         match self {
             #[cfg(test)]
-            PolicyType::Unknown => SettingType::Unknown,
-            PolicyType::Audio => SettingType::Audio,
+            PolicyType::Unknown => Some(SettingType::Unknown),
+            #[allow(unreachable_patterns)]
+            _ => None,
         }
     }
 }
@@ -58,11 +57,10 @@ impl PolicyType {
 generate_inspect_with_info! {
     /// Enumeration over the possible policy state information for all policies.
     #[derive(PartialEq, Debug, Clone)]
+    #[allow(dead_code)]
     pub enum PolicyInfo {
         /// This value is reserved for testing purposes.
-        #[cfg(test)]
         Unknown(UnknownInfo),
-        Audio(State),
     }
 }
 
@@ -92,49 +90,34 @@ macro_rules! conversion_impls {
 }
 
 conversion_impls! {
-    #[cfg(test)] Unknown(UnknownInfo) => Unknown,
-    Audio(State) => Audio,
+    Unknown(UnknownInfo) => Unknown,
 }
 
-#[cfg(test)]
-mod testing {
-    use super::{PolicyInfo, UnknownInfo};
-    use settings_storage::device_storage::DeviceStorageCompatible;
+impl DeviceStorageCompatible for UnknownInfo {
+    const KEY: &'static str = "unknown_info";
 
-    impl DeviceStorageCompatible for UnknownInfo {
-        const KEY: &'static str = "unknown_info";
-
-        fn default_value() -> Self {
-            Self(false)
-        }
-    }
-
-    impl From<UnknownInfo> for PolicyInfo {
-        fn from(unknown_info: UnknownInfo) -> Self {
-            PolicyInfo::Unknown(unknown_info)
-        }
+    fn default_value() -> Self {
+        Self(false)
     }
 }
 
-impl From<State> for PolicyInfo {
-    fn from(state: State) -> Self {
-        PolicyInfo::Audio(state)
+impl From<UnknownInfo> for PolicyInfo {
+    fn from(unknown_info: UnknownInfo) -> Self {
+        PolicyInfo::Unknown(unknown_info)
     }
 }
 
 impl From<&PolicyInfo> for PolicyType {
     fn from(policy_info: &PolicyInfo) -> Self {
         match policy_info {
-            #[cfg(test)]
             PolicyInfo::Unknown(_) => PolicyType::Unknown,
-            PolicyInfo::Audio(_) => PolicyType::Audio,
         }
     }
 }
 
 /// This struct is reserved for testing purposes.
 #[derive(PartialEq, Debug, Copy, Clone, Serialize, Deserialize)]
-#[cfg(test)]
+#[allow(dead_code)]
 pub struct UnknownInfo(pub bool);
 
 #[derive(PartialEq, Clone, Debug)]
@@ -162,9 +145,6 @@ pub enum Request {
 
     /// Restore saved state from disk.
     Restore,
-
-    /// Request targeted to the Audio policy.
-    Audio(audio::Request),
 }
 
 pub mod response {
@@ -178,7 +158,6 @@ pub mod response {
     pub enum Payload {
         PolicyInfo(PolicyInfo),
         Restore,
-        Audio(audio::Response),
     }
 
     /// The possible errors that can be returned from a request. Note that

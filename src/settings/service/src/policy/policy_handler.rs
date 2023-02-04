@@ -4,21 +4,16 @@
 
 use crate::base::SettingType;
 use crate::handler::base::{Payload as HandlerPayload, Request, Response as SettingResponse};
-use crate::handler::setting_handler::{SettingHandlerResult, StorageFactory};
+use crate::handler::setting_handler::SettingHandlerResult;
 use crate::message::base::Audience;
 use crate::policy::response::{Error as PolicyError, Response};
-use crate::policy::{
-    BoxedHandler, Context, GenerateHandlerResult, HasPolicyType, PolicyInfo, PolicyType,
-    Request as PolicyRequest,
-};
+use crate::policy::{HasPolicyType, PolicyInfo, PolicyType, Request as PolicyRequest};
 use crate::service;
 use crate::storage::{self, StorageInfo};
 use anyhow::Error;
 use async_trait::async_trait;
 use fuchsia_syslog::fx_log_err;
 use fuchsia_trace as ftrace;
-use futures::future::BoxFuture;
-use settings_storage::device_storage::DeviceStorage;
 use settings_storage::UpdateState;
 use std::convert::{TryFrom, TryInto};
 
@@ -67,6 +62,7 @@ pub trait PolicyHandler {
 /// [`PolicyProxy`]: ../policy_proxy/struct.PolicyProxy.html
 ///
 #[derive(Clone, Debug, PartialEq)]
+#[allow(dead_code)]
 pub enum RequestTransform {
     /// A new, modified request that should be forwarded to the setting handler for processing.
     Request(Request),
@@ -83,6 +79,7 @@ pub enum RequestTransform {
 /// [`PolicyProxy`]: ../policy_proxy/struct.PolicyProxy.html
 ///
 #[derive(Clone, Debug, PartialEq)]
+#[allow(dead_code)]
 pub enum ResponseTransform {
     /// A new, modified response that should be forwarded.
     Response(SettingResponse),
@@ -94,31 +91,16 @@ pub trait Create: Sized {
     async fn create(handler: ClientProxy) -> Result<Self, Error>;
 }
 
-/// Creates a [`PolicyHandler`] from the given [`Context`].
-///
-/// [`PolicyHandler`]: trait.PolicyHandler.html
-/// [`Context`]: ../base/struct.Context.html
-pub(crate) fn create_handler<C, T: StorageFactory<Storage = DeviceStorage> + 'static>(
-    context: Context<T>,
-) -> BoxFuture<'static, GenerateHandlerResult>
-where
-    C: Create + PolicyHandler + Send + Sync + 'static,
-{
-    Box::pin(async move {
-        let _ = &context;
-        let proxy = ClientProxy::new(context.service_messenger);
-        C::create(proxy).await.map(|handler| Box::new(handler) as BoxedHandler)
-    })
-}
-
 /// `ClientProxy` provides common functionality, like messaging and persistence to policy handlers.
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct ClientProxy {
     service_messenger: service::message::Messenger,
 }
 
 impl ClientProxy {
     /// Sends a setting request to the underlying setting proxy this policy handler controls.
+    #[allow(dead_code)]
     pub(crate) fn send_setting_request(
         &self,
         setting_type: SettingType,
@@ -131,6 +113,7 @@ impl ClientProxy {
     }
 
     /// Requests the setting handler to rebroadcast a settings changed event to its listeners.
+    #[allow(dead_code)]
     pub(crate) fn request_rebroadcast(&self, setting_type: SettingType) {
         // Ignore the receptor result.
         let _ = self.service_messenger.message(
@@ -141,12 +124,14 @@ impl ClientProxy {
 }
 
 impl ClientProxy {
+    #[allow(dead_code)]
     pub(crate) fn new(service_messenger: service::message::Messenger) -> Self {
         Self { service_messenger }
     }
 
     /// The type `T` is any type that has a [`PolicyType`] associated with it and that can be
     /// converted into a [`PolicyInfo`]. This is usually a variant of the `PolicyInfo` enum.
+    #[allow(dead_code)]
     pub(crate) async fn read_policy<T: HasPolicyType + TryFrom<PolicyInfo>>(
         &self,
         id: ftrace::Id,
@@ -185,6 +170,7 @@ impl ClientProxy {
     /// Write a policy info object to storage. The argument `write_through` will
     /// block returning until the value has been completely written to
     /// persistent store, rather than any temporary in-memory caching.
+    #[allow(dead_code)]
     pub(crate) async fn write_policy(
         &self,
         policy_info: PolicyInfo,
@@ -237,7 +223,7 @@ mod tests {
         let service_delegate = service::MessageHub::create_hub();
         let (_, mut setting_proxy_receptor) = service_delegate
             .create(MessengerType::Addressable(service::Address::Handler(
-                policy_type.setting_type(),
+                policy_type.setting_type().unwrap(),
             )))
             .await
             .expect("setting proxy messenger created");

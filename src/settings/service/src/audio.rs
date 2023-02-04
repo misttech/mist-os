@@ -10,7 +10,6 @@ pub(crate) use self::audio_default_settings::{
 };
 pub use self::stream_volume_control::StreamVolumeControl;
 pub mod audio_controller;
-pub mod policy;
 pub mod types;
 
 mod audio_default_settings;

@@ -38,7 +38,7 @@ where
         policy_type: PolicyType,
         service_messenger: service::message::Messenger,
     ) -> Result<BoxedHandler, PolicyHandlerFactoryError> {
-        let setting_type = policy_type.setting_type();
+        let setting_type = policy_type.setting_type().unwrap();
         if !self.policies.contains(&policy_type) {
             return Err(PolicyHandlerFactoryError::PolicyNotFound(policy_type));
         }
@@ -83,6 +83,7 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync> PolicyHandlerFact
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn register(
         &mut self,
         policy_type: PolicyType,

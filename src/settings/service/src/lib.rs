@@ -4,6 +4,9 @@
 
 #![warn(clippy::all)]
 
+#[cfg(test)]
+use tracing as _; // Make it easier to debug tests by always building with tracing
+
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
@@ -34,7 +37,6 @@ use futures::StreamExt;
 use settings_storage::device_storage::DeviceStorage;
 use settings_storage::fidl_storage::FidlStorage;
 
-pub use audio::policy::AudioPolicyConfig;
 pub use display::display_configuration::DisplayConfiguration;
 pub use display::LightSensorConfig;
 use handler::setting_handler::Handler;
@@ -59,7 +61,6 @@ use crate::accessibility::accessibility_controller::AccessibilityController;
 use crate::agent::authority::Authority;
 use crate::agent::{AgentCreator, Lifespan};
 use crate::audio::audio_controller::AudioController;
-use crate::audio::policy::audio_policy_handler::AudioPolicyHandler;
 use crate::base::{Dependency, Entity, SettingType};
 use crate::config::base::{AgentType, ControllerFlag};
 use crate::display::display_controller::{DisplayController, ExternalBrightnessControl};
@@ -80,7 +81,6 @@ use crate::job::source::Seeder;
 use crate::keyboard::keyboard_controller::KeyboardController;
 use crate::light::light_controller::LightController;
 use crate::night_mode::night_mode_controller::NightModeController;
-use crate::policy::policy_handler;
 use crate::policy::policy_handler_factory_impl::PolicyHandlerFactoryImpl;
 use crate::policy::policy_proxy::PolicyProxy;
 use crate::policy::PolicyType;
@@ -638,21 +638,11 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
     /// Initializes storage and registers handler generation functions for the configured policy
     /// types.
     async fn register_policy_handlers(
-        policies: &HashSet<PolicyType>,
-        storage_factory: Arc<T>,
-        policy_handler_factory: &mut PolicyHandlerFactoryImpl<T>,
+        _policies: &HashSet<PolicyType>,
+        _storage_factory: Arc<T>,
+        _policy_handler_factory: &mut PolicyHandlerFactoryImpl<T>,
     ) {
-        // Audio
-        if policies.contains(&PolicyType::Audio) {
-            storage_factory
-                .initialize::<AudioPolicyHandler>()
-                .await
-                .expect("storage should still be initializing");
-            policy_handler_factory.register(
-                PolicyType::Audio,
-                Box::new(policy_handler::create_handler::<AudioPolicyHandler, _>),
-            );
-        }
+        // There currently aren't any policies supported.
     }
 
     /// Initializes storage and registers handler generation functions for the configured setting
@@ -890,11 +880,12 @@ where
     }
 
     for policy_type in &policies {
-        let setting_type = policy_type.setting_type();
-        if components.contains(&setting_type) {
-            PolicyProxy::create(*policy_type, policy_handler_factory.clone(), delegate.clone())
-                .await?;
-            let _ = entities.insert(Entity::PolicyHandler(*policy_type));
+        if let Some(setting_type) = policy_type.setting_type() {
+            if components.contains(&setting_type) {
+                PolicyProxy::create(*policy_type, policy_handler_factory.clone(), delegate.clone())
+                    .await?;
+                let _ = entities.insert(Entity::PolicyHandler(*policy_type));
+            }
         }
     }
 

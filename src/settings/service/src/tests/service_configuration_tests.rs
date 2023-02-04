@@ -5,15 +5,13 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use fidl_fuchsia_settings::{AccessibilityMarker, AudioMarker, DisplayMarker, PrivacyMarker};
+use fidl_fuchsia_settings::{AccessibilityMarker, DisplayMarker, PrivacyMarker};
 
 use fidl_fuchsia_settings_policy::VolumePolicyControllerMarker;
 
 use crate::config::default_settings::DefaultSetting;
 use crate::ingress::fidl::InterfaceSpec;
 use crate::storage::testing::InMemoryStorageFactory;
-use crate::tests::fakes::audio_core_service;
-use crate::tests::fakes::service_registry::ServiceRegistry;
 use crate::AgentConfiguration;
 use crate::EnabledInterfacesConfiguration;
 use crate::EnvironmentBuilder;
@@ -79,70 +77,4 @@ async fn test_default_interfaces_configuration_provided() {
     // Any calls to the privacy service should fail since the service isn't included in the configuration.
     let privacy_service = env.connect_to_protocol::<PrivacyMarker>().unwrap();
     let _ = privacy_service.watch().await.expect_err("watch completed");
-}
-
-// Verify that providing a policy in the interface configuration allows us to connect to it.
-#[fuchsia::test(allow_stalls = false)]
-async fn test_policy_configuration_provided() {
-    let factory = InMemoryStorageFactory::new();
-
-    let flags = ServiceFlags::default();
-    let configuration = ServiceConfiguration::from(
-        AgentConfiguration::default(),
-        // Include audio setting so audio policy works.
-        EnabledInterfacesConfiguration::with_interfaces(
-            [InterfaceSpec::Audio, InterfaceSpec::AudioPolicy].into(),
-        ),
-        flags,
-    );
-
-    // Include fake audio core service so we can be sure there's no funkiness if audio setting
-    // connects to the real audio core.
-    let service_registry = ServiceRegistry::create();
-    let audio_core_service_handle = audio_core_service::Builder::new().build();
-    service_registry.lock().await.register_service(audio_core_service_handle.clone());
-
-    let env = EnvironmentBuilder::new(Arc::new(factory))
-        .service(ServiceRegistry::serve(service_registry))
-        .configuration(configuration)
-        .spawn_and_get_protocol_connector(ENV_NAME)
-        .await
-        .unwrap();
-
-    let _ = env.connect_to_protocol::<AudioMarker>().expect("Connected to service");
-
-    // Service configuration includes volume policy and audio setting, so calls to volume policy
-    // will succeed.
-    let policy = env
-        .connect_to_protocol::<VolumePolicyControllerMarker>()
-        .expect("Connected to policy service");
-    let _ = policy.get_properties().await.expect("Policy get should succeed");
-}
-
-// Verify that providing a policy in the interface configuration without its dependencies causes
-// connections to fali.
-#[fuchsia::test(allow_stalls = false)]
-async fn test_policy_configuration_provided_without_base_setting() {
-    let factory = InMemoryStorageFactory::new();
-
-    let flags = ServiceFlags::default();
-    let configuration = ServiceConfiguration::from(
-        AgentConfiguration::default(),
-        // Don't include audio setting so audio policy won't work.
-        EnabledInterfacesConfiguration::with_interfaces([InterfaceSpec::AudioPolicy].into()),
-        flags,
-    );
-
-    let env = EnvironmentBuilder::new(Arc::new(factory))
-        .configuration(configuration)
-        .spawn_and_get_protocol_connector(ENV_NAME)
-        .await
-        .unwrap();
-
-    // Audio policy service connection should fail since its dependency on the Audio setting was not
-    // satisfied.
-    let policy = env
-        .connect_to_protocol::<VolumePolicyControllerMarker>()
-        .expect("Connected to policy service");
-    let _ = policy.get_properties().await.expect_err("Policy get should fail");
 }

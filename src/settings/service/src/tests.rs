@@ -37,8 +37,6 @@ macro_rules! async_property_test {
 
 mod accessibility_tests;
 mod agent_tests;
-mod audio_policy_handler_tests;
-mod audio_policy_tests;
 mod audio_tests;
 mod camera_watcher_agent_tests;
 mod display_tests;

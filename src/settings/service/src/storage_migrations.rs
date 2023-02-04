@@ -64,8 +64,7 @@ mod tests {
         let _ = settings.insert(SettingType::NightMode);
         let _ = settings.insert(SettingType::Privacy);
         let _ = settings.insert(SettingType::Setup);
-        let mut policies = HashSet::new();
-        let _ = policies.insert(PolicyType::Audio);
+        let policies = HashSet::new();
         let (directory_proxy, _) = create_proxy::<DirectoryMarker>().unwrap();
         let (store_proxy, _) =
             create_proxy::<StoreMarker>().expect("failed to create proxy for stash");

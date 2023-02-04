@@ -6,14 +6,12 @@ use crate::base::{Dependency, Entity, SettingType};
 use crate::handler::base::Error;
 use crate::ingress::registration::{Registrant, Registrar};
 use crate::job::source::Seeder;
-use crate::policy::PolicyType;
 use fidl_fuchsia_settings::{
     AccessibilityRequestStream, AudioRequestStream, DisplayRequestStream,
     DoNotDisturbRequestStream, FactoryResetRequestStream, InputRequestStream, IntlRequestStream,
     KeyboardRequestStream, LightRequestStream, NightModeRequestStream, PrivacyRequestStream,
     SetupRequestStream,
 };
-use fidl_fuchsia_settings_policy::VolumePolicyControllerRequestStream;
 use fuchsia_component::server::{ServiceFsDir, ServiceObj};
 use fuchsia_zircon;
 use serde::Deserialize;
@@ -31,7 +29,6 @@ impl From<Error> for fuchsia_zircon::Status {
 pub enum Interface {
     Accessibility,
     Audio,
-    AudioPolicy,
     Display(display::InterfaceFlags),
     DoNotDisturb,
     FactoryReset,
@@ -51,7 +48,6 @@ pub enum Interface {
 pub enum InterfaceSpec {
     Accessibility,
     Audio,
-    AudioPolicy,
     // Should ideally be a HashSet, but HashSet does not impl Hash.
     Display(Vec<display::InterfaceSpec>),
     DoNotDisturb,
@@ -69,7 +65,6 @@ impl From<InterfaceSpec> for Interface {
     fn from(spec: InterfaceSpec) -> Self {
         match spec {
             InterfaceSpec::Audio => Interface::Audio,
-            InterfaceSpec::AudioPolicy => Interface::AudioPolicy,
             InterfaceSpec::Accessibility => Interface::Accessibility,
             InterfaceSpec::Display(variants) => Interface::Display(variants.into()),
             InterfaceSpec::DoNotDisturb => Interface::DoNotDisturb,
@@ -134,9 +129,6 @@ impl Interface {
             Interface::Audio => {
                 vec![Dependency::Entity(Entity::Handler(SettingType::Audio))]
             }
-            Interface::AudioPolicy => {
-                vec![Dependency::Entity(Entity::PolicyHandler(PolicyType::Audio))]
-            }
             Interface::Display(interfaces) => {
                 let mut dependencies = Vec::new();
 
@@ -195,14 +187,6 @@ impl Interface {
                     let _ = service_dir.add_fidl_service(move |stream: AudioRequestStream| {
                         seeder.seed(stream);
                     });
-                }
-                Interface::AudioPolicy => {
-                    let seeder = seeder.clone();
-                    let _ = service_dir.add_fidl_service(
-                        move |stream: VolumePolicyControllerRequestStream| {
-                            seeder.seed(stream);
-                        },
-                    );
                 }
                 Interface::Accessibility => {
                     let seeder = seeder.clone();

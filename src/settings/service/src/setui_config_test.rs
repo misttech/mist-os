@@ -7,8 +7,8 @@ use argh::FromArgs;
 use fuchsia_syslog::fx_log_info;
 use serde::de::DeserializeOwned;
 use settings::{
-    AgentConfiguration, AudioPolicyConfig, DisplayConfiguration, EnabledInterfacesConfiguration,
-    InputConfiguration, LightHardwareConfiguration, LightSensorConfig, ServiceFlags,
+    AgentConfiguration, DisplayConfiguration, EnabledInterfacesConfiguration, InputConfiguration,
+    LightHardwareConfiguration, LightSensorConfig, ServiceFlags,
 };
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
@@ -115,8 +115,8 @@ fn main() -> Result<(), Error> {
         let _ = read_config::<AgentConfiguration>(&config)?;
     }
 
-    for config in test_config.audio_policy_config.into_iter() {
-        let _ = read_config::<AudioPolicyConfig>(&config)?;
+    for _config in test_config.audio_policy_config.into_iter() {
+        // Audio policy support has been deprecated.
     }
 
     Ok(())

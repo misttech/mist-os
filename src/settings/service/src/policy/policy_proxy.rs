@@ -36,7 +36,7 @@ impl PolicyProxy {
         let (handler_messenger, receptor) =
             delegate.create(MessengerType::Unbound).await.map_err(Error::new)?;
 
-        let setting_type = policy_type.setting_type();
+        let setting_type = policy_type.setting_type().unwrap();
         let setting_handler_address = service::Address::Handler(setting_type);
         let setting_handler_audience = Audience::Address(setting_handler_address);
         let setting_handler_signature = Signature::Address(setting_handler_address);

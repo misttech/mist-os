@@ -15,7 +15,6 @@ use futures::StreamExt;
 
 use crate::accessibility::types::AccessibilityInfo;
 use crate::agent::{self, AgentCreator, Context, CreationFunc, Lifespan};
-use crate::audio::policy as audio_policy;
 use crate::audio::types::AudioInfo;
 #[cfg(test)]
 use crate::base::UnknownInfo;
@@ -31,7 +30,6 @@ use crate::message::base::{MessageEvent, MessengerType};
 use crate::message::receptor::Receptor;
 use crate::night_mode::types::NightModeInfo;
 use crate::payload_convert;
-#[cfg(test)]
 use crate::policy;
 use crate::policy::{PolicyInfo, PolicyType};
 use crate::privacy::types::PrivacyInfo;
@@ -168,7 +166,6 @@ macro_rules! into_storage_info {
 
 #[cfg(test)]
 into_storage_info!(UnknownInfo => SettingInfo);
-#[cfg(test)]
 into_storage_info!(policy::UnknownInfo => PolicyInfo);
 into_storage_info!(AccessibilityInfo => SettingInfo);
 into_storage_info!(AudioInfo => SettingInfo);
@@ -182,7 +179,6 @@ into_storage_info!(KeyboardInfo => SettingInfo);
 into_storage_info!(NightModeInfo => SettingInfo);
 into_storage_info!(PrivacyInfo => SettingInfo);
 into_storage_info!(SetupInfo => SettingInfo);
-into_storage_info!(audio_policy::State => PolicyInfo);
 
 struct StorageManagement<T, F>
 where
@@ -306,9 +302,7 @@ where
                 }
             }
             StorageRequest::Read(StorageType::PolicyType(policy_type), id) => match policy_type {
-                #[cfg(test)]
                 PolicyType::Unknown => self.read::<policy::UnknownInfo>(id, responder).await,
-                PolicyType::Audio => self.read::<audio_policy::State>(id, responder).await,
             },
             StorageRequest::Write(StorageInfo::SettingInfo(setting_info), id) => match setting_info
             {
@@ -334,9 +328,7 @@ where
                 SettingInfo::Setup(info) => self.write(info, responder).await,
             },
             StorageRequest::Write(StorageInfo::PolicyInfo(policy_info), _id) => match policy_info {
-                #[cfg(test)]
                 PolicyInfo::Unknown(info) => self.write(info, responder).await,
-                PolicyInfo::Audio(info) => self.write(info, responder).await,
             },
         }
     }
