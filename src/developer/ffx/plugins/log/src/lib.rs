@@ -293,7 +293,7 @@ pub struct LogOpts {
 #[derive(Clone)]
 pub struct LogFormatterOptions {
     display: DisplayOption,
-    no_symbols: bool,
+    raw: bool,
     highlight_spam: bool,
 }
 
@@ -339,7 +339,7 @@ impl<'a> LogFormatter for DefaultLogFormatter<'_> {
                                 data: LogData::SymbolizedTargetLog(_, ref symbolized),
                                 ..
                             } => {
-                                if !self.options.no_symbols && symbolized.is_empty() {
+                                if !self.options.raw && symbolized.is_empty() {
                                     return Ok(());
                                 }
                             }
@@ -387,7 +387,7 @@ impl<'a> DefaultLogFormatter<'a> {
                 Some(self.format_target_log_data(options, data, None, color_override))
             }
             LogEntry { data: LogData::SymbolizedTargetLog(data, symbolized), .. } => {
-                if !self.options.no_symbols && symbolized.is_empty() {
+                if !self.options.raw && symbolized.is_empty() {
                     return Ok(None);
                 }
 
@@ -442,7 +442,7 @@ impl<'a> DefaultLogFormatter<'a> {
         symbolized_msg: Option<String>,
         color_override: Option<ColorOverride>,
     ) -> String {
-        let symbolized_msg = if self.options.no_symbols { None } else { symbolized_msg };
+        let symbolized_msg = if self.options.raw { None } else { symbolized_msg };
 
         let ts = self.format_target_timestamp(&options, data.metadata.timestamp);
         let color_str = if options.color {
@@ -579,7 +579,7 @@ pub async fn log_impl<W: std::io::Write>(
         LogFilterCriteria::try_from_cmd(&cmd, default_log_spam_path)?,
         &mut stdout,
         LogFormatterOptions {
-            no_symbols: cmd.no_symbols,
+            raw: cmd.raw || cmd.no_symbols,
             display: if opts.is_machine {
                 DisplayOption::Json
             } else {
@@ -851,40 +851,12 @@ mod test {
         }
     }
 
-    fn empty_log_command() -> LogCommand {
-        LogCommand {
-            clock: TimeFormat::Monotonic,
-            exclude: vec![],
-            exclude_tags: vec![],
-            filter: vec![],
-            moniker: vec![],
-            hide_file: false,
-            hide_tags: false,
-            kernel: false,
-            no_color: false,
-            no_symbols: false,
-            select: vec![],
-            severity: Severity::Info,
-            show_full_moniker: false,
-            show_metadata: false,
-            since: None,
-            since_monotonic: None,
-            sub_command: None,
-            tags: vec![],
-            until: None,
-            until_monotonic: None,
-            spam_list_path: None,
-            disable_spam_filter: false,
-            enable_spam_highlight: false,
-        }
-    }
-
     fn empty_dump_command() -> LogCommand {
         LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {
                 session: SessionSpec::Relative(0),
             })),
-            ..empty_log_command()
+            ..LogCommand::default()
         }
     }
 
@@ -906,7 +878,7 @@ mod test {
     impl Default for LogFormatterOptions {
         fn default() -> Self {
             LogFormatterOptions {
-                no_symbols: false,
+                raw: false,
                 display: DisplayOption::Text(TextDisplayOptions::default()),
                 highlight_spam: false,
             }
@@ -957,7 +929,7 @@ mod test {
     #[fuchsia::test]
     async fn test_watch() {
         let mut formatter = FakeLogFormatter::new();
-        let cmd = empty_log_command();
+        let cmd = LogCommand::default();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
             ..DaemonDiagnosticsStreamParameters::EMPTY
@@ -996,7 +968,7 @@ mod test {
     #[fuchsia::test]
     async fn test_watch_with_error() {
         let mut formatter = FakeLogFormatter::new();
-        let cmd = empty_log_command();
+        let cmd = LogCommand::default();
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
             ..DaemonDiagnosticsStreamParameters::EMPTY
@@ -1117,7 +1089,7 @@ mod test {
             selector: parse_component_selector::<VerboseError>("core/my_component").unwrap(),
             interest: Interest { min_severity: Some(FidlSeverity::Info), ..Interest::EMPTY },
         }];
-        let cmd = LogCommand { select: selectors.clone(), ..empty_log_command() };
+        let cmd = LogCommand { select: selectors.clone(), ..LogCommand::default() };
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
             ..DaemonDiagnosticsStreamParameters::EMPTY
@@ -1160,7 +1132,7 @@ mod test {
             selector: parse_component_selector::<VerboseError>("core/my_component").unwrap(),
             interest: Interest { min_severity: Some(FidlSeverity::Info), ..Interest::EMPTY },
         }];
-        let cmd = LogCommand { select: selectors.clone(), ..empty_log_command() };
+        let cmd = LogCommand { select: selectors.clone(), ..LogCommand::default() };
         let params = DaemonDiagnosticsStreamParameters {
             stream_mode: Some(StreamMode::SnapshotRecentThenSubscribe),
             ..DaemonDiagnosticsStreamParameters::EMPTY
@@ -1869,11 +1841,8 @@ mod test {
     #[fuchsia::test]
     async fn test_default_formatter_with_json() {
         let mut output = vec![];
-        let options = LogFormatterOptions {
-            display: DisplayOption::Json,
-            no_symbols: false,
-            highlight_spam: false,
-        };
+        let options =
+            LogFormatterOptions { display: DisplayOption::Json, raw: false, highlight_spam: false };
         {
             let mut formatter = DefaultLogFormatter::new(
                 LogFilterCriteria::default(),
@@ -1899,7 +1868,7 @@ mod test {
                 time_format: TimeFormat::Utc,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
         let mut formatter =
@@ -1944,7 +1913,7 @@ mod test {
                 time_format: TimeFormat::Utc,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
         let mut formatter =
@@ -1986,7 +1955,7 @@ mod test {
                 color: true,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
         let formatter =
@@ -2015,7 +1984,7 @@ mod test {
                 show_metadata: true,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
 
@@ -2060,9 +2029,9 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn test_default_formatter_no_symbols() {
+    async fn test_default_formatter_raw() {
         let mut stdout = Unblock::new(std::io::stdout());
-        let options = LogFormatterOptions { no_symbols: true, ..LogFormatterOptions::default() };
+        let options = LogFormatterOptions { raw: true, ..LogFormatterOptions::default() };
         let formatter =
             DefaultLogFormatter::new(LogFilterCriteria::default(), &mut stdout, options.clone());
         match &options.display {
@@ -2089,7 +2058,7 @@ mod test {
                 show_tags: true,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
         let formatter =
@@ -2118,7 +2087,7 @@ mod test {
                 show_tags: true,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
 
@@ -2148,7 +2117,7 @@ mod test {
                 show_tags: true,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
         let formatter =
@@ -2177,7 +2146,7 @@ mod test {
                 show_metadata: true,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
 
@@ -2213,7 +2182,7 @@ mod test {
             TextDisplayOptions { show_file: true, ..TextDisplayOptions::default() };
         let options = LogFormatterOptions {
             display: DisplayOption::Text(display_options.clone()),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
 
@@ -2267,7 +2236,7 @@ mod test {
                 show_full_moniker: true,
                 ..TextDisplayOptions::default()
             }),
-            no_symbols: false,
+            raw: false,
             highlight_spam: false,
         };
         let formatter =

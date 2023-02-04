@@ -160,6 +160,10 @@ pub struct LogCommand {
 
     /// if provided, logs will not be symbolized
     #[argh(switch)]
+    pub raw: bool,
+
+    /// DEPRECATED
+    #[argh(switch)]
     pub no_symbols: bool,
 
     /// configure the log settings on the target device for components matching
@@ -200,6 +204,7 @@ impl Default for LogCommand {
             kernel: false,
             severity: Severity::Info,
             show_metadata: false,
+            raw: false,
             no_symbols: false,
             since: None,
             since_monotonic: None,
