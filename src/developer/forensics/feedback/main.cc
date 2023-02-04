@@ -25,7 +25,6 @@
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/component/component.h"
 #include "src/lib/files/file.h"
-#include "src/lib/files/path.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/uuid/uuid.h"
 
@@ -51,9 +50,6 @@ int main() {
     FX_LOGS(FATAL) << "Failed to parse product config";
     return EXIT_FAILURE;
   }
-
-  // TODO(fxbug.dev/100847): stop deleting migration file once all devices are running F8+.
-  files::DeletePath("/data/migration_log.json", /*recursive=*/false);
 
   forensics::component::Component component;
   std::unique_ptr<cobalt::Logger> cobalt = std::make_unique<cobalt::Logger>(
