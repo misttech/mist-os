@@ -35,12 +35,7 @@ pub fn serve_with_options<'a, ServiceObjTy: ServiceObjTrait>(
     let dir = create_diagnostics_dir_with_options(inspector.clone(), options);
     let server_end = server.into_channel().into();
     let scope = ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        Path::dot(),
-        server_end,
-    );
+    dir.open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), server_end);
     service_fs.add_remote(DIAGNOSTICS_DIR, proxy);
 
     Ok(())
@@ -147,7 +142,7 @@ mod tests {
         let diagnostics_dir = fuchsia_fs::directory::open_directory(
             &out_dir,
             "diagnostics",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::OpenFlags::RIGHT_READABLE,
         )
         .await
         .expect("opened diagnostics");
