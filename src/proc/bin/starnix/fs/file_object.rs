@@ -903,9 +903,15 @@ impl FileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        self.ops().wait_async(self, current_task, waiter, events, handler, options)
+        self.ops().wait_async(
+            self,
+            current_task,
+            waiter,
+            events,
+            handler,
+            WaitAsyncOptions::EDGE_TRIGGERED,
+        )
     }
 
     // Cancel a wait set up with wait_async

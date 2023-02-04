@@ -206,7 +206,7 @@ impl SocketOps for VsockSocket {
         let mut inner = self.lock();
         match &inner.state {
             VsockSocketState::Connected(file) => {
-                file.wait_async(current_task, waiter, events, handler, options)
+                file.wait_async(current_task, waiter, events, handler)
             }
             _ => {
                 let present_events = inner.query_events(current_task);

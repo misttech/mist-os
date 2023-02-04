@@ -148,27 +148,11 @@ impl EpollFileObject {
         key: EpollKey,
         wait_object: &mut WaitObject,
     ) -> Result<(), Errno> {
-        self.wait_on_file_with_options(
-            current_task,
-            key,
-            wait_object,
-            WaitAsyncOptions::EDGE_TRIGGERED,
-        )
-    }
-
-    fn wait_on_file_with_options(
-        &self,
-        current_task: &CurrentTask,
-        key: EpollKey,
-        wait_object: &mut WaitObject,
-        options: WaitAsyncOptions,
-    ) -> Result<(), Errno> {
         wait_object.cancel_key = wait_object.target()?.wait_async(
             current_task,
             &self.waiter,
             wait_object.events,
             self.new_wait_handler(key),
-            options,
         );
         Ok(())
     }
@@ -661,13 +645,7 @@ mod tests {
             let handler = move |_observed: FdEvents| {
                 callback_count_clone.fetch_add(1, Ordering::Relaxed);
             };
-            let key = event.wait_async(
-                &current_task,
-                &waiter,
-                FdEvents::POLLIN,
-                Box::new(handler),
-                WaitAsyncOptions::empty(),
-            );
+            let key = event.wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler));
             if do_cancel {
                 event.cancel_wait(&current_task, &waiter, key);
             }
