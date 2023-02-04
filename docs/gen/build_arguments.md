@@ -2343,7 +2343,19 @@ From //third_party/pigweed/src/third_party/boringssl/boringssl.gni:19
 If compiling with Emboss, this variable is set to the path to the Emboss
 source code.
 
-**Current value (from the default):** `""`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/github.com/google/emboss/src"`
+
+From //.gn:82
+
+**Overridden from the default:** `""`
+
+From //third_party/pigweed/src/third_party/emboss/emboss.gni:18
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/github.com/google/emboss/src"`
+
+From //.gn:82
+
+**Overridden from the default:** `""`
 
 From //third_party/pigweed/src/third_party/emboss/emboss.gni:18
 
