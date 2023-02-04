@@ -50,7 +50,6 @@ impl FileOps for InotifyFileObject {
         _waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-        _options: WaitAsyncOptions,
     ) -> WaitKey {
         crate::task::WaitKey::empty()
     }

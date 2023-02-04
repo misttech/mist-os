@@ -205,9 +205,8 @@ impl SocketOps for InetSocket {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        zxio_wait_async(&self.zxio, waiter, events, handler, options)
+        zxio_wait_async(&self.zxio, waiter, events, handler)
     }
 
     fn cancel_wait(

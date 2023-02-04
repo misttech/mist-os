@@ -475,34 +475,16 @@ impl FileOps for EpollFileObject {
     fn wait_async(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        let present_events = self.query_events(current_task);
-        if present_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
-        {
-            waiter.wake_immediately(present_events.bits(), handler)
-        } else {
-            let wait_key =
-                self.state.write().waiters.wait_async_mask(waiter, events.bits(), handler);
-
-            // Resolve the race if the events changed while adding the waiter while unlocked.
-            let present_events = self.query_events(current_task);
-            if present_events.intersects(events)
-                && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
-            {
-                self.state.write().waiters.wake_key_immediately(&wait_key, present_events.bits());
-            }
-            wait_key
-        }
+        self.state.write().waiters.wait_async_mask(waiter, events.bits(), handler)
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, key: WaitKey) {
-        let mut state = self.state.write();
-        state.waiters.cancel_wait(key);
+        self.state.write().waiters.cancel_wait(key);
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {

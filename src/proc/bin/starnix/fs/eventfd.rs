@@ -51,18 +51,6 @@ pub fn new_eventfd(
     )
 }
 
-fn query_events_internal(inner: &EventFdInner) -> FdEvents {
-    // TODO check for error and HUP events
-    let mut events = FdEvents::empty();
-    if inner.value > 0 {
-        events |= FdEvents::POLLIN;
-    }
-    if inner.value < u64::MAX - 1 {
-        events |= FdEvents::POLLOUT;
-    }
-    events
-}
-
 impl FileOps for EventFdFileObject {
     fileops_impl_nonseekable!();
 
@@ -145,25 +133,24 @@ impl FileOps for EventFdFileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        let mut inner = self.inner.lock();
-        let present_events = query_events_internal(&inner);
-        if present_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
-        {
-            waiter.wake_immediately(present_events.bits(), handler)
-        } else {
-            inner.wait_queue.wait_async_mask(waiter, events.bits(), handler)
-        }
+        self.inner.lock().wait_queue.wait_async_mask(waiter, events.bits(), handler)
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, key: WaitKey) {
-        let mut inner = self.inner.lock();
-        inner.wait_queue.cancel_wait(key);
+        self.inner.lock().wait_queue.cancel_wait(key);
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         let inner = self.inner.lock();
-        query_events_internal(&inner)
+        // TODO check for error and HUP events
+        let mut events = FdEvents::empty();
+        if inner.value > 0 {
+            events |= FdEvents::POLLIN;
+        }
+        if inner.value < u64::MAX - 1 {
+            events |= FdEvents::POLLOUT;
+        }
+        events
     }
 }

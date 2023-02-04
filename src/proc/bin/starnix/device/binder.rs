@@ -14,7 +14,7 @@ use crate::fs::fuchsia::new_remote_file;
 use crate::fs::{
     fs_node_impl_dir_readonly, DirEntryHandle, FdEvents, FdFlags, FdNumber, FileHandle, FileObject,
     FileOps, FileSystem, FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr,
-    MemoryDirectoryFile, NamespaceNode, SeekOrigin, SpecialNode, WaitAsyncOptions,
+    MemoryDirectoryFile, NamespaceNode, SeekOrigin, SpecialNode,
 };
 use crate::lock::{
     Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockUpgradableReadGuard, RwLockWriteGuard,
@@ -129,12 +129,11 @@ impl FileOps for BinderConnection {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
         match self.proc(current_task) {
             Ok(proc) => {
                 let binder_thread = proc.lock().find_or_register_thread(current_task.get_tid());
-                self.driver.wait_async(&proc, &binder_thread, waiter, events, handler, options)
+                self.driver.wait_async(&proc, &binder_thread, waiter, events, handler)
             }
             Err(_) => {
                 handler(FdEvents::POLLERR);
@@ -3138,7 +3137,6 @@ impl BinderDriver {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        _options: WaitAsyncOptions,
     ) -> WaitKey {
         // THREADING: Always acquire the [`BinderThread::state`] lock before the
         // [`BinderProcess::command_queue`] lock or else it may lead to deadlock.

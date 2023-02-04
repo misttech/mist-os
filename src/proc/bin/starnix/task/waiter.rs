@@ -8,7 +8,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
 use crate::fs::FdEvents;
-use crate::fs::WaitAsyncOptions;
 use crate::lock::Mutex;
 use crate::logging::*;
 use crate::task::*;
@@ -241,16 +240,15 @@ impl Waiter {
         handle: &dyn zx::AsHandleRef,
         zx_signals: zx::Signals,
         handler: SignalHandler,
-        options: WaitAsyncOptions,
     ) -> Result<WaitKey, zx::Status> {
         let callback = WaitCallback::SignalHandler(handler);
         let key = self.register_callback(callback);
-        let zx_options = if options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            zx::WaitAsyncOpts::EDGE_TRIGGERED
-        } else {
-            zx::WaitAsyncOpts::empty()
-        };
-        handle.wait_async_handle(&self.0.port, key, zx_signals, zx_options)?;
+        handle.wait_async_handle(
+            &self.0.port,
+            key,
+            zx_signals,
+            zx::WaitAsyncOpts::EDGE_TRIGGERED,
+        )?;
         Ok(WaitKey { key })
     }
 
@@ -471,25 +469,6 @@ impl WaitQueue {
             }
         });
         cancelled
-    }
-
-    // Manually signals the task associated with the given key.
-    pub fn wake_key_immediately(&mut self, key: &WaitKey, events: u32) -> bool {
-        let mut woken = false;
-        self.waiters.retain(|entry| {
-            if entry.key.equals(key) {
-                woken = true;
-                entry.waiter.access(|waiter| {
-                    if let Some(waiter) = waiter {
-                        waiter.queue_events(key, events);
-                    }
-                });
-                false
-            } else {
-                true
-            }
-        });
-        woken
     }
 
     pub fn notify_mask(&mut self, events: u32) {

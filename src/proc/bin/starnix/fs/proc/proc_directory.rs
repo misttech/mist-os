@@ -162,7 +162,6 @@ impl FileOps for ProcKmsgFile {
         _waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-        _options: WaitAsyncOptions,
     ) -> WaitKey {
         WaitKey::empty()
     }

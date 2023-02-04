@@ -308,15 +308,8 @@ impl SocketOps for NetlinkSocket {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        let mut inner = self.lock();
-        let cur_events = inner.query_events();
-        if cur_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(cur_events.bits(), handler)
-        } else {
-            inner.waiters.wait_async_mask(waiter, events.bits(), handler)
-        }
+        self.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
     }
 
     fn cancel_wait(

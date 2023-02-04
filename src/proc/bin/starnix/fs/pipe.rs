@@ -338,21 +338,12 @@ impl FileOps for PipeFileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        let mut pipe = self.pipe.lock();
-        let present_events = pipe.query_events();
-        if present_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
-        {
-            waiter.wake_immediately(present_events.bits(), handler)
-        } else {
-            pipe.waiters.wait_async_mask(waiter, events.bits(), handler)
-        }
+        self.pipe.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, key: WaitKey) {
-        let mut pipe = self.pipe.lock();
-        pipe.waiters.cancel_wait(key);
+        self.pipe.lock().waiters.cancel_wait(key);
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {

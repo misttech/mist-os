@@ -231,7 +231,6 @@ impl FileOps for TimerFile {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
         let signal_handler = move |signals: zx::Signals| {
             let events = TimerFile::get_events_from_signals(signals);
@@ -242,7 +241,6 @@ impl FileOps for TimerFile {
                 &self.timer,
                 TimerFile::get_signals_from_events(events),
                 Box::new(signal_handler),
-                options,
             )
             .unwrap() // TODO return error
     }

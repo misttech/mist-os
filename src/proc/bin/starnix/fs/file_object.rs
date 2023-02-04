@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use std::fmt;
 use std::sync::Arc;
@@ -18,13 +17,6 @@ use crate::types::as_any::*;
 use crate::types::*;
 
 pub const MAX_LFS_FILESIZE: usize = 0x7fffffffffffffff;
-
-bitflags! {
-    pub struct WaitAsyncOptions: u32 {
-        // Ignore events active at the time of the call to wait_async().
-        const EDGE_TRIGGERED = 1;
-    }
-}
 
 pub enum SeekOrigin {
     Set,
@@ -191,10 +183,12 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         error!(ENOTDIR)
     }
 
-    /// Establish a one-shot, asynchronous wait for the given FdEvents for the given file and task.
-    /// If no options are set and the events are already active at the time of calling, handler
-    /// will be called on immediately on the next wait. If `WaitAsyncOptions::EDGE_TRIGGERED` is
-    /// specified as an option, active events are not considered.
+    /// Establish a one-shot, edge-triggered, asynchronous wait for the given FdEvents for the
+    /// given file and task.
+    ///
+    /// Active events are not considered. This is similar to the semantics of the
+    /// ZX_WAIT_ASYNC_EDGE flag on zx_wait_async. To avoid missing events, the caller must call
+    /// query_events after calling this.
     ///
     /// If your file does not block, implement this with fileops_impl_nonblocking.
     fn wait_async(
@@ -204,7 +198,6 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         _waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-        _options: WaitAsyncOptions,
     ) -> WaitKey;
 
     /// Cancel a wait set up by wait_async.
@@ -433,7 +426,6 @@ macro_rules! fileops_impl_nonblocking {
             _waiter: &crate::task::Waiter,
             _events: crate::fs::FdEvents,
             _handler: crate::task::EventHandler,
-            _options: crate::fs::WaitAsyncOptions,
         ) -> crate::task::WaitKey {
             crate::task::WaitKey::empty()
         }
@@ -703,14 +695,7 @@ impl FileObject {
         let waiter = Waiter::new();
         loop {
             // Register the waiter before running the operation to prevent a race.
-            self.ops().wait_async(
-                self,
-                current_task,
-                &waiter,
-                events,
-                WaitCallback::none(),
-                WaitAsyncOptions::EDGE_TRIGGERED,
-            );
+            self.ops().wait_async(self, current_task, &waiter, events, WaitCallback::none());
             let result = op();
             if !is_partial(&result) {
                 return result.map(BlockableOpsResult::value);
@@ -904,14 +889,7 @@ impl FileObject {
         events: FdEvents,
         handler: EventHandler,
     ) -> WaitKey {
-        self.ops().wait_async(
-            self,
-            current_task,
-            waiter,
-            events,
-            handler,
-            WaitAsyncOptions::EDGE_TRIGGERED,
-        )
+        self.ops().wait_async(self, current_task, waiter, events, handler)
     }
 
     // Cancel a wait set up with wait_async

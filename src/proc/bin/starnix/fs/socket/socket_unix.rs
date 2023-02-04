@@ -538,28 +538,13 @@ impl SocketOps for UnixSocket {
 
     fn wait_async(
         &self,
-        socket: &Socket,
-        current_task: &CurrentTask,
+        _socket: &Socket,
+        _current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        let cur_events = self.query_events(socket, current_task);
-        if cur_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED) {
-            waiter.wake_immediately(cur_events.bits(), handler)
-        } else {
-            let wait_key = self.lock().waiters.wait_async_mask(waiter, events.bits(), handler);
-
-            // Resolve the race if the events changed while adding the waiter while unlocked.
-            let present_events = self.query_events(socket, current_task);
-            if present_events.intersects(events)
-                && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
-            {
-                self.lock().waiters.wake_key_immediately(&wait_key, present_events.bits());
-            }
-            wait_key
-        }
+        self.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
     }
 
     fn cancel_wait(

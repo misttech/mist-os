@@ -201,23 +201,13 @@ impl SocketOps for VsockSocket {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
         let mut inner = self.lock();
         match &inner.state {
             VsockSocketState::Connected(file) => {
                 file.wait_async(current_task, waiter, events, handler)
             }
-            _ => {
-                let present_events = inner.query_events(current_task);
-                if present_events.intersects(events)
-                    && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
-                {
-                    waiter.wake_immediately(present_events.bits(), handler)
-                } else {
-                    inner.waiters.wait_async_mask(waiter, events.bits(), handler)
-                }
-            }
+            _ => inner.waiters.wait_async_mask(waiter, events.bits(), handler),
         }
     }
 

@@ -175,9 +175,8 @@ impl Terminal {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        self.write().main_wait_async(waiter, events, handler, options)
+        self.write().main_wait_async(waiter, events, handler)
     }
 
     /// `cancel_wait` implementation of the main side of the terminal.
@@ -228,9 +227,8 @@ impl Terminal {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        self.write().replica_wait_async(waiter, events, handler, options)
+        self.write().replica_wait_async(waiter, events, handler)
     }
 
     /// `cancel_wait` implementation of the replica side of the terminal.
@@ -414,15 +412,8 @@ impl TerminalMutableState<Base = Terminal> {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        let current_events = self.main_query_events();
-        if current_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
-        {
-            waiter.wake_immediately(current_events.bits(), handler)
-        } else {
-            self.main_wait_queue.wait_async_events(waiter, events, handler)
-        }
+        self.main_wait_queue.wait_async_events(waiter, events, handler)
     }
 
     /// `cancel_wait` implementation of the main side of the terminal.
@@ -484,15 +475,8 @@ impl TerminalMutableState<Base = Terminal> {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-        options: WaitAsyncOptions,
     ) -> WaitKey {
-        let current_events = self.replica_query_events();
-        if current_events.intersects(events) && !options.contains(WaitAsyncOptions::EDGE_TRIGGERED)
-        {
-            waiter.wake_immediately(current_events.bits(), handler)
-        } else {
-            self.replica_wait_queue.wait_async_events(waiter, events, handler)
-        }
+        self.replica_wait_queue.wait_async_events(waiter, events, handler)
     }
 
     /// `cancel_wait` implementation of the replica side of the terminal.
