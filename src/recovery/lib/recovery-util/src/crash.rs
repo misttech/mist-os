@@ -49,25 +49,25 @@ macro_rules! send_report {
 
 #[derive(thiserror::Error, Debug)]
 pub enum RecoveryError {
-    #[error("generic-error")]
+    #[error("fuchsia-recovery-generic-error")]
     GenericError(),
 
-    #[error("ota-failure-error")]
+    #[error("fuchsia-recovery-ota-failure-error")]
     OtaFailureError(),
 
-    #[error("factory-reset-policy-failure")]
+    #[error("fuchsia-recovery-factory-reset-policy-failure")]
     FdrPolicyError(),
 
-    #[error("factory-reset-failure")]
+    #[error("fuchsia-recovery-factory-reset-failure")]
     FdrResetError(),
 
-    #[error("wifi-connection-error")]
+    #[error("fuchsia-recovery-wifi-connection-error")]
     WifiConnectionError(),
 
-    #[error("wifi-connection-success")]
+    #[error("fuchsia-recovery-wifi-connection-success")]
     WifiConnectionSuccess(),
 
-    #[error("reports-exceed-limit")]
+    #[error("fuchsia-recovery-reports-exceed-limit")]
     OutOfSpace(),
 
     #[cfg(test)]
@@ -130,7 +130,7 @@ pub struct ErrorReportMessage {
 }
 
 impl CrashReporter {
-    const DEFAULT_PROGRAM_NAME: &'static str = "fuchsia-recovery";
+    const DEFAULT_PROGRAM_NAME: &'static str = "recovery";
 
     /// Attempt to send a crash report with the given error and an optional context.
     pub async fn file_crash_report(
@@ -236,8 +236,8 @@ mod tests {
             assert_eq!(
                 report,
                 fidl_feedback::CrashReport {
-                    program_name: Some("fuchsia-recovery".to_string()),
-                    crash_signature: Some("factory-reset-failure".to_string()),
+                    program_name: Some("recovery".to_string()),
+                    crash_signature: Some("fuchsia-recovery-factory-reset-failure".to_string()),
                     is_fatal: Some(false),
                     annotations: Some(vec![Annotation {
                         key: "context".into(),
@@ -277,7 +277,7 @@ mod tests {
             assert_eq!(
                 report,
                 fidl_feedback::CrashReport {
-                    program_name: Some("fuchsia-recovery".to_string()),
+                    program_name: Some("recovery".to_string()),
                     crash_signature: Some(gen_string('A', SIGNATURE_MAX_LENGTH)),
                     is_fatal: Some(false),
                     annotations: Some(vec![Annotation {
