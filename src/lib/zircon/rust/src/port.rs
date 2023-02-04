@@ -274,11 +274,17 @@ impl GuestMemPacket {
         self.0.xt
     }
 
-    /// For AccessType::Write this is the data that was being written.
-    pub fn data(&self) -> Option<u64> {
-        match self.access_type() {
-            guest::AccessType::Read => None,
-            guest::AccessType::Write => Some(self.0.data),
+    /// For `AccessType::Write` this is the data that was being written.
+    pub fn data(&self) -> Option<guest::MemData> {
+        if let guest::AccessType::Write = self.access_type() {
+            self.access_size().map(|size| match size {
+                guest::MemAccessSize::Bits8 => guest::MemData::Data8(self.0.data as u8),
+                guest::MemAccessSize::Bits16 => guest::MemData::Data16(self.0.data as u16),
+                guest::MemAccessSize::Bits32 => guest::MemData::Data32(self.0.data as u32),
+                guest::MemAccessSize::Bits64 => guest::MemData::Data64(self.0.data),
+            })
+        } else {
+            None
         }
     }
 

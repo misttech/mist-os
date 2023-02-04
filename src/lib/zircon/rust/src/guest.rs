@@ -123,6 +123,14 @@ pub enum MemAccessSize {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub enum MemData {
+    Data8(u8),
+    Data16(u16),
+    Data32(u32),
+    Data64(u64),
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum PortAccessSize {
     Bits8 = 1,
     Bits16 = 2,
