@@ -926,15 +926,13 @@ zx_status_t NodeManager::GetNodePage(nid_t nid, LockedPage *out) {
   return ZX_OK;
 }
 
+// TODO(https://fxbug.dev/119886): Readahead a node page
 #if 0  // porting needed
-// TODO: Readahead a node page
 void NodeManager::RaNodePage(nid_t nid) {
-  // TODO: IMPL Read ahead
 }
 // Return a locked page for the desired node page.
 // And, readahead kMaxRaNode number of node pages.
 Page *NodeManager::GetNodePageRa(Page *parent, int start) {
-  // TODO: IMPL Read ahead
   return nullptr;
 }
 #endif
@@ -965,7 +963,6 @@ pgoff_t NodeManager::FlushDirtyNodePages(WritebackOperation &operation) {
     FX_LOGS(ERROR) << "Failed to flush dirty vnodes ";
     return 0;
   }
-  // TODO: Consider ordered writeback
   return fs_->GetNodeVnode().Writeback(operation);
 }
 

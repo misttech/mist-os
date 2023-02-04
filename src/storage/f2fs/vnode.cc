@@ -56,23 +56,11 @@ zx_status_t VnodeF2fs::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol
 }
 
 zx_status_t VnodeF2fs::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) {
-  if (!IsReg()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  if (flags & fuchsia_io::wire::VmoFlags::kExecute) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  if ((flags & fuchsia_io::wire::VmoFlags::kSharedBuffer) &&
-      (flags & fuchsia_io::wire::VmoFlags::kWrite)) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
   std::lock_guard lock(mutex_);
   auto size_or = CreatePagedVmo();
   if (size_or.is_error()) {
     return size_or.error_value();
   }
-
   return ClonePagedVmo(flags, *size_or, out_vmo);
 }
 
@@ -111,26 +99,30 @@ zx_status_t VnodeF2fs::ClonePagedVmo(fuchsia_io::wire::VmoFlags flags, size_t si
   rights |= (flags & fuchsia_io::wire::VmoFlags::kRead) ? ZX_RIGHT_READ : 0;
   rights |= (flags & fuchsia_io::wire::VmoFlags::kWrite) ? ZX_RIGHT_WRITE : 0;
 
-  zx::vmo vmo;
-  if (flags & fuchsia_io::wire::VmoFlags::kSharedBuffer) {
-    if (auto status = paged_vmo().duplicate(rights, &vmo); status != ZX_OK) {
-      FX_LOGS(ERROR) << "Faild to duplicate VMO: " << zx_status_get_string(status);
-      return status;
-    }
-  } else {
-    uint32_t options = ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE;
-    if (!(flags & fuchsia_io::wire::VmoFlags::kWrite)) {
-      options |= ZX_VMO_CHILD_NO_WRITE;
-    }
-    if (auto status = paged_vmo().create_child(options, 0, size, &vmo); status != ZX_OK) {
-      FX_LOGS(ERROR) << "Faild to create child VMO: " << zx_status_get_string(status);
-      return status;
-    }
-    DidClonePagedVmo();
+  uint32_t options = 0;
+  if (flags & fuchsia_io::wire::VmoFlags::kPrivateClone) {
+    options = ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE;
+    // Allowed only on private vmo.
     rights |= ZX_RIGHT_SET_PROPERTY;
-    if (auto status = vmo.replace(rights, &vmo); status != ZX_OK) {
-      return status;
-    }
+  } else {
+    // |size| should be 0 with ZX_VMO_CHILD_REFERENCE.
+    size = 0;
+    options = ZX_VMO_CHILD_REFERENCE;
+  }
+
+  if (!(flags & fuchsia_io::wire::VmoFlags::kWrite)) {
+    options |= ZX_VMO_CHILD_NO_WRITE;
+  }
+
+  zx::vmo vmo;
+  if (auto status = paged_vmo().create_child(options, 0, size, &vmo); status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to duplicate VMO: " << zx_status_get_string(status);
+    return status;
+  }
+  DidClonePagedVmo();
+
+  if (auto status = vmo.replace(rights, &vmo); status != ZX_OK) {
+    return status;
   }
   *out_vmo = std::move(vmo);
   return ZX_OK;

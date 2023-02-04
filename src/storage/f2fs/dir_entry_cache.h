@@ -102,6 +102,7 @@ class DirEntryCache {
     return EntryKey(parent_ino, std::string(child_name));
   }
 
+  // TODO(ahttps://fxbug.dev/119885): Adjust the cache size according to memory pressure
   std::unique_ptr<ElementAllocator> slab_allocator_ __TA_GUARDED(lock_);
   std::map<EntryKey, ElementRefPtr> map_ __TA_GUARDED(lock_);
   ElementList element_lru_list_ __TA_GUARDED(lock_);

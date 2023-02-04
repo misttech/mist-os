@@ -490,7 +490,7 @@ zx_status_t File::RecoverInlineData(NodePage &page) {
   // [prev.] [next] of inline_data flag
   //    o       o  -> recover inline_data
   //    o       x  -> remove inline_data, and then recover data blocks
-  //    x       o  -> remove data blocks, and then recover inline_data (TODO)
+  //    x       o  -> remove data blocks, and then recover inline_data (not happen)
   //    x       x  -> recover data blocks
   // ([prev.] is checkpointed data. And [next] is data written and fsynced after checkpoint.)
 
@@ -501,8 +501,6 @@ zx_status_t File::RecoverInlineData(NodePage &page) {
 
   // [next] have inline data.
   if (raw_inode && (raw_inode->i_inline & kInlineData)) {
-    // TODO: We should consider converting data blocks to inline data.
-
     // Process inline.
     LockedPage ipage;
     if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK) {

@@ -92,6 +92,10 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   static uint64_t DirBlockIndex(uint32_t level, uint8_t dir_level, uint32_t idx);
   void SetColdFile(VnodeF2fs &vnode);
 
+  zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) final {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
  private:
   // helper
   bool IsMultimediaFile(VnodeF2fs &vnode, std::string_view sub);

@@ -12,7 +12,7 @@
 
 namespace f2fs {
 
-// TODO: set .configurable to true when the feature is supported.
+// Set .configurable to true when the feature is supported.
 const MountOpt default_option[] = {
     {"background_gc_off", 1, false},
     {"disable_roll_forward", 0, true},

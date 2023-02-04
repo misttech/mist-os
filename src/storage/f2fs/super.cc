@@ -80,6 +80,7 @@ void F2fs::SyncFs(bool bShutdown) {
     ZX_ASSERT(WaitForWriteback().is_ok());
     // Stop listening to memorypressure.
     memory_pressure_watcher_.reset();
+
     // Flush every dirty Pages.
     while (superblock_info_->GetPageCount(CountType::kDirtyData)) {
       // If necessary, do gc.
@@ -403,8 +404,8 @@ zx_status_t F2fs::FillSuper() {
     RecoverFsyncData();
   }
 
+  // TODO(https://fxbug.dev/119887): enable a thread for background gc
   // After POR, we can run background GC thread
-  // TODO: Enable wb thread first, and then impl gc thread
   // err = StartGcThread(superblock_info);
   // if (err)
   //   goto fail;

@@ -82,7 +82,7 @@ class VnodeF2fs : public fs::PagedVnode,
                                      fs::VnodeRepresentation *info) override;
 
   // For fs::PagedVnode
-  virtual zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) override
+  zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo *out_vmo) override
       __TA_EXCLUDES(mutex_);
   void VmoRead(uint64_t offset, uint64_t length) final __TA_EXCLUDES(mutex_);
   void VmoDirty(uint64_t offset, uint64_t length) override __TA_EXCLUDES(mutex_);

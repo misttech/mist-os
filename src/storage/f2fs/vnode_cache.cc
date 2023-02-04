@@ -127,7 +127,8 @@ void VnodeCache::Downgrade(VnodeF2fs* raw_vnode) {
     return;
   }
 
-  // TODO: Need to adjust the size of vnode_table_ according to memory pressure
+  // TODO(https://fxbug.dev/119885): Need to adjust the size of vnode_table_ according to memory
+  // pressure
 
   // It is leaked to keep alive in vnode_table
   [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&vnode);

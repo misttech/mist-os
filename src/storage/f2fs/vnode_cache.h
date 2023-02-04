@@ -61,21 +61,17 @@ class VnodeCache {
   }
 
  private:
-  // All vnode pointers including dirty vnodes are insered in vnode_table_, and
-  // f2fs tries to evict invalid vnodes (nlink_ = 0) at every checkpoint or VnodeF2fs::Recycle().
-  // To make inactive (ref = 0) vnodes keep alive in vnode_table_,
-  // it resurrects valid vnode pointers at VnodeF2fs::Recycle().
-  // TODO: Eviction policy needs to consider memory pressure.
+  // All vnode raw pointers including dirty vnodes are kept in vnode_table_, and invalid vnodes
+  // (nlink_ = 0) are evicted in VnodeF2fs::Recycle() when they have no connection anymore.
+  // TODO(https://fxbug.dev/119885): Eviction policy needs to consider memory pressure.
   using VnodeTableTraits = fbl::DefaultKeyedObjectTraits<ino_t, VnodeF2fs>;
   using VnodeTable = fbl::WAVLTree<ino_t, VnodeF2fs*, VnodeTableTraits>;
 
-  // It is intented that dirty_list_ keeps valid dirty vnodes as keeping their ref_count.
-  // Once dirty vnode are inserted in dirty_list_, it never happen that their ref_count
-  // reach 0 and VnodeF2fs::Recycle is called before their eviction.
-  // Every checkpoint f2fs traverses dirty_list_ to write out dirty vnodes and to purge invalid
-  // dirty vnodes. A valid dirty vnode continues to be kept in vnode_tables_ regardless of eviction
-  // while invalid dirty nodes are deleted in Vnode::Recycle().
-  // Must not acquire kNodeTrunc lock when evciting invalid dirty nodes.
+  // |dirty_list_| intentionally keeps the reference of dirty vnodes until all the regarding
+  // dirty pages are flushed. Once a dirty vnode is inserted in dirty_list_, it never happen that
+  // their ref_count reaches zero. Checkpoint traverses dirty_list_ and evicts clean vnodes. Then
+  // linked vnodes continue to be kept in vnode_tables_ in the form of raw pointers wheares unlinked
+  // vnodes are deleted in Vnode::Recycle() in which LockType::kFileOp is acquired.
   using DirtyVnodeList = fbl::DoublyLinkedList<fbl::RefPtr<VnodeF2fs>>;
 
   std::mutex table_lock_{};

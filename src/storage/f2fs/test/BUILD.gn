@@ -113,7 +113,7 @@ fs_test_config("f2fs") {
   supports_inspect = true
   supports_shutdown_on_no_connections = true
   supports_mmap = true
-  supports_mmap_shared_write = false
+  supports_mmap_shared_write = true
 
   options = [
     {
