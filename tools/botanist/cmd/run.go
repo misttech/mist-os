@@ -25,6 +25,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/lib/syslog"
@@ -224,14 +225,38 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 		stdout, stderr, flush := botanist.NewStdioWriters(ctx)
 		defer flush()
 		ffx.SetStdoutStderr(stdout, stderr)
+		cmd := ffx.Command("daemon", "start")
+		daemonLog, err := osmisc.CreateFile(filepath.Join(ffxOutputsDir, "daemon.log"))
+		if err != nil {
+			return err
+		}
+		cmd.Stdout = daemonLog
+		logger.Debugf(ctx, "%s", cmd.Args)
+		if err := cmd.Start(); err != nil {
+			return err
+		}
 		defer func() {
-			ffx.Stop()
+			// TODO(fxbug.dev/120758): Clean up daemon by sending a SIGTERM to the
+			// process once that is supported.
+			if err := ffx.Stop(); err != nil {
+				logger.Errorf(ctx, "failed to stop ffx daemon: %s", err)
+			}
+			if err := cmd.Wait(); err != nil {
+				logger.Errorf(ctx, "daemon process finished with err: %s", err)
+			} else {
+				logger.Debugf(ctx, "ffx daemon process finished")
+			}
+			if err := daemonLog.Close(); err != nil {
+				logger.Errorf(ctx, "failed to close ffx daemon log: %s", err)
+			}
 			if removeFFXOutputsDir {
 				os.RemoveAll(ffxOutputsDir)
 			}
 		}()
-		if err := ffx.SetLogLevel(ctx, ffxutil.Trace); err != nil {
-			return err
+		if r.ffxExperimentLevel > 0 {
+			if err := ffx.SetLogLevel(ctx, ffxutil.Trace); err != nil {
+				return err
+			}
 		}
 		if err := ffx.Run(ctx, "config", "env"); err != nil {
 			return err
@@ -411,7 +436,7 @@ func (r *RunCommand) execute(ctx context.Context, args []string) error {
 	})
 
 	err = eg.Wait()
-	if err == nil {
+	if err == nil && r.ffxExperimentLevel > 0 {
 		// In the case of a successful run, remove the ffx_outputs dir which contains ffx logs.
 		// These logs can be very large, so we should only upload them in the case of a failure.
 		removeFFXOutputsDir = true

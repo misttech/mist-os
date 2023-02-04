@@ -175,9 +175,6 @@ var ffxInstance = func(
 		}
 		return ffxInstance, nil
 	}()
-	if err != nil && ffx != nil {
-		ffx.Stop()
-	}
 	return ffx, err
 }
 
@@ -224,7 +221,6 @@ func execute(
 			return err
 		}
 		if ffx != nil {
-			defer ffx.Stop()
 			t, err := sshTester(
 				ctx, addr, sshKeyFile, outputs.OutDir, serialSocketPath)
 			if err != nil {

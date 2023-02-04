@@ -940,9 +940,6 @@ func TestExecute(t *testing.T) {
 			if err != nil {
 				t.Errorf("got error: %v", err)
 			}
-			if c.useFFX && !ffx.ContainsCmd("stop") {
-				t.Errorf("failed to call `ffx daemon stop`, called: %s", ffx.CmdsCalled)
-			}
 
 			funcCalls := strings.Join(fuchsiaTester.funcCalls, ",")
 			testCount := strings.Count(funcCalls, testFunc)
