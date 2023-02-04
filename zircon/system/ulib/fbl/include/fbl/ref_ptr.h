@@ -148,8 +148,11 @@ class RefPtr final {
   }
 
   ~RefPtr() {
-    if (ptr_ && ptr_->Release()) {
-      recycle(ptr_);
+    T* ptr = ptr_;
+    // Clear ptr_ to help detect re-entrancy in ~T.
+    ptr_ = nullptr;
+    if (ptr && ptr->Release()) {
+      recycle(ptr);
     }
   }
 
