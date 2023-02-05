@@ -11,7 +11,8 @@
 #include <lib/mmio-ptr/mmio-ptr.h>
 #include <stdint.h>
 
-// TODO(fxbug.dev/121013): this macro will go away
+// TODO(fxbug.dev/89182): This is only used by old motmot and pl011 uart
+// drivers, which are slated to be replaced. Remove this when they go.
 #define REG32(addr) ((volatile uint32_t*)(uintptr_t)(addr))
 
 // TODO(fxbug.dev/121013): Remaining users should be migrated to more modern

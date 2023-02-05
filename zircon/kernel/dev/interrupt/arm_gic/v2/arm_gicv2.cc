@@ -66,7 +66,9 @@ static zx_status_t arm_gic_init();
 static zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
                                            enum interrupt_polarity pol);
 
-static uint32_t read_gicd_targetsr(int target_reg) { return GICREG(0, GICD_ITARGETSR(target_reg)); }
+static uint32_t read_gicd_targetsr(int target_reg) {
+  return arm_gicv2_read32(GICD_ITARGETSR(target_reg));
+}
 
 uint8_t gic_determine_local_mask(
     fit::inline_function<uint32_t(int), sizeof(void*)> fetch_gicd_targetsr_reg) {
@@ -108,23 +110,23 @@ static void gic_set_enable(uint vector, bool enable) {
   uint32_t mask = (uint32_t)(1ULL << (vector % 32));
 
   if (enable) {
-    GICREG(0, GICD_ISENABLER(reg)) = mask;
+    arm_gicv2_write32(GICD_ISENABLER(reg), mask);
   } else {
-    GICREG(0, GICD_ICENABLER(reg)) = mask;
+    arm_gicv2_write32(GICD_ICENABLER(reg), mask);
   }
 }
 
 static void gic_init_percpu_early() {
-  GICREG(0, GICC_CTLR) = 0x1;  // EnableGrp1
-  GICREG(0, GICC_PMR) = 0xff;  // unmask interrupts at all priority levels
+  arm_gicv2_write32(GICC_CTLR, 0x1);  // EnableGrp1
+  arm_gicv2_write32(GICC_PMR, 0xff);  // unmask interrupts at all priority levels
 }
 
-static unsigned int arm_gic_max_cpu() { return (GICREG(0, GICD_TYPER) >> 5) & 0x7; }
+static unsigned int arm_gic_max_cpu() { return (arm_gicv2_read32(GICD_TYPER) >> 5) & 0x7; }
 
 static zx_status_t arm_gic_init() {
   uint i;
 
-  uint32_t typer = GICREG(0, GICD_TYPER);
+  uint32_t typer = arm_gicv2_read32(GICD_TYPER);
   uint32_t it_lines_number = BITS_SHIFT(typer, 4, 0);
   max_irqs = (it_lines_number + 1) * 32;
   printf("GICv2 detected: max interrupts %u, max_cpus %u, TYPER %#x\n", max_irqs, arm_gic_max_cpu(),
@@ -132,14 +134,14 @@ static zx_status_t arm_gic_init() {
   DEBUG_ASSERT(max_irqs <= MAX_INT);
 
   for (i = 0; i < max_irqs; i += 32) {
-    GICREG(0, GICD_ICENABLER(i / 32)) = ~0;
-    GICREG(0, GICD_ICPENDR(i / 32)) = ~0;
+    arm_gicv2_write32(GICD_ICENABLER(i / 32), ~0);
+    arm_gicv2_write32(GICD_ICPENDR(i / 32), ~0);
   }
 
   if (arm_gic_max_cpu() > 0) {
     // Set external interrupts to target cpu 0
     for (i = 32; i < max_irqs; i += 4) {
-      GICREG(0, GICD_ITARGETSR(i / 4)) = 0x01010101;
+      arm_gicv2_write32(GICD_ITARGETSR(i / 4), 0x01010101);
     }
   }
   // Initialize all the SPIs to edge triggered
@@ -147,7 +149,7 @@ static zx_status_t arm_gic_init() {
     gic_configure_interrupt(i, IRQ_TRIGGER_MODE_EDGE, IRQ_POLARITY_ACTIVE_HIGH);
   }
 
-  GICREG(0, GICD_CTLR) = 1;  // enable GIC0
+  arm_gicv2_write32(GICD_CTLR, 1);  // enable GIC0
 
   gic_init_percpu_early();
 
@@ -165,7 +167,7 @@ static zx_status_t arm_gic_sgi(unsigned int irq, unsigned int flags, unsigned in
 
   LTRACEF("GICD_SGIR: %x\n", val);
 
-  GICREG(0, GICD_SGIR) = val;
+  arm_gicv2_write32(GICD_SGIR, val);
 
   return ZX_OK;
 }
@@ -198,7 +200,7 @@ static zx_status_t gic_deactivate_interrupt(unsigned int vector) {
   }
 
   uint32_t reg = 1 << (vector % 32);
-  GICREG(0, GICD_ICACTIVER(vector / 32)) = reg;
+  arm_gicv2_write32(GICD_ICACTIVER(vector / 32), reg);
 
   return ZX_OK;
 }
@@ -219,17 +221,17 @@ static zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_t
   // 16 irqs encoded per ICFGR register
   uint32_t reg_ndx = vector >> 4;
   uint32_t bit_shift = ((vector & 0xf) << 1) + 1;
-  uint32_t reg_val = GICREG(0, GICD_ICFGR(reg_ndx));
+  uint32_t reg_val = arm_gicv2_read32(GICD_ICFGR(reg_ndx));
   if (tm == IRQ_TRIGGER_MODE_EDGE) {
     reg_val |= (1 << bit_shift);
   } else {
     reg_val &= ~(1 << bit_shift);
   }
-  GICREG(0, GICD_ICFGR(reg_ndx)) = reg_val;
+  arm_gicv2_write32(GICD_ICFGR(reg_ndx), reg_val);
 
   const uint32_t clear_reg = vector / 32;
   const uint32_t clear_mask = 1 << (vector % 32);
-  GICREG(0, GICD_ICPENDR(clear_reg)) = clear_mask;
+  arm_gicv2_write32(GICD_ICPENDR(clear_reg), clear_mask);
 
   return ZX_OK;
 }
@@ -254,7 +256,7 @@ static unsigned int gic_remap_interrupt(unsigned int vector) { return vector; }
 
 static void gic_handle_irq(iframe_t* frame) {
   // get the current vector
-  uint32_t iar = GICREG(0, GICC_IAR);
+  uint32_t iar = arm_gicv2_read32(GICC_IAR);
   unsigned int vector = iar & 0x3ff;
 
   if (vector >= 0x3fe) {
@@ -273,7 +275,7 @@ static void gic_handle_irq(iframe_t* frame) {
 
   // deliver the interrupt
   pdev_invoke_int_if_present(vector);
-  GICREG(0, GICC_EOIR) = iar;
+  arm_gicv2_write32(GICC_EOIR, iar);
 
   LTRACEF_LEVEL(2, "cpu %u exit\n", arch_curr_cpu_num());
 }
@@ -336,7 +338,7 @@ static void gic_init_percpu() {
 
 static void gic_shutdown() {
   // Turn off all GIC0 interrupts at the distributor.
-  GICREG(0, GICD_CTLR) = 0;
+  arm_gicv2_write32(GICD_CTLR, 0);
 }
 
 // Returns true if any PPIs are enabled on the calling CPU.
@@ -347,7 +349,7 @@ static bool is_ppi_enabled() {
   uint32_t ppi_mask = 0xffff0000;
 
   // GICD_ISENABLER0 is banked so it corresponds to *this* CPU's interface.
-  return (GICREG(0, GICD_ISENABLER(0)) & ppi_mask) != 0;
+  return (arm_gicv2_read32(GICD_ISENABLER(0)) & ppi_mask) != 0;
 }
 
 // Returns true if any SPIs are enabled on the calling CPU.
@@ -361,7 +363,7 @@ static bool is_spi_enabled() {
   uint32_t mask = 0x01010101U << cpu_num;
 
   for (unsigned int vector = GIC_BASE_SPI; vector < max_irqs; vector += 4) {
-    uint32_t reg = GICREG(0, GICD_ITARGETSR(vector / 4));
+    uint32_t reg = arm_gicv2_read32(GICD_ITARGETSR(vector / 4));
     if (reg & mask) {
       return true;
     }
@@ -385,7 +387,7 @@ static void gic_shutdown_cpu() {
   DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID || !is_spi_enabled());
 
   // Turn off interrupts at the CPU interface.
-  GICREG(0, GICC_CTLR) = 0;
+  arm_gicv2_write32(GICC_CTLR, 0);
 }
 
 static const struct pdev_interrupt_ops gic_ops = {
@@ -436,7 +438,7 @@ void ArmGicInitEarly(const zbi_dcfg_arm_gic_v2_driver_t& config) {
   }
 
   dprintf(SPEW, "GICv2 (ID %#x), IPI base %u, GICH offset %#lx, GICV offset %#lx\n",
-          GICREG(0, GICC_IIDR), ipi_base, arm_gicv2_gich_offset, arm_gicv2_gicv_offset);
+          arm_gicv2_read32(GICC_IIDR), ipi_base, arm_gicv2_gich_offset, arm_gicv2_gicv_offset);
 
   // pass the list of physical and virtual addresses for the GICv2m register apertures
   if (msi_frame_phys) {

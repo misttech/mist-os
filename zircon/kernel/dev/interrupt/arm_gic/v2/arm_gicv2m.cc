@@ -66,9 +66,9 @@ void arm_gicv2m_init(const paddr_t* reg_frames, const vaddr_t* reg_frames_virt,
 
       uint reg_ndx = spi_id >> 4;
       uint bit_shift = ((spi_id & 0xF) << 1) + 1;
-      uint32_t reg_val = GICREG(0, GICD_ICFGR(reg_ndx));
+      uint32_t reg_val = arm_gicv2_read32(GICD_ICFGR(reg_ndx));
       reg_val |= (0x1u << bit_shift);
-      GICREG(0, GICD_ICFGR(reg_ndx)) = reg_val;
+      arm_gicv2_write32(GICD_ICFGR(reg_ndx), reg_val);
     }
   }
 }

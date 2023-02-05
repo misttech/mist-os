@@ -7,7 +7,8 @@
 
 #ifndef ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V2_INCLUDE_DEV_INTERRUPT_ARM_GICV2_REGS_H_
 #define ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V2_INCLUDE_DEV_INTERRUPT_ARM_GICV2_REGS_H_
-#include <reg.h>
+
+#include <lib/mmio-ptr/mmio-ptr.h>
 
 extern uint64_t arm_gicv2_gic_base;
 extern uint64_t arm_gicv2_gicd_offset;
@@ -21,7 +22,17 @@ extern uint64_t arm_gicv2_gicv_offset;
 #define GICV_REG_SIZE (0x2000)
 #define GICV2M_FRAME_REG_SIZE (0x1000)
 
-#define GICREG(gic, reg) (*REG32(arm_gicv2_gic_base + (reg)))
+template <typename T>
+inline MMIO_PTR volatile T* arm_gicv2_reg(uint64_t reg) {
+  return reinterpret_cast<MMIO_PTR volatile T*>(arm_gicv2_gic_base + reg);
+}
+
+inline uint32_t arm_gicv2_read32(uint64_t reg) { return MmioRead32(arm_gicv2_reg<uint32_t>(reg)); }
+
+inline void arm_gicv2_write32(uint64_t reg, uint32_t value) {
+  MmioWrite32(value, arm_gicv2_reg<uint32_t>(reg));
+}
+
 #define GICD_OFFSET arm_gicv2_gicd_offset
 #define GICC_OFFSET arm_gicv2_gicc_offset
 #define GICH_OFFSET arm_gicv2_gich_offset
