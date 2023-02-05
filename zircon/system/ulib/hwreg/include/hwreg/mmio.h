@@ -5,11 +5,12 @@
 #ifndef HWREG_MMIO_H_
 #define HWREG_MMIO_H_
 
-#include <stdint.h>
+#include <lib/mmio-ptr/mmio-ptr.h>
 
+#include <cstdint>
 #include <type_traits>
 
-#include <hwreg/internal.h>
+#include "internal.h"
 
 namespace hwreg {
 
@@ -23,30 +24,40 @@ namespace hwreg {
 template <uint32_t Scale>
 class RegisterMmioScaled {
  public:
-  RegisterMmioScaled(volatile void* mmio) : mmio_(reinterpret_cast<uintptr_t>(mmio)) {}
+  RegisterMmioScaled(volatile void* mmio) : mmio_(InitPtr(mmio)) {}
 
   // Write |val| to the |sizeof(IntType)| byte field located |offset| bytes from
   // |base()|.
-  template <class IntType>
+  template <typename IntType>
   void Write(IntType val, uint32_t offset) {
-    static_assert(internal::IsSupportedInt<IntType>::value, "unsupported register access width");
-    auto ptr = reinterpret_cast<volatile IntType*>(mmio_ + (offset * Scale));
-    *ptr = val;
+    MmioWrite(val, MmioPtr<IntType>(offset));
   }
 
   // Read the value of the |sizeof(IntType)| byte field located |offset| bytes from
   // |base()|.
-  template <class IntType>
+  template <typename IntType>
   IntType Read(uint32_t offset) {
-    static_assert(internal::IsSupportedInt<IntType>::value, "unsupported register access width");
-    auto ptr = reinterpret_cast<volatile IntType*>(mmio_ + (offset * Scale));
-    return *ptr;
+    return MmioRead(MmioPtr<const IntType>(offset));
   }
 
-  uintptr_t base() const { return mmio_; }
+  uintptr_t base() const { return reinterpret_cast<uintptr_t>(mmio_); }
 
  private:
-  uintptr_t mmio_;
+  MMIO_PTR volatile std::byte* InitPtr(volatile void* ptr) {
+    uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+    return reinterpret_cast<MMIO_PTR volatile std::byte*>(addr);
+  }
+
+  template <typename T>
+  MMIO_PTR volatile T* MmioPtr(uint32_t offset) {
+    using PtrType = MMIO_PTR volatile T*;
+    using IntType = std::remove_const_t<T>;
+    static_assert(internal::IsSupportedInt<IntType>::value, "unsupported register access width");
+    MMIO_PTR volatile std::byte* addr = mmio_ + (offset * Scale);
+    return reinterpret_cast<PtrType>(addr);
+  }
+
+  MMIO_PTR volatile std::byte* mmio_ = nullptr;
 };
 
 using RegisterMmio = RegisterMmioScaled<1>;

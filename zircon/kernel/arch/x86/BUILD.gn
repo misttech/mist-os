@@ -98,6 +98,9 @@ config("kernel") {
     # <arch/x86/page_tables/page_tables.h> has #include <hwreg/bitfields.h>.
     "//zircon/system/ulib/hwreg/include",
 
+    # <hwreg/mmio.h> has #include <lib//mmio-ptr/mmio-ptr.h>.
+    "//zircon/system/ulib/mmio-ptr/include",
+
     # <arch/x86/page_tables/page_tables.h> has #include <page_tables/x86/constants.h>.
     "//zircon/system/ulib/page_tables/include",
 

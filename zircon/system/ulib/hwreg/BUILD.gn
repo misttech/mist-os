@@ -17,11 +17,17 @@ zx_library("hwreg") {
     "hwreg/pio.h",
   ]
 
+  public_deps = [
+    # <hwreg/mmio.h> has #include <lib/mmio-ptr/mmio-ptr.h>.
+    "//zircon/system/ulib/mmio-ptr",
+  ]
+
   sources = [ "printers.cc" ]
+
   if (is_kernel) {
     # TODO(mcgrathr): remove old multiboot environment
     if (toolchain_environment != "multiboot") {
-      public_deps = [
+      public_deps += [
         "//zircon/kernel/lib/ktl:headers",
         "//zircon/kernel/lib/libc:headers",
       ]
