@@ -8,30 +8,39 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_REG_H_
 #define ZIRCON_KERNEL_INCLUDE_REG_H_
 
+#include <lib/mmio-ptr/mmio-ptr.h>
 #include <stdint.h>
 
+// TODO(fxbug.dev/121013): these macros will go away
 /* low level macros for accessing memory mapped hardware registers */
-#define REG64(addr) ((volatile uint64_t *)(uintptr_t)(addr))
-#define REG32(addr) ((volatile uint32_t *)(uintptr_t)(addr))
-#define REG16(addr) ((volatile uint16_t *)(uintptr_t)(addr))
-#define REG8(addr) ((volatile uint8_t *)(uintptr_t)(addr))
+#define REG64(addr) ((volatile uint64_t*)(uintptr_t)(addr))
+#define REG32(addr) ((volatile uint32_t*)(uintptr_t)(addr))
+#define REG16(addr) ((volatile uint16_t*)(uintptr_t)(addr))
+#define REG8(addr) ((volatile uint8_t*)(uintptr_t)(addr))
 
-#define RMWREG64(addr, startbit, width, val) \
-  *REG64(addr) = (*REG64(addr) & ~(((1 << (width)) - 1) << (startbit))) | ((val) << (startbit))
-#define RMWREG32(addr, startbit, width, val) \
-  *REG32(addr) = (*REG32(addr) & ~(((1 << (width)) - 1) << (startbit))) | ((val) << (startbit))
-#define RMWREG16(addr, startbit, width, val) \
-  *REG16(addr) = (*REG16(addr) & ~(((1 << (width)) - 1) << (startbit))) | ((val) << (startbit))
-#define RMWREG8(addr, startbit, width, val) \
-  *REG8(addr) = (*REG8(addr) & ~(((1 << (width)) - 1) << (startbit))) | ((val) << (startbit))
+// TODO(fxbug.dev/121013): Remaining users should be migrated to more modern
+// facilities such as hwreg or mmio-ptr directly.
 
-#define writell(v, a) (*REG64(a) = (v))
-#define readll(a) (*REG64(a))
-#define writel(v, a) (*REG32(a) = (v))
-#define readl(a) (*REG32(a))
-#define writew(v, a) (*REG16(a) = (v))
-#define readw(a) (*REG16(a))
-#define writeb(v, a) (*REG8(a) = (v))
-#define readb(a) (*REG8(a))
+inline void RMWREG32(volatile void* addr, unsigned int startbit, unsigned int width,
+                     uint32_t value) {
+  MMIO_PTR volatile uint32_t* ptr =
+      reinterpret_cast<MMIO_PTR volatile uint32_t*>(reinterpret_cast<uintptr_t>(addr));
+  uint32_t reg = MmioRead32(ptr);
+  reg &= ~(((1 << width) - 1) << startbit);
+  reg |= (value << startbit);
+  MmioWrite32(reg, ptr);
+}
+
+inline uint32_t readl(uintptr_t addr) {
+  return MmioRead32(reinterpret_cast<MMIO_PTR volatile uint32_t*>(addr));
+}
+
+inline void writel(uint32_t value, uintptr_t addr) {
+  MmioWrite32(value, reinterpret_cast<MMIO_PTR volatile uint32_t*>(addr));
+}
+
+inline void writel(uint32_t value, volatile void* addr) {
+  writel(value, reinterpret_cast<uintptr_t>(addr));
+}
 
 #endif  // ZIRCON_KERNEL_INCLUDE_REG_H_

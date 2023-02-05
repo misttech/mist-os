@@ -91,6 +91,9 @@ if (current_toolchain == default_toolchain) {
         # <dev/iommu.h> has #include <fbl/name.h>
         "//zircon/kernel/lib/fbl:headers.config",
 
+        # <reg.h> has #include <lib/mmio-ptr/mmio-ptr.h>.
+        "//zircon/system/ulib/mmio-ptr:headers.config",
+
         # Everywhere has #include <lib/fit/result.h>
         # Everywhere has #include <zx/result.h>
         "//zircon/system/ulib/zx:headers.config",
