@@ -11,11 +11,11 @@ use {
     crate::fvm::{get_partition_size, FvmRamdisk},
     anyhow::{Context, Error},
     fidl_fuchsia_boot::{ArgumentsMarker, BoolPair},
-    fidl_fuchsia_hardware_block_partition::PartitionProxy,
-    fuchsia_watch::PathEvent,
+    fidl_fuchsia_hardware_block_partition::PartitionMarker,
+    fidl_fuchsia_io as fio,
+    fuchsia_vfs_watcher::{WatchEvent, Watcher},
     fuchsia_zircon as zx,
     futures::prelude::*,
-    std::path::PathBuf,
     tracing::{error, info},
 };
 
@@ -41,58 +41,48 @@ async fn is_live_usb_enabled() -> Result<bool, Error> {
 }
 
 /// This function is intended for use as an argument to skip_while().
-async fn is_not_sparse_fvm(devfs_root: &zx::Channel, path: &PathBuf) -> Result<bool, Error> {
-    let (local, remote) = zx::Channel::create();
-    fdio::service_connect_at(&devfs_root, path.file_name().unwrap().to_str().unwrap(), remote)?;
-
-    let proxy = PartitionProxy::new(fidl::AsyncChannel::from_channel(local)?);
+async fn is_sparse_fvm(
+    dev_class_block: &fio::DirectoryProxy,
+    filename: &str,
+) -> Result<bool, Error> {
+    let proxy =
+        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<PartitionMarker>(
+            dev_class_block,
+            filename,
+        )
+        .context("connecting to block device")?;
     let (status, guid) = proxy.get_type_guid().await?;
     zx::Status::ok(status).context("getting partition type")?;
     let guid = guid.ok_or(anyhow::anyhow!("no guid!"))?;
 
-    if guid.value == WORKSTATION_INSTALLER_GPT {
-        Ok(false)
-    } else {
-        Ok(true)
-    }
+    Ok(guid.value == WORKSTATION_INSTALLER_GPT)
 }
 
 /// Waits for a sparse FVM to appear.
 /// Returns the path to the partition with the sparse FVM once one is found.
 async fn wait_for_sparse_fvm() -> Result<String, Error> {
-    let stream =
-        fuchsia_watch::watch("/dev/class/block").await.context("Starting block watcher")?;
-    let (root, remote) = zx::Channel::create();
-    fdio::service_connect("/dev/class/block", remote)?;
-    let root_ref = &root;
-    let event = Box::pin(stream.skip_while(|e| {
-        // "name" is a full path, like /dev/class/block/000
-        let path_to_check = match e {
-            PathEvent::Added(name, _) => Some(name),
-            PathEvent::Existing(name, _) => Some(name),
-            _ => None,
-        }
-        .map(|v| v.to_path_buf());
-        async move {
-            match path_to_check {
-                Some(path_to_check) => {
-                    is_not_sparse_fvm(root_ref, &path_to_check).await.unwrap_or(true)
-                }
-                None => true,
-            }
-        }
-    }))
-    .next()
-    .await
-    .ok_or(anyhow::anyhow!("didn't get an event while watching for block device"))?;
-    let name = match event {
-        PathEvent::Added(name, _) => name,
-        PathEvent::Existing(name, _) => name,
-        // skip_while() above should only return for PathEvent::Added or PathEvent::Existing.
-        _ => unreachable!(),
-    };
+    let dir = fuchsia_fs::directory::open_in_namespace(
+        "/dev/class/block",
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )
+    .context("opening block dir")?;
+    let mut watcher = Watcher::new(&dir).await.context("starting watch")?;
 
-    Ok(name.to_str().ok_or(anyhow::anyhow!("Invalid unicode in path"))?.to_owned())
+    while let Some(message) = watcher.next().await {
+        let message = message.context("watcher returned an error")?;
+        if message.event != WatchEvent::ADD_FILE && message.event != WatchEvent::EXISTING {
+            continue;
+        }
+        let filename = message.filename.to_str().unwrap();
+        if filename == "." {
+            continue;
+        }
+        if is_sparse_fvm(&dir, filename).await.unwrap_or(false) {
+            return Ok(format!("/dev/class/block/{}", filename));
+        }
+    }
+
+    Err(anyhow::anyhow!("failed to find sparse fvm"))
 }
 
 async fn inner_main() -> Result<(), Error> {
@@ -155,7 +145,7 @@ mod tests {
             GptConfig,
         },
         fidl_fuchsia_device::ControllerMarker,
-        fidl_fuchsia_hardware_block_partition::PartitionProxy,
+        fidl_fuchsia_hardware_block_partition::PartitionMarker,
         ramdevice_client::{RamdiskClient, RamdiskClientBuilder},
         std::collections::BTreeMap,
     };
@@ -216,12 +206,11 @@ mod tests {
         let _disk = create_ramdisk_with_partitions(uuids).await;
         let path = wait_for_sparse_fvm().await.expect("found FVM");
 
-        let (local, remote) = zx::Channel::create();
         // Don't just assert on the path, as other tests might use the devmgr and cause race
         // conditions.
-        fdio::service_connect(&path, remote).expect("connecting to partition OK");
-
-        let proxy = PartitionProxy::new(fidl::AsyncChannel::from_channel(local).unwrap());
+        let proxy =
+            fuchsia_component::client::connect_to_protocol_at_path::<PartitionMarker>(&path)
+                .unwrap();
         let (status, guid) = proxy.get_type_guid().await.expect("send get type guid");
         zx::Status::ok(status).expect("get_type_guid ok");
 

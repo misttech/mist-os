@@ -25,7 +25,7 @@ use euclid::{point2, size2};
 use fidl_fuchsia_boot::ArgumentsMarker;
 use fidl_fuchsia_hardware_display::VirtconMode;
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_watch::PathEvent;
+use fuchsia_vfs_watcher::{WatchEvent, Watcher};
 use fuchsia_zircon as zx;
 use futures::StreamExt;
 use recovery_ui_config::Config as UiConfig;
@@ -739,11 +739,16 @@ async fn do_install(
 
 /// Wait for a display to become available.
 async fn wait_for_display() -> Result<(), Error> {
-    let mut stream =
-        fuchsia_watch::watch("/dev/class/display-controller").await.context("Starting watch")?;
-    while let Some(element) = stream.next().await {
-        match element {
-            PathEvent::Added(_, _) | PathEvent::Existing(_, _) => return Ok(()),
+    let dir = fuchsia_fs::directory::open_in_namespace(
+        "/dev/class/display-controller",
+        fuchsia_fs::OpenFlags::empty(),
+    )
+    .context("opening display controller dir")?;
+    let mut watcher = Watcher::new(&dir).await.context("starting watch")?;
+    while let Some(message) = watcher.next().await {
+        let message = message.context("error on watcher channel")?;
+        match message.event {
+            WatchEvent::ADD_FILE | WatchEvent::EXISTING => return Ok(()),
             _ => {}
         }
     }
@@ -772,13 +777,24 @@ async fn check_is_interactive() -> Result<bool, Error> {
 
 /// Wait for an installation source to become present on the system.
 async fn wait_for_install_disk() -> Result<(), Error> {
-    let mut stream = fuchsia_watch::watch("/dev/class/block").await.context("Starting watch")?;
+    let dir = fuchsia_fs::directory::open_in_namespace(
+        "/dev/class/block",
+        fuchsia_fs::OpenFlags::empty(),
+    )
+    .context("opening block dir")?;
+    let mut watcher = Watcher::new(&dir).await.context("starting watch")?;
     let bootloader_type = get_bootloader_type().await?;
     let mut devices = vec![];
-    while let Some(element) = stream.next().await {
-        match element {
-            PathEvent::Added(path, _) | PathEvent::Existing(path, _) => {
-                match get_block_device(path.to_str().unwrap()).await {
+    while let Some(message) = watcher.next().await {
+        let message = message.context("error on watcher channel")?;
+        let filename = message.filename.to_str().unwrap();
+        if filename == "." {
+            continue;
+        }
+        match message.event {
+            WatchEvent::ADD_FILE | WatchEvent::EXISTING => {
+                let path = format!("/dev/class/block/{}", filename);
+                match get_block_device(&path).await {
                     Ok(Some(bd)) => {
                         devices.push(bd);
                         if let Ok(_) = find_install_source(&devices, bootloader_type).await {

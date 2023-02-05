@@ -26,7 +26,7 @@ rustc_library("fs_management") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/storage/fuchsia-watch",
+    "//src/lib/storage/fuchsia-vfs-watcher",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs:fuchsia.fxfs_rust",

@@ -12,8 +12,8 @@ use {
     },
     fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
     fuchsia_async::TimeoutExt,
-    fuchsia_component::client::connect_to_protocol_at_path,
-    fuchsia_watch::{watch, PathEvent},
+    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
+    fuchsia_vfs_watcher::{WatchEvent, Watcher},
     fuchsia_zircon::{self as zx, Duration},
     futures::StreamExt,
 };
@@ -47,13 +47,23 @@ const BLOCK_DEV_PATH: &str = "/dev/class/block/";
 /// path of the partition if found. Errors after timeout duration.
 pub async fn find_partition(matcher: PartitionMatcher, timeout: Duration) -> Result<String, Error> {
     async {
-        let mut dev_stream = watch(BLOCK_DEV_PATH).await.context("Watch failed")?;
-        while let Some(path_event) = dev_stream.next().await {
-            match path_event {
-                PathEvent::Added(path, _) | PathEvent::Existing(path, _) => {
-                    let path = path.into_os_string().into_string().unwrap();
-                    let device_proxy =
-                        connect_to_protocol_at_path::<PartitionAndDeviceMarker>(&path)?;
+        let dir = fuchsia_fs::directory::open_in_namespace(
+            BLOCK_DEV_PATH,
+            fuchsia_fs::OpenFlags::empty(),
+        )?;
+        let mut watcher = Watcher::new(&dir).await.context("making watcher")?;
+        while let Some(message) = watcher.next().await {
+            let message = message.context("watcher channel returned error")?;
+            match message.event {
+                WatchEvent::ADD_FILE | WatchEvent::EXISTING => {
+                    let filename = message.filename.to_str().unwrap();
+                    if filename == "." {
+                        continue;
+                    }
+                    let device_proxy = connect_to_named_protocol_at_dir_root::<
+                        PartitionAndDeviceMarker,
+                    >(&dir, filename)
+                    .context("opening partition path")?;
                     let topological_path = device_proxy
                         .get_topological_path()
                         .await
@@ -63,7 +73,7 @@ pub async fn find_partition(matcher: PartitionMatcher, timeout: Duration) -> Res
                         return Ok(topological_path);
                     }
                 }
-                PathEvent::Removed(_) => (),
+                _ => (),
             }
         }
         Err(anyhow!("Watch stream unexpectedly ended"))
