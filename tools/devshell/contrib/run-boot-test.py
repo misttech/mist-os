@@ -25,9 +25,9 @@ PE_SIGNATURE = b'PE\0\0'
 
 
 def is_pe(filepath):
+    if not os.path.exists(filepath):
+        return False
     with open(filepath, 'rb') as f:
-        if not os.path.exists(filepath):
-            return False
         if f.read(2) != PE_MAGIC:
             return False
         f.seek(0x3c)
