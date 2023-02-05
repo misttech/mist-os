@@ -65,10 +65,10 @@ static uint32_t gic_get_max_vector() { return gic_max_int; }
 
 static void gic_wait_for_rwp(uint64_t reg) {
   int count = 1000000;
-  while (GICREG(0, reg) & (1 << 31)) {
+  while (arm_gicv3_read32(reg) & (1 << 31)) {
     count -= 1;
     if (!count) {
-      LTRACEF("arm_gicv3: rwp timeout 0x%x\n", GICREG(0, reg));
+      LTRACEF("arm_gicv3: rwp timeout 0x%x\n", arm_gicv3_read32(reg));
       return;
     }
   }
@@ -81,16 +81,16 @@ static void gic_set_enable(uint vector, bool enable) {
   if (vector < 32) {
     cpu_num_t cpu_id = arch_curr_cpu_num();
     if (enable) {
-      GICREG(0, GICR_ISENABLER0(cpu_id)) = mask;
+      arm_gicv3_write32(GICR_ISENABLER0(cpu_id), mask);
     } else {
-      GICREG(0, GICR_ICENABLER0(cpu_id)) = mask;
+      arm_gicv3_write32(GICR_ICENABLER0(cpu_id), mask);
     }
     gic_wait_for_rwp(GICR_CTLR(cpu_id));
   } else {
     if (enable) {
-      GICREG(0, GICD_ISENABLER(reg)) = mask;
+      arm_gicv3_write32(GICD_ISENABLER(reg), mask);
     } else {
-      GICREG(0, GICD_ICENABLER(reg)) = mask;
+      arm_gicv3_write32(GICD_ICENABLER(reg), mask);
     }
     gic_wait_for_rwp(GICD_CTLR);
   }
@@ -100,12 +100,12 @@ static void gic_init_percpu_early() {
   cpu_num_t cpu = arch_curr_cpu_num();
 
   // redistributer config: configure sgi/ppi as non-secure group 1.
-  GICREG(0, GICR_IGROUPR0(cpu)) = ~0;
+  arm_gicv3_write32(GICR_IGROUPR0(cpu), ~0);
   gic_wait_for_rwp(GICR_CTLR(cpu));
 
   // redistributer config: clear and mask sgi/ppi.
-  GICREG(0, GICR_ICENABLER0(cpu)) = 0xffffffff;
-  GICREG(0, GICR_ICPENDR0(cpu)) = ~0;
+  arm_gicv3_write32(GICR_ICENABLER0(cpu), 0xffffffff);
+  arm_gicv3_write32(GICR_ICPENDR0(cpu), ~0);
   gic_wait_for_rwp(GICR_CTLR(cpu));
 
   // TODO lpi init
@@ -130,34 +130,34 @@ static zx_status_t gic_init() {
 
   DEBUG_ASSERT(arch_ints_disabled());
 
-  uint pidr2 = GICREG(0, GICD_PIDR2);
+  uint pidr2 = arm_gicv3_read32(GICD_PIDR2);
   uint rev = BITS_SHIFT(pidr2, 7, 4);
   if (rev != GICV3 && rev != GICV4) {
     return ZX_ERR_NOT_FOUND;
   }
 
-  uint32_t typer = GICREG(0, GICD_TYPER);
+  uint32_t typer = arm_gicv3_read32(GICD_TYPER);
   gic_max_int = (BITS(typer, 4, 0) + 1) * 32;
 
   printf("GICv3 detected: rev %u, max interrupts %u, TYPER %#x\n", rev, gic_max_int, typer);
 
   // disable the distributor
-  GICREG(0, GICD_CTLR) = 0;
+  arm_gicv3_write32(GICD_CTLR, 0);
   gic_wait_for_rwp(GICD_CTLR);
   __isb(ARM_MB_SY);
 
   // distributor config: mask and clear all spis, set group 1.
   uint i;
   for (i = 32; i < gic_max_int; i += 32) {
-    GICREG(0, GICD_ICENABLER(i / 32)) = ~0;
-    GICREG(0, GICD_ICPENDR(i / 32)) = ~0;
-    GICREG(0, GICD_IGROUPR(i / 32)) = ~0;
-    GICREG(0, GICD_IGRPMODR(i / 32)) = 0;
+    arm_gicv3_write32(GICD_ICENABLER(i / 32), ~0);
+    arm_gicv3_write32(GICD_ICPENDR(i / 32), ~0);
+    arm_gicv3_write32(GICD_IGROUPR(i / 32), ~0);
+    arm_gicv3_write32(GICD_IGRPMODR(i / 32), 0);
   }
   gic_wait_for_rwp(GICD_CTLR);
 
   // enable distributor with ARE, group 1 enable
-  GICREG(0, GICD_CTLR) = CTLR_ENABLE_G0 | CTLR_ENABLE_G1NS | CTLR_ARE_S;
+  arm_gicv3_write32(GICD_CTLR, CTLR_ENABLE_G0 | CTLR_ENABLE_G1NS | CTLR_ARE_S);
   gic_wait_for_rwp(GICD_CTLR);
 
   // ensure we're running on cpu 0 and that cpu 0 corresponds to affinity 0.0.0.0
@@ -171,7 +171,7 @@ static zx_status_t gic_init() {
   uint max_cpu = BITS_SHIFT(typer, 7, 5);
   if (max_cpu > 0) {
     for (i = 32; i < gic_max_int; i++) {
-      GICREG64(0, GICD_IROUTER(i)) = 0;
+      arm_gicv3_write64(GICD_IROUTER(i), 0);
     }
   }
 
@@ -263,7 +263,7 @@ static zx_status_t gic_deactivate_interrupt(unsigned int vector) {
   }
 
   uint32_t reg = 1 << (vector % 32);
-  GICREG(0, GICD_ICACTIVER(vector / 32)) = reg;
+  arm_gicv3_write32(GICD_ICACTIVER(vector / 32), reg);
 
   return ZX_OK;
 }
@@ -283,17 +283,17 @@ static zx_status_t gic_configure_interrupt(unsigned int vector, enum interrupt_t
 
   uint reg = vector / 16;
   uint mask = 0x2 << ((vector % 16) * 2);
-  uint32_t val = GICREG(0, GICD_ICFGR(reg));
+  uint32_t val = arm_gicv3_read32(GICD_ICFGR(reg));
   if (tm == IRQ_TRIGGER_MODE_EDGE) {
     val |= mask;
   } else {
     val &= ~mask;
   }
-  GICREG(0, GICD_ICFGR(reg)) = val;
+  arm_gicv3_write32(GICD_ICFGR(reg), val);
 
   const uint32_t clear_reg = vector / 32;
   const uint32_t clear_mask = 1 << (vector % 32);
-  GICREG(0, GICD_ICPENDR(clear_reg)) = clear_mask;
+  arm_gicv3_write32(GICD_ICPENDR(clear_reg), clear_mask);
 
   return ZX_OK;
 }
@@ -382,7 +382,7 @@ static void gic_init_percpu() {
 
 static void gic_shutdown() {
   // Turn off all GIC0 interrupts at the distributor.
-  GICREG(0, GICD_CTLR) = 0;
+  arm_gicv3_write32(GICD_CTLR, 0);
 }
 
 // Returns true if any PPIs are enabled on the calling CPU.
@@ -393,7 +393,7 @@ static bool is_ppi_enabled() {
   uint32_t mask = 0xffff0000;
 
   cpu_num_t cpu_num = arch_curr_cpu_num();
-  uint32_t reg = GICREG(0, GICR_ICENABLER0(cpu_num));
+  uint32_t reg = arm_gicv3_read32(GICR_ICENABLER0(cpu_num));
   if ((reg & mask) != 0) {
     return true;
   }
@@ -414,7 +414,7 @@ static bool is_spi_enabled() {
 
   // Check each SPI to see if it's routed to this CPU.
   for (uint i = 32u; i < gic_max_int; ++i) {
-    if ((GICREG64(0, GICD_IROUTER(i)) & aff_mask) != 0) {
+    if ((arm_gicv3_read64(GICD_IROUTER(i)) & aff_mask) != 0) {
       return true;
     }
   }

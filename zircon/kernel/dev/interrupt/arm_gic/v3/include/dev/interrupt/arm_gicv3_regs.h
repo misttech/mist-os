@@ -6,7 +6,8 @@
 
 #ifndef ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_
 #define ZIRCON_KERNEL_DEV_INTERRUPT_ARM_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_
-#include <reg.h>
+
+#include <lib/mmio-ptr/mmio-ptr.h>
 
 #include <arch/arm64.h>
 
@@ -18,8 +19,23 @@ extern uint64_t arm_gicv3_gicr_stride;
 #define BIT_32(bit) (1u << bit)
 #define BIT_64(bit) (1ul << bit)
 
-#define GICREG(gic, reg) (*REG32(arm_gicv3_gic_base + (reg)))
-#define GICREG64(gic, reg) (*REG64(arm_gicv3_gic_base + (reg)))
+template <typename T>
+inline MMIO_PTR volatile T* arm_gicv3_reg(uint64_t reg) {
+  return reinterpret_cast<MMIO_PTR volatile T*>(arm_gicv3_gic_base + reg);
+}
+
+inline uint32_t arm_gicv3_read32(uint64_t reg) { return MmioRead32(arm_gicv3_reg<uint32_t>(reg)); }
+
+inline void arm_gicv3_write32(uint64_t reg, uint32_t value) {
+  MmioWrite32(value, arm_gicv3_reg<uint32_t>(reg));
+}
+
+inline uint64_t arm_gicv3_read64(uint64_t reg) { return MmioRead64(arm_gicv3_reg<uint64_t>(reg)); }
+
+inline void arm_gicv3_write64(uint64_t reg, uint64_t value) {
+  MmioWrite64(value, arm_gicv3_reg<uint64_t>(reg));
+}
+
 #define GICD_OFFSET arm_gicv3_gicd_offset
 #define GICR_OFFSET arm_gicv3_gicr_offset
 #define GICR_STRIDE arm_gicv3_gicr_stride

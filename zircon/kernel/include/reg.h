@@ -11,12 +11,8 @@
 #include <lib/mmio-ptr/mmio-ptr.h>
 #include <stdint.h>
 
-// TODO(fxbug.dev/121013): these macros will go away
-/* low level macros for accessing memory mapped hardware registers */
-#define REG64(addr) ((volatile uint64_t*)(uintptr_t)(addr))
+// TODO(fxbug.dev/121013): this macro will go away
 #define REG32(addr) ((volatile uint32_t*)(uintptr_t)(addr))
-#define REG16(addr) ((volatile uint16_t*)(uintptr_t)(addr))
-#define REG8(addr) ((volatile uint8_t*)(uintptr_t)(addr))
 
 // TODO(fxbug.dev/121013): Remaining users should be migrated to more modern
 // facilities such as hwreg or mmio-ptr directly.
