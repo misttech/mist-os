@@ -95,7 +95,7 @@ class PerfTestHelper {
   // process described in summarize.dart, and publishes that as
   // results for the current test.
   Future<void> processResultsSummarized(List<File> jsonFiles,
-      {String expectedMetricNamesFile}) async {
+      {@required String expectedMetricNamesFile}) async {
     final jsonSummaryData = summarizeFuchsiaPerfFiles(jsonFiles);
 
     final File jsonSummaryFile = dump.createFile('results', 'fuchsiaperf.json');
@@ -115,7 +115,7 @@ class PerfTestHelper {
   // results to, in fuchsiaperf.json format.
   Future<void> runTestCommand(
       String Function(String resultsFilename) getCommand,
-      {String expectedMetricNamesFile}) async {
+      {@required String expectedMetricNamesFile}) async {
     // Make a filename that is very likely to be unique.  Using a
     // unique filename should not be strictly necessary, but it should
     // avoid potential problems.  We do not expect performance tests
@@ -188,7 +188,7 @@ class PerfTestHelper {
       {@required String packageName,
       @required String componentName,
       @required String commandArgs,
-      String expectedMetricNamesFile,
+      @required String expectedMetricNamesFile,
       int processRuns = 1}) async {
     final List<File> localResultsFiles = [];
     for (var process = 0; process < processRuns; ++process) {
