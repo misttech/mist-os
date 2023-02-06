@@ -93,10 +93,11 @@ class FakeCanvasProtocol : ddk::AmlogicCanvasProtocol<FakeCanvasProtocol> {
  public:
   zx_status_t AmlogicCanvasConfig(zx::vmo vmo, size_t offset, const canvas_info_t* info,
                                   uint8_t* canvas_idx) {
-    for (uint32_t i = 0; i < std::size(in_use_); i++) {
+    for (size_t i = 0; i < std::size(in_use_); i++) {
+      ZX_DEBUG_ASSERT_MSG(i <= std::numeric_limits<uint8_t>::max(), "%zu", i);
       if (!in_use_[i]) {
         in_use_[i] = true;
-        *canvas_idx = i;
+        *canvas_idx = static_cast<uint8_t>(i);
         return ZX_OK;
       }
     }

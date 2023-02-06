@@ -202,7 +202,10 @@ zx_status_t HdmiHost::EdidTransfer(uint32_t bus_id, const i2c_impl_op_t* op_list
     ops[i].address = op_list[i].address;
     ops[i].is_write = !op_list[i].is_read;
     if (op_list[i].is_read) {
-      reads[read_cnt] = op_list[i].data_size;
+      // TODO(fxbug.dev/121409): Fix the data_size time and remove this check.
+      ZX_DEBUG_ASSERT_MSG(op_list[i].data_size <= std::numeric_limits<uint8_t>::max(), "%zu",
+                          op_list[i].data_size);
+      reads[read_cnt] = static_cast<uint8_t>(op_list[i].data_size);
       read_cnt++;
     } else {
       writes[write_cnt] = fidl::VectorView<uint8_t>::FromExternal(

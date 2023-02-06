@@ -767,7 +767,6 @@ config("Wno-conversion") {
     "//src/firmware/gigaboot/lib",
     "//src/firmware/gigaboot/src",
     "//src/graphics/display/drivers/aml-hdmi:*",
-    "//src/graphics/display/drivers/amlogic-display:*",
     "//src/graphics/display/drivers/display:*",
     "//src/graphics/display/drivers/fake:*",
     "//src/graphics/display/drivers/goldfish-display:*",

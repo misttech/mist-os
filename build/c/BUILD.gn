@@ -83,7 +83,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/devices/usb/drivers/usb-peripheral:usb-peripheral-driver",
     "//src/devices/usb/drivers/usb-peripheral:usb-peripheral-unittest-bin",
     "//src/devices/usb/tests/usb",
-    "//src/graphics/display/drivers/amlogic-display:common_srcs",
     "//src/graphics/display/drivers/display:shared",
     "//src/graphics/display/drivers/display/tests:base",
     "//src/graphics/display/drivers/dsi-dw:common_srcs",
