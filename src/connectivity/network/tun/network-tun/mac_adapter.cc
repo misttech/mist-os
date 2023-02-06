@@ -51,11 +51,12 @@ void MacAdapter::MacAddrGetAddress(uint8_t* out_mac) {
 void MacAdapter::MacAddrGetFeatures(features_t* out_features) {
   if (promisc_only_) {
     out_features->multicast_filter_count = 0;
-    out_features->supported_modes = MODE_MULTICAST_PROMISCUOUS;
+    out_features->supported_modes = SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS;
   } else {
     out_features->multicast_filter_count = fuchsia_net_tun::wire::kMaxMulticastFilters;
-    out_features->supported_modes =
-        MODE_PROMISCUOUS | MODE_MULTICAST_FILTER | MODE_MULTICAST_PROMISCUOUS;
+    out_features->supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS |
+                                    SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER |
+                                    SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS;
   }
 }
 

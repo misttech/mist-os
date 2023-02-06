@@ -989,7 +989,7 @@ void Gvnic::MacAddrGetFeatures(features_t* out_features) {
 
   // "Implementations must set 0 if multicast filtering is not supported."
   // out_features->multicast_filter_count = 0;
-  out_features->supported_modes = MODE_PROMISCUOUS;
+  out_features->supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS;
 }
 
 void Gvnic::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,

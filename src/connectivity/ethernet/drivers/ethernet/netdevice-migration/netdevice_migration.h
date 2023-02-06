@@ -42,8 +42,9 @@ class NetdeviceMigration
   // Equivalent to old ethernet driver FIFO depth; see
   // https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/ethernet/drivers/ethernet/ethernet.h;l=169;drc=bd653b0d513ea6cc0d2ec85d38ae31bf084f0651
   static constexpr uint32_t kFifoDepth = 256;
-  static constexpr mode_t kSupportedMacFilteringModes =
-      MODE_MULTICAST_FILTER | MODE_MULTICAST_PROMISCUOUS | MODE_PROMISCUOUS;
+  static constexpr supported_mac_filter_mode_t kSupportedMacFilteringModes =
+      SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER | SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS |
+      SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS;
   static constexpr uint32_t kMulticastFilterMax = MAX_MAC_FILTER;
   static zx::result<std::unique_ptr<NetdeviceMigration>> Create(zx_device_t* dev);
   virtual ~NetdeviceMigration() = default;

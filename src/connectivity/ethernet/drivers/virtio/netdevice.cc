@@ -535,7 +535,7 @@ void NetworkDevice::MacAddrGetFeatures(features_t* out_features) {
   LTRACE_ENTRY;
   *out_features = {
       .multicast_filter_count = 0,
-      .supported_modes = MODE_PROMISCUOUS,
+      .supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS,
   };
 }
 

@@ -15,7 +15,10 @@ const MAC_SIZE uint64 = 6;
 const MAX_MAC_FILTER uint64 = 64;
 
 /// Device MAC filtering modes supported.
-type Mode = strict enum : uint32 {
+///
+/// The variants of this type should match
+/// fuchsia.hardware.network.MacFilterMode.
+type SupportedMacFilterMode = strict bits {
     /// Device accepts only unicast frames addressed to its own unicast address,
     /// or multicast frames that are part of the multicast address filter list.
     MULTICAST_FILTER = 1;
@@ -24,6 +27,20 @@ type Mode = strict enum : uint32 {
     MULTICAST_PROMISCUOUS = 2;
     /// Device accepts all frames.
     PROMISCUOUS = 4;
+};
+
+/// Device MAC filtering modes supported.
+// TODO(https://fxbug.dev/120564): Replace this type with
+// fuchsia.hardware.network.MacFilterMode.
+type Mode = strict enum : uint32 {
+    /// Device accepts only unicast frames addressed to its own unicast address,
+    /// or multicast frames that are part of the multicast address filter list.
+    MULTICAST_FILTER = 0;
+    /// Device accepts unicast frames addressed to its own unicast address, or
+    /// any multicast frames.
+    MULTICAST_PROMISCUOUS = 1;
+    /// Device accepts all frames.
+    PROMISCUOUS = 2;
 };
 
 /// Device features reported by [`MacAddr.GetFeatures`].
@@ -38,7 +55,7 @@ type Features = struct {
     ///
     /// Bitfield of possible [`Mode`] values that can be passed to
     /// [`MacAddr.SetMode`].
-    supported_modes uint32;
+    supported_modes SupportedMacFilterMode;
 };
 
 @transport("Banjo")

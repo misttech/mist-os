@@ -23,8 +23,9 @@
 
 namespace network {
 
-constexpr mode_t kSupportedModesMask =
-    MODE_PROMISCUOUS | MODE_MULTICAST_PROMISCUOUS | MODE_MULTICAST_FILTER;
+constexpr supported_mac_filter_mode_t kSupportedModesMask =
+    SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS | SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS |
+    SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER;
 using MacAddress = fuchsia_net::wire::MacAddress;
 
 namespace netdev = fuchsia_hardware_network;
@@ -48,7 +49,7 @@ class MacInterface : public ::network::MacAddrDeviceInterface {
 
   // Converts a fuchsia.hardware.network.MacFilterMode to a valid mode to be communicated to the
   // device implementation, taking into consideration the device's available operating modes.
-  mode_t ConvertMode(const netdev::wire::MacFilterMode& mode) const;
+  std::optional<mode_t> ConvertMode(const netdev::wire::MacFilterMode& mode) const;
 
  private:
   friend MacClientInstance;

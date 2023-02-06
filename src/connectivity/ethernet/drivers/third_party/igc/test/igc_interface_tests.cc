@@ -518,7 +518,7 @@ TEST_F(IgcInterfaceTest, MacAddrGetFeatures) {
   driver_->MacAddrGetFeatures(&out_feature);
 
   EXPECT_EQ(out_feature.multicast_filter_count, 0U);
-  EXPECT_EQ(out_feature.supported_modes, MODE_PROMISCUOUS);
+  EXPECT_EQ(out_feature.supported_modes, SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS);
 }
 
 }  // namespace

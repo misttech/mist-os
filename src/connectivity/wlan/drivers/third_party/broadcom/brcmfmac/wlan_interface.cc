@@ -513,7 +513,7 @@ void WlanInterface::MacGetAddress(uint8_t out_mac[MAC_SIZE]) {
 void WlanInterface::MacGetFeatures(features_t* out_features) {
   *out_features = {
       .multicast_filter_count = 0,
-      .supported_modes = MODE_MULTICAST_FILTER | MODE_MULTICAST_PROMISCUOUS,
+      .supported_modes = SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER | SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS,
   };
 }
 

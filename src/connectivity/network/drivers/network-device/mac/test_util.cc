@@ -4,8 +4,6 @@
 
 #include "test_util.h"
 
-#include <gtest/gtest.h>
-
 #include "src/lib/testing/predicates/status.h"
 
 namespace network {
@@ -33,8 +31,7 @@ void FakeMacDeviceImpl::MacAddrGetFeatures(features_t* out_features) { *out_feat
 void FakeMacDeviceImpl::MacAddrSetMode(mode_t mode, const uint8_t* multicast_macs_list,
                                        size_t multicast_macs_count) {
   EXPECT_EQ(mode & kSupportedModesMask, mode);
-  EXPECT_NE(mode, 0u);
-  mode_t old_mode = mode_;
+  std::optional<mode_t> old_mode = mode_;
   mode_ = mode;
   addresses_.clear();
   for (size_t i = 0; i < multicast_macs_count; i++) {
@@ -44,7 +41,7 @@ void FakeMacDeviceImpl::MacAddrSetMode(mode_t mode, const uint8_t* multicast_mac
     addresses_.push_back(mac);
   }
   // Signal only if this wasn't the first time, given we always get a SetMode on startup.
-  if (old_mode != 0) {
+  if (old_mode.has_value()) {
     event_.signal(0, kConfigurationChangedEvent);
   }
 }

@@ -87,7 +87,7 @@ class NetworkDeviceTest : public ::testing::Test {
           },
       .get_features =
           [](void* ctx, features_t* out_features) {
-            *out_features = {.supported_modes = MODE_MULTICAST_FILTER};
+            *out_features = {.supported_modes = SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER};
           },
       .set_mode = [](void* ctx, mode_t mode, const uint8_t* multicast_macs_list,
                      size_t multicast_macs_count) {},

@@ -737,7 +737,7 @@ void IgcDriver::MacAddrGetAddress(uint8_t* out_mac) {
 void IgcDriver::MacAddrGetFeatures(features_t* out_features) {
   *out_features = {
       .multicast_filter_count = 0,
-      .supported_modes = MODE_PROMISCUOUS,
+      .supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS,
   };
 }
 

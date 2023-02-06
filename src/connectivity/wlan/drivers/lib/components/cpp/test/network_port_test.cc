@@ -278,7 +278,8 @@ TEST_F(NetworkPortMacTestFixture, MacGetAddress) {
 }
 
 TEST_F(NetworkPortMacTestFixture, MacGetFeatures) {
-  constexpr uint32_t kSupportedModes = MODE_PROMISCUOUS | MODE_MULTICAST_FILTER;
+  constexpr supported_mac_filter_mode_t kSupportedModes =
+      SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS | SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER;
   constexpr uint32_t kNumMulticastFilters = 42;
   port_ifc_.mac_get_features_.ExpectCallWithMatcher([&](features_t* out_features) {
     out_features->supported_modes = kSupportedModes;

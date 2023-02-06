@@ -9,6 +9,8 @@
 
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "mac_interface.h"
 
 namespace network {
@@ -33,7 +35,10 @@ class FakeMacDeviceImpl : public ddk::MacAddrProtocol<FakeMacDeviceImpl> {
 
   features_t& features() { return features_; }
 
-  mode_t mode() { return mode_; }
+  mode_t mode() {
+    EXPECT_TRUE(mode_.has_value());
+    return mode_.value();
+  }
 
   std::vector<MacAddress>& addresses() { return addresses_; }
 
@@ -42,7 +47,7 @@ class FakeMacDeviceImpl : public ddk::MacAddrProtocol<FakeMacDeviceImpl> {
  private:
   fuchsia_net::wire::MacAddress mac_ = {0x00, 0x02, 0x03, 0x04, 0x05, 0x06};
   features_t features_{};
-  mode_t mode_ = 0;
+  std::optional<mode_t> mode_ = std::nullopt;
   std::vector<MacAddress> addresses_;
   zx::event event_;
 };

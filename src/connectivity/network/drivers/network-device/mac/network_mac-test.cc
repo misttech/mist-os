@@ -115,19 +115,20 @@ TEST_F(MacDeviceTest, StartupModeFilter) {
 }
 
 TEST_F(MacDeviceTest, StartupModeMcastPromiscuous) {
-  impl_.features().supported_modes = MODE_MULTICAST_PROMISCUOUS | MODE_PROMISCUOUS;
+  impl_.features().supported_modes =
+      SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS | SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS;
   ASSERT_OK(CreateDevice());
   ASSERT_EQ(impl_.mode(), MODE_MULTICAST_PROMISCUOUS);
 }
 
 TEST_F(MacDeviceTest, StartupModePromiscuous) {
-  impl_.features().supported_modes = MODE_PROMISCUOUS;
+  impl_.features().supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS;
   ASSERT_OK(CreateDevice());
   ASSERT_EQ(impl_.mode(), MODE_PROMISCUOUS);
 }
 
 TEST_F(MacDeviceTest, SetBadMode) {
-  impl_.features().supported_modes = MODE_MULTICAST_FILTER;
+  impl_.features().supported_modes = SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER;
   ASSERT_OK(CreateDevice());
   zx::result open_result = OpenInstance();
   ASSERT_OK(open_result.status_value());

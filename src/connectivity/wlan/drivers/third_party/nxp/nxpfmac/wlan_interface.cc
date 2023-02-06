@@ -721,7 +721,9 @@ void WlanInterface::MacGetAddress(uint8_t out_mac[MAC_SIZE]) {
 void WlanInterface::MacGetFeatures(features_t* out_features) {
   *out_features = {
       .multicast_filter_count = MLAN_MAX_MULTICAST_LIST_SIZE,
-      .supported_modes = MODE_MULTICAST_FILTER | MODE_MULTICAST_PROMISCUOUS | MODE_PROMISCUOUS,
+      .supported_modes = SUPPORTED_MAC_FILTER_MODE_MULTICAST_FILTER |
+                         SUPPORTED_MAC_FILTER_MODE_MULTICAST_PROMISCUOUS |
+                         SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS,
   };
 }
 

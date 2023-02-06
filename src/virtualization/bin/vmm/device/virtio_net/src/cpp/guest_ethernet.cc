@@ -443,7 +443,7 @@ void GuestEthernet::MacAddrGetFeatures(features_t* out_features) {
       .multicast_filter_count = 0,
 
       // We don't perform any filtering.
-      .supported_modes = MODE_PROMISCUOUS,
+      .supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS,
   };
 }
 
