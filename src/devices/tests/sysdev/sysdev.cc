@@ -4,7 +4,6 @@
 
 #include "src/devices/tests/sysdev/sysdev.h"
 
-#include <fuchsia/boot/c/fidl.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
