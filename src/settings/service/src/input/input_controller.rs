@@ -401,7 +401,7 @@ impl InputController {
 impl data_controller::Create for InputController {
     async fn create(client: ClientProxy) -> Result<Self, ControllerError> {
         if let Ok(Some(config)) = DefaultSetting::<InputConfiguration, &str>::new(
-            None,
+            Some(InputConfiguration { devices: Vec::new() }),
             "/config/data/input_device_config.json",
         )
         .load_default_value()
@@ -594,23 +594,6 @@ mod tests {
     async fn test_camera_error_on_restore() {
         let message_hub = service::MessageHub::create_hub();
 
-        // Create the messenger that the client proxy uses to send messages.
-        let (controller_messenger, _) = message_hub
-            .create(service::message::MessengerType::Unbound)
-            .await
-            .expect("Unable to create agent messenger");
-
-        // Note that no camera service is registered, to mimic scenarios where devices do not
-        // have a functioning camera service.
-        let service_registry = ServiceRegistry::create();
-
-        let service_context =
-            ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None);
-
-        // This isn't actually the signature for the notifier, but it's unused in this test, so just
-        // provide the signature of its own messenger to the client proxy.
-        let signature = controller_messenger.get_signature();
-
         // Create a fake storage receptor used to receive and respond to storage messages.
         let (_, mut storage_receptor) = message_hub
             .create(service::message::MessengerType::Addressable(Address::Storage))
@@ -648,17 +631,8 @@ mod tests {
         })
         .detach();
 
-        let client_proxy = ClientProxy::new(
-            Arc::new(ClientImpl::for_test(
-                Default::default(),
-                controller_messenger,
-                signature,
-                Arc::new(service_context),
-                SettingType::Input,
-            )),
-            SettingType::Input,
-        )
-        .await;
+        let client_proxy = create_proxy(message_hub).await;
+
         let controller = InputController::create_with_config(
             client_proxy,
             InputConfiguration {
@@ -690,5 +664,46 @@ mod tests {
             .get_state(InputDeviceType::CAMERA, DEFAULT_CAMERA_NAME.to_string())
             .unwrap();
         assert!(camera_state.has_state(DeviceState::ERROR));
+    }
+
+    #[fasync::run_until_stalled(test)]
+    async fn test_controller_creation_with_default_config() {
+        use crate::handler::setting_handler::persist::controller::Create;
+
+        let message_hub = service::MessageHub::create_hub();
+        let client_proxy = create_proxy(message_hub).await;
+        let _controller =
+            InputController::create(client_proxy).await.expect("Should have controller");
+    }
+
+    async fn create_proxy(message_hub: service::message::Delegate) -> ClientProxy {
+        // Create the messenger that the client proxy uses to send messages.
+        let (controller_messenger, _) = message_hub
+            .create(service::message::MessengerType::Unbound)
+            .await
+            .expect("Unable to create agent messenger");
+
+        // Note that no camera service is registered, to mimic scenarios where devices do not
+        // have a functioning camera service.
+        let service_registry = ServiceRegistry::create();
+
+        let service_context =
+            ServiceContext::new(Some(ServiceRegistry::serve(service_registry)), None);
+
+        // This isn't actually the signature for the notifier, but it's unused in this test, so just
+        // provide the signature of its own messenger to the client proxy.
+        let signature = controller_messenger.get_signature();
+
+        ClientProxy::new(
+            Arc::new(ClientImpl::for_test(
+                Default::default(),
+                controller_messenger,
+                signature,
+                Arc::new(service_context),
+                SettingType::Input,
+            )),
+            SettingType::Input,
+        )
+        .await
     }
 }
