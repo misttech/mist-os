@@ -8,6 +8,7 @@ use super::sysctl::*;
 use crate::auth::FsCred;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
+use crate::lock::Mutex;
 use crate::logging::not_implemented;
 use crate::task::*;
 use crate::types::*;
@@ -48,13 +49,14 @@ impl ProcDirectory {
             &b"meminfo"[..] => fs.create_node(ByteVecFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
             // Fake kmsg as being empty.
             &b"kmsg"[..] =>
-                fs.create_node(SimpleFileNode::new(|| Ok(ProcKmsgFile{})), mode!(IFREG, 0o100), FsCred::root()),
+                fs.create_node(SimpleFileNode::new(|| Ok(ProcKmsgFile)), mode!(IFREG, 0o100), FsCred::root()),
             &b"mounts"[..] =>
                 fs.create_node(ProcMountsFile::new_node(), mode!(IFREG, 0o777), FsCred::root()),
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
             &b"cgroups"[..] => fs.create_node(ByteVecFile::new_node(vec![]), mode!(IFREG, 0o444), FsCred::root()),
             &b"sys"[..] => sysctl_directory(fs),
+            &b"pressure"[..] => pressure_directory(fs),
         };
 
         Arc::new(ProcDirectory { kernel, nodes })
@@ -150,7 +152,7 @@ impl FileOps for Arc<ProcDirectory> {
     }
 }
 
-struct ProcKmsgFile {}
+struct ProcKmsgFile;
 
 impl FileOps for ProcKmsgFile {
     fileops_impl_seekless!();
@@ -230,5 +232,77 @@ impl FsNodeOps for ThreadSelfSymlink {
         Ok(SymlinkTarget::Path(
             format!("{}/task/{}", current_task.get_pid(), current_task.get_tid()).into_bytes(),
         ))
+    }
+}
+
+/// Creates the /proc/pressure directory. https://docs.kernel.org/accounting/psi.html
+fn pressure_directory(fs: &FileSystemHandle) -> FsNodeHandle {
+    StaticDirectoryBuilder::new(fs)
+        .entry(b"memory", PressureFile::new_node(), mode!(IFREG, 0o666))
+        .build()
+}
+
+#[derive(Default)]
+struct PressureFile {
+    seq: Mutex<SeqFileState<()>>,
+}
+
+impl PressureFile {
+    fn new_node() -> impl FsNodeOps {
+        SimpleFileNode::new(|| Ok(Self::default()))
+    }
+}
+
+impl FileOps for PressureFile {
+    fileops_impl_seekable!();
+
+    fn read_at(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        // TODO(115887): Replace with real implementation.
+        self.seq.lock().read_at(
+            current_task,
+            |_, sink: &mut SeqFileBuf| {
+                writeln!(sink, "some avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
+                writeln!(sink, "full avg10={:.2} avg60={:.2} avg300={:.2} total={}", 0, 0, 0, 0)?;
+                Ok(None)
+            },
+            offset,
+            data,
+        )
+    }
+
+    /// Pressure notifications are configured by writing to the file.
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        _offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        // Ignore the request for now.
+        not_implemented!(current_task, "pressure notification setup");
+        Ok(data.drain())
+    }
+
+    fn wait_async(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        _events: FdEvents,
+        _handler: EventHandler,
+    ) -> WaitKey {
+        waiter.fake_wait()
+    }
+
+    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}
+
+    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
+        FdEvents::empty()
     }
 }
