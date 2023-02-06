@@ -652,7 +652,6 @@ fn enable_ipv6_device<
     if !is_ip_routing_enabled(sync_ctx, device_id) {
         RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
     }
-    ctx.on_event(IpDeviceEvent::EnabledChanged { device: device_id.clone(), ip_enabled: true });
 }
 
 fn disable_ipv6_device<
@@ -712,7 +711,6 @@ fn disable_ipv6_device<
 
     GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
     leave_ip_multicast(sync_ctx, ctx, device_id, Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS);
-    ctx.on_event(IpDeviceEvent::EnabledChanged { device: device_id.clone(), ip_enabled: false });
 }
 
 fn enable_ipv4_device<
@@ -726,7 +724,6 @@ fn enable_ipv4_device<
     // All systems should join the all-systems multicast group.
     join_ip_multicast(sync_ctx, ctx, device_id, Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS);
     GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
-    ctx.on_event(IpDeviceEvent::EnabledChanged { device: device_id.clone(), ip_enabled: true });
     sync_ctx.with_ip_device_state(device_id, |state| {
         state.ip_state.iter_addrs().for_each(|addr| {
             ctx.on_event(IpDeviceEvent::AddressStateChanged {
@@ -758,7 +755,6 @@ fn disable_ipv4_device<
             });
         })
     });
-    ctx.on_event(IpDeviceEvent::EnabledChanged { device: device_id.clone(), ip_enabled: false });
 }
 
 pub(crate) fn with_assigned_addr_subnets<
@@ -1221,9 +1217,14 @@ pub(crate) fn update_ipv4_configuration<
     } = new_config;
 
     if !prev_ip_enabled && next_ip_enabled {
+        ctx.on_event(IpDeviceEvent::EnabledChanged { device: device_id.clone(), ip_enabled: true });
         enable_ipv4_device(sync_ctx, ctx, device_id);
     } else if prev_ip_enabled && !next_ip_enabled {
         disable_ipv4_device(sync_ctx, ctx, device_id);
+        ctx.on_event(IpDeviceEvent::EnabledChanged {
+            device: device_id.clone(),
+            ip_enabled: false,
+        });
     }
 
     if !prev_gmp_enabled && next_gmp_enabled {
@@ -1289,13 +1290,81 @@ pub(crate) fn update_ipv6_configuration<
 
     if !prev_ip_enabled && next_ip_enabled {
         enable_ipv6_device(sync_ctx, ctx, device_id);
+        ctx.on_event(IpDeviceEvent::EnabledChanged { device: device_id.clone(), ip_enabled: true });
     } else if prev_ip_enabled && !next_ip_enabled {
         disable_ipv6_device(sync_ctx, ctx, device_id);
+        ctx.on_event(IpDeviceEvent::EnabledChanged {
+            device: device_id.clone(),
+            ip_enabled: false,
+        });
     }
 
     if !prev_gmp_enabled && next_gmp_enabled {
         GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
     } else if prev_gmp_enabled && !next_gmp_enabled {
+        GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+    }
+}
+
+/// Removes IPv4 state for the device without emitting events.
+pub(crate) fn clear_ipv4_device_state<
+    C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
+    SC: IpDeviceContext<Ipv4, C> + GmpHandler<Ipv4, C> + NudIpHandler<Ipv4, C>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &SC::DeviceId,
+) {
+    let IpDeviceConfiguration { ip_enabled, gmp_enabled } =
+        sync_ctx.with_ip_device_state(device_id, |state| {
+            let Ipv4DeviceState { ip_state: _, config: Ipv4DeviceConfiguration { ip_config } } =
+                state;
+            *ip_config
+        });
+    if ip_enabled {
+        disable_ipv4_device(sync_ctx, ctx, device_id);
+    }
+    if gmp_enabled {
+        GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+    }
+}
+
+/// Removes IPv6 state for the device without emitting events.
+pub(crate) fn clear_ipv6_device_state<
+    C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
+    SC: Ipv6DeviceContext<C>
+        + GmpHandler<Ipv6, C>
+        + RsHandler<C>
+        + DadHandler<C>
+        + RouteDiscoveryHandler<C>
+        + SlaacHandler<C>
+        + NudIpHandler<Ipv6, C>,
+>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device_id: &SC::DeviceId,
+) {
+    let IpDeviceConfiguration { ip_enabled, gmp_enabled } =
+        sync_ctx.with_ip_device_state(device_id, |state| {
+            let Ipv6DeviceState {
+                ip_state: _,
+                config:
+                    Ipv6DeviceConfiguration {
+                        ip_config,
+                        dad_transmits: _,
+                        max_router_solicitations: _,
+                        slaac_config: _,
+                    },
+                retrans_timer: _,
+                route_discovery: _,
+                router_soliciations_remaining: _,
+            } = state;
+            *ip_config
+        });
+    if ip_enabled {
+        disable_ipv6_device(sync_ctx, ctx, device_id);
+    }
+    if gmp_enabled {
         GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
     }
 }
