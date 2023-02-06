@@ -8,10 +8,9 @@ const METADATA_MAX_SIZE uint32 = 0x1000;
 
 /// Protocol to query a driver's metadata. This is only used to test that the
 /// isolateddevmgr sends test metadata correctly to drivers.
-@for_deprecated_c_bindings
-closed protocol Metadata {
+protocol Metadata {
     /// Recieves the metadata that the driver has been given.
-    strict GetMetadata(struct {
+    GetMetadata(struct {
         type uint32;
     }) -> (struct {
         data vector<uint8>:METADATA_MAX_SIZE;

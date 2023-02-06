@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 #include <fcntl.h>
-#include <fuchsia/device/manager/test/c/fidl.h>
+#include <fidl/fuchsia.device.manager.test/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver-integration-test/fixture.h>
@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <zircon/syscalls.h>
 
+#include <string>
 #include <vector>
 
 #include <zxtest/zxtest.h>
@@ -23,29 +24,39 @@ namespace {
 
 class IsolatedDevMgrTest : public zxtest::Test {};
 
-const uint8_t metadata1[] = {1, 2, 3, 4, 5};
+const std::vector<uint8_t> metadata1 = {1, 2, 3, 4, 5};
 const board_test::DeviceEntry kDeviceEntry1 = []() {
   board_test::DeviceEntry entry = {};
   strcpy(entry.name, "metadata-test");
   entry.vid = PDEV_VID_TEST;
   entry.pid = PDEV_PID_METADATA_TEST;
   entry.did = PDEV_DID_TEST_CHILD_1;
-  entry.metadata_size = sizeof(metadata1);
-  entry.metadata = metadata1;
+  entry.metadata_size = metadata1.size();
+  entry.metadata = metadata1.data();
   return entry;
 }();
 
-const uint8_t metadata2[] = {7, 6, 5, 4, 3, 2, 1};
+const std::vector<uint8_t> metadata2 = {7, 6, 5, 4, 3, 2, 1};
 const board_test::DeviceEntry kDeviceEntry2 = []() {
   board_test::DeviceEntry entry = {};
   strcpy(entry.name, "metadata-test");
   entry.vid = PDEV_VID_TEST;
   entry.pid = PDEV_PID_METADATA_TEST;
   entry.did = PDEV_DID_TEST_CHILD_2;
-  entry.metadata_size = sizeof(metadata2);
-  entry.metadata = metadata2;
+  entry.metadata_size = metadata2.size();
+  entry.metadata = metadata2.data();
   return entry;
 }();
+
+void CheckMetadata(fidl::WireSyncClient<fuchsia_device_manager_test::Metadata>& client,
+                   const std::vector<uint8_t>& expected_metadata) {
+  fidl::WireResult result = client->GetMetadata(DEVICE_METADATA_TEST);
+  ASSERT_OK(result.status());
+  fidl::VectorView<uint8_t> received_metadata = std::move(result->data);
+  ASSERT_EQ(received_metadata.count(), expected_metadata.size());
+
+  EXPECT_BYTES_EQ(received_metadata.data(), expected_metadata.data(), expected_metadata.size());
+}
 
 TEST_F(IsolatedDevMgrTest, MetadataOneDriverTest) {
   IsolatedDevmgr devmgr;
@@ -63,23 +74,9 @@ TEST_F(IsolatedDevMgrTest, MetadataOneDriverTest) {
                                                             "sys/platform/11:07:2/metadata-test");
   ASSERT_OK(channel.status_value());
 
-  // Get a FIDL channel to the Metadata device
-  zx::channel metadata_driver_channel = std::move(channel.value());
-
-  // Read the metadata it received.
-  size_t out_size;
-  std::vector<uint8_t> received_metadata(sizeof(metadata1));
-
-  status = fuchsia_device_manager_test_MetadataGetMetadata(
-      metadata_driver_channel.get(), DEVICE_METADATA_TEST, received_metadata.data(),
-      received_metadata.size(), &out_size);
-
-  ASSERT_OK(status);
-  ASSERT_EQ(out_size, sizeof(metadata1));
-
-  for (size_t i = 0; i < received_metadata.size(); i++) {
-    EXPECT_EQ(received_metadata[i], metadata1[i]);
-  }
+  fidl::WireSyncClient client{
+      fidl::ClientEnd<fuchsia_device_manager_test::Metadata>(std::move(channel.value()))};
+  ASSERT_NO_FATAL_FAILURE(CheckMetadata(client, metadata1));
 }
 
 TEST_F(IsolatedDevMgrTest, MetadataTwoDriverTest) {
@@ -94,39 +91,30 @@ TEST_F(IsolatedDevMgrTest, MetadataTwoDriverTest) {
   zx_status_t status = IsolatedDevmgr::Create(&args, &devmgr);
   ASSERT_OK(status);
 
-  // Wait for Metadata-test driver to be created
-  zx::result metadata_driver_channel1 = device_watcher::RecursiveWaitForFile(
-      devmgr.devfs_root().get(), "sys/platform/11:07:2/metadata-test");
-  ASSERT_OK(metadata_driver_channel1.status_value());
+  struct MetadataTest {
+    std::string path;
+    std::vector<uint8_t> metadata;
+  };
 
-  zx::result metadata_driver_channel2 = device_watcher::RecursiveWaitForFile(
-      devmgr.devfs_root().get(), "sys/platform/11:07:3/metadata-test");
-  ASSERT_OK(metadata_driver_channel2.status_value());
+  std::vector<MetadataTest> tests{
+      {
+          .path = "sys/platform/11:07:2/metadata-test",
+          .metadata = metadata1,
+      },
+      {
+          .path = "sys/platform/11:07:3/metadata-test",
+          .metadata = metadata2,
+      },
+  };
 
-  // Read the metadata it received.
-  size_t out_size;
-  std::vector<uint8_t> received_metadata(sizeof(metadata1));
-
-  status = fuchsia_device_manager_test_MetadataGetMetadata(
-      metadata_driver_channel1.value().get(), DEVICE_METADATA_TEST, received_metadata.data(),
-      received_metadata.size(), &out_size);
-
-  ASSERT_OK(status);
-  ASSERT_EQ(out_size, sizeof(metadata1));
-
-  for (size_t i = 0; i < received_metadata.size(); i++) {
-    EXPECT_EQ(received_metadata[i], metadata1[i]);
-  }
-
-  received_metadata.resize(sizeof(metadata2));
-  status = fuchsia_device_manager_test_MetadataGetMetadata(
-      metadata_driver_channel2.value().get(), DEVICE_METADATA_TEST, received_metadata.data(),
-      received_metadata.size(), &out_size);
-  ASSERT_OK(status);
-  ASSERT_EQ(out_size, sizeof(metadata2));
-
-  for (size_t i = 0; i < received_metadata.size(); i++) {
-    EXPECT_EQ(received_metadata[i], metadata2[i]);
+  for (MetadataTest& test : tests) {
+    SCOPED_TRACE(test.path);
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(devmgr.devfs_root().get(), test.path.c_str());
+    ASSERT_OK(channel.status_value());
+    fidl::WireSyncClient client{
+        fidl::ClientEnd<fuchsia_device_manager_test::Metadata>(std::move(channel.value()))};
+    ASSERT_NO_FATAL_FAILURE(CheckMetadata(client, test.metadata));
   }
 }
 
