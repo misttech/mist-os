@@ -12,7 +12,12 @@ fidl_library("fuchsia.examples.rot13") {
 }
 
 executable("hello_fidl") {
-  deps = [ ":fuchsia.examples.rot13" ]
+  deps = [
+    ":fuchsia.examples.rot13",
+    ":fuchsia.examples.rot13_cpp",
+    ":fuchsia.examples.rot13_cpp_hlcpp_conversion",
+    ":fuchsia.examples.rot13_cpp_natural_ostream",
+  ]
   sources = [ "//tests/package/hello.cc" ]
 }
 
