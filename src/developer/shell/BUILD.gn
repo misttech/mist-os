@@ -60,22 +60,10 @@ fuchsia_test_package("josh-tests") {
 group("tests") {
   testonly = true
 
-  deps = []
-
-  # TODO(fxbug.dev/107823): Don't block LTO builds on this test passing.
-  if (select_variant + [
-        "lto",
-        "thinlto",
-      ] -
-      [
-        "lto",
-        "thinlto",
-      ] == select_variant) {
-    deps += [
-      ":josh-log-tests",
-      ":josh-tests",
-    ]
-  }
+  deps = [
+    ":josh-log-tests",
+    ":josh-tests",
+  ]
 }
 
 # "josh" is Javascript Object SHell.
