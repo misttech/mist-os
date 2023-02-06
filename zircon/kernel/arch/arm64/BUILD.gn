@@ -64,21 +64,10 @@ if (toolchain_environment == "physmem" ||
     cflags = [ "-ffixed-x20" ]
 
     if (!is_gcc) {
-      # Use the right thread-pointer ABI for the kernel.
-      cflags += [ "-mtp=el1" ]
-    }
-
-    # Don't use the outline atomics since we don't have the helper functions.
-    # TODO(mcgrathr): use code-patching to define the outcalls for the kernel
-    configs = [ "//build/config/arm64:no-outline-atomics" ]
-  }
-
-  # This is used pervasively throughout the kernel on arm64.
-  config("kernel") {
-    cflags = []
-
-    if (!is_gcc) {
       cflags += [
+        # Use the right thread-pointer ABI for the kernel.
+        "-mtp=el1",
+
         # Use shadow-call-stack rather than safe-stack for the kernel,
         # regardless of the compiler's default.
         "-fno-sanitize=safe-stack",
@@ -90,7 +79,10 @@ if (toolchain_environment == "physmem" ||
     # it always sees all the same `-fsanitize=...` flags and the like.
     asmflags = cflags
     ldflags = cflags
+  }
 
+  # This is used pervasively throughout the kernel on arm64.
+  config("kernel") {
     defines = [ "ARCH_ARM64" ]
 
     # For #include <arch/foo.h>.
@@ -103,7 +95,11 @@ if (toolchain_environment == "physmem" ||
 
     # Align the kernel's segments to 64k so it can use "combined pages" to
     # reduce the TLB load.
-    ldflags += [ "-Wl,-z,max-page-size=65536" ]
+    ldflags = [ "-Wl,-z,max-page-size=65536" ]
+
+    # Don't use the outline atomics since we don't have the helper functions.
+    # TODO(mcgrathr): use code-patching to define the outcalls for the kernel
+    configs += [ "//build/config/arm64:no-outline-atomics" ]
   }
 
   source_set("arm64") {
