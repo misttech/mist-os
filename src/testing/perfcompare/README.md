@@ -24,6 +24,16 @@ dependencies (currently just the `scipy` Python library):
   sudo apt-get install python3-scipy
   ```
 
+## Running the unit tests
+
+The unit tests used to be run on CI/CQ, but that regressed.  Running
+them on CI/CQ is somewhat difficult now because of the dependency on
+`scipy`, so for now the tests must be run manually, with:
+
+```sh
+python3 src/testing/perfcompare/perfcompare_test.py
+```
+
 ## Example: Running perf tests locally and comparing results
 
 The perfcompare tool can be used to run perf tests locally and to
