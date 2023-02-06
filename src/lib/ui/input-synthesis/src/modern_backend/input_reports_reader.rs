@@ -62,6 +62,9 @@ impl InputReportsReader {
                     (InputReportsReaderRequest::ReadInputReports { responder }, reports) => {
                         responder
                             .send(&mut Ok(reports))
+                            // TODO(fxbug.dev/113160): Remove this line since
+                            // is_closed() will always be false.
+                            .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
                             .map_err(anyhow::Error::from)
                             .context("while sending reports")
                     }
@@ -250,7 +253,7 @@ mod tests {
         }
 
         #[fasync::run_until_stalled(test)]
-        async fn resolves_to_err_if_send_fails() -> Result<(), Error> {
+        async fn resolves_to_ok_if_client_closes_channel_and_ignores_reply() -> Result<(), Error> {
             let (proxy, request_stream) =
                 endpoints::create_proxy_and_stream::<InputReportsReaderMarker>()
                     .context("creating InputReportsReader proxy and stream")?;
@@ -262,7 +265,7 @@ mod tests {
             std::mem::drop(result_fut); // Close handle to channel.
             std::mem::drop(proxy); // Close other handle to channel.
             std::mem::drop(report_sender); // Drop `report_sender` to terminate `report_receiver`.
-            assert_matches!(reader_fut.await, Err(_)); // while sending reports
+            assert_matches!(reader_fut.await, Ok(()));
             Ok(())
         }
 
