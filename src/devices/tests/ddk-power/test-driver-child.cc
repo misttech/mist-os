@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.device.power.test/cpp/wire.h>
-#include <fuchsia/device/c/fidl.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -155,7 +154,7 @@ void TestPowerDriverChild::AddDeviceWithPowerArgs(
   auto states = std::make_unique<device_power_state_info_t[]>(request->info.count());
   auto count = static_cast<uint8_t>(request->info.count());
   for (uint8_t i = 0; i < count; i++) {
-    states[i].state_id = static_cast<fuchsia_device_DevicePowerState>(state_info[i].state_id);
+    states[i].state_id = static_cast<device_power_state_t>(state_info[i].state_id);
     states[i].restore_latency = state_info[i].restore_latency;
     states[i].wakeup_capable = state_info[i].wakeup_capable;
     states[i].system_wake_state = state_info[i].system_wake_state;
