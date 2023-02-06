@@ -11,11 +11,15 @@ rustc_library("flyweights") {
 
   sources = [ "src/lib.rs" ]
   deps = [
+    "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:static_assertions",
   ]
-  test_deps = [ "//third_party/rust_crates:serde_json" ]
+  test_deps = [
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:test-case",
+  ]
   if (is_host) {
     test_deps += [ "//third_party/rust_crates:serial_test" ]
   }
