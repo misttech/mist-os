@@ -9,11 +9,14 @@ import("//build/config/current_target_tuple.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/config/sanitizers/sanitizer_default_options.gni")
 import("//build/config/sysroot.gni")
-import("//build/rust/config.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/rbe.gni")
 import("//src/lib/icu/third_party_icu_headers.gni")
-import("//zircon/public/sysroot/rust.gni")
+
+if (support_rust) {
+  import("//build/rust/config.gni")
+  import("//zircon/public/sysroot/rust.gni")
+}
 
 # ccache, at least in some configurations, caches preprocessed content. This
 # means that by the time the compiler sees it, macros are unrolled. A number
@@ -42,15 +45,6 @@ config("compiler") {
     ":compiler_fuchsia_api_level",
   ]
 
-  if (!is_debug || rust_rbe_enable) {
-    # fxbug.dev/85921#c15: forcing one codegen unit produces
-    # smaller binaries but makes builds slower.
-    # Enforce one codegen unit only when we really care about
-    # size (release builds), or when RBE is enabled (and then
-    # the benefits of parallelized codegen are diminished).
-    configs += [ "//build/config/rust:one_codegen_unit" ]
-  }
-
   if (board_configs != []) {
     configs += board_configs
   } else {
@@ -61,28 +55,40 @@ config("compiler") {
     configs += [ ":ccache" ]
   }
 
-  rustflags = [
-    "-L",
-    rebase_path(rust_sysroot_dir, root_build_dir) + "/lib",
-    "-Clinker=$rebased_clang_prefix/lld",
-    "-Clink-arg=--sysroot=" + rebase_path(rust_sysroot_dir, root_build_dir),
-
-    # These could alternatively come from clang's '--print-search-dirs', but that would require an
-    # exec_script and post-processing of the output or a JSON file generated during the toolchain
-    # build.
-    "-Clink-arg=-L" + rebased_clang_prefix + "/../lib/" + current_target_tuple,
-    "-Clink-arg=-L" + clang_resource_dir + "/lib/" + current_target_tuple,
-    "-Clink-arg=--pack-dyn-relocs=relr",
-    "-Clink-arg=-dynamic-linker=ld.so.1",
-    "-Clink-arg=--icf=all",
-  ]
-
-  # TODO(fxbug.dev/53078): Eventually the default in the compler driver.
-  rustflags += [ "-Clink-arg=-zrel" ]
-
   ldflags = []
   if (build_id_format != "") {
     ldflags += [ "-Wl,--build-id=$build_id_format" ]
+  }
+
+  if (support_rust) {
+    if (!is_debug || rust_rbe_enable) {
+      # fxbug.dev/85921#c15: forcing one codegen unit produces
+      # smaller binaries but makes builds slower.
+      # Enforce one codegen unit only when we really care about
+      # size (release builds), or when RBE is enabled (and then
+      # the benefits of parallelized codegen are diminished).
+      configs += [ "//build/config/rust:one_codegen_unit" ]
+    }
+
+    rustflags = [
+      "-L",
+      rebase_path(rust_sysroot_dir, root_build_dir) + "/lib",
+      "-Clinker=$rebased_clang_prefix/lld",
+      "-Clink-arg=--sysroot=" + rebase_path(rust_sysroot_dir, root_build_dir),
+
+      # These could alternatively come from clang's '--print-search-dirs', but that would require an
+      # exec_script and post-processing of the output or a JSON file generated during the toolchain
+      # build.
+      "-Clink-arg=-L" + rebased_clang_prefix + "/../lib/" +
+          current_target_tuple,
+      "-Clink-arg=-L" + clang_resource_dir + "/lib/" + current_target_tuple,
+      "-Clink-arg=--pack-dyn-relocs=relr",
+      "-Clink-arg=-dynamic-linker=ld.so.1",
+      "-Clink-arg=--icf=all",
+    ]
+
+    # TODO(fxbug.dev/53078): Eventually the default in the compler driver.
+    rustflags += [ "-Clink-arg=-zrel" ]
   }
 }
 

@@ -156,8 +156,19 @@ template("zither_golden_test") {
     enable_zither = true
   }
 
+  if (support_rust) {
+    all_cases = invoker.cases
+  } else {
+    all_cases = []
+    foreach(case, invoker.cases) {
+      if (case.backend != "rust" && case.backend != "rust_syscall") {
+        all_cases += [ case ]
+      }
+    }
+  }
+
   case_deps = []
-  foreach(case, invoker.cases) {
+  foreach(case, all_cases) {
     assert(defined(case.backend), "`${case}` must provide `backend`")
     assert(defined(case.files) && case.files != [],
            "`${case}` must provide `files`")

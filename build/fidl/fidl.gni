@@ -2,8 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/banjo/fidl_banjo.gni")
-import("//build/bind/fidl_bind_library.gni")
 import("//build/c/fidl_c.gni")
 import("//build/cpp/fidl_cpp.gni")
 import("//build/dart/fidl_dart.gni")
@@ -12,8 +10,13 @@ import("//build/fidl/fidl_library.gni")
 import("//build/fidl/toolchain.gni")
 import("//build/go/fidl_go.gni")
 import("//build/go/toolchain.gni")
-import("//build/rust/fidl_rust.gni")
 import("//zircon/tools/zither/zither_library.gni")
+
+if (support_rust) {
+  import("//build/banjo/fidl_banjo.gni")
+  import("//build/bind/fidl_bind_library.gni")
+  import("//build/rust/fidl_rust.gni")
+}
 
 # Declares a FIDL library.
 #
@@ -240,28 +243,30 @@ template("fidl") {
       enable_hlcpp = enable_hlcpp
     }
 
-    fidl_rust("${target_name}_rust") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                               "public_deps",
-                             ])
-      forward_variables_from(extra_parameters, "*", [ "fidl_target" ])
-      fidl_gen_dir += "/rust"
+    if (support_rust) {
+      fidl_rust("${target_name}_rust") {
+        forward_variables_from(invoker,
+                               [
+                                 "testonly",
+                                 "visibility",
+                                 "public_deps",
+                               ])
+        forward_variables_from(extra_parameters, "*", [ "fidl_target" ])
+        fidl_gen_dir += "/rust"
+      }
+
+      fidl_bind_library("${target_name}_bindlib") {
+        forward_variables_from(invoker,
+                               [
+                                 "testonly",
+                                 "visibility",
+                               ])
+        forward_variables_from(extra_parameters, "*", [ "fidl_target" ])
+        fidl_gen_dir += "/bindlib"
+      }
     }
 
-    fidl_bind_library("${target_name}_bindlib") {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      forward_variables_from(extra_parameters, "*", [ "fidl_target" ])
-      fidl_gen_dir += "/bindlib"
-    }
-
-    if (enable_banjo) {
+    if (enable_banjo && support_rust) {
       fidl_banjo("${target_name}_banjo") {
         forward_variables_from(invoker,
                                [

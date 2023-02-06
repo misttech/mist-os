@@ -9,10 +9,13 @@ import("//build/config/clang/time_trace.gni")
 import("//build/config/compiler.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/config/linker.gni")
-import("//build/rust/config.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/goma.gni")
+
+if (support_rust) {
+  import("//build/rust/config.gni")
+}
 
 declare_args() {
   if (is_fuchsia) {
@@ -192,7 +195,9 @@ config("toolchain_version_stamp") {
             "json")
     defines = [ "TOOLCHAIN_VERSION=${clang_version.instance_id}" ]
   }
-  rustflags = [ "--cfg=__rust_toolchain=\"${rustc_version_string}\"" ]
+  if (support_rust) {
+    rustflags = [ "--cfg=__rust_toolchain=\"${rustc_version_string}\"" ]
+  }
 }
 
 config("relative_paths") {

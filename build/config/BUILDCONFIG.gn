@@ -209,6 +209,8 @@ if (current_os == "fuchsia") {
   is_win = true
 }
 
+support_rust = zircon_toolchain == false
+
 # Some library targets may be built as different type depending on the target
 # platform. This variable specifies the default library type for each target.
 if (is_fuchsia) {

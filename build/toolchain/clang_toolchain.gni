@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/config/clang/clang.gni")
-import("//build/rust/config.gni")
 import("//build/toolchain/breakpad.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
@@ -11,6 +10,10 @@ import("//build/toolchain/default_tools.gni")
 import("//build/toolchain/goma.gni")
 import("//build/toolchain/rbe.gni")
 import("//build/toolchain/restat.gni")
+
+if (support_rust) {
+  import("//build/rust/config.gni")
+}
 
 # Defines a Clang-based toolchain.
 #
@@ -44,6 +47,11 @@ import("//build/toolchain/restat.gni")
 #   strip
 #     Optional: Override default tool names.
 #
+#   enable_rust
+#     Optional: Whether to enable the rust tools in the toolchain.
+#     Type: bool
+#     Default: true
+#
 #   use_ccache, use_goma, cxx_rbe_enable
 #     Optional: Override the global setting, useful to opt out of
 #     ccache/goma in a particular toolchain.
@@ -61,9 +69,14 @@ template("clang_toolchain") {
     assert(defined(invoker.toolchain_os),
            "clang_toolchain() must specify a \"toolchain_os\"")
 
+    enable_rust =
+        support_rust && (!defined(invoker.enable_rust) || invoker.enable_rust)
+
     compiler_prefix = ""
-    if (defined(invoker.rust_rbe_enable)) {
-      rust_rbe_enable = invoker.rust_rbe_enable
+    if (enable_rust) {
+      if (defined(invoker.rust_rbe_enable)) {
+        rust_rbe_enable = invoker.rust_rbe_enable
+      }
     }
     if (defined(invoker.cxx_rbe_enable)) {
       cxx_rbe_enable = invoker.cxx_rbe_enable
@@ -110,18 +123,20 @@ template("clang_toolchain") {
       prefix = invoker.prefix
     }
 
-    # Configure builds to be restat-friendly by preserving timestamps of
-    # unchanged outputs.
-    _restat_rustc_prefix = ""
-    if (restat_rust) {
-      _restat_rust_wrapper =
-          string_join(" ",
-                      [
-                        rebase_path(python_exe_src, root_build_dir),
-                        "-S",
-                        rebase_path(restat_wrapper, root_build_dir),
-                      ])
-      _restat_rustc_prefix = "$_restat_rust_wrapper --outputs substitute_after:-o:{{output}} {{DEPFILE}} -- "
+    if (enable_rust) {
+      # Configure builds to be restat-friendly by preserving timestamps of
+      # unchanged outputs.
+      _restat_rustc_prefix = ""
+      if (restat_rust) {
+        _restat_rust_wrapper =
+            string_join(" ",
+                        [
+                          rebase_path(python_exe_src, root_build_dir),
+                          "-S",
+                          rebase_path(restat_wrapper, root_build_dir),
+                        ])
+        _restat_rustc_prefix = "$_restat_rust_wrapper --outputs substitute_after:-o:{{output}} {{DEPFILE}} -- "
+      }
     }
     _restat_cc_prefix = ""
     if (restat_cc) {
@@ -135,45 +150,47 @@ template("clang_toolchain") {
       _restat_cc_prefix = "$_restat_cc_wrapper --outputs substitute_after:-o:{{output}} {{DEPFILE}} -- "
     }
 
-    # Configure Rust remote builds.
-    _rustc_wrapper = ""
-    _rust_concurrent_jobs = ""
-    if (rust_rbe_enable) {
-      assert(
-          rust_rbe_check == "none" || rust_rbe_check == "consistency" ||
-              rust_rbe_check == "determinism",
-          "rust_rbe_check must be one of {none,consistency,determinism}, but got: ${rust_rbe_check}.")
-      if (rust_rbe_check == "consistency") {
-        # Compare local vs. remote build.
-        # Allow caching.
-        # Use local concurrency.
-        _rewrapper_flags = " --compare --fsatrace --exec_strategy=remote"
-      } else if (rust_rbe_check == "determinism") {
-        # Determinism check is run locally, and doesn't use RBE,
-        # even though it uses the same wrapper script.
-        _rewrapper_flags = " --local --check-determinism"
-      } else {
-        assert(rust_rbe_exec_strategy == "remote" ||
-                   rust_rbe_exec_strategy == "remote_local_fallback" ||
-                   rust_rbe_exec_strategy == "local" ||
-                   rust_rbe_exec_strategy == "racing",
-               "Unsupported RBE exec_strategy: \"$rust_rbe_exec_strategy\".")
-        if (rust_rbe_exec_strategy == "remote") {
-          _rewrapper_flags = " --exec_strategy=remote"
-        } else if (rust_rbe_exec_strategy == "remote_local_fallback") {
-          _rewrapper_flags = " --exec_strategy=remote_local_fallback"
-        } else if (rust_rbe_exec_strategy == "local") {
-          _rewrapper_flags =
-              " --exec_strategy=local --remote_update_cache=false"
-        } else if (rust_rbe_exec_strategy == "racing") {
-          _rewrapper_flags = " --exec_strategy=racing"
+    if (enable_rust) {
+      # Configure Rust remote builds.
+      _rustc_wrapper = ""
+      _rust_concurrent_jobs = ""
+      if (rust_rbe_enable) {
+        assert(
+            rust_rbe_check == "none" || rust_rbe_check == "consistency" ||
+                rust_rbe_check == "determinism",
+            "rust_rbe_check must be one of {none,consistency,determinism}, but got: ${rust_rbe_check}.")
+        if (rust_rbe_check == "consistency") {
+          # Compare local vs. remote build.
+          # Allow caching.
+          # Use local concurrency.
+          _rewrapper_flags = " --compare --fsatrace --exec_strategy=remote"
+        } else if (rust_rbe_check == "determinism") {
+          # Determinism check is run locally, and doesn't use RBE,
+          # even though it uses the same wrapper script.
+          _rewrapper_flags = " --local --check-determinism"
+        } else {
+          assert(rust_rbe_exec_strategy == "remote" ||
+                     rust_rbe_exec_strategy == "remote_local_fallback" ||
+                     rust_rbe_exec_strategy == "local" ||
+                     rust_rbe_exec_strategy == "racing",
+                 "Unsupported RBE exec_strategy: \"$rust_rbe_exec_strategy\".")
+          if (rust_rbe_exec_strategy == "remote") {
+            _rewrapper_flags = " --exec_strategy=remote"
+          } else if (rust_rbe_exec_strategy == "remote_local_fallback") {
+            _rewrapper_flags = " --exec_strategy=remote_local_fallback"
+          } else if (rust_rbe_exec_strategy == "local") {
+            _rewrapper_flags =
+                " --exec_strategy=local --remote_update_cache=false"
+          } else if (rust_rbe_exec_strategy == "racing") {
+            _rewrapper_flags = " --exec_strategy=racing"
+          }
         }
+        _rustc_wrapper = rebase_path(rustc_remote_wrapper, root_build_dir) +
+                         _rewrapper_flags + " -- "
+        _rust_concurrent_jobs = concurrent_jobs.remote
+      } else {
+        _rust_concurrent_jobs = concurrent_jobs.local
       }
-      _rustc_wrapper = rebase_path(rustc_remote_wrapper, root_build_dir) +
-                       _rewrapper_flags + " -- "
-      _rust_concurrent_jobs = concurrent_jobs.remote
-    } else {
-      _rust_concurrent_jobs = concurrent_jobs.local
     }
 
     # Set all tools to defaults
@@ -181,7 +198,9 @@ template("clang_toolchain") {
     cxx = "${prefix}/clang++"
     ar = "${prefix}/llvm-ar"
     ld = cxx
-    rustc = "${rebased_rustc_prefix}/bin/rustc"
+    if (enable_rust) {
+      rustc = "${rebased_rustc_prefix}/bin/rustc"
+    }
     verify_depfile = string_join(" ",
                                  [
                                    rebase_path(python_exe_src, root_build_dir),
@@ -320,292 +339,307 @@ template("clang_toolchain") {
              "Unsupported toolchain_os value \"${invoker.toolchain_os}\"")
     }
 
-    # The _rust_link_common scope is used to capture common computations that
-    # are needed by the "rust_bin", "rust_dylib" and "rust_cdylib" tool()
-    # definitions below. It should define the following keys:
-    #
-    #   depfile: The depfile to use.
-    #   command: The command used to build the binary.
-    #   outputs: The list of outputs for the command.
-    #   unstripped_outfile: Path to unstripped output file (see below).
-    #
-    # Note that the 'command' and 'outputs' keys will use template parameters in their
-    # string, with the following values, which must be expanded based on the final
-    # target type:
-    #
-    # - {{UNSTRIPPED_OUTFILE}}: path of the unstripped output file. Should be
-    #   'unstripped_outfile', except for tool("rust_bin") when toolchain_os == "wasm32", where
-    #   it should be "${unstripped_outfile}.wasm" instead. The reason for this is that setting
-    #   default_output_extension doesn't work for binaries as it does for libraries.
-    #
-    # - {{UNSTRIPPED_DIR}}: name of directory holding unstripped binaries. 'lib.unstripped'
-    #   for shared libraries and modules, and 'exe.unstripped' for executables. Must be
-    #   expanded after {{UNSTRIPPED_OUTFILE}}.
-    #
-    # - {{BREAKPAD_NAME}}: Either an empty string, or "-n \"$breakpad_name\" "
-    #   (note the trailing space) for loadable modules and executables
-    #   (but not shared libraries), when breakpad symbols must be generated. Note that
-    #   this is only used if 'breakpad_name' is defined.
-    #
-    # Note that the choice of GN-style source expansion parameters is intentional: If by
-    # mistake the parameters are not properly expanded inside the tool() definitions, GN
-    # will complain loudly about it!
-    #
-    _rust_link_common = {
-      outname = "{{target_output_name}}{{output_extension}}"
-      outfile = "{{output_dir}}/$outname"
-      depfile = "$outfile.d"
-      command = ""
-      unstripped_outfile = outfile
+    if (enable_rust) {
+      # The _rust_link_common scope is used to capture common computations that
+      # are needed by the "rust_bin", "rust_dylib" and "rust_cdylib" tool()
+      # definitions below. It should define the following keys:
+      #
+      #   depfile: The depfile to use.
+      #   command: The command used to build the binary.
+      #   outputs: The list of outputs for the command.
+      #   unstripped_outfile: Path to unstripped output file (see below).
+      #
+      # Note that the 'command' and 'outputs' keys will use template parameters in their
+      # string, with the following values, which must be expanded based on the final
+      # target type:
+      #
+      # - {{UNSTRIPPED_OUTFILE}}: path of the unstripped output file. Should be
+      #   'unstripped_outfile', except for tool("rust_bin") when toolchain_os == "wasm32", where
+      #   it should be "${unstripped_outfile}.wasm" instead. The reason for this is that setting
+      #   default_output_extension doesn't work for binaries as it does for libraries.
+      #
+      # - {{UNSTRIPPED_DIR}}: name of directory holding unstripped binaries. 'lib.unstripped'
+      #   for shared libraries and modules, and 'exe.unstripped' for executables. Must be
+      #   expanded after {{UNSTRIPPED_OUTFILE}}.
+      #
+      # - {{BREAKPAD_NAME}}: Either an empty string, or "-n \"$breakpad_name\" "
+      #   (note the trailing space) for loadable modules and executables
+      #   (but not shared libraries), when breakpad symbols must be generated. Note that
+      #   this is only used if 'breakpad_name' is defined.
+      #
+      # Note that the choice of GN-style source expansion parameters is intentional: If by
+      # mistake the parameters are not properly expanded inside the tool() definitions, GN
+      # will complain loudly about it!
+      #
+      _rust_link_common = {
+        outname = "{{target_output_name}}{{output_extension}}"
+        outfile = "{{output_dir}}/$outname"
+        depfile = "$outfile.d"
+        command = ""
+        unstripped_outfile = outfile
 
-      if (use_strip) {
-        unstripped_outfile = "{{output_dir}}/{{UNSTRIPPED_DIR}}/{{target_output_name}}{{output_extension}}"
-      }
+        if (use_strip) {
+          unstripped_outfile = "{{output_dir}}/{{UNSTRIPPED_DIR}}/{{target_output_name}}{{output_extension}}"
+        }
 
-      forward_variables_from(_rust_concurrent_jobs, "*")
-      if (defined(invoker.pool)) {
-        pool = invoker.pool
-      }
+        forward_variables_from(_rust_concurrent_jobs, "*")
+        if (defined(invoker.pool)) {
+          pool = invoker.pool
+        }
 
-      # TODO: see the comment below.
-      if (use_strip) {
-        command += "mkdir -p {{output_dir}}/{{UNSTRIPPED_DIR}} && "
-      }
+        # TODO: see the comment below.
+        if (use_strip) {
+          command += "mkdir -p {{output_dir}}/{{UNSTRIPPED_DIR}} && "
+        }
 
-      ld_location_env = ""
-      link_map_args = ""
-      if (invoker.toolchain_os == "fuchsia") {
-        # On Fuchsia, lld is directly used to perform linking
-        link_map_args = "-C link-args=--Map=\"{{UNSTRIPPED_OUTFILE}}.map\""
-      } else if (invoker.toolchain_cpu == "wasm32") {
-        # TODO(fxbug.dev/56076): Remove need for ld location.
-        # On WASM builds, rust-ldd has trouble finding libLLVM.
-        # This workaround allows the build to proceed.
-        shared_lib_dir = rebase_path("$rustc_prefix/lib", root_build_dir)
-        if (host_os == "mac") {
-          ld_location_env = " DYLD_FALLBACK_LIBRARY_PATH=\"$shared_lib_dir\""
-        } else if (host_os == "linux") {
-          ld_location_env = " LD_LIBRARY_PATH=\"$shared_lib_dir\""
+        ld_location_env = ""
+        link_map_args = ""
+        if (invoker.toolchain_os == "fuchsia") {
+          # On Fuchsia, lld is directly used to perform linking
+          link_map_args = "-C link-args=--Map=\"{{UNSTRIPPED_OUTFILE}}.map\""
+        } else if (invoker.toolchain_cpu == "wasm32") {
+          # TODO(fxbug.dev/56076): Remove need for ld location.
+          # On WASM builds, rust-ldd has trouble finding libLLVM.
+          # This workaround allows the build to proceed.
+          shared_lib_dir = rebase_path("$rustc_prefix/lib", root_build_dir)
+          if (host_os == "mac") {
+            ld_location_env = " DYLD_FALLBACK_LIBRARY_PATH=\"$shared_lib_dir\""
+          } else if (host_os == "linux") {
+            ld_location_env = " LD_LIBRARY_PATH=\"$shared_lib_dir\""
+          } else {
+            assert(false, "Unsupported host os: $host_os")
+          }
+
+          # Disable link map args, which also seems to have a problem with WASM.
+        } else if (invoker.toolchain_os == "mac") {
+          # NOTE: MacOs does not support '--Map' in linker flags
         } else {
-          assert(false, "Unsupported host os: $host_os")
+          # On host, clang seems to be used to perform linking
+          link_map_args =
+              "-C link-args=-Wl,--Map=\"{{UNSTRIPPED_OUTFILE}}.map\""
         }
 
-        # Disable link map args, which also seems to have a problem with WASM.
-      } else if (invoker.toolchain_os == "mac") {
-        # NOTE: MacOs does not support '--Map' in linker flags
-      } else {
-        # On host, clang seems to be used to perform linking
-        link_map_args = "-C link-args=-Wl,--Map=\"{{UNSTRIPPED_OUTFILE}}.map\""
-      }
+        # Overwrite an existing output file only if its contents have changed.
+        command += string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
+        restat = restat_rust
 
-      # Overwrite an existing output file only if its contents have changed.
-      command += string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
-      restat = restat_rust
+        # Possibly enable remote building for the rustc command.
+        command += _rustc_wrapper
 
-      # Possibly enable remote building for the rustc command.
-      command += _rustc_wrapper
+        # TODO(fxbug.dev/47565): Replacement for rustenv
+        command += "{{rustenv}}${ld_location_env} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
+        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target $link_map_args {{rustflags}}"
+        command += " -o \"{{UNSTRIPPED_OUTFILE}}\" {{rustdeps}} {{externs}}"
+        command +=
+            " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
-      # TODO(fxbug.dev/47565): Replacement for rustenv
-      command += "{{rustenv}}${ld_location_env} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
-      command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target $link_map_args {{rustflags}}"
-      command += " -o \"{{UNSTRIPPED_OUTFILE}}\" {{rustdeps}} {{externs}}"
-      command += " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
-
-      outputs = [ outfile ]
-      if (outfile != unstripped_outfile) {
-        outputs += [ unstripped_outfile ]
-      }
-      if (defined(breakpad_name) && host_os != "mac") {
-        command += " && $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\" > \"$outfile.sym\""
-        outputs += [ "$outfile.sym" ]
-      }
-      if (output_gsym && invoker.toolchain_os == "fuchsia") {
-        outputs += [ "$outfile.gsym" ]
-        command += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$outfile.gsym\""
-      }
-      if (use_strip) {
-        if (invoker.toolchain_os == "mac") {
-          command += " && $strip -Sx \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
-        } else {
-          # TODO(fxbug.dev/59286): Strip .rustc section from packaged dylibs.
-          command += " && $strip --strip-all --keep-section=.rustc \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
+        outputs = [ outfile ]
+        if (outfile != unstripped_outfile) {
+          outputs += [ unstripped_outfile ]
         }
-        if (invoker.toolchain_os != "mac" && invoker.toolchain_os != "win") {
-          outputs += [ "$outfile.build-id.stamp" ]
-          command +=
-              " && $buildidtool -build-id-dir .build-id" +
-              " -stamp \"$outfile.build-id.stamp\"" + " -entry \"=$outfile\"" +
-              " -entry \".debug={{UNSTRIPPED_OUTFILE}}\""
+        if (defined(breakpad_name) && host_os != "mac") {
+          command += " && $dump_syms -r {{BREAKPAD_NAME}}-o Fuchsia \"{{UNSTRIPPED_OUTFILE}}\" > \"$outfile.sym\""
+          outputs += [ "$outfile.sym" ]
         }
-      }
-      rust_sysroot = "$rebased_rustc_prefix"
-    }
-
-    # Compute common values for "rust_dylib" and "rust_cdylib".
-    # All template parameters will be expanded.
-    _rust_dylib_common = {
-      forward_variables_from(_rust_link_common, "*", [ "outputs" ])
-
-      # Expand UNSTRIPPED_OUTFILE
-      command =
-          string_replace(command, "{{UNSTRIPPED_OUTFILE}}", unstripped_outfile)
-      default_output_extension = _dylib_extension
-
-      # Expand UNSTRIPPED_DIR
-      _unstripped_dir = "lib.unstripped"
-      command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
-      outputs = []
-      foreach(output, _rust_link_common.outputs) {
-        output =
-            string_replace(output, "{{UNSTRIPPED_OUTFILE}}", unstripped_outfile)
-        output = string_replace(output, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
-        outputs += [ output ]
+        if (output_gsym && invoker.toolchain_os == "fuchsia") {
+          outputs += [ "$outfile.gsym" ]
+          command += " && $gsymutil --convert=\"{{UNSTRIPPED_OUTFILE}}\" --out-file=\"$outfile.gsym\""
+        }
+        if (use_strip) {
+          if (invoker.toolchain_os == "mac") {
+            command +=
+                " && $strip -Sx \"{{UNSTRIPPED_OUTFILE}}\" -o \"$outfile\""
+          } else {
+            # TODO(fxbug.dev/59286): Strip .rustc section from packaged dylibs.
+            command += " && $strip --strip-all --keep-section=.rustc \"{{UNSTRIPPED_OUTFILE}}\" \"$outfile\""
+          }
+          if (invoker.toolchain_os != "mac" && invoker.toolchain_os != "win") {
+            outputs += [ "$outfile.build-id.stamp" ]
+            command += " && $buildidtool -build-id-dir .build-id" +
+                       " -stamp \"$outfile.build-id.stamp\"" +
+                       " -entry \"=$outfile\"" +
+                       " -entry \".debug={{UNSTRIPPED_OUTFILE}}\""
+          }
+        }
+        rust_sysroot = "$rebased_rustc_prefix"
       }
 
-      # Expand BREAKPAD_NAME, if present, which is unused for dynamic libraries.
-      command = string_replace(command, "{{BREAKPAD_NAME}}", "")
+      # Compute common values for "rust_dylib" and "rust_cdylib".
+      # All template parameters will be expanded.
+      _rust_dylib_common = {
+        forward_variables_from(_rust_link_common, "*", [ "outputs" ])
 
-      if (invoker.toolchain_os == "fuchsia") {
-        # On Fuchsia, lld is directly used to perform linking
-        command = string_replace(
-                command,
-                "{{rustflags}}",
-                "-C link-arg=--soname=\"{{target_output_name}}{{output_extension}}\" {{rustflags}}")
-      } else {
-        # TODO: should soname be set on other platforms?
-      }
-    }
-
-    tool("rust_bin") {
-      description = "RUST {{output}}"
-      default_output_dir = "{{root_out_dir}}"
-      rust_sysroot = "$rebased_rustc_prefix"
-
-      forward_variables_from(_rust_link_common, "*", [ "outputs" ])
-
-      # Expand UNSTRIPPED_OUTFILE
-      if (invoker.toolchain_cpu == "wasm32") {
-        unstripped_outfile += ".wasm"
-      }
-      command =
-          string_replace(command, "{{UNSTRIPPED_OUTFILE}}", unstripped_outfile)
-
-      # Expand UNSTRIPPED_DIR
-      _unstripped_dir = "exe.unstripped"
-      command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
-      outputs = []
-      foreach(output, _rust_link_common.outputs) {
-        output =
-            string_replace(output, "{{UNSTRIPPED_OUTFILE}}", unstripped_outfile)
-        output = string_replace(output, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
-        outputs += [ output ]
-      }
-
-      # Expand BREAKPAD_NAME if present.
-      if (defined(breakpad_name)) {
+        # Expand UNSTRIPPED_OUTFILE
         command = string_replace(command,
-                                 "{{BREAKPAD_NAME}}",
-                                 "-n \"$breakpad_name\" ")
+                                 "{{UNSTRIPPED_OUTFILE}}",
+                                 unstripped_outfile)
+        default_output_extension = _dylib_extension
+
+        # Expand UNSTRIPPED_DIR
+        _unstripped_dir = "lib.unstripped"
+        command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
+        outputs = []
+        foreach(output, _rust_link_common.outputs) {
+          output = string_replace(output,
+                                  "{{UNSTRIPPED_OUTFILE}}",
+                                  unstripped_outfile)
+          output = string_replace(output, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
+          outputs += [ output ]
+        }
+
+        # Expand BREAKPAD_NAME, if present, which is unused for dynamic libraries.
+        command = string_replace(command, "{{BREAKPAD_NAME}}", "")
+
+        if (invoker.toolchain_os == "fuchsia") {
+          # On Fuchsia, lld is directly used to perform linking
+          command = string_replace(
+                  command,
+                  "{{rustflags}}",
+                  "-C link-arg=--soname=\"{{target_output_name}}{{output_extension}}\" {{rustflags}}")
+        } else {
+          # TODO: should soname be set on other platforms?
+        }
       }
 
-      # As a special case, on Fuchsia, replace --strip-all with --strip-sections.
-      # It is stronger, and thus generates smaller binaries, but also creates
-      # crashes for host binaries (e.g. https://fxbug.dev/49945).
-      if (invoker.toolchain_os == "fuchsia") {
-        command = string_replace(command, " --strip-all ", " --strip-sections ")
+      tool("rust_bin") {
+        description = "RUST {{output}}"
+        default_output_dir = "{{root_out_dir}}"
+        rust_sysroot = "$rebased_rustc_prefix"
+
+        forward_variables_from(_rust_link_common, "*", [ "outputs" ])
+
+        # Expand UNSTRIPPED_OUTFILE
+        if (invoker.toolchain_cpu == "wasm32") {
+          unstripped_outfile += ".wasm"
+        }
+        command = string_replace(command,
+                                 "{{UNSTRIPPED_OUTFILE}}",
+                                 unstripped_outfile)
+
+        # Expand UNSTRIPPED_DIR
+        _unstripped_dir = "exe.unstripped"
+        command = string_replace(command, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
+        outputs = []
+        foreach(output, _rust_link_common.outputs) {
+          output = string_replace(output,
+                                  "{{UNSTRIPPED_OUTFILE}}",
+                                  unstripped_outfile)
+          output = string_replace(output, "{{UNSTRIPPED_DIR}}", _unstripped_dir)
+          outputs += [ output ]
+        }
+
+        # Expand BREAKPAD_NAME if present.
+        if (defined(breakpad_name)) {
+          command = string_replace(command,
+                                   "{{BREAKPAD_NAME}}",
+                                   "-n \"$breakpad_name\" ")
+        }
+
+        # As a special case, on Fuchsia, replace --strip-all with --strip-sections.
+        # It is stronger, and thus generates smaller binaries, but also creates
+        # crashes for host binaries (e.g. https://fxbug.dev/49945).
+        if (invoker.toolchain_os == "fuchsia") {
+          command =
+              string_replace(command, " --strip-all ", " --strip-sections ")
+        }
       }
-    }
 
-    tool("rust_rlib") {
-      forward_variables_from(_rust_concurrent_jobs, "*")
-      depfile = "{{output}}.d"
+      tool("rust_rlib") {
+        forward_variables_from(_rust_concurrent_jobs, "*")
+        depfile = "{{output}}.d"
 
-      # Overwrite an existing output file only if its contents have changed.
-      command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
-      restat = restat_rust
+        # Overwrite an existing output file only if its contents have changed.
+        command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
+        restat = restat_rust
 
-      # Possibly enable remote building for the rustc command.
-      command += _rustc_wrapper
+        # Possibly enable remote building for the rustc command.
+        command += _rustc_wrapper
 
-      # TODO(fxbug.dev/47565): Replacement for rustenv
-      command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
-      command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-      command += " -o {{output}} {{rustdeps}} {{externs}}"
-      command += " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
+        # TODO(fxbug.dev/47565): Replacement for rustenv
+        command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
+        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
+        command += " -o {{output}} {{rustdeps}} {{externs}}"
+        command +=
+            " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
-      description = "RUST {{output}}"
-      outputs =
-          [ "{{output_dir}}/lib{{target_output_name}}{{output_extension}}" ]
-      default_output_dir = "{{target_out_dir}}"
-      default_output_extension = ".rlib"
-      rust_sysroot = "$rebased_rustc_prefix"
-    }
+        description = "RUST {{output}}"
+        outputs =
+            [ "{{output_dir}}/lib{{target_output_name}}{{output_extension}}" ]
+        default_output_dir = "{{target_out_dir}}"
+        default_output_extension = ".rlib"
+        rust_sysroot = "$rebased_rustc_prefix"
+      }
 
-    tool("rust_staticlib") {
-      forward_variables_from(_rust_concurrent_jobs, "*")
-      depfile = "{{output}}.d"
+      tool("rust_staticlib") {
+        forward_variables_from(_rust_concurrent_jobs, "*")
+        depfile = "{{output}}.d"
 
-      # Overwrite an existing output file only if its contents have changed.
-      command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
-      restat = restat_rust
+        # Overwrite an existing output file only if its contents have changed.
+        command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
+        restat = restat_rust
 
-      # Possibly enable remote building for the rustc command.
-      command += _rustc_wrapper
+        # Possibly enable remote building for the rustc command.
+        command += _rustc_wrapper
 
-      # TODO(fxbug.dev/47565): Replacement for rustenv
-      command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
-      command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-      command += " -o {{output}} {{rustdeps}} {{externs}}"
-      command += " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
+        # TODO(fxbug.dev/47565): Replacement for rustenv
+        command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}}"
+        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
+        command += " -o {{output}} {{rustdeps}} {{externs}}"
+        command +=
+            " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
-      description = "RUST {{output}}"
+        description = "RUST {{output}}"
 
-      outputs = [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
-      default_output_dir = "{{target_out_dir}}"
-      default_output_extension = ".a"
-      output_prefix = "lib"
-      rust_sysroot = "$rebased_rustc_prefix"
-    }
+        outputs =
+            [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
+        default_output_dir = "{{target_out_dir}}"
+        default_output_extension = ".a"
+        output_prefix = "lib"
+        rust_sysroot = "$rebased_rustc_prefix"
+      }
 
-    tool("rust_cdylib") {
-      forward_variables_from(_rust_dylib_common, "*")
+      tool("rust_cdylib") {
+        forward_variables_from(_rust_dylib_common, "*")
 
-      description = "RUST {{output}}"
-      default_output_dir = "{{target_out_dir}}"
-      output_prefix = "lib"
-    }
+        description = "RUST {{output}}"
+        default_output_dir = "{{target_out_dir}}"
+        output_prefix = "lib"
+      }
 
-    tool("rust_dylib") {
-      forward_variables_from(_rust_dylib_common, "*")
+      tool("rust_dylib") {
+        forward_variables_from(_rust_dylib_common, "*")
 
-      description = "RUST {{output}}"
-      default_output_dir = "{{root_out_dir}}/rust-shared"
-      output_prefix = "lib"
-    }
+        description = "RUST {{output}}"
+        default_output_dir = "{{root_out_dir}}/rust-shared"
+        output_prefix = "lib"
+      }
 
-    tool("rust_macro") {
-      forward_variables_from(_rust_concurrent_jobs, "*")
-      depfile = "{{output}}.d"
+      tool("rust_macro") {
+        forward_variables_from(_rust_concurrent_jobs, "*")
+        depfile = "{{output}}.d"
 
-      # Overwrite an existing output file only if its contents have changed.
-      command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
-      restat = restat_rust
+        # Overwrite an existing output file only if its contents have changed.
+        command = string_replace(_restat_rustc_prefix, "{{DEPFILE}}", depfile)
+        restat = restat_rust
 
-      # Possibly enable remote building for the rustc command.
-      command += _rustc_wrapper
+        # Possibly enable remote building for the rustc command.
+        command += _rustc_wrapper
 
-      # TODO(fxbug.dev/47565): Replacement for rustenv
-      command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}} "
-      command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
-      command += " -o {{output}} --extern proc_macro {{rustdeps}} {{externs}}"
-      command += " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
+        # TODO(fxbug.dev/47565): Replacement for rustenv
+        command += "{{rustenv}} RUST_BACKTRACE=1 $rustc --color=always --crate-name {{crate_name}} {{source}} "
+        command += " --crate-type {{crate_type}} --emit=dep-info=$depfile,link -Zdep-info-omit-d-target {{rustflags}}"
+        command += " -o {{output}} --extern proc_macro {{rustdeps}} {{externs}}"
+        command +=
+            " && $verify_depfile -t \"{{label}}\" -d $depfile {{sources}}"
 
-      description = "RUST {{output}}"
-      outputs = [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
-      default_output_dir = "{{root_out_dir}}"
-      default_output_extension = _dylib_extension
-      output_prefix = "lib"
-      rust_sysroot = "$rebased_rustc_prefix"
+        description = "RUST {{output}}"
+        outputs =
+            [ "{{output_dir}}/{{target_output_name}}{{output_extension}}" ]
+        default_output_dir = "{{root_out_dir}}"
+        default_output_extension = _dylib_extension
+        output_prefix = "lib"
+        rust_sysroot = "$rebased_rustc_prefix"
+      }
     }
 
     tool("alink") {
