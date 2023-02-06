@@ -184,13 +184,13 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     }
 
     /// Establish a one-shot, edge-triggered, asynchronous wait for the given FdEvents for the
-    /// given file and task.
+    /// given file and task. Returns WaitKey::empty() if this file does not support blocking waits.
     ///
     /// Active events are not considered. This is similar to the semantics of the
     /// ZX_WAIT_ASYNC_EDGE flag on zx_wait_async. To avoid missing events, the caller must call
     /// query_events after calling this.
     ///
-    /// If your file does not block, implement this with fileops_impl_nonblocking.
+    /// If your file does not support blocking waits, leave this as the default implementation.
     fn wait_async(
         &self,
         _file: &FileObject,
@@ -198,15 +198,19 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         _waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> WaitKey;
+    ) -> WaitKey {
+        WaitKey::empty()
+    }
 
     /// Cancel a wait set up by wait_async.
     /// Returns true if the wait has not been activated and has been cancelled.
     ///
-    /// If your file does not block, implement this with fileops_impl_nonblocking.
-    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey);
+    /// If your file does not support blocking waits, leave this as the default implementation.
+    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}
 
-    fn query_events(&self, current_task: &CurrentTask) -> FdEvents;
+    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
+        FdEvents::POLLIN | FdEvents::POLLOUT
+    }
 
     fn ioctl(
         &self,
@@ -368,8 +372,6 @@ macro_rules! fileops_impl_seekless {
 /// [`FileOps::seek`] and [`FileOps::readdir`].
 macro_rules! fileops_impl_directory {
     () => {
-        crate::fs::fileops_impl_nonblocking!();
-
         fn read(
             &self,
             _file: &crate::fs::FileObject,
@@ -414,40 +416,9 @@ macro_rules! fileops_impl_directory {
     };
 }
 
-/// Implements [`FileOps`] methods in a way that makes sense for files that never block
-/// while reading/writing. The [`FileOps::wait_async`] and [`FileOps::query_events`] methods are
-/// implemented for you.
-macro_rules! fileops_impl_nonblocking {
-    () => {
-        fn wait_async(
-            &self,
-            _file: &crate::fs::FileObject,
-            _current_task: &crate::task::CurrentTask,
-            _waiter: &crate::task::Waiter,
-            _events: crate::fs::FdEvents,
-            _handler: crate::task::EventHandler,
-        ) -> crate::task::WaitKey {
-            crate::task::WaitKey::empty()
-        }
-
-        fn cancel_wait(
-            &self,
-            _current_task: &crate::task::CurrentTask,
-            _waiter: &crate::task::Waiter,
-            _key: crate::task::WaitKey,
-        ) {
-        }
-
-        fn query_events(&self, _current_task: &crate::task::CurrentTask) -> crate::fs::FdEvents {
-            crate::fs::FdEvents::POLLIN | crate::fs::FdEvents::POLLOUT
-        }
-    };
-}
-
 // Public re-export of macros allows them to be used like regular rust items.
 
 pub(crate) use fileops_impl_directory;
-pub(crate) use fileops_impl_nonblocking;
 pub(crate) use fileops_impl_nonseekable;
 pub(crate) use fileops_impl_seekable;
 pub(crate) use fileops_impl_seekless;
@@ -488,8 +459,6 @@ impl OPathOps {
 }
 
 impl FileOps for OPathOps {
-    fileops_impl_nonblocking!();
-
     fn read(
         &self,
         _file: &FileObject,

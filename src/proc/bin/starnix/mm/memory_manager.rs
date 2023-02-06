@@ -1550,7 +1550,6 @@ impl ProcMapsFile {
 }
 impl FileOps for ProcMapsFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,
@@ -1621,7 +1620,6 @@ impl ProcStatFile {
 
 impl FileOps for ProcStatFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,
@@ -1676,7 +1674,6 @@ impl ProcStatusFile {
 
 impl FileOps for ProcStatusFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,

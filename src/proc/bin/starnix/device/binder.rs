@@ -137,7 +137,7 @@ impl FileOps for BinderConnection {
             }
             Err(_) => {
                 handler(FdEvents::POLLERR);
-                WaitKey::empty()
+                waiter.fake_wait()
             }
         }
     }

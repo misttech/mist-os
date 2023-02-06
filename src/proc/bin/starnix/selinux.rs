@@ -105,7 +105,6 @@ trait SeLinuxFile {
 
 impl<T: SeLinuxFile + Send + Sync + AsAny + 'static> FileOps for T {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn write_at(
         &self,
@@ -218,7 +217,6 @@ struct AccessFile {
 
 impl FileOps for AccessFile {
     fileops_impl_nonseekable!();
-    fileops_impl_nonblocking!();
 
     fn read(
         &self,

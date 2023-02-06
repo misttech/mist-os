@@ -47,11 +47,11 @@ impl FileOps for InotifyFileObject {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _waiter: &Waiter,
+        waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
     ) -> WaitKey {
-        crate::task::WaitKey::empty()
+        waiter.fake_wait()
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}

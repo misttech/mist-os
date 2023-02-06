@@ -57,7 +57,6 @@ impl ImageFile {
 
 impl FileOps for ImageFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,

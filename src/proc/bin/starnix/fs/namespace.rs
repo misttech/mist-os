@@ -525,7 +525,6 @@ impl ProcMountsFile {
 
 impl FileOps for ProcMountsFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,
@@ -585,7 +584,6 @@ impl ProcMountinfoFile {
 
 impl FileOps for ProcMountinfoFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,

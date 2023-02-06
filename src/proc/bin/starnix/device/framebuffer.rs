@@ -92,7 +92,6 @@ impl DeviceOps for Arc<Framebuffer> {
 
 impl FileOps for Arc<Framebuffer> {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn ioctl(
         &self,

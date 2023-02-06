@@ -67,7 +67,6 @@ fn attr_directory(task: &Arc<Task>, fs: &FileSystemHandle) -> Arc<FsNode> {
 struct SeLinuxAttribute;
 impl FileOps for SeLinuxAttribute {
     fileops_impl_nonseekable!();
-    fileops_impl_nonblocking!();
 
     fn read(
         &self,
@@ -407,7 +406,6 @@ impl CmdlineFile {
 
 impl FileOps for CmdlineFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,
@@ -460,7 +458,6 @@ impl CommFile {
 
 impl FileOps for CommFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,

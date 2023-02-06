@@ -112,7 +112,6 @@ impl MagmaFile {
 
 impl FileOps for MagmaFile {
     fileops_impl_nonseekable!();
-    fileops_impl_nonblocking!();
 
     fn ioctl(
         &self,

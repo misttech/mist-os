@@ -38,7 +38,6 @@ impl BufferCollectionFile {
 
 impl FileOps for BufferCollectionFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,

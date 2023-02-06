@@ -159,11 +159,11 @@ impl FileOps for ProcKmsgFile {
         &self,
         _file: &FileObject,
         _current_task: &CurrentTask,
-        _waiter: &Waiter,
+        waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
     ) -> WaitKey {
-        WaitKey::empty()
+        waiter.fake_wait()
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}

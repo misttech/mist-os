@@ -245,7 +245,6 @@ impl DmaBufFile {
 
 impl FileOps for DmaBufFile {
     fileops_impl_nonseekable!();
-    fileops_impl_nonblocking!();
 
     fn ioctl(
         &self,

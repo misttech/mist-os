@@ -217,7 +217,6 @@ impl PanickingFile {
 
 impl FileOps for PanickingFile {
     fileops_impl_nonseekable!();
-    fileops_impl_nonblocking!();
 
     fn write(
         &self,

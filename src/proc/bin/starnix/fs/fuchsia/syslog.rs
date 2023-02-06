@@ -19,7 +19,6 @@ impl SyslogFile {
 
 impl FileOps for SyslogFile {
     fileops_impl_nonseekable!();
-    fileops_impl_nonblocking!();
 
     fn write(
         &self,

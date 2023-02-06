@@ -35,7 +35,6 @@ impl StubSysctl {
 
 impl FileOps for StubSysctl {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn write_at(
         &self,

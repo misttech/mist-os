@@ -36,7 +36,6 @@ struct BpfHandle(Arc<dyn BpfObject>);
 
 impl FileOps for BpfHandle {
     fileops_impl_nonseekable!();
-    fileops_impl_nonblocking!();
     fn read(
         &self,
         _file: &FileObject,

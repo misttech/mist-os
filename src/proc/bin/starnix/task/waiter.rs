@@ -22,7 +22,7 @@ pub enum WaitCallback {
     EventHandler(EventHandler),
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WaitKey {
     key: u64,
 }
@@ -31,10 +31,6 @@ impl WaitKey {
     /// an empty key means no associated handler
     pub fn empty() -> WaitKey {
         WaitKey { key: 0 }
-    }
-
-    pub fn equals(&self, other: &WaitKey) -> bool {
-        self.key == other.key
     }
 }
 
@@ -252,6 +248,22 @@ impl Waiter {
         Ok(WaitKey { key })
     }
 
+    /// Return a WaitKey representing a wait that will never complete. Useful for stub
+    /// implementations that should block forever even though a real implementation would wake up
+    /// eventually.
+    ///
+    /// This is intended for use in a FileObject::wait_async implementation to distinguish an
+    /// infinite wait from a file that doesn't support blocking and returns EPERM when used in
+    /// epoll (represented by WaitKey::empty()).
+    ///
+    /// TODO(tbodt): Figure out a less messy way to do this. This is necessary because wait_async
+    /// returns a WaitKey. There is probably a better way to design the waiting trait methods to
+    /// avoid this.
+    pub fn fake_wait(&self) -> WaitKey {
+        // This key will never be woken up because we never register it on a wait queue or port.
+        WaitKey { key: self.0.next_key.fetch_add(1, Ordering::Relaxed) }
+    }
+
     pub fn cancel_signal_wait<H>(&self, handle: &H, key: WaitKey) -> bool
     where
         H: zx::AsHandleRef,
@@ -281,16 +293,11 @@ impl Waiter {
         if self.0.ignore_signals {
             return;
         }
-        self.queue_user_packet(zx::sys::ZX_ERR_CANCELED);
+        self.queue_user_packet_data(&WaitKey::empty(), zx::sys::ZX_ERR_CANCELED, [0u8; 32]);
     }
 
     /// Queue a packet to the underlying Zircon port, which will cause the
     /// waiter to wake up.
-    fn queue_user_packet(&self, status: i32) {
-        let key = WaitKey::empty();
-        self.queue_user_packet_data(&key, status, [0u8; 32]);
-    }
-
     fn queue_user_packet_data(&self, key: &WaitKey, status: i32, packet_data: [u8; 32]) {
         let user_packet = zx::UserPacket::from_u8_array(packet_data);
         let packet = zx::Packet::from_user_packet(key.key, status, user_packet);
@@ -461,7 +468,7 @@ impl WaitQueue {
         let mut cancelled = false;
         // TODO(steveaustin) Maybe make waiters a map to avoid linear search
         self.waiters.retain(|entry| {
-            if entry.key.equals(&key) {
+            if entry.key == key {
                 cancelled = true;
                 false
             } else {

@@ -26,7 +26,6 @@ pub fn new_null_file(kernel: &Kernel, flags: OpenFlags) -> FileHandle {
 
 impl FileOps for DevNull {
     fileops_impl_seekless!();
-    fileops_impl_nonblocking!();
 
     fn write_at(
         &self,
@@ -59,7 +58,6 @@ impl FileOps for DevNull {
 struct DevZero;
 impl FileOps for DevZero {
     fileops_impl_seekless!();
-    fileops_impl_nonblocking!();
 
     fn write_at(
         &self,
@@ -88,7 +86,6 @@ impl FileOps for DevZero {
 struct DevFull;
 impl FileOps for DevFull {
     fileops_impl_seekless!();
-    fileops_impl_nonblocking!();
 
     fn write_at(
         &self,
@@ -117,7 +114,6 @@ impl FileOps for DevFull {
 struct DevRandom;
 impl FileOps for DevRandom {
     fileops_impl_seekless!();
-    fileops_impl_nonblocking!();
 
     fn write_at(
         &self,
@@ -146,7 +142,6 @@ impl FileOps for DevRandom {
 struct DevKmsg;
 impl FileOps for DevKmsg {
     fileops_impl_seekless!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,

@@ -12,8 +12,8 @@ use std::sync::{Arc, Weak};
 use crate::auth::FsCred;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::{
-    fileops_impl_nonblocking, fileops_impl_seekable, FileObject, FileOps, FsNode, FsNodeHandle,
-    FsNodeOps, FsStr, MemoryDirectoryFile, SeqFileBuf, SeqFileState,
+    fileops_impl_seekable, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
+    MemoryDirectoryFile, SeqFileBuf, SeqFileState,
 };
 use crate::lock::Mutex;
 use crate::task::{CurrentTask, Task};
@@ -136,7 +136,6 @@ impl ControlGroupFile {
 
 impl FileOps for ControlGroupFile {
     fileops_impl_seekable!();
-    fileops_impl_nonblocking!();
 
     fn read_at(
         &self,
