@@ -48,7 +48,6 @@ config("fidl-deprecated-c-bindings") {
     "//src/connectivity/bluetooth/hci/vendor/broadcom:common",
     "//src/connectivity/bluetooth/hci/vendor/broadcom:tests_executable",
     "//src/connectivity/bluetooth/hci/virtual:common",
-    "//src/connectivity/bluetooth/tools/bt-hci-tool:bin",
     "//src/connectivity/bluetooth/tools/bt-intel-tool:bin",
 
     # TODO(https://fxbug.dev/111342): Remove.
