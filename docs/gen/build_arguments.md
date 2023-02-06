@@ -1247,9 +1247,9 @@ From //third_party/crashpad/src/build/crashpad_buildconfig.gni:22
 
 ### crashpad_http_transport_impl
 
-**Current value (from the default):** `"libcurl"`
+**Current value (from the default):** `"socket"`
 
-From //third_party/crashpad/src/util/net/tls.gni:21
+From //third_party/crashpad/src/util/net/tls.gni:19
 
 ### crashpad_use_boringssl_for_http_transport_socket
 
