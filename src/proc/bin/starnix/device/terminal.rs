@@ -985,7 +985,6 @@ impl Queue {
         }
         let mut buffer = vec![0 as RawByte; std::cmp::min(room, data_length)];
         let read_from_userspace = data.read_exact(&mut buffer)?;
-        assert!(read_from_userspace == buffer.len());
         let signals = self.push_to_waiting_buffer(terminal, buffer);
         Ok((read_from_userspace, signals))
     }
