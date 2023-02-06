@@ -225,7 +225,7 @@ where
                     let i = self.find_client_index(index);
                     match result {
                         Ok(()) => self.next_event(i),
-                        Err(ClosedClient)=> {
+                        Err(ClosedClient) => {
                             self.clients.swap_remove(i);
                         },
                     }
@@ -516,21 +516,13 @@ mod tests {
             match stream.try_next().await.unwrap().unwrap() {
                 ExampleEventMonitorRequest::OnEvent { event, responder } => {
                     assert_eq!(&event, expected_event);
-                    responder.send().unwrap();
+                    responder
+                        .send()
+                        // TODO(fxbug.dev/113160): Remove this line since
+                        // is_closed() will always be false.
+                        .or_else(|err| if err.is_closed() { Ok(()) } else { Err(err) })
+                        .unwrap();
                 }
-            }
-        }
-    }
-
-    async fn assert_client_dropped(
-        stream: &mut ExampleEventMonitorRequestStream,
-        expected_event: &str,
-    ) {
-        match stream.try_next().await.unwrap().unwrap() {
-            ExampleEventMonitorRequest::OnEvent { event, responder } => {
-                assert_eq!(&event, expected_event);
-                // Sending response will fail because the client was dropped.
-                assert_matches!(responder.send(), Err(_));
             }
         }
     }
@@ -798,7 +790,7 @@ mod tests {
         for i in 1..12 {
             handle.queue_event(format!("event{i}")).await.unwrap();
         }
-        assert_client_dropped(&mut stream, "event1").await;
+        assert_events(&mut stream, &["event1"]).await;
         assert_matches!(stream.next().await, None);
     }
 
@@ -811,7 +803,7 @@ mod tests {
         handle.queue_event("event1".into()).await.unwrap();
         handle.queue_event("event2".into()).await.unwrap();
         handle.queue_event("event3".into()).await.unwrap();
-        assert_client_dropped(&mut stream, "event1").await;
+        assert_events(&mut stream, &["event1"]).await;
         assert_matches!(stream.next().await, None);
     }
 
