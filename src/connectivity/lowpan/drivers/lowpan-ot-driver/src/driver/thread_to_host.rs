@@ -7,12 +7,23 @@ use super::*;
 use futures::prelude::*;
 
 use lowpan_driver_common::spinel::Subnet;
+use tracing::{debug, error, info, trace, warn};
 
 impl<OT, NI, BI> OtDriver<OT, NI, BI>
 where
     OT: Send + ot::InstanceInterface,
     NI: NetworkInterface,
+    BI: BackboneInterface,
 {
+    pub fn start_multicast_routing_manager(&mut self) {
+        match self.backbone_if.get_nicid() {
+            None => info!("Backbone interface not present, not starting multicast routing manager"),
+            Some(backbone_nicid) => {
+                self.multicast_routing_manager.start(backbone_nicid.into(), self.net_if.get_index())
+            }
+        }
+    }
+
     pub fn on_ot_ip6_receive(&self, msg: OtMessageBox<'_>) {
         // NOTE: DRIVER STATE IS ALREADY LOCKED WHEN THIS IS CALLED!
         //       Calling `lock()` on the driver state will deadlock!
@@ -34,7 +45,7 @@ where
         &self,
         flags: ot::ChangedFlags,
     ) -> Result<(), anyhow::Error> {
-        fx_log_debug!("OpenThread State Change: {:?}", flags);
+        debug!("OpenThread State Change: {:?}", flags);
         self.update_connectivity_state();
 
         // TODO(rquattle): Consider make this a little more selective, this async-condition
@@ -81,8 +92,7 @@ where
                 }
             } else {
                 debug!("OpenThread LEFT multicast group: {:?}", info);
-                if let Err(err) = self.net_if.leave_mcast_group(info.addr()).ignore_already_exists()
-                {
+                if let Err(err) = self.net_if.leave_mcast_group(info.addr()).ignore_not_found() {
                     warn!("Unable to leave multicast group `{:?}`: {:?}", subnet, err);
                 }
             }
@@ -95,7 +105,7 @@ where
                     subnet.addr
                 );
             } else if let Err(err) = self.net_if.add_address(&subnet).ignore_already_exists() {
-                fx_log_warn!("Unable to add address `{:?}` to interface: {:?}", subnet, err);
+                warn!("Unable to add address `{:?}` to interface: {:?}", subnet, err);
             }
         } else {
             debug!("OpenThread REMOVED address: {:?}", info);
@@ -105,11 +115,34 @@ where
                     subnet.addr
                 );
             } else if let Err(err) = self.net_if.remove_address(&subnet).ignore_not_found() {
-                fx_log_warn!(
-                    "Unable to remove address `{:?}` from interface: {:?}",
-                    subnet,
-                    err
-                );
+                warn!("Unable to remove address `{:?}` from interface: {:?}", subnet, err);
+            }
+        }
+    }
+
+    pub(crate) fn on_ot_bbr_multicast_listener_event(
+        &self,
+        event: ot::BackboneRouterMulticastListenerEvent,
+        address: &ot::Ip6Address,
+    ) {
+        // NOTE: DRIVER STATE IS LOCKED WHEN THIS IS CALLED!
+        //       Calling `lock()` on the driver state will deadlock!
+
+        match event {
+            ot::BackboneRouterMulticastListenerEvent::ListenerAdded => {
+                if let Err(err) = self.backbone_if.join_mcast_group(address).ignore_already_exists()
+                {
+                    warn!("Unable to join multicast group `{:?}`: {:?}", address, err);
+                } else {
+                    let future = self.multicast_routing_manager.add_forwarding_route(address);
+                    futures::executor::block_on(future);
+                }
+            }
+
+            ot::BackboneRouterMulticastListenerEvent::ListenerRemoved => {
+                if let Err(err) = self.backbone_if.leave_mcast_group(address).ignore_not_found() {
+                    warn!("Unable to leave multicast group `{:?}`: {:?}", address, err);
+                }
             }
         }
     }
