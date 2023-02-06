@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
 import("//build/cpp/library_headers.gni")
 
 config("config") {
@@ -52,32 +51,36 @@ config("suppress-warning.config") {
   }
 }
 
-executable("fxt_tests_app") {
-  testonly = true
-  output_name = "fxt_tests"
-  sources = [
-    "deduction_tests.cc",
-    "fields_tests.cc",
-    "interned_category_tests.cc",
-    "interned_string_tests.cc",
-    "macro_tests.cc",
-    "serializer_test.cc",
-    "trace_base_tests.cc",
-  ]
-  deps = [
-    ":fxt",
-    "//sdk/lib/fdio",
-    "//src/lib/fxl",
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gtest",
-  ]
-}
+if (!is_kernel) {
+  import("//build/components.gni")
 
-fuchsia_unittest_package("fxt_tests") {
-  deps = [ ":fxt_tests_app" ]
-}
+  executable("fxt_tests_app") {
+    testonly = true
+    output_name = "fxt_tests"
+    sources = [
+      "deduction_tests.cc",
+      "fields_tests.cc",
+      "interned_category_tests.cc",
+      "interned_string_tests.cc",
+      "macro_tests.cc",
+      "serializer_test.cc",
+      "trace_base_tests.cc",
+    ]
+    deps = [
+      ":fxt",
+      "//sdk/lib/fdio",
+      "//src/lib/fxl",
+      "//src/lib/fxl/test:gtest_main",
+      "//third_party/googletest:gtest",
+    ]
+  }
 
-group("tests") {
-  testonly = true
-  public_deps = [ ":fxt_tests" ]
+  fuchsia_unittest_package("fxt_tests") {
+    deps = [ ":fxt_tests_app" ]
+  }
+
+  group("tests") {
+    testonly = true
+    public_deps = [ ":fxt_tests" ]
+  }
 }

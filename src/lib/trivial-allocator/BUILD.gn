@@ -2,11 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/components.gni")
 import("//build/config/sanitizers/sanitizer_default_options.gni")
-import("//build/cpp/cpp_fuzzer.gni")
-import("//build/test.gni")
-import("//build/testing/zbi_test.gni")
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("trivial-allocator") {
@@ -96,54 +92,61 @@ static_library("panic-delete") {
   }
 }
 
-test("trivial-allocator-unittests") {
-  sources = [
-    "basic-leaky-allocator-tests.cc",
-    "basic-owning-allocator-tests.cc",
-    "new-tests.cc",
-    "page-allocator-tests.cc",
-    "sealed-page-allocator-tests.cc",
-    "single-heap-allocator-tests.cc",
-  ]
-  deps = [
-    ":trivial-allocator",
-    "//src/lib/fxl/test:gtest_main",
-  ]
-}
+if (!is_kernel) {
+  import("//build/components.gni")
+  import("//build/cpp/cpp_fuzzer.gni")
+  import("//build/test.gni")
+  import("//build/testing/zbi_test.gni")
 
-fuchsia_unittest_package("trivial-allocator-tests") {
-  deps = [ ":trivial-allocator-unittests" ]
-  manifest = "meta/trivial-allocator-tests.cml"
-}
-
-# This test is isolated since it no-op's out the `delete` usage done by the
-# test harness itself.  For the same reason it's not really possible to have a
-# test for panic-delete.
-test("stub-delete-unittests") {
-  deps = [
-    ":trivial-allocator",
-    "//src/lib/fxl/test:gtest_main",
-  ]
-
-  if ((is_fuchsia || current_os == "linux") &&
-      toolchain_variant.tags + [ "replaces-allocator" ] -
-      [ "replaces-allocator" ] == toolchain_variant.tags) {
-    sources = [ "delete-tests.cc" ]
-    deps += [ ":stub-delete" ]
+  test("trivial-allocator-unittests") {
+    sources = [
+      "basic-leaky-allocator-tests.cc",
+      "basic-owning-allocator-tests.cc",
+      "new-tests.cc",
+      "page-allocator-tests.cc",
+      "sealed-page-allocator-tests.cc",
+      "single-heap-allocator-tests.cc",
+    ]
+    deps = [
+      ":trivial-allocator",
+      "//src/lib/fxl/test:gtest_main",
+    ]
   }
-}
 
-fuchsia_unittest_package("stub-delete-tests") {
-  deps = [ ":stub-delete-unittests" ]
-}
+  fuchsia_unittest_package("trivial-allocator-tests") {
+    deps = [ ":trivial-allocator-unittests" ]
+    manifest = "meta/trivial-allocator-tests.cml"
+  }
 
-group("tests") {
-  testonly = true
+  # This test is isolated since it no-op's out the `delete` usage done by the
+  # test harness itself.  For the same reason it's not really possible to have a
+  # test for panic-delete.
+  test("stub-delete-unittests") {
+    deps = [
+      ":trivial-allocator",
+      "//src/lib/fxl/test:gtest_main",
+    ]
 
-  deps = [
-    ":stub-delete-tests",
-    ":stub-delete-unittests($host_toolchain)",
-    ":trivial-allocator-tests",
-    ":trivial-allocator-unittests($host_toolchain)",
-  ]
+    if ((is_fuchsia || current_os == "linux") &&
+        toolchain_variant.tags + [ "replaces-allocator" ] -
+        [ "replaces-allocator" ] == toolchain_variant.tags) {
+      sources = [ "delete-tests.cc" ]
+      deps += [ ":stub-delete" ]
+    }
+  }
+
+  fuchsia_unittest_package("stub-delete-tests") {
+    deps = [ ":stub-delete-unittests" ]
+  }
+
+  group("tests") {
+    testonly = true
+
+    deps = [
+      ":stub-delete-tests",
+      ":stub-delete-unittests($host_toolchain)",
+      ":trivial-allocator-tests",
+      ":trivial-allocator-unittests($host_toolchain)",
+    ]
+  }
 }

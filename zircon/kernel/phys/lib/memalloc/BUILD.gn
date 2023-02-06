@@ -4,10 +4,6 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/components.gni")
-import("//build/cpp/cpp_fuzzer.gni")
-import("//build/fuzz.gni")
-import("//build/test.gni")
 import("//build/zircon/migrated_targets.gni")
 
 zx_library("memalloc") {
@@ -63,6 +59,11 @@ source_set("testing") {
 }
 
 if (!is_kernel) {
+  import("//build/components.gni")
+  import("//build/cpp/cpp_fuzzer.gni")
+  import("//build/fuzz.gni")
+  import("//build/test.gni")
+
   test("memalloc-test") {
     sources = [
       "algorithm-test.cc",

@@ -4,12 +4,6 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/components.gni")
-import("//build/cpp/cpp_fuzzer.gni")
-import("//build/dist/resource.gni")
-import("//build/fuzz.gni")
-import("//build/test.gni")
-
 if (is_kernel) {
   # NOTE: This cannot be called 'tests' due to the target with the same name
   # below that is used in the Fuchsia build to add boot-option-test-package.
@@ -25,6 +19,12 @@ if (is_kernel) {
     ]
   }
 } else {
+  import("//build/components.gni")
+  import("//build/cpp/cpp_fuzzer.gni")
+  import("//build/dist/resource.gni")
+  import("//build/fuzz.gni")
+  import("//build/test.gni")
+
   group("tests") {
     testonly = true
     deps = [
