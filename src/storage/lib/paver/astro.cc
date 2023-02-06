@@ -140,7 +140,6 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
 
   // Enable abr wear-leveling only when we see an explicitly defined boot argument
   // "astro.sysconfig.abr-wear-leveling".
-  // TODO(fxbug.dev/47505): Find a proper place to document the parameter.
   AbrWearLevelingOption option =
       boot_arg_client && GetBool(boot_arg_client, "astro.sysconfig.abr-wear-leveling", false)
           ? AbrWearLevelingOption::ON
