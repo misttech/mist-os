@@ -73,6 +73,14 @@ supporting the general public using its APIs. At that time, the Fuchsia project
 will need to define the compatibility window for those APIs, which will likely
 be longer than the compatibility window for `partner` APIs.
 
+An additional type of SDK category is required for the APIs used in the prebuilt
+`partner` or `public` SDK atoms when it's undesirable to expose these APIs to
+SDK users. These `partner_internal` and `public_internal` categories will enforce
+the same API compatibility windows as the `partner` and `public` categories
+without requiring adding those APIs to the SDK API surface area. Only the
+`partner_internal` category will be introduced for now as there's no `public`
+SDK atoms.
+
 A typical SDK Atom begins its lifecycle in the `internal` SDK category. At some
 point, the API Council might graduate the SDK Atom might to the `partner` SDK
 category, often when a partner needs access to an API contained in the Atom.
@@ -101,6 +109,8 @@ Each SDK Atom has an `category` parameter with one of the following values:
  - `experimental`: (this SDK category does not make much sense);
  - `internal`: supported for use within the Fuchsia platform source tree;
  - `cts`: supported for use in the Compatibility Tests for Fuchsia;
+ - `partner_internal`: supported for use in non-source SDK atoms in the
+   `partner` category but not exposed to the SDK users;
  - `partner`: supported for use by select partners;
  - `public`: supported for use by the general public.
 
@@ -119,6 +129,10 @@ that audience. For example, an SDK for `partner` can include SDK Atoms
 authorized for `public` (because `public` comes after `partner` in this list
 above) but cannot include SDK Atoms authorized only for `internal` use (because
 `internal` comes before `partner` in this list).
+
+The `partner_internal` SDK category is used to give some APIs the same
+compatibility constraints as `partner` APIs without exposing them to the SDK
+users.
 
 The `excluded` SDK category is used as a double-check to prevent certain
 targets from ever being included in an SDK. Effectively, `excluded` is
