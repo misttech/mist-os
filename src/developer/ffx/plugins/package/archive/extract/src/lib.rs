@@ -11,10 +11,7 @@ use ffx_writer::Writer;
 use std::fs;
 
 #[ffx_plugin("ffx_package")]
-pub async fn cmd_extract(
-    cmd: ExtractCommand,
-    #[ffx(machine = Vec<T:Serialize>)] mut writer: Writer,
-) -> Result<()> {
+pub async fn cmd_extract(cmd: ExtractCommand, mut writer: Writer) -> Result<()> {
     let mut archive_reader: Box<dyn FarListReader> = Box::new(FarArchiveReader::new(&cmd.archive)?);
 
     extract_implementation(cmd, &mut writer, &mut archive_reader)

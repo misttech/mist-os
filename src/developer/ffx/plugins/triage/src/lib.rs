@@ -9,7 +9,9 @@ use {
     ffx_triage_args::TriageCommand,
     ffx_writer::Writer,
     fidl_fuchsia_feedback::DataProviderProxy,
-    fuchsia_triage::{analyze, analyze_structured, ActionResultFormatter, ActionTagDirective},
+    fuchsia_triage::{
+        analyze, analyze_structured, ActionResultFormatter, ActionTagDirective, TriageOutput,
+    },
     std::{env, io::Write, path::PathBuf},
     tempfile::tempdir,
     triage_app_lib::file_io::{config_from_files, diagnostics_from_directory},

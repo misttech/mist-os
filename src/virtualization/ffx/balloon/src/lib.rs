@@ -9,7 +9,7 @@ use {
 
 #[ffx_plugin("guest_enabled")]
 pub async fn guest_balloon(
-    #[ffx(machine = guest_cli::Balloon::BalloonResult)] writer: Writer,
+    #[ffx(machine = guest_cli::balloon::BalloonResult)] writer: Writer,
     args: BalloonArgs,
     remote_control: RemoteControlProxy,
 ) -> Result<()> {

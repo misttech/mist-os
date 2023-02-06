@@ -154,11 +154,12 @@ impl net_cli::ServiceConnector<fname::LookupMarker> for FfxConnector<'_> {
 
 const EXIT_FAILURE: i32 = 1;
 
+// TODO(121214): Fix incorrect- or invalid-type writer declarations
 #[ffx_plugin()]
 pub async fn net(
     remote_control: fremotecontrol::RemoteControlProxy,
     cmd: ffx_net_args::Command,
-    #[ffx(machine = Vec<T::Serialize>)] writer: ffx_writer::Writer,
+    #[ffx(machine = Vec<dyn serde::Serialize>)] writer: ffx_writer::Writer,
 ) -> Result<(), anyhow::Error> {
     let ffx_net_args::Command { cmd, realm } = cmd;
     let realm = realm.as_deref().unwrap_or(NETWORK_REALM);

@@ -23,11 +23,19 @@ use {
 
 const MAX_HASH: usize = 11;
 
+// TODO(121214): Fix incorrect- or invalid-type, and undiscriminated writer declarations
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+pub enum PackagesOutput {
+    Show(PackageEntry),
+    List(RepositoryPackage),
+}
+
 #[ffx_plugin(RepositoryRegistryProxy = "daemon::protocol")]
 pub async fn packages(
     cmd: PackagesCommand,
     repos: RepositoryRegistryProxy,
-    #[ffx(machine = Vec<T:Serialize>)] mut writer: Writer,
+    #[ffx(machine = Vec<PackagesOutput>)] mut writer: Writer,
 ) -> Result<()> {
     match cmd.subcommand {
         PackagesSubCommand::List(subcmd) => list_impl(subcmd, repos, None, &mut writer).await,
@@ -73,14 +81,15 @@ async fn show_impl(
             break;
         }
 
-        for blob in batch {
-            blobs.push((&blob).into());
+        for blob in &batch {
+            blobs.push(blob.into());
         }
     }
 
     blobs.sort();
 
     if writer.is_machine() {
+        let blobs = Vec::from_iter(blobs.into_iter().map(PackagesOutput::Show));
         writer.machine(&blobs).context("writing machine representation of blobs")?;
     } else {
         print_blob_table(&cmd, &blobs, table_format, writer).context("printing repository table")?
@@ -182,6 +191,7 @@ async fn list_impl(
     packages.sort();
 
     if writer.is_machine() {
+        let packages = Vec::from_iter(packages.into_iter().map(PackagesOutput::List));
         writer.machine(&packages).context("writing machine representation of packages")?;
     } else {
         print_package_table(&cmd, &packages, table_format, writer)

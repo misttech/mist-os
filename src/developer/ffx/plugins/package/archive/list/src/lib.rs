@@ -11,10 +11,7 @@ use humansize::{file_size_opts, FileSize};
 use prettytable::{cell, format::TableFormat, row, Row, Table};
 
 #[ffx_plugin("ffx_package")]
-pub async fn cmd_list(
-    cmd: ListCommand,
-    #[ffx(machine = Vec<T:Serialize>)] mut writer: Writer,
-) -> Result<()> {
+pub async fn cmd_list(cmd: ListCommand, mut writer: Writer) -> Result<()> {
     let mut archive_reader: Box<dyn FarListReader> = Box::new(FarArchiveReader::new(&cmd.archive)?);
     list_implementaion(cmd, /*table_format=*/ None, &mut writer, &mut archive_reader)
 }

@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::Result,
-    component_debug::cli::{list_cmd_print, list_cmd_serialized},
-    errors::FfxError,
-    ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query},
-    ffx_component_list_args::ComponentListCommand,
-    ffx_core::ffx_plugin,
-    ffx_writer::Writer,
-    fidl_fuchsia_developer_remotecontrol as rc,
-};
+use anyhow::Result;
+use component_debug::cli::{list_cmd_print, list_cmd_serialized};
+use component_debug::list::Instance;
+use errors::FfxError;
+use ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query};
+use ffx_component_list_args::ComponentListCommand;
+use ffx_core::ffx_plugin;
+use ffx_writer::Writer;
+use fidl_fuchsia_developer_remotecontrol as rc;
 
 #[ffx_plugin]
 pub async fn cmd(

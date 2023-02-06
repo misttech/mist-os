@@ -547,7 +547,7 @@ This likely means that your logs will not be symbolized."
 )]
 pub async fn log(
     diagnostics_proxy: DiagnosticsProxy,
-    #[ffx(machine = Vec<JsonTargets>)] writer: Writer,
+    #[ffx(machine = Vec<LogEntry>)] writer: Writer,
     rcs_proxy: Option<RemoteControlProxy>,
     log_settings: Option<LogSettingsProxy>,
     cmd: LogCommand,

@@ -52,7 +52,7 @@ pub async fn cmd_file_hash(
 }
 
 #[derive(Serialize)]
-struct FileHashEntry {
+pub struct FileHashEntry {
     path: PathBuf,
     hash: String,
 }

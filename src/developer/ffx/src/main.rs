@@ -84,27 +84,17 @@ impl ToolRunner for FfxSubCommand {
     }
 
     async fn run(self: Box<Self>, metrics: MetricsSession) -> Result<ExitStatus> {
-        use SubCommand::FfxSchema;
-        match self.cmd {
-            FfxBuiltIn { subcommand: Some(FfxSchema(_)) } => {
-                ffx_lib_suite::ffx_plugin_writer_all_output(0);
-                Ok(ExitStatus::from_raw(0))
-            }
-            subcommand => {
-                if self.app.global.machine.is_some()
-                    && !ffx_lib_suite::ffx_plugin_is_machine_supported(&subcommand)
-                {
-                    Err(ffx_error!("The machine flag is not supported for this subcommand").into())
-                } else {
-                    metrics.print_notice(&mut std::io::stderr()).await?;
-                    let redacted_args =
-                        ffx_lib_suite::ffx_plugin_redact_args(&self.app, &subcommand);
-                    let res = run_legacy_subcommand(self.app, self.context, subcommand)
-                        .await
-                        .map(|_| ExitStatus::from_raw(0));
-                    metrics.command_finished(res.is_ok(), &redacted_args).await.and(res)
-                }
-            }
+        if self.app.global.machine.is_some()
+            && !ffx_lib_suite::ffx_plugin_is_machine_supported(&self.cmd)
+        {
+            Err(ffx_error!("The machine flag is not supported for this subcommand").into())
+        } else {
+            metrics.print_notice(&mut std::io::stderr()).await?;
+            let redacted_args = ffx_lib_suite::ffx_plugin_redact_args(&self.app, &self.cmd);
+            let res = run_legacy_subcommand(self.app, self.context, self.cmd)
+                .await
+                .map(|_| ExitStatus::from_raw(0));
+            metrics.command_finished(res.is_ok(), &redacted_args).await.and(res)
         }
     }
 }

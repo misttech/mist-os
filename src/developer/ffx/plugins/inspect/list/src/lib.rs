@@ -18,7 +18,7 @@ use {
 pub async fn list(
     rcs_proxy: RemoteControlProxy,
     diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
-    #[ffx(machine = Vec<ListResponseItem>)] writer: Writer,
+    #[ffx(machine = Vec<iq::ListResponseItem>)] writer: Writer,
     cmd: ListCommand,
 ) -> Result<()> {
     run_command(rcs_proxy, diagnostics_proxy, iq::ListCommand::from(cmd), writer).await

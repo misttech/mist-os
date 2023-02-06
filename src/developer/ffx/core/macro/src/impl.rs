@@ -663,16 +663,11 @@ pub fn ffx_plugin(input: ItemFn, proxies: ProxyMap) -> Result<TokenStream, Error
         writer_attributes.into_iter().map(|t| t.parse_args::<WriterArgument>()).collect();
     let mut writer_attributes = writer_attributes?;
     let (writers, is_supported) = if writer_attributes.is_empty() {
-        (quote! { String::from("Not supported") }, quote! { false })
+        (quote! { () }, quote! { false })
     } else {
         assert!(writer_attributes.len() == 1);
         let writer_attribute = writer_attributes.swap_remove(0);
-        (
-            quote! {
-                stringify!(#writer_attribute).to_owned()
-            },
-            quote! { true },
-        )
+        (quote! { #writer_attribute }, quote! { true })
     };
 
     let implementation = if proxies_to_generate.len() > 0 {
@@ -714,9 +709,7 @@ pub fn ffx_plugin(input: ItemFn, proxies: ProxyMap) -> Result<TokenStream, Error
 
         #(#test_fake_methods_to_generate)*
 
-        pub fn ffx_plugin_writer_output() -> String {
-            #writers
-        }
+        pub type FfxWriterType = #writers;
 
         // This is built for the execution library.
         pub fn ffx_plugin_is_machine_supported() -> bool {

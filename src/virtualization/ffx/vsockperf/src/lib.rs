@@ -9,7 +9,7 @@ use {
 
 #[ffx_plugin("guest_enabled")]
 pub async fn guest_vsockperf(
-    #[ffx(machine = guest_cli::VsockPerf::VsockPerfResult)] _writer: Writer,
+    #[ffx(machine = guest_cli::vsockperf::VsockPerfResult)] _writer: Writer,
     args: VsockPerfArgs,
     _remote_control: RemoteControlProxy,
 ) -> Result<()> {

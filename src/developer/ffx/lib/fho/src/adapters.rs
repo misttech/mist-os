@@ -32,11 +32,6 @@ macro_rules! embedded_plugin {
             }
         }
 
-        pub fn ffx_plugin_writer_output() -> String {
-            use $crate::FfxToolIo;
-            <$tool as $crate::FfxMain>::Writer::machine_writer_output()
-        }
-
         pub fn ffx_plugin_is_machine_supported() -> bool {
             use $crate::FfxToolIo;
             <$tool as $crate::FfxMain>::Writer::is_machine_supported()
@@ -74,11 +69,6 @@ mod tests {
             "tool pre-check should not have been called yet"
         );
 
-        assert_eq!(
-            ffx_plugin_writer_output(),
-            "Not supported",
-            "Test plugin should not support machine output"
-        );
         assert!(
             !ffx_plugin_is_machine_supported(),
             "Test plugin should not support machine output"

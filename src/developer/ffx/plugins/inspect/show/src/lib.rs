@@ -18,7 +18,7 @@ use {
 pub async fn show(
     rcs_proxy: RemoteControlProxy,
     diagnostics_proxy: RemoteDiagnosticsBridgeProxy,
-    #[ffx(machine = Vec<ShowCommandResultItem>)] writer: Writer,
+    #[ffx(machine = Vec<iq::ShowCommandResultItem>)] writer: Writer,
     cmd: ShowCommand,
 ) -> Result<()> {
     run_command(rcs_proxy, diagnostics_proxy, iq::ShowCommand::from(cmd), writer).await

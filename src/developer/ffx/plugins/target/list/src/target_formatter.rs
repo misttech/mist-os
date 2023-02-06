@@ -365,7 +365,7 @@ macro_rules! make_structs_and_support_functions {
         }
 
         #[derive(Clone, Serialize, Debug, PartialEq, Eq)]
-        pub(crate) struct JsonTarget {
+        pub struct JsonTarget {
             $(
                 $field: serde_json::Value,
             )*

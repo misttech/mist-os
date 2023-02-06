@@ -9,7 +9,7 @@ use {
 
 #[ffx_plugin("guest_enabled")]
 pub async fn guest_socat(
-    #[ffx(machine = guest_cli::Socat::SocatResult)] _writer: Writer,
+    #[ffx(machine = guest_cli::socat::SocatResult)] _writer: Writer,
     _args: SocatArgs,
     _remote_control: RemoteControlProxy,
 ) -> Result<()> {

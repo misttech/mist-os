@@ -9,7 +9,7 @@ use {
 
 #[ffx_plugin("guest_enabled")]
 pub async fn guest_wipe(
-    #[ffx(machine = guest_cli::stop::WipeResult)] writer: Writer,
+    #[ffx(machine = guest_cli::wipe::WipeResult)] writer: Writer,
     args: WipeArgs,
     remote_control: RemoteControlProxy,
 ) -> Result<()> {

@@ -9,7 +9,7 @@ use {
 
 #[ffx_plugin("guest_enabled")]
 pub async fn guest_attach(
-    #[ffx(machine = guest_cli::Attach::AttachResult)] _writer: Writer,
+    #[ffx(machine = guest_cli::attach::AttachResult)] _writer: Writer,
     args: AttachArgs,
     _remote_control: RemoteControlProxy,
 ) -> Result<()> {

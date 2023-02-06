@@ -29,16 +29,17 @@ use {
 // This is to make the schema make sense as this plugin can output one of these based on the
 // subcommand. An alternative is to break this one plugin into multiple plugins each with their own
 // output type. That is probably preferred but either way works.
+// TODO(121214): Fix incorrect- or invalid-type writer declarations
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
-enum TraceOutput {
+pub enum TraceOutput {
     ListCategories(Vec<TraceKnownCategory>),
     ListProviders(Vec<TraceProviderInfo>),
 }
 
 // These fields are arranged this way because deriving Ord uses field declaration order.
 #[derive(Debug, Deserialize, Serialize, PartialOrd, Ord, PartialEq, Eq)]
-struct TraceKnownCategory {
+pub struct TraceKnownCategory {
     /// The name of the category.
     name: String,
     /// A short, possibly empty description of this category.
@@ -59,7 +60,7 @@ impl From<&'static str> for TraceKnownCategory {
 
 // These fields are arranged this way because deriving Ord uses field declaration order.
 #[derive(Debug, Deserialize, Serialize, PartialOrd, Ord, PartialEq, Eq)]
-struct TraceProviderInfo {
+pub struct TraceProviderInfo {
     name: String,
     id: Option<u32>,
     pid: Option<u64>,

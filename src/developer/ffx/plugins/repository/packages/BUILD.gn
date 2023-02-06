@@ -18,6 +18,7 @@ ffx_plugin("ffx_repository_packages") {
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:humansize",
     "//third_party/rust_crates:prettytable-rs",
+    "//third_party/rust_crates:serde",
   ]
   test_deps = [
     "//src/developer/ffx/lib/timeout:lib",

@@ -44,19 +44,6 @@ pub fn ffx_plugin_redact_args(
   vec![]
 }
 
-pub fn ffx_plugin_writer_all_output(_level: usize) {
-{% if includes_subcommands %}
-{% for plugin in plugins %}
-  println!("{:level$}- {{plugin.lib}}", "", level=_level);
-  {{plugin.lib}}_suite::ffx_plugin_writer_all_output(_level + 2);
-{% endfor %}
-{% else %}
-{% if includes_execution %}
-  println!("{:level$}- {}", "", {{execution_lib}}::ffx_plugin_writer_output(), level=_level);
-{% endif %}
-{% endif %}
-}
-
 pub fn ffx_plugin_is_machine_supported(
   _cmd: &{{suite_args_lib}}::FfxPluginCommand,
 ) -> bool {

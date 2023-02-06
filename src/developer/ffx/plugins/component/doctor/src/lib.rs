@@ -5,6 +5,7 @@
 use {
     anyhow::Result,
     component_debug::cli::{doctor_cmd_print, doctor_cmd_serialized},
+    component_debug::doctor::RouteReport,
     errors::FfxError,
     ffx_component::rcs::{connect_to_realm_explorer, connect_to_route_validator},
     ffx_component_doctor_args::DoctorCommand,

@@ -44,10 +44,6 @@ pub trait FfxMain: Sized {
 }
 
 pub trait FfxToolIo {
-    fn machine_writer_output() -> String {
-        String::from("Not supported")
-    }
-
     fn is_machine_supported() -> bool {
         false
     }

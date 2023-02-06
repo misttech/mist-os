@@ -5,6 +5,7 @@
 use {
     anyhow::Result,
     component_debug::cli::{show_cmd_print, show_cmd_serialized},
+    component_debug::show::Instance,
     errors::FfxError,
     ffx_component::rcs::{connect_to_realm_explorer, connect_to_realm_query},
     ffx_component_show_args::ComponentShowCommand,

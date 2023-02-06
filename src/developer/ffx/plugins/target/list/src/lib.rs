@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::target_formatter::{JsonTargetFormatter, TargetFormatter},
+    crate::target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter},
     anyhow::Result,
     errors::{ffx_bail, ffx_bail_with_code},
     ffx_config::keys::TARGET_DEFAULT_KEY,
@@ -35,7 +35,7 @@ fn address_types_from_cmd(cmd: &ListCommand) -> AddressTypes {
 #[ffx_plugin(TargetCollectionProxy = "daemon::protocol")]
 pub async fn list_targets(
     tc_proxy: TargetCollectionProxy,
-    #[ffx(machine = Vec<JsonTargets>)] writer: Writer,
+    #[ffx(machine = Vec<JsonTarget>)] writer: Writer,
     cmd: ListCommand,
 ) -> Result<()> {
     let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>()?;

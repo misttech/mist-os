@@ -10,10 +10,7 @@ use ffx_writer::Writer;
 use std::fs::File;
 
 #[ffx_plugin("ffx_package")]
-pub fn cmd_hash(
-    cmd: HashCommand,
-    #[ffx(machine = Vec<T:Serialize>)] mut writer: Writer,
-) -> Result<()> {
+pub fn cmd_hash(cmd: HashCommand, mut writer: Writer) -> Result<()> {
     merkleroot_hash_implementation(cmd, &mut writer)
 }
 
