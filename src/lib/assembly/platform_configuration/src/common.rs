@@ -279,6 +279,7 @@ impl ComponentConfigBuilder for ComponentConfiguration {
     ) -> Result<&mut dyn ComponentConfigBuilder> {
         if self.fields.insert(key.to_owned(), value).is_some() {
             Err(anyhow!("Each Structured Config field can only be set once for a component"))
+                .with_context(|| format!("Setting field: {}", &key))
                 .with_context(|| {
                     format!("Setting configuration for component: {}", self.manifest_path)
                 })
@@ -552,7 +553,8 @@ mod tests {
             format_result(result),
             r"Configuring Subsystem Failed
     1.  Setting configuration for component: bar
-    2.  Each Structured Config field can only be set once for a component"
+    2.  Setting field: key
+    3.  Each Structured Config field can only be set once for a component"
         );
     }
 
