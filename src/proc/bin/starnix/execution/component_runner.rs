@@ -116,7 +116,7 @@ pub async fn start_component(
     let credentials = Credentials::from_passwd(user_passwd)?;
     current_task.set_creds(credentials);
 
-    if let Some(local_mounts) = get_program_strvec(&start_info, "mounts") {
+    if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts") {
         for mount in local_mounts.iter() {
             let (mount_point, child_fs) = create_filesystem_from_spec(&current_task, &pkg, mount)?;
             let mount_point = current_task.lookup_path_from_root(mount_point)?;
