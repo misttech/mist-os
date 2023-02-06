@@ -53,7 +53,7 @@ class DriverTestLoopFixture : public ::testing::Test {
   }
 
   // Shuts down the driver dispatcher.
-  void ShutdownDriverDispatcher() { EXPECT_EQ(ZX_OK, dispatcher_.StopSync().status_value()); }
+  void ShutdownDriverDispatcher() { EXPECT_EQ(ZX_OK, dispatcher_.Stop().status_value()); }
 
   // Posts a task on the driver dispatcher and waits synchronously until it is completed.
   void RunOnDispatcher(fit::closure task) {

@@ -11,6 +11,7 @@ group("tests") {
   testonly = true
   deps = [
     ":driver_runtime_death_tests",
+    ":driver_runtime_sdk_tests",
     ":driver_runtime_tests",
     "microbenchmarks",
   ]
@@ -104,6 +105,19 @@ test("driver_runtime_death_test") {
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+}
+
+test("fixture_test") {
+  sources = [ "fixture_test.cc" ]
+  deps = [
+    "//sdk/lib/driver/runtime/testing/loop_fixture:gtest",
+    "//src/devices/lib/driver:driver_runtime",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_unittest_package("driver_runtime_sdk_tests") {
+  deps = [ ":fixture_test" ]
 }
 
 fuchsia_unittest_package("driver_runtime_tests") {
