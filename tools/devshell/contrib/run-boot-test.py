@@ -20,17 +20,17 @@ import sys
 # value.
 #
 # See https://learn.microsoft.com/en-us/windows/win32/debug/pe-format.
-PE_MAGIC = b'MZ'
-PE_SIGNATURE = b'PE\0\0'
+PE_MAGIC = b"MZ"
+PE_SIGNATURE = b"PE\0\0"
 
 
 def is_pe(filepath):
     if not os.path.exists(filepath):
         return False
-    with open(filepath, 'rb') as f:
+    with open(filepath, "rb") as f:
         if f.read(2) != PE_MAGIC:
             return False
-        f.seek(0x3c)
+        f.seek(0x3C)
         signature_offset = int.from_bytes(f.read(4), byteorder="little")
         f.seek(signature_offset)
         return f.read(4) == PE_SIGNATURE
@@ -58,8 +58,12 @@ class BootTest(object):
         self.qemu_kernel = (
             images_by_label[images["qemu_kernel"]]
             if "qemu_kernel" in images else None)
-        self.efi_disk = images_by_label[
-            images["efi_disk"]] if "efi_disk" in images else None
+        self.efi_disk = (
+            images_by_label[images["efi_disk"]]
+            if "efi_disk" in images else None)
+
+        arch_image = self.qemu_kernel or self.efi_disk or self.zbi or None
+        self.arch = arch_image.get("cpu", None) if arch_image else None
 
     # Enables sorting by name.
     def __lt__(self, other):
@@ -91,6 +95,7 @@ class BootTest(object):
             kinds.append("EFI disk")
         print("* %s (%s)" % (self.name, ", ".join(kinds)))
         print("    label: %s" % self.label)
+        print("    cpu: %s" % (self.arch or "Unknown!"))
         if self.qemu_kernel:
             print("    qemu kernel: %s" % self.qemu_kernel["path"])
         if self.zbi:
@@ -163,14 +168,19 @@ def main():
         help="Name of the boot test (target) to run",
         nargs="?",
     )
+    parser.add_argument(
+        "--arch",
+        help="CPU architecture to run",
+        metavar="ARCH",
+        default=os.getenv("FUCHSIA_ARCH"),
+    )
     args = parser.parse_args()
 
     build_dir = os.path.relpath(os.getenv("FUCHSIA_BUILD_DIR"))
     if build_dir is None:
         print("FUCHSIA_BUILD_DIR not set")
         return 1
-    test_cpu = os.getenv("FUCHSIA_ARCH")
-    if test_cpu is None:
+    if args.arch is None:
         print("FUCHSIA_ARCH not set")
         return 1
 
@@ -189,7 +199,8 @@ def main():
         for test in json.load(file):
             if BootTest.is_boot_test(test):
                 boot_test = BootTest(images, test, build_dir)
-                boot_tests[boot_test.name] = boot_test
+                if boot_test.arch == args.arch:
+                    boot_tests[boot_test.name] = boot_test
 
     if not boot_tests:
         warning(
@@ -228,7 +239,7 @@ def main():
         bootserver = find_bootserver(build_dir)
         cmd = [bootserver, "--boot"] + test.zbi["path"] + args.args
     else:
-        cmd = ["fx", "qemu"] + args.args
+        cmd = ["fx", "qemu", "--arch", args.arch] + args.args
 
         if test.is_uefi_boot():
             cmd += ["--uefi"]

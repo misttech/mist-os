@@ -84,6 +84,10 @@ while [[ $# -gt 0 ]]; do
     --uefi)
       UEFI=1
       ;;
+    -a|--arch)
+      shift
+      FUCHSIA_ARCH="$1"
+      ;;
     --)
       # Stop processing args if we hit a "--" argument.
       break
