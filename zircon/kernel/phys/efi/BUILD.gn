@@ -191,12 +191,14 @@ efi_executable("efi-zbi") {
   ]
 }
 
+group("boot_tests") {
+  testonly = true
+  deps = [ ":efi-zbi" ]
+}
+
 group("tests") {
   testonly = true
-  deps = [
-    ":efi-unittests($host_toolchain)",
-    ":efi-zbi",
-  ]
+  deps = [ ":efi-unittests($host_toolchain)" ]
 }
 
 test("efi-unittests") {

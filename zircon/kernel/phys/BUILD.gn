@@ -25,6 +25,12 @@ declare_args() {
   use_elf_physboot = false
 }
 
+declare_args() {
+  # Cause //zircon/kernel/phys:boot_tests to generate the phys boot tests
+  # for all supported CPUs, not just $target_cpu.
+  all_cpu_phys_boot_tests = false
+}
+
 arch_phys = "//zircon/kernel/arch/$zircon_cpu/phys"
 
 if (current_toolchain == default_toolchain) {
@@ -587,8 +593,17 @@ group("boot_tests") {
   deps = [
     "$arch_phys:tests",
     "boot-shim:boot_tests",
+    "efi:boot_tests",
     "test",
   ]
+  if (all_cpu_phys_boot_tests) {
+    foreach(cpu, standard_fuchsia_cpus) {
+      deps += [
+        "efi:boot_tests(//zircon/kernel/phys/efi:kernel.efi_$cpu)",
+        "test:$cpu",
+      ]
+    }
+  }
 }
 
 zbi_executable("zbi-physboot") {

@@ -4,6 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
+import("//build/config/zircon/standard.gni")
 import("//build/dist/generated_resource.gni")
 import("//build/testing/boot_test.gni")
 import("//build/zbi/kernel_cmdline.gni")
@@ -518,5 +519,12 @@ if (current_toolchain != default_toolchain) {
              # Debug Data propagation to userspace.
              "debugdata-propagation:early-boot-debugdata-zbi-test",
            ] + test_deps
+  }
+}
+
+foreach(cpu, standard_fuchsia_cpus) {
+  group(cpu) {
+    testonly = true
+    public_deps = [ ":test(//zircon/kernel/phys:kernel.phys_$cpu)" ]
   }
 }
