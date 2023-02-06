@@ -21,7 +21,7 @@ async fn command(proxy: AccessibilityProxy, options: SetArgs) -> WatchOrSetResul
     settings.color_correction = options.color_correction;
 
     if settings == AccessibilitySettings::EMPTY {
-        return Err(format_err!("At least one option is required."));
+        return Err(format_err!("At least one option is required. Use --help to see options."));
     }
 
     Ok(Either::Set(if let Err(err) = proxy.set(settings).await? {
