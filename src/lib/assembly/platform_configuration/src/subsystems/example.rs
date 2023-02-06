@@ -5,7 +5,6 @@
 // [START example_patches]
 use crate::subsystems::prelude::*;
 use assembly_config_schema::platform_config::example_config::ExampleConfig;
-use assembly_config_schema::BuildType;
 
 pub(crate) struct ExampleSubsystemConfig;
 impl DefineSubsystemConfiguration<ExampleConfig> for ExampleSubsystemConfig {

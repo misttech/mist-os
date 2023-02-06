@@ -91,6 +91,7 @@ pub struct PlatformConfig {
     pub example_config: example_config::ExampleConfig,
 }
 
+// LINT.IfChange
 /// The platform's base service level.
 ///
 /// This is the basis for the contract with the product as to what the minimal
@@ -129,8 +130,8 @@ pub enum FeatureSupportLevel {
     #[serde(rename = "minimal")]
     #[default]
     Minimal,
-    // Core  (in the future)
 }
+// LINT.ThenChange(../../platform_configuration/src/common.rs)
 
 /// The platform BuildTypes.
 ///

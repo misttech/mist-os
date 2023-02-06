@@ -4,7 +4,6 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_schema::platform_config::connectivity_config::PlatformConnectivityConfig;
-use assembly_config_schema::FeatureSupportLevel;
 
 pub(crate) struct ConnectivitySubsystemConfig;
 impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySubsystemConfig {

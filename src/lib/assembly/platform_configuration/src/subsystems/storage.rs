@@ -4,19 +4,14 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
-use assembly_config_schema::FeatureSupportLevel;
 
 pub(crate) struct StorageSubsystemConfig;
 impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
     fn define_configuration(
-        context: &ConfigurationContext<'_>,
+        _context: &ConfigurationContext<'_>,
         storage_config: &StorageConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if matches!(context.feature_set_level, FeatureSupportLevel::Empty) {
-            return Ok(());
-        }
-
         if storage_config.live_usb_enabled {
             builder.platform_bundle("live_usb");
         } else {

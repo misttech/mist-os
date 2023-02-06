@@ -6,7 +6,6 @@ use crate::subsystems::prelude::*;
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, DiagnosticsConfig,
 };
-use assembly_config_schema::{BuildType, FeatureSupportLevel};
 use std::collections::BTreeSet;
 
 pub(crate) struct DiagnosticsSubsystem;
@@ -29,7 +28,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         let mut archivist_config = builder.bootfs().component("meta/archivist.cm")?;
 
         match (context.build_type, context.feature_set_level) {
-            (_, FeatureSupportLevel::Empty) => return Ok(()),
             // Always clear bind_services for bringup.
             (_, FeatureSupportLevel::Bringup) => {
                 bind_services.clear();

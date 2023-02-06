@@ -13,6 +13,7 @@ def run_product_assembly(
         legacy_bundle,
         outdir,
         extra_config=[],
+        capture_output=False,
         **kwargs):
     """
     Run `ffx assembly product ...` with appropriate configuration and arguments for host tests.
@@ -61,4 +62,4 @@ def run_product_assembly(
         args.append("--" + arg_name.replace('_', '-'))
         args.append(value)
 
-    return subprocess.run(args, capture_output=True)
+    return subprocess.run(args, capture_output)

@@ -150,13 +150,13 @@ template("test_assembly_config") {
     #
     # NOTE:  This action should only occur in the target toolchain, not in the
     # host toolchain.
-    stamp = "$target_out_dir/test_assembled_config.stamp"
+    stamp = "$target_out_dir/test_assembled_config.passed"
     platform_bundles_target = "//bundles/assembly($default_toolchain)"
     platform_bundles_dir =
         get_label_info(platform_bundles_target, "target_out_dir")
     outdir = "$target_out_dir/outdir"
     image_assembly_config = "$outdir/image_assembly.json"
-    python_action("${target_name}") {
+    python_action(target_name) {
       testonly = true
 
       # This will not be resolved except by moving to Bazel.
@@ -182,6 +182,10 @@ template("test_assembly_config") {
                labels.ffx,
                platform_bundles_target,
              ] + additional_deps_param
+      inputs = [
+        files.ffx,
+        fuchsia_files.assembly_config,
+      ]
       outputs = [
         stamp,
         image_assembly_config,

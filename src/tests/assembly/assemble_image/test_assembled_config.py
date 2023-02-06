@@ -69,8 +69,7 @@ def main():
         outdir=args.outdir,
         **kwargs)
     if output.returncode != 0:
-        print('command failed! stderr:')
-        print(output.stderr.decode('UTF-8'))
         sys.exit(1)
+
     with open(args.stamp, 'w') as f:
         pass  # creates the file

@@ -5,7 +5,59 @@
 use anyhow::{anyhow, Context, Result};
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
-use assembly_config_schema::{BoardInformation, BuildType, FeatureSupportLevel};
+use assembly_config_schema::{BoardInformation, BuildType};
+
+/// The platform's base service level.
+///
+/// This is the basis for the contract with the product as to what the minimal
+/// set of services that are available in the platform will be.  Features can
+/// be enabled on top of this most-basic level, but some features will require
+/// a higher basic level of support.
+///
+/// These are (initially) based on the product definitions that are used to
+/// provide the basis for all other products:
+///
+/// bringup.gni
+///   +--> minimal.gni
+///         +--> core.gni
+///               +--> (everything else)
+///
+/// Note:  This version of the enum does not contain the
+/// `assembly_config_schema::FeatureSetLevel::Empty` option, as that is instead
+/// represented as `Option::None`, with the other values as an
+/// `Option::Some(value)`.
+pub(crate) enum FeatureSupportLevel {
+    /// Bootable, but serial-only.  No netstack, no storage drivers, etc.  this
+    /// is the smallest bootable system, and is primarily used for board-level
+    /// bringup.
+    ///
+    /// https://fuchsia.dev/fuchsia-src/development/build/build_system/bringup
+    Bringup,
+
+    /// This is the smallest "full Fuchsia" configuration.  This has a netstack,
+    /// can update itself, and has all the subsystems that are required to
+    /// ship a production-level product.
+    ///
+    /// This is the default level unless otherwise specified.
+    Minimal,
+}
+impl FeatureSupportLevel {
+    /// Convert a deserialized assembly_config_schema:: FeatureSetLevel into an
+    /// `Option<FeatureSetLevel>`, where the `Empty` case becomes `None`.
+    pub fn from_deserialized(
+        value: &assembly_config_schema::platform_config::FeatureSupportLevel,
+    ) -> Option<Self> {
+        match value {
+            assembly_config_schema::FeatureSupportLevel::Empty => None,
+            assembly_config_schema::FeatureSupportLevel::Bringup => {
+                Some(FeatureSupportLevel::Bringup)
+            }
+            assembly_config_schema::FeatureSupportLevel::Minimal => {
+                Some(FeatureSupportLevel::Minimal)
+            }
+        }
+    }
+}
 
 /// A trait for subsystems to implement to provide the configuration for their
 /// subsystem's components.

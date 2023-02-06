@@ -3,10 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_schema::{
-    platform_config::development_support_config::DevelopmentSupportConfig, BuildType,
-    FeatureSupportLevel,
-};
+use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
 
 pub(crate) struct DevelopmentConfig;
 impl DefineSubsystemConfiguration<Option<DevelopmentSupportConfig>> for DevelopmentConfig {
@@ -15,10 +12,6 @@ impl DefineSubsystemConfiguration<Option<DevelopmentSupportConfig>> for Developm
         config: &Option<DevelopmentSupportConfig>,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        if matches!(context.feature_set_level, FeatureSupportLevel::Empty) {
-            return Ok(());
-        }
-
         // Select the correct AIB based on the user-provided setting if present
         // and fall-back to the default by build-type.
         let aib_name = match (config, context.build_type) {

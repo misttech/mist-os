@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context};
-use assembly_config_schema::{
-    AssemblyConfig, BoardInformation, BuildType, ExampleConfig, FeatureSupportLevel,
-};
+use assembly_config_schema::{AssemblyConfig, BoardInformation, BuildType, ExampleConfig};
 
 use crate::common::{CompletedConfiguration, ConfigurationBuilderImpl};
 
@@ -14,8 +12,12 @@ pub(crate) mod prelude {
     #[allow(unused)]
     pub(crate) use crate::common::{
         BoardInformationExt, ComponentConfigBuilderExt, ConfigurationBuilder, ConfigurationContext,
-        DefaultByBuildType, DefineSubsystemConfiguration, OptionDefaultByBuildTypeExt,
+        DefaultByBuildType, DefineSubsystemConfiguration, FeatureSupportLevel,
+        OptionDefaultByBuildTypeExt,
     };
+
+    #[allow(unused)]
+    pub(crate) use assembly_config_schema::BuildType;
 }
 
 use prelude::*;
@@ -36,6 +38,37 @@ mod virtualization;
 
 /// ffx config flag for enabling configuring the assembly+structured config example.
 const EXAMPLE_ENABLED_FLAG: &str = "assembly_example_enabled";
+
+/// Convert the high-level description of product configuration into a series of configuration
+/// value files with concrete package/component tuples.
+///
+/// Returns a map from package names to configuration updates.
+pub fn define_configuration(
+    config: &AssemblyConfig,
+    board_info: Option<&BoardInformation>,
+) -> anyhow::Result<CompletedConfiguration> {
+    let mut builder = ConfigurationBuilderImpl::default();
+
+    // The emulator support bundle is always added, even to an empty build.
+    builder.platform_bundle("emulator_support");
+
+    let feature_set_level =
+        FeatureSupportLevel::from_deserialized(&config.platform.feature_set_level);
+
+    // Only perform configuration if the feature_set_level is not None (ie, Empty).
+    if let Some(feature_set_level) = &feature_set_level {
+        let build_type = &config.platform.build_type;
+
+        // Set up the context that's used by each subsystem to get the generally-
+        // available platform information.
+        let context = ConfigurationContext { feature_set_level, build_type, board_info };
+
+        // Call the configuration functions for each subsystem.
+        configure_subsystems(&context, config, &mut builder)?;
+    }
+
+    Ok(builder.build())
+}
 
 struct CommonBundles;
 impl DefineSubsystemConfiguration<()> for CommonBundles {
@@ -63,43 +96,29 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
             (FeatureSupportLevel::Minimal, BuildType::User) => {
                 vec!["common_bringup", "common_minimal"]
             }
-            (FeatureSupportLevel::Empty, _) => vec![],
         } {
             builder.platform_bundle(bundle_name);
         }
-        builder.platform_bundle("emulator_support");
 
         Ok(())
     }
 }
 
-/// Convert the high-level description of product configuration into a series of configuration
-/// value files with concrete package/component tuples.
-///
-/// Returns a map from package names to configuration updates.
-pub fn define_configuration(
+fn configure_subsystems(
+    context: &ConfigurationContext<'_>,
     config: &AssemblyConfig,
-    board_info: Option<&BoardInformation>,
-) -> anyhow::Result<CompletedConfiguration> {
-    let mut builder = ConfigurationBuilderImpl::default();
-
-    let feature_set_level = &config.platform.feature_set_level;
-    let build_type = &config.platform.build_type;
-
-    // Set up the context that's used by each subsystem to get the generally-
-    // available platform information.
-    let context = ConfigurationContext { feature_set_level, build_type, board_info };
-
+    builder: &mut dyn ConfigurationBuilder,
+) -> anyhow::Result<()> {
     // Define the common platform bundles for this platform configuration.
-    CommonBundles::define_configuration(&context, &(), &mut builder)
+    CommonBundles::define_configuration(context, &(), builder)
         .context("Selecting the common platform assembly input bundles")?;
 
     // Configure the Product Assembly + Structured Config example, if enabled.
     if should_configure_example() {
         example::ExampleSubsystemConfig::define_configuration(
-            &context,
+            context,
             &config.platform.example_config,
-            &mut builder,
+            builder,
         )?;
     } else if config.platform.example_config != ExampleConfig::default() {
         bail!("Config options were set for the example subsystem, but the example is not enabled to be configured.");
@@ -108,83 +127,71 @@ pub fn define_configuration(
     // The real platform subsystems
 
     connectivity::ConnectivitySubsystemConfig::define_configuration(
-        &context,
+        context,
         &config.platform.connectivity,
-        &mut builder,
+        builder,
     )
     .context("Configuring the 'connectivity' subsystem")?;
 
     console::ConsoleSubsystemConfig::define_configuration(
-        &context,
+        context,
         &config.platform.additional_serial_log_tags,
-        &mut builder,
+        builder,
     )
     .context("Configuring the 'console' subsystem")?;
 
     development::DevelopmentConfig::define_configuration(
-        &context,
+        context,
         &config.platform.development_support,
-        &mut builder,
+        builder,
     )
     .context("Configuring the 'development' subsystem")?;
 
     diagnostics::DiagnosticsSubsystem::define_configuration(
-        &context,
+        context,
         &config.platform.diagnostics,
-        &mut builder,
+        builder,
     )
     .context("Configuring the 'diagnostics' subsystem")?;
 
     graphics::GraphicsSubsystemConfig::define_configuration(
-        &context,
+        context,
         &config.platform.graphics,
-        &mut builder,
+        builder,
     )
     .context("Configuring the 'graphics' subsystem")?;
 
     identity::IdentitySubsystemConfig::define_configuration(
-        &context,
+        context,
         &config.platform.identity,
-        &mut builder,
+        builder,
     )
     .context("Configuring the 'identity' subsystem")?;
 
-    input::InputSubsystemConfig::define_configuration(
-        &context,
-        &config.platform.input,
-        &mut builder,
-    )
-    .context("Configuring the 'input' subsystem")?;
+    input::InputSubsystemConfig::define_configuration(context, &config.platform.input, builder)
+        .context("Configuring the 'input' subsystem")?;
 
-    session::SessionConfig::define_configuration(
-        &context,
-        &config.product.session_url,
-        &mut builder,
-    )
-    .context("Configuring the 'session' subsystem")?;
+    session::SessionConfig::define_configuration(context, &config.product.session_url, builder)
+        .context("Configuring the 'session' subsystem")?;
 
-    starnix::StarnixSubsystem::define_configuration(
-        &context,
-        &config.platform.starnix,
-        &mut builder,
-    )
-    .context("Configuring the starnix subsystem")?;
+    starnix::StarnixSubsystem::define_configuration(context, &config.platform.starnix, builder)
+        .context("Configuring the starnix subsystem")?;
 
     storage::StorageSubsystemConfig::define_configuration(
-        &context,
+        context,
         &config.platform.storage,
-        &mut builder,
+        builder,
     )
     .context("Configuring the 'storage' subsystem")?;
 
     virtualization::VirtualizationSubsystem::define_configuration(
-        &context,
+        context,
         &config.platform.virtualization,
-        &mut builder,
+        builder,
     )
     .context("Configuring the 'virtualization' subsystem")?;
 
-    Ok(builder.build())
+    Ok(())
 }
 
 /// Check ffx config for whether we should execute example code.

@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_schema::{
-    platform_config::graphics_config::GraphicsConfig, FeatureSupportLevel,
-};
+use assembly_config_schema::platform_config::graphics_config::GraphicsConfig;
 
 pub(crate) struct GraphicsSubsystemConfig;
 impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
@@ -14,20 +12,17 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         graphics_config: &GraphicsConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        // This is only enabled in the `Bringup` and `Minimal` levels.
-        if context.feature_set_level != &FeatureSupportLevel::Empty {
-            let enable_virtual_console =
-                match (context.build_type, graphics_config.enable_virtual_console) {
-                    // Use the value if one was specified.
-                    (_, Some(enable_virtual_console)) => enable_virtual_console,
-                    // If unspecified, virtcon is disabled if it's a user build-type
-                    (assembly_config_schema::BuildType::User, _) => false,
-                    // Otherwise, enable virtcon.
-                    (_, _) => true,
-                };
-            if enable_virtual_console {
-                builder.platform_bundle("virtcon");
-            }
+        let enable_virtual_console =
+            match (context.build_type, graphics_config.enable_virtual_console) {
+                // Use the value if one was specified.
+                (_, Some(enable_virtual_console)) => enable_virtual_console,
+                // If unspecified, virtcon is disabled if it's a user build-type
+                (assembly_config_schema::BuildType::User, _) => false,
+                // Otherwise, enable virtcon.
+                (_, _) => true,
+            };
+        if enable_virtual_console {
+            builder.platform_bundle("virtcon");
         }
         Ok(())
     }
