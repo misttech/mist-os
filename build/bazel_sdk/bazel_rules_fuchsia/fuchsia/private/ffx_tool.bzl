@@ -33,24 +33,6 @@ def get_ffx_assembly_inputs(fuchsia_toolchain):
         fuchsia_toolchain.zbi_manifest,
     ]
 
-def get_ffx_publish_inputs(fuchsia_toolchain):
-    """Return the list of inputs needed to run `ffx publish` commands.
-
-    Args:
-      fuchsia_toolchain: A fuchsia_toolchain() instance used to locate
-         all host tools, including the 'ffx' one.
-    Returns:
-      A list of File instances.
-    """
-    return [
-        fuchsia_toolchain.ffx,
-        fuchsia_toolchain.sdk_manifest,
-        fuchsia_toolchain.fvm,
-        fuchsia_toolchain.fvm_manifest,
-        fuchsia_toolchain.zbi,
-        fuchsia_toolchain.zbi_manifest,
-    ]
-
 def get_ffx_product_bundle_inputs(fuchsia_toolchain):
     """Return the list of inputs needed to run `ffx product` commands.
 

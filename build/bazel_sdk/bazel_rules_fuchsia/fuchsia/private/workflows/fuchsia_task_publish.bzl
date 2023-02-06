@@ -6,7 +6,6 @@
 
 load("@rules_fuchsia//fuchsia/private:providers.bzl", "FuchsiaPackageGroupInfo", "FuchsiaPackageInfo")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_publish_inputs")
 
 def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
     sdk = ctx.toolchains["@rules_fuchsia//fuchsia:toolchain"]
@@ -16,16 +15,16 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
         for pkg in (dep[FuchsiaPackageGroupInfo].packages if FuchsiaPackageGroupInfo in dep else [dep[FuchsiaPackageInfo]])
     ]
 
-    sdk_runfiles = get_ffx_publish_inputs(sdk) + [
-        sdk.pm,
-    ]
-
     repo_name_args = [
         "--repo_name",
         ctx.attr.package_repository_name,
     ] if ctx.attr.package_repository_name else []
     return make_fuchsia_task(
         task_runner = ctx.attr._publish_packages_tool,
+
+        # NOTE: make_fuchsia_task() collects all File instances in prepend_args
+        # as runfiles, and the `ffx publish` command does not depend on other
+        # host tools at run time, so a `runfiles` attribute is not necessary.
         prepend_args = [
             "--ffx",
             sdk.ffx,
@@ -33,7 +32,6 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
             sdk.pm,
             "--package",
         ] + far_files + repo_name_args,
-        runfiles = [sdk_runfiles, far_files],
     )
 
 (

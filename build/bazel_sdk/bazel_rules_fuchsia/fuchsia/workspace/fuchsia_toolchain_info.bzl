@@ -9,6 +9,7 @@ load("//fuchsia/private:providers.bzl", "FuchsiaComponentManifestShardCollection
 def _fuchsia_toolchain_info_impl(ctx):
     return [platform_common.ToolchainInfo(
         name = ctx.label.name,
+        aemu_runfiles = ctx.runfiles(ctx.files.aemu_runfiles),
         bootserver = ctx.executable.bootserver,
         blobfs = ctx.executable.blobfs,
         blobfs_manifest = ctx.file.blobfs_manifest,
@@ -46,6 +47,11 @@ It provides information about tools in the Fuchsia toolchain, primarily those
 included in the Fuchsia IDK.
 """,
     attrs = {
+        "aemu_runfiles": attr.label(
+            doc = "emulator runfiles",
+            mandatory = True,
+            cfg = "exec",
+        ),
         "bootserver": attr.label(
             doc = "bootserver executable",
             mandatory = True,

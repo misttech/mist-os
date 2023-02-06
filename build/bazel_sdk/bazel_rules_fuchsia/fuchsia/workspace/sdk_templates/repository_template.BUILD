@@ -6,7 +6,7 @@
 #
 # This is referenced by //fuchsia/private/fuchsia_sdk_repository.bzl, see
 # the `fuchsia_sdk_repository` rule for more information.
-load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_package_resource", "fuchsia_toolchain_info")
+load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_debug_symbols", "fuchsia_toolchain_info")
 load("api_version.bzl", "DEFAULT_FIDL_TARGET_API", "DEFAULT_TARGET_API")
 load("@rules_fuchsia//fuchsia/workspace:sdk_host_tool.bzl", "sdk_host_tool")
 
@@ -62,6 +62,7 @@ fuchsia_debug_symbols(
 
 fuchsia_toolchain_info(
     name = "fuchsia_toolchain_info",
+    aemu_runfiles = "//tools:aemu_internal_x64",
     bindc = select({
         ":has_experimental": "//tools:x64/bindc",
         ":no_experimental": None,
