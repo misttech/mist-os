@@ -287,7 +287,7 @@ else
     # FIXME(http://fxbug.dev/78891): `ffx daemon log` doesn't have a mechanism for
     # filtering based off of a specific tag, so we'll grep for the lines that
     # denote traffic to the web server.
-    fx-command-run ffx daemon log --follow --line-count 0 | grep ' \(pkg::repository::server\)\|\(ffx_daemon_service_repo\): ' &
+    fx-command-run ffx daemon log --follow --line-count 0 | grep ' \(fuchsia_repo::server\)\|\(ffx_daemon_service_repo\): ' &
     pm_pid=$!
   fi
 fi
