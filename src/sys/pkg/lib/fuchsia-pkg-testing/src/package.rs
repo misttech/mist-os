@@ -16,7 +16,6 @@ use {
     fuchsia_url::PackageName,
     fuchsia_zircon::{self as zx, prelude::*, Status},
     futures::{join, prelude::*},
-    maplit::btreeset,
     std::{
         collections::{BTreeMap, BTreeSet, HashMap, HashSet},
         convert::TryInto as _,
@@ -165,14 +164,14 @@ impl Package {
         })
     }
 
-    /// Returns a set of all unique blobs contained in this package.
-    /// Does not include subpackage blobs.
+    /// Returns a set of all unique blobs contained in this package including subpackage blobs.
     pub fn list_blobs(&self) -> Result<BTreeSet<Hash>, Error> {
-        let meta_contents = self.meta_contents()?;
-
-        let mut res = btreeset![self.meta_far_merkle];
-        let () = res.extend(meta_contents.into_hashes_undeduplicated());
-        Ok(res)
+        Ok(self
+            .meta_contents()?
+            .into_hashes_undeduplicated()
+            .chain([self.meta_far_merkle])
+            .chain(self.subpackage_blobs.iter().flat_map(|m| m.keys().copied()))
+            .collect())
     }
 
     /// Returns an iterator of merkle/File pairs for each content blob in the package.
@@ -790,9 +789,9 @@ impl PackageBuilder {
             .arg("build")?
             .arg("-depfile=false")?
             .arg(format!("-output-package-manifest={}/manifest.json", &package_mount_path))?
-            .add_dir_to_namespace("/in".to_owned(), File::open(indir.path()).context("open /in")?)?
+            .add_dir_to_namespace("/in", File::open(indir.path()).context("open /in")?)?
             .add_dir_to_namespace(
-                package_mount_path.clone(),
+                package_mount_path,
                 File::open(&packagedir).context("open /packages")?,
             )?
             .spawn_from_path("/pkg/bin/pm", &fuchsia_runtime::job_default())
@@ -916,10 +915,10 @@ mod tests {
         assert_eq!(pkg.meta_far_merkle, MerkleTree::from_reader(pkg.meta_far()?)?.root());
         assert_eq!(
             pkg.list_blobs()?,
-            btreeset![
+            BTreeSet::from([
                 "de210ba39b8f597cc1986c37b369c990707649f63bb8fa23b244a38274018b78".parse()?,
                 "b5b34f6234631edc7ccaa25533e2050e5d597a7331c8974306b617a3682a3197".parse()?
-            ]
+            ])
         );
 
         Ok(())
@@ -1174,6 +1173,14 @@ mod tests {
                 sub_sub_pkg_meta_far.merkle
             )])
         );
+        let (sub_pkg_meta_far, content_blobs) = sub_pkg.contents();
+        let mut expected_all_blobs = content_blobs
+            .keys()
+            .copied()
+            .chain([sub_pkg_meta_far.merkle])
+            .chain(expected_subpackage_blobs.keys().copied())
+            .collect();
+        assert_eq!(sub_pkg.list_blobs().unwrap(), expected_all_blobs);
 
         // Package with subpackage that is a superpackage.
         let pkg = PackageBuilder::new("pkg")
@@ -1182,7 +1189,6 @@ mod tests {
             .await
             .unwrap();
 
-        let (sub_pkg_meta_far, content_blobs) = sub_pkg.contents();
         expected_subpackage_blobs.insert(sub_pkg_meta_far.merkle, sub_pkg_meta_far.contents);
         expected_subpackage_blobs
             .insert(content_blobs.into_keys().next().unwrap(), b"b-blob-contents".to_vec());
@@ -1195,6 +1201,8 @@ mod tests {
                 sub_pkg_meta_far.merkle
             )])
         );
+        expected_all_blobs.insert(*pkg.meta_far_merkle_root());
+        assert_eq!(pkg.list_blobs().unwrap(), expected_all_blobs);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

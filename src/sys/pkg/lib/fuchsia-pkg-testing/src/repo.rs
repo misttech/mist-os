@@ -39,6 +39,7 @@ use {
 pub struct RepositoryBuilder<'a> {
     packages: Vec<MaybeOwned<'a, Package>>,
     repodir: Option<PathBuf>,
+    delivery_blob_type: Option<String>,
 }
 
 impl<'a> RepositoryBuilder<'a> {
@@ -49,12 +50,20 @@ impl<'a> RepositoryBuilder<'a> {
 
     /// Creates a new `RepositoryBuilder` from a template TUF repository dir.
     pub fn from_template_dir(path: impl Into<PathBuf>) -> Self {
-        Self { packages: vec![], repodir: Some(path.into()) }
+        Self { repodir: Some(path.into()), ..Self::default() }
     }
 
     /// Adds a package (or a reference to one) to the repository.
     pub fn add_package(mut self, package: impl Into<MaybeOwned<'a, Package>>) -> Self {
         self.packages.push(package.into());
+        self
+    }
+
+    /// Set the type of delivery blob to generate, if set, in addition to exposing the blobs at
+    /// "/blobs/", the repo will also expose an appropriately modified copy of each blob at
+    /// "/blobs/{type}/".
+    pub fn delivery_blob_type(mut self, delivery_blob_type: impl Into<String>) -> Self {
+        self.delivery_blob_type = Some(delivery_blob_type.into());
         self
     }
 
@@ -122,6 +131,28 @@ impl<'a> RepositoryBuilder<'a> {
 
         wait_for_process_termination(pm).await.context("waiting for pm to build repo")?;
 
+        if let Some(delivery_blob_type) = self.delivery_blob_type {
+            fs::create_dir(repodir.path().join(format!("repository/blobs/{delivery_blob_type}")))
+                .context("create delivery blob dir")?;
+            for package in &self.packages {
+                let package = package.as_ref();
+                for blob in package.list_blobs()? {
+                    let delivery_blob_path =
+                        format!("repository/blobs/{delivery_blob_type}/{blob}");
+                    if repodir.path().join(&delivery_blob_path).exists() {
+                        continue;
+                    }
+                    crate::delivery_blob::generate_delivery_blob_in_path(
+                        &repodir,
+                        format!("repository/blobs/{blob}"),
+                        &repodir,
+                        delivery_blob_path,
+                    )
+                    .await
+                    .context("generate_delivery_blob")?;
+                }
+            }
+        }
         Ok(Repository { dir: repodir })
     }
 }
@@ -176,13 +207,15 @@ pub struct Repository {
 impl Repository {
     /// Returns an iterator over all blobs contained in this repository.
     pub fn iter_blobs(&self) -> Result<impl Iterator<Item = Result<Hash, Error>>, io::Error> {
-        Ok(fs::read_dir(self.dir.path().join("repository/blobs"))?.map(|entry| {
-            Ok(entry?
-                .file_name()
-                .to_str()
-                .ok_or_else(|| format_err!("non-utf8 file path"))?
-                .parse()?)
-        }))
+        Ok(fs::read_dir(self.dir.path().join("repository/blobs"))?
+            .filter(|entry| entry.as_ref().map(|e| !e.path().is_dir()).unwrap_or(true))
+            .map(|entry| {
+                Ok(entry?
+                    .file_name()
+                    .to_str()
+                    .ok_or_else(|| format_err!("non-utf8 file path"))?
+                    .parse()?)
+            }))
     }
 
     /// Returns a set of all blobs contained in this repository.
@@ -193,6 +226,17 @@ impl Repository {
     /// Reads the contents of requested blob from the repository.
     pub fn read_blob(&self, merkle_root: &Hash) -> Result<Vec<u8>, io::Error> {
         fs::read(self.dir.path().join(format!("repository/blobs/{merkle_root}")))
+    }
+
+    /// Reads the contents of requested delivery blob from the repository.
+    pub fn read_delivery_blob(
+        &self,
+        delivery_blob_type: impl std::fmt::Display,
+        merkle_root: &Hash,
+    ) -> Result<Vec<u8>, io::Error> {
+        fs::read(
+            self.dir.path().join(format!("repository/blobs/{delivery_blob_type}/{merkle_root}")),
+        )
     }
 
     /// Returns the path of the base of the repository.
@@ -401,9 +445,10 @@ mod tests {
     use {super::*, crate::package::PackageBuilder, fuchsia_merkle::MerkleTree};
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_repo_builder() -> Result<(), Error> {
-        let same_contents = "same contents";
+    async fn test_repo_builder() {
+        let same_contents = b"same contents";
         let repo = RepositoryBuilder::new()
+            .delivery_blob_type("1")
             .add_package(
                 PackageBuilder::new("rolldice")
                     .add_resource_at("bin/rolldice", "#!/boot/bin/sh\necho 4\n".as_bytes())
@@ -413,7 +458,8 @@ mod tests {
                     )
                     .add_resource_at("data/duplicate_a", "same contents".as_bytes())
                     .build()
-                    .await?,
+                    .await
+                    .unwrap(),
             )
             .add_package(
                 PackageBuilder::new("fortune")
@@ -425,30 +471,33 @@ mod tests {
                         "meta/fortune.cml",
                         r#"{"program":{"binary":"bin/fortune"}}"#.as_bytes(),
                     )
-                    .add_resource_at("data/duplicate_b", same_contents.as_bytes())
-                    .add_resource_at("data/duplicate_c", same_contents.as_bytes())
+                    .add_resource_at("data/duplicate_b", &same_contents[..])
+                    .add_resource_at("data/duplicate_c", &same_contents[..])
                     .build()
-                    .await?,
+                    .await
+                    .unwrap(),
             )
             .build()
-            .await?;
+            .await
+            .unwrap();
 
-        let blobs = repo.list_blobs()?;
+        let blobs = repo.list_blobs().unwrap();
         // 2 meta FARs, 2 binaries, and 1 duplicated resource
         assert_eq!(blobs.len(), 5);
 
         // Spot check the contents of a blob in the repo.
-        let same_contents_merkle = MerkleTree::from_reader(same_contents.as_bytes())?.root();
-        assert_eq!(repo.read_blob(&same_contents_merkle)?.as_slice(), same_contents.as_bytes());
+        let same_contents_merkle = MerkleTree::from_reader(&same_contents[..]).unwrap().root();
+        assert_eq!(repo.read_blob(&same_contents_merkle).unwrap(), same_contents);
+        assert_eq!(
+            repo.read_delivery_blob("1", &same_contents_merkle).unwrap(),
+            crate::delivery_blob::generate_delivery_blob(same_contents).await.unwrap()
+        );
 
-        let packages = repo.list_packages()?;
-        assert_eq!(packages.len(), 2);
+        let packages = repo.list_packages().unwrap();
         assert_eq!(
             packages.into_iter().map(|pkg| pkg.path).collect::<Vec<_>>(),
             vec!["fortune/0".to_owned(), "rolldice/0".to_owned()]
         );
-
-        Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -461,10 +510,7 @@ mod tests {
             .arg("pm")?
             .arg("newrepo")?
             .arg("-repo=/repo")?
-            .add_dir_to_namespace(
-                "/repo".to_owned(),
-                File::open(repodir.path()).context("open /repo")?,
-            )?
+            .add_dir_to_namespace("/repo", File::open(repodir.path()).context("open /repo")?)?
             .spawn_from_path("/pkg/bin/pm", &fuchsia_runtime::job_default())
             .context("spawning pm to build repo")?;
         wait_for_process_termination(pm).await.context("waiting for pm to build repo")?;

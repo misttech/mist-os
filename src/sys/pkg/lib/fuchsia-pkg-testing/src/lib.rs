@@ -32,3 +32,6 @@ pub use crate::update_package::{
 mod process;
 
 pub mod blobfs;
+
+mod delivery_blob;
+pub use crate::delivery_blob::generate_delivery_blob;
