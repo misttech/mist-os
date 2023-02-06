@@ -289,11 +289,19 @@ zx::result<fbl::RefPtr<DriverHost>> CompositeDevice::GetDriverHost() {
   // The composite should be colocated if both its colocate flags from device_add_composite()
   // and the driver CML are set to true. If the CompositeDevice isn't created from
   // device_add_composite(), we will only use the colocate flag from the driver CML.
+  // TODO(fxb/121385): Remove the legacy colocate flag and the warning log once the migration
+  // is completed.
   bool should_colocate = driver_->colocate;
   if (legacy_colocate_flag_.has_value()) {
-    if (driver_->colocate != legacy_colocate_flag_.value()) {
-      LOGF(WARNING, "Inconsistent colocation flags in driver: %s", driver_.value().name());
+    if (!legacy_colocate_flag_.value() && driver_->colocate) {
+      LOGF(WARNING,
+           "Inconsistent colocation flags in driver: %s. The legacy flag is %s "
+           "whereas the Driver CML colocate value is %s. This is only an issue if you "
+           "want the driver to be co-located. See fxb/121385 for more details.",
+           driver_.value().name(), legacy_colocate_flag_.value() ? "true" : "false",
+           driver_->colocate ? "true" : "false");
     }
+
     should_colocate = driver_->colocate && legacy_colocate_flag_.value();
   }
 
